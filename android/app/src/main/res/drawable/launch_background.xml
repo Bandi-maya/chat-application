@@ -1,13 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Launch background with enlarged rounded icon -->
+<!--
+  Keep the pre-Flutter window neutral. Runtime custom images cannot be injected
+  into an APK XML drawable after installation. Chaty's first Flutter frame
+  renders the persisted bundled/custom BrandIcon instead, so startup never
+  flashes an unrelated fixed launcher asset.
+-->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@android:color/black" />
-    <item
-        android:width="120dp"
-        android:height="120dp"
-        android:gravity="center">
-        <bitmap
-            android:gravity="fill"
-            android:src="@mipmap/ic_launcher" />
-    </item>
 </layer-list>
