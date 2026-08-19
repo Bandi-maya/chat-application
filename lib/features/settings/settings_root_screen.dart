@@ -12,6 +12,7 @@ import '../../ui/core/theme/theme_controller.dart';
 import '../../ui/core/validators/chaty_validators.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/widgets/chaty_brand_icon.dart';
+import '../../ui/core/widgets/username_availability_field.dart';
 import 'appearance/app_icon_settings_screen.dart';
 import 'appearance/universal_appearance_screen.dart';
 import 'conversation/conversation_settings_page.dart';
@@ -136,12 +137,14 @@ class SettingsRootScreen extends StatelessWidget {
 
   Future<void> _showEditProfile(BuildContext context) async {
     final user = dataStore.currentUser;
+    final backend = locator<ChatyBackendService>();
     final formKey = GlobalKey<FormState>();
     final displayNameController = TextEditingController(text: user.displayName);
     final usernameController = TextEditingController(text: user.username);
     final aboutController = TextEditingController(text: user.about);
     final phoneController = TextEditingController(text: user.phone);
     var saving = false;
+    bool? usernameAvailable = true;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -152,19 +155,35 @@ class SettingsRootScreen extends StatelessWidget {
         builder: (sheetContext, setSheetState) {
           Future<void> save() async {
             if (saving || formKey.currentState?.validate() != true) return;
+            final normalized = ChatyValidators.normalizeUsername(usernameController.text);
+            final unchanged = normalized == ChatyValidators.normalizeUsername(user.username);
+            if (!unchanged && usernameAvailable != true) {
+              ScaffoldMessenger.of(sheetContext).showSnackBar(
+                const SnackBar(content: Text('Choose an available username before saving.')),
+              );
+              return;
+            }
             setSheetState(() => saving = true);
             final displayName = displayNameController.text.trim();
-            final username = usernameController.text.trim();
             final about = aboutController.text.trim();
             final phone = phoneController.text.trim();
             final updated = user.copyWith(
               displayName: displayName,
-              username: username,
+              username: normalized,
               about: about,
               phone: phone,
               avatarInitials: _initialsFor(displayName),
             );
             try {
+              if (!unchanged && !await backend.isUsernameAvailable(normalized)) {
+                if (!sheetContext.mounted) return;
+                setSheetState(() {
+                  saving = false;
+                  usernameAvailable = false;
+                });
+                formKey.currentState?.validate();
+                return;
+              }
               await dataStore.updateUser(updated);
               if (!sheetContext.mounted) return;
               Navigator.of(sheetContext).pop();
@@ -198,31 +217,35 @@ class SettingsRootScreen extends StatelessWidget {
                     const Text('Edit profile', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
                     const SizedBox(height: 4),
                     Text(
-                      'Update the profile information stored for your signed-in Chaty account.',
+                      'Update your profile. Usernames are checked live so you never submit a name that is already taken.',
                       style: Theme.of(sheetContext).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 18),
                     TextFormField(
                       controller: displayNameController,
+                      enabled: !saving,
                       textInputAction: TextInputAction.next,
                       validator: ChatyValidators.validateDisplayName,
                       decoration: const InputDecoration(labelText: 'Display name', border: OutlineInputBorder()),
                     ),
                     const SizedBox(height: 12),
-                    TextFormField(
+                    UsernameAvailabilityField(
                       controller: usernameController,
-                      textInputAction: TextInputAction.next,
-                      autocorrect: false,
-                      validator: ChatyValidators.validateUsername,
+                      backend: backend,
+                      currentUsername: user.username,
+                      enabled: !saving,
+                      onAvailabilityChanged: (value) {
+                        usernameAvailable = value;
+                      },
                       decoration: const InputDecoration(
                         labelText: 'Username',
-                        prefixText: '@',
                         border: OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: phoneController,
+                      enabled: !saving,
                       keyboardType: TextInputType.phone,
                       textInputAction: TextInputAction.next,
                       validator: (value) => value == null || value.trim().isEmpty
@@ -233,6 +256,7 @@ class SettingsRootScreen extends StatelessWidget {
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: aboutController,
+                      enabled: !saving,
                       minLines: 2,
                       maxLines: 4,
                       maxLength: 256,
