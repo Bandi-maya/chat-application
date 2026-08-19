@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../../../ui/core/theme/theme_config.dart';
 import '../../../ui/core/theme/theme_controller.dart';
+import '../../data/repositories/mock_data_store.dart';
+import '../../data/services/chaty_notification_service.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/user_profile.dart';
-import '../../data/repositories/mock_data_store.dart';
 import '../../ui/core/controllers/chaty_preferences_controller.dart';
-import '../../data/services/chaty_notification_service.dart';
 import '../../ui/core/design_system/chaty_settings_primitives.dart';
+import '../search/global_search_screen.dart';
 import 'chat_detail_screen.dart';
 import 'new_chat_screen.dart';
-import '../search/global_search_screen.dart';
 
 class ChatsHomeScreen extends StatefulWidget {
   final ThemeConfig theme;
@@ -18,6 +18,8 @@ class ChatsHomeScreen extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
   final ThemeController themeController;
   final ChatyNotificationService notificationService;
+  final ConversationType? forcedType;
+  final String? pageTitle;
 
   const ChatsHomeScreen({
     super.key,
@@ -26,6 +28,8 @@ class ChatsHomeScreen extends StatefulWidget {
     required this.preferencesController,
     required this.themeController,
     required this.notificationService,
+    this.forcedType,
+    this.pageTitle,
   });
 
   @override
@@ -107,6 +111,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     final query = _searchCtrl.text.trim().toLowerCase();
 
     final conversations = dataStore.conversations.where((conversation) {
+      if (widget.forcedType != null && conversation.type != widget.forcedType) return false;
       final matchesQuery = query.isEmpty ||
           conversation.title.toLowerCase().contains(query) ||
           conversation.lastMessageText.toLowerCase().contains(query);
@@ -125,6 +130,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
 
     final pinned = conversations.where((item) => item.isPinned && !item.isArchived).toList(growable: false);
     final recent = conversations.where((item) => !item.isPinned && !item.isArchived).toList(growable: false);
+    final filters = widget.forcedType == null
+        ? const <String>['All', 'Unread', 'Groups', 'Direct']
+        : const <String>['All', 'Unread'];
 
     return Scaffold(
       backgroundColor: theme.backgroundColor,
@@ -137,7 +145,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Chaty',
+                      widget.pageTitle ?? 'Chaty',
                       style: TextStyle(
                         color: theme.primaryTextColor,
                         fontSize: 24 * theme.fontScale,
@@ -180,7 +188,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                         onChanged: (_) => setState(() {}),
                         style: TextStyle(color: theme.primaryTextColor),
                         decoration: InputDecoration(
-                          hintText: 'Search chats and messages…',
+                          hintText: widget.forcedType == ConversationType.group
+                              ? 'Search groups…'
+                              : widget.forcedType == ConversationType.direct
+                                  ? 'Search direct chats…'
+                                  : 'Search chats and messages…',
                           hintStyle: TextStyle(color: theme.secondaryTextColor),
                           prefixIcon: Icon(Icons.search_rounded, color: theme.secondaryTextColor),
                           suffixIcon: _searchCtrl.text.isEmpty
@@ -203,14 +215,14 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                     )
                   : const SizedBox.shrink(),
             ),
-            if (homePrefs.enableStoriesStrip)
+            if (homePrefs.enableStoriesStrip && widget.forcedType != ConversationType.group)
               SizedBox(
                 height: 82,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   itemCount: dataStore.contacts.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                  separatorBuilder: (_, _) => const SizedBox(width: 10),
                   itemBuilder: (context, index) {
                     final contact = dataStore.contacts[index];
                     return SizedBox(
@@ -242,7 +254,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.fromLTRB(16, 3, 16, 8),
                 child: Row(
-                  children: <String>['All', 'Unread', 'Groups', 'Direct'].map((filter) {
+                  children: filters.map((filter) {
                     final selected = _selectedFilter == filter;
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
@@ -267,7 +279,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
             ),
             Expanded(
               child: conversations.isEmpty
-                  ? _EmptyChats(theme: theme, onSearch: () => _openGlobalSearch(theme))
+                  ? _EmptyChats(
+                      theme: theme,
+                      onSearch: () => _openGlobalSearch(theme),
+                      forcedType: widget.forcedType,
+                    )
                   : ListView(
                       padding: const EdgeInsets.fromLTRB(8, 0, 8, 96),
                       children: [
@@ -300,7 +316,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
             ),
           );
         },
-        child: const Icon(Icons.edit_rounded),
+        child: Icon(widget.forcedType == ConversationType.group ? Icons.group_add_rounded : Icons.edit_rounded),
       ),
     );
   }
@@ -472,22 +488,29 @@ class _SectionLabel extends StatelessWidget {
 class _EmptyChats extends StatelessWidget {
   final ThemeConfig theme;
   final VoidCallback onSearch;
-  const _EmptyChats({required this.theme, required this.onSearch});
+  final ConversationType? forcedType;
+  const _EmptyChats({required this.theme, required this.onSearch, this.forcedType});
 
   @override
   Widget build(BuildContext context) {
+    final isGroups = forcedType == ConversationType.group;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.chat_bubble_outline_rounded, size: 56, color: theme.accentColor),
+            Icon(isGroups ? Icons.groups_outlined : Icons.chat_bubble_outline_rounded, size: 56, color: theme.accentColor),
             const SizedBox(height: 18),
-            Text('No conversations yet', style: TextStyle(color: theme.primaryTextColor, fontSize: 18, fontWeight: FontWeight.w800)),
+            Text(
+              isGroups ? 'No groups yet' : 'No conversations yet',
+              style: TextStyle(color: theme.primaryTextColor, fontSize: 18, fontWeight: FontWeight.w800),
+            ),
             const SizedBox(height: 8),
             Text(
-              'Find a user by @username or create a group to start a conversation.',
+              isGroups
+                  ? 'Create a group or search for people to start a group conversation.'
+                  : 'Find a user by @username or create a group to start a conversation.',
               textAlign: TextAlign.center,
               style: TextStyle(color: theme.secondaryTextColor, height: 1.45),
             ),
