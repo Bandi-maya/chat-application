@@ -1,13 +1,20 @@
 package com.example.chat
 
 import android.content.ComponentName
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ShortcutInfo
+import android.content.pm.ShortcutManager
+import android.graphics.BitmapFactory
+import android.graphics.drawable.Icon
+import android.os.Build
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val launcherChannel = "chaty/launcher_icon"
+    private val customShortcutId = "chaty-custom-home"
 
     private val launcherAliases: LinkedHashMap<String, String>
         get() = linkedMapOf(
@@ -43,6 +50,27 @@ class MainActivity : FlutterActivity() {
                         result.success("original")
                     } catch (error: Exception) {
                         result.error("launcher_icon_reset_failed", error.message, null)
+                    }
+                }
+                "applyCustomHomeShortcut" -> {
+                    val imagePath = call.argument<String>("imagePath")
+                    val label = call.argument<String>("label") ?: "Chaty"
+                    if (imagePath.isNullOrBlank()) {
+                        result.error("invalid_image", "Custom icon image path is missing.", null)
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        result.success(applyCustomHomeShortcut(imagePath, label))
+                    } catch (error: Exception) {
+                        result.error("custom_shortcut_failed", error.message, null)
+                    }
+                }
+                "removeCustomHomeShortcut" -> {
+                    try {
+                        removeCustomHomeShortcut()
+                        result.success(null)
+                    } catch (error: Exception) {
+                        result.error("custom_shortcut_remove_failed", error.message, null)
                     }
                 }
                 else -> result.notImplemented()
@@ -87,5 +115,41 @@ class MainActivity : FlutterActivity() {
             }
             throw error
         }
+    }
+
+    private fun applyCustomHomeShortcut(imagePath: String, label: String): String {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return "unsupported"
+        val shortcutManager = getSystemService(ShortcutManager::class.java) ?: return "unsupported"
+        val bitmap = BitmapFactory.decodeFile(imagePath) ?: error("Unable to decode the custom icon image.")
+        val launchIntent = Intent(this, MainActivity::class.java).apply {
+            action = Intent.ACTION_VIEW
+            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+        val shortcut = ShortcutInfo.Builder(this, customShortcutId)
+            .setShortLabel(label.take(10))
+            .setLongLabel(label.take(25))
+            .setIcon(Icon.createWithAdaptiveBitmap(bitmap))
+            .setIntent(launchIntent)
+            .build()
+
+        val isAlreadyPinned = shortcutManager.pinnedShortcuts.any { it.id == customShortcutId }
+        return if (isAlreadyPinned) {
+            shortcutManager.updateShortcuts(listOf(shortcut))
+            "updated"
+        } else if (shortcutManager.isRequestPinShortcutSupported) {
+            val accepted = shortcutManager.requestPinShortcut(shortcut, null)
+            if (accepted) "requested" else "unsupported"
+        } else {
+            "unsupported"
+        }
+    }
+
+    private fun removeCustomHomeShortcut() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val shortcutManager = getSystemService(ShortcutManager::class.java) ?: return
+        shortcutManager.disableShortcuts(
+            listOf(customShortcutId),
+            "Custom Chaty shortcut removed. Add a new one from Settings if needed.",
+        )
     }
 }
