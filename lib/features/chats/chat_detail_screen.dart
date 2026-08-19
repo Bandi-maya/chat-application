@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../../ui/core/theme/theme_config.dart';
 import '../../../ui/core/theme/theme_controller.dart';
 import '../../domain/models/conversation.dart';
@@ -12,7 +13,6 @@ import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/widgets/security_chip.dart';
 import '../../ui/core/commands/chat_command_parser.dart';
 import '../messages/message_bubble.dart';
-
 import '../messages/message_action_sheet.dart';
 import '../messages/attachment_sheet.dart';
 import '../messages/media_viewer_screen.dart';
@@ -47,60 +47,90 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   ChatMessage? _replyTarget;
   bool _showQuickReplyOverlay = false;
 
+  ThemeConfig get _theme => widget.themeController?.globalTheme ?? widget.theme;
+
   @override
   void initState() {
     super.initState();
-    final conv = widget.dataStore.conversations.firstWhere(
-      (c) => c.id == widget.conversationId,
-      orElse: () => widget.dataStore.conversations.first,
-    );
-    if (conv.draftText.isNotEmpty) {
-      _textCtrl.text = conv.draftText;
+    final conversation = widget.dataStore.conversations
+        .where((item) => item.id == widget.conversationId)
+        .firstOrNull;
+    if (conversation != null && conversation.draftText.isNotEmpty) {
+      _textCtrl.text = conversation.draftText;
     }
+    widget.dataStore.ensureConversationLoaded(widget.conversationId).then((_) {
+      if (!mounted) return;
+      setState(() {});
+      _scrollToBottom();
+    }).catchError((_) {});
   }
 
   @override
   void dispose() {
+    widget.dataStore.setDraft(widget.conversationId, _textCtrl.text);
     _textCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
   }
 
-  void _sendMessage() {
+  String _senderName(String senderId) {
+    if (senderId == widget.dataStore.currentUser.id) return 'You';
+    return widget.dataStore.getUser(senderId)?.displayName ?? 'Chaty user';
+  }
+
+  String _lastSeen(UserProfile? user) {
+    if (user == null) return '';
+    if (user.presence == PresenceState.typing) return 'typing…';
+    if (user.presence == PresenceState.online) return 'online';
+    final lastSeen = user.lastSeenAt.toLocal();
+    final now = DateTime.now();
+    final difference = now.difference(lastSeen);
+    if (difference.inMinutes < 1) return 'last seen just now';
+    if (difference.inMinutes < 60) return 'last seen ${difference.inMinutes}m ago';
+    if (difference.inHours < 24 && now.day == lastSeen.day) {
+      final hour = lastSeen.hour.toString().padLeft(2, '0');
+      final minute = lastSeen.minute.toString().padLeft(2, '0');
+      return 'last seen today at $hour:$minute';
+    }
+    return 'last seen ${lastSeen.day}/${lastSeen.month}/${lastSeen.year}';
+  }
+
+  Future<void> _sendMessage() async {
     final text = _textCtrl.text.trim();
     if (text.isEmpty) return;
 
-    final parsedCommand = ChatCommandParser.parse(text);
-    if (parsedCommand.type == ChatCommandType.task) {
+    final command = ChatCommandParser.parse(text);
+    if (command.type == ChatCommandType.task) {
       _textCtrl.clear();
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (context) => TaskCreateEditModal(
-          theme: widget.theme,
-          dataStore: widget.dataStore,
-          sourceConversationId: widget.conversationId,
-          initialTitle: parsedCommand.argument.isNotEmpty ? parsedCommand.argument : null,
-        ),
-      );
+      setState(() {});
+      _openCreateTaskModal(initialTitle: command.argument.isEmpty ? null : command.argument);
       return;
     }
 
-    widget.dataStore.sendMessage(
-      conversationId: widget.conversationId,
-      text: text,
-      replyToMessageId: _replyTarget?.id,
-      replyToSenderName: _replyTarget != null ? _getSenderName(_replyTarget!.senderId) : null,
-      replyToPreviewText: _replyTarget?.text,
-    );
-
+    final reply = _replyTarget;
     _textCtrl.clear();
     setState(() {
       _replyTarget = null;
       _showQuickReplyOverlay = false;
     });
-    _scrollToBottom();
+
+    try {
+      await widget.dataStore.sendMessage(
+        conversationId: widget.conversationId,
+        text: text,
+        replyToMessageId: reply?.id,
+        replyToSenderName: reply == null ? null : _senderName(reply.senderId),
+        replyToPreviewText: reply?.text,
+      );
+      _scrollToBottom();
+    } catch (error) {
+      if (!mounted) return;
+      _textCtrl.text = text;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+      setState(() {});
+    }
   }
 
   void _scrollToBottom() {
@@ -108,65 +138,59 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       if (_scrollCtrl.hasClients) {
         _scrollCtrl.animateTo(
           _scrollCtrl.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
         );
       }
     });
   }
 
-  String _getSenderName(String senderId) {
-    if (senderId == widget.dataStore.currentUser.id) return 'You';
-    final contacts = widget.dataStore.contacts;
-    final contact = contacts.where((c) => c.id == senderId).firstOrNull;
-    return contact?.displayName ?? 'Chaty user';
-  }
-
   void _onMessageLongPress(ChatMessage message) {
-    final isMe = message.senderId == widget.dataStore.currentUser.id;
+    final theme = _theme;
+    final isMine = message.senderId == widget.dataStore.currentUser.id;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => MessageActionSheet(
+      builder: (sheetContext) => MessageActionSheet(
         message: message,
-        isMe: isMe,
-        theme: widget.theme,
+        isMe: isMine,
+        theme: theme,
         onReact: (emoji) {
           widget.dataStore.toggleReaction(widget.conversationId, message.id, emoji);
-          Navigator.of(context).pop();
+          Navigator.of(sheetContext).pop();
         },
         onReply: () {
+          Navigator.of(sheetContext).pop();
           setState(() => _replyTarget = message);
-          Navigator.of(context).pop();
         },
         onPin: () {
           widget.dataStore.togglePinMessage(widget.conversationId, message.id);
-          Navigator.of(context).pop();
+          Navigator.of(sheetContext).pop();
         },
         onStar: () {
           widget.dataStore.toggleStarMessage(widget.conversationId, message.id);
-          Navigator.of(context).pop();
+          Navigator.of(sheetContext).pop();
         },
         onCopy: () {
-          Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Message copied to clipboard')));
+          Navigator.of(sheetContext).pop();
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Message copied')));
         },
         onDeleteForMe: () {
           widget.dataStore.deleteMessage(widget.conversationId, message.id, forEveryone: false);
-          Navigator.of(context).pop();
+          Navigator.of(sheetContext).pop();
         },
-        onDeleteForEveryone: isMe
+        onDeleteForEveryone: isMine
             ? () {
                 widget.dataStore.deleteMessage(widget.conversationId, message.id, forEveryone: true);
-                Navigator.of(context).pop();
+                Navigator.of(sheetContext).pop();
               }
             : null,
         onReport: () {
-          Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Message reported')));
+          Navigator.of(sheetContext).pop();
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Report submitted')));
         },
         onCreateTask: () {
-          Navigator.of(context).pop();
+          Navigator.of(sheetContext).pop();
           _openCreateTaskModal(initialTitle: message.text, sourceMessageId: message.id);
         },
       ),
@@ -178,8 +202,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => TaskCreateEditModal(
-        theme: widget.theme,
+      builder: (_) => TaskCreateEditModal(
+        theme: _theme,
         dataStore: widget.dataStore,
         sourceConversationId: widget.conversationId,
         initialTitle: initialTitle,
@@ -195,7 +219,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         type: type,
       );
       if (attachment == null) return;
-
       await widget.dataStore.sendMessage(
         conversationId: widget.conversationId,
         text: attachment.name,
@@ -211,16 +234,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.toString().replaceFirst('Exception: ', '')),
-        ),
+        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
       );
     }
   }
 
-  void _showAttachmentUnavailable(String feature) {
+  void _showUnavailable(String feature) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$feature is not configured for this release yet.')),
+      SnackBar(content: Text('$feature is not connected to a production service yet.')),
     );
   }
 
@@ -228,27 +249,27 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => AttachmentSheet(
-        theme: widget.theme,
+      builder: (_) => AttachmentSheet(
+        theme: _theme,
         onMediaRequested: _shareMedia,
-        onLocationRequested: () => _showAttachmentUnavailable('Location sharing'),
-        onContactRequested: () => _showAttachmentUnavailable('Contact sharing'),
-        onPollRequested: () => _showAttachmentUnavailable('Poll creation'),
-        onTaskOption: () => _openCreateTaskModal(),
+        onLocationRequested: () => _showUnavailable('Location sharing'),
+        onContactRequested: () => _showUnavailable('Contact sharing'),
+        onPollRequested: () => _showUnavailable('Poll creation'),
+        onTaskOption: _openCreateTaskModal,
       ),
     );
   }
 
-  void _startMockCall(bool isVideo) {
-    final conv = widget.dataStore.conversations.firstWhere(
-      (c) => c.id == widget.conversationId,
-      orElse: () => widget.dataStore.conversations.first,
-    );
+  void _startCall(bool isVideo) {
+    final conversation = widget.dataStore.conversations
+        .where((item) => item.id == widget.conversationId)
+        .firstOrNull;
+    if (conversation == null) return;
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => MockCallScreen(
-          theme: widget.theme,
-          title: conv.title,
+        builder: (_) => MockCallScreen(
+          theme: _theme,
+          title: conversation.title,
           isVideo: isVideo,
         ),
       ),
@@ -257,50 +278,71 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = widget.theme;
+    final theme = _theme;
     final dataStore = widget.dataStore;
-    final convPrefs = widget.preferencesController.conversation;
-    final autoPrefs = widget.preferencesController.automation;
+    final conversation = dataStore.conversations
+        .where((item) => item.id == widget.conversationId)
+        .firstOrNull;
 
-    final conv = dataStore.conversations.firstWhere(
-      (c) => c.id == widget.conversationId,
-      orElse: () => dataStore.conversations.first,
-    );
+    if (conversation == null) {
+      return Scaffold(
+        backgroundColor: theme.backgroundColor,
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          leading: IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.chevron_left_rounded),
+          ),
+          title: const Text('Chat'),
+        ),
+        body: Center(child: Text('Conversation unavailable', style: TextStyle(color: theme.secondaryTextColor))),
+      );
+    }
 
-    final otherParticipant = conv.participantIds.firstWhere(
+    final otherId = conversation.participantIds.firstWhere(
       (id) => id != dataStore.currentUser.id,
       orElse: () => '',
     );
-    final otherUser = otherParticipant.isNotEmpty ? dataStore.getUser(otherParticipant) : null;
-
+    final otherUser = otherId.isEmpty ? null : dataStore.getUser(otherId);
+    final presence = conversation.type == ConversationType.direct
+        ? _lastSeen(otherUser)
+        : '${conversation.participantIds.length} participants';
     final messages = dataStore.getMessages(widget.conversationId);
-    final isTyping = dataStore.isUserTyping(widget.conversationId);
+    final autoPrefs = widget.preferencesController.automation;
 
-    Widget chatContent = Scaffold(
+    Widget chat = Scaffold(
       backgroundColor: theme.backgroundColor,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: theme.surfaceColor,
-        elevation: 1,
+        foregroundColor: theme.primaryTextColor,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0.5,
+        leading: IconButton(
+          tooltip: 'Back',
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.chevron_left_rounded),
+        ),
         titleSpacing: 0,
         title: InkWell(
-          onTap: () {
-            if (conv.type == ConversationType.group) {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => GroupInfoScreen(
-                    theme: theme,
-                    dataStore: dataStore,
-                    conversationId: widget.conversationId,
-                  ),
-                ),
-              );
-            }
-          },
+          onTap: conversation.type == ConversationType.group
+              ? () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => GroupInfoScreen(
+                        theme: theme,
+                        dataStore: dataStore,
+                        conversationId: widget.conversationId,
+                      ),
+                    ),
+                  );
+                }
+              : null,
           child: Row(
             children: [
               AppAvatar(
-                initials: conv.avatarInitials ?? conv.title.characters.take(2).toString().toUpperCase(),
-                colorHex: conv.avatarColorHex ?? '0xFF6366F1',
+                initials: conversation.avatarInitials ?? conversation.title.characters.take(2).toString().toUpperCase(),
+                colorHex: conversation.avatarColorHex ?? '0xFF6366F1',
                 size: 38,
               ),
               const SizedBox(width: 10),
@@ -310,28 +352,20 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      conv.title,
-                      style: TextStyle(
-                        color: theme.primaryTextColor,
-                        fontSize: 16 * theme.fontScale,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      conversation.title,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: theme.primaryTextColor, fontSize: 15.5 * theme.fontScale, fontWeight: FontWeight.w800),
                     ),
-                    Row(
-                      children: [
-                        if (isTyping)
-                          Text(
-                            'typing...',
-                            style: TextStyle(color: theme.accentColor, fontSize: 11.5, fontStyle: FontStyle.italic),
-                          )
-                        else if (otherUser?.presence == PresenceState.online) ...[
-                          Container(width: 7, height: 7, decoration: const BoxDecoration(color: Colors.greenAccent, shape: BoxShape.circle)),
-                          const SizedBox(width: 4),
-                          Text('Online', style: TextStyle(color: theme.secondaryTextColor, fontSize: 11.5)),
-                        ] else
-                          Text('Offline', style: TextStyle(color: theme.secondaryTextColor, fontSize: 11.5)),
-                      ],
+                    Text(
+                      presence,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: otherUser?.presence == PresenceState.online ? theme.successColor : theme.secondaryTextColor,
+                        fontSize: 10.5 * theme.fontScale,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
@@ -340,297 +374,273 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           ),
         ),
         actions: [
-          IconButton(icon: const Icon(Icons.call_rounded), onPressed: () => _startMockCall(false)),
-          IconButton(icon: const Icon(Icons.videocam_rounded), onPressed: () => _startMockCall(true)),
+          IconButton(icon: const Icon(Icons.call_rounded), tooltip: 'Voice call', onPressed: () => _startCall(false)),
+          IconButton(icon: const Icon(Icons.videocam_rounded), tooltip: 'Video call', onPressed: () => _startCall(true)),
           Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: SecurityChip(status: conv.encryptionStatus),
+            padding: const EdgeInsets.only(right: 6),
+            child: SecurityChip(status: conversation.encryptionStatus),
           ),
         ],
       ),
       body: SafeArea(
+        top: false,
         child: Column(
           children: [
             Expanded(
-              child: ListView.builder(
-                controller: _scrollCtrl,
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                itemCount: messages.length,
-                itemBuilder: (context, idx) {
-                  final msg = messages[idx];
-                  final isMe = msg.senderId == dataStore.currentUser.id;
-                  final senderName = conv.type == ConversationType.group && !isMe ? _getSenderName(msg.senderId) : null;
-                  return MessageBubble(
-                    message: msg,
-                    isMe: isMe,
-                    theme: theme,
-                    senderName: senderName,
-                    onLongPress: () => _onMessageLongPress(msg),
-                    onReactionTap: (emoji) => dataStore.toggleReaction(conv.id, msg.id, emoji),
-                    onTaskTap: msg.linkedTaskId != null ? () => _openCreateTaskModal(sourceMessageId: msg.id) : null,
-                    onMediaTap: msg.attachment != null
-                        ? () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => MediaViewerScreen(
-                                  title: msg.attachment!.name,
-                                  type: msg.attachment!.type,
-                                  size: msg.attachment!.size,
-                                  storagePath: msg.attachment!.url,
-                                  theme: theme,
-                                ),
-                              ),
-                            );
-                          }
-                        : null,
-                  );
-                },
-              ),
+              child: messages.isEmpty
+                  ? Center(
+                      child: Text('No messages yet', style: TextStyle(color: theme.secondaryTextColor)),
+                    )
+                  : ListView.builder(
+                      controller: _scrollCtrl,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: messages.length,
+                      itemBuilder: (context, index) {
+                        final message = messages[index];
+                        final isMine = message.senderId == dataStore.currentUser.id;
+                        return MessageBubble(
+                          message: message,
+                          isMe: isMine,
+                          theme: theme,
+                          senderName: conversation.type == ConversationType.group && !isMine
+                              ? _senderName(message.senderId)
+                              : null,
+                          onLongPress: () => _onMessageLongPress(message),
+                          onReactionTap: (emoji) => dataStore.toggleReaction(conversation.id, message.id, emoji),
+                          onTaskTap: message.linkedTaskId == null
+                              ? null
+                              : () => _openCreateTaskModal(sourceMessageId: message.id),
+                          onMediaTap: message.attachment == null
+                              ? null
+                              : () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => MediaViewerScreen(
+                                        title: message.attachment!.name,
+                                        type: message.attachment!.type,
+                                        size: message.attachment!.size,
+                                        storagePath: message.attachment!.url,
+                                        theme: theme,
+                                      ),
+                                    ),
+                                  );
+                                },
+                        );
+                      },
+                    ),
             ),
             if (_showQuickReplyOverlay && autoPrefs.quickReplies.isNotEmpty)
               Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                padding: const EdgeInsets.all(8),
+                margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                constraints: const BoxConstraints(maxHeight: 180),
                 decoration: BoxDecoration(
                   color: theme.cardColor,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: theme.accentColor.withValues(alpha: 0.3)),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: theme.surfaceColor),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(left: 6, bottom: 4),
-                      child: Text('QUICK REPLIES (#)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: theme.accentColor)),
-                    ),
-                    ...autoPrefs.quickReplies.map((q) {
-                      return ListTile(
-                        dense: true,
-                        title: Text('${q.shortcut} — ${q.title}', style: TextStyle(color: theme.primaryTextColor, fontSize: 13, fontWeight: FontWeight.bold)),
-                        subtitle: Text(q.content, maxLines: 1, overflow: TextOverflow.ellipsis),
-                        onTap: () {
-                          _textCtrl.text = q.content;
-                          setState(() => _showQuickReplyOverlay = false);
-                        },
-                      );
-                    }),
-                  ],
+                child: ListView(
+                  shrinkWrap: true,
+                  children: autoPrefs.quickReplies.map((reply) {
+                    return ListTile(
+                      dense: true,
+                      title: Text(
+                        '${reply.shortcut} — ${reply.title}',
+                        style: TextStyle(color: theme.primaryTextColor, fontWeight: FontWeight.w700, fontSize: 12.5),
+                      ),
+                      subtitle: Text(reply.content, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      onTap: () {
+                        _textCtrl.text = reply.content;
+                        _textCtrl.selection = TextSelection.collapsed(offset: _textCtrl.text.length);
+                        setState(() => _showQuickReplyOverlay = false);
+                      },
+                    );
+                  }).toList(growable: false),
                 ),
               ),
             if (_replyTarget != null)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                 color: theme.cardColor,
                 child: Row(
                   children: [
-                    Icon(Icons.reply_rounded, color: theme.accentColor, size: 20),
-                    const SizedBox(width: 10),
+                    Icon(Icons.reply_rounded, color: theme.accentColor, size: 18),
+                    const SizedBox(width: 9),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Replying to ${_getSenderName(_replyTarget!.senderId)}', style: TextStyle(color: theme.accentColor, fontWeight: FontWeight.bold, fontSize: 12)),
-                          Text(_replyTarget!.text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: theme.secondaryTextColor, fontSize: 12)),
+                          Text(
+                            'Replying to ${_senderName(_replyTarget!.senderId)}',
+                            style: TextStyle(color: theme.accentColor, fontSize: 11.5, fontWeight: FontWeight.w700),
+                          ),
+                          Text(
+                            _replyTarget!.text,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: theme.secondaryTextColor, fontSize: 11.5),
+                          ),
                         ],
                       ),
                     ),
-                    IconButton(icon: const Icon(Icons.close_rounded, size: 18), onPressed: () => setState(() => _replyTarget = null)),
-                  ],
-                ),
-              ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: theme.surfaceColor,
-                border: Border(
-                  top: BorderSide(
-                    color: theme.brightness == Brightness.dark
-                        ? Colors.white.withValues(alpha: 0.06)
-                        : Colors.black.withValues(alpha: 0.05),
-                    width: 1,
-                  ),
-                ),
-              ),
-              child: SafeArea(
-                top: false,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
                     IconButton(
-                      icon: const Icon(Icons.add_circle_outline_rounded),
-                      color: theme.accentColor,
-                      tooltip: 'Attach Media or File',
-                      onPressed: _openAttachmentSheet,
-                    ),
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: theme.cardColor,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: theme.brightness == Brightness.dark
-                                ? Colors.white.withValues(alpha: 0.08)
-                                : Colors.black.withValues(alpha: 0.06),
-                            width: 1,
-                          ),
-                        ),
-                        child: TextField(
-                          controller: _textCtrl,
-                          maxLines: 5,
-                          minLines: 1,
-                          style: TextStyle(
-                            color: theme.primaryTextColor,
-                            fontSize: 14.5 * theme.fontScale,
-                            height: 1.3,
-                          ),
-                          onChanged: (val) {
-                            setState(() {
-                              _showQuickReplyOverlay = val.contains('#');
-                            });
-                          },
-                          decoration: InputDecoration(
-                            hintText: 'Type a message... (try /task or #)',
-                            hintStyle: TextStyle(
-                              color: theme.secondaryTextColor.withValues(alpha: 0.65),
-                              fontSize: 13.5 * theme.fontScale,
-                            ),
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            border: InputBorder.none,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 160),
-                      transitionBuilder: (child, animation) => ScaleTransition(
-                        scale: Tween<double>(begin: 0.85, end: 1.0).animate(animation),
-                        child: FadeTransition(opacity: animation, child: child),
-                      ),
-                      child: _textCtrl.text.trim().isNotEmpty
-                          ? Container(
-                              key: const ValueKey('send_btn'),
-                              decoration: BoxDecoration(
-                                color: theme.accentColor,
-                                shape: BoxShape.circle,
-                              ),
-                              child: IconButton(
-                                style: IconButton.styleFrom(
-                                  backgroundColor: theme.accentColor,
-                                  foregroundColor: Colors.white,
-                                ),
-                                icon: const Icon(Icons.send_rounded, size: 18),
-                                onPressed: _sendMessage,
-                              ),
-                            )
-                          : Container(
-                              key: const ValueKey('mic_btn'),
-                              decoration: BoxDecoration(
-                                color: theme.accentColor.withValues(alpha: 0.15),
-                                shape: BoxShape.circle,
-                              ),
-                              child: IconButton(
-                                style: IconButton.styleFrom(
-                                  foregroundColor: theme.accentColor,
-                                ),
-                                icon: const Icon(Icons.mic_rounded, size: 20),
-                                onPressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Voice-note recording is not configured for this release.'),
-                                      duration: Duration(seconds: 2),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
+                      onPressed: () => setState(() => _replyTarget = null),
+                      icon: const Icon(Icons.close_rounded, size: 18),
                     ),
                   ],
                 ),
               ),
+            _Composer(
+              theme: theme,
+              controller: _textCtrl,
+              onAttach: _openAttachmentSheet,
+              onSend: _sendMessage,
+              onChanged: (value) {
+                widget.dataStore.setDraft(widget.conversationId, value);
+                setState(() => _showQuickReplyOverlay = value.contains('#'));
+              },
+              onVoice: () => _showUnavailable('Voice-note recording'),
             ),
           ],
         ),
       ),
     );
 
-    if (convPrefs.enableQuickContactSidebar) {
-      final contacts = dataStore.contacts;
-      return Row(
-        children: [
-          if (convPrefs.sidebarPosition == 'Left')
-            Container(
-              width: 54,
-              color: theme.surfaceColor.withValues(alpha: convPrefs.sidebarOpacity),
-              child: ListView.builder(
-                itemCount: contacts.length,
-                itemBuilder: (ctx, i) {
-                  final c = contacts[i];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: GestureDetector(
-                      onTap: () {
-                        final nextConv = dataStore.conversations.firstWhere(
-                          (cv) => cv.title.contains(c.displayName.split(' ').first),
-                          orElse: () => dataStore.conversations.first,
-                        );
-                        Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(
-                            builder: (_) => ChatDetailScreen(
-                              conversationId: nextConv.id,
-                              theme: theme,
-                              dataStore: dataStore,
-                              preferencesController: widget.preferencesController,
-                            ),
-                          ),
-                        );
-                      },
-                      child: ChatyAvatar(initials: c.avatarInitials, color: Color(int.parse(c.avatarColorHex)), size: 36),
-                    ),
-                  );
+    final conversationPrefs = widget.preferencesController.conversation;
+    if (!conversationPrefs.enableQuickContactSidebar || MediaQuery.sizeOf(context).width < 720) {
+      return chat;
+    }
+
+    final contacts = dataStore.contacts;
+    Widget sidebar() {
+      return Container(
+        width: 62,
+        color: theme.surfaceColor.withValues(alpha: conversationPrefs.sidebarOpacity),
+        child: ListView.builder(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          itemCount: contacts.length,
+          itemBuilder: (context, index) {
+            final contact = contacts[index];
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(30),
+                onTap: () async {
+                  try {
+                    final next = await dataStore.getOrCreateDirectConversation(contact);
+                    if (!mounted) return;
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (_) => ChatDetailScreen(
+                          conversationId: next.id,
+                          theme: theme,
+                          dataStore: dataStore,
+                          preferencesController: widget.preferencesController,
+                          themeController: widget.themeController,
+                        ),
+                      ),
+                    );
+                  } catch (_) {}
                 },
+                child: Center(
+                  child: ChatyAvatar(
+                    initials: contact.avatarInitials,
+                    color: Color(int.parse(contact.avatarColorHex)),
+                    size: 38,
+                  ),
+                ),
               ),
-            ),
-          Expanded(child: chatContent),
-          if (convPrefs.sidebarPosition == 'Right')
-            Container(
-              width: 54,
-              color: theme.surfaceColor.withValues(alpha: convPrefs.sidebarOpacity),
-              child: ListView.builder(
-                itemCount: contacts.length,
-                itemBuilder: (ctx, i) {
-                  final c = contacts[i];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: GestureDetector(
-                      onTap: () {
-                        final nextConv = dataStore.conversations.firstWhere(
-                          (cv) => cv.title.contains(c.displayName.split(' ').first),
-                          orElse: () => dataStore.conversations.first,
-                        );
-                        Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(
-                            builder: (_) => ChatDetailScreen(
-                              conversationId: nextConv.id,
-                              theme: theme,
-                              dataStore: dataStore,
-                              preferencesController: widget.preferencesController,
-                            ),
-                          ),
-                        );
-                      },
-                      child: ChatyAvatar(initials: c.avatarInitials, color: Color(int.parse(c.avatarColorHex)), size: 36),
-                    ),
-                  );
-                },
-              ),
-            ),
-        ],
+            );
+          },
+        ),
       );
     }
 
-    return chatContent;
+    return Row(
+      children: [
+        if (conversationPrefs.sidebarPosition == 'Left') sidebar(),
+        Expanded(child: chat),
+        if (conversationPrefs.sidebarPosition == 'Right') sidebar(),
+      ],
+    );
+  }
+}
+
+class _Composer extends StatelessWidget {
+  final ThemeConfig theme;
+  final TextEditingController controller;
+  final VoidCallback onAttach;
+  final VoidCallback onSend;
+  final VoidCallback onVoice;
+  final ValueChanged<String> onChanged;
+
+  const _Composer({
+    required this.theme,
+    required this.controller,
+    required this.onAttach,
+    required this.onSend,
+    required this.onVoice,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(6, 7, 7, 7),
+      decoration: BoxDecoration(
+        color: theme.surfaceColor,
+        border: Border(top: BorderSide(color: theme.cardColor)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            IconButton(
+              tooltip: 'Attach',
+              color: theme.accentColor,
+              onPressed: onAttach,
+              icon: const Icon(Icons.add_circle_outline_rounded),
+            ),
+            Expanded(
+              child: TextField(
+                controller: controller,
+                minLines: 1,
+                maxLines: 5,
+                onChanged: onChanged,
+                style: TextStyle(color: theme.primaryTextColor, fontSize: 14 * theme.fontScale),
+                decoration: InputDecoration(
+                  hintText: 'Message…  /task or #reply',
+                  hintStyle: TextStyle(color: theme.secondaryTextColor),
+                  filled: true,
+                  fillColor: theme.cardColor,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: BorderSide.none,
+                  ),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: controller,
+              builder: (context, value, _) {
+                final hasText = value.text.trim().isNotEmpty;
+                return IconButton.filled(
+                  tooltip: hasText ? 'Send' : 'Voice note',
+                  style: IconButton.styleFrom(
+                    backgroundColor: theme.accentColor,
+                    foregroundColor: theme.onAccentColor,
+                  ),
+                  onPressed: hasText ? onSend : onVoice,
+                  icon: Icon(hasText ? Icons.send_rounded : Icons.mic_rounded, size: 19),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

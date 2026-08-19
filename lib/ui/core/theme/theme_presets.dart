@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'theme_config.dart';
 
 class ThemePresets {
-  // 0. Monochrome Dark (Pure Minimalist Black & White Dark Theme - Default)
   static const ThemeConfig monochromeDark = ThemeConfig(
     id: 'monochrome_dark',
     name: 'Monochrome Dark',
@@ -26,7 +25,6 @@ class ThemePresets {
     wallpaperId: 'none',
   );
 
-  // 0. Monochrome Light (Pure Minimalist Black & White Light Theme - Default)
   static const ThemeConfig monochromeLight = ThemeConfig(
     id: 'monochrome_light',
     name: 'Monochrome Light',
@@ -50,19 +48,18 @@ class ThemePresets {
     wallpaperId: 'none',
   );
 
-  // 1. Midnight (Dark Navy & Neon Cyan/Indigo)
   static const ThemeConfig midnight = ThemeConfig(
     id: 'midnight',
     name: 'Midnight',
     brightness: Brightness.dark,
-    accentColor: Color(0xFF6366F1), // Electric Indigo
-    backgroundColor: Color(0xFF0B0F19), // Deep Dark Navy
-    surfaceColor: Color(0xFF111827), // Midnight Slate
-    cardColor: Color(0xFF1E293B), // Card Surface
+    accentColor: Color(0xFF6366F1),
+    backgroundColor: Color(0xFF0B0F19),
+    surfaceColor: Color(0xFF111827),
+    cardColor: Color(0xFF1E293B),
     primaryTextColor: Color(0xFFF9FAFB),
     secondaryTextColor: Color(0xFF94A3B8),
-    outgoingBubbleColor: Color(0xFF4F46E5), // Vivid Indigo
-    incomingBubbleColor: Color(0xFF1E293B), // Slate Bubble
+    outgoingBubbleColor: Color(0xFF4F46E5),
+    incomingBubbleColor: Color(0xFF1E293B),
     outgoingTextColor: Color(0xFFFFFFFF),
     incomingTextColor: Color(0xFFF1F5F9),
     linkColor: Color(0xFF38BDF8),
@@ -74,19 +71,18 @@ class ThemePresets {
     wallpaperId: 'subtle_dots',
   );
 
-  // 2. Paper (Clean Warm Minimalist Light Theme)
   static const ThemeConfig paper = ThemeConfig(
     id: 'paper',
     name: 'Paper',
     brightness: Brightness.light,
-    accentColor: Color(0xFF0F172A), // Dark Ink
-    backgroundColor: Color(0xFFF8FAFC), // Off-white
+    accentColor: Color(0xFF0F172A),
+    backgroundColor: Color(0xFFF8FAFC),
     surfaceColor: Color(0xFFFFFFFF),
     cardColor: Color(0xFFFFFFFF),
     primaryTextColor: Color(0xFF0F172A),
     secondaryTextColor: Color(0xFF64748B),
-    outgoingBubbleColor: Color(0xFF0F172A), // Ink bubble
-    incomingBubbleColor: Color(0xFFE2E8F0), // Soft gray
+    outgoingBubbleColor: Color(0xFF0F172A),
+    incomingBubbleColor: Color(0xFFE2E8F0),
     outgoingTextColor: Color(0xFFFFFFFF),
     incomingTextColor: Color(0xFF0F172A),
     linkColor: Color(0xFF2563EB),
@@ -98,14 +94,13 @@ class ThemePresets {
     wallpaperId: 'none',
   );
 
-  // 3. Ocean (Teal & Deep Blue)
   static const ThemeConfig ocean = ThemeConfig(
     id: 'ocean',
     name: 'Ocean',
     brightness: Brightness.dark,
-    accentColor: Color(0xFF06B6D4), // Cyan
-    backgroundColor: Color(0xFF071A2E), // Deep Marine
-    surfaceColor: Color(0xFF0B2942), // Ocean Surface
+    accentColor: Color(0xFF06B6D4),
+    backgroundColor: Color(0xFF071A2E),
+    surfaceColor: Color(0xFF0B2942),
     cardColor: Color(0xFF113857),
     primaryTextColor: Color(0xFFECFEFF),
     secondaryTextColor: Color(0xFF7DD3FC),
@@ -122,14 +117,13 @@ class ThemePresets {
     wallpaperId: 'constellation',
   );
 
-  // 4. Sunset (Warm Violet, Rose & Amber)
   static const ThemeConfig sunset = ThemeConfig(
     id: 'sunset',
     name: 'Sunset',
     brightness: Brightness.dark,
-    accentColor: Color(0xFFF43F5E), // Rose Coral
-    backgroundColor: Color(0xFF1C1326), // Deep Plum
-    surfaceColor: Color(0xFF2B1C3A), // Dark Amethyst
+    accentColor: Color(0xFFF43F5E),
+    backgroundColor: Color(0xFF1C1326),
+    surfaceColor: Color(0xFF2B1C3A),
     cardColor: Color(0xFF3B274F),
     primaryTextColor: Color(0xFFFFF1F2),
     secondaryTextColor: Color(0xFFFDA4AF),
@@ -146,13 +140,12 @@ class ThemePresets {
     wallpaperId: 'gradient_mesh',
   );
 
-  // 5. Forest (Emerald & Dark Moss)
   static const ThemeConfig forest = ThemeConfig(
     id: 'forest',
     name: 'Forest',
     brightness: Brightness.dark,
-    accentColor: Color(0xFF10B981), // Emerald
-    backgroundColor: Color(0xFF091E15), // Deep Forest
+    accentColor: Color(0xFF10B981),
+    backgroundColor: Color(0xFF091E15),
     surfaceColor: Color(0xFF0E2E20),
     cardColor: Color(0xFF15402D),
     primaryTextColor: Color(0xFFECFDF5),
@@ -170,13 +163,12 @@ class ThemePresets {
     wallpaperId: 'geometric',
   );
 
-  // 6. High Contrast (Accessible Pure Contrast)
   static const ThemeConfig highContrast = ThemeConfig(
     id: 'high_contrast',
     name: 'High Contrast',
     brightness: Brightness.dark,
-    accentColor: Color(0xFFFFFF00), // Pure Yellow
-    backgroundColor: Color(0xFF000000), // Pure Black
+    accentColor: Color(0xFFFFFF00),
+    backgroundColor: Color(0xFF000000),
     surfaceColor: Color(0xFF121212),
     cardColor: Color(0xFF1E1E1E),
     primaryTextColor: Color(0xFFFFFFFF),
@@ -195,7 +187,6 @@ class ThemePresets {
     wallpaperId: 'none',
   );
 
-  // 7. Graphite (Monochrome Dark Charcoal)
   static const ThemeConfig graphite = ThemeConfig(
     id: 'graphite',
     name: 'Graphite',
@@ -216,7 +207,6 @@ class ThemePresets {
     cornerRadius: 12.0,
   );
 
-  // 8. Lavender (Soft Purple Light Theme)
   static const ThemeConfig lavender = ThemeConfig(
     id: 'lavender',
     name: 'Lavender',
@@ -237,7 +227,6 @@ class ThemePresets {
     cornerRadius: 18.0,
   );
 
-  // 9. Rose (Blush Pink Light Theme)
   static const ThemeConfig rose = ThemeConfig(
     id: 'rose',
     name: 'Rose',
@@ -258,7 +247,6 @@ class ThemePresets {
     cornerRadius: 18.0,
   );
 
-  // 10. Coffee (Warm Cozy Espresso Theme)
   static const ThemeConfig coffee = ThemeConfig(
     id: 'coffee',
     name: 'Coffee',
@@ -279,7 +267,6 @@ class ThemePresets {
     cornerRadius: 16.0,
   );
 
-  // 11. Arctic (Crisp Glacier Blue Light Theme)
   static const ThemeConfig arctic = ThemeConfig(
     id: 'arctic',
     name: 'Arctic',
@@ -300,7 +287,6 @@ class ThemePresets {
     cornerRadius: 16.0,
   );
 
-  // 12. AMOLED (Pure OLED Pitch Black)
   static const ThemeConfig amoled = ThemeConfig(
     id: 'amoled',
     name: 'AMOLED',
@@ -321,7 +307,6 @@ class ThemePresets {
     cornerRadius: 14.0,
   );
 
-  // 13. Warm Neutral (Soft Sand Beige Theme)
   static const ThemeConfig warmNeutral = ThemeConfig(
     id: 'warm_neutral',
     name: 'Warm Neutral',
@@ -342,7 +327,107 @@ class ThemePresets {
     cornerRadius: 16.0,
   );
 
-  static const List<ThemeConfig> all = [
+  static const ThemeConfig cobalt = ThemeConfig(
+    id: 'cobalt',
+    name: 'Cobalt',
+    brightness: Brightness.dark,
+    accentColor: Color(0xFF60A5FA),
+    backgroundColor: Color(0xFF07111F),
+    surfaceColor: Color(0xFF0D1D33),
+    cardColor: Color(0xFF142A47),
+    primaryTextColor: Color(0xFFF8FBFF),
+    secondaryTextColor: Color(0xFF9CC5F1),
+    outgoingBubbleColor: Color(0xFF2563EB),
+    incomingBubbleColor: Color(0xFF17304F),
+    outgoingTextColor: Color(0xFFFFFFFF),
+    incomingTextColor: Color(0xFFF3F8FF),
+    linkColor: Color(0xFF93C5FD),
+    dangerColor: Color(0xFFF87171),
+    successColor: Color(0xFF34D399),
+    cornerRadius: 17.0,
+  );
+
+  static const ThemeConfig sage = ThemeConfig(
+    id: 'sage',
+    name: 'Sage',
+    brightness: Brightness.light,
+    accentColor: Color(0xFF3F6550),
+    backgroundColor: Color(0xFFF4F7F2),
+    surfaceColor: Color(0xFFFFFFFF),
+    cardColor: Color(0xFFE6EEE8),
+    primaryTextColor: Color(0xFF173326),
+    secondaryTextColor: Color(0xFF52695C),
+    outgoingBubbleColor: Color(0xFF3F6550),
+    incomingBubbleColor: Color(0xFFDCE8DF),
+    outgoingTextColor: Color(0xFFFFFFFF),
+    incomingTextColor: Color(0xFF173326),
+    linkColor: Color(0xFF2E6B4A),
+    dangerColor: Color(0xFFB42318),
+    successColor: Color(0xFF287A4B),
+    cornerRadius: 18.0,
+  );
+
+  static const ThemeConfig burgundy = ThemeConfig(
+    id: 'burgundy',
+    name: 'Burgundy',
+    brightness: Brightness.dark,
+    accentColor: Color(0xFFFB7185),
+    backgroundColor: Color(0xFF1A0B10),
+    surfaceColor: Color(0xFF291119),
+    cardColor: Color(0xFF3B1923),
+    primaryTextColor: Color(0xFFFFF7F8),
+    secondaryTextColor: Color(0xFFE8A1AE),
+    outgoingBubbleColor: Color(0xFF9F1239),
+    incomingBubbleColor: Color(0xFF3A1721),
+    outgoingTextColor: Color(0xFFFFFFFF),
+    incomingTextColor: Color(0xFFFFF1F3),
+    linkColor: Color(0xFFFDA4AF),
+    dangerColor: Color(0xFFFF6B6B),
+    successColor: Color(0xFF4ADE80),
+    cornerRadius: 18.0,
+  );
+
+  static const ThemeConfig daylight = ThemeConfig(
+    id: 'daylight',
+    name: 'Daylight',
+    brightness: Brightness.light,
+    accentColor: Color(0xFF1D4ED8),
+    backgroundColor: Color(0xFFFFFEFA),
+    surfaceColor: Color(0xFFFFFFFF),
+    cardColor: Color(0xFFF1F5F9),
+    primaryTextColor: Color(0xFF111827),
+    secondaryTextColor: Color(0xFF586174),
+    outgoingBubbleColor: Color(0xFF1D4ED8),
+    incomingBubbleColor: Color(0xFFE8EEF7),
+    outgoingTextColor: Color(0xFFFFFFFF),
+    incomingTextColor: Color(0xFF111827),
+    linkColor: Color(0xFF1D4ED8),
+    dangerColor: Color(0xFFB91C1C),
+    successColor: Color(0xFF15803D),
+    cornerRadius: 14.0,
+  );
+
+  static const ThemeConfig violetNight = ThemeConfig(
+    id: 'violet_night',
+    name: 'Violet Night',
+    brightness: Brightness.dark,
+    accentColor: Color(0xFFA78BFA),
+    backgroundColor: Color(0xFF100D1A),
+    surfaceColor: Color(0xFF191428),
+    cardColor: Color(0xFF28203E),
+    primaryTextColor: Color(0xFFF8F5FF),
+    secondaryTextColor: Color(0xFFC4B5FD),
+    outgoingBubbleColor: Color(0xFF7C3AED),
+    incomingBubbleColor: Color(0xFF2A2141),
+    outgoingTextColor: Color(0xFFFFFFFF),
+    incomingTextColor: Color(0xFFF5F3FF),
+    linkColor: Color(0xFFC4B5FD),
+    dangerColor: Color(0xFFFB7185),
+    successColor: Color(0xFF34D399),
+    cornerRadius: 20.0,
+  );
+
+  static const List<ThemeConfig> all = <ThemeConfig>[
     monochromeDark,
     monochromeLight,
     midnight,
@@ -358,14 +443,19 @@ class ThemePresets {
     arctic,
     amoled,
     warmNeutral,
+    cobalt,
+    sage,
+    burgundy,
+    daylight,
+    violetNight,
   ];
 
   static ThemeConfig getSystemDefaultTheme([Brightness? platformBrightness]) {
-    final b = platformBrightness ?? WidgetsBinding.instance.platformDispatcher.platformBrightness;
-    return b == Brightness.light ? monochromeLight : monochromeDark;
+    final brightness = platformBrightness ?? WidgetsBinding.instance.platformDispatcher.platformBrightness;
+    return brightness == Brightness.light ? monochromeLight : monochromeDark;
   }
 
   static ThemeConfig getById(String id) {
-    return all.firstWhere((t) => t.id == id, orElse: () => monochromeDark);
+    return all.firstWhere((theme) => theme.id == id, orElse: () => monochromeDark);
   }
 }

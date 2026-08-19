@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../../ui/core/theme/theme_config.dart';
 import '../../../ui/core/theme/theme_controller.dart';
 import '../../domain/models/conversation.dart';
@@ -10,7 +11,6 @@ import '../../ui/core/design_system/chaty_settings_primitives.dart';
 import 'chat_detail_screen.dart';
 import 'new_chat_screen.dart';
 import '../search/global_search_screen.dart';
-
 
 class ChatsHomeScreen extends StatefulWidget {
   final ThemeConfig theme;
@@ -34,76 +34,69 @@ class ChatsHomeScreen extends StatefulWidget {
 
 class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
-  String _selectedFilter = 'All'; // 'All', 'Unread', 'Groups', 'Direct'
+  final FocusNode _searchFocus = FocusNode();
+  String _selectedFilter = 'All';
   bool _isSearchOpen = false;
 
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
-  void _showShortcutsMenu() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: widget.theme.surfaceColor,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Quick Shortcuts', style: TextStyle(color: widget.theme.primaryTextColor, fontSize: 17, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                ListTile(
-                  leading: const Icon(Icons.qr_code_2_rounded, color: Colors.blueAccent),
-                  title: const Text('My Safety Number QR Code'),
-                  subtitle: const Text('View and share your identity key'),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Safety Number: 58291 04928 11948 29384')));
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.group_add_rounded, color: Colors.greenAccent),
-                  title: const Text('Create New Group'),
-                  subtitle: const Text('Start an encrypted group conversation'),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => NewChatScreen(theme: widget.theme, dataStore: widget.dataStore, preferencesController: widget.preferencesController)));
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.lock_reset_rounded, color: Colors.purpleAccent),
-                  title: const Text('Instant Ghost Lock'),
-                  subtitle: const Text('Hide previews and activate ghost security'),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    widget.preferencesController.updateHome(widget.preferencesController.home.copyWith(ghostMode: true));
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ghost Mode activated.')));
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+  void _toggleSearch() {
+    setState(() {
+      _isSearchOpen = !_isSearchOpen;
+      if (!_isSearchOpen) _searchCtrl.clear();
+    });
+    if (_isSearchOpen) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _searchFocus.requestFocus());
+    } else {
+      _searchFocus.unfocus();
+    }
   }
 
-  String _formatTime(DateTime dt) {
+  String _formatMessageTime(DateTime value) {
     final now = DateTime.now();
-    if (now.difference(dt).inDays == 0) {
-      final hour = dt.hour.toString().padLeft(2, '0');
-      final min = dt.minute.toString().padLeft(2, '0');
-      return '$hour:$min';
-    } else if (now.difference(dt).inDays == 1) {
-      return 'Yesterday';
-    } else {
-      return '${dt.day}/${dt.month}';
+    final local = value.toLocal();
+    final difference = now.difference(local);
+    if (difference.inDays == 0 && now.day == local.day) {
+      final hour = local.hour.toString().padLeft(2, '0');
+      final minute = local.minute.toString().padLeft(2, '0');
+      return '$hour:$minute';
     }
+    if (difference.inDays <= 1) return 'Yesterday';
+    return '${local.day}/${local.month}';
+  }
+
+  String _formatLastSeen(UserProfile? user) {
+    if (user == null) return '';
+    if (user.presence == PresenceState.online || user.presence == PresenceState.typing) return 'online';
+    final value = user.lastSeenAt.toLocal();
+    final now = DateTime.now();
+    final difference = now.difference(value);
+    if (difference.inMinutes < 1) return 'last seen just now';
+    if (difference.inMinutes < 60) return 'last seen ${difference.inMinutes}m ago';
+    if (difference.inHours < 24 && now.day == value.day) {
+      final hour = value.hour.toString().padLeft(2, '0');
+      final minute = value.minute.toString().padLeft(2, '0');
+      return 'last seen $hour:$minute';
+    }
+    return 'last seen ${value.day}/${value.month}';
+  }
+
+  void _openGlobalSearch(ThemeConfig theme) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => GlobalSearchScreen(
+          theme: theme,
+          dataStore: widget.dataStore,
+          preferencesController: widget.preferencesController,
+          themeController: widget.themeController,
+        ),
+      ),
+    );
   }
 
   @override
@@ -111,154 +104,131 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     final theme = widget.themeController.globalTheme;
     final dataStore = widget.dataStore;
     final homePrefs = widget.preferencesController.home;
+    final query = _searchCtrl.text.trim().toLowerCase();
 
-    final allConversations = dataStore.conversations.where((c) {
-      final query = _searchCtrl.text.trim().toLowerCase();
-      final matchQuery = query.isEmpty ||
-          c.title.toLowerCase().contains(query) ||
-          c.lastMessageText.toLowerCase().contains(query);
+    final conversations = dataStore.conversations.where((conversation) {
+      final matchesQuery = query.isEmpty ||
+          conversation.title.toLowerCase().contains(query) ||
+          conversation.lastMessageText.toLowerCase().contains(query);
+      if (!matchesQuery) return false;
+      switch (_selectedFilter) {
+        case 'Unread':
+          return conversation.unreadCount > 0;
+        case 'Groups':
+          return conversation.type == ConversationType.group;
+        case 'Direct':
+          return conversation.type == ConversationType.direct;
+        default:
+          return true;
+      }
+    }).toList(growable: false);
 
-      if (!matchQuery) return false;
-
-      if (_selectedFilter == 'Unread') return c.unreadCount > 0;
-      if (_selectedFilter == 'Groups' || homePrefs.separateChatsAndGroups) return c.type == ConversationType.group;
-      if (_selectedFilter == 'Direct') return c.type == ConversationType.direct;
-      return true; // All
-    }).toList();
-
-    final pinned = allConversations.where((c) => c.isPinned && !c.isArchived).toList();
-    final recent = allConversations.where((c) => !c.isPinned && !c.isArchived).toList();
+    final pinned = conversations.where((item) => item.isPinned && !item.isArchived).toList(growable: false);
+    final recent = conversations.where((item) => !item.isPinned && !item.isArchived).toList(growable: false);
 
     return Scaffold(
       backgroundColor: theme.backgroundColor,
       body: SafeArea(
         child: Column(
           children: [
-            // Top App Bar
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              padding: const EdgeInsets.fromLTRB(16, 8, 10, 6),
               child: Row(
                 children: [
-                  Text(
-                    'Chaty',
-                    style: TextStyle(
-                      color: theme.primaryTextColor,
-                      fontSize: 24 * theme.fontScale,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
+                  Expanded(
+                    child: Text(
+                      'Chaty',
+                      style: TextStyle(
+                        color: theme.primaryTextColor,
+                        fontSize: 24 * theme.fontScale,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
                     ),
                   ),
-                  const Spacer(),
                   if (homePrefs.showCameraIcon)
                     IconButton(
-                      icon: const Icon(Icons.camera_alt_outlined),
                       tooltip: 'Camera',
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Quick camera launch simulation')),
-                        );
-                      },
-                    ),
-                  IconButton(
-                    icon: const Icon(Icons.qr_code_scanner_rounded),
-                    tooltip: 'QR & Shortcuts',
-                    onPressed: _showShortcutsMenu,
-                  ),
-                  IconButton(
-                    icon: Icon(_isSearchOpen ? Icons.close_rounded : Icons.search_rounded),
-                    tooltip: 'Search Chats',
-                    onPressed: () {
-                      setState(() {
-                        _isSearchOpen = !_isSearchOpen;
-                        if (!_isSearchOpen) {
-                          _searchCtrl.clear();
-                        }
-                      });
-                    },
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      theme.brightness == Brightness.dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
                       color: theme.primaryTextColor,
+                      onPressed: () => _openGlobalSearch(theme),
+                      icon: const Icon(Icons.camera_alt_outlined),
                     ),
-                    tooltip: 'Toggle Dark / Light Mode',
-                    onPressed: () {
-                      widget.themeController.toggleBrightness();
-                    },
+                  IconButton(
+                    tooltip: _isSearchOpen ? 'Close search' : 'Search chats',
+                    color: theme.primaryTextColor,
+                    onPressed: _toggleSearch,
+                    icon: Icon(_isSearchOpen ? Icons.close_rounded : Icons.search_rounded),
+                  ),
+                  IconButton(
+                    tooltip: 'Toggle light / dark',
+                    color: theme.primaryTextColor,
+                    onPressed: widget.themeController.toggleBrightness,
+                    icon: Icon(theme.brightness == Brightness.dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded),
                   ),
                 ],
               ),
             ),
-
-            // Search Bar Input Box (Shown when search icon is clicked)
-            if (_isSearchOpen)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-                child: TextField(
-                  controller: _searchCtrl,
-                  autofocus: true,
-                  onChanged: (_) => setState(() {}),
-                  style: TextStyle(color: theme.primaryTextColor, fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: 'Search chats, contacts, or messages...',
-                    hintStyle: TextStyle(color: theme.secondaryTextColor),
-                    filled: true,
-                    fillColor: theme.surfaceColor,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    prefixIcon: Icon(Icons.search, color: theme.secondaryTextColor, size: 20),
-                    suffixIcon: _searchCtrl.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
-                            onPressed: () => setState(() => _searchCtrl.clear()),
-                          )
-                        : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-              ),
-
-            // Instagram-like Stories Strip
-            if (homePrefs.enableStoriesStrip) ...[
+            AnimatedSize(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              child: _isSearchOpen
+                  ? Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+                      child: TextField(
+                        controller: _searchCtrl,
+                        focusNode: _searchFocus,
+                        onChanged: (_) => setState(() {}),
+                        style: TextStyle(color: theme.primaryTextColor),
+                        decoration: InputDecoration(
+                          hintText: 'Search chats and messages…',
+                          hintStyle: TextStyle(color: theme.secondaryTextColor),
+                          prefixIcon: Icon(Icons.search_rounded, color: theme.secondaryTextColor),
+                          suffixIcon: _searchCtrl.text.isEmpty
+                              ? null
+                              : IconButton(
+                                  onPressed: () {
+                                    _searchCtrl.clear();
+                                    setState(() {});
+                                  },
+                                  icon: const Icon(Icons.close_rounded),
+                                ),
+                          filled: true,
+                          fillColor: theme.cardColor,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(theme.cornerRadius),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+            if (homePrefs.enableStoriesStrip)
               SizedBox(
-                height: 86,
-                child: ListView.builder(
+                height: 82,
+                child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
                   itemCount: dataStore.contacts.length,
-                  itemBuilder: (context, idx) {
-                    final contact = dataStore.contacts[idx];
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                  itemBuilder: (context, index) {
+                    final contact = dataStore.contacts[index];
+                    return SizedBox(
+                      width: 58,
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(2.5),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: const LinearGradient(
-                                colors: [Colors.pinkAccent, Colors.purpleAccent, Colors.amberAccent],
-                              ),
-                            ),
-                            child: ChatyAvatar(
-                              initials: contact.avatarInitials,
-                              color: Color(int.parse(contact.avatarColorHex)),
-                              size: 48,
-                              shape: homePrefs.avatarShape,
-                            ),
+                          ChatyAvatar(
+                            initials: contact.avatarInitials,
+                            color: Color(int.parse(contact.avatarColorHex)),
+                            size: 48,
+                            shape: homePrefs.avatarShape,
                           ),
                           const SizedBox(height: 4),
                           Text(
                             contact.displayName.split(' ').first,
-                            style: TextStyle(
-                              fontSize: 11 * theme.fontScale,
-                              color: theme.secondaryTextColor,
-                              fontWeight: FontWeight.w500,
-                            ),
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: theme.secondaryTextColor, fontSize: 10.5),
                           ),
                         ],
                       ),
@@ -266,173 +236,49 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   },
                 ),
               ),
-              const SizedBox(height: 4),
-            ],
-
-            // Search Bar
-            if (homePrefs.showSearchBar)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-                child: TextField(
-                  controller: _searchCtrl,
-                  onChanged: (val) => setState(() {}),
-                  style: TextStyle(color: theme.primaryTextColor, fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: 'Search chats and messages...',
-                    hintStyle: TextStyle(color: theme.secondaryTextColor.withValues(alpha: 0.8), fontSize: 13.5),
-                    prefixIcon: Icon(Icons.search_rounded, color: theme.secondaryTextColor, size: 20),
-                    filled: true,
-                    fillColor: theme.cardColor,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(theme.cornerRadius),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-              ),
-
-            // Filter Chips Row (Left-aligned)
             Align(
               alignment: Alignment.centerLeft,
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 2.0, bottom: 8.0),
+                padding: const EdgeInsets.fromLTRB(16, 3, 16, 8),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: ['All', 'Unread', 'Groups', 'Direct'].map((filter) {
-                    final isSel = _selectedFilter == filter;
+                  children: <String>['All', 'Unread', 'Groups', 'Direct'].map((filter) {
+                    final selected = _selectedFilter == filter;
                     return Padding(
-                      padding: const EdgeInsets.only(right: 8.0),
+                      padding: const EdgeInsets.only(right: 8),
                       child: ChoiceChip(
                         label: Text(filter),
-                        selected: isSel,
-                        selectedColor: theme.accentColor.withValues(alpha: 0.25),
+                        selected: selected,
+                        selectedColor: theme.accentColor.withValues(alpha: 0.18),
                         backgroundColor: theme.cardColor,
+                        side: BorderSide(color: selected ? theme.accentColor.withValues(alpha: 0.35) : theme.surfaceColor),
                         labelStyle: TextStyle(
-                          color: isSel ? theme.accentColor : theme.secondaryTextColor,
-                          fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                          fontSize: 12.5,
+                          color: selected ? theme.accentColor : theme.secondaryTextColor,
+                          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                         ),
-                        onSelected: (val) {
-                          if (val) setState(() => _selectedFilter = filter);
+                        onSelected: (value) {
+                          if (value) setState(() => _selectedFilter = filter);
                         },
                       ),
                     );
-                  }).toList(),
+                  }).toList(growable: false),
                 ),
               ),
             ),
-
-            // Chat List
             Expanded(
-              child: allConversations.isEmpty
-                  ? Center(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(28.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(24),
-                              decoration: BoxDecoration(
-                                color: theme.accentColor.withValues(alpha: 0.12),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.chat_bubble_outline_rounded,
-                                size: 54,
-                                color: theme.accentColor,
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            Text(
-                              'No conversations yet',
-                              style: TextStyle(
-                                color: theme.primaryTextColor,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Search for any user by @username or create a new group to start communicating.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: theme.secondaryTextColor,
-                                fontSize: 13.5,
-                                height: 1.4,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            ElevatedButton.icon(
-                              onPressed: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => GlobalSearchScreen(
-                                      theme: theme,
-                                      dataStore: dataStore,
-                                      preferencesController: widget.preferencesController,
-                                      themeController: widget.themeController,
-                                    ),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(Icons.search_rounded, size: 18),
-                              label: const Text('Discover by @username'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: theme.accentColor,
-                                foregroundColor: theme.onAccentColor,
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
+              child: conversations.isEmpty
+                  ? _EmptyChats(theme: theme, onSearch: () => _openGlobalSearch(theme))
                   : ListView(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-
+                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 96),
                       children: [
                         if (pinned.isNotEmpty) ...[
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
-                            child: Row(
-                              children: [
-                                Icon(Icons.push_pin_rounded, size: 14, color: theme.accentColor),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'PINNED CHATS',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.accentColor,
-                                    letterSpacing: 0.8,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          ...pinned.map((c) => _buildConversationTile(context, c, theme, dataStore)),
-                          const SizedBox(height: 8),
+                          _SectionLabel(label: 'PINNED', theme: theme),
+                          ...pinned.map((conversation) => _conversationTile(conversation, theme)),
+                          const SizedBox(height: 6),
                         ],
                         if (recent.isNotEmpty) ...[
-                          if (pinned.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
-                              child: Text(
-                                'ALL MESSAGES',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: theme.secondaryTextColor,
-                                  letterSpacing: 0.8,
-                                ),
-                              ),
-                            ),
-                          ...recent.map((c) => _buildConversationTile(context, c, theme, dataStore)),
+                          if (pinned.isNotEmpty) _SectionLabel(label: 'MESSAGES', theme: theme),
+                          ...recent.map((conversation) => _conversationTile(conversation, theme)),
                         ],
                       ],
                     ),
@@ -446,7 +292,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         onPressed: () {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => NewChatScreen(theme: theme, dataStore: dataStore),
+              builder: (_) => NewChatScreen(
+                theme: theme,
+                dataStore: dataStore,
+                preferencesController: widget.preferencesController,
+              ),
             ),
           );
         },
@@ -455,139 +305,197 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     );
   }
 
-  Widget _buildConversationTile(
-    BuildContext context,
-    Conversation conversation,
-    ThemeConfig theme,
-    MockDataStore dataStore,
-  ) {
+  Widget _conversationTile(Conversation conversation, ThemeConfig theme) {
+    final dataStore = widget.dataStore;
     final homePrefs = widget.preferencesController.home;
-    final otherParticipant = conversation.participantIds.firstWhere(
+    final otherParticipantId = conversation.participantIds.firstWhere(
       (id) => id != dataStore.currentUser.id,
       orElse: () => '',
     );
-    final otherUser = otherParticipant.isNotEmpty ? dataStore.getUser(otherParticipant) : null;
-    final isOnline = otherUser?.presence == PresenceState.online;
+    final otherUser = otherParticipantId.isEmpty ? null : dataStore.getUser(otherParticipantId);
+    final presenceLabel = conversation.type == ConversationType.direct ? _formatLastSeen(otherUser) : '';
+    final isOnline = otherUser?.presence == PresenceState.online || otherUser?.presence == PresenceState.typing;
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-      decoration: BoxDecoration(
-        color: conversation.isPinned ? theme.cardColor.withValues(alpha: 0.9) : Colors.transparent,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      child: Material(
+        color: conversation.isPinned ? theme.cardColor : Colors.transparent,
         borderRadius: BorderRadius.circular(16),
-        border: conversation.isPinned ? Border.all(color: theme.accentColor.withValues(alpha: 0.25), width: 1) : null,
-      ),
-      child: ListTile(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => ChatDetailScreen(
-                conversationId: conversation.id,
-                theme: theme,
-                dataStore: dataStore,
-                preferencesController: widget.preferencesController,
-                themeController: widget.themeController,
-              ),
-            ),
-          );
-        },
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
-        leading: Stack(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.15),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: ChatyAvatar(
-                initials: conversation.avatarInitials ?? conversation.title.characters.take(2).toString().toUpperCase(),
-                color: conversation.avatarColorHex != null ? Color(int.parse(conversation.avatarColorHex!)) : theme.accentColor,
-                size: 50,
-                shape: homePrefs.avatarShape,
-              ),
-            ),
-            if (isOnline)
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: Container(
-                  width: 14,
-                  height: 14,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF10B981),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: theme.backgroundColor, width: 2.5),
-                  ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ChatDetailScreen(
+                  conversationId: conversation.id,
+                  theme: theme,
+                  dataStore: dataStore,
+                  preferencesController: widget.preferencesController,
+                  themeController: widget.themeController,
                 ),
               ),
-          ],
-        ),
-      title: Row(
-        children: [
-          Expanded(
-            child: Text(
-              conversation.title,
-              style: TextStyle(
-                color: theme.primaryTextColor,
-                fontSize: 15 * theme.fontScale,
-                fontWeight: conversation.unreadCount > 0 ? FontWeight.bold : FontWeight.w600,
-              ),
-              overflow: TextOverflow.ellipsis,
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            child: Row(
+              children: [
+                Stack(
+                  children: [
+                    ChatyAvatar(
+                      initials: conversation.avatarInitials ?? conversation.title.characters.take(2).toString().toUpperCase(),
+                      color: conversation.avatarColorHex == null ? theme.accentColor : Color(int.parse(conversation.avatarColorHex!)),
+                      size: 50,
+                      shape: homePrefs.avatarShape,
+                    ),
+                    if (isOnline)
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          width: 13,
+                          height: 13,
+                          decoration: BoxDecoration(
+                            color: theme.successColor,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: theme.backgroundColor, width: 2.2),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              conversation.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: theme.primaryTextColor,
+                                fontSize: 15 * theme.fontScale,
+                                fontWeight: conversation.unreadCount > 0 ? FontWeight.w800 : FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _formatMessageTime(conversation.lastMessageTime),
+                            style: TextStyle(
+                              color: conversation.unreadCount > 0 ? theme.accentColor : theme.secondaryTextColor,
+                              fontSize: 11.5,
+                              fontWeight: conversation.unreadCount > 0 ? FontWeight.w700 : FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              conversation.lastMessageText.isEmpty ? presenceLabel : conversation.lastMessageText,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: conversation.unreadCount > 0 ? theme.primaryTextColor : theme.secondaryTextColor,
+                                fontSize: 12.5 * theme.fontScale,
+                              ),
+                            ),
+                          ),
+                          if (presenceLabel.isNotEmpty && conversation.lastMessageText.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 105),
+                              child: Text(
+                                presenceLabel,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.right,
+                                style: TextStyle(
+                                  color: isOnline ? theme.successColor : theme.secondaryTextColor.withValues(alpha: 0.85),
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (conversation.unreadCount > 0) ...[
+                            const SizedBox(width: 7),
+                            Container(
+                              constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(color: theme.accentColor, borderRadius: BorderRadius.circular(10)),
+                              child: Text(
+                                '${conversation.unreadCount}',
+                                style: TextStyle(color: theme.onAccentColor, fontSize: 10.5, fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          Text(
-            _formatTime(conversation.lastMessageTime),
-            style: TextStyle(
-              color: conversation.unreadCount > 0 ? theme.accentColor : theme.secondaryTextColor,
-              fontSize: 12,
-              fontWeight: conversation.unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-        ],
-      ),
-        subtitle: Row(
-          children: [
-            Expanded(
-              child: Text(
-                conversation.lastMessageText,
-                style: TextStyle(
-                  color: conversation.unreadCount > 0 ? theme.primaryTextColor : theme.secondaryTextColor,
-                  fontSize: 13 * theme.fontScale,
-                  fontWeight: conversation.unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            if (conversation.unreadCount > 0)
-              Container(
-                margin: const EdgeInsets.only(left: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: theme.accentColor,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '${conversation.unreadCount}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-          ],
         ),
       ),
     );
   }
 }
 
+class _SectionLabel extends StatelessWidget {
+  final String label;
+  final ThemeConfig theme;
+  const _SectionLabel({required this.label, required this.theme});
 
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 7, 12, 4),
+      child: Text(
+        label,
+        style: TextStyle(color: theme.secondaryTextColor, fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 0.8),
+      ),
+    );
+  }
+}
 
+class _EmptyChats extends StatelessWidget {
+  final ThemeConfig theme;
+  final VoidCallback onSearch;
+  const _EmptyChats({required this.theme, required this.onSearch});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.chat_bubble_outline_rounded, size: 56, color: theme.accentColor),
+            const SizedBox(height: 18),
+            Text('No conversations yet', style: TextStyle(color: theme.primaryTextColor, fontSize: 18, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            Text(
+              'Find a user by @username or create a group to start a conversation.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: theme.secondaryTextColor, height: 1.45),
+            ),
+            const SizedBox(height: 18),
+            FilledButton.icon(onPressed: onSearch, icon: const Icon(Icons.search_rounded), label: const Text('Find people')),
+          ],
+        ),
+      ),
+    );
+  }
+}
