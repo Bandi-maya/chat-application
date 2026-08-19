@@ -16,7 +16,7 @@ class GbFeatureCenterScreen extends StatefulWidget {
 class _GbFeatureCenterScreenState extends State<GbFeatureCenterScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
-  String _category = 'All';
+  String? _category;
 
   @override
   void dispose() {
@@ -30,25 +30,32 @@ class _GbFeatureCenterScreenState extends State<GbFeatureCenterScreen> {
       listenable: widget.preferencesController,
       builder: (context, _) {
         final scheme = Theme.of(context).colorScheme;
+        final q = _query.toLowerCase();
         final definitions = GbFeatureCatalog.all.where((item) {
-          final categoryMatch = _category == 'All' || item.category == _category;
+          final categoryMatch = _category == null || item.category == _category;
           if (!categoryMatch) return false;
-          if (_query.isEmpty) return true;
-          final q = _query.toLowerCase();
+          if (q.isEmpty) return true;
           return item.title.toLowerCase().contains(q) ||
-              item.key.toLowerCase().contains(q) ||
               item.description.toLowerCase().contains(q) ||
-              item.category.toLowerCase().contains(q);
+              item.category.toLowerCase().contains(q) ||
+              item.key.toLowerCase().contains(q);
         }).toList(growable: false);
+        final browsingCategories = _category == null && _query.isEmpty;
 
         return Scaffold(
           appBar: AppBar(
             leading: IconButton(
-              tooltip: 'Back',
-              onPressed: () => Navigator.of(context).pop(),
+              tooltip: _category == null ? 'Back' : 'All categories',
+              onPressed: () {
+                if (_category != null) {
+                  setState(() => _category = null);
+                } else {
+                  Navigator.of(context).pop();
+                }
+              },
               icon: const Icon(Icons.chevron_left_rounded),
             ),
-            title: const Text('Advanced Features'),
+            title: Text(_category ?? 'Advanced Features'),
             actions: [
               IconButton(
                 tooltip: 'Reset advanced features',
@@ -61,39 +68,41 @@ class _GbFeatureCenterScreenState extends State<GbFeatureCenterScreen> {
             top: false,
             child: Column(
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-                  child: _SummaryCard(
-                    enabled: widget.preferencesController.gbFeatures.values.whereType<bool>().where((value) => value).length,
-                    total: GbFeatureCatalog.all.length,
-                    onGhostMode: () => _applyBundle(<String, Object?>{
-                      'yo_want_ghostmode': true,
-                      'yoHideSeen': true,
-                      'yoHideStatViewV2': true,
-                      'abu_saleh_toast_typing': false,
-                      'abu_saleh_toast_online': false,
-                      'always_online': false,
-                    }, 'Stealth privacy bundle'),
-                    onStandardMode: () => _applyBundle(<String, Object?>{
-                      'yo_want_ghostmode': false,
-                      'yo_want_airplanemode': false,
-                      'yoHideSeen': false,
-                      'yoHideStatViewV2': false,
-                      'always_online': false,
-                    }, 'Standard connectivity bundle'),
+                if (browsingCategories)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                    child: _SummaryCard(
+                      enabled: widget.preferencesController.gbFeatures.values.whereType<bool>().where((value) => value).length,
+                      total: GbFeatureCatalog.all.length,
+                      onGhostMode: () => _applyBundle(<String, Object?>{
+                        'yo_want_ghostmode': true,
+                        'yoHideSeen': true,
+                        'yoHideStatViewV2': true,
+                        'abu_saleh_toast_typing': false,
+                        'abu_saleh_toast_online': false,
+                        'always_online': false,
+                      }, 'Stealth privacy bundle'),
+                      onStandardMode: () => _applyBundle(<String, Object?>{
+                        'yo_want_ghostmode': false,
+                        'yo_want_airplanemode': false,
+                        'yoHideSeen': false,
+                        'yoHideStatViewV2': false,
+                        'always_online': false,
+                      }, 'Standard connectivity bundle'),
+                    ),
                   ),
-                ),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
                   child: TextField(
                     controller: _searchController,
                     onChanged: (value) => setState(() => _query = value.trim()),
                     decoration: InputDecoration(
-                      hintText: 'Search all ${GbFeatureCatalog.all.length} advanced controls',
+                      hintText: _category == null ? 'Search all advanced settings' : 'Search in $_category',
                       prefixIcon: const Icon(Icons.search_rounded),
                       suffixIcon: _query.isEmpty
                           ? null
                           : IconButton(
+                              tooltip: 'Clear search',
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() => _query = '');
@@ -106,41 +115,27 @@ class _GbFeatureCenterScreenState extends State<GbFeatureCenterScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 40,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    scrollDirection: Axis.horizontal,
-                    itemCount: GbFeatureCatalog.categories.length + 1,
-                    separatorBuilder: (_, _) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) {
-                      final category = index == 0 ? 'All' : GbFeatureCatalog.categories[index - 1];
-                      return ChoiceChip(
-                        label: Text(category),
-                        selected: _category == category,
-                        onSelected: (_) => setState(() => _category = category),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 8),
                 Expanded(
-                  child: definitions.isEmpty
-                      ? const Center(child: Text('No matching features'))
-                      : ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 30),
-                          itemCount: definitions.length,
-                          itemBuilder: (context, index) {
-                            final item = definitions[index];
-                            return _FeatureTile(
-                              definition: item,
-                              controller: widget.preferencesController,
-                              onColor: () => _editColor(item),
-                              onAction: () => _runAction(item),
-                            );
-                          },
-                        ),
+                  child: browsingCategories
+                      ? _CategoryList(
+                          controller: widget.preferencesController,
+                          onOpen: (category) => setState(() => _category = category),
+                        )
+                      : definitions.isEmpty
+                          ? const Center(child: Text('No matching settings'))
+                          : ListView.builder(
+                              padding: const EdgeInsets.fromLTRB(12, 0, 12, 30),
+                              itemCount: definitions.length,
+                              itemBuilder: (context, index) {
+                                final item = definitions[index];
+                                return _FeatureTile(
+                                  definition: item,
+                                  controller: widget.preferencesController,
+                                  onColor: () => _editColor(item),
+                                  onAction: () => _runAction(item),
+                                );
+                              },
+                            ),
                 ),
               ],
             ),
@@ -162,8 +157,18 @@ class _GbFeatureCenterScreenState extends State<GbFeatureCenterScreen> {
     final initial = current == 0 ? '' : '#${current.toRadixString(16).padLeft(8, '0').toUpperCase()}';
     final controller = TextEditingController(text: initial);
     final presets = <int>[
-      0xFF000000, 0xFFFFFFFF, 0xFF2563EB, 0xFF7C3AED, 0xFFDB2777, 0xFFDC2626,
-      0xFFEA580C, 0xFFCA8A04, 0xFF16A34A, 0xFF0891B2, 0xFF475569, 0xFF18181B,
+      0xFF000000,
+      0xFFFFFFFF,
+      0xFF2563EB,
+      0xFF7C3AED,
+      0xFFDB2777,
+      0xFFDC2626,
+      0xFFEA580C,
+      0xFFCA8A04,
+      0xFF16A34A,
+      0xFF0891B2,
+      0xFF475569,
+      0xFF18181B,
     ];
     final selected = await showDialog<int?>(
       context: context,
@@ -272,7 +277,7 @@ class _GbFeatureCenterScreenState extends State<GbFeatureCenterScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Reset advanced features?'),
-        content: const Text('This resets the compatibility controls to Chaty defaults. Existing chats and server data are not deleted.'),
+        content: const Text('This resets advanced controls to Chaty defaults. Existing chats and server data are not deleted.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Reset')),
@@ -287,6 +292,64 @@ class _GbFeatureCenterScreenState extends State<GbFeatureCenterScreen> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+class _CategoryList extends StatelessWidget {
+  final ChatyPreferencesController controller;
+  final ValueChanged<String> onOpen;
+
+  const _CategoryList({required this.controller, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 30),
+      itemCount: GbFeatureCatalog.categories.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 4),
+      itemBuilder: (context, index) {
+        final category = GbFeatureCatalog.categories[index];
+        final items = GbFeatureCatalog.all.where((item) => item.category == category).toList(growable: false);
+        final enabled = items.where((item) => item.kind == GbFeatureKind.toggle && controller.gbBool(item.key, fallback: item.defaultValue == true)).length;
+        return Card(
+          elevation: 0,
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+            leading: Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: Icon(_categoryIcon(category), color: Theme.of(context).colorScheme.onPrimaryContainer, size: 21),
+            ),
+            title: Text(category, style: const TextStyle(fontWeight: FontWeight.w800)),
+            subtitle: Text('$enabled enabled • ${items.length} settings'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => onOpen(category),
+          ),
+        );
+      },
+    );
+  }
+
+  static IconData _categoryIcon(String category) {
+    final value = category.toLowerCase();
+    if (value.contains('privacy')) return Icons.shield_outlined;
+    if (value.contains('call')) return Icons.call_outlined;
+    if (value.contains('media')) return Icons.perm_media_outlined;
+    if (value.contains('status')) return Icons.auto_stories_outlined;
+    if (value.contains('notification') || value.contains('alert')) return Icons.notifications_outlined;
+    if (value.contains('font') || value.contains('icon')) return Icons.text_fields_rounded;
+    if (value.contains('color') || value.contains('appearance')) return Icons.palette_outlined;
+    if (value.contains('composer')) return Icons.edit_note_rounded;
+    if (value.contains('bubble') || value.contains('conversation')) return Icons.chat_bubble_outline_rounded;
+    if (value.contains('home')) return Icons.home_outlined;
+    if (value.contains('navigation')) return Icons.space_dashboard_outlined;
+    if (value.contains('storage')) return Icons.storage_outlined;
+    return Icons.tune_rounded;
   }
 }
 
@@ -321,7 +384,7 @@ class _SummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Controls are implemented independently in Chaty and synchronized with your account. Core privacy, messaging, status, presence and automation controls are enforced by runtime/server paths.',
+            'Settings are grouped by purpose. Open one category at a time instead of scanning one very long list.',
             style: TextStyle(color: scheme.onSurfaceVariant, height: 1.35),
           ),
           const SizedBox(height: 12),
@@ -411,14 +474,7 @@ class _FeatureTile extends StatelessWidget {
         title: Text(definition.title, style: const TextStyle(fontWeight: FontWeight.w700)),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 3),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(definition.description, maxLines: 3, overflow: TextOverflow.ellipsis),
-              const SizedBox(height: 3),
-              Text(definition.key, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: scheme.outline)),
-            ],
-          ),
+          child: Text(definition.description, maxLines: 3, overflow: TextOverflow.ellipsis),
         ),
         trailing: trailing,
         onTap: onTap,
