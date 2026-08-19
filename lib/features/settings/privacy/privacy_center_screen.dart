@@ -261,7 +261,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
               icon: Icons.visibility_off_rounded,
               iconColor: Colors.grey,
               title: 'Hide Privacy Option from Main Settings',
-              subtitle: 'Hide this Privacy entry. Restore it through the GB Feature Center.',
+              subtitle: 'Hide this Privacy entry. Restore it through Advanced Features.',
               value: prefs.hidePrivacyOption,
               onChanged: (value) => widget.preferencesController.updatePrivacy(
                 prefs.copyWith(hidePrivacyOption: value),
