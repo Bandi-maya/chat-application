@@ -41,12 +41,25 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
   void initState() {
     super.initState();
     final task = widget.existingTask;
-    _titleCtrl = TextEditingController(
-      text: task?.title ?? widget.initialTitle ?? '',
-    );
+    _titleCtrl = TextEditingController(text: task?.title ?? widget.initialTitle ?? '');
     _descCtrl = TextEditingController(text: task?.description ?? '');
-    _selectedAssigneeIds =
-        task?.assigneeIds.toList() ?? <String>[widget.dataStore.currentUser.id];
+
+    if (task != null) {
+      _selectedAssigneeIds = task.assigneeIds.toList();
+    } else {
+      final me = widget.dataStore.currentUser.id;
+      final conversation = widget.dataStore.conversations
+          .where((item) => item.id == widget.sourceConversationId)
+          .firstOrNull;
+      final otherParticipant = conversation?.participantIds.firstWhere(
+        (id) => id != me,
+        orElse: () => '',
+      );
+      _selectedAssigneeIds = <String>[
+        if (otherParticipant != null && otherParticipant.isNotEmpty) otherParticipant else me,
+      ];
+    }
+
     _priority = task?.priority ?? TaskPriority.medium;
     _dueDate = task?.dueAt ?? DateTime.now().add(const Duration(days: 3));
   }
@@ -115,7 +128,10 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
       if (!mounted) return;
       setState(() {
         _isSaving = false;
-        _errorMessage = error.toString().replaceFirst('Exception: ', '');
+        final message = error.toString().replaceFirst('Exception: ', '');
+        _errorMessage = message.contains('23514')
+            ? 'Task status could not be saved. Please retry after refreshing the chat.'
+            : message;
       });
     }
   }
@@ -190,9 +206,7 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    widget.existingTask != null
-                        ? 'Edit Task'
-                        : 'Create Task (/task)',
+                    widget.existingTask != null ? 'Edit Task' : 'Create Task (/task)',
                     style: TextStyle(
                       color: theme.primaryTextColor,
                       fontSize: 16,
@@ -210,19 +224,14 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                 controller: _titleCtrl,
                 enabled: !_isSaving,
                 maxLength: 140,
-                style: TextStyle(
-                  color: theme.primaryTextColor,
-                  fontSize: 14.5,
-                ),
+                style: TextStyle(color: theme.primaryTextColor, fontSize: 14.5),
                 decoration: InputDecoration(
                   labelText: 'Task Title',
                   counterText: '',
                   labelStyle: TextStyle(color: theme.secondaryTextColor),
                   filled: true,
                   fillColor: theme.cardColor,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(theme.cornerRadius),
-                  ),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(theme.cornerRadius)),
                 ),
               ),
               const SizedBox(height: 14),
@@ -231,94 +240,66 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                 enabled: !_isSaving,
                 maxLines: 3,
                 maxLength: 2000,
-                style: TextStyle(
-                  color: theme.primaryTextColor,
-                  fontSize: 13.5,
-                ),
+                style: TextStyle(color: theme.primaryTextColor, fontSize: 13.5),
                 decoration: InputDecoration(
                   labelText: 'Description / Instructions',
                   labelStyle: TextStyle(color: theme.secondaryTextColor),
                   filled: true,
                   fillColor: theme.cardColor,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(theme.cornerRadius),
-                  ),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(theme.cornerRadius)),
                 ),
               ),
               const SizedBox(height: 16),
               Text(
-                'Assign To Participants',
-                style: TextStyle(
-                  color: theme.primaryTextColor,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
+                'Assign To',
+                style: TextStyle(color: theme.primaryTextColor, fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                widget.existingTask == null
+                    ? 'New tasks default to the other participant. Select yourself only when you want the task assigned to you.'
+                    : 'Update who is responsible for this task.',
+                style: TextStyle(color: theme.secondaryTextColor, fontSize: 11.5),
               ),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  FilterChip(
-                    label: Text(
-                      'You (${currentUser.displayName.split(' ').first})',
-                    ),
-                    selected: _selectedAssigneeIds.contains(currentUser.id),
-                    selectedColor: theme.accentColor.withValues(alpha: 0.25),
-                    onSelected: _isSaving
-                        ? null
-                        : (selected) => _setAssignee(
-                              currentUser.id,
-                              selected,
-                            ),
-                  ),
                   ...candidateAssignees.map((candidate) {
                     final selected = _selectedAssigneeIds.contains(candidate.id);
                     return FilterChip(
+                      avatar: Icon(selected ? Icons.check_circle_rounded : Icons.person_outline_rounded, size: 17),
                       label: Text(candidate.displayName.split(' ').first),
                       selected: selected,
-                      selectedColor:
-                          theme.accentColor.withValues(alpha: 0.25),
-                      onSelected: _isSaving
-                          ? null
-                          : (value) => _setAssignee(candidate.id, value),
+                      selectedColor: theme.accentColor.withValues(alpha: 0.25),
+                      onSelected: _isSaving ? null : (value) => _setAssignee(candidate.id, value),
                     );
                   }),
+                  FilterChip(
+                    avatar: const Icon(Icons.person_rounded, size: 17),
+                    label: Text('Me (${currentUser.displayName.split(' ').first})'),
+                    selected: _selectedAssigneeIds.contains(currentUser.id),
+                    selectedColor: theme.accentColor.withValues(alpha: 0.25),
+                    onSelected: _isSaving ? null : (selected) => _setAssignee(currentUser.id, selected),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
               Text(
                 'Priority',
-                style: TextStyle(
-                  color: theme.primaryTextColor,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(color: theme.primaryTextColor, fontSize: 13, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               SegmentedButton<TaskPriority>(
                 segments: const <ButtonSegment<TaskPriority>>[
-                  ButtonSegment<TaskPriority>(
-                    value: TaskPriority.low,
-                    label: Text('Low'),
-                  ),
-                  ButtonSegment<TaskPriority>(
-                    value: TaskPriority.medium,
-                    label: Text('Med'),
-                  ),
-                  ButtonSegment<TaskPriority>(
-                    value: TaskPriority.high,
-                    label: Text('High'),
-                  ),
-                  ButtonSegment<TaskPriority>(
-                    value: TaskPriority.urgent,
-                    label: Text('Urgent'),
-                  ),
+                  ButtonSegment<TaskPriority>(value: TaskPriority.low, label: Text('Low')),
+                  ButtonSegment<TaskPriority>(value: TaskPriority.medium, label: Text('Med')),
+                  ButtonSegment<TaskPriority>(value: TaskPriority.high, label: Text('High')),
+                  ButtonSegment<TaskPriority>(value: TaskPriority.urgent, label: Text('Urgent')),
                 ],
                 selected: <TaskPriority>{_priority},
-                onSelectionChanged: _isSaving
-                    ? null
-                    : (value) => setState(() => _priority = value.first),
+                onSelectionChanged: _isSaving ? null : (value) => setState(() => _priority = value.first),
               ),
               const SizedBox(height: 16),
               OutlinedButton.icon(
@@ -331,13 +312,7 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
               ),
               if (_errorMessage != null) ...[
                 const SizedBox(height: 14),
-                Text(
-                  _errorMessage!,
-                  style: TextStyle(
-                    color: theme.dangerColor,
-                    fontSize: 13,
-                  ),
-                ),
+                Text(_errorMessage!, style: TextStyle(color: theme.dangerColor, fontSize: 13)),
               ],
               const SizedBox(height: 20),
               ElevatedButton.icon(
@@ -345,19 +320,14 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                   backgroundColor: theme.accentColor,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(theme.cornerRadius),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(theme.cornerRadius)),
                 ),
                 onPressed: _isSaving ? null : _saveTask,
                 icon: _isSaving
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
                     : const Icon(Icons.check_rounded, size: 18),
                 label: Text(
@@ -375,9 +345,7 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
   void _setAssignee(String userId, bool selected) {
     setState(() {
       if (selected) {
-        if (!_selectedAssigneeIds.contains(userId)) {
-          _selectedAssigneeIds.add(userId);
-        }
+        if (!_selectedAssigneeIds.contains(userId)) _selectedAssigneeIds.add(userId);
       } else {
         _selectedAssigneeIds.remove(userId);
       }
