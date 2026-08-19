@@ -73,7 +73,7 @@ class StatusService {
 
   Future<StatusRecord?> pickAndPublish({required String mediaType, String text = ''}) async {
     if (mediaType == 'audio' && !_preferences.gbBool('abu9aleh_status_audio')) {
-      throw Exception('Enable Audio Status in GB Feature Center first.');
+      throw Exception('Enable Audio Status in Advanced Features first.');
     }
 
     final fileType = switch (mediaType) {

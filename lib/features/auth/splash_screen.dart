@@ -6,7 +6,9 @@ import 'package:chat/data/services/chaty_backend_service.dart';
 import 'package:chat/features/auth/welcome_screen.dart';
 import 'package:chat/features/chats/main_navigation_shell.dart';
 import 'package:chat/injection/locator.dart';
+import 'package:chat/ui/core/controllers/app_icon_controller.dart';
 import 'package:chat/ui/core/theme/theme_controller.dart';
+import 'package:chat/ui/core/widgets/chaty_brand_icon.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -37,9 +39,13 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _routeFromRealSession() async {
     final started = DateTime.now();
     final backend = locator<ChatyBackendService>();
-    if (!backend.isInitialized) await backend.initialize();
+    try {
+      if (!backend.isInitialized) await backend.initialize();
+    } catch (_) {
+      // Authentication remains the source of truth. If profile hydration fails,
+      // the welcome/auth flow can recover instead of leaving a blank startup.
+    }
 
-    // Keep the branded splash visible for a short, deterministic minimum only.
     final elapsed = DateTime.now().difference(started);
     const minimum = Duration(milliseconds: 900);
     if (elapsed < minimum) await Future<void>.delayed(minimum - elapsed);
@@ -67,6 +73,7 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     final theme = locator<ThemeController>().globalTheme;
+    final appIconController = locator<AppIconController>();
 
     return Scaffold(
       backgroundColor: theme.backgroundColor,
@@ -93,32 +100,10 @@ class _SplashScreenState extends State<SplashScreen>
                           ),
                         ],
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(34),
-                        child: Image.asset(
-                          'assets/app_icon.png',
-                          width: 124,
-                          height: 124,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(34),
-                              gradient: LinearGradient(
-                                colors: [
-                                  theme.accentColor,
-                                  theme.accentColor.withValues(alpha: 0.8),
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                            ),
-                            child: const Icon(
-                              Icons.chat_bubble_rounded,
-                              size: 64,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
+                      child: ChatyBrandIcon(
+                        controller: appIconController,
+                        size: 124,
+                        borderRadius: 34,
                       ),
                     ),
                   ),
@@ -172,7 +157,7 @@ class _SplashScreenState extends State<SplashScreen>
                         color: theme.accentColor,
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: 2.0,
+                        letterSpacing: 2,
                       ),
                     ),
                   ],

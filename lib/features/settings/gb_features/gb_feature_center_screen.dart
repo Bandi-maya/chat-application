@@ -48,10 +48,10 @@ class _GbFeatureCenterScreenState extends State<GbFeatureCenterScreen> {
               onPressed: () => Navigator.of(context).pop(),
               icon: const Icon(Icons.chevron_left_rounded),
             ),
-            title: const Text('GB Feature Center'),
+            title: const Text('Advanced Features'),
             actions: [
               IconButton(
-                tooltip: 'Reset extracted features',
+                tooltip: 'Reset advanced features',
                 onPressed: _confirmReset,
                 icon: const Icon(Icons.restart_alt_rounded),
               ),
@@ -89,7 +89,7 @@ class _GbFeatureCenterScreenState extends State<GbFeatureCenterScreen> {
                     controller: _searchController,
                     onChanged: (value) => setState(() => _query = value.trim()),
                     decoration: InputDecoration(
-                      hintText: 'Search all ${GbFeatureCatalog.all.length} extracted features',
+                      hintText: 'Search all ${GbFeatureCatalog.all.length} advanced controls',
                       prefixIcon: const Icon(Icons.search_rounded),
                       suffixIcon: _query.isEmpty
                           ? null
@@ -271,7 +271,7 @@ class _GbFeatureCenterScreenState extends State<GbFeatureCenterScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Reset extracted features?'),
+        title: const Text('Reset advanced features?'),
         content: const Text('This resets the compatibility controls to Chaty defaults. Existing chats and server data are not deleted.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
@@ -315,7 +315,7 @@ class _SummaryCard extends StatelessWidget {
             children: [
               Icon(Icons.tune_rounded, color: scheme.primary),
               const SizedBox(width: 8),
-              Expanded(child: Text('$total extracted GB-style controls', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800))),
+              Expanded(child: Text('$total advanced controls', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800))),
               Text('$enabled enabled', style: TextStyle(color: scheme.onSurfaceVariant)),
             ],
           ),

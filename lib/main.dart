@@ -9,9 +9,10 @@ import 'package:chat/data/services/chaty_backend_service.dart';
 import 'package:chat/data/services/message_automation_service.dart';
 import 'package:chat/domain/models/user_profile.dart';
 import 'package:chat/features/auth/create_new_password_screen.dart';
+import 'package:chat/features/auth/splash_screen.dart';
 import 'package:chat/features/auth/welcome_screen.dart';
-import 'package:chat/features/chats/main_navigation_shell.dart';
 import 'package:chat/injection/locator.dart';
+import 'package:chat/ui/core/controllers/app_icon_controller.dart';
 import 'package:chat/ui/core/controllers/appearance_variant_controller.dart';
 import 'package:chat/ui/core/controllers/chaty_preferences_controller.dart';
 import 'package:chat/ui/core/gb/gb_theme_overrides.dart';
@@ -39,7 +40,7 @@ Future<void> main() async {
     debug: !kReleaseMode,
   );
   setupLocator();
-  await locator<ChatyBackendService>().initialize();
+  await locator<AppIconController>().initialize();
   runApp(const ChatyApp());
 }
 
@@ -163,7 +164,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
               ),
             );
           },
-          home: _backend.isAuthenticated ? const MainNavigationShell() : const WelcomeScreen(),
+          home: const SplashScreen(),
         );
       },
     );
