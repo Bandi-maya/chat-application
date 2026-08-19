@@ -1,11 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import '../../ui/core/theme/theme_controller.dart';
-import '../../data/repositories/mock_data_store.dart';
+
 import '../../data/services/chaty_backend_service.dart';
+import '../../injection/locator.dart';
 import '../../ui/core/persistence/preferences_storage.dart';
+import '../../ui/core/theme/theme_controller.dart';
 import '../chats/main_navigation_shell.dart';
 import 'widgets/auth_components.dart';
-import '../../injection/locator.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -31,39 +33,109 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  Future<void> _openHome(ChatyBackendService backend) async {
+    final user = backend.currentUser;
+    if (user == null || !backend.isAuthenticated) {
+      throw Exception('A verified session was not created yet.');
+    }
+    await LocalPreferencesStorage.setStoredUserId(user.id);
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const MainNavigationShell()),
+      (route) => false,
+    );
+  }
+
   Future<void> _handleRegister() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate() || _isLoading) return;
 
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
+    final backend = locator<ChatyBackendService>();
     try {
-      final backend = locator<ChatyBackendService>();
-      final user = await backend.registerUser(
+      await backend.registerUser(
         displayName: _usernameController.text.trim(),
         username: _usernameController.text.trim(),
         password: _passwordController.text,
         email: _emailController.text.trim(),
       );
 
-      // Save persistent preference and activate session in mock data store
-      await LocalPreferencesStorage.setStoredUserId(user.id);
-      locator<MockDataStore>().switchDemoAccount(user);
+      if (backend.isAuthenticated) {
+        await _openHome(backend);
+        return;
+      }
 
       if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const MainNavigationShell()),
-        (route) => false,
-      );
-    } catch (e) {
+      setState(() => _isLoading = false);
+      await _showVerificationDialog(backend);
+    } catch (error) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _errorMessage = _friendlyError(error);
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _showVerificationDialog(ChatyBackendService backend) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Verify your email'),
+        content: const Text(
+          'Your account was created. Open the newest Chaty verification email and tap Confirm. Android can reopen Chaty through the secure chaty:// callback. Then tap Continue below.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Later'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || confirmed != true) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await backend
+          .login(
+            identifier: _emailController.text.trim(),
+            password: _passwordController.text,
+          )
+          .timeout(const Duration(seconds: 15));
+      await _openHome(backend);
+    } on TimeoutException {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Verification is taking too long. Check your connection, then sign in with the same email and password.';
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Email verification is still pending. Tap the confirmation link in the newest email, then sign in with the same credentials.';
+        _isLoading = false;
+      });
+    }
+  }
+
+  String _friendlyError(Object error) {
+    final value = error.toString().replaceFirst('Exception: ', '');
+    if (value.contains('already registered')) return 'An account already exists for this email. Sign in instead.';
+    if (value.contains('rate limit')) return 'Too many attempts. Wait a moment and try again.';
+    return value;
   }
 
   @override
@@ -84,157 +156,131 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                // Top circular back button
-                const AuthBackButton(),
-                const SizedBox(height: 28),
-
-                // Everything You Need! Heading matching mockup
-                Text(
-                  'Everything You Need!',
-                  style: TextStyle(
-                    color: theme.primaryTextColor,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Create account and start exploring.',
-                  style: TextStyle(
-                    color: theme.secondaryTextColor,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // Email field
-                AuthTextField(
-                  label: 'Email',
-                  hintText: 'Enter email',
-                  controller: _emailController,
-                  theme: theme,
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (val) {
-                    if (val == null || val.trim().isEmpty) {
-                      return 'Please enter your email';
-                    }
-                    if (!val.contains('@')) {
-                      return 'Please enter a valid email address';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 18),
-
-                // User Name field
-                AuthTextField(
-                  label: 'User Name',
-                  hintText: 'Enter User Name',
-                  controller: _usernameController,
-                  theme: theme,
-                  validator: (val) {
-                    if (val == null || val.trim().isEmpty) {
-                      return 'Please enter a username';
-                    }
-                    if (val.trim().length < 3) {
-                      return 'Username must be at least 3 characters';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 18),
-
-                // Password field
-                AuthTextField(
-                  label: 'Password',
-                  hintText: 'Enter password',
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  theme: theme,
-                  textInputAction: TextInputAction.done,
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                      color: theme.secondaryTextColor.withValues(alpha: 0.6),
-                      size: 20,
-                    ),
-                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                  ),
-                  validator: (val) {
-                    if (val == null || val.isEmpty) {
-                      return 'Please enter your password';
-                    }
-                    if (val.length < 6) {
-                      return 'Password must be at least 6 characters';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 24),
-
-                if (_errorMessage != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16.0),
-                    child: Text(
-                      _errorMessage!,
-                      style: TextStyle(
-                        color: theme.dangerColor,
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-
-                // Register Button
-                AuthPrimaryButton(
-                  text: 'Register',
-                  onPressed: _handleRegister,
-                  isLoading: _isLoading,
-                  theme: theme,
-                ),
-                const SizedBox(height: 20),
-
-                // Or Divider
-                AuthOrDivider(theme: theme),
-                const SizedBox(height: 20),
-
-                // Social Row
-                AuthSocialRow(theme: theme),
-                const SizedBox(height: 28),
-
-                // Already have an account? Log In
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
+                    const AuthBackButton(),
+                    const SizedBox(height: 28),
                     Text(
-                      'Already have an account? ',
+                      'Everything You Need!',
                       style: TextStyle(
-                        color: theme.secondaryTextColor,
-                        fontSize: 13.5,
+                        color: theme.primaryTextColor,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
                       ),
                     ),
-                    GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: Text(
-                        'Log In',
-                        style: TextStyle(
-                          color: theme.accentColor,
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
+                    const SizedBox(height: 6),
+                    Text(
+                      'Create account and start exploring.',
+                      style: TextStyle(color: theme.secondaryTextColor, fontSize: 14),
+                    ),
+                    const SizedBox(height: 32),
+                    AuthTextField(
+                      label: 'Email',
+                      hintText: 'Enter email',
+                      controller: _emailController,
+                      theme: theme,
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (value) {
+                        final email = value?.trim() ?? '';
+                        if (email.isEmpty) return 'Please enter your email';
+                        final valid = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email);
+                        if (!valid) return 'Please enter a valid email address';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 18),
+                    AuthTextField(
+                      label: 'User Name',
+                      hintText: 'Enter User Name',
+                      controller: _usernameController,
+                      theme: theme,
+                      validator: (value) {
+                        final username = value?.trim() ?? '';
+                        if (username.isEmpty) return 'Please enter a username';
+                        if (username.length < 3 || username.length > 24) return 'Username must be 3–24 characters';
+                        if (!RegExp(r'^[A-Za-z0-9_]+$').hasMatch(username)) return 'Use only letters, numbers, and underscore';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 18),
+                    AuthTextField(
+                      label: 'Password',
+                      hintText: 'Enter password',
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
+                      theme: theme,
+                      textInputAction: TextInputAction.done,
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                          color: theme.secondaryTextColor.withValues(alpha: 0.6),
+                          size: 20,
+                        ),
+                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      ),
+                      validator: (value) {
+                        final password = value ?? '';
+                        if (password.isEmpty) return 'Please enter your password';
+                        if (password.length < 8) return 'Password must be at least 8 characters';
+                        if (!RegExp(r'[A-Z]').hasMatch(password) ||
+                            !RegExp(r'[a-z]').hasMatch(password) ||
+                            !RegExp(r'[0-9]').hasMatch(password)) {
+                          return 'Use upper/lowercase letters and a number';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    if (_errorMessage != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16.0),
+                        child: Text(
+                          _errorMessage!,
+                          style: TextStyle(
+                            color: theme.dangerColor,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
+                    AuthPrimaryButton(
+                      text: 'Register',
+                      onPressed: _handleRegister,
+                      isLoading: _isLoading,
+                      theme: theme,
                     ),
+                    const SizedBox(height: 20),
+                    AuthOrDivider(theme: theme),
+                    const SizedBox(height: 20),
+                    AuthSocialRow(theme: theme),
+                    const SizedBox(height: 28),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Already have an account? ',
+                          style: TextStyle(color: theme.secondaryTextColor, fontSize: 13.5),
+                        ),
+                        GestureDetector(
+                          onTap: () => Navigator.of(context).pop(),
+                          child: Text(
+                            'Log In',
+                            style: TextStyle(
+                              color: theme.accentColor,
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
                   ],
                 ),
-                const SizedBox(height: 16),
-              ],
+              ),
             ),
           ),
         ),
       ),
-    ),
-  ),
-);
+    );
   }
 }

@@ -1,152 +1,323 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
+
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
-import '../../domain/models/user_profile.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
+
 import '../../domain/models/chat_message.dart';
-import '../../domain/models/conversation.dart';
 import '../../domain/models/chat_task.dart';
+import '../../domain/models/conversation.dart';
 import '../../domain/models/other_models.dart';
-import '../../ui/core/validators/chaty_validators.dart';
+import '../../domain/models/user_profile.dart';
 import '../../ui/core/realtime/realtime_event_bus.dart';
+import '../../ui/core/validators/chaty_validators.dart';
+
 class AuthSession {
   final String userId;
   final String token;
   final DateTime expiresAt;
   final String deviceId;
 
-  AuthSession({
+  const AuthSession({
     required this.userId,
     required this.token,
     required this.expiresAt,
     required this.deviceId,
   });
-
-  Map<String, dynamic> toJson() => {
-    'userId': userId,
-    'token': token,
-    'expiresAt': expiresAt.toIso8601String(),
-    'deviceId': deviceId,
-  };
-
-  factory AuthSession.fromJson(Map<String, dynamic> json) => AuthSession(
-    userId: json['userId'] as String,
-    token: json['token'] as String,
-    expiresAt: DateTime.parse(json['expiresAt'] as String),
-    deviceId: json['deviceId'] as String? ?? 'device_primary',
-  );
 }
 
-/// Production-ready persistent backend engine for Chaty.
-/// ZERO mock data, ZERO hardcoded accounts, 100% genuine user-generated data.
+/// Server-backed application state for Chaty.
+///
+/// Supabase Auth is the source of truth for identity/session state. Postgres +
+/// RLS-backed RPCs are the source of truth for conversations/messages/tasks.
+/// This class keeps only a presentation cache so the existing UI can remain
+/// reactive without storing credentials or pretending local JSON is a backend.
 class ChatyBackendService extends ChangeNotifier {
   static final ChatyBackendService _instance = ChatyBackendService._internal();
   factory ChatyBackendService() => _instance;
   ChatyBackendService._internal();
 
   final RealtimeEventBus eventBus = RealtimeEventBus();
+  final Uuid _uuid = const Uuid();
+
+  SupabaseClient get _client => Supabase.instance.client;
 
   UserProfile? _currentUser;
   AuthSession? _currentSession;
+  final Map<String, UserProfile> _usersById = <String, UserProfile>{};
+  final Map<String, Conversation> _conversationsById = <String, Conversation>{};
+  final Map<String, List<ChatMessage>> _messagesByChatId = <String, List<ChatMessage>>{};
+  final List<ChatTask> _tasks = <ChatTask>[];
+  final List<CallRecord> _calls = <CallRecord>[];
+  final List<UpdateStory> _stories = <UpdateStory>[];
+  final List<LinkedDevice> _linkedDevices = <LinkedDevice>[];
 
-  final Map<String, UserProfile> _usersById = {};
-  final Map<String, String> _passwordsByUserId = {};
-  final Map<String, String> _userIdByNormalizedUsername = {};
-  final Map<String, String> _userIdByEmail = {};
-
-  final Map<String, Conversation> _conversationsById = {};
-  final Map<String, List<ChatMessage>> _messagesByChatId = {};
-  final Map<String, List<LinkedDevice>> _devicesByUser = {};
-  final List<ChatTask> _tasks = [];
-  final List<CallRecord> _calls = [];
-  final List<UpdateStory> _stories = [];
-
+  RealtimeChannel? _realtimeChannel;
+  Timer? _reconcileTimer;
   bool _isInitialized = false;
+  bool _isHydrating = false;
+
   bool get isInitialized => _isInitialized;
-  bool get isAuthenticated => _currentUser != null && _currentSession != null;
+  bool get isAuthenticated => _client.auth.currentSession != null && _currentUser != null;
   UserProfile? get currentUser => _currentUser;
   AuthSession? get currentSession => _currentSession;
+  List<UserProfile> get allUsers => List<UserProfile>.unmodifiable(_usersById.values);
 
-  List<UserProfile> get allUsers => _usersById.values.toList();
   List<Conversation> get conversations {
-    if (_currentUser == null) return [];
-    return _conversationsById.values
-        .where((c) => c.participantIds.contains(_currentUser!.id))
-        .toList()
-      ..sort((a, b) {
-        if (a.isPinned && !b.isPinned) return -1;
-        if (!a.isPinned && b.isPinned) return 1;
-        return b.lastMessageTime.compareTo(a.lastMessageTime);
-      });
+    final values = _conversationsById.values.toList();
+    values.sort((a, b) {
+      if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
+      return b.lastMessageTime.compareTo(a.lastMessageTime);
+    });
+    return List<Conversation>.unmodifiable(values);
   }
 
-  List<ChatTask> get tasks {
-    if (_currentUser == null) return [];
-    return List.unmodifiable(_tasks.where((t) => 
-      t.creatorId == _currentUser!.id || t.assigneeIds.contains(_currentUser!.id)));
-  }
-
-  List<CallRecord> get calls {
-    if (_currentUser == null) return [];
-    return List.unmodifiable(_calls.where((c) => 
-      c.callerId == _currentUser!.id || c.participantIds.contains(_currentUser!.id)));
-  }
-
-  List<UpdateStory> get stories => List.unmodifiable(_stories);
-
-  List<LinkedDevice> get currentUserDevices {
-    if (_currentUser == null) return [];
-    return _devicesByUser[_currentUser!.id] ?? [];
-  }
+  List<ChatTask> get tasks => List<ChatTask>.unmodifiable(_tasks);
+  List<CallRecord> get calls => List<CallRecord>.unmodifiable(_calls);
+  List<UpdateStory> get stories => List<UpdateStory>.unmodifiable(_stories);
+  List<LinkedDevice> get currentUserDevices => List<LinkedDevice>.unmodifiable(_linkedDevices);
 
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    // Load authentic persisted state from disk
-    await _loadFromDisk();
+    _client.auth.onAuthStateChange.listen((AuthState state) {
+      unawaited(_handleSession(state.session));
+    });
 
+    await _handleSession(_client.auth.currentSession);
     _isInitialized = true;
     notifyListeners();
   }
 
-  /// Clear state in memory and delete disk database for test isolation
-  Future<void> clearStateForTesting() async {
-    _usersById.clear();
-    _userIdByNormalizedUsername.clear();
-    _userIdByEmail.clear();
-    _passwordsByUserId.clear();
-    _conversationsById.clear();
-    _messagesByChatId.clear();
-    _tasks.clear();
-    _stories.clear();
-    _calls.clear();
-    _currentUser = null;
-    try {
-      final file = await _getDataFile();
-      if (file.existsSync()) {
-        file.deleteSync();
-      }
-    } catch (_) {}
-    notifyListeners();
+  Future<void> _handleSession(Session? session) async {
+    if (session == null) {
+      await _removeRealtimeChannel();
+      _currentUser = null;
+      _currentSession = null;
+      _usersById.clear();
+      _conversationsById.clear();
+      _messagesByChatId.clear();
+      _tasks.clear();
+      _linkedDevices.clear();
+      notifyListeners();
+      return;
+    }
+
+    _currentSession = _mapSession(session);
+    await _hydrateAuthenticatedState();
+    await _subscribeRealtime();
   }
 
+  AuthSession _mapSession(Session session) {
+    final expiresSeconds = session.expiresAt ??
+        DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch ~/ 1000;
+    return AuthSession(
+      userId: session.user.id,
+      token: session.accessToken,
+      expiresAt: DateTime.fromMillisecondsSinceEpoch(expiresSeconds * 1000, isUtc: true),
+      deviceId: 'device_${session.user.id.substring(0, 8)}',
+    );
+  }
 
-  /// Internal registration helper
-
-  void _registerUserInternal(UserProfile user, String password) {
-    _usersById[user.id] = user;
-    _passwordsByUserId[user.id] = password;
-    final normalized = ChatyValidators.normalizeUsername(user.username);
-    _userIdByNormalizedUsername[normalized] = user.id;
-    if (user.email.isNotEmpty) {
-      _userIdByEmail[user.email.toLowerCase().trim()] = user.id;
+  Future<void> _hydrateAuthenticatedState() async {
+    if (_isHydrating) return;
+    _isHydrating = true;
+    try {
+      await _loadCurrentProfile();
+      await Future.wait<void>(<Future<void>>[
+        _loadConversations(),
+        _loadTasks(),
+      ]);
+      await _refreshLoadedMessageTimelines();
+      notifyListeners();
+    } finally {
+      _isHydrating = false;
     }
   }
 
-  // --- AUTHENTICATION & REGISTRATION API ---
+  Future<void> _loadCurrentProfile() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return;
 
-  /// Register a new real account
+    final row = await _client.from('profiles').select().eq('id', user.id).single();
+    final profile = _profileFromRow(
+      Map<String, dynamic>.from(row),
+      email: user.email ?? '',
+      phone: user.phone ?? '',
+    );
+    _currentUser = profile;
+    _usersById[profile.id] = profile;
+
+    unawaited(
+      _client
+          .from('profiles')
+          .update(<String, dynamic>{
+            'presence': 'online',
+            'last_seen_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', user.id),
+    );
+  }
+
+  Future<void> _loadConversations() async {
+    final raw = await _client.rpc('get_my_conversations');
+    final rows = _asRows(raw);
+    final next = <String, Conversation>{};
+
+    for (final row in rows) {
+      final id = row['conversation_id']?.toString() ?? '';
+      if (id.isEmpty) continue;
+      final participantIds = _stringList(row['participant_ids']);
+      final adminIds = _stringList(row['admin_ids']);
+
+      final conversation = Conversation(
+        id: id,
+        type: row['kind'] == 'group' ? ConversationType.group : ConversationType.direct,
+        title: row['title']?.toString() ?? 'Conversation',
+        participantIds: participantIds,
+        adminIds: adminIds,
+        avatarInitials: row['avatar_initials']?.toString(),
+        avatarColorHex: row['avatar_color_hex']?.toString(),
+        lastMessageText: row['last_message']?.toString() ?? '',
+        lastMessageTime: _date(row['last_message_at']) ?? DateTime.now(),
+        lastMessageSenderId: row['last_message_sender_id']?.toString() ?? '',
+        unreadCount: _integer(row['unread_count']),
+        isPinned: row['is_pinned'] == true,
+        isArchived: row['is_archived'] == true,
+        isMuted: row['is_muted'] == true,
+        draftText: row['draft_text']?.toString() ?? '',
+        encryptionStatus: EncryptionStatus.verificationNeeded,
+      );
+      next[id] = conversation;
+    }
+
+    _conversationsById
+      ..clear()
+      ..addAll(next);
+
+    await Future.wait<void>(next.keys.map(_loadConversationMembers));
+  }
+
+  Future<void> _loadConversationMembers(String conversationId) async {
+    final raw = await _client.rpc(
+      'get_conversation_members',
+      params: <String, dynamic>{'p_conversation_id': conversationId},
+    );
+    for (final row in _asRows(raw)) {
+      final profile = _profileFromRow(row);
+      _usersById[profile.id] = profile;
+    }
+  }
+
+  Future<void> ensureConversationLoaded(String conversationId) async {
+    if (!_conversationsById.containsKey(conversationId)) {
+      await _loadConversations();
+    }
+    await _loadConversationMembers(conversationId);
+    await _loadMessages(conversationId);
+    await markAsRead(conversationId);
+  }
+
+  Future<void> _loadMessages(String conversationId) async {
+    final raw = await _client.rpc(
+      'get_conversation_messages',
+      params: <String, dynamic>{
+        'p_conversation_id': conversationId,
+        'p_limit': 100,
+      },
+    );
+    final rows = _asRows(raw);
+    final messages = rows
+        .where((row) => row['is_hidden'] != true)
+        .map(_messageFromRow)
+        .toList()
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    _messagesByChatId[conversationId] = messages;
+  }
+
+  Future<void> _refreshLoadedMessageTimelines() async {
+    final ids = _messagesByChatId.keys.toList();
+    for (final id in ids) {
+      try {
+        await _loadMessages(id);
+      } catch (error, stackTrace) {
+        debugPrint('Chaty message reconciliation failed: $error\n$stackTrace');
+      }
+    }
+  }
+
+  Future<void> _loadTasks() async {
+    final raw = await _client.rpc('get_my_tasks');
+    final rows = _asRows(raw);
+    _tasks
+      ..clear()
+      ..addAll(rows.map(_taskFromRow));
+  }
+
+  Future<void> _subscribeRealtime() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return;
+    await _removeRealtimeChannel();
+
+    final channel = _client.channel('chaty-user-$userId');
+    channel
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'messages',
+          callback: (_) => _scheduleReconciliation(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'conversation_members',
+          callback: (_) => _scheduleReconciliation(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'message_reactions',
+          callback: (_) => _scheduleReconciliation(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'message_receipts',
+          callback: (_) => _scheduleReconciliation(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'tasks',
+          callback: (_) => _scheduleReconciliation(),
+        )
+        .subscribe();
+    _realtimeChannel = channel;
+  }
+
+  void _scheduleReconciliation() {
+    _reconcileTimer?.cancel();
+    _reconcileTimer = Timer(const Duration(milliseconds: 120), () async {
+      try {
+        await _hydrateAuthenticatedState();
+        eventBus.publish(RealtimeEvent(type: RealtimeEventType.conversationUpdated));
+      } catch (error, stackTrace) {
+        debugPrint('Chaty realtime reconciliation failed: $error\n$stackTrace');
+      }
+    });
+  }
+
+  Future<void> _removeRealtimeChannel() async {
+    _reconcileTimer?.cancel();
+    final channel = _realtimeChannel;
+    _realtimeChannel = null;
+    if (channel != null) {
+      try {
+        await _client.removeChannel(channel);
+      } catch (_) {}
+    }
+  }
+
   Future<UserProfile> registerUser({
     required String displayName,
     required String username,
@@ -155,288 +326,180 @@ class ChatyBackendService extends ChangeNotifier {
     String phone = '',
     String about = 'Hey there! I am using Chaty.',
   }) async {
-    // 1. Server-side validation
     final usernameError = ChatyValidators.validateUsername(username);
     if (usernameError != null) throw Exception(usernameError);
-
-    final passError = ChatyValidators.validatePassword(password);
-    if (passError != null) throw Exception(passError);
-
-    if (email.isNotEmpty) {
-      final emailError = ChatyValidators.validateEmail(email);
-      if (emailError != null) throw Exception(emailError);
+    final passwordError = ChatyValidators.validatePassword(password);
+    if (passwordError != null) throw Exception(passwordError);
+    if (displayName.trim().length < 2) throw Exception('Display name is required.');
+    if (email.trim().isEmpty || !email.contains('@')) {
+      throw Exception('A valid email is required for account verification.');
+    }
+    if (!await isUsernameAvailable(username)) {
+      throw Exception('That username is already taken.');
     }
 
-    final normalized = ChatyValidators.normalizeUsername(username);
-    if (_userIdByNormalizedUsername.containsKey(normalized)) {
-      throw Exception('Username @$username is already taken. Please choose another.');
-    }
+    final initials = _initials(displayName);
+    const color = '0xFF6366F1';
+    final response = await _client.auth.signUp(
+      email: email.trim().toLowerCase(),
+      password: password,
+      emailRedirectTo: 'chaty://login-callback/',
+      data: <String, dynamic>{
+        'display_name': displayName.trim(),
+        'username': ChatyValidators.normalizeUsername(username),
+        'about': about.trim(),
+        'phone': phone.trim(),
+        'avatar_initials': initials,
+        'avatar_color_hex': color,
+      },
+    );
 
-    if (email.isNotEmpty && _userIdByEmail.containsKey(email.toLowerCase().trim())) {
-      throw Exception('An account with email $email already exists.');
-    }
+    final authUser = response.user;
+    if (authUser == null) throw Exception('Unable to create the account.');
 
-    // 2. Generate immutable UUID
-    final userId = 'usr_${DateTime.now().millisecondsSinceEpoch}_${normalized.hashCode.abs().toString().substring(0, 4)}';
-    
-    // Derive initials & palette
-    final parts = displayName.trim().split(RegExp(r'\s+'));
-    final initials = parts.length > 1
-        ? '${parts[0][0]}${parts[1][0]}'.toUpperCase()
-        : displayName.substring(0, displayName.length >= 2 ? 2 : 1).toUpperCase();
-
-    final colors = [
-      '0xFF6366F1', '0xFF8B5CF6', '0xFFEC4899', '0xFF10B981', '0xFF06B6D4', '0xFFF59E0B'
-    ];
-    final colorHex = colors[userId.hashCode.abs() % colors.length];
-
-    final newUser = UserProfile(
-      id: userId,
+    final result = UserProfile(
+      id: authUser.id,
       displayName: displayName.trim(),
-      username: normalized,
+      username: ChatyValidators.normalizeUsername(username),
       avatarInitials: initials,
-      avatarColorHex: colorHex,
-      about: about,
-      presence: PresenceState.online,
+      avatarColorHex: color,
+      about: about.trim(),
+      presence: PresenceState.offline,
       lastSeenAt: DateTime.now(),
       isVerified: false,
-      email: email.trim(),
-      phone: phone.trim(),
+      email: authUser.email ?? email.trim(),
+      phone: authUser.phone ?? phone.trim(),
+      safetyNumber: '',
     );
 
-    _registerUserInternal(newUser, password);
-
-    // 3. Set Active Session
-    _currentUser = newUser;
-    _currentSession = AuthSession(
-      userId: newUser.id,
-      token: 'tok_${DateTime.now().millisecondsSinceEpoch}_${newUser.id}',
-      expiresAt: DateTime.now().add(const Duration(days: 30)),
-      deviceId: 'device_primary',
-    );
-
-    _devicesByUser[newUser.id] = [
-      LinkedDevice(
-        id: 'dev_${DateTime.now().millisecondsSinceEpoch}',
-        deviceName: 'Primary Mobile Device',
-        platform: defaultTargetPlatform.name,
-        lastActiveAt: DateTime.now(),
-        location: 'Current Session',
-        isCurrentDevice: true,
-      ),
-    ];
-
-    await _saveToDisk();
-    notifyListeners();
-    return newUser;
+    if (response.session != null) {
+      await _handleSession(response.session);
+    }
+    return result;
   }
 
-  /// Login with email or username and password
   Future<UserProfile> login({
     required String identifier,
     required String password,
   }) async {
-    final cleanId = identifier.trim().toLowerCase().replaceAll(RegExp(r'^@+'), '');
-    String? matchedUserId = _userIdByNormalizedUsername[cleanId] ?? _userIdByEmail[cleanId];
-
-    if (matchedUserId == null) {
-      throw Exception('Account not found for "$identifier".');
+    final value = identifier.trim();
+    if (!value.contains('@')) {
+      throw Exception('Sign in with your registered email address. Username discovery remains available after login.');
     }
-
-    final storedPass = _passwordsByUserId[matchedUserId];
-    if (storedPass != password) {
-      throw Exception('Incorrect password. Please try again.');
-    }
-
-    final user = _usersById[matchedUserId]!;
-    _currentUser = user;
-    _currentSession = AuthSession(
-      userId: user.id,
-      token: 'tok_${DateTime.now().millisecondsSinceEpoch}',
-      expiresAt: DateTime.now().add(const Duration(days: 30)),
-      deviceId: 'device_primary',
+    final response = await _client.auth.signInWithPassword(
+      email: value.toLowerCase(),
+      password: password,
     );
-
-    await _saveToDisk();
-    notifyListeners();
-    return user;
+    if (response.session == null || response.user == null) {
+      throw Exception('Unable to establish a secure session.');
+    }
+    await _handleSession(response.session);
+    final profile = _currentUser;
+    if (profile == null) throw Exception('Your profile could not be loaded.');
+    return profile;
   }
 
-  /// Social Login for Google, Apple, and Facebook
   Future<UserProfile> loginWithSocial({
     required String provider,
-    required String email,
-    required String displayName,
+    String email = '',
+    String displayName = '',
   }) async {
-    final cleanEmail = email.toLowerCase().trim();
-    String? matchedUserId = _userIdByEmail[cleanEmail];
+    throw Exception('$provider sign-in is not configured on the Chaty Supabase project yet. Use email/password sign-in.');
+  }
 
-    if (matchedUserId != null && _usersById.containsKey(matchedUserId)) {
-      final user = _usersById[matchedUserId]!;
-      _currentUser = user;
-      _currentSession = AuthSession(
-        userId: user.id,
-        token: 'tok_social_${DateTime.now().millisecondsSinceEpoch}_${user.id}',
-        expiresAt: DateTime.now().add(const Duration(days: 30)),
-        deviceId: 'device_primary',
-      );
-      await _saveToDisk();
-      notifyListeners();
-      return user;
-    }
-
-    final rawName = cleanEmail.split('@').first.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
-    final username = rawName.length >= 3 ? rawName : '${rawName}_usr';
-
-    return await registerUser(
-      displayName: displayName,
-      username: username,
-      password: 'social_pass_${DateTime.now().millisecondsSinceEpoch}',
-      email: cleanEmail,
-      about: 'Verified $provider user on Chaty',
+  Future<void> resetPassword(String email) async {
+    await _client.auth.resetPasswordForEmail(
+      email.trim().toLowerCase(),
+      redirectTo: 'chaty://reset-password/',
     );
   }
 
-  /// Reset password for an existing account
-  Future<bool> resetPassword({
-    required String identifier,
-    required String newPassword,
-  }) async {
-    final cleanId = identifier.trim().toLowerCase().replaceAll(RegExp(r'^@+'), '');
-    String? matchedUserId = _userIdByNormalizedUsername[cleanId] ?? _userIdByEmail[cleanId];
-
-    if (matchedUserId == null) {
-      throw Exception('No account found for "$identifier".');
-    }
-
-    final passError = ChatyValidators.validatePassword(newPassword);
-    if (passError != null) {
-      throw Exception(passError);
-    }
-
-    _passwordsByUserId[matchedUserId] = newPassword;
-    await _saveToDisk();
-    notifyListeners();
-    return true;
+  Future<bool> isUsernameAvailable(String username) async {
+    final error = ChatyValidators.validateUsername(username);
+    if (error != null) return false;
+    final raw = await _client.rpc(
+      'is_username_available',
+      params: <String, dynamic>{'p_username': ChatyValidators.normalizeUsername(username)},
+    );
+    return raw == true;
   }
 
-  /// Check username availability in real-time
-  bool isUsernameAvailable(String username) {
-    final normalized = ChatyValidators.normalizeUsername(username);
-    if (ChatyValidators.validateUsername(normalized) != null) return false;
-    return !_userIdByNormalizedUsername.containsKey(normalized);
-  }
+  UserProfile? getUserById(String id) => _usersById[id];
 
-  /// Search user by username
-  UserProfile? getUserByUsername(String username) {
-    final normalized = ChatyValidators.normalizeUsername(username);
-    final id = _userIdByNormalizedUsername[normalized];
-    if (id == null) return null;
-    return _usersById[id];
-  }
-
-  UserProfile? getUserById(String id) {
-    return _usersById[id];
-  }
-
-  /// Search users across registered userbase
   List<UserProfile> searchUsers(String query, {bool includeSelf = false}) {
-    final q = query.trim().toLowerCase().replaceAll(RegExp(r'^@+'), '');
-    if (q.isEmpty) return [];
-
-    return _usersById.values.where((u) {
-      if (!includeSelf && u.id == _currentUser?.id) return false;
-      return u.username.toLowerCase().contains(q) ||
-             u.displayName.toLowerCase().contains(q) ||
-             u.email.toLowerCase().contains(q);
+    final normalized = query.trim().replaceFirst('@', '').toLowerCase();
+    if (normalized.isEmpty) return <UserProfile>[];
+    return _usersById.values.where((user) {
+      if (!includeSelf && user.id == _currentUser?.id) return false;
+      return user.username.toLowerCase().contains(normalized) ||
+          user.displayName.toLowerCase().contains(normalized);
     }).toList();
   }
 
-
-  /// Start or retrieve direct conversation with a target user
-  Conversation getOrCreateDirectConversation(UserProfile otherUser) {
-    if (_currentUser == null) throw Exception('Must be logged in');
-
-    // Check if conversation already exists
-    for (final conv in _conversationsById.values) {
-      if (conv.type == ConversationType.direct &&
-          conv.participantIds.contains(_currentUser!.id) &&
-          conv.participantIds.contains(otherUser.id)) {
-        return conv;
-      }
+  Future<List<UserProfile>> searchUsersRemote(String query, {bool includeSelf = false}) async {
+    final trimmed = query.trim();
+    if (trimmed.length < 2) return <UserProfile>[];
+    final raw = await _client.rpc('search_profiles', params: <String, dynamic>{'p_query': trimmed});
+    final results = _asRows(raw).map(_profileFromRow).toList();
+    for (final profile in results) {
+      _usersById[profile.id] = profile;
     }
-
-    // Create new direct conversation
-    final newConvId = 'conv_${_currentUser!.id}_${otherUser.id}';
-    final conv = Conversation(
-      id: newConvId,
-      type: ConversationType.direct,
-      title: otherUser.displayName,
-      participantIds: [_currentUser!.id, otherUser.id],
-      avatarInitials: otherUser.avatarInitials,
-      avatarColorHex: otherUser.avatarColorHex,
-      lastMessageText: 'Conversation started',
-      lastMessageTime: DateTime.now(),
-      lastMessageSenderId: _currentUser!.id,
-      unreadCount: 0,
-      isPinned: false,
-    );
-
-    _conversationsById[newConvId] = conv;
-    _saveToDisk();
+    if (includeSelf && _currentUser != null) results.insert(0, _currentUser!);
     notifyListeners();
-    return conv;
+    return results;
   }
 
-  /// Create a new group conversation
+  Future<Conversation> getOrCreateDirectConversationAsync(UserProfile otherUser) async {
+    if (_currentUser == null) throw Exception('Authentication required.');
+    final raw = await _client.rpc(
+      'create_direct_conversation',
+      params: <String, dynamic>{'p_other_user_id': otherUser.id},
+    );
+    final id = raw?.toString() ?? '';
+    if (id.isEmpty) throw Exception('Unable to create conversation.');
+    _usersById[otherUser.id] = otherUser;
+    await _loadConversations();
+    await ensureConversationLoaded(id);
+    notifyListeners();
+    return _conversationsById[id]!;
+  }
+
+  Conversation getOrCreateDirectConversation(UserProfile otherUser) {
+    final me = _currentUser;
+    if (me != null) {
+      for (final conversation in _conversationsById.values) {
+        if (conversation.type == ConversationType.direct &&
+            conversation.participantIds.contains(me.id) &&
+            conversation.participantIds.contains(otherUser.id)) {
+          return conversation;
+        }
+      }
+    }
+    throw StateError('Conversation is not loaded. Use getOrCreateDirectConversationAsync().');
+  }
+
   Future<Conversation> createGroup({
     required String title,
     required List<String> memberUserIds,
     String? avatarInitials,
     String? avatarColorHex,
   }) async {
-    if (_currentUser == null) throw Exception('Must be logged in');
-
-    final groupId = 'grp_${DateTime.now().millisecondsSinceEpoch}';
-    final allParticipants = [_currentUser!.id, ...memberUserIds];
-    
-    final group = Conversation(
-      id: groupId,
-      type: ConversationType.group,
-      title: title.trim(),
-      participantIds: allParticipants,
-      adminIds: [_currentUser!.id],
-      avatarInitials: avatarInitials ?? (title.length >= 2 ? title.substring(0, 2).toUpperCase() : 'GP'),
-      avatarColorHex: avatarColorHex ?? '0xFF8B5CF6',
-      lastMessageText: 'Group created with ${allParticipants.length} members',
-      lastMessageTime: DateTime.now(),
-      lastMessageSenderId: _currentUser!.id,
-      unreadCount: 0,
+    final raw = await _client.rpc(
+      'create_group_conversation',
+      params: <String, dynamic>{
+        'p_title': title.trim(),
+        'p_member_ids': memberUserIds,
+      },
     );
-
-    _conversationsById[groupId] = group;
-    _messagesByChatId[groupId] = [
-      ChatMessage(
-        id: 'msg_init_${DateTime.now().millisecondsSinceEpoch}',
-        conversationId: groupId,
-        senderId: 'system',
-        type: MessageType.system,
-        text: '${_currentUser!.displayName} created group "$title"',
-        createdAt: DateTime.now(),
-        deliveryState: DeliveryState.delivered,
-      ),
-    ];
-
-    await _saveToDisk();
+    final id = raw?.toString() ?? '';
+    if (id.isEmpty) throw Exception('Unable to create group.');
+    await _loadConversations();
     notifyListeners();
-    return group;
+    return _conversationsById[id]!;
   }
 
-  // --- MESSAGES API ---
-
-  List<ChatMessage> getMessages(String conversationId) {
-    return _messagesByChatId[conversationId] ?? [];
-  }
+  List<ChatMessage> getMessages(String conversationId) =>
+      List<ChatMessage>.unmodifiable(_messagesByChatId[conversationId] ?? const <ChatMessage>[]);
 
   Future<ChatMessage> sendMessage({
     required String conversationId,
@@ -448,118 +511,137 @@ class ChatyBackendService extends ChangeNotifier {
     String? replyToSenderName,
     String? linkedTaskId,
   }) async {
-    if (_currentUser == null) throw Exception('Must be logged in');
+    final me = _currentUser;
+    if (me == null) throw Exception('Authentication required.');
+    if (!_conversationsById.containsKey(conversationId)) throw Exception('Conversation not found.');
 
-    final msgId = 'msg_${DateTime.now().millisecondsSinceEpoch}_${_currentUser!.id.substring(0, 4)}';
-    final now = DateTime.now();
+    final clientMessageId = _uuid.v4();
+    final metadata = <String, dynamic>{
+      if (replyToMessageId != null) 'reply_to_message_id': replyToMessageId,
+      if (replyToPreviewText != null) 'reply_to_preview_text': replyToPreviewText,
+      if (replyToSenderName != null) 'reply_to_sender_name': replyToSenderName,
+      if (linkedTaskId != null) 'linked_task_id': linkedTaskId,
+      if (attachment != null)
+        'attachment': <String, dynamic>{
+          'id': attachment.id,
+          'type': attachment.type,
+          'name': attachment.name,
+          'size': attachment.size,
+          'url': attachment.url,
+          'duration_seconds': attachment.durationSeconds,
+        },
+    };
 
-    final message = ChatMessage(
-      id: msgId,
-      conversationId: conversationId,
-      senderId: _currentUser!.id,
-      type: type,
-      text: text,
-      attachment: attachment,
-      replyToMessageId: replyToMessageId,
-      replyToPreviewText: replyToPreviewText,
-      replyToSenderName: replyToSenderName,
-      linkedTaskId: linkedTaskId,
-      createdAt: now,
-      deliveryState: DeliveryState.sent,
+    final raw = await _client.rpc(
+      'send_message',
+      params: <String, dynamic>{
+        'p_conversation_id': conversationId,
+        'p_client_message_id': clientMessageId,
+        'p_body': text.trim(),
+        'p_type': _messageTypeToDatabase(type),
+        'p_metadata': metadata,
+      },
     );
+    final messageId = raw?.toString() ?? '';
+    await Future.wait<void>(<Future<void>>[_loadMessages(conversationId), _loadConversations()]);
+    notifyListeners();
 
-    _messagesByChatId.putIfAbsent(conversationId, () => []).add(message);
-
-    // Update conversation metadata
-    final conv = _conversationsById[conversationId];
-    if (conv != null) {
-      _conversationsById[conversationId] = conv.copyWith(
-        lastMessageText: text.isNotEmpty ? text : (attachment?.name ?? 'Attachment'),
-        lastMessageTime: now,
-        lastMessageSenderId: _currentUser!.id,
-      );
-    }
-
-    eventBus.publish(
-      RealtimeEvent(
-        type: RealtimeEventType.messageCreated,
+    final result = _messagesByChatId[conversationId]!.firstWhere(
+      (message) => message.id == messageId,
+      orElse: () => ChatMessage(
+        id: messageId,
         conversationId: conversationId,
-        userId: _currentUser!.id,
-        payload: {'messageId': msgId, 'text': text},
+        senderId: me.id,
+        type: type,
+        text: text.trim(),
+        attachment: attachment,
+        createdAt: DateTime.now(),
+        deliveryState: DeliveryState.sent,
       ),
     );
-
-    await _saveToDisk();
-    notifyListeners();
-    return message;
+    eventBus.publish(RealtimeEvent(
+      type: RealtimeEventType.messageCreated,
+      conversationId: conversationId,
+      userId: me.id,
+      payload: <String, dynamic>{'messageId': result.id},
+    ));
+    return result;
   }
 
   void toggleReaction(String conversationId, String messageId, String emoji) {
-    if (_currentUser == null) return;
-    final messages = _messagesByChatId[conversationId];
-    if (messages == null) return;
+    unawaited(_toggleReactionAsync(conversationId, messageId, emoji));
+  }
 
-    final index = messages.indexWhere((m) => m.id == messageId);
-    if (index == -1) return;
-
-    final msg = messages[index];
-    final currentReactions = List<MessageReaction>.from(msg.reactions);
-    final reactionIndex = currentReactions.indexWhere((r) => r.emoji == emoji);
-
-    if (reactionIndex >= 0) {
-      final r = currentReactions[reactionIndex];
-      final userIds = List<String>.from(r.userIds);
-      if (userIds.contains(_currentUser!.id)) {
-        userIds.remove(_currentUser!.id);
-        if (userIds.isEmpty) {
-          currentReactions.removeAt(reactionIndex);
-        } else {
-          currentReactions[reactionIndex] = r.copyWith(userIds: userIds);
-        }
-      } else {
-        userIds.add(_currentUser!.id);
-        currentReactions[reactionIndex] = r.copyWith(userIds: userIds);
-      }
-    } else {
-      currentReactions.add(MessageReaction(emoji: emoji, userIds: [_currentUser!.id]));
-    }
-
-    messages[index] = msg.copyWith(reactions: currentReactions);
-    _saveToDisk();
+  Future<void> _toggleReactionAsync(String conversationId, String messageId, String emoji) async {
+    await _client.rpc('toggle_message_reaction', params: <String, dynamic>{
+      'p_message_id': messageId,
+      'p_emoji': emoji,
+    });
+    await _loadMessages(conversationId);
     notifyListeners();
   }
 
   void deleteMessage(String conversationId, String messageId, {bool forEveryone = false}) {
-    final messages = _messagesByChatId[conversationId];
-    if (messages == null) return;
+    unawaited(_deleteMessageAsync(conversationId, messageId, forEveryone));
+  }
 
-    final index = messages.indexWhere((m) => m.id == messageId);
-    if (index == -1) return;
-
-    if (forEveryone) {
-      messages[index] = messages[index].copyWith(
-        isDeletedForEveryone: true,
-        text: 'This message was deleted',
-      );
-    } else {
-      messages[index] = messages[index].copyWith(isDeletedForMe: true);
-    }
-
-    _saveToDisk();
+  Future<void> _deleteMessageAsync(String conversationId, String messageId, bool forEveryone) async {
+    await _client.rpc('delete_chat_message', params: <String, dynamic>{
+      'p_message_id': messageId,
+      'p_for_everyone': forEveryone,
+    });
+    await Future.wait<void>(<Future<void>>[_loadMessages(conversationId), _loadConversations()]);
     notifyListeners();
   }
 
-  void markAsRead(String conversationId) {
-    final conv = _conversationsById[conversationId];
-    if (conv != null && conv.unreadCount > 0) {
-      _conversationsById[conversationId] = conv.copyWith(unreadCount: 0);
-      _saveToDisk();
-      notifyListeners();
-    }
+  Future<void> markAsRead(String conversationId) async {
+    await _client.rpc('mark_conversation_read', params: <String, dynamic>{'p_conversation_id': conversationId});
+    await _loadConversations();
+    if (_messagesByChatId.containsKey(conversationId)) await _loadMessages(conversationId);
+    notifyListeners();
   }
 
-  // --- TASKS API ---
-  void createTask({
+  void setConversationState(String conversationId, String field, bool value) {
+    unawaited(_setConversationStateAsync(conversationId, field, value));
+  }
+
+  Future<void> _setConversationStateAsync(String conversationId, String field, bool value) async {
+    await _client.rpc('set_conversation_state', params: <String, dynamic>{
+      'p_conversation_id': conversationId,
+      'p_field': field,
+      'p_value': value,
+    });
+    await _loadConversations();
+    notifyListeners();
+  }
+
+  void setMessageState(String conversationId, String messageId, String field, bool value) {
+    unawaited(_setMessageStateAsync(conversationId, messageId, field, value));
+  }
+
+  Future<void> _setMessageStateAsync(String conversationId, String messageId, String field, bool value) async {
+    await _client.rpc('set_message_user_state', params: <String, dynamic>{
+      'p_message_id': messageId,
+      'p_field': field,
+      'p_value': value,
+    });
+    await _loadMessages(conversationId);
+    notifyListeners();
+  }
+
+  void setDraft(String conversationId, String draft) {
+    final current = _conversationsById[conversationId];
+    if (current != null) {
+      _conversationsById[conversationId] = current.copyWith(draftText: draft);
+      notifyListeners();
+    }
+    unawaited(_client.rpc('set_conversation_draft', params: <String, dynamic>{
+      'p_conversation_id': conversationId,
+      'p_draft': draft,
+    }));
+  }
+
+  Future<ChatTask> createTask({
     required String sourceConversationId,
     String? sourceMessageId,
     required String title,
@@ -567,357 +649,303 @@ class ChatyBackendService extends ChangeNotifier {
     required List<String> assigneeIds,
     required TaskPriority priority,
     required DateTime dueAt,
-    List<String> labels = const [],
-  }) {
-    if (_currentUser == null) return;
-    final taskId = 'task_${DateTime.now().millisecondsSinceEpoch}';
-    final newTask = ChatTask(
-      id: taskId,
-      sourceConversationId: sourceConversationId,
-      sourceMessageId: sourceMessageId,
-      title: title,
-      description: description,
-      creatorId: _currentUser!.id,
-      assigneeIds: assigneeIds,
-      status: TaskStatus.assigned,
-      priority: priority,
-      dueAt: dueAt,
-      labels: labels,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-      activities: [
-        TaskActivity(
-          id: 'act_${DateTime.now().millisecondsSinceEpoch}',
-          userId: _currentUser!.id,
-          text: 'Created task "$title"',
-          timestamp: DateTime.now(),
-        ),
-      ],
-    );
-
-    _tasks.insert(0, newTask);
-
-    // Also send task card message into the conversation
-    sendMessage(
-      conversationId: sourceConversationId,
-      text: title,
-      type: MessageType.taskCard,
-      linkedTaskId: taskId,
-    );
-
-    _saveToDisk();
+    List<String> labels = const <String>[],
+  }) async {
+    final clientTaskId = _uuid.v4();
+    final raw = await _client.rpc('create_chat_task', params: <String, dynamic>{
+      'p_conversation_id': sourceConversationId,
+      'p_client_task_id': clientTaskId,
+      'p_title': title.trim(),
+      'p_assignee_ids': assigneeIds,
+      'p_priority': _taskPriorityToDatabase(priority),
+      'p_due_at': dueAt.toUtc().toIso8601String(),
+      'p_description': description.trim(),
+      'p_labels': labels,
+      'p_source_message_id': sourceMessageId,
+    });
+    final id = raw?.toString() ?? '';
+    await Future.wait<void>(<Future<void>>[
+      _loadTasks(),
+      _loadConversations(),
+      if (_messagesByChatId.containsKey(sourceConversationId)) _loadMessages(sourceConversationId),
+    ]);
     notifyListeners();
+    return _tasks.firstWhere((task) => task.id == id);
   }
 
   void updateTaskStatus(String taskId, TaskStatus status) {
-    if (_currentUser == null) return;
-    final idx = _tasks.indexWhere((t) => t.id == taskId);
-    if (idx != -1) {
-      final task = _tasks[idx];
-      final activities = List<TaskActivity>.from(task.activities);
-      activities.add(TaskActivity(
-        id: 'act_${DateTime.now().millisecondsSinceEpoch}',
-        userId: _currentUser!.id,
-        text: 'Changed status to ${status.name}',
-        timestamp: DateTime.now(),
-      ));
-      _tasks[idx] = task.copyWith(
-        status: status,
-        updatedAt: DateTime.now(),
-        activities: activities,
-      );
-      _saveToDisk();
-      notifyListeners();
-    }
+    unawaited(_updateTaskStatusAsync(taskId, status));
   }
 
-  // --- STORIES / UPDATES API ---
-  void addStory(String content) {
-    if (_currentUser == null) return;
-    final story = UpdateStory(
-      id: 'story_${DateTime.now().millisecondsSinceEpoch}',
-      userId: _currentUser!.id,
-      content: content,
-      timestamp: DateTime.now(),
-    );
-    _stories.insert(0, story);
-    _saveToDisk();
+  Future<void> _updateTaskStatusAsync(String taskId, TaskStatus status) async {
+    await _client.rpc('update_task_status', params: <String, dynamic>{
+      'p_task_id': taskId,
+      'p_status': _taskStatusToDatabase(status),
+    });
+    await _loadTasks();
+    await _refreshLoadedMessageTimelines();
     notifyListeners();
   }
 
-  void markStoryViewed(String storyId) {
-    final idx = _stories.indexWhere((s) => s.id == storyId);
-    if (idx != -1) {
-      _stories[idx] = _stories[idx].copyWith(isViewed: true);
-      _saveToDisk();
-      notifyListeners();
+  Future<void> updateCurrentUser(UserProfile updated) async {
+    final authUser = _client.auth.currentUser;
+    if (authUser == null || authUser.id != updated.id) {
+      throw Exception('You can only update the signed-in profile.');
     }
+    await _client.from('profiles').update(<String, dynamic>{
+      'username': ChatyValidators.normalizeUsername(updated.username),
+      'display_name': updated.displayName.trim(),
+      'about': updated.about.trim(),
+      'phone': updated.phone.trim(),
+      'avatar_initials': updated.avatarInitials,
+      'avatar_color_hex': updated.avatarColorHex,
+      'presence': _presenceToDatabase(updated.presence),
+      'last_seen_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', authUser.id);
+    await _loadCurrentProfile();
+    notifyListeners();
   }
 
-  // --- CALL LOGS API ---
+  Future<void> setPresence(PresenceState presence) async {
+    final authUser = _client.auth.currentUser;
+    if (authUser == null) return;
+    await _client.from('profiles').update(<String, dynamic>{
+      'presence': _presenceToDatabase(presence),
+      'last_seen_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', authUser.id);
+  }
+
+  void addStory(String content) {
+    throw UnsupportedError('Status publishing requires the production media/status service.');
+  }
+
+  void markStoryViewed(String storyId) {}
+
   void logCall({
     required String receiverId,
     required CallType type,
     required CallDirection direction,
     required int durationSeconds,
-  }) {
-    if (_currentUser == null) return;
-    final record = CallRecord(
-      id: 'call_${DateTime.now().millisecondsSinceEpoch}',
-      callerId: direction == CallDirection.outgoing ? _currentUser!.id : receiverId,
-      participantIds: [_currentUser!.id, receiverId],
-      type: type,
-      direction: direction,
-      timestamp: DateTime.now(),
-      durationSeconds: durationSeconds,
-    );
-    _calls.insert(0, record);
-    _saveToDisk();
-    notifyListeners();
-  }
+  }) {}
 
-  // --- LINKED DEVICES API ---
   void revokeLinkedDevice(String deviceId) {
-    if (_currentUser == null) return;
-    final devices = _devicesByUser[_currentUser!.id];
-    if (devices != null) {
-      devices.removeWhere((d) => d.id == deviceId);
-      _saveToDisk();
-      notifyListeners();
-    }
-  }
-
-  // --- PROFILE UPDATE ---
-  void updateCurrentUser(UserProfile updated) {
-    _currentUser = updated;
-    _usersById[updated.id] = updated;
-    _saveToDisk();
+    _linkedDevices.removeWhere((device) => device.id == deviceId && !device.isCurrentDevice);
     notifyListeners();
   }
 
-  void logout() {
-    _currentUser = null;
-    _currentSession = null;
-    _saveToDisk();
-    notifyListeners();
+  Future<void> logout() async {
+    try {
+      await setPresence(PresenceState.offline);
+    } catch (_) {}
+    await _client.auth.signOut();
+    await _handleSession(null);
   }
 
-  // --- PERSISTENCE ---
+  Future<void> clearStateForTesting() async {
+    await logout();
+  }
 
-  Future<File> _getDataFile() async {
-    try {
-      final docDir = await getApplicationDocumentsDirectory();
-      final dir = Directory('${docDir.path}/.chaty_data');
-      if (!await dir.exists()) {
-        await dir.create(recursive: true);
+  UserProfile _profileFromRow(Map<String, dynamic> row, {String email = '', String phone = ''}) {
+    return UserProfile(
+      id: row['id']?.toString() ?? '',
+      displayName: row['display_name']?.toString() ?? 'Chaty User',
+      username: row['username']?.toString() ?? 'user',
+      avatarInitials: row['avatar_initials']?.toString() ?? 'CU',
+      avatarColorHex: row['avatar_color_hex']?.toString() ?? '0xFF6366F1',
+      about: row['about']?.toString() ?? row['bio']?.toString() ?? '',
+      presence: _presenceFromDatabase(row['presence']?.toString()),
+      lastSeenAt: _date(row['last_seen_at']) ?? DateTime.now(),
+      isVerified: row['is_verified'] == true,
+      email: email,
+      phone: phone.isNotEmpty ? phone : (row['phone']?.toString() ?? ''),
+      safetyNumber: '',
+    );
+  }
+
+  ChatMessage _messageFromRow(Map<String, dynamic> row) {
+    final metadata = _stringDynamicMap(row['metadata']);
+    final attachmentJson = _stringDynamicMap(metadata['attachment']);
+    final reactions = <MessageReaction>[];
+    final rawReactions = row['reactions'];
+    if (rawReactions is List) {
+      for (final raw in rawReactions) {
+        final item = _stringDynamicMap(raw);
+        reactions.add(MessageReaction(
+          emoji: item['emoji']?.toString() ?? '',
+          userIds: _stringList(item['user_ids']),
+        ));
       }
-      return File('${dir.path}/backend_state.json');
-    } catch (_) {
-      // Fallback for tests or environments without native plugins
-      final dir = Directory('.chaty_data');
-      if (!dir.existsSync()) {
-        dir.createSync(recursive: true);
-      }
-      return File('.chaty_data/backend_state.json');
+    }
+
+    final deletedAt = _date(row['deleted_at']);
+    final senderId = row['sender_id']?.toString() ?? '';
+    final isReadByOther = row['is_read_by_other'] == true;
+    final isMine = senderId == _currentUser?.id;
+
+    return ChatMessage(
+      id: row['id']?.toString() ?? '',
+      conversationId: row['conversation_id']?.toString() ?? '',
+      senderId: senderId,
+      type: _messageTypeFromDatabase(row['type']?.toString()),
+      text: deletedAt == null ? (row['body']?.toString() ?? '') : 'This message was deleted',
+      attachment: attachmentJson.isEmpty
+          ? null
+          : MessageAttachment(
+              id: attachmentJson['id']?.toString() ?? '',
+              type: attachmentJson['type']?.toString() ?? 'document',
+              name: attachmentJson['name']?.toString() ?? 'Attachment',
+              size: attachmentJson['size']?.toString() ?? '',
+              url: attachmentJson['url']?.toString(),
+              durationSeconds: _integer(attachmentJson['duration_seconds']),
+            ),
+      replyToMessageId: metadata['reply_to_message_id']?.toString(),
+      replyToPreviewText: metadata['reply_to_preview_text']?.toString(),
+      replyToSenderName: metadata['reply_to_sender_name']?.toString(),
+      linkedTaskId: metadata['task_id']?.toString() ?? metadata['linked_task_id']?.toString(),
+      reactions: reactions,
+      createdAt: _date(row['created_at']) ?? DateTime.now(),
+      editedAt: _date(row['edited_at']),
+      deliveryState: isMine ? (isReadByOther ? DeliveryState.read : DeliveryState.sent) : DeliveryState.delivered,
+      isPinned: row['is_pinned'] == true,
+      isStarred: row['is_starred'] == true,
+      isDeletedForEveryone: deletedAt != null,
+      isDeletedForMe: row['is_hidden'] == true,
+    );
+  }
+
+  ChatTask _taskFromRow(Map<String, dynamic> row) {
+    final createdAt = _date(row['created_at']) ?? DateTime.now();
+    return ChatTask(
+      id: row['task_id']?.toString() ?? '',
+      sourceConversationId: row['conversation_id']?.toString() ?? '',
+      sourceMessageId: row['source_message_id']?.toString(),
+      title: row['title']?.toString() ?? '',
+      description: row['description']?.toString() ?? '',
+      creatorId: row['creator_id']?.toString() ?? '',
+      assigneeIds: _stringList(row['assignee_ids']),
+      status: _taskStatusFromDatabase(row['status']?.toString()),
+      priority: _taskPriorityFromDatabase(row['priority']?.toString()),
+      dueAt: _date(row['due_at']) ?? createdAt.add(const Duration(days: 3)),
+      labels: _stringList(row['labels']),
+      createdAt: createdAt,
+      updatedAt: _date(row['updated_at']) ?? createdAt,
+    );
+  }
+
+  static List<Map<String, dynamic>> _asRows(dynamic value) {
+    if (value is! List) return <Map<String, dynamic>>[];
+    return value.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+  }
+
+  static Map<String, dynamic> _stringDynamicMap(dynamic value) {
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return <String, dynamic>{};
+  }
+
+  static List<String> _stringList(dynamic value) {
+    if (value is List) return value.map((item) => item.toString()).toList();
+    return <String>[];
+  }
+
+  static DateTime? _date(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value.toLocal();
+    return DateTime.tryParse(value.toString())?.toLocal();
+  }
+
+  static int _integer(dynamic value) {
+    if (value is int) return value;
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static String _initials(String name) {
+    final words = name.trim().split(RegExp(r'\s+')).where((word) => word.isNotEmpty).toList();
+    if (words.isEmpty) return 'CU';
+    if (words.length == 1) return words.first.substring(0, words.first.length >= 2 ? 2 : 1).toUpperCase();
+    return '${words.first[0]}${words.last[0]}'.toUpperCase();
+  }
+
+  static PresenceState _presenceFromDatabase(String? value) {
+    switch (value) {
+      case 'online': return PresenceState.online;
+      case 'away': return PresenceState.away;
+      case 'typing': return PresenceState.typing;
+      default: return PresenceState.offline;
     }
   }
 
-  Future<void> _saveToDisk() async {
-    try {
-      final file = await _getDataFile();
-
-      final data = {
-
-        'currentUserId': _currentUser?.id,
-        'currentSession': _currentSession?.toJson(),
-        'users': _usersById.values.map((u) => {
-          'id': u.id,
-          'displayName': u.displayName,
-          'username': u.username,
-          'avatarInitials': u.avatarInitials,
-          'avatarColorHex': u.avatarColorHex,
-          'about': u.about,
-          'isVerified': u.isVerified,
-          'email': u.email,
-          'phone': u.phone,
-        }).toList(),
-        'passwords': _passwordsByUserId,
-        'conversations': _conversationsById.values.map((c) => {
-          'id': c.id,
-          'type': c.type.name,
-          'title': c.title,
-          'participantIds': c.participantIds,
-          'adminIds': c.adminIds,
-          'avatarInitials': c.avatarInitials,
-          'avatarColorHex': c.avatarColorHex,
-          'lastMessageText': c.lastMessageText,
-          'lastMessageTime': c.lastMessageTime.toIso8601String(),
-          'lastMessageSenderId': c.lastMessageSenderId,
-          'unreadCount': c.unreadCount,
-          'isPinned': c.isPinned,
-          'isArchived': c.isArchived,
-          'isMuted': c.isMuted,
-        }).toList(),
-        'messages': _messagesByChatId.map((chatId, msgs) => MapEntry(
-          chatId,
-          msgs.map((m) => {
-            'id': m.id,
-            'conversationId': m.conversationId,
-            'senderId': m.senderId,
-            'type': m.type.name,
-            'text': m.text,
-            'linkedTaskId': m.linkedTaskId,
-            'createdAt': m.createdAt.toIso8601String(),
-            'deliveryState': m.deliveryState.name,
-            'reactions': m.reactions.map((r) => {'emoji': r.emoji, 'userIds': r.userIds}).toList(),
-          }).toList(),
-        )),
-        'stories': _stories.map((s) => {
-          'id': s.id,
-          'userId': s.userId,
-          'content': s.content,
-          'timestamp': s.timestamp.toIso8601String(),
-          'isViewed': s.isViewed,
-        }).toList(),
-        'calls': _calls.map((c) => {
-          'id': c.id,
-          'callerId': c.callerId,
-          'participantIds': c.participantIds,
-          'type': c.type.name,
-          'direction': c.direction.name,
-          'timestamp': c.timestamp.toIso8601String(),
-          'durationSeconds': c.durationSeconds,
-        }).toList(),
-      };
-
-      await file.writeAsString(jsonEncode(data));
-
-
-    } catch (e) {
-      debugPrint('Persistence warning: $e');
+  static String _presenceToDatabase(PresenceState value) {
+    switch (value) {
+      case PresenceState.online: return 'online';
+      case PresenceState.away: return 'away';
+      case PresenceState.typing: return 'typing';
+      case PresenceState.offline: return 'offline';
     }
   }
 
-  Future<void> _loadFromDisk() async {
-    try {
-      final file = await _getDataFile();
-      if (!await file.exists()) return;
-      final content = await file.readAsString();
-      if (content.trim().isEmpty) return;
-      final data = jsonDecode(content) as Map<String, dynamic>;
+  static MessageType _messageTypeFromDatabase(String? value) {
+    switch (value) {
+      case 'image': return MessageType.image;
+      case 'video': return MessageType.video;
+      case 'audio': return MessageType.audio;
+      case 'document': return MessageType.document;
+      case 'location': return MessageType.location;
+      case 'contact': return MessageType.contact;
+      case 'task': return MessageType.taskCard;
+      case 'system': return MessageType.system;
+      default: return MessageType.text;
+    }
+  }
 
+  static String _messageTypeToDatabase(MessageType value) {
+    switch (value) {
+      case MessageType.image: return 'image';
+      case MessageType.video: return 'video';
+      case MessageType.audio: return 'audio';
+      case MessageType.document: return 'document';
+      case MessageType.location: return 'location';
+      case MessageType.contact: return 'contact';
+      case MessageType.taskCard: return 'task';
+      case MessageType.system: return 'system';
+      case MessageType.text: return 'text';
+    }
+  }
 
-      if (data['users'] != null) {
-        for (final u in data['users'] as List) {
-          final user = UserProfile(
-            id: u['id'] as String,
-            displayName: u['displayName'] as String,
-            username: u['username'] as String,
-            avatarInitials: u['avatarInitials'] as String,
-            avatarColorHex: u['avatarColorHex'] as String,
-            about: u['about'] as String,
-            presence: PresenceState.online,
-            lastSeenAt: DateTime.now(),
-            isVerified: u['isVerified'] as bool? ?? false,
-            email: u['email'] as String? ?? '',
-          );
-          final password = data['passwords']?[user.id] as String?;
-          if (password == null) {
-            throw Exception('Missing password for user ${user.id}');
-          }
-          _registerUserInternal(user, password);
-        }
-      }
+  static TaskPriority _taskPriorityFromDatabase(String? value) {
+    switch (value) {
+      case 'low': return TaskPriority.low;
+      case 'high': return TaskPriority.high;
+      case 'urgent': return TaskPriority.urgent;
+      default: return TaskPriority.medium;
+    }
+  }
 
-      if (data['conversations'] != null) {
-        for (final c in data['conversations'] as List) {
-          final conv = Conversation(
-            id: c['id'] as String,
-            type: (c['type'] == 'group') ? ConversationType.group : ConversationType.direct,
-            title: c['title'] as String,
-            participantIds: List<String>.from(c['participantIds'] as List),
-            adminIds: List<String>.from(c['adminIds'] as List? ?? []),
-            avatarInitials: c['avatarInitials'] as String?,
-            avatarColorHex: c['avatarColorHex'] as String?,
-            lastMessageText: c['lastMessageText'] as String,
-            lastMessageTime: DateTime.parse(c['lastMessageTime'] as String),
-            lastMessageSenderId: c['lastMessageSenderId'] as String,
-            unreadCount: c['unreadCount'] as int? ?? 0,
-            isPinned: c['isPinned'] as bool? ?? false,
-            isArchived: c['isArchived'] as bool? ?? false,
-            isMuted: c['isMuted'] as bool? ?? false,
-          );
-          _conversationsById[conv.id] = conv;
-        }
-      }
+  static String _taskPriorityToDatabase(TaskPriority value) {
+    switch (value) {
+      case TaskPriority.low: return 'low';
+      case TaskPriority.medium: return 'normal';
+      case TaskPriority.high: return 'high';
+      case TaskPriority.urgent: return 'urgent';
+    }
+  }
 
-      if (data['messages'] != null) {
-        final msgMap = data['messages'] as Map<String, dynamic>;
-        msgMap.forEach((chatId, msgList) {
-          _messagesByChatId[chatId] = (msgList as List).map((m) {
-            final reactionsList = (m['reactions'] as List? ?? []).map((r) => MessageReaction(
-              emoji: r['emoji'] as String,
-              userIds: List<String>.from(r['userIds'] as List),
-            )).toList();
+  static TaskStatus _taskStatusFromDatabase(String? value) {
+    switch (value) {
+      case 'in_progress': return TaskStatus.inProgress;
+      case 'completed': return TaskStatus.completed;
+      case 'cancelled': return TaskStatus.archived;
+      default: return TaskStatus.inbox;
+    }
+  }
 
-            return ChatMessage(
-              id: m['id'] as String,
-              conversationId: m['conversationId'] as String,
-              senderId: m['senderId'] as String,
-              type: MessageType.values.firstWhere(
-                (t) => t.name == m['type'],
-                orElse: () => MessageType.text,
-              ),
-              text: m['text'] as String,
-              linkedTaskId: m['linkedTaskId'] as String?,
-              createdAt: DateTime.parse(m['createdAt'] as String),
-              deliveryState: DeliveryState.values.firstWhere(
-                (d) => d.name == m['deliveryState'],
-                orElse: () => DeliveryState.delivered,
-              ),
-              reactions: reactionsList,
-            );
-          }).toList();
-        });
-      }
-
-      if (data['stories'] != null) {
-        for (final s in data['stories'] as List) {
-          _stories.add(UpdateStory(
-            id: s['id'] as String,
-            userId: s['userId'] as String,
-            content: s['content'] as String,
-            timestamp: DateTime.parse(s['timestamp'] as String),
-            isViewed: s['isViewed'] as bool? ?? false,
-          ));
-        }
-      }
-
-      if (data['calls'] != null) {
-        for (final c in data['calls'] as List) {
-          _calls.add(CallRecord(
-            id: c['id'] as String,
-            callerId: c['callerId'] as String,
-            participantIds: List<String>.from(c['participantIds'] as List? ?? [c['callerId'] as String]),
-            type: CallType.values.firstWhere((t) => t.name == c['type'], orElse: () => CallType.voice),
-            direction: CallDirection.values.firstWhere((d) => d.name == c['direction'], orElse: () => CallDirection.incoming),
-            timestamp: DateTime.parse(c['timestamp'] as String),
-            durationSeconds: c['durationSeconds'] as int? ?? 0,
-          ));
-        }
-      }
-
-
-      final curId = data['currentUserId'] as String?;
-      if (curId != null && _usersById.containsKey(curId)) {
-        _currentUser = _usersById[curId];
-      }
-
-      if (data['currentSession'] != null) {
-        _currentSession = AuthSession.fromJson(data['currentSession'] as Map<String, dynamic>);
-      }
-    } catch (e) {
-      debugPrint('Load state error: $e');
+  static String _taskStatusToDatabase(TaskStatus value) {
+    switch (value) {
+      case TaskStatus.inProgress: return 'in_progress';
+      case TaskStatus.completed: return 'completed';
+      case TaskStatus.archived: return 'cancelled';
+      case TaskStatus.blocked: return 'in_progress';
+      case TaskStatus.assigned: return 'todo';
+      case TaskStatus.inbox: return 'todo';
     }
   }
 }

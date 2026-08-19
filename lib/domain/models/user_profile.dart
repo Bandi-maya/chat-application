@@ -31,7 +31,8 @@ class UserProfile {
     this.isVerified = false,
     this.email = '',
     this.phone = '',
-    this.safetyNumber = '58291 04928 11948 29384 10293 88472',
+    // Populated only when real device-to-device verification exists.
+    this.safetyNumber = '',
   });
 
   UserProfile copyWith({

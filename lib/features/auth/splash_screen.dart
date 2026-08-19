@@ -1,10 +1,12 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:chat/ui/core/theme/theme_controller.dart';
-import 'package:chat/data/repositories/mock_data_store.dart';
+
+import 'package:chat/data/services/chaty_backend_service.dart';
 import 'package:chat/features/auth/welcome_screen.dart';
 import 'package:chat/features/chats/main_navigation_shell.dart';
 import 'package:chat/injection/locator.dart';
+import 'package:chat/ui/core/theme/theme_controller.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -13,10 +15,11 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _animCtrl;
-  late Animation<double> _scaleAnim;
-  late Animation<double> _opacityAnim;
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _animCtrl;
+  late final Animation<double> _scaleAnim;
+  late final Animation<double> _opacityAnim;
 
   @override
   void initState() {
@@ -27,34 +30,32 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     );
     _scaleAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutBack);
     _opacityAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeInOut);
-
     _animCtrl.forward();
+    unawaited(_routeFromRealSession());
+  }
 
-    Timer(const Duration(milliseconds: 1400), () async {
-      if (!mounted) return;
-      final dataStore = locator<MockDataStore>();
-      if (dataStore.currentUser.id == 'usr_guest') {
-        // Direct to new auth flow
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => const WelcomeScreen(),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) =>
-                FadeTransition(opacity: animation, child: child),
-            transitionDuration: const Duration(milliseconds: 400),
-          ),
-        );
-      } else {
-        // Logged in user, go to main navigation
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => const MainNavigationShell(),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) =>
-                FadeTransition(opacity: animation, child: child),
-            transitionDuration: const Duration(milliseconds: 400),
-          ),
-        );
-      }
-    });
+  Future<void> _routeFromRealSession() async {
+    final started = DateTime.now();
+    final backend = locator<ChatyBackendService>();
+    if (!backend.isInitialized) await backend.initialize();
+
+    // Keep the branded splash visible for a short, deterministic minimum only.
+    final elapsed = DateTime.now().difference(started);
+    const minimum = Duration(milliseconds: 900);
+    if (elapsed < minimum) await Future<void>.delayed(minimum - elapsed);
+    if (!mounted) return;
+
+    final destination = backend.isAuthenticated
+        ? const MainNavigationShell()
+        : const WelcomeScreen();
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder<void>(
+        pageBuilder: (_, animation, secondaryAnimation) => destination,
+        transitionsBuilder: (_, animation, secondaryAnimation, child) =>
+            FadeTransition(opacity: animation, child: child),
+        transitionDuration: const Duration(milliseconds: 280),
+      ),
+    );
   }
 
   @override
@@ -65,15 +66,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    final themeController = locator<ThemeController>();
-    final theme = themeController.globalTheme;
+    final theme = locator<ThemeController>().globalTheme;
 
     return Scaffold(
       backgroundColor: theme.backgroundColor,
       body: SafeArea(
         child: Stack(
           children: [
-            // Center whatsapp-style enlarged rounded icon
             Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -105,7 +104,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(34),
                               gradient: LinearGradient(
-                                colors: [theme.accentColor, theme.accentColor.withValues(alpha: 0.8)],
+                                colors: [
+                                  theme.accentColor,
+                                  theme.accentColor.withValues(alpha: 0.8),
+                                ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
@@ -136,8 +138,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 ],
               ),
             ),
-
-            // Bottom loading & branding footer
             Positioned(
               left: 0,
               right: 0,

@@ -19,7 +19,6 @@ enum DeliveryState {
   failed,
 }
 
-
 class MessageReaction {
   final String emoji;
   final List<String> userIds;
@@ -42,11 +41,11 @@ class MessageReaction {
 
 class MessageAttachment {
   final String id;
-  final String type; // 'image', 'video', 'audio', 'document'
+  final String type;
   final String name;
   final String size;
   final String? url;
-  final int durationSeconds; // for audio/video
+  final int durationSeconds;
 
   const MessageAttachment({
     required this.id,
@@ -65,6 +64,7 @@ class ChatMessage {
   final MessageType type;
   final String text;
   final MessageAttachment? attachment;
+  final Map<String, dynamic> metadata;
   final String? replyToMessageId;
   final String? replyToPreviewText;
   final String? replyToSenderName;
@@ -85,6 +85,7 @@ class ChatMessage {
     this.type = MessageType.text,
     required this.text,
     this.attachment,
+    this.metadata = const <String, dynamic>{},
     this.replyToMessageId,
     this.replyToPreviewText,
     this.replyToSenderName,
@@ -106,6 +107,7 @@ class ChatMessage {
     MessageType? type,
     String? text,
     MessageAttachment? attachment,
+    Map<String, dynamic>? metadata,
     String? replyToMessageId,
     String? replyToPreviewText,
     String? replyToSenderName,
@@ -126,6 +128,7 @@ class ChatMessage {
       type: type ?? this.type,
       text: text ?? this.text,
       attachment: attachment ?? this.attachment,
+      metadata: metadata ?? this.metadata,
       replyToMessageId: replyToMessageId ?? this.replyToMessageId,
       replyToPreviewText: replyToPreviewText ?? this.replyToPreviewText,
       replyToSenderName: replyToSenderName ?? this.replyToSenderName,

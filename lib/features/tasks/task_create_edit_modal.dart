@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+
 import '../../../ui/core/theme/theme_config.dart';
-import '../../domain/models/chat_task.dart';
-import '../../domain/models/user_profile.dart';
-import '../../domain/models/conversation.dart';
 import '../../data/repositories/mock_data_store.dart';
+import '../../domain/models/chat_task.dart';
+import '../../domain/models/conversation.dart';
+import '../../domain/models/user_profile.dart';
 
 class TaskCreateEditModal extends StatefulWidget {
   final ThemeConfig theme;
@@ -28,19 +29,24 @@ class TaskCreateEditModal extends StatefulWidget {
 }
 
 class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
-  late TextEditingController _titleCtrl;
-  late TextEditingController _descCtrl;
+  late final TextEditingController _titleCtrl;
+  late final TextEditingController _descCtrl;
   late List<String> _selectedAssigneeIds;
   late TaskPriority _priority;
   late DateTime _dueDate;
+  bool _isSaving = false;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
     final task = widget.existingTask;
-    _titleCtrl = TextEditingController(text: task?.title ?? widget.initialTitle ?? '');
+    _titleCtrl = TextEditingController(
+      text: task?.title ?? widget.initialTitle ?? '',
+    );
     _descCtrl = TextEditingController(text: task?.description ?? '');
-    _selectedAssigneeIds = task?.assigneeIds.toList() ?? [widget.dataStore.currentUser.id];
+    _selectedAssigneeIds =
+        task?.assigneeIds.toList() ?? <String>[widget.dataStore.currentUser.id];
     _priority = task?.priority ?? TaskPriority.medium;
     _dueDate = task?.dueAt ?? DateTime.now().add(const Duration(days: 3));
   }
@@ -52,32 +58,85 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
     super.dispose();
   }
 
-  void _saveTask() {
-    if (_titleCtrl.text.trim().isEmpty) return;
-
-    if (widget.existingTask != null) {
-      // Update
-      widget.dataStore.updateTaskStatus(widget.existingTask!.id, widget.existingTask!.status);
-    } else {
-      widget.dataStore.createTask(
-        sourceConversationId: widget.sourceConversationId,
-        sourceMessageId: widget.sourceMessageId,
-        title: _titleCtrl.text.trim(),
-        description: _descCtrl.text.trim(),
-        assigneeIds: _selectedAssigneeIds,
-        priority: _priority,
-        dueAt: _dueDate,
-        labels: ['In-Chat', 'Workflow'],
-      );
+  Future<void> _saveTask() async {
+    if (_isSaving) return;
+    final title = _titleCtrl.text.trim();
+    if (title.isEmpty) {
+      setState(() => _errorMessage = 'Task title is required.');
+      return;
+    }
+    if (_selectedAssigneeIds.isEmpty) {
+      setState(() => _errorMessage = 'Select at least one assignee.');
+      return;
     }
 
-    Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Task "${_titleCtrl.text.trim()}" saved and linked!'),
-        backgroundColor: const Color(0xFF10B981),
-      ),
+    setState(() {
+      _isSaving = true;
+      _errorMessage = null;
+    });
+
+    try {
+      if (widget.existingTask != null) {
+        await widget.dataStore.updateTaskAsync(
+          taskId: widget.existingTask!.id,
+          title: title,
+          description: _descCtrl.text.trim(),
+          assigneeIds: _selectedAssigneeIds,
+          priority: _priority,
+          dueAt: _dueDate,
+          labels: widget.existingTask!.labels,
+        );
+      } else {
+        await widget.dataStore.createTaskAsync(
+          sourceConversationId: widget.sourceConversationId,
+          sourceMessageId: widget.sourceMessageId,
+          title: title,
+          description: _descCtrl.text.trim(),
+          assigneeIds: _selectedAssigneeIds,
+          priority: _priority,
+          dueAt: _dueDate,
+          labels: const <String>['In-Chat', 'Workflow'],
+        );
+      }
+
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.existingTask == null
+                ? 'Task "$title" created and shared in chat.'
+                : 'Task "$title" updated.',
+          ),
+          backgroundColor: const Color(0xFF10B981),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isSaving = false;
+        _errorMessage = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _pickDueDate() async {
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _dueDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 3650)),
     );
+    if (selected == null || !mounted) return;
+    setState(() {
+      _dueDate = DateTime(
+        selected.year,
+        selected.month,
+        selected.day,
+        _dueDate.hour,
+        _dueDate.minute,
+      );
+    });
   }
 
   @override
@@ -85,25 +144,23 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
     final theme = widget.theme;
     final currentUser = widget.dataStore.currentUser;
     final conv = widget.dataStore.conversations.firstWhere(
-      (c) => c.id == widget.sourceConversationId,
+      (conversation) => conversation.id == widget.sourceConversationId,
       orElse: () => Conversation(
         id: widget.sourceConversationId,
         type: ConversationType.direct,
         title: 'Chat',
-        participantIds: [currentUser.id],
+        participantIds: <String>[currentUser.id],
         lastMessageText: '',
         lastMessageTime: DateTime.now(),
         lastMessageSenderId: currentUser.id,
       ),
     );
 
-    // Filter candidate assignees: only users participating in this specific conversation
     final candidateAssignees = conv.participantIds
         .where((id) => id != currentUser.id)
-        .map((id) => widget.dataStore.getUser(id))
+        .map(widget.dataStore.getUser)
         .whereType<UserProfile>()
         .toList();
-
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -133,7 +190,9 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    widget.existingTask != null ? 'Edit Task' : 'Create Task (/task)',
+                    widget.existingTask != null
+                        ? 'Edit Task'
+                        : 'Create Task (/task)',
                     style: TextStyle(
                       color: theme.primaryTextColor,
                       fontSize: 16,
@@ -142,18 +201,22 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.close_rounded),
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: _isSaving ? null : () => Navigator.pop(context),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
-
-              // Title
               TextField(
                 controller: _titleCtrl,
-                style: TextStyle(color: theme.primaryTextColor, fontSize: 14.5),
+                enabled: !_isSaving,
+                maxLength: 140,
+                style: TextStyle(
+                  color: theme.primaryTextColor,
+                  fontSize: 14.5,
+                ),
                 decoration: InputDecoration(
                   labelText: 'Task Title',
+                  counterText: '',
                   labelStyle: TextStyle(color: theme.secondaryTextColor),
                   filled: true,
                   fillColor: theme.cardColor,
@@ -163,12 +226,15 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                 ),
               ),
               const SizedBox(height: 14),
-
-              // Description
               TextField(
                 controller: _descCtrl,
+                enabled: !_isSaving,
                 maxLines: 3,
-                style: TextStyle(color: theme.primaryTextColor, fontSize: 13.5),
+                maxLength: 2000,
+                style: TextStyle(
+                  color: theme.primaryTextColor,
+                  fontSize: 13.5,
+                ),
                 decoration: InputDecoration(
                   labelText: 'Description / Instructions',
                   labelStyle: TextStyle(color: theme.secondaryTextColor),
@@ -180,73 +246,100 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // Assignees
               Text(
                 'Assign To Participants',
-                style: TextStyle(color: theme.primaryTextColor, fontSize: 13, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  color: theme.primaryTextColor,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  // Self
                   FilterChip(
-                    label: Text('You (${currentUser.displayName.split(' ')[0]})'),
+                    label: Text(
+                      'You (${currentUser.displayName.split(' ').first})',
+                    ),
                     selected: _selectedAssigneeIds.contains(currentUser.id),
                     selectedColor: theme.accentColor.withValues(alpha: 0.25),
-                    onSelected: (val) {
-                      setState(() {
-                        if (val) {
-                          _selectedAssigneeIds.add(currentUser.id);
-                        } else {
-                          _selectedAssigneeIds.remove(currentUser.id);
-                        }
-                      });
-                    },
+                    onSelected: _isSaving
+                        ? null
+                        : (selected) => _setAssignee(
+                              currentUser.id,
+                              selected,
+                            ),
                   ),
-                  ...candidateAssignees.map((c) {
-                    final isSel = _selectedAssigneeIds.contains(c.id);
+                  ...candidateAssignees.map((candidate) {
+                    final selected = _selectedAssigneeIds.contains(candidate.id);
                     return FilterChip(
-                      label: Text(c.displayName.split(' ')[0]),
-                      selected: isSel,
-                      selectedColor: theme.accentColor.withValues(alpha: 0.25),
-                      onSelected: (val) {
-                        setState(() {
-                          if (val) {
-                            _selectedAssigneeIds.add(c.id);
-                          } else {
-                            _selectedAssigneeIds.remove(c.id);
-                          }
-                        });
-                      },
+                      label: Text(candidate.displayName.split(' ').first),
+                      selected: selected,
+                      selectedColor:
+                          theme.accentColor.withValues(alpha: 0.25),
+                      onSelected: _isSaving
+                          ? null
+                          : (value) => _setAssignee(candidate.id, value),
                     );
                   }),
                 ],
               ),
-
               const SizedBox(height: 16),
-
-              // Priority
               Text(
                 'Priority',
-                style: TextStyle(color: theme.primaryTextColor, fontSize: 13, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  color: theme.primaryTextColor,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 8),
               SegmentedButton<TaskPriority>(
-                segments: const [
-                  ButtonSegment(value: TaskPriority.low, label: Text('Low')),
-                  ButtonSegment(value: TaskPriority.medium, label: Text('Med')),
-                  ButtonSegment(value: TaskPriority.high, label: Text('High')),
-                  ButtonSegment(value: TaskPriority.urgent, label: Text('Urgent')),
+                segments: const <ButtonSegment<TaskPriority>>[
+                  ButtonSegment<TaskPriority>(
+                    value: TaskPriority.low,
+                    label: Text('Low'),
+                  ),
+                  ButtonSegment<TaskPriority>(
+                    value: TaskPriority.medium,
+                    label: Text('Med'),
+                  ),
+                  ButtonSegment<TaskPriority>(
+                    value: TaskPriority.high,
+                    label: Text('High'),
+                  ),
+                  ButtonSegment<TaskPriority>(
+                    value: TaskPriority.urgent,
+                    label: Text('Urgent'),
+                  ),
                 ],
-                selected: {_priority},
-                onSelectionChanged: (val) => setState(() => _priority = val.first),
+                selected: <TaskPriority>{_priority},
+                onSelectionChanged: _isSaving
+                    ? null
+                    : (value) => setState(() => _priority = value.first),
               ),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: _isSaving ? null : _pickDueDate,
+                icon: const Icon(Icons.event_rounded),
+                label: Text(
+                  'Due ${_dueDate.day.toString().padLeft(2, '0')}/'
+                  '${_dueDate.month.toString().padLeft(2, '0')}/${_dueDate.year}',
+                ),
+              ),
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 14),
+                Text(
+                  _errorMessage!,
+                  style: TextStyle(
+                    color: theme.dangerColor,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
-
-              // Save Action
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: theme.accentColor,
@@ -256,14 +349,38 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                     borderRadius: BorderRadius.circular(theme.cornerRadius),
                   ),
                 ),
-                onPressed: _saveTask,
-                icon: const Icon(Icons.check_rounded, size: 18),
-                label: const Text('Save and Share in Chat', style: TextStyle(fontWeight: FontWeight.bold)),
+                onPressed: _isSaving ? null : _saveTask,
+                icon: _isSaving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.check_rounded, size: 18),
+                label: Text(
+                  _isSaving ? 'Saving…' : 'Save and Share in Chat',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  void _setAssignee(String userId, bool selected) {
+    setState(() {
+      if (selected) {
+        if (!_selectedAssigneeIds.contains(userId)) {
+          _selectedAssigneeIds.add(userId);
+        }
+      } else {
+        _selectedAssigneeIds.remove(userId);
+      }
+    });
   }
 }

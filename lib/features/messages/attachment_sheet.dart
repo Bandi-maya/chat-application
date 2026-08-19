@@ -1,146 +1,115 @@
 import 'package:flutter/material.dart';
+
 import '../../../ui/core/theme/theme_config.dart';
 
 class AttachmentSheet extends StatelessWidget {
   final ThemeConfig theme;
-  final Function(String type, String name, String size) onAttachmentSelected;
+  final ValueChanged<String> onMediaRequested;
+  final VoidCallback onLocationRequested;
+  final VoidCallback onContactRequested;
+  final VoidCallback onPollRequested;
   final VoidCallback onTaskOption;
 
   const AttachmentSheet({
     super.key,
     required this.theme,
-    required this.onAttachmentSelected,
+    required this.onMediaRequested,
+    required this.onLocationRequested,
+    required this.onContactRequested,
+    required this.onPollRequested,
     required this.onTaskOption,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 26),
       decoration: BoxDecoration(
         color: theme.surfaceColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
       ),
       child: SafeArea(
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: theme.secondaryTextColor.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
+            Container(
+              width: 38,
+              height: 4,
+              decoration: BoxDecoration(
+                color: theme.secondaryTextColor.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(3),
               ),
             ),
             const SizedBox(height: 16),
-            Text(
-              'Share Media & Items',
-              style: TextStyle(
-                color: theme.primaryTextColor,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            GridView.count(
-              crossAxisCount: 4,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 12,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildItem(
-                  context,
-                  icon: Icons.image_rounded,
+                _option(
+                  icon: Icons.photo_library_rounded,
                   label: 'Gallery',
-                  color: const Color(0xFF3B82F6),
-                  onTap: () {
-                    Navigator.pop(context);
-                    onAttachmentSelected('image', 'mock_photo_preview.jpg', '2.8 MB');
-                  },
+                  color: const Color(0xFF8B5CF6),
+                  onTap: () => _closeAnd(context, () => onMediaRequested('image')),
                 ),
-                _buildItem(
-                  context,
+                _option(
                   icon: Icons.videocam_rounded,
                   label: 'Video',
-                  color: const Color(0xFF8B5CF6),
-                  onTap: () {
-                    Navigator.pop(context);
-                    onAttachmentSelected('video', 'security_brief.mp4', '14.2 MB');
-                  },
+                  color: const Color(0xFFEC4899),
+                  onTap: () => _closeAnd(context, () => onMediaRequested('video')),
                 ),
-                _buildItem(
-                  context,
-                  icon: Icons.description_rounded,
+                _option(
+                  icon: Icons.insert_drive_file_rounded,
                   label: 'Document',
-                  color: const Color(0xFFEF4444),
-                  onTap: () {
-                    Navigator.pop(context);
-                    onAttachmentSelected('document', 'E2EE_ASVS_Specification.pdf', '1.8 MB');
-                  },
+                  color: const Color(0xFF3B82F6),
+                  onTap: () => _closeAnd(context, () => onMediaRequested('document')),
                 ),
-                _buildItem(
-                  context,
-                  icon: Icons.task_alt_rounded,
-                  label: 'New Task',
-                  color: const Color(0xFF10B981),
-                  onTap: () {
-                    Navigator.pop(context);
-                    onTaskOption();
-                  },
-                ),
-                _buildItem(
-                  context,
-                  icon: Icons.mic_rounded,
-                  label: 'Audio Note',
+                _option(
+                  icon: Icons.headphones_rounded,
+                  label: 'Audio',
                   color: const Color(0xFFF59E0B),
-                  onTap: () {
-                    Navigator.pop(context);
-                    onAttachmentSelected('audio', 'voice_memo.aac', '512 KB');
-                  },
+                  onTap: () => _closeAnd(context, () => onMediaRequested('audio')),
                 ),
-                _buildItem(
-                  context,
+              ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _option(
                   icon: Icons.location_on_rounded,
                   label: 'Location',
-                  color: const Color(0xFF06B6D4),
-                  onTap: () {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Mock Location card shared.')),
-                    );
-                  },
+                  color: const Color(0xFF10B981),
+                  onTap: () => _closeAnd(context, onLocationRequested),
                 ),
-                _buildItem(
-                  context,
+                _option(
                   icon: Icons.person_rounded,
                   label: 'Contact',
-                  color: const Color(0xFFEC4899),
-                  onTap: () {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Mock Contact card shared.')),
-                    );
-                  },
+                  color: const Color(0xFF06B6D4),
+                  onTap: () => _closeAnd(context, onContactRequested),
                 ),
-                _buildItem(
-                  context,
+                _option(
                   icon: Icons.poll_rounded,
                   label: 'Poll',
                   color: const Color(0xFF6366F1),
-                  onTap: () {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Mock Poll modal triggered.')),
-                    );
-                  },
+                  onTap: () => _closeAnd(context, onPollRequested),
+                ),
+                _option(
+                  icon: Icons.task_alt_rounded,
+                  label: 'Task',
+                  color: const Color(0xFFEF4444),
+                  onTap: () => _closeAnd(context, onTaskOption),
                 ),
               ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Files are selected from the device and uploaded to the private Chaty conversation bucket.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: theme.secondaryTextColor,
+                fontSize: 11.5,
+                height: 1.35,
+              ),
             ),
           ],
         ),
@@ -148,40 +117,47 @@ class AttachmentSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildItem(
-    BuildContext context, {
+  Widget _option({
     required IconData icon,
     required String label,
     required Color color,
     required VoidCallback onTap,
   }) {
     return InkWell(
+      borderRadius: BorderRadius.circular(16),
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-              border: Border.all(color: color.withValues(alpha: 0.3)),
+      child: SizedBox(
+        width: 68,
+        child: Column(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(icon, color: color, size: 25),
             ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: theme.primaryTextColor,
-              fontSize: 11.5 * theme.fontScale,
-              fontWeight: FontWeight.w500,
+            const SizedBox(height: 7),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: theme.primaryTextColor,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
+  }
+
+  void _closeAnd(BuildContext context, VoidCallback action) {
+    Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) => action());
   }
 }

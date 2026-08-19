@@ -46,7 +46,9 @@ class Conversation {
     this.isMuted = false,
     this.wallpaperId,
     this.disappearingDuration,
-    this.encryptionStatus = EncryptionStatus.encrypted,
+    // Chaty must not claim E2EE until audited device-to-device encryption is
+    // actually implemented and verified. The option remains in the UI.
+    this.encryptionStatus = EncryptionStatus.verificationNeeded,
     this.draftText = '',
   });
 

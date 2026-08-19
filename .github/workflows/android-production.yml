@@ -19,32 +19,40 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+
       - name: Set up Flutter stable
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
+
       - name: Toolchain
         run: |
           flutter --version
           dart --version
           java -version
+
       - name: Resolve dependencies
         run: flutter pub get
+
       - name: Analyze
         run: flutter analyze --no-fatal-infos
+
       - name: Test
         run: flutter test
+
       - name: Build release APK
         run: >-
           flutter build apk --release --no-pub
           --dart-define=SUPABASE_URL=https://dntnxeanubswyswahdnj.supabase.co
           --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_gFpVYJctaDkRRgttvnUl-A_TKu81hFF
+
       - name: Verify APK
         shell: bash
         run: |
@@ -55,6 +63,7 @@ jobs:
           unzip -t Chaty-production.apk >/dev/null
           sha256sum Chaty-production.apk | tee Chaty-production.apk.sha256
           ls -lh Chaty-production.apk
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:

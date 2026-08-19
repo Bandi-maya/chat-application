@@ -5,6 +5,7 @@ import '../../domain/models/conversation.dart';
 import '../../domain/models/user_profile.dart';
 import '../../domain/models/chat_message.dart';
 import '../../data/repositories/mock_data_store.dart';
+import '../../data/services/chat_media_service.dart';
 import '../../ui/core/controllers/chaty_preferences_controller.dart';
 import '../../ui/core/design_system/chaty_settings_primitives.dart';
 import '../../ui/core/widgets/app_avatar.dart';
@@ -42,6 +43,7 @@ class ChatDetailScreen extends StatefulWidget {
 class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final TextEditingController _textCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
+  final ChatMediaService _mediaService = ChatMediaService();
   ChatMessage? _replyTarget;
   bool _showQuickReplyOverlay = false;
 
@@ -68,7 +70,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final text = _textCtrl.text.trim();
     if (text.isEmpty) return;
 
-    // Check for slash commands like /task
     final parsedCommand = ChatCommandParser.parse(text);
     if (parsedCommand.type == ChatCommandType.task) {
       _textCtrl.clear();
@@ -102,7 +103,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     _scrollToBottom();
   }
 
-
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollCtrl.hasClients) {
@@ -117,11 +117,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   String _getSenderName(String senderId) {
     if (senderId == widget.dataStore.currentUser.id) return 'You';
-    final contact = widget.dataStore.contacts.firstWhere(
-      (c) => c.id == senderId,
-      orElse: () => widget.dataStore.contacts.first,
-    );
-    return contact.displayName;
+    final contacts = widget.dataStore.contacts;
+    final contact = contacts.where((c) => c.id == senderId).firstOrNull;
+    return contact?.displayName ?? 'Chaty user';
   }
 
   void _onMessageLongPress(ChatMessage message) {
@@ -190,33 +188,52 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
+  Future<void> _shareMedia(String type) async {
+    try {
+      final attachment = await _mediaService.pickAndUpload(
+        conversationId: widget.conversationId,
+        type: type,
+      );
+      if (attachment == null) return;
+
+      await widget.dataStore.sendMessage(
+        conversationId: widget.conversationId,
+        text: attachment.name,
+        type: switch (type) {
+          'image' => MessageType.image,
+          'video' => MessageType.video,
+          'audio' => MessageType.audio,
+          _ => MessageType.document,
+        },
+        attachment: attachment,
+      );
+      _scrollToBottom();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    }
+  }
+
+  void _showAttachmentUnavailable(String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$feature is not configured for this release yet.')),
+    );
+  }
+
   void _openAttachmentSheet() {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => AttachmentSheet(
         theme: widget.theme,
-        onAttachmentSelected: (type, name, size) {
-          widget.dataStore.sendMessage(
-            conversationId: widget.conversationId,
-            text: 'Shared a $type: $name',
-            type: type == 'image'
-                ? MessageType.image
-                : type == 'video'
-                    ? MessageType.video
-                    : type == 'audio'
-                        ? MessageType.audio
-                        : MessageType.document,
-            attachment: MessageAttachment(
-              id: 'att_${DateTime.now().millisecondsSinceEpoch}',
-              type: type,
-              name: name,
-              size: size,
-              durationSeconds: type == 'audio' ? 38 : 0,
-            ),
-          );
-          _scrollToBottom();
-        },
+        onMediaRequested: _shareMedia,
+        onLocationRequested: () => _showAttachmentUnavailable('Location sharing'),
+        onContactRequested: () => _showAttachmentUnavailable('Contact sharing'),
+        onPollRequested: () => _showAttachmentUnavailable('Poll creation'),
         onTaskOption: () => _openCreateTaskModal(),
       ),
     );
@@ -334,7 +351,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Message Timeline
             Expanded(
               child: ListView.builder(
                 controller: _scrollCtrl,
@@ -360,6 +376,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                                   title: msg.attachment!.name,
                                   type: msg.attachment!.type,
                                   size: msg.attachment!.size,
+                                  storagePath: msg.attachment!.url,
                                   theme: theme,
                                 ),
                               ),
@@ -370,8 +387,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 },
               ),
             ),
-
-            // Quick Reply Dropdown Autocomplete Overlay
             if (_showQuickReplyOverlay && autoPrefs.quickReplies.isNotEmpty)
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -403,8 +418,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   ],
                 ),
               ),
-
-            // Reply Preview Container
             if (_replyTarget != null)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -426,8 +439,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   ],
                 ),
               ),
-
-            // Input Composer Bar
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
@@ -528,8 +539,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                                 onPressed: () {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Hold to record voice note (audio simulation)'),
-                                      duration: Duration(seconds: 1),
+                                      content: Text('Voice-note recording is not configured for this release.'),
+                                      duration: Duration(seconds: 2),
                                     ),
                                   );
                                 },
@@ -545,7 +556,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       ),
     );
 
-    // Quick Contact Sidebar Wrap
     if (convPrefs.enableQuickContactSidebar) {
       final contacts = dataStore.contacts;
       return Row(

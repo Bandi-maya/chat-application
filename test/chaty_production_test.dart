@@ -1,11 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:chat/ui/core/validators/chaty_validators.dart';
-import 'package:chat/data/services/chaty_backend_service.dart';
-import 'package:chat/ui/core/realtime/realtime_event_bus.dart';
-import 'package:chat/ui/core/commands/chat_command_parser.dart';
-import 'package:chat/domain/models/chat_message.dart';
+
 import 'package:chat/domain/models/conversation.dart';
-import 'package:chat/domain/models/chat_task.dart';
+import 'package:chat/domain/models/user_profile.dart';
+import 'package:chat/ui/core/commands/chat_command_parser.dart';
+import 'package:chat/ui/core/realtime/realtime_event_bus.dart';
+import 'package:chat/ui/core/validators/chaty_validators.dart';
+
 void main() {
   group('ChatyValidators Unit Tests', () {
     test('Username validation allows valid usernames', () {
@@ -15,12 +15,12 @@ void main() {
     });
 
     test('Username validation rejects invalid patterns and reserved keywords', () {
-      expect(ChatyValidators.validateUsername('abc'), isNotNull); // Too short
-      expect(ChatyValidators.validateUsername('admin'), isNotNull); // Reserved
-      expect(ChatyValidators.validateUsername('root'), isNotNull); // Reserved
-      expect(ChatyValidators.validateUsername('support'), isNotNull); // Reserved
-      expect(ChatyValidators.validateUsername('chaty'), isNotNull); // Reserved
-      expect(ChatyValidators.validateUsername('user!name'), isNotNull); // Invalid char
+      expect(ChatyValidators.validateUsername('abc'), isNotNull);
+      expect(ChatyValidators.validateUsername('admin'), isNotNull);
+      expect(ChatyValidators.validateUsername('root'), isNotNull);
+      expect(ChatyValidators.validateUsername('support'), isNotNull);
+      expect(ChatyValidators.validateUsername('chaty'), isNotNull);
+      expect(ChatyValidators.validateUsername('user!name'), isNotNull);
     });
 
     test('Email validator enforces valid email patterns', () {
@@ -29,26 +29,26 @@ void main() {
       expect(ChatyValidators.validateEmail(''), isNotNull);
     });
 
-    test('Password validator enforces length rules', () {
+    test('Password validator enforces minimum strength', () {
       expect(ChatyValidators.validatePassword('secret123'), isNull);
-      expect(ChatyValidators.validatePassword('123'), isNotNull); // Too short
+      expect(ChatyValidators.validatePassword('123'), isNotNull);
       expect(ChatyValidators.validatePassword(''), isNotNull);
     });
   });
 
   group('Chat Command Parser Tests', () {
     test('Parses /task commands accurately with arguments', () {
-      final cmd = ChatCommandParser.parse('/task Review pull request #42');
-      expect(cmd.isCommand, isTrue);
-      expect(cmd.type, ChatCommandType.task);
-      expect(cmd.argument, 'Review pull request #42');
+      final command = ChatCommandParser.parse('/task Review pull request #42');
+      expect(command.isCommand, isTrue);
+      expect(command.type, ChatCommandType.task);
+      expect(command.argument, 'Review pull request #42');
     });
 
     test('Parses /task without arguments cleanly', () {
-      final cmd = ChatCommandParser.parse('/task');
-      expect(cmd.isCommand, isTrue);
-      expect(cmd.type, ChatCommandType.task);
-      expect(cmd.argument, isEmpty);
+      final command = ChatCommandParser.parse('/task');
+      expect(command.isCommand, isTrue);
+      expect(command.type, ChatCommandType.task);
+      expect(command.argument, isEmpty);
     });
 
     test('Treats standard text as non-command', () {
@@ -58,137 +58,57 @@ void main() {
     });
   });
 
-  group('ChatyBackendService Zero-Mock Integration Tests', () {
-    late ChatyBackendService backend;
-
-    setUp(() async {
-      backend = ChatyBackendService();
-      await backend.clearStateForTesting();
-      await backend.initialize();
-    });
-
-    test('Registration creates user, authenticates session, and enforces unique handles', () async {
-      // Register User A
-      final userA = await backend.registerUser(
-        displayName: 'Alice Engineer',
-        username: 'alice_eng',
-        password: 'secure_password_123',
-        email: 'alice@chaty.app',
+  group('Production Security Contract Tests', () {
+    test('Conversations never claim E2EE by default', () {
+      final conversation = Conversation(
+        id: 'conversation-id',
+        type: ConversationType.direct,
+        title: 'Secure chat',
+        participantIds: const <String>['a', 'b'],
+        lastMessageText: '',
+        lastMessageTime: DateTime.utc(2026),
+        lastMessageSenderId: 'a',
       );
 
-      expect(userA.id, isNotEmpty);
-      expect(userA.username, 'alice_eng');
-      expect(backend.currentUser?.id, userA.id);
-      expect(backend.isAuthenticated, isTrue);
-
-      // Verify availability checks
-      expect(backend.isUsernameAvailable('alice_eng'), isFalse);
-      expect(backend.isUsernameAvailable('bob_designer'), isTrue);
-
-      // Duplicate registration must throw
       expect(
-        () => backend.registerUser(
-          displayName: 'Alice Imposter',
-          username: 'alice_eng',
-          password: 'another_password',
-        ),
-        throwsException,
+        conversation.encryptionStatus,
+        EncryptionStatus.verificationNeeded,
       );
     });
 
-    test('Two-user communication lifecycle: search, message, reaction, read receipt', () async {
-      // Register User A
-      final userA = await backend.registerUser(
-        displayName: 'Alice Rivera',
-        username: 'alice_r',
-        password: 'password123',
+    test('Profiles do not fabricate cryptographic safety numbers', () {
+      final profile = UserProfile(
+        id: 'user-id',
+        displayName: 'User',
+        username: 'user_name',
+        avatarInitials: 'US',
+        avatarColorHex: '0xFF6366F1',
+        about: '',
+        lastSeenAt: DateTime.utc(2026),
       );
 
-      // Register User B
-      final userB = await backend.registerUser(
-        displayName: 'Bob Builder',
-        username: 'bob_b',
-        password: 'password123',
-      );
-
-      // User B searches for User A
-      final searchResults = backend.searchUsers('alice', includeSelf: false);
-      expect(searchResults.any((u) => u.username == 'alice_r'), isTrue);
-
-      // User B creates/opens direct chat with User A
-      final directConv = backend.getOrCreateDirectConversation(userA);
-      expect(directConv.type, ConversationType.direct);
-      expect(directConv.participantIds.contains(userA.id), isTrue);
-      expect(directConv.participantIds.contains(userB.id), isTrue);
-
-      // User B sends message to User A
-      final msg = await backend.sendMessage(
-        conversationId: directConv.id,
-        text: 'Hi Alice! Welcome to the production channel.',
-      );
-      expect(msg.deliveryState, DeliveryState.sent);
-
-      // User A reads message
-      backend.markAsRead(directConv.id);
-      final messages = backend.getMessages(directConv.id);
-      expect(messages.first.text, 'Hi Alice! Welcome to the production channel.');
+      expect(profile.safetyNumber, isEmpty);
     });
 
-    test('/task creation inside direct chat scopes assignees and links card', () async {
-      final userA = await backend.registerUser(
-        displayName: 'Alice Lead',
-        username: 'alice_lead',
-        password: 'password123',
-      );
-
-      final userB = await backend.registerUser(
-        displayName: 'Charlie Tech',
-        username: 'charlie_tech',
-        password: 'password123',
-      );
-
-      final conv = backend.getOrCreateDirectConversation(userB);
-
-      // User A creates task assigned to User B
-      backend.createTask(
-        sourceConversationId: conv.id,
-        title: 'Complete security audit for v1.0',
-        description: 'Verify ASVS L3 compliance.',
-        assigneeIds: [userA.id, userB.id],
-        priority: TaskPriority.urgent,
-        dueAt: DateTime.now().add(const Duration(days: 3)),
-      );
-
-      expect(backend.tasks.length, 1);
-      final createdTask = backend.tasks.first;
-      expect(createdTask.title, 'Complete security audit for v1.0');
-      expect(createdTask.assigneeIds.contains(userB.id), isTrue);
-
-      // Task status transition
-      backend.updateTaskStatus(createdTask.id, TaskStatus.inProgress);
-      final updatedTask = backend.tasks.firstWhere((t) => t.id == createdTask.id);
-      expect(updatedTask.status, TaskStatus.inProgress);
-      expect(updatedTask.activities.any((a) => a.text.contains('inProgress')), isTrue);
-    });
-
-    test('Realtime event bus publishes and filters events', () async {
+    test('Realtime event bus publishes typed events', () async {
       final bus = RealtimeEventBus();
       final events = <RealtimeEvent>[];
-      final sub = bus.events.listen((e) => events.add(e));
+      final subscription = bus.events.listen(events.add);
 
       bus.publish(
         RealtimeEvent(
           type: RealtimeEventType.messageCreated,
-          conversationId: 'c_test',
-          userId: 'u_test',
-          payload: {'text': 'Hello world!'},
+          conversationId: 'conversation-id',
+          userId: 'user-id',
+          payload: const <String, dynamic>{'text': 'Hello world!'},
         ),
       );
 
-      await Future.delayed(const Duration(milliseconds: 20));
-      expect(events.length, 1);
-      expect(events.first.type, RealtimeEventType.messageCreated);
-      await sub.cancel();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(events, hasLength(1));
+      expect(events.single.type, RealtimeEventType.messageCreated);
+      expect(events.single.conversationId, 'conversation-id');
+      await subscription.cancel();
     });
   });
 }
