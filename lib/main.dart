@@ -14,6 +14,7 @@ import 'package:chat/features/chats/main_navigation_shell.dart';
 import 'package:chat/injection/locator.dart';
 import 'package:chat/ui/core/controllers/appearance_variant_controller.dart';
 import 'package:chat/ui/core/controllers/chaty_preferences_controller.dart';
+import 'package:chat/ui/core/gb/gb_theme_overrides.dart';
 import 'package:chat/ui/core/theme/theme_controller.dart';
 import 'package:chat/ui/core/theme/theme_presets.dart';
 import 'package:chat/ui/core/widgets/click_particle_overlay.dart';
@@ -32,13 +33,11 @@ final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   await Supabase.initialize(
     url: _supabaseUrl,
     publishableKey: _supabasePublishableKey,
     debug: !kReleaseMode,
   );
-
   setupLocator();
   await locator<ChatyBackendService>().initialize();
   runApp(const ChatyApp());
@@ -72,9 +71,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
       preferencesController: _preferencesController,
       dataStore: locator<MockDataStore>(),
     );
-    _authUiSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(
-      _handleAuthUiEvent,
-    );
+    _authUiSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(_handleAuthUiEvent);
   }
 
   void _handleAuthUiEvent(AuthState state) {
@@ -87,17 +84,12 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
           return;
         }
         navigator.pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (_) => CreateNewPasswordScreen(
-              email: state.session?.user.email ?? '',
-            ),
-          ),
+          MaterialPageRoute(builder: (_) => CreateNewPasswordScreen(email: state.session?.user.email ?? '')),
           (route) => false,
         );
       });
       return;
     }
-
     if (state.event == AuthChangeEvent.signedOut) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _rootNavigatorKey.currentState?.pushAndRemoveUntil(
@@ -112,11 +104,8 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   void didChangePlatformBrightness() {
     super.didChangePlatformBrightness();
     final brightness = WidgetsBinding.instance.platformDispatcher.platformBrightness;
-    if (_themeController.globalTheme.id == 'monochrome_dark' ||
-        _themeController.globalTheme.id == 'monochrome_light') {
-      _themeController.setGlobalTheme(
-        ThemePresets.getSystemDefaultTheme(brightness),
-      );
+    if (_themeController.globalTheme.id == 'monochrome_dark' || _themeController.globalTheme.id == 'monochrome_light') {
+      _themeController.setGlobalTheme(ThemePresets.getSystemDefaultTheme(brightness));
     }
   }
 
@@ -124,11 +113,16 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     if (!_backend.isAuthenticated) return;
-    if (state == AppLifecycleState.resumed) {
+    final airplane = _preferencesController.home.airplaneModeSimulator || _preferencesController.gbBool('yo_want_airplanemode');
+    final ghost = _preferencesController.home.ghostMode || _preferencesController.gbBool('yo_want_ghostmode');
+    final alwaysOnline = _preferencesController.gbBool('always_online');
+    if (airplane || ghost) {
+      unawaited(_backend.setPresence(PresenceState.offline));
+      return;
+    }
+    if (state == AppLifecycleState.resumed || alwaysOnline) {
       unawaited(_backend.setPresence(PresenceState.online));
-    } else if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.detached ||
-        state == AppLifecycleState.hidden) {
+    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.detached || state == AppLifecycleState.hidden) {
       unawaited(_backend.setPresence(PresenceState.offline));
     }
   }
@@ -144,14 +138,9 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge(<Listenable>[
-        _themeController,
-        _preferencesController,
-        _appearanceController,
-        _backend,
-      ]),
+      listenable: Listenable.merge(<Listenable>[_themeController, _preferencesController, _appearanceController, _backend]),
       builder: (context, _) {
-        final currentTheme = _themeController.globalTheme;
+        final currentTheme = GbThemeOverrides.resolve(_themeController.globalTheme, _preferencesController);
         return MaterialApp(
           navigatorKey: _rootNavigatorKey,
           title: 'Chaty',
@@ -160,10 +149,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
           builder: (context, child) {
             final media = MediaQuery.of(context);
             final scaled = media.copyWith(
-              textScaler: TextScaler.linear(
-                (media.textScaler.scale(1.0) * _appearanceController.textScale)
-                    .clamp(0.8, 1.6),
-              ),
+              textScaler: TextScaler.linear((media.textScaler.scale(1.0) * _appearanceController.textScale).clamp(0.8, 1.6)),
             );
             return MediaQuery(
               data: scaled,
@@ -177,9 +163,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
               ),
             );
           },
-          home: _backend.isAuthenticated
-              ? const MainNavigationShell()
-              : const WelcomeScreen(),
+          home: _backend.isAuthenticated ? const MainNavigationShell() : const WelcomeScreen(),
         );
       },
     );

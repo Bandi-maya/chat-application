@@ -8,6 +8,7 @@ import '../../ui/core/widgets/app_avatar.dart';
 import 'appearance/universal_appearance_screen.dart';
 import 'conversation/conversation_settings_page.dart';
 import 'effects/navigation_effects_page.dart';
+import 'gb_features/gb_feature_center_screen.dart';
 import 'home/home_screen_settings_page.dart';
 import 'message_management/message_management_page.dart';
 import 'notifications/notification_settings_page.dart';
@@ -37,6 +38,13 @@ class SettingsRootScreen extends StatelessWidget {
 
   List<SettingsSearchResult> _searchIndex() {
     return <SettingsSearchResult>[
+      SettingsSearchResult(
+        title: 'GB Feature Center',
+        category: 'Advanced',
+        description: 'All extracted privacy, media, status, messaging, appearance and behavior controls',
+        icon: Icons.tune_rounded,
+        destination: GbFeatureCenterScreen(preferencesController: preferencesController),
+      ),
       SettingsSearchResult(
         title: 'Privacy',
         category: 'Settings',
@@ -129,25 +137,15 @@ class SettingsRootScreen extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  AppAvatar(
-                    initials: user.avatarInitials,
-                    colorHex: user.avatarColorHex,
-                    size: 52,
-                  ),
+                  AppAvatar(initials: user.avatarInitials, colorHex: user.avatarColorHex, size: 52),
                   const SizedBox(width: 13),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          user.displayName,
-                          style: TextStyle(color: theme.primaryTextColor, fontSize: 16, fontWeight: FontWeight.w800),
-                        ),
+                        Text(user.displayName, style: TextStyle(color: theme.primaryTextColor, fontSize: 16, fontWeight: FontWeight.w800)),
                         const SizedBox(height: 3),
-                        Text(
-                          '@${user.username}',
-                          style: TextStyle(color: theme.secondaryTextColor, fontSize: 12.5),
-                        ),
+                        Text('@${user.username}', style: TextStyle(color: theme.secondaryTextColor, fontSize: 12.5)),
                         if (user.about.isNotEmpty)
                           Text(
                             user.about,
@@ -162,6 +160,15 @@ class SettingsRootScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 18),
+            _SectionTitle(theme: theme, label: 'Advanced controls'),
+            _SettingsTile(
+              theme: theme,
+              icon: Icons.tune_rounded,
+              title: 'GB Feature Center',
+              subtitle: 'Extracted privacy, media, status, messaging, layout and behavior controls',
+              onTap: () => _push(context, GbFeatureCenterScreen(preferencesController: preferencesController)),
+            ),
+            const SizedBox(height: 14),
             _SectionTitle(theme: theme, label: 'Appearance'),
             _SettingsTile(
               theme: theme,
@@ -216,10 +223,7 @@ class SettingsRootScreen extends StatelessWidget {
               subtitle: 'Alerts, preview behavior and sounds',
               onTap: () => _push(
                 context,
-                NotificationSettingsPage(
-                  preferencesController: preferencesController,
-                  notificationService: notificationService,
-                ),
+                NotificationSettingsPage(preferencesController: preferencesController, notificationService: notificationService),
               ),
             ),
             _SettingsTile(
@@ -229,10 +233,7 @@ class SettingsRootScreen extends StatelessWidget {
               subtitle: 'Quick replies, automation and scheduled messages',
               onTap: () => _push(
                 context,
-                MessageManagementPage(
-                  preferencesController: preferencesController,
-                  dataStore: dataStore,
-                ),
+                MessageManagementPage(preferencesController: preferencesController, dataStore: dataStore),
               ),
             ),
             _SettingsTile(
@@ -249,10 +250,7 @@ class SettingsRootScreen extends StatelessWidget {
               subtitle: 'Camera, microphone, media, contacts and notifications',
               onTap: () => _push(
                 context,
-                SystemPermissionsScreen(
-                  preferencesController: preferencesController,
-                  notificationService: notificationService,
-                ),
+                SystemPermissionsScreen(preferencesController: preferencesController, notificationService: notificationService),
               ),
             ),
           ],
@@ -286,13 +284,7 @@ class _SettingsTile extends StatelessWidget {
   final String subtitle;
   final VoidCallback onTap;
 
-  const _SettingsTile({
-    required this.theme,
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
+  const _SettingsTile({required this.theme, required this.icon, required this.title, required this.subtitle, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -311,10 +303,7 @@ class _SettingsTile extends StatelessWidget {
                 Container(
                   width: 38,
                   height: 38,
-                  decoration: BoxDecoration(
-                    color: theme.accentColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  decoration: BoxDecoration(color: theme.accentColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
                   child: Icon(icon, color: theme.accentColor, size: 20),
                 ),
                 const SizedBox(width: 12),

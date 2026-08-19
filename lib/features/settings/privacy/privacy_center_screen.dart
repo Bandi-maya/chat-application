@@ -1,33 +1,33 @@
 import 'package:flutter/material.dart';
-import '../../../ui/core/design_system/chaty_settings_primitives.dart';
+
+import '../../../data/repositories/mock_data_store.dart';
+import '../../../data/services/gb_feature_backend_service.dart';
+import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/chaty_preferences_controller.dart';
+import '../../../ui/core/design_system/chaty_settings_primitives.dart';
 
 class PrivacyCenterScreen extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
 
-  const PrivacyCenterScreen({
-    super.key,
-    required this.preferencesController,
-  });
+  const PrivacyCenterScreen({super.key, required this.preferencesController});
 
   @override
   State<PrivacyCenterScreen> createState() => _PrivacyCenterScreenState();
 }
 
 class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
-  static const List<String> _audienceOptions = [
-    'Everyone',
-    'My Contacts',
-    'My Contacts Except…',
-    'Nobody',
-  ];
+  static const List<String> _audienceOptions = <String>['Everyone', 'My Contacts', 'My Contacts Except…', 'Nobody'];
+  static const List<String> _whoCanCallMeOptions = <String>['Everyone', 'My Contacts', 'My Contacts Except…', 'Nobody'];
+  final GbFeatureBackendService _privacyBackend = GbFeatureBackendService();
+  late Future<List<Map<String, dynamic>>> _blockedFuture;
 
-  static const List<String> _whoCanCallMeOptions = [
-    'Everyone',
-    'My Contacts',
-    'My Contacts Except…',
-    'Nobody',
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _blockedFuture = _privacyBackend.getBlockedUsers();
+  }
+
+  void _refreshBlocked() => setState(() => _blockedFuture = _privacyBackend.getBlockedUsers());
 
   @override
   Widget build(BuildContext context) {
@@ -35,9 +35,8 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
 
     return ChatySettingsPage(
       title: 'Privacy Center',
-      subtitle: 'Granular Last Seen, Receipts, Status & Chat Privacy',
+      subtitle: 'Server-enforced presence, receipts, status & chat privacy',
       children: [
-        // Freeze & Hide Last Seen Section
         ChatySettingsSection(
           title: 'Last Seen & Online Presence',
           description: 'Freeze your last seen timestamp or restrict audience visibility.',
@@ -47,16 +46,16 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
               iconColor: Colors.lightBlueAccent,
               title: 'Freeze Last Seen',
               subtitle: prefs.freezeLastSeen
-                  ? 'Frozen at ${prefs.frozenLastSeenTime.isNotEmpty ? prefs.frozenLastSeenTime : "now"}. Contacts will not see updated timestamps.'
+                  ? 'Frozen at ${prefs.frozenLastSeenTime.isNotEmpty ? prefs.frozenLastSeenTime : "now"}. Server updates no longer move this timestamp.'
                   : 'Stops updating your last visible timestamp to contacts.',
               value: prefs.freezeLastSeen,
-              onChanged: (val) {
-                final timestamp = val ? DateTime.now().toLocal().toString().substring(0, 16) : '';
+              onChanged: (value) {
+                final timestamp = value ? DateTime.now().toLocal().toString().substring(0, 16) : '';
                 widget.preferencesController.updatePrivacy(
-                  prefs.copyWith(freezeLastSeen: val, frozenLastSeenTime: timestamp),
+                  prefs.copyWith(freezeLastSeen: value, frozenLastSeenTime: timestamp),
                   logTitle: 'Freeze Last Seen',
                   prevVal: prefs.freezeLastSeen,
-                  newVal: val,
+                  newVal: value,
                 );
               },
             ),
@@ -64,152 +63,171 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
               title: 'Who Can See My Last Seen',
               options: _audienceOptions,
               selectedOption: prefs.hideLastSeenAudience,
-              optionLabel: (s) => s,
-              onSelected: (aud) {
-                widget.preferencesController.updatePrivacy(
-                  prefs.copyWith(hideLastSeenAudience: aud),
-                  logTitle: 'Hide Last Seen Audience',
-                );
-              },
+              optionLabel: (value) => value,
+              onSelected: (audience) => widget.preferencesController.updatePrivacy(
+                prefs.copyWith(hideLastSeenAudience: audience),
+                logTitle: 'Hide Last Seen Audience',
+              ),
             ),
             ChatyChoiceTile<String>(
               title: 'Who Can See When I\'m Online',
-              options: const ['Everyone', 'Same as Last Seen'],
+              options: const <String>['Everyone', 'Same as Last Seen'],
               selectedOption: prefs.hideOnlineAudience,
-              optionLabel: (s) => s,
-              onSelected: (aud) {
-                widget.preferencesController.updatePrivacy(
-                  prefs.copyWith(hideOnlineAudience: aud),
-                  logTitle: 'Hide Online Audience',
-                );
-              },
+              optionLabel: (value) => value,
+              onSelected: (audience) => widget.preferencesController.updatePrivacy(
+                prefs.copyWith(hideOnlineAudience: audience),
+                logTitle: 'Hide Online Audience',
+              ),
             ),
           ],
         ),
-
-        // Read Receipts & Indicators
         ChatySettingsSection(
-          title: 'Read Receipts & Presence Simulation',
+          title: 'Read Receipts & Presence',
           children: [
             ChatySwitchTile(
               icon: Icons.done_all_rounded,
               iconColor: Colors.blueAccent,
               title: 'Read Receipts (Blue Ticks)',
-              subtitle: 'Send and receive read receipts in direct conversations',
+              subtitle: 'The server only publishes read receipts when this is enabled.',
               value: prefs.readReceipts,
-              onChanged: (val) {
-                widget.preferencesController.updatePrivacy(
-                  prefs.copyWith(readReceipts: val),
-                  logTitle: 'Read Receipts',
-                );
-              },
+              onChanged: (value) => widget.preferencesController.updatePrivacy(
+                prefs.copyWith(readReceipts: value),
+                logTitle: 'Read Receipts',
+              ),
             ),
             ChatySwitchTile(
               icon: Icons.mark_chat_read_rounded,
               iconColor: Colors.indigoAccent,
               title: 'Show Blue Ticks After Reply',
-              subtitle: 'Delay read receipt visualization until you reply to a message',
+              subtitle: 'Opening a chat clears your unread count but publishes receipts only after you reply.',
               value: prefs.showBlueTicksAfterReply,
-              onChanged: (val) {
-                widget.preferencesController.updatePrivacy(
-                  prefs.copyWith(showBlueTicksAfterReply: val),
-                  logTitle: 'Show Blue Ticks After Reply',
-                );
-              },
+              onChanged: (value) => widget.preferencesController.updatePrivacy(
+                prefs.copyWith(showBlueTicksAfterReply: value),
+                logTitle: 'Show Blue Ticks After Reply',
+              ),
             ),
             ChatySwitchTile(
               icon: Icons.edit_note_rounded,
               iconColor: Colors.orangeAccent,
               title: 'Typing Indicators',
-              subtitle: 'Show when you are typing a message',
+              subtitle: 'Realtime typing state is published only while this is enabled.',
               value: prefs.typingIndicators,
-              onChanged: (val) {
-                widget.preferencesController.updatePrivacy(
-                  prefs.copyWith(typingIndicators: val),
-                  logTitle: 'Typing Indicators',
-                );
-              },
+              onChanged: (value) => widget.preferencesController.updatePrivacy(
+                prefs.copyWith(typingIndicators: value),
+                logTitle: 'Typing Indicators',
+              ),
             ),
             ChatySwitchTile(
               icon: Icons.mic_none_rounded,
               iconColor: Colors.redAccent,
               title: 'Recording Indicators',
-              subtitle: 'Show presence when recording a voice note',
+              subtitle: 'Allow voice-note recording presence to be shown.',
               value: prefs.recordingIndicators,
-              onChanged: (val) {
-                widget.preferencesController.updatePrivacy(
-                  prefs.copyWith(recordingIndicators: val),
-                  logTitle: 'Recording Indicators',
-                );
-              },
+              onChanged: (value) => widget.preferencesController.updatePrivacy(
+                prefs.copyWith(recordingIndicators: value),
+                logTitle: 'Recording Indicators',
+              ),
             ),
           ],
         ),
-
-        // Anti-Delete & View Once Protection
         ChatySettingsSection(
           title: 'Anti-Delete & View-Once Safeguards',
-          description: 'Prototype simulation: retain deleted messages and status updates locally.',
+          description: 'Chaty preserves the original server payload while applying your private local visibility preference.',
           children: [
             ChatySwitchTile(
               icon: Icons.delete_forever_rounded,
               iconColor: Colors.deepOrangeAccent,
               title: 'Anti-Delete Messages',
-              subtitle: 'Deleted messages remain visible locally marked "Deleted by sender"',
+              subtitle: 'Keep the original message visible to you after the sender deletes it.',
               value: prefs.antiDeleteMessages,
-              onChanged: (val) {
-                widget.preferencesController.updatePrivacy(
-                  prefs.copyWith(antiDeleteMessages: val),
-                  logTitle: 'Anti-Delete Messages',
-                );
+              onChanged: (value) {
+                widget.preferencesController.updatePrivacy(prefs.copyWith(antiDeleteMessages: value), logTitle: 'Anti-Delete Messages');
+                widget.preferencesController.updateGbFeature('yoAntiRevoke', value, logTitle: 'Anti-Delete Messages');
               },
             ),
             ChatySwitchTile(
               icon: Icons.history_toggle_off_rounded,
               iconColor: Colors.amberAccent,
               title: 'Anti-Delete Status / Stories',
-              subtitle: 'Deleted contact stories remain locally viewable marked "Deleted by author"',
+              subtitle: 'Keep a deleted status available until its normal 24-hour expiry.',
               value: prefs.antiDeleteStatus,
-              onChanged: (val) {
-                widget.preferencesController.updatePrivacy(
-                  prefs.copyWith(antiDeleteStatus: val),
-                  logTitle: 'Anti-Delete Status',
-                );
+              onChanged: (value) {
+                widget.preferencesController.updatePrivacy(prefs.copyWith(antiDeleteStatus: value), logTitle: 'Anti-Delete Status');
+                widget.preferencesController.updateGbFeature('yoAntiRevokeStatus', value, logTitle: 'Anti-Delete Status');
               },
             ),
             ChatySwitchTile(
               icon: Icons.remove_red_eye_rounded,
               iconColor: Colors.tealAccent,
               title: 'Anti View-Once Media',
-              subtitle: 'View-once photos and videos remain viewable after opening (Demo behavior)',
+              subtitle: 'Retain opened view-once media in Chaty when the sender permissions allow the stored payload to remain available.',
               value: prefs.antiViewOnce,
-              onChanged: (val) {
-                widget.preferencesController.updatePrivacy(
-                  prefs.copyWith(antiViewOnce: val),
-                  logTitle: 'Anti View Once',
-                );
+              onChanged: (value) {
+                widget.preferencesController.updatePrivacy(prefs.copyWith(antiViewOnce: value), logTitle: 'Anti View Once');
+                widget.preferencesController.updateGbFeature('anti_vw_once', value, logTitle: 'Anti View Once');
               },
             ),
             ChatySwitchTile(
               icon: Icons.notification_important_rounded,
               iconColor: Colors.purpleAccent,
               title: 'Message & Status Revoke Alerts',
-              subtitle: 'Generate in-app notifications whenever a mock message or story is revoked',
+              subtitle: 'Notify when a sender revokes a message or status.',
               value: prefs.messageRevokeAlert,
-              onChanged: (val) {
+              onChanged: (value) {
                 widget.preferencesController.updatePrivacy(
-                  prefs.copyWith(
-                    messageRevokeAlert: val,
-                    statusRevocationAlert: val,
-                  ),
+                  prefs.copyWith(messageRevokeAlert: value, statusRevocationAlert: value),
                   logTitle: 'Revoke Alerts',
+                );
+                widget.preferencesController.updateGbFeatures(
+                  <String, Object?>{'AntiRevokeMsgNotif': value, 'AntiRevokeStatusNotif': value},
+                  logTitle: 'Revoke alerts',
                 );
               },
             ),
           ],
         ),
-
-        // Calling & Forwarding Privacy
+        ChatySettingsSection(
+          title: 'Blocked Users',
+          description: 'Blocking is enforced server-side for direct-message sends.',
+          children: [
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: _blockedFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const ListTile(title: Text('Loading blocked users…'), trailing: SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2)));
+                }
+                final users = snapshot.data ?? const <Map<String, dynamic>>[];
+                if (users.isEmpty) return const ListTile(title: Text('No blocked users'), subtitle: Text('Blocked accounts will appear here.'));
+                return Column(
+                  children: users.map((user) => ChatySettingsTile(
+                    icon: Icons.block_rounded,
+                    iconColor: Colors.redAccent,
+                    title: user['display_name']?.toString() ?? 'User',
+                    subtitle: '@${user['username'] ?? ''}',
+                    trailing: TextButton(
+                      onPressed: () async {
+                        try {
+                          await _privacyBackend.unblockUser(user['id'].toString());
+                          _refreshBlocked();
+                        } catch (error) {
+                          _toast('Unable to unblock: $error');
+                        }
+                      },
+                      child: const Text('Unblock'),
+                    ),
+                  )).toList(growable: false),
+                );
+              },
+            ),
+            ChatySettingsTile(
+              icon: Icons.person_off_outlined,
+              iconColor: Colors.redAccent,
+              title: 'Block a user',
+              subtitle: 'Search Chaty users by name or @username',
+              onTap: _openBlockSearch,
+            ),
+          ],
+        ),
         ChatySettingsSection(
           title: 'Call & Forwarding Controls',
           children: [
@@ -217,31 +235,25 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
               title: 'Who Can Call Me',
               options: _whoCanCallMeOptions,
               selectedOption: prefs.whoCanCallMe,
-              optionLabel: (s) => s,
-              onSelected: (aud) {
-                widget.preferencesController.updatePrivacy(
-                  prefs.copyWith(whoCanCallMe: aud),
-                  logTitle: 'Who Can Call Me',
-                );
+              optionLabel: (value) => value,
+              onSelected: (audience) {
+                widget.preferencesController.updatePrivacy(prefs.copyWith(whoCanCallMe: audience), logTitle: 'Who Can Call Me');
+                widget.preferencesController.updateGbFeature('yoCallsPrivacy', audience, logTitle: 'Who Can Call Me');
               },
             ),
             ChatySwitchTile(
               icon: Icons.shortcut_rounded,
               iconColor: Colors.cyanAccent,
               title: 'Disable Forwarded Tag',
-              subtitle: 'Remove the "Forwarded" label from forwarded outgoing messages',
+              subtitle: 'Do not display a forwarded marker on your outgoing forwarded messages.',
               value: prefs.disableForwardedLabel,
-              onChanged: (val) {
-                widget.preferencesController.updatePrivacy(
-                  prefs.copyWith(disableForwardedLabel: val),
-                  logTitle: 'Disable Forwarded Label',
-                );
+              onChanged: (value) {
+                widget.preferencesController.updatePrivacy(prefs.copyWith(disableForwardedLabel: value), logTitle: 'Disable Forwarded Label');
+                widget.preferencesController.updateGbFeature('yoDisableFwd', value, logTitle: 'Disable Forwarded Label');
               },
             ),
           ],
         ),
-
-        // Advanced Privacy & Recovery
         ChatySettingsSection(
           title: 'Advanced Settings & Recovery',
           children: [
@@ -249,18 +261,96 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
               icon: Icons.visibility_off_rounded,
               iconColor: Colors.grey,
               title: 'Hide Privacy Option from Main Settings',
-              subtitle: 'Hide this Privacy entry. Restore via Settings → Restore Hidden Settings.',
+              subtitle: 'Hide this Privacy entry. Restore it through the GB Feature Center.',
               value: prefs.hidePrivacyOption,
-              onChanged: (val) {
-                widget.preferencesController.updatePrivacy(
-                  prefs.copyWith(hidePrivacyOption: val),
-                  logTitle: 'Hide Privacy Option',
-                );
-              },
+              onChanged: (value) => widget.preferencesController.updatePrivacy(
+                prefs.copyWith(hidePrivacyOption: value),
+                logTitle: 'Hide Privacy Option',
+              ),
             ),
           ],
         ),
       ],
     );
+  }
+
+  Future<void> _openBlockSearch() async {
+    final dataStore = locator<MockDataStore>();
+    final searchController = TextEditingController();
+    List<dynamic> results = const <dynamic>[];
+    var busy = false;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, updateDialog) => AlertDialog(
+          title: const Text('Block a Chaty user'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: searchController,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: '@username or name',
+                    suffixIcon: busy
+                        ? const Padding(padding: EdgeInsets.all(13), child: CircularProgressIndicator(strokeWidth: 2))
+                        : IconButton(
+                            icon: const Icon(Icons.search_rounded),
+                            onPressed: () async {
+                              final query = searchController.text.trim();
+                              if (query.length < 2) return;
+                              updateDialog(() => busy = true);
+                              try {
+                                final found = await dataStore.searchUsersRemote(query);
+                                if (dialogContext.mounted) updateDialog(() => results = found);
+                              } finally {
+                                if (dialogContext.mounted) updateDialog(() => busy = false);
+                              }
+                            },
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: results.length,
+                    itemBuilder: (context, index) {
+                      final user = results[index];
+                      return ListTile(
+                        title: Text(user.displayName),
+                        subtitle: Text('@${user.username}'),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () async {
+                          try {
+                            await _privacyBackend.blockUser(user.id);
+                            if (dialogContext.mounted) Navigator.pop(dialogContext);
+                            _refreshBlocked();
+                            _toast('${user.displayName} blocked.');
+                          } catch (error) {
+                            _toast('Unable to block user: $error');
+                          }
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close'))],
+        ),
+      ),
+    );
+    searchController.dispose();
+  }
+
+  void _toast(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 }

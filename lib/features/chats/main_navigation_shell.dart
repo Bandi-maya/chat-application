@@ -5,6 +5,7 @@ import '../../../ui/core/theme/theme_controller.dart';
 import '../../data/repositories/mock_data_store.dart';
 import '../../ui/core/controllers/chaty_preferences_controller.dart';
 import '../../ui/core/controllers/appearance_variant_controller.dart';
+import '../../ui/core/gb/gb_theme_overrides.dart';
 import '../../data/services/chaty_notification_service.dart';
 import 'chats_home_screen.dart';
 import '../tasks/tasks_screen.dart';
@@ -37,7 +38,6 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       setState(() => _currentIndex = 0);
       return;
     }
-
     final now = DateTime.now();
     final previous = _lastExitAttempt;
     if (previous == null || now.difference(previous) > const Duration(seconds: 2)) {
@@ -45,16 +45,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       if (mounted) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
-          ..showSnackBar(
-            const SnackBar(
-              content: Text('Press back again to exit Chaty'),
-              duration: Duration(seconds: 2),
-            ),
-          );
+          ..showSnackBar(const SnackBar(content: Text('Press back again to exit Chaty'), duration: Duration(seconds: 2)));
       }
       return;
     }
-
     await SystemNavigator.pop();
   }
 
@@ -67,14 +61,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     final notificationService = locator<ChatyNotificationService>();
 
     return ListenableBuilder(
-      listenable: Listenable.merge(<Listenable>[
-        themeController,
-        preferencesController,
-        appearanceController,
-        dataStore,
-      ]),
+      listenable: Listenable.merge(<Listenable>[themeController, preferencesController, appearanceController, dataStore]),
       builder: (context, _) {
-        final theme = themeController.globalTheme;
+        final theme = GbThemeOverrides.resolve(themeController.globalTheme, preferencesController);
         final screens = <Widget>[
           ChatsHomeScreen(
             theme: theme,
@@ -83,11 +72,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             themeController: themeController,
             notificationService: notificationService,
           ),
-          UpdatesScreen(
-            theme: theme,
-            dataStore: dataStore,
-            preferencesController: preferencesController,
-          ),
+          UpdatesScreen(theme: theme, dataStore: dataStore, preferencesController: preferencesController),
           TasksScreen(theme: theme, dataStore: dataStore),
           CallsScreen(theme: theme, dataStore: dataStore),
           SettingsRootScreen(
@@ -109,21 +94,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               final forceRail = <int>{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 17, 18}.contains(navIndex);
               final useRail = constraints.maxWidth >= (forceRail ? 720 : 900);
               final content = IndexedStack(index: _currentIndex, children: screens);
-
               if (useRail) {
-                return _buildRailShell(
-                  theme: theme,
-                  content: content,
-                  appearance: appearanceController,
-                  maxWidth: constraints.maxWidth,
-                );
+                return _buildRailShell(theme: theme, content: content, appearance: appearanceController, maxWidth: constraints.maxWidth);
               }
-
-              return _buildBottomShell(
-                theme: theme,
-                content: content,
-                appearance: appearanceController,
-              );
+              return _buildBottomShell(theme: theme, content: content, appearance: appearanceController);
             },
           ),
         );
@@ -131,12 +105,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     );
   }
 
-  Widget _buildRailShell({
-    required dynamic theme,
-    required Widget content,
-    required AppearanceVariantController appearance,
-    required double maxWidth,
-  }) {
+  Widget _buildRailShell({required dynamic theme, required Widget content, required AppearanceVariantController appearance, required double maxWidth}) {
     final index = appearance.navigationIndex;
     final compact = <int>{1, 2, 6, 7, 15, 19}.contains(index);
     final showAllLabels = <int>{0, 3, 4, 8, 9, 17, 18}.contains(index) && maxWidth >= 900;
@@ -162,15 +131,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               selectedLabelTextStyle: TextStyle(color: theme.primaryTextColor, fontWeight: FontWeight.w700),
               unselectedLabelTextStyle: TextStyle(color: theme.secondaryTextColor),
               labelType: showAllLabels ? NavigationRailLabelType.none : NavigationRailLabelType.selected,
-              destinations: _navItems
-                  .map(
-                    (item) => NavigationRailDestination(
-                      icon: Icon(item.icon),
-                      selectedIcon: Icon(item.activeIcon),
-                      label: Text(item.label),
-                    ),
-                  )
-                  .toList(growable: false),
+              destinations: _navItems.map((item) => NavigationRailDestination(icon: Icon(item.icon), selectedIcon: Icon(item.activeIcon), label: Text(item.label))).toList(growable: false),
             ),
             VerticalDivider(width: 1, color: theme.cardColor),
             Expanded(child: content),
@@ -180,11 +141,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     );
   }
 
-  Widget _buildBottomShell({
-    required dynamic theme,
-    required Widget content,
-    required AppearanceVariantController appearance,
-  }) {
+  Widget _buildBottomShell({required dynamic theme, required Widget content, required AppearanceVariantController appearance}) {
     final index = appearance.bottomBarIndex;
     final radius = <double>[32, 14, 25, 22, 28, 30, 18, 12, 8, 22, 16, 20, 4, 10, 34, 27, 18, 0, 14, 10][index];
     final sideMargin = <double>[12, 0, 28, 18, 12, 18, 36, 8, 0, 18, 8, 16, 0, 4, 8, 24, 14, 0, 10, 6][index];
@@ -209,18 +166,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             decoration: BoxDecoration(
               color: theme.surfaceColor,
               borderRadius: BorderRadius.circular(radius),
-              border: Border.all(
-                color: <int>{4, 16}.contains(index) ? theme.accentColor.withValues(alpha: 0.35) : theme.cardColor,
-                width: <int>{4, 16}.contains(index) ? 1.3 : 1,
-              ),
+              border: Border.all(color: <int>{4, 16}.contains(index) ? theme.accentColor.withValues(alpha: 0.35) : theme.cardColor, width: <int>{4, 16}.contains(index) ? 1.3 : 1),
               boxShadow: sideMargin > 0
-                  ? <BoxShadow>[
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: theme.brightness == Brightness.dark ? 0.26 : 0.09),
-                        blurRadius: <int>{3, 5, 9, 16}.contains(index) ? 24 : 14,
-                        offset: const Offset(0, 6),
-                      ),
-                    ]
+                  ? <BoxShadow>[BoxShadow(color: Colors.black.withValues(alpha: theme.brightness == Brightness.dark ? 0.26 : 0.09), blurRadius: <int>{3, 5, 9, 16}.contains(index) ? 24 : 14, offset: const Offset(0, 6))]
                   : const <BoxShadow>[],
             ),
             child: Row(
@@ -245,20 +193,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     );
   }
 
-  Widget _buildBottomItem({
-    required _NavDestinationItem item,
-    required bool isSelected,
-    required dynamic theme,
-    required bool compact,
-    required bool showLabel,
-    required bool selectedFilled,
-    required int styleIndex,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildBottomItem({required _NavDestinationItem item, required bool isSelected, required dynamic theme, required bool compact, required bool showLabel, required bool selectedFilled, required int styleIndex, required VoidCallback onTap}) {
     final iconColor = isSelected ? theme.accentColor : theme.secondaryTextColor;
     final fill = isSelected && selectedFilled ? theme.accentColor.withValues(alpha: 0.13) : Colors.transparent;
     final radius = <int>{1, 7, 12, 17}.contains(styleIndex) ? 10.0 : 24.0;
-
     return Flexible(
       child: InkWell(
         onTap: onTap,
@@ -275,15 +213,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               Icon(isSelected ? item.activeIcon : item.icon, color: iconColor, size: compact ? 19 : 21),
               if (isSelected && showLabel && MediaQuery.sizeOf(context).width >= 350) ...[
                 const SizedBox(width: 5),
-                Flexible(
-                  child: Text(
-                    item.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.fade,
-                    softWrap: false,
-                    style: TextStyle(color: theme.primaryTextColor, fontSize: compact ? 10.5 : 11.5, fontWeight: FontWeight.w700),
-                  ),
-                ),
+                Flexible(child: Text(item.label, maxLines: 1, overflow: TextOverflow.fade, softWrap: false, style: TextStyle(color: theme.primaryTextColor, fontSize: compact ? 10.5 : 11.5, fontWeight: FontWeight.w700))),
               ],
             ],
           ),
@@ -297,10 +227,5 @@ class _NavDestinationItem {
   final String label;
   final IconData icon;
   final IconData activeIcon;
-
-  const _NavDestinationItem({
-    required this.label,
-    required this.icon,
-    required this.activeIcon,
-  });
+  const _NavDestinationItem({required this.label, required this.icon, required this.activeIcon});
 }

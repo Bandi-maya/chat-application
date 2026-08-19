@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../ui/core/theme/theme_config.dart';
@@ -6,15 +8,16 @@ import '../../domain/models/conversation.dart';
 import '../../domain/models/user_profile.dart';
 import '../../domain/models/chat_message.dart';
 import '../../data/repositories/mock_data_store.dart';
-import '../../data/services/chat_media_service.dart';
 import '../../ui/core/controllers/chaty_preferences_controller.dart';
 import '../../ui/core/design_system/chaty_settings_primitives.dart';
+import '../../ui/core/gb/gb_theme_overrides.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/widgets/security_chip.dart';
 import '../../ui/core/commands/chat_command_parser.dart';
 import '../messages/message_bubble.dart';
 import '../messages/message_action_sheet.dart';
 import '../messages/attachment_sheet.dart';
+import '../messages/chat_attachment_actions.dart';
 import '../messages/media_viewer_screen.dart';
 import '../tasks/task_create_edit_modal.dart';
 import 'group_info_screen.dart';
@@ -43,15 +46,25 @@ class ChatDetailScreen extends StatefulWidget {
 class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final TextEditingController _textCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
-  final ChatMediaService _mediaService = ChatMediaService();
+  late final ChatAttachmentActions _attachments;
+  Timer? _typingIdleTimer;
+  bool _typingPublished = false;
   ChatMessage? _replyTarget;
   bool _showQuickReplyOverlay = false;
 
-  ThemeConfig get _theme => widget.themeController?.globalTheme ?? widget.theme;
+  ThemeConfig get _theme => GbThemeOverrides.resolve(
+        widget.themeController?.globalTheme ?? widget.theme,
+        widget.preferencesController,
+      );
 
   @override
   void initState() {
     super.initState();
+    _attachments = ChatAttachmentActions(
+      conversationId: widget.conversationId,
+      dataStore: widget.dataStore,
+      preferencesController: widget.preferencesController,
+    );
     final conversation = widget.dataStore.conversations
         .where((item) => item.id == widget.conversationId)
         .firstOrNull;
@@ -67,6 +80,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   @override
   void dispose() {
+    _typingIdleTimer?.cancel();
+    if (_typingPublished) widget.dataStore.setTyping(widget.conversationId, false);
     widget.dataStore.setDraft(widget.conversationId, _textCtrl.text);
     _textCtrl.dispose();
     _scrollCtrl.dispose();
@@ -95,6 +110,28 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     return 'last seen ${lastSeen.day}/${lastSeen.month}/${lastSeen.year}';
   }
 
+  void _handleComposerChanged(String value) {
+    widget.dataStore.setDraft(widget.conversationId, value);
+    final shouldType = value.trim().isNotEmpty;
+    if (shouldType && !_typingPublished) {
+      _typingPublished = true;
+      widget.dataStore.setTyping(widget.conversationId, true);
+    }
+    if (!shouldType && _typingPublished) {
+      _typingPublished = false;
+      widget.dataStore.setTyping(widget.conversationId, false);
+    }
+    _typingIdleTimer?.cancel();
+    if (shouldType) {
+      _typingIdleTimer = Timer(const Duration(seconds: 5), () {
+        if (!mounted || !_typingPublished) return;
+        _typingPublished = false;
+        widget.dataStore.setTyping(widget.conversationId, false);
+      });
+    }
+    setState(() => _showQuickReplyOverlay = value.contains('#'));
+  }
+
   Future<void> _sendMessage() async {
     final text = _textCtrl.text.trim();
     if (text.isEmpty) return;
@@ -102,6 +139,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final command = ChatCommandParser.parse(text);
     if (command.type == ChatCommandType.task) {
       _textCtrl.clear();
+      _typingPublished = false;
+      widget.dataStore.setTyping(widget.conversationId, false);
       setState(() {});
       _openCreateTaskModal(initialTitle: command.argument.isEmpty ? null : command.argument);
       return;
@@ -109,6 +148,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
     final reply = _replyTarget;
     _textCtrl.clear();
+    _typingIdleTimer?.cancel();
+    if (_typingPublished) {
+      _typingPublished = false;
+      widget.dataStore.setTyping(widget.conversationId, false);
+    }
     setState(() {
       _replyTarget = null;
       _showQuickReplyOverlay = false;
@@ -212,49 +256,28 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
-  Future<void> _shareMedia(String type) async {
-    try {
-      final attachment = await _mediaService.pickAndUpload(
-        conversationId: widget.conversationId,
-        type: type,
-      );
-      if (attachment == null) return;
-      await widget.dataStore.sendMessage(
-        conversationId: widget.conversationId,
-        text: attachment.name,
-        type: switch (type) {
-          'image' => MessageType.image,
-          'video' => MessageType.video,
-          'audio' => MessageType.audio,
-          _ => MessageType.document,
-        },
-        attachment: attachment,
-      );
-      _scrollToBottom();
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
-      );
-    }
-  }
-
-  void _showUnavailable(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$feature is not connected to a production service yet.')),
-    );
-  }
-
   void _openAttachmentSheet() {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (_) => AttachmentSheet(
         theme: _theme,
-        onMediaRequested: _shareMedia,
-        onLocationRequested: () => _showUnavailable('Location sharing'),
-        onContactRequested: () => _showUnavailable('Contact sharing'),
-        onPollRequested: () => _showUnavailable('Poll creation'),
+        onMediaRequested: (type) async {
+          await _attachments.shareMedia(context, type);
+          _scrollToBottom();
+        },
+        onLocationRequested: () async {
+          await _attachments.shareLocation(context);
+          _scrollToBottom();
+        },
+        onContactRequested: () async {
+          await _attachments.shareContact(context);
+          _scrollToBottom();
+        },
+        onPollRequested: () async {
+          await _attachments.createPoll(context);
+          _scrollToBottom();
+        },
         onTaskOption: _openCreateTaskModal,
       ),
     );
@@ -304,9 +327,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       orElse: () => '',
     );
     final otherUser = otherId.isEmpty ? null : dataStore.getUser(otherId);
+    final remoteTyping = dataStore.isTypingInChat(widget.conversationId);
     final presence = conversation.type == ConversationType.direct
-        ? _lastSeen(otherUser)
-        : '${conversation.participantIds.length} participants';
+        ? (remoteTyping ? 'typing…' : _lastSeen(otherUser))
+        : (remoteTyping ? 'someone is typing…' : '${conversation.participantIds.length} participants');
     final messages = dataStore.getMessages(widget.conversationId);
     final autoPrefs = widget.preferencesController.automation;
 
@@ -362,7 +386,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: otherUser?.presence == PresenceState.online ? theme.successColor : theme.secondaryTextColor,
+                        color: remoteTyping || otherUser?.presence == PresenceState.online ? theme.successColor : theme.secondaryTextColor,
                         fontSize: 10.5 * theme.fontScale,
                         fontWeight: FontWeight.w500,
                       ),
@@ -398,7 +422,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       itemBuilder: (context, index) {
                         final message = messages[index];
                         final isMine = message.senderId == dataStore.currentUser.id;
-                        return MessageBubble(
+                        final bubble = MessageBubble(
                           message: message,
                           isMe: isMine,
                           theme: theme,
@@ -426,6 +450,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                                   );
                                 },
                         );
+                        if (!ChatAttachmentActions.isPollMessage(message)) return bubble;
+                        return GestureDetector(
+                          behavior: HitTestBehavior.translucent,
+                          onTap: () => _attachments.openPoll(context, message.id),
+                          child: bubble,
+                        );
                       },
                     ),
             ),
@@ -451,7 +481,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       onTap: () {
                         _textCtrl.text = reply.content;
                         _textCtrl.selection = TextSelection.collapsed(offset: _textCtrl.text.length);
-                        setState(() => _showQuickReplyOverlay = false);
+                        _handleComposerChanged(_textCtrl.text);
                       },
                     );
                   }).toList(growable: false),
@@ -494,11 +524,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               controller: _textCtrl,
               onAttach: _openAttachmentSheet,
               onSend: _sendMessage,
-              onChanged: (value) {
-                widget.dataStore.setDraft(widget.conversationId, value);
-                setState(() => _showQuickReplyOverlay = value.contains('#'));
+              onChanged: _handleComposerChanged,
+              onVoice: () async {
+                if (_typingPublished) {
+                  _typingPublished = false;
+                  widget.dataStore.setTyping(widget.conversationId, false);
+                }
+                await _attachments.recordVoiceNote(context);
+                _scrollToBottom();
               },
-              onVoice: () => _showUnavailable('Voice-note recording'),
             ),
           ],
         ),
