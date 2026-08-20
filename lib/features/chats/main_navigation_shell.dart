@@ -26,9 +26,15 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   int _currentIndex = 0;
   DateTime? _lastExitAttempt;
 
+  void _selectRootDestination(int next) {
+    if (next == _currentIndex) return;
+    HapticFeedback.selectionClick();
+    setState(() => _currentIndex = next);
+  }
+
   Future<void> _handleRootBack() async {
     if (_currentIndex != 0) {
-      setState(() => _currentIndex = 0);
+      _selectRootDestination(0);
       return;
     }
     final now = DateTime.now();
@@ -163,7 +169,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           children: [
             NavigationRail(
               selectedIndex: selectedIndex,
-              onDestinationSelected: (next) => setState(() => _currentIndex = next),
+              onDestinationSelected: _selectRootDestination,
               minWidth: compact ? 58 : 72,
               minExtendedWidth: 190,
               extended: showAllLabels,
@@ -199,9 +205,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     final radius = <double>[32, 14, 25, 22, 28, 30, 18, 12, 8, 22, 16, 20, 4, 10, 34, 27, 18, 0, 14, 10][index];
     final sideMargin = <double>[12, 0, 28, 18, 12, 18, 36, 8, 0, 18, 8, 16, 0, 4, 8, 24, 14, 0, 10, 6][index];
     final bottomMargin = <double>[10, 0, 10, 12, 10, 12, 12, 6, 0, 10, 7, 12, 0, 4, 10, 12, 10, 0, 8, 5][index];
-    final height = <double>[60, 64, 54, 58, 60, 60, 54, 60, 50, 64, 58, 60, 58, 52, 64, 54, 60, 58, 58, 52][index];
+    final requestedHeight = <double>[60, 64, 54, 58, 60, 60, 54, 60, 50, 64, 58, 60, 58, 52, 64, 54, 60, 58, 58, 52][index];
+    final height = requestedHeight < 56 ? 56.0 : requestedHeight;
     final compact = <int>{2, 6, 8, 13, 15, 19}.contains(index);
-    final showLabels = !<int>{6, 8, 13, 19}.contains(index);
+    final showLabels = navItems.length <= 5 && !<int>{6, 8, 13, 19}.contains(index);
     final selectedFilled = !<int>{4, 8, 12, 17}.contains(index);
 
     return Scaffold(
@@ -248,7 +255,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     showLabel: showLabels,
                     selectedFilled: selectedFilled,
                     styleIndex: index,
-                    onTap: () => setState(() => _currentIndex = navItemIndex),
+                    onTap: () => _selectRootDestination(navItemIndex),
                   );
                 }),
               ),
@@ -273,40 +280,46 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     final fill = isSelected && selectedFilled ? theme.accentColor.withValues(alpha: 0.13) : Colors.transparent;
     final radius = <int>{1, 7, 12, 17}.contains(styleIndex) ? 10.0 : 24.0;
     return Flexible(
-      child: Semantics(
-        button: true,
-        selected: isSelected,
-        label: item.label,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(radius),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOutCubic,
-            padding: EdgeInsets.symmetric(horizontal: compact ? 6 : 8, vertical: compact ? 5 : 6),
-            decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(radius)),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(isSelected ? item.activeIcon : item.icon, color: iconColor, size: compact ? 19 : 21),
-                if (isSelected && showLabel && MediaQuery.sizeOf(context).width >= 380 && navItemsCanShowLabel(styleIndex)) ...[
-                  const SizedBox(width: 5),
-                  Flexible(
-                    child: Text(
-                      item.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.fade,
-                      softWrap: false,
-                      style: TextStyle(
-                        color: theme.primaryTextColor,
-                        fontSize: compact ? 10.5 : 11.5,
-                        fontWeight: FontWeight.w700,
+      child: Tooltip(
+        message: item.label,
+        child: Semantics(
+          button: true,
+          selected: isSelected,
+          label: item.label,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(radius),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                padding: EdgeInsets.symmetric(horizontal: compact ? 6 : 8, vertical: compact ? 5 : 6),
+                decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(radius)),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(isSelected ? item.activeIcon : item.icon, color: iconColor, size: compact ? 19 : 21),
+                    if (isSelected && showLabel && MediaQuery.sizeOf(context).width >= 380 && navItemsCanShowLabel(styleIndex)) ...[
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          item.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.fade,
+                          softWrap: false,
+                          style: TextStyle(
+                            color: theme.primaryTextColor,
+                            fontSize: compact ? 10.5 : 11.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ],
-              ],
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
         ),
