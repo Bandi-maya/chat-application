@@ -8,10 +8,10 @@ import 'package:local_auth/local_auth.dart';
 
 /// Local-only authentication primitives used by both App Lock and Chat Lock.
 ///
-/// Secrets are never persisted in application preferences or sent to Supabase.
-/// PINs, passwords, and patterns are stored as salted PBKDF2 hashes inside the
-/// platform secure storage. Biometrics/device credentials are verified by the
-/// operating system through Flutter's open-source `local_auth` plugin.
+/// New PINs, passwords, and patterns are never persisted in application
+/// preferences or sent to Supabase. They are stored as salted PBKDF2 hashes
+/// inside platform secure storage. Biometrics/device credentials are verified
+/// by the operating system through Flutter's open-source `local_auth` plugin.
 class LocalLockService {
   LocalLockService({
     LocalAuthentication? localAuthentication,
@@ -95,31 +95,13 @@ class LocalLockService {
     await _secureStorage.write(key: _hashKey(normalized), value: base64Encode(bytes));
   }
 
-  Future<bool> verifyCredential(
-    String method,
-    String secret, {
-    String? legacySecret,
-  }) async {
+  Future<bool> verifyCredential(String method, String secret) async {
     final normalized = _normalizedMethod(method);
     try {
       final encodedHash = await _secureStorage.read(key: _hashKey(normalized));
       final encodedSalt = await _secureStorage.read(key: _saltKey(normalized));
-
-      // One-way migration path for installs that used the previous plaintext
-      // preference fields. New writes never use those fields.
-      if ((encodedHash == null || encodedSalt == null) && legacySecret != null && legacySecret.isNotEmpty) {
-        if (_constantTimeEquals(secret, legacySecret)) {
-          await setCredential(
-            normalized,
-            secret,
-            pinLength: normalized == 'pin' ? secret.length : null,
-          );
-          return true;
-        }
-        return false;
-      }
-
       if (encodedHash == null || encodedSalt == null) return false;
+
       final salt = base64Decode(encodedSalt);
       final expected = base64Decode(encodedHash);
       final derived = await _pbkdf2.deriveKeyFromPassword(password: secret, nonce: salt);
@@ -200,8 +182,6 @@ class LocalLockService {
     if (parsed.any((value) => value == null || value < 0 || value > 8)) return false;
     return parsed.toSet().length == parsed.length;
   }
-
-  bool _constantTimeEquals(String a, String b) => _constantTimeBytesEqual(utf8.encode(a), utf8.encode(b));
 
   bool _constantTimeBytesEqual(List<int> a, List<int> b) {
     var difference = a.length ^ b.length;
