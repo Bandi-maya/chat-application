@@ -57,6 +57,7 @@ class AppIconController extends ChangeNotifier {
   BrandIconSource _brandIconSource = BrandIconSource.bundled;
   String? _customBrandIconPath;
   bool _customHomeShortcutApplied = false;
+  bool _customLauncherModeActive = false;
   bool _initialized = false;
   bool _isApplyingLauncherIcon = false;
   bool _isSavingCustomBrandIcon = false;
@@ -66,6 +67,7 @@ class AppIconController extends ChangeNotifier {
   BrandIconSource get brandIconSource => _brandIconSource;
   String? get customBrandIconPath => _customBrandIconPath;
   bool get customHomeShortcutApplied => _customHomeShortcutApplied;
+  bool get customLauncherModeActive => _customLauncherModeActive;
   bool get initialized => _initialized;
   bool get isApplyingLauncherIcon => _isApplyingLauncherIcon;
   bool get isSavingCustomBrandIcon => _isSavingCustomBrandIcon;
@@ -88,6 +90,7 @@ class AppIconController extends ChangeNotifier {
         _brandIconSource = BrandIconSource.bundled;
         _customBrandIconPath = null;
         _customHomeShortcutApplied = false;
+        _customLauncherModeActive = false;
         await prefs.setString(_brandSourcePreferenceKey, BrandIconSource.bundled.name);
         await prefs.remove(_customBrandPathPreferenceKey);
         await prefs.setBool(_customHomeShortcutPreferenceKey, false);
@@ -103,14 +106,11 @@ class AppIconController extends ChangeNotifier {
             _launcherIcon = nativeVariant;
             await prefs.setString(_launcherPreferenceKey, nativeVariant.id);
           }
-        } else {
-          await _channel.invokeMethod<void>('setLauncherIcon', <String, dynamic>{
-            'alias': _launcherIcon.androidAlias,
-          });
         }
 
         if (_brandIconSource == BrandIconSource.custom) {
           final pinned = await _channel.invokeMethod<bool>('isCustomHomeShortcutPinned') ?? false;
+          _customLauncherModeActive = await _channel.invokeMethod<bool>('isCustomLauncherModeActive') ?? false;
           if (pinned != _customHomeShortcutApplied) {
             _customHomeShortcutApplied = pinned;
             await prefs.setBool(_customHomeShortcutPreferenceKey, pinned);
@@ -149,8 +149,11 @@ class AppIconController extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       _launcherIcon = variant;
       _brandIconSource = BrandIconSource.bundled;
+      _customHomeShortcutApplied = false;
+      _customLauncherModeActive = false;
       await prefs.setString(_launcherPreferenceKey, variant.id);
       await prefs.setString(_brandSourcePreferenceKey, BrandIconSource.bundled.name);
+      await prefs.setBool(_customHomeShortcutPreferenceKey, false);
       return true;
     } catch (error) {
       _launcherIcon = previous;
@@ -181,6 +184,7 @@ class AppIconController extends ChangeNotifier {
       await temporary.rename(target.path);
 
       var homeShortcutApplied = false;
+      var customModeActive = false;
       if (!kIsWeb && Platform.isAndroid) {
         try {
           final result = await _channel.invokeMethod<String>('applyCustomHomeShortcut', <String, dynamic>{
@@ -188,18 +192,20 @@ class AppIconController extends ChangeNotifier {
             'label': 'Chaty',
           });
           homeShortcutApplied = result == 'requested' || result == 'updated';
+          customModeActive = await _channel.invokeMethod<bool>('isCustomLauncherModeActive') ?? false;
           if (result == 'unsupported') {
-            _lastError = 'The custom icon is active inside Chaty, but this Android launcher does not support pinned Home Screen icons.';
+            _lastError = 'This Android launcher does not support the temporary custom Home icon mode.';
           }
         } catch (error) {
-          debugPrint('Custom Home Screen shortcut failed: $error');
-          _lastError = 'The custom icon is active inside Chaty, but Android could not add or update its Home Screen launcher icon.';
+          debugPrint('Custom launcher mode failed: $error');
+          _lastError = 'Android could not add or activate the temporary custom launcher icon.';
         }
       }
 
       _customBrandIconPath = target.path;
       _brandIconSource = BrandIconSource.custom;
       _customHomeShortcutApplied = homeShortcutApplied;
+      _customLauncherModeActive = customModeActive;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_brandSourcePreferenceKey, BrandIconSource.custom.name);
       await prefs.setString(_customBrandPathPreferenceKey, target.path);
@@ -234,6 +240,7 @@ class AppIconController extends ChangeNotifier {
     }
     _customBrandIconPath = null;
     _customHomeShortcutApplied = false;
+    _customLauncherModeActive = false;
     _brandIconSource = BrandIconSource.bundled;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_brandSourcePreferenceKey, BrandIconSource.bundled.name);
