@@ -58,24 +58,9 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
     });
   }
 
-  String? _legacySecret(String method) {
-    final security = widget.preferencesController.security;
-    switch (method) {
-      case 'PIN':
-        return security.pinCode;
-      case 'Pattern':
-        return security.patternCode;
-      case 'Password':
-        return security.password;
-      default:
-        return null;
-    }
-  }
-
   Future<bool> _hasConfiguredMethod(String method) async {
     if (method == 'Biometric' || method == 'Device Credential') return false;
-    if (await _lockService.hasCredential(method)) return true;
-    return _legacySecret(method)?.isNotEmpty == true;
+    return _lockService.hasCredential(method);
   }
 
   Future<bool> _configureMethod(String method, {int? pinLength}) async {
@@ -251,7 +236,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
                 ChatySettingsTile(
                   icon: Icons.pin_rounded,
                   title: 'Change PIN Code',
-                  subtitle: '${_pinLength}-digit PIN stored securely on this device',
+                  subtitle: '$_pinLength-digit PIN stored securely on this device',
                   onTap: () => _configureMethod('PIN', pinLength: _pinLength),
                 ),
               ],
