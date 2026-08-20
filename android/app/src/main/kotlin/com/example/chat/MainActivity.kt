@@ -1,5 +1,6 @@
 package com.example.chat
 
+import android.app.ActivityManager
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -39,10 +40,12 @@ open class MainActivity : FlutterFragmentActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        reconcileCustomLauncherMode()
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, launcherChannel).setMethodCallHandler { call, result ->
             when (call.method) {
                 "getCurrentLauncherIcon" -> result.success(getCurrentLauncherIcon())
                 "isCustomHomeShortcutPinned" -> result.success(isCustomHomeShortcutPinned())
+                "isCustomLauncherModeActive" -> result.success(isCustomLauncherModeActive())
                 "setLauncherIcon" -> {
                     val alias = call.argument<String>("alias")
                     if (alias.isNullOrBlank() || !launcherComponents.containsKey(alias)) {
@@ -98,6 +101,12 @@ open class MainActivity : FlutterFragmentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        reconcileCustomLauncherMode()
+        applyCustomTaskDescriptionIfNeeded()
+    }
+
     protected fun nativePreferences() = getSharedPreferences(NATIVE_PREFERENCES_NAME, MODE_PRIVATE)
 
     private fun componentFor(alias: String): ComponentName {
@@ -105,12 +114,18 @@ open class MainActivity : FlutterFragmentActivity() {
         return ComponentName(this, className)
     }
 
+    private fun componentState(alias: String): Int =
+        packageManager.getComponentEnabledSetting(componentFor(alias))
+
+    private fun isComponentEnabled(alias: String): Boolean {
+        val state = componentState(alias)
+        return state == PackageManager.COMPONENT_ENABLED_STATE_ENABLED ||
+            (state == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT && alias == "original")
+    }
+
     private fun getCurrentLauncherIcon(): String? {
         for ((alias, _) in launcherComponents) {
-            val state = packageManager.getComponentEnabledSetting(componentFor(alias))
-            val enabled = state == PackageManager.COMPONENT_ENABLED_STATE_ENABLED ||
-                (state == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT && alias == "original")
-            if (enabled) {
+            if (isComponentEnabled(alias)) {
                 nativePreferences().edit().putString(LAUNCHER_PREFERENCE_KEY, alias).apply()
                 return alias
             }
@@ -130,52 +145,107 @@ open class MainActivity : FlutterFragmentActivity() {
 
     private fun setLauncherIcon(alias: String) {
         val previous = getCurrentLauncherIcon() ?: "original"
-        if (previous == alias) {
-            nativePreferences().edit().putString(LAUNCHER_PREFERENCE_KEY, alias).apply()
-            return
-        }
-
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                val changes = launcherComponents.keys.map { candidate ->
-                    PackageManager.ComponentEnabledSetting(
-                        componentFor(candidate),
-                        if (candidate == alias) {
-                            PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-                        } else {
-                            PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-                        },
-                        PackageManager.DONT_KILL_APP,
-                    )
-                }
-                packageManager.setComponentEnabledSettings(changes)
-            } else {
-                setComponent(alias, PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
-                for (candidate in launcherComponents.keys) {
-                    if (candidate != alias) {
-                        setComponent(candidate, PackageManager.COMPONENT_ENABLED_STATE_DISABLED)
-                    }
-                }
-            }
-            nativePreferences().edit().putString(LAUNCHER_PREFERENCE_KEY, alias).apply()
+            restoreBundledLauncher(alias)
+            nativePreferences().edit()
+                .putString(LAUNCHER_PREFERENCE_KEY, alias)
+                .putBoolean(CUSTOM_MODE_PREFERENCE_KEY, false)
+                .apply()
+            disableCustomShortcutIfPresent()
         } catch (error: Exception) {
-            runCatching { setComponent(previous, PackageManager.COMPONENT_ENABLED_STATE_ENABLED) }
-            for (candidate in launcherComponents.keys) {
-                if (candidate != previous) {
-                    runCatching { setComponent(candidate, PackageManager.COMPONENT_ENABLED_STATE_DISABLED) }
-                }
-            }
-            nativePreferences().edit().putString(LAUNCHER_PREFERENCE_KEY, previous).apply()
+            runCatching { restoreBundledLauncher(previous) }
+            nativePreferences().edit()
+                .putString(LAUNCHER_PREFERENCE_KEY, previous)
+                .putBoolean(CUSTOM_MODE_PREFERENCE_KEY, false)
+                .apply()
             throw error
         }
     }
 
+    private fun restoreBundledLauncher(alias: String) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val changes = launcherComponents.keys.map { candidate ->
+                PackageManager.ComponentEnabledSetting(
+                    componentFor(candidate),
+                    if (candidate == alias) {
+                        PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                    } else {
+                        PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+                    },
+                    PackageManager.DONT_KILL_APP,
+                )
+            }
+            packageManager.setComponentEnabledSettings(changes)
+        } else {
+            setComponent(alias, PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
+            for (candidate in launcherComponents.keys) {
+                if (candidate != alias) {
+                    setComponent(candidate, PackageManager.COMPONENT_ENABLED_STATE_DISABLED)
+                }
+            }
+        }
+    }
+
+    private fun disableBundledLaunchersForCustomMode() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val changes = launcherComponents.keys.map { candidate ->
+                PackageManager.ComponentEnabledSetting(
+                    componentFor(candidate),
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    PackageManager.DONT_KILL_APP,
+                )
+            }
+            packageManager.setComponentEnabledSettings(changes)
+        } else {
+            for (candidate in launcherComponents.keys) {
+                setComponent(candidate, PackageManager.COMPONENT_ENABLED_STATE_DISABLED)
+            }
+        }
+    }
+
+    private fun enterCustomLauncherMode(): Boolean {
+        if (!isCustomHomeShortcutPinned()) return false
+        disableBundledLaunchersForCustomMode()
+        nativePreferences().edit().putBoolean(CUSTOM_MODE_PREFERENCE_KEY, true).apply()
+        applyCustomTaskDescriptionIfNeeded()
+        return true
+    }
+
+    private fun isCustomLauncherModeActive(): Boolean {
+        if (!nativePreferences().getBoolean(CUSTOM_MODE_PREFERENCE_KEY, false)) return false
+        if (!isCustomHomeShortcutPinned()) return false
+        return launcherComponents.keys.none(::isComponentEnabled)
+    }
+
+    private fun reconcileCustomLauncherMode() {
+        val wantsCustomMode = nativePreferences().getBoolean(CUSTOM_MODE_PREFERENCE_KEY, false)
+        if (wantsCustomMode && isCustomHomeShortcutPinned()) {
+            runCatching { disableBundledLaunchersForCustomMode() }
+            return
+        }
+
+        if (!wantsCustomMode && launcherComponents.keys.none(::isComponentEnabled)) {
+            val selected = nativePreferences().getString(LAUNCHER_PREFERENCE_KEY, "original")
+                ?.takeIf(launcherComponents::containsKey)
+                ?: "original"
+            runCatching { restoreBundledLauncher(selected) }
+        }
+    }
+
     private fun restartApp() {
-        val selected = getCurrentLauncherIcon() ?: "original"
-        val launchIntent = Intent(Intent.ACTION_MAIN).apply {
-            component = componentFor(selected)
-            addCategory(Intent.CATEGORY_LAUNCHER)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        val customMode = isCustomLauncherModeActive()
+        val launchIntent = if (customMode) {
+            Intent(this, CustomLauncherActivity::class.java).apply {
+                action = Intent.ACTION_MAIN
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            }
+        } else {
+            val selected = getCurrentLauncherIcon() ?: "original"
+            Intent(Intent.ACTION_MAIN).apply {
+                component = componentFor(selected)
+                addCategory(Intent.CATEGORY_LAUNCHER)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            }
         }
         startActivity(launchIntent)
         finishAffinity()
@@ -202,10 +272,14 @@ open class MainActivity : FlutterFragmentActivity() {
             .setIntent(launchIntent)
             .build()
 
-        nativePreferences().edit().putString(CUSTOM_IMAGE_PATH_PREFERENCE_KEY, imagePath).apply()
+        nativePreferences().edit()
+            .putString(CUSTOM_IMAGE_PATH_PREFERENCE_KEY, imagePath)
+            .putBoolean(CUSTOM_MODE_PREFERENCE_KEY, true)
+            .apply()
 
         return if (shortcutManager.pinnedShortcuts.any { it.id == CUSTOM_SHORTCUT_ID }) {
             shortcutManager.updateShortcuts(listOf(shortcut))
+            enterCustomLauncherMode()
             "updated"
         } else if (shortcutManager.isRequestPinShortcutSupported) {
             val requested = shortcutManager.requestPinShortcut(shortcut, null)
@@ -215,15 +289,43 @@ open class MainActivity : FlutterFragmentActivity() {
         }
     }
 
-    private fun removeCustomHomeShortcut() {
-        nativePreferences().edit().remove(CUSTOM_IMAGE_PATH_PREFERENCE_KEY).apply()
+    private fun disableCustomShortcutIfPresent() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val shortcutManager = getSystemService(ShortcutManager::class.java) ?: return
-        if (shortcutManager.pinnedShortcuts.any { it.id == CUSTOM_SHORTCUT_ID }) {
+        if (shortcutManager.pinnedShortcuts.any { it.id == CUSTOM_SHORTCUT_ID && it.isEnabled }) {
             shortcutManager.disableShortcuts(
                 listOf(CUSTOM_SHORTCUT_ID),
-                "Custom Chaty icon removed. Choose a new custom icon in Chaty Settings.",
+                "Custom Chaty icon is no longer active.",
             )
+        }
+    }
+
+    private fun removeCustomHomeShortcut() {
+        val selected = nativePreferences().getString(LAUNCHER_PREFERENCE_KEY, "original")
+            ?.takeIf(launcherComponents::containsKey)
+            ?: "original"
+        restoreBundledLauncher(selected)
+        nativePreferences().edit()
+            .remove(CUSTOM_IMAGE_PATH_PREFERENCE_KEY)
+            .putBoolean(CUSTOM_MODE_PREFERENCE_KEY, false)
+            .apply()
+        disableCustomShortcutIfPresent()
+    }
+
+    private fun applyCustomTaskDescriptionIfNeeded() {
+        if (!nativePreferences().getBoolean(CUSTOM_MODE_PREFERENCE_KEY, false)) return
+        val imagePath = nativePreferences().getString(CUSTOM_IMAGE_PATH_PREFERENCE_KEY, null) ?: return
+        val bitmap = BitmapFactory.decodeFile(imagePath) ?: return
+
+        if (Build.VERSION.SDK_INT >= 37) {
+            val description = ActivityManager.TaskDescription.Builder()
+                .setLabel("Chaty")
+                .setIcon(Icon.createWithAdaptiveBitmap(bitmap))
+                .build()
+            setTaskDescription(description)
+        } else {
+            @Suppress("DEPRECATION")
+            setTaskDescription(ActivityManager.TaskDescription("Chaty", bitmap, Color.BLACK))
         }
     }
 
@@ -232,6 +334,7 @@ open class MainActivity : FlutterFragmentActivity() {
         const val NATIVE_PREFERENCES_NAME = "chaty_launcher_native"
         const val LAUNCHER_PREFERENCE_KEY = "selected_launcher"
         const val CUSTOM_IMAGE_PATH_PREFERENCE_KEY = "custom_image_path"
+        const val CUSTOM_MODE_PREFERENCE_KEY = "custom_launcher_mode"
     }
 }
 
