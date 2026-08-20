@@ -11,7 +11,6 @@ import '../../data/services/chaty_notification_service.dart';
 import '../../data/services/contact_relationship_service.dart';
 import '../../data/services/rich_chat_realtime_service.dart';
 import '../../domain/models/conversation.dart';
-import '../../domain/models/user_profile.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/chaty_preferences_controller.dart';
 import '../../ui/core/design_system/chaty_settings_primitives.dart';
