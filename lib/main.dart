@@ -6,13 +6,17 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:chat/data/repositories/mock_data_store.dart';
 import 'package:chat/data/services/chaty_backend_service.dart';
+import 'package:chat/data/services/chaty_notification_service.dart';
+import 'package:chat/data/services/contact_relationship_service.dart';
 import 'package:chat/data/services/local_lock_service.dart';
 import 'package:chat/data/services/message_automation_service.dart';
+import 'package:chat/data/services/rich_chat_realtime_service.dart';
 import 'package:chat/domain/models/user_profile.dart';
 import 'package:chat/features/auth/create_new_password_screen.dart';
 import 'package:chat/features/auth/splash_screen.dart';
 import 'package:chat/features/auth/welcome_screen.dart';
 import 'package:chat/features/settings/security/app_lock_overlay.dart';
+import 'package:chat/features/settings/security/security_center_screen.dart';
 import 'package:chat/injection/locator.dart';
 import 'package:chat/ui/core/controllers/app_icon_controller.dart';
 import 'package:chat/ui/core/controllers/appearance_variant_controller.dart';
@@ -20,6 +24,7 @@ import 'package:chat/ui/core/controllers/chaty_preferences_controller.dart';
 import 'package:chat/ui/core/gb/gb_theme_overrides.dart';
 import 'package:chat/ui/core/theme/theme_controller.dart';
 import 'package:chat/ui/core/theme/theme_presets.dart';
+import 'package:chat/ui/core/widgets/chaty_event_toast_overlay.dart';
 import 'package:chat/ui/core/widgets/click_particle_overlay.dart';
 import 'package:chat/ui/core/widgets/falling_particles_overlay.dart';
 
@@ -59,11 +64,18 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   late final AppearanceVariantController _appearanceController;
   late final ChatyBackendService _backend;
   late final LocalLockService _lockService;
+  late final ChatyNotificationService _notificationService;
+  late final ContactRelationshipService _relationshipService;
+  late final RichChatRealtimeService _richRealtime;
   late final MessageAutomationService _automationService;
   late final StreamSubscription<AuthState> _authUiSubscription;
   bool _recoveryRouteOpen = false;
   bool _appLockRequired = false;
   bool _initialAppLockScheduled = false;
+  bool _checkingLockCapability = false;
+  bool _freshLoginSession = false;
+  bool _postLoginAppLockPromptScheduled = false;
+  bool _postLoginAppLockPromptShown = false;
   DateTime? _backgroundedAt;
 
   @override
@@ -75,30 +87,115 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     _appearanceController = locator<AppearanceVariantController>();
     _backend = locator<ChatyBackendService>();
     _lockService = locator<LocalLockService>();
+    _notificationService = locator<ChatyNotificationService>();
+    _relationshipService = locator<ContactRelationshipService>();
+    _richRealtime = locator<RichChatRealtimeService>();
     _preferencesController.addListener(_handleSecurityPreferenceChanged);
     _automationService = MessageAutomationService(
       preferencesController: _preferencesController,
       dataStore: locator<MockDataStore>(),
     );
     _authUiSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(_handleAuthUiEvent);
+    if (Supabase.instance.client.auth.currentSession != null) unawaited(_registerCurrentDevice());
+  }
+
+  Future<void> _registerCurrentDevice() async {
+    try {
+      await _relationshipService.registerCurrentDevice();
+    } catch (error) {
+      debugPrint('Chaty device registration skipped: $error');
+    }
   }
 
   void _handleSecurityPreferenceChanged() {
     if (_preferencesController.security.isAppLockEnabled) return;
     _initialAppLockScheduled = false;
     _backgroundedAt = null;
-    if (_appLockRequired && mounted) {
-      setState(() => _appLockRequired = false);
+    if (_appLockRequired && mounted) setState(() => _appLockRequired = false);
+  }
+
+  Future<bool> _isCurrentLockMethodReady() async {
+    final security = _preferencesController.security;
+    if (!security.isAppLockEnabled) return false;
+    switch (security.lockMethod) {
+      case 'PIN':
+      case 'Pattern':
+      case 'Password':
+        return _lockService.hasCredential(security.lockMethod);
+      case 'Biometric':
+        return _lockService.canUseBiometrics();
+      case 'Device Credential':
+        return true;
+      default:
+        return false;
     }
   }
 
   void _scheduleInitialAppLockIfNeeded() {
     if (!_backend.isAuthenticated || !_preferencesController.security.isAppLockEnabled) return;
-    if (_initialAppLockScheduled || _appLockRequired) return;
-    _initialAppLockScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_backend.isAuthenticated || !_preferencesController.security.isAppLockEnabled) return;
-      setState(() => _appLockRequired = true);
+    if (_freshLoginSession || _initialAppLockScheduled || _appLockRequired || _checkingLockCapability) return;
+    _checkingLockCapability = true;
+    unawaited(() async {
+      final ready = await _isCurrentLockMethodReady();
+      if (!mounted) return;
+      _checkingLockCapability = false;
+      if (!ready || _freshLoginSession || !_backend.isAuthenticated || !_preferencesController.security.isAppLockEnabled) return;
+      _initialAppLockScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _freshLoginSession || !_backend.isAuthenticated || !_preferencesController.security.isAppLockEnabled) return;
+        setState(() => _appLockRequired = true);
+      });
+    }());
+  }
+
+  void _schedulePostLoginAppLockPrompt() {
+    if (_postLoginAppLockPromptScheduled || _postLoginAppLockPromptShown) return;
+    _postLoginAppLockPromptScheduled = true;
+    Future<void>.delayed(const Duration(milliseconds: 650), () async {
+      _postLoginAppLockPromptScheduled = false;
+      if (!mounted || !_backend.isAuthenticated || _postLoginAppLockPromptShown) return;
+      _postLoginAppLockPromptShown = true;
+
+      // If App Lock is already correctly configured there is nothing to ask.
+      if (_preferencesController.security.isAppLockEnabled && await _isCurrentLockMethodReady()) return;
+      if (!mounted) return;
+      final navigator = _rootNavigatorKey.currentState;
+      final context = _rootNavigatorKey.currentContext;
+      if (navigator == null || context == null) return;
+
+      final openSettings = await showDialog<bool>(
+        context: context,
+        barrierDismissible: true,
+        builder: (dialogContext) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.lock_outline_rounded),
+              SizedBox(width: 10),
+              Expanded(child: Text('Enable App Lock?')),
+            ],
+          ),
+          content: const Text(
+            'You can protect Chaty with biometrics, device lock, PIN, pattern, or password. Setup is optional and can be changed anytime in Settings.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Not now'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Open settings'),
+            ),
+          ],
+        ),
+      );
+      if (openSettings == true && mounted) {
+        navigator.push(
+          MaterialPageRoute(
+            builder: (_) => SecurityCenterScreen(preferencesController: _preferencesController),
+          ),
+        );
+      }
     });
   }
 
@@ -114,7 +211,6 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
         return const Duration(minutes: 5);
       case '15m':
         return const Duration(minutes: 15);
-      case 'Immediately':
       default:
         return Duration.zero;
     }
@@ -128,19 +224,25 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     final backgroundedAt = _backgroundedAt;
     _backgroundedAt = null;
     if (backgroundedAt == null) return;
-    final elapsed = DateTime.now().difference(backgroundedAt);
-    final delay = _autoLockDelay(_preferencesController.security.autoLockTimeout);
-    if (elapsed >= delay && mounted && !_appLockRequired) {
-      setState(() => _appLockRequired = true);
-    }
+    if (DateTime.now().difference(backgroundedAt) < _autoLockDelay(_preferencesController.security.autoLockTimeout)) return;
+    if (_appLockRequired || _checkingLockCapability) return;
+    _checkingLockCapability = true;
+    unawaited(() async {
+      final ready = await _isCurrentLockMethodReady();
+      if (!mounted) return;
+      _checkingLockCapability = false;
+      if (ready && _backend.isAuthenticated && _preferencesController.security.isAppLockEnabled && !_appLockRequired) {
+        setState(() => _appLockRequired = true);
+      }
+    }());
   }
 
   void _handleAppUnlocked() {
-    if (!mounted) return;
-    setState(() => _appLockRequired = false);
+    if (mounted) setState(() => _appLockRequired = false);
   }
 
   void _handleAuthUiEvent(AuthState state) {
+    if (state.session != null) unawaited(_registerCurrentDevice());
     if (state.event == AuthChangeEvent.passwordRecovery && !_recoveryRouteOpen) {
       _recoveryRouteOpen = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -156,15 +258,24 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
       });
       return;
     }
-    if (state.event == AuthChangeEvent.signedOut) {
+    if (state.event == AuthChangeEvent.signedIn) {
+      // A successful login must always enter Chaty first. App Lock is opt-in
+      // and configured from Settings, never used as a post-login blocker.
+      _freshLoginSession = true;
       _initialAppLockScheduled = false;
+      _backgroundedAt = null;
+      if (_appLockRequired && mounted) setState(() => _appLockRequired = false);
+      _schedulePostLoginAppLockPrompt();
+    }
+    if (state.event == AuthChangeEvent.signedOut) {
+      _freshLoginSession = false;
+      _initialAppLockScheduled = false;
+      _postLoginAppLockPromptScheduled = false;
+      _postLoginAppLockPromptShown = false;
       _backgroundedAt = null;
       if (mounted && _appLockRequired) setState(() => _appLockRequired = false);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _rootNavigatorKey.currentState?.pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const WelcomeScreen()),
-          (route) => false,
-        );
+        _rootNavigatorKey.currentState?.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const WelcomeScreen()), (route) => false);
       });
     }
   }
@@ -181,11 +292,14 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-
     if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden || state == AppLifecycleState.detached) {
       _backgroundedAt ??= DateTime.now();
     } else if (state == AppLifecycleState.resumed) {
+      // Once the user leaves and returns, a deliberately configured App Lock
+      // behaves normally according to the selected timeout.
+      _freshLoginSession = false;
       _applyAutoLockOnResume();
+      if (_backend.isAuthenticated) unawaited(_registerCurrentDevice());
     }
 
     if (!_backend.isAuthenticated) return;
@@ -215,7 +329,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge(<Listenable>[_themeController, _preferencesController, _appearanceController, _backend]),
+      listenable: Listenable.merge(<Listenable>[_themeController, _preferencesController, _appearanceController, _backend, _richRealtime]),
       builder: (context, _) {
         _scheduleInitialAppLockIfNeeded();
         final currentTheme = GbThemeOverrides.resolve(_themeController.globalTheme, _preferencesController);
@@ -226,23 +340,23 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
           theme: currentTheme.toThemeData(),
           builder: (context, child) {
             final media = MediaQuery.of(context);
-            final scaled = media.copyWith(
-              textScaler: TextScaler.linear((media.textScaler.scale(1.0) * _appearanceController.textScale).clamp(0.8, 1.6)),
-            );
+            final scaled = media.copyWith(textScaler: TextScaler.linear((media.textScaler.scale(1.0) * _appearanceController.textScale).clamp(0.8, 1.6)));
             final appContent = MediaQuery(
               data: scaled,
-              child: ClickParticleOverlay(
+              child: ChatyEventToastOverlay(
+                notificationService: _notificationService,
                 preferencesController: _preferencesController,
-                child: FallingParticlesOverlay(
+                child: ClickParticleOverlay(
                   preferencesController: _preferencesController,
-                  currentScope: 'Home',
-                  child: child ?? const SizedBox(),
+                  child: FallingParticlesOverlay(
+                    preferencesController: _preferencesController,
+                    currentScope: 'Home',
+                    child: child ?? const SizedBox(),
+                  ),
                 ),
               ),
             );
-            final shouldShowLock = _backend.isAuthenticated &&
-                _preferencesController.security.isAppLockEnabled &&
-                _appLockRequired;
+            final shouldShowLock = _backend.isAuthenticated && _preferencesController.security.isAppLockEnabled && _appLockRequired;
             if (!shouldShowLock) return appContent;
             return Stack(
               fit: StackFit.expand,
