@@ -5,9 +5,10 @@ plugins {
 
 android {
     namespace = "com.example.chat"
-    // Current Android plugins in Chaty require API 36 metadata. Increasing
-    // compileSdk does not change the minimum supported Android version.
-    compileSdk = 36
+    // flutter_secure_storage 11 requires Android API 37 metadata. Raising
+    // compileSdk only exposes newer compile-time APIs; minSdk/targetSdk keep
+    // their existing Flutter-managed behavior and device compatibility.
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
