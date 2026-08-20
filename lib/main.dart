@@ -6,6 +6,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:chat/data/repositories/mock_data_store.dart';
 import 'package:chat/data/services/chaty_backend_service.dart';
+import 'package:chat/data/services/chaty_notification_service.dart';
+import 'package:chat/data/services/contact_relationship_service.dart';
 import 'package:chat/data/services/local_lock_service.dart';
 import 'package:chat/data/services/message_automation_service.dart';
 import 'package:chat/domain/models/user_profile.dart';
@@ -20,6 +22,7 @@ import 'package:chat/ui/core/controllers/chaty_preferences_controller.dart';
 import 'package:chat/ui/core/gb/gb_theme_overrides.dart';
 import 'package:chat/ui/core/theme/theme_controller.dart';
 import 'package:chat/ui/core/theme/theme_presets.dart';
+import 'package:chat/ui/core/widgets/chaty_event_toast_overlay.dart';
 import 'package:chat/ui/core/widgets/click_particle_overlay.dart';
 import 'package:chat/ui/core/widgets/falling_particles_overlay.dart';
 
@@ -59,6 +62,8 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   late final AppearanceVariantController _appearanceController;
   late final ChatyBackendService _backend;
   late final LocalLockService _lockService;
+  late final ChatyNotificationService _notificationService;
+  late final ContactRelationshipService _relationshipService;
   late final MessageAutomationService _automationService;
   late final StreamSubscription<AuthState> _authUiSubscription;
   bool _recoveryRouteOpen = false;
@@ -75,12 +80,25 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     _appearanceController = locator<AppearanceVariantController>();
     _backend = locator<ChatyBackendService>();
     _lockService = locator<LocalLockService>();
+    _notificationService = locator<ChatyNotificationService>();
+    _relationshipService = locator<ContactRelationshipService>();
     _preferencesController.addListener(_handleSecurityPreferenceChanged);
     _automationService = MessageAutomationService(
       preferencesController: _preferencesController,
       dataStore: locator<MockDataStore>(),
     );
     _authUiSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(_handleAuthUiEvent);
+    if (Supabase.instance.client.auth.currentSession != null) {
+      unawaited(_registerCurrentDevice());
+    }
+  }
+
+  Future<void> _registerCurrentDevice() async {
+    try {
+      await _relationshipService.registerCurrentDevice();
+    } catch (error) {
+      debugPrint('Chaty device registration skipped: $error');
+    }
   }
 
   void _handleSecurityPreferenceChanged() {
@@ -141,6 +159,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   }
 
   void _handleAuthUiEvent(AuthState state) {
+    if (state.session != null) unawaited(_registerCurrentDevice());
     if (state.event == AuthChangeEvent.passwordRecovery && !_recoveryRouteOpen) {
       _recoveryRouteOpen = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -186,6 +205,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
       _backgroundedAt ??= DateTime.now();
     } else if (state == AppLifecycleState.resumed) {
       _applyAutoLockOnResume();
+      if (_backend.isAuthenticated) unawaited(_registerCurrentDevice());
     }
 
     if (!_backend.isAuthenticated) return;
@@ -231,12 +251,16 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
             );
             final appContent = MediaQuery(
               data: scaled,
-              child: ClickParticleOverlay(
+              child: ChatyEventToastOverlay(
+                notificationService: _notificationService,
                 preferencesController: _preferencesController,
-                child: FallingParticlesOverlay(
+                child: ClickParticleOverlay(
                   preferencesController: _preferencesController,
-                  currentScope: 'Home',
-                  child: child ?? const SizedBox(),
+                  child: FallingParticlesOverlay(
+                    preferencesController: _preferencesController,
+                    currentScope: 'Home',
+                    child: child ?? const SizedBox(),
+                  ),
                 ),
               ),
             );
