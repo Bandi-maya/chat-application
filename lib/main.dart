@@ -16,6 +16,7 @@ import 'package:chat/features/auth/create_new_password_screen.dart';
 import 'package:chat/features/auth/splash_screen.dart';
 import 'package:chat/features/auth/welcome_screen.dart';
 import 'package:chat/features/settings/security/app_lock_overlay.dart';
+import 'package:chat/features/settings/security/security_center_screen.dart';
 import 'package:chat/injection/locator.dart';
 import 'package:chat/ui/core/controllers/app_icon_controller.dart';
 import 'package:chat/ui/core/controllers/appearance_variant_controller.dart';
@@ -71,6 +72,10 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   bool _recoveryRouteOpen = false;
   bool _appLockRequired = false;
   bool _initialAppLockScheduled = false;
+  bool _checkingLockCapability = false;
+  bool _freshLoginSession = false;
+  bool _postLoginAppLockPromptScheduled = false;
+  bool _postLoginAppLockPromptShown = false;
   DateTime? _backgroundedAt;
 
   @override
@@ -109,24 +114,105 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     if (_appLockRequired && mounted) setState(() => _appLockRequired = false);
   }
 
+  Future<bool> _isCurrentLockMethodReady() async {
+    final security = _preferencesController.security;
+    if (!security.isAppLockEnabled) return false;
+    switch (security.lockMethod) {
+      case 'PIN':
+      case 'Pattern':
+      case 'Password':
+        return _lockService.hasCredential(security.lockMethod);
+      case 'Biometric':
+        return _lockService.canUseBiometrics();
+      case 'Device Credential':
+        return true;
+      default:
+        return false;
+    }
+  }
+
   void _scheduleInitialAppLockIfNeeded() {
     if (!_backend.isAuthenticated || !_preferencesController.security.isAppLockEnabled) return;
-    if (_initialAppLockScheduled || _appLockRequired) return;
-    _initialAppLockScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_backend.isAuthenticated || !_preferencesController.security.isAppLockEnabled) return;
-      setState(() => _appLockRequired = true);
+    if (_freshLoginSession || _initialAppLockScheduled || _appLockRequired || _checkingLockCapability) return;
+    _checkingLockCapability = true;
+    unawaited(() async {
+      final ready = await _isCurrentLockMethodReady();
+      if (!mounted) return;
+      _checkingLockCapability = false;
+      if (!ready || _freshLoginSession || !_backend.isAuthenticated || !_preferencesController.security.isAppLockEnabled) return;
+      _initialAppLockScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _freshLoginSession || !_backend.isAuthenticated || !_preferencesController.security.isAppLockEnabled) return;
+        setState(() => _appLockRequired = true);
+      });
+    }());
+  }
+
+  void _schedulePostLoginAppLockPrompt() {
+    if (_postLoginAppLockPromptScheduled || _postLoginAppLockPromptShown) return;
+    _postLoginAppLockPromptScheduled = true;
+    Future<void>.delayed(const Duration(milliseconds: 650), () async {
+      _postLoginAppLockPromptScheduled = false;
+      if (!mounted || !_backend.isAuthenticated || _postLoginAppLockPromptShown) return;
+      _postLoginAppLockPromptShown = true;
+
+      // If App Lock is already correctly configured there is nothing to ask.
+      if (_preferencesController.security.isAppLockEnabled && await _isCurrentLockMethodReady()) return;
+      if (!mounted) return;
+      final navigator = _rootNavigatorKey.currentState;
+      final context = _rootNavigatorKey.currentContext;
+      if (navigator == null || context == null) return;
+
+      final openSettings = await showDialog<bool>(
+        context: context,
+        barrierDismissible: true,
+        builder: (dialogContext) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.lock_outline_rounded),
+              SizedBox(width: 10),
+              Expanded(child: Text('Enable App Lock?')),
+            ],
+          ),
+          content: const Text(
+            'You can protect Chaty with biometrics, device lock, PIN, pattern, or password. Setup is optional and can be changed anytime in Settings.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Not now'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Open settings'),
+            ),
+          ],
+        ),
+      );
+      if (openSettings == true && mounted) {
+        navigator.push(
+          MaterialPageRoute(
+            builder: (_) => SecurityCenterScreen(preferencesController: _preferencesController),
+          ),
+        );
+      }
     });
   }
 
   Duration _autoLockDelay(String value) {
     switch (value) {
-      case '15s': return const Duration(seconds: 15);
-      case '30s': return const Duration(seconds: 30);
-      case '1m': return const Duration(minutes: 1);
-      case '5m': return const Duration(minutes: 5);
-      case '15m': return const Duration(minutes: 15);
-      default: return Duration.zero;
+      case '15s':
+        return const Duration(seconds: 15);
+      case '30s':
+        return const Duration(seconds: 30);
+      case '1m':
+        return const Duration(minutes: 1);
+      case '5m':
+        return const Duration(minutes: 5);
+      case '15m':
+        return const Duration(minutes: 15);
+      default:
+        return Duration.zero;
     }
   }
 
@@ -138,9 +224,17 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     final backgroundedAt = _backgroundedAt;
     _backgroundedAt = null;
     if (backgroundedAt == null) return;
-    if (DateTime.now().difference(backgroundedAt) >= _autoLockDelay(_preferencesController.security.autoLockTimeout) && mounted && !_appLockRequired) {
-      setState(() => _appLockRequired = true);
-    }
+    if (DateTime.now().difference(backgroundedAt) < _autoLockDelay(_preferencesController.security.autoLockTimeout)) return;
+    if (_appLockRequired || _checkingLockCapability) return;
+    _checkingLockCapability = true;
+    unawaited(() async {
+      final ready = await _isCurrentLockMethodReady();
+      if (!mounted) return;
+      _checkingLockCapability = false;
+      if (ready && _backend.isAuthenticated && _preferencesController.security.isAppLockEnabled && !_appLockRequired) {
+        setState(() => _appLockRequired = true);
+      }
+    }());
   }
 
   void _handleAppUnlocked() {
@@ -164,8 +258,20 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
       });
       return;
     }
-    if (state.event == AuthChangeEvent.signedOut) {
+    if (state.event == AuthChangeEvent.signedIn) {
+      // A successful login must always enter Chaty first. App Lock is opt-in
+      // and configured from Settings, never used as a post-login blocker.
+      _freshLoginSession = true;
       _initialAppLockScheduled = false;
+      _backgroundedAt = null;
+      if (_appLockRequired && mounted) setState(() => _appLockRequired = false);
+      _schedulePostLoginAppLockPrompt();
+    }
+    if (state.event == AuthChangeEvent.signedOut) {
+      _freshLoginSession = false;
+      _initialAppLockScheduled = false;
+      _postLoginAppLockPromptScheduled = false;
+      _postLoginAppLockPromptShown = false;
       _backgroundedAt = null;
       if (mounted && _appLockRequired) setState(() => _appLockRequired = false);
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -189,6 +295,9 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden || state == AppLifecycleState.detached) {
       _backgroundedAt ??= DateTime.now();
     } else if (state == AppLifecycleState.resumed) {
+      // Once the user leaves and returns, a deliberately configured App Lock
+      // behaves normally according to the selected timeout.
+      _freshLoginSession = false;
       _applyAutoLockOnResume();
       if (_backend.isAuthenticated) unawaited(_registerCurrentDevice());
     }
