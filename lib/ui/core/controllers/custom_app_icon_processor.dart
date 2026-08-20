@@ -9,9 +9,16 @@ class CustomAppIconProcessor {
 
   static const int outputSize = 512;
 
-  static Future<File> persistSquarePng(Uint8List sourcePng) async {
+  static Future<File> persistSquarePng(
+    Uint8List sourcePng, {
+    String? presetId,
+  }) async {
     if (sourcePng.isEmpty) {
-      throw ArgumentError.value(sourcePng, 'sourcePng', 'Custom icon data is empty.');
+      throw ArgumentError.value(
+        sourcePng,
+        'sourcePng',
+        'Custom icon data is empty.',
+      );
     }
 
     final codec = await ui.instantiateImageCodec(
@@ -20,25 +27,33 @@ class CustomAppIconProcessor {
       targetHeight: outputSize,
       allowUpscaling: true,
     );
+
     try {
       final frame = await codec.getNextFrame();
       final byteData = await frame.image.toByteData(format: ui.ImageByteFormat.png);
       frame.image.dispose();
+
       final normalized = byteData?.buffer.asUint8List();
       if (normalized == null || normalized.isEmpty) {
         throw StateError('Unable to encode the processed custom app icon.');
       }
 
       final root = await getApplicationSupportDirectory();
-      final directory = Directory('${root.path}${Platform.pathSeparator}branding');
+      final directory = Directory(
+        '${root.path}${Platform.pathSeparator}branding${Platform.pathSeparator}custom_icons',
+      );
       if (!await directory.exists()) {
         await directory.create(recursive: true);
       }
 
-      final target = File('${directory.path}${Platform.pathSeparator}custom_brand_icon.png');
+      final safeId = (presetId ?? 'custom_${DateTime.now().microsecondsSinceEpoch}')
+          .replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      final target = File(
+        '${directory.path}${Platform.pathSeparator}$safeId.png',
+      );
       final temporary = File('${target.path}.tmp');
-      await temporary.writeAsBytes(normalized, flush: true);
 
+      await temporary.writeAsBytes(normalized, flush: true);
       if (await target.exists()) {
         await target.delete();
       }
