@@ -6,6 +6,7 @@ import '../../data/services/chaty_backend_service.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/persistence/preferences_storage.dart';
 import '../../ui/core/theme/theme_controller.dart';
+import '../../ui/core/widgets/username_availability_field.dart';
 import '../chats/main_navigation_shell.dart';
 import 'widgets/auth_components.dart';
 
@@ -21,9 +22,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  late final ChatyBackendService _backend;
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool? _usernameAvailable;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _backend = locator<ChatyBackendService>();
+  }
 
   @override
   void dispose() {
@@ -47,30 +56,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _handleRegister() async {
-    if (!_formKey.currentState!.validate() || _isLoading) return;
+    if (_isLoading) return;
+    if (_formKey.currentState?.validate() != true) return;
+    if (_usernameAvailable != true) {
+      setState(() => _errorMessage = 'Choose an available username before creating the account.');
+      return;
+    }
 
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
-    final backend = locator<ChatyBackendService>();
     try {
-      await backend.registerUser(
+      await _backend.registerUser(
         displayName: _usernameController.text.trim(),
         username: _usernameController.text.trim(),
         password: _passwordController.text,
         email: _emailController.text.trim(),
       );
 
-      if (backend.isAuthenticated) {
-        await _openHome(backend);
+      if (_backend.isAuthenticated) {
+        await _openHome(_backend);
         return;
       }
 
       if (!mounted) return;
       setState(() => _isLoading = false);
-      await _showVerificationDialog(backend);
+      await _showVerificationDialog(_backend);
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -134,6 +147,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String _friendlyError(Object error) {
     final value = error.toString().replaceFirst('Exception: ', '');
     if (value.contains('already registered')) return 'An account already exists for this email. Sign in instead.';
+    if (value.contains('already taken')) return 'That username was just taken. Choose one of the available suggestions.';
     if (value.contains('rate limit')) return 'Too many attempts. Wait a moment and try again.';
     return value;
   }
@@ -169,7 +183,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Create account and start exploring.',
+                      'Create your Chaty account with a unique public username.',
                       style: TextStyle(color: theme.secondaryTextColor, fontSize: 14),
                     ),
                     const SizedBox(height: 32),
@@ -188,18 +202,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       },
                     ),
                     const SizedBox(height: 18),
-                    AuthTextField(
-                      label: 'User Name',
-                      hintText: 'Enter User Name',
+                    UsernameAvailabilityField(
                       controller: _usernameController,
-                      theme: theme,
-                      validator: (value) {
-                        final username = value?.trim() ?? '';
-                        if (username.isEmpty) return 'Please enter a username';
-                        if (username.length < 3 || username.length > 24) return 'Username must be 3–24 characters';
-                        if (!RegExp(r'^[A-Za-z0-9_]+$').hasMatch(username)) return 'Use only letters, numbers, and underscore';
-                        return null;
+                      backend: _backend,
+                      enabled: !_isLoading,
+                      onAvailabilityChanged: (value) {
+                        if (mounted) setState(() => _usernameAvailable = value);
                       },
+                      style: TextStyle(color: theme.primaryTextColor, fontSize: 14),
+                      decoration: InputDecoration(
+                        labelText: 'Username',
+                        hintText: 'Choose a unique username',
+                        filled: true,
+                        fillColor: theme.cardColor,
+                        labelStyle: TextStyle(color: theme.secondaryTextColor),
+                        hintStyle: TextStyle(color: theme.secondaryTextColor.withValues(alpha: 0.65)),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(theme.cornerRadius)),
+                      ),
                     ),
                     const SizedBox(height: 18),
                     AuthTextField(

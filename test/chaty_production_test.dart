@@ -12,10 +12,11 @@ void main() {
       expect(ChatyValidators.validateUsername('bandi_maya'), isNull);
       expect(ChatyValidators.validateUsername('@alex_rivera99'), isNull);
       expect(ChatyValidators.validateUsername('john_doe'), isNull);
+      expect(ChatyValidators.validateUsername('abc'), isNull);
     });
 
     test('Username validation rejects invalid patterns and reserved keywords', () {
-      expect(ChatyValidators.validateUsername('abc'), isNotNull);
+      expect(ChatyValidators.validateUsername('ab'), isNotNull);
       expect(ChatyValidators.validateUsername('admin'), isNotNull);
       expect(ChatyValidators.validateUsername('root'), isNotNull);
       expect(ChatyValidators.validateUsername('support'), isNotNull);

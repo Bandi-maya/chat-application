@@ -4,24 +4,25 @@ import 'package:flutter/material.dart';
 
 import '../../../ui/core/theme/theme_config.dart';
 import '../../../ui/core/theme/theme_controller.dart';
+import '../../data/repositories/mock_data_store.dart';
+import '../../data/services/voice_note_service.dart';
+import '../../domain/models/chat_message.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/user_profile.dart';
-import '../../domain/models/chat_message.dart';
-import '../../data/repositories/mock_data_store.dart';
+import '../../ui/core/commands/chat_command_parser.dart';
 import '../../ui/core/controllers/chaty_preferences_controller.dart';
 import '../../ui/core/design_system/chaty_settings_primitives.dart';
 import '../../ui/core/gb/gb_theme_overrides.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/widgets/security_chip.dart';
-import '../../ui/core/commands/chat_command_parser.dart';
-import '../messages/message_bubble.dart';
-import '../messages/message_action_sheet.dart';
+import '../calls/mock_call_screen.dart';
 import '../messages/attachment_sheet.dart';
 import '../messages/chat_attachment_actions.dart';
 import '../messages/media_viewer_screen.dart';
+import '../messages/message_action_sheet.dart';
+import '../messages/message_bubble.dart';
 import '../tasks/task_create_edit_modal.dart';
 import 'group_info_screen.dart';
-import '../calls/mock_call_screen.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final ThemeConfig theme;
@@ -47,10 +48,18 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final TextEditingController _textCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
   late final ChatAttachmentActions _attachments;
+  late final VoiceNoteService _voice;
   Timer? _typingIdleTimer;
+  Timer? _voiceTimer;
   bool _typingPublished = false;
+  bool _loadingMessages = true;
+  String? _loadError;
   ChatMessage? _replyTarget;
   bool _showQuickReplyOverlay = false;
+  bool _recording = false;
+  bool _recordLocked = false;
+  bool _voiceBusy = false;
+  int _voiceSeconds = 0;
 
   ThemeConfig get _theme => GbThemeOverrides.resolve(
         widget.themeController?.globalTheme ?? widget.theme,
@@ -65,24 +74,38 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       dataStore: widget.dataStore,
       preferencesController: widget.preferencesController,
     );
-    final conversation = widget.dataStore.conversations
-        .where((item) => item.id == widget.conversationId)
-        .firstOrNull;
-    if (conversation != null && conversation.draftText.isNotEmpty) {
-      _textCtrl.text = conversation.draftText;
-    }
-    widget.dataStore.ensureConversationLoaded(widget.conversationId).then((_) {
+    _voice = VoiceNoteService(conversationId: widget.conversationId, dataStore: widget.dataStore);
+    final conversation = widget.dataStore.conversations.where((item) => item.id == widget.conversationId).firstOrNull;
+    if (conversation != null && conversation.draftText.isNotEmpty) _textCtrl.text = conversation.draftText;
+    _loadConversation();
+  }
+
+  Future<void> _loadConversation() async {
+    if (mounted) setState(() {
+      _loadingMessages = widget.dataStore.getMessages(widget.conversationId).isEmpty;
+      _loadError = null;
+    });
+    try {
+      await widget.dataStore.ensureConversationLoaded(widget.conversationId);
       if (!mounted) return;
-      setState(() {});
+      setState(() => _loadingMessages = false);
       _scrollToBottom();
-    }).catchError((_) {});
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadingMessages = false;
+        _loadError = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
   }
 
   @override
   void dispose() {
     _typingIdleTimer?.cancel();
+    _voiceTimer?.cancel();
     if (_typingPublished) widget.dataStore.setTyping(widget.conversationId, false);
     widget.dataStore.setDraft(widget.conversationId, _textCtrl.text);
+    unawaited(_voice.dispose());
     _textCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
@@ -135,7 +158,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Future<void> _sendMessage() async {
     final text = _textCtrl.text.trim();
     if (text.isEmpty) return;
-
     final command = ChatCommandParser.parse(text);
     if (command.type == ChatCommandType.task) {
       _textCtrl.clear();
@@ -157,7 +179,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       _replyTarget = null;
       _showQuickReplyOverlay = false;
     });
-
     try {
       await widget.dataStore.sendMessage(
         conversationId: widget.conversationId,
@@ -170,21 +191,88 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     } catch (error) {
       if (!mounted) return;
       _textCtrl.text = text;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))));
       setState(() {});
     }
+  }
+
+  Future<void> _beginVoice({required bool locked}) async {
+    if (_voiceBusy || _recording) return;
+    if (_typingPublished) {
+      _typingPublished = false;
+      widget.dataStore.setTyping(widget.conversationId, false);
+    }
+    setState(() => _voiceBusy = true);
+    try {
+      await _voice.start();
+      if (!mounted) return;
+      setState(() {
+        _recording = true;
+        _recordLocked = locked;
+        _voiceSeconds = 0;
+      });
+      _voiceTimer?.cancel();
+      _voiceTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() => _voiceSeconds++);
+      });
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
+    } finally {
+      if (mounted) setState(() => _voiceBusy = false);
+    }
+  }
+
+  Future<void> _finishVoice() async {
+    if (!_recording || _voiceBusy) return;
+    setState(() => _voiceBusy = true);
+    _voiceTimer?.cancel();
+    try {
+      final sent = await _voice.stopAndSend();
+      if (sent) _scrollToBottom();
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Unable to send voice note: $error')));
+    } finally {
+      if (mounted) setState(() {
+        _recording = false;
+        _recordLocked = false;
+        _voiceBusy = false;
+        _voiceSeconds = 0;
+      });
+    }
+  }
+
+  Future<void> _cancelVoice() async {
+    if (!_recording || _voiceBusy) return;
+    setState(() => _voiceBusy = true);
+    _voiceTimer?.cancel();
+    await _voice.cancel();
+    if (mounted) setState(() {
+      _recording = false;
+      _recordLocked = false;
+      _voiceBusy = false;
+      _voiceSeconds = 0;
+    });
+  }
+
+  void _handleVoiceDrag(LongPressMoveUpdateDetails details) {
+    if (!_recording) return;
+    if (details.offsetFromOrigin.dx < -70) {
+      unawaited(_cancelVoice());
+      return;
+    }
+    if (details.offsetFromOrigin.dy < -55 && !_recordLocked) {
+      setState(() => _recordLocked = true);
+    }
+  }
+
+  void _handleVoiceRelease() {
+    if (_recording && !_recordLocked) unawaited(_finishVoice());
   }
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollCtrl.hasClients) {
-        _scrollCtrl.animateTo(
-          _scrollCtrl.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-        );
+        _scrollCtrl.animateTo(_scrollCtrl.position.maxScrollExtent, duration: const Duration(milliseconds: 220), curve: Curves.easeOutCubic);
       }
     });
   }
@@ -284,48 +372,43 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   void _startCall(bool isVideo) {
-    final conversation = widget.dataStore.conversations
-        .where((item) => item.id == widget.conversationId)
-        .firstOrNull;
+    final conversation = widget.dataStore.conversations.where((item) => item.id == widget.conversationId).firstOrNull;
     if (conversation == null) return;
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => MockCallScreen(
-          theme: _theme,
-          title: conversation.title,
-          isVideo: isVideo,
-        ),
+        builder: (_) => MockCallScreen(theme: _theme, title: conversation.title, isVideo: isVideo),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: widget.dataStore,
+      builder: (context, _) => _buildChat(context),
+    );
+  }
+
+  Widget _buildChat(BuildContext context) {
     final theme = _theme;
     final dataStore = widget.dataStore;
-    final conversation = dataStore.conversations
-        .where((item) => item.id == widget.conversationId)
-        .firstOrNull;
+    final conversation = dataStore.conversations.where((item) => item.id == widget.conversationId).firstOrNull;
 
     if (conversation == null) {
       return Scaffold(
         backgroundColor: theme.backgroundColor,
         appBar: AppBar(
           automaticallyImplyLeading: false,
-          leading: IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.chevron_left_rounded),
-          ),
+          leading: IconButton(onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.chevron_left_rounded)),
           title: const Text('Chat'),
         ),
-        body: Center(child: Text('Conversation unavailable', style: TextStyle(color: theme.secondaryTextColor))),
+        body: _loadingMessages
+            ? const Center(child: CircularProgressIndicator())
+            : Center(child: Text('Conversation unavailable', style: TextStyle(color: theme.secondaryTextColor))),
       );
     }
 
-    final otherId = conversation.participantIds.firstWhere(
-      (id) => id != dataStore.currentUser.id,
-      orElse: () => '',
-    );
+    final otherId = conversation.participantIds.firstWhere((id) => id != dataStore.currentUser.id, orElse: () => '');
     final otherUser = otherId.isEmpty ? null : dataStore.getUser(otherId);
     final remoteTyping = dataStore.isTypingInChat(widget.conversationId);
     final presence = conversation.type == ConversationType.direct
@@ -333,6 +416,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         : (remoteTyping ? 'someone is typing…' : '${conversation.participantIds.length} participants');
     final messages = dataStore.getMessages(widget.conversationId);
     final autoPrefs = widget.preferencesController.automation;
+    final showDeleted = widget.preferencesController.privacy.antiDeleteMessages || widget.preferencesController.gbBool('yoAntiRevoke');
 
     Widget chat = Scaffold(
       backgroundColor: theme.backgroundColor,
@@ -342,55 +426,23 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         foregroundColor: theme.primaryTextColor,
         surfaceTintColor: Colors.transparent,
         elevation: 0.5,
-        leading: IconButton(
-          tooltip: 'Back',
-          onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.chevron_left_rounded),
-        ),
+        leading: IconButton(tooltip: 'Back', onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.chevron_left_rounded)),
         titleSpacing: 0,
         title: InkWell(
           onTap: conversation.type == ConversationType.group
-              ? () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => GroupInfoScreen(
-                        theme: theme,
-                        dataStore: dataStore,
-                        conversationId: widget.conversationId,
-                      ),
-                    ),
-                  );
-                }
+              ? () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupInfoScreen(theme: theme, dataStore: dataStore, conversationId: widget.conversationId)))
               : null,
           child: Row(
             children: [
-              AppAvatar(
-                initials: conversation.avatarInitials ?? conversation.title.characters.take(2).toString().toUpperCase(),
-                colorHex: conversation.avatarColorHex ?? '0xFF6366F1',
-                size: 38,
-              ),
+              AppAvatar(initials: conversation.avatarInitials ?? conversation.title.characters.take(2).toString().toUpperCase(), colorHex: conversation.avatarColorHex ?? '0xFF6366F1', size: 38),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      conversation.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: theme.primaryTextColor, fontSize: 15.5 * theme.fontScale, fontWeight: FontWeight.w800),
-                    ),
-                    Text(
-                      presence,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: remoteTyping || otherUser?.presence == PresenceState.online ? theme.successColor : theme.secondaryTextColor,
-                        fontSize: 10.5 * theme.fontScale,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
+                    Text(conversation.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: theme.primaryTextColor, fontSize: 15.5 * theme.fontScale, fontWeight: FontWeight.w800)),
+                    Text(presence, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: remoteTyping || otherUser?.presence == PresenceState.online ? theme.successColor : theme.secondaryTextColor, fontSize: 10.5 * theme.fontScale, fontWeight: FontWeight.w500)),
                   ],
                 ),
               ),
@@ -399,11 +451,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         ),
         actions: [
           IconButton(icon: const Icon(Icons.call_rounded), tooltip: 'Voice call', onPressed: () => _startCall(false)),
-          IconButton(icon: const Icon(Icons.videocam_rounded), tooltip: 'Video call', onPressed: () => _startCall(true)),
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: SecurityChip(status: conversation.encryptionStatus),
-          ),
+          IconButton(icon: const Icon(Icons.video_camera_front_rounded), tooltip: 'Video / Meet', onPressed: () => _startCall(true)),
+          Padding(padding: const EdgeInsets.only(right: 6), child: SecurityChip(status: conversation.encryptionStatus)),
         ],
       ),
       body: SafeArea(
@@ -411,72 +460,19 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         child: Column(
           children: [
             Expanded(
-              child: messages.isEmpty
-                  ? Center(
-                      child: Text('No messages yet', style: TextStyle(color: theme.secondaryTextColor)),
-                    )
-                  : ListView.builder(
-                      controller: _scrollCtrl,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: messages.length,
-                      itemBuilder: (context, index) {
-                        final message = messages[index];
-                        final isMine = message.senderId == dataStore.currentUser.id;
-                        final bubble = MessageBubble(
-                          message: message,
-                          isMe: isMine,
-                          theme: theme,
-                          senderName: conversation.type == ConversationType.group && !isMine
-                              ? _senderName(message.senderId)
-                              : null,
-                          onLongPress: () => _onMessageLongPress(message),
-                          onReactionTap: (emoji) => dataStore.toggleReaction(conversation.id, message.id, emoji),
-                          onTaskTap: message.linkedTaskId == null
-                              ? null
-                              : () => _openCreateTaskModal(sourceMessageId: message.id),
-                          onMediaTap: message.attachment == null
-                              ? null
-                              : () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => MediaViewerScreen(
-                                        title: message.attachment!.name,
-                                        type: message.attachment!.type,
-                                        size: message.attachment!.size,
-                                        storagePath: message.attachment!.url,
-                                        theme: theme,
-                                      ),
-                                    ),
-                                  );
-                                },
-                        );
-                        if (!ChatAttachmentActions.isPollMessage(message)) return bubble;
-                        return GestureDetector(
-                          behavior: HitTestBehavior.translucent,
-                          onTap: () => _attachments.openPoll(context, message.id),
-                          child: bubble,
-                        );
-                      },
-                    ),
+              child: _messagesBody(theme, conversation, messages, showDeleted),
             ),
-            if (_showQuickReplyOverlay && autoPrefs.quickReplies.isNotEmpty)
+            if (_showQuickReplyOverlay && autoPrefs.quickReplies.isNotEmpty && !_recording)
               Container(
                 margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
                 constraints: const BoxConstraints(maxHeight: 180),
-                decoration: BoxDecoration(
-                  color: theme.cardColor,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: theme.surfaceColor),
-                ),
+                decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(14), border: Border.all(color: theme.surfaceColor)),
                 child: ListView(
                   shrinkWrap: true,
                   children: autoPrefs.quickReplies.map((reply) {
                     return ListTile(
                       dense: true,
-                      title: Text(
-                        '${reply.shortcut} — ${reply.title}',
-                        style: TextStyle(color: theme.primaryTextColor, fontWeight: FontWeight.w700, fontSize: 12.5),
-                      ),
+                      title: Text('${reply.shortcut} — ${reply.title}', style: TextStyle(color: theme.primaryTextColor, fontWeight: FontWeight.w700, fontSize: 12.5)),
                       subtitle: Text(reply.content, maxLines: 1, overflow: TextOverflow.ellipsis),
                       onTap: () {
                         _textCtrl.text = reply.content;
@@ -487,7 +483,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   }).toList(growable: false),
                 ),
               ),
-            if (_replyTarget != null)
+            if (_replyTarget != null && !_recording)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                 color: theme.cardColor,
@@ -499,23 +495,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Replying to ${_senderName(_replyTarget!.senderId)}',
-                            style: TextStyle(color: theme.accentColor, fontSize: 11.5, fontWeight: FontWeight.w700),
-                          ),
-                          Text(
-                            _replyTarget!.text,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: theme.secondaryTextColor, fontSize: 11.5),
-                          ),
+                          Text('Replying to ${_senderName(_replyTarget!.senderId)}', style: TextStyle(color: theme.accentColor, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                          Text(_replyTarget!.text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: theme.secondaryTextColor, fontSize: 11.5)),
                         ],
                       ),
                     ),
-                    IconButton(
-                      onPressed: () => setState(() => _replyTarget = null),
-                      icon: const Icon(Icons.close_rounded, size: 18),
-                    ),
+                    IconButton(onPressed: () => setState(() => _replyTarget = null), icon: const Icon(Icons.close_rounded, size: 18)),
                   ],
                 ),
               ),
@@ -525,14 +510,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               onAttach: _openAttachmentSheet,
               onSend: _sendMessage,
               onChanged: _handleComposerChanged,
-              onVoice: () async {
-                if (_typingPublished) {
-                  _typingPublished = false;
-                  widget.dataStore.setTyping(widget.conversationId, false);
-                }
-                await _attachments.recordVoiceNote(context);
-                _scrollToBottom();
-              },
+              recording: _recording,
+              recordLocked: _recordLocked,
+              voiceBusy: _voiceBusy,
+              voiceSeconds: _voiceSeconds,
+              onVoiceTap: () => _beginVoice(locked: true),
+              onVoiceHoldStart: () => _beginVoice(locked: false),
+              onVoiceMove: _handleVoiceDrag,
+              onVoiceHoldEnd: _handleVoiceRelease,
+              onVoiceCancel: _cancelVoice,
+              onVoiceSend: _finishVoice,
             ),
           ],
         ),
@@ -540,61 +527,105 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
 
     final conversationPrefs = widget.preferencesController.conversation;
-    if (!conversationPrefs.enableQuickContactSidebar || MediaQuery.sizeOf(context).width < 720) {
-      return chat;
-    }
-
+    if (!conversationPrefs.enableQuickContactSidebar || MediaQuery.sizeOf(context).width < 720) return chat;
     final contacts = dataStore.contacts;
-    Widget sidebar() {
-      return Container(
-        width: 62,
-        color: theme.surfaceColor.withValues(alpha: conversationPrefs.sidebarOpacity),
-        child: ListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: contacts.length,
-          itemBuilder: (context, index) {
-            final contact = contacts[index];
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 5),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(30),
-                onTap: () async {
-                  try {
-                    final next = await dataStore.getOrCreateDirectConversation(contact);
-                    if (!mounted) return;
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (_) => ChatDetailScreen(
-                          conversationId: next.id,
-                          theme: theme,
-                          dataStore: dataStore,
-                          preferencesController: widget.preferencesController,
-                          themeController: widget.themeController,
-                        ),
-                      ),
-                    );
-                  } catch (_) {}
-                },
-                child: Center(
-                  child: ChatyAvatar(
-                    initials: contact.avatarInitials,
-                    color: Color(int.parse(contact.avatarColorHex)),
-                    size: 38,
-                  ),
+    Widget sidebar() => Container(
+          width: 62,
+          color: theme.surfaceColor.withValues(alpha: conversationPrefs.sidebarOpacity),
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            itemCount: contacts.length,
+            itemBuilder: (context, index) {
+              final contact = contacts[index];
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(30),
+                  onTap: () async {
+                    try {
+                      final next = await dataStore.getOrCreateDirectConversation(contact);
+                      if (!mounted) return;
+                      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => ChatDetailScreen(conversationId: next.id, theme: theme, dataStore: dataStore, preferencesController: widget.preferencesController, themeController: widget.themeController)));
+                    } catch (_) {}
+                  },
+                  child: Center(child: ChatyAvatar(initials: contact.avatarInitials, color: Color(int.parse(contact.avatarColorHex)), size: 38)),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
+        );
+    return Row(children: [if (conversationPrefs.sidebarPosition == 'Left') sidebar(), Expanded(child: chat), if (conversationPrefs.sidebarPosition == 'Right') sidebar()]);
+  }
+
+  Widget _messagesBody(ThemeConfig theme, Conversation conversation, List<ChatMessage> messages, bool showDeleted) {
+    if (_loadingMessages && messages.isEmpty) return _MessageLoadingSkeleton(theme: theme);
+    if (_loadError != null && messages.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.cloud_off_rounded, size: 42, color: theme.secondaryTextColor),
+              const SizedBox(height: 10),
+              Text('Could not load messages', style: TextStyle(color: theme.primaryTextColor, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 6),
+              Text(_loadError!, textAlign: TextAlign.center, style: TextStyle(color: theme.secondaryTextColor)),
+              const SizedBox(height: 12),
+              FilledButton.tonalIcon(onPressed: _loadConversation, icon: const Icon(Icons.refresh_rounded), label: const Text('Retry')),
+            ],
+          ),
         ),
       );
     }
+    if (messages.isEmpty) return Center(child: Text('No messages yet', style: TextStyle(color: theme.secondaryTextColor)));
+    return ListView.builder(
+      controller: _scrollCtrl,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: messages.length,
+      itemBuilder: (context, index) {
+        final message = messages[index];
+        final isMine = message.senderId == widget.dataStore.currentUser.id;
+        final bubble = MessageBubble(
+          message: message,
+          isMe: isMine,
+          theme: theme,
+          showDeletedContent: showDeleted,
+          senderName: conversation.type == ConversationType.group && !isMine ? _senderName(message.senderId) : null,
+          onLongPress: () => _onMessageLongPress(message),
+          onReactionTap: (emoji) => widget.dataStore.toggleReaction(conversation.id, message.id, emoji),
+          onTaskTap: message.linkedTaskId == null ? null : () => _openCreateTaskModal(sourceMessageId: message.id),
+          onMediaTap: message.attachment == null
+              ? null
+              : () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MediaViewerScreen(title: message.attachment!.name, type: message.attachment!.type, size: message.attachment!.size, storagePath: message.attachment!.url, theme: theme))),
+        );
+        if (!ChatAttachmentActions.isPollMessage(message)) return bubble;
+        return GestureDetector(behavior: HitTestBehavior.translucent, onTap: () => _attachments.openPoll(context, message.id), child: bubble);
+      },
+    );
+  }
+}
 
-    return Row(
-      children: [
-        if (conversationPrefs.sidebarPosition == 'Left') sidebar(),
-        Expanded(child: chat),
-        if (conversationPrefs.sidebarPosition == 'Right') sidebar(),
-      ],
+class _MessageLoadingSkeleton extends StatelessWidget {
+  final ThemeConfig theme;
+  const _MessageLoadingSkeleton({required this.theme});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 18, 14, 12),
+      children: List.generate(7, (index) {
+        final right = index.isOdd;
+        return Align(
+          alignment: right ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            width: index % 3 == 0 ? 210 : 150,
+            height: index % 3 == 0 ? 58 : 42,
+            margin: const EdgeInsets.symmetric(vertical: 5),
+            decoration: BoxDecoration(color: theme.cardColor.withValues(alpha: 0.65), borderRadius: BorderRadius.circular(16)),
+          ),
+        );
+      }),
     );
   }
 }
@@ -604,76 +635,132 @@ class _Composer extends StatelessWidget {
   final TextEditingController controller;
   final VoidCallback onAttach;
   final VoidCallback onSend;
-  final VoidCallback onVoice;
   final ValueChanged<String> onChanged;
+  final bool recording;
+  final bool recordLocked;
+  final bool voiceBusy;
+  final int voiceSeconds;
+  final VoidCallback onVoiceTap;
+  final VoidCallback onVoiceHoldStart;
+  final ValueChanged<LongPressMoveUpdateDetails> onVoiceMove;
+  final VoidCallback onVoiceHoldEnd;
+  final VoidCallback onVoiceCancel;
+  final VoidCallback onVoiceSend;
 
   const _Composer({
     required this.theme,
     required this.controller,
     required this.onAttach,
     required this.onSend,
-    required this.onVoice,
     required this.onChanged,
+    required this.recording,
+    required this.recordLocked,
+    required this.voiceBusy,
+    required this.voiceSeconds,
+    required this.onVoiceTap,
+    required this.onVoiceHoldStart,
+    required this.onVoiceMove,
+    required this.onVoiceHoldEnd,
+    required this.onVoiceCancel,
+    required this.onVoiceSend,
   });
+
+  String _time() {
+    final min = (voiceSeconds ~/ 60).toString().padLeft(2, '0');
+    final sec = (voiceSeconds % 60).toString().padLeft(2, '0');
+    return '$min:$sec';
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(6, 7, 7, 7),
-      decoration: BoxDecoration(
-        color: theme.surfaceColor,
-        border: Border(top: BorderSide(color: theme.cardColor)),
-      ),
+      decoration: BoxDecoration(color: theme.surfaceColor, border: Border(top: BorderSide(color: theme.cardColor))),
       child: SafeArea(
         top: false,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            IconButton(
-              tooltip: 'Attach',
-              color: theme.accentColor,
-              onPressed: onAttach,
-              icon: const Icon(Icons.add_circle_outline_rounded),
-            ),
-            Expanded(
-              child: TextField(
-                controller: controller,
-                minLines: 1,
-                maxLines: 5,
-                onChanged: onChanged,
-                style: TextStyle(color: theme.primaryTextColor, fontSize: 14 * theme.fontScale),
-                decoration: InputDecoration(
-                  hintText: 'Message…  /task or #reply',
-                  hintStyle: TextStyle(color: theme.secondaryTextColor),
-                  filled: true,
-                  fillColor: theme.cardColor,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(22),
-                    borderSide: BorderSide.none,
+        child: recording
+            ? Row(
+                children: [
+                  IconButton(tooltip: 'Cancel recording', onPressed: voiceBusy ? null : onVoiceCancel, icon: Icon(Icons.delete_outline_rounded, color: theme.dangerColor)),
+                  const SizedBox(width: 4),
+                  Container(width: 8, height: 8, decoration: BoxDecoration(color: theme.dangerColor, shape: BoxShape.circle)),
+                  const SizedBox(width: 8),
+                  Text(_time(), style: TextStyle(color: theme.primaryTextColor, fontFeatures: const <FontFeature>[], fontWeight: FontWeight.w700)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      recordLocked ? 'Recording locked • tap send when ready' : 'Slide left to cancel • slide up to lock',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: theme.secondaryTextColor, fontSize: 11.5),
+                    ),
                   ),
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-                ),
+                  if (recordLocked)
+                    IconButton.filled(
+                      tooltip: 'Send voice note',
+                      style: IconButton.styleFrom(backgroundColor: theme.accentColor, foregroundColor: theme.onAccentColor),
+                      onPressed: voiceBusy ? null : onVoiceSend,
+                      icon: voiceBusy
+                          ? const SizedBox(width: 17, height: 17, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.send_rounded, size: 19),
+                    ),
+                ],
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  IconButton(tooltip: 'Attach', color: theme.accentColor, onPressed: onAttach, icon: const Icon(Icons.add_circle_outline_rounded)),
+                  Expanded(
+                    child: TextField(
+                      controller: controller,
+                      minLines: 1,
+                      maxLines: 5,
+                      onChanged: onChanged,
+                      style: TextStyle(color: theme.primaryTextColor, fontSize: 14 * theme.fontScale),
+                      decoration: InputDecoration(
+                        hintText: 'Message…  /task or #reply',
+                        hintStyle: TextStyle(color: theme.secondaryTextColor),
+                        filled: true,
+                        fillColor: theme.cardColor,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(22), borderSide: BorderSide.none),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: controller,
+                    builder: (context, value, _) {
+                      final hasText = value.text.trim().isNotEmpty;
+                      if (hasText) {
+                        return IconButton.filled(
+                          tooltip: 'Send',
+                          style: IconButton.styleFrom(backgroundColor: theme.accentColor, foregroundColor: theme.onAccentColor),
+                          onPressed: onSend,
+                          icon: const Icon(Icons.send_rounded, size: 19),
+                        );
+                      }
+                      return Semantics(
+                        button: true,
+                        label: 'Voice note. Tap to start locked recording, or hold to record and slide.',
+                        child: GestureDetector(
+                          onTap: onVoiceTap,
+                          onLongPressStart: (_) => onVoiceHoldStart(),
+                          onLongPressMoveUpdate: onVoiceMove,
+                          onLongPressEnd: (_) => onVoiceHoldEnd(),
+                          child: Container(
+                            width: 46,
+                            height: 46,
+                            decoration: BoxDecoration(color: theme.accentColor, shape: BoxShape.circle),
+                            child: Icon(Icons.mic_rounded, size: 20, color: theme.onAccentColor),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 6),
-            ValueListenableBuilder<TextEditingValue>(
-              valueListenable: controller,
-              builder: (context, value, _) {
-                final hasText = value.text.trim().isNotEmpty;
-                return IconButton.filled(
-                  tooltip: hasText ? 'Send' : 'Voice note',
-                  style: IconButton.styleFrom(
-                    backgroundColor: theme.accentColor,
-                    foregroundColor: theme.onAccentColor,
-                  ),
-                  onPressed: hasText ? onSend : onVoice,
-                  icon: Icon(hasText ? Icons.send_rounded : Icons.mic_rounded, size: 19),
-                );
-              },
-            ),
-          ],
-        ),
       ),
     );
   }

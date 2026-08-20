@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../../../ui/core/theme/theme_config.dart';
 import '../../../ui/core/theme/theme_controller.dart';
+import '../../data/repositories/mock_data_store.dart';
+import '../../data/services/chaty_notification_service.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/user_profile.dart';
-import '../../data/repositories/mock_data_store.dart';
 import '../../ui/core/controllers/chaty_preferences_controller.dart';
-import '../../data/services/chaty_notification_service.dart';
 import '../../ui/core/design_system/chaty_settings_primitives.dart';
+import '../search/global_search_screen.dart';
 import 'chat_detail_screen.dart';
 import 'new_chat_screen.dart';
-import '../search/global_search_screen.dart';
 
 class ChatsHomeScreen extends StatefulWidget {
   final ThemeConfig theme;
@@ -18,6 +18,8 @@ class ChatsHomeScreen extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
   final ThemeController themeController;
   final ChatyNotificationService notificationService;
+  final ConversationType? forcedType;
+  final String? pageTitle;
 
   const ChatsHomeScreen({
     super.key,
@@ -26,6 +28,8 @@ class ChatsHomeScreen extends StatefulWidget {
     required this.preferencesController,
     required this.themeController,
     required this.notificationService,
+    this.forcedType,
+    this.pageTitle,
   });
 
   @override
@@ -107,6 +111,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     final query = _searchCtrl.text.trim().toLowerCase();
 
     final conversations = dataStore.conversations.where((conversation) {
+      if (widget.forcedType != null && conversation.type != widget.forcedType) return false;
       final matchesQuery = query.isEmpty ||
           conversation.title.toLowerCase().contains(query) ||
           conversation.lastMessageText.toLowerCase().contains(query);
@@ -125,6 +130,19 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
 
     final pinned = conversations.where((item) => item.isPinned && !item.isArchived).toList(growable: false);
     final recent = conversations.where((item) => !item.isPinned && !item.isArchived).toList(growable: false);
+    final filters = widget.forcedType == null
+        ? const <String>['All', 'Unread', 'Groups', 'Direct']
+        : const <String>['All', 'Unread'];
+    final listEntries = <Object>[];
+    if (pinned.isNotEmpty) {
+      listEntries
+        ..add(const _ConversationSection('PINNED'))
+        ..addAll(pinned);
+    }
+    if (recent.isNotEmpty) {
+      if (pinned.isNotEmpty) listEntries.add(const _ConversationSection('MESSAGES'));
+      listEntries.addAll(recent);
+    }
 
     return Scaffold(
       backgroundColor: theme.backgroundColor,
@@ -137,7 +155,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Chaty',
+                      widget.pageTitle ?? 'Chaty',
                       style: TextStyle(
                         color: theme.primaryTextColor,
                         fontSize: 24 * theme.fontScale,
@@ -180,12 +198,17 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                         onChanged: (_) => setState(() {}),
                         style: TextStyle(color: theme.primaryTextColor),
                         decoration: InputDecoration(
-                          hintText: 'Search chats and messages…',
+                          hintText: widget.forcedType == ConversationType.group
+                              ? 'Search groups…'
+                              : widget.forcedType == ConversationType.direct
+                                  ? 'Search direct chats…'
+                                  : 'Search chats and messages…',
                           hintStyle: TextStyle(color: theme.secondaryTextColor),
                           prefixIcon: Icon(Icons.search_rounded, color: theme.secondaryTextColor),
                           suffixIcon: _searchCtrl.text.isEmpty
                               ? null
                               : IconButton(
+                                  tooltip: 'Clear search',
                                   onPressed: () {
                                     _searchCtrl.clear();
                                     setState(() {});
@@ -203,14 +226,14 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                     )
                   : const SizedBox.shrink(),
             ),
-            if (homePrefs.enableStoriesStrip)
+            if (homePrefs.enableStoriesStrip && widget.forcedType != ConversationType.group)
               SizedBox(
                 height: 82,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   itemCount: dataStore.contacts.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                  separatorBuilder: (_, _) => const SizedBox(width: 10),
                   itemBuilder: (context, index) {
                     final contact = dataStore.contacts[index];
                     return SizedBox(
@@ -242,7 +265,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.fromLTRB(16, 3, 16, 8),
                 child: Row(
-                  children: <String>['All', 'Unread', 'Groups', 'Direct'].map((filter) {
+                  children: filters.map((filter) {
                     final selected = _selectedFilter == filter;
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
@@ -267,26 +290,29 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
             ),
             Expanded(
               child: conversations.isEmpty
-                  ? _EmptyChats(theme: theme, onSearch: () => _openGlobalSearch(theme))
-                  : ListView(
+                  ? _EmptyChats(
+                      theme: theme,
+                      onSearch: () => _openGlobalSearch(theme),
+                      forcedType: widget.forcedType,
+                    )
+                  : ListView.builder(
                       padding: const EdgeInsets.fromLTRB(8, 0, 8, 96),
-                      children: [
-                        if (pinned.isNotEmpty) ...[
-                          _SectionLabel(label: 'PINNED', theme: theme),
-                          ...pinned.map((conversation) => _conversationTile(conversation, theme)),
-                          const SizedBox(height: 6),
-                        ],
-                        if (recent.isNotEmpty) ...[
-                          if (pinned.isNotEmpty) _SectionLabel(label: 'MESSAGES', theme: theme),
-                          ...recent.map((conversation) => _conversationTile(conversation, theme)),
-                        ],
-                      ],
+                      cacheExtent: 420,
+                      itemCount: listEntries.length,
+                      itemBuilder: (context, index) {
+                        final entry = listEntries[index];
+                        if (entry is _ConversationSection) {
+                          return _SectionLabel(label: entry.label, theme: theme);
+                        }
+                        return _conversationTile(entry as Conversation, theme);
+                      },
                     ),
             ),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
+        tooltip: widget.forcedType == ConversationType.group ? 'Create group' : 'New chat',
         backgroundColor: theme.accentColor,
         foregroundColor: theme.onAccentColor,
         onPressed: () {
@@ -300,7 +326,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
             ),
           );
         },
-        child: const Icon(Icons.edit_rounded),
+        child: Icon(widget.forcedType == ConversationType.group ? Icons.group_add_rounded : Icons.edit_rounded),
       ),
     );
   }
@@ -336,114 +362,117 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               ),
             );
           },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            child: Row(
-              children: [
-                Stack(
-                  children: [
-                    ChatyAvatar(
-                      initials: conversation.avatarInitials ?? conversation.title.characters.take(2).toString().toUpperCase(),
-                      color: conversation.avatarColorHex == null ? theme.accentColor : Color(int.parse(conversation.avatarColorHex!)),
-                      size: 50,
-                      shape: homePrefs.avatarShape,
-                    ),
-                    if (isOnline)
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          width: 13,
-                          height: 13,
-                          decoration: BoxDecoration(
-                            color: theme.successColor,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: theme.backgroundColor, width: 2.2),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 72),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              child: Row(
+                children: [
+                  Stack(
+                    children: [
+                      ChatyAvatar(
+                        initials: conversation.avatarInitials ?? conversation.title.characters.take(2).toString().toUpperCase(),
+                        color: conversation.avatarColorHex == null ? theme.accentColor : Color(int.parse(conversation.avatarColorHex!)),
+                        size: 50,
+                        shape: homePrefs.avatarShape,
+                      ),
+                      if (isOnline)
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            width: 13,
+                            height: 13,
+                            decoration: BoxDecoration(
+                              color: theme.successColor,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: theme.backgroundColor, width: 2.2),
+                            ),
                           ),
                         ),
-                      ),
-                  ],
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              conversation.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: theme.primaryTextColor,
-                                fontSize: 15 * theme.fontScale,
-                                fontWeight: conversation.unreadCount > 0 ? FontWeight.w800 : FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _formatMessageTime(conversation.lastMessageTime),
-                            style: TextStyle(
-                              color: conversation.unreadCount > 0 ? theme.accentColor : theme.secondaryTextColor,
-                              fontSize: 11.5,
-                              fontWeight: conversation.unreadCount > 0 ? FontWeight.w700 : FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              conversation.lastMessageText.isEmpty ? presenceLabel : conversation.lastMessageText,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: conversation.unreadCount > 0 ? theme.primaryTextColor : theme.secondaryTextColor,
-                                fontSize: 12.5 * theme.fontScale,
-                              ),
-                            ),
-                          ),
-                          if (presenceLabel.isNotEmpty && conversation.lastMessageText.isNotEmpty) ...[
-                            const SizedBox(width: 8),
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 105),
+                    ],
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
                               child: Text(
-                                presenceLabel,
+                                conversation.title,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.right,
                                 style: TextStyle(
-                                  color: isOnline ? theme.successColor : theme.secondaryTextColor.withValues(alpha: 0.85),
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w600,
+                                  color: theme.primaryTextColor,
+                                  fontSize: 15 * theme.fontScale,
+                                  fontWeight: conversation.unreadCount > 0 ? FontWeight.w800 : FontWeight.w600,
                                 ),
                               ),
                             ),
-                          ],
-                          if (conversation.unreadCount > 0) ...[
-                            const SizedBox(width: 7),
-                            Container(
-                              constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
-                              padding: const EdgeInsets.symmetric(horizontal: 6),
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(color: theme.accentColor, borderRadius: BorderRadius.circular(10)),
-                              child: Text(
-                                '${conversation.unreadCount}',
-                                style: TextStyle(color: theme.onAccentColor, fontSize: 10.5, fontWeight: FontWeight.w800),
+                            const SizedBox(width: 8),
+                            Text(
+                              _formatMessageTime(conversation.lastMessageTime),
+                              style: TextStyle(
+                                color: conversation.unreadCount > 0 ? theme.accentColor : theme.secondaryTextColor,
+                                fontSize: 11.5,
+                                fontWeight: conversation.unreadCount > 0 ? FontWeight.w700 : FontWeight.w500,
                               ),
                             ),
                           ],
-                        ],
-                      ),
-                    ],
+                        ),
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                conversation.lastMessageText.isEmpty ? presenceLabel : conversation.lastMessageText,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: conversation.unreadCount > 0 ? theme.primaryTextColor : theme.secondaryTextColor,
+                                  fontSize: 12.5 * theme.fontScale,
+                                ),
+                              ),
+                            ),
+                            if (presenceLabel.isNotEmpty && conversation.lastMessageText.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 105),
+                                child: Text(
+                                  presenceLabel,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.right,
+                                  style: TextStyle(
+                                    color: isOnline ? theme.successColor : theme.secondaryTextColor.withValues(alpha: 0.85),
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            if (conversation.unreadCount > 0) ...[
+                              const SizedBox(width: 7),
+                              Container(
+                                constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                                padding: const EdgeInsets.symmetric(horizontal: 6),
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(color: theme.accentColor, borderRadius: BorderRadius.circular(10)),
+                                child: Text(
+                                  '${conversation.unreadCount}',
+                                  style: TextStyle(color: theme.onAccentColor, fontSize: 10.5, fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -452,9 +481,15 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
   }
 }
 
+class _ConversationSection {
+  final String label;
+  const _ConversationSection(this.label);
+}
+
 class _SectionLabel extends StatelessWidget {
   final String label;
   final ThemeConfig theme;
+
   const _SectionLabel({required this.label, required this.theme});
 
   @override
@@ -463,7 +498,12 @@ class _SectionLabel extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 7, 12, 4),
       child: Text(
         label,
-        style: TextStyle(color: theme.secondaryTextColor, fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 0.8),
+        style: TextStyle(
+          color: theme.secondaryTextColor,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.8,
+        ),
       ),
     );
   }
@@ -472,27 +512,43 @@ class _SectionLabel extends StatelessWidget {
 class _EmptyChats extends StatelessWidget {
   final ThemeConfig theme;
   final VoidCallback onSearch;
-  const _EmptyChats({required this.theme, required this.onSearch});
+  final ConversationType? forcedType;
+
+  const _EmptyChats({
+    required this.theme,
+    required this.onSearch,
+    this.forcedType,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final isGroups = forcedType == ConversationType.group;
+    final isDirect = forcedType == ConversationType.direct;
+    final title = isGroups ? 'No groups yet' : isDirect ? 'No direct chats yet' : 'No conversations yet';
+    final description = isGroups
+        ? 'Create a group and add people to start a shared conversation.'
+        : 'Find a user by @username or create a group to start a conversation.';
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.chat_bubble_outline_rounded, size: 56, color: theme.accentColor),
+            Icon(isGroups ? Icons.groups_outlined : Icons.chat_bubble_outline_rounded, size: 56, color: theme.accentColor),
             const SizedBox(height: 18),
-            Text('No conversations yet', style: TextStyle(color: theme.primaryTextColor, fontSize: 18, fontWeight: FontWeight.w800)),
+            Text(title, style: TextStyle(color: theme.primaryTextColor, fontSize: 18, fontWeight: FontWeight.w800)),
             const SizedBox(height: 8),
             Text(
-              'Find a user by @username or create a group to start a conversation.',
+              description,
               textAlign: TextAlign.center,
               style: TextStyle(color: theme.secondaryTextColor, height: 1.45),
             ),
             const SizedBox(height: 18),
-            FilledButton.icon(onPressed: onSearch, icon: const Icon(Icons.search_rounded), label: const Text('Find people')),
+            FilledButton.icon(
+              onPressed: onSearch,
+              icon: const Icon(Icons.search_rounded),
+              label: Text(isGroups ? 'Find people' : 'Find people'),
+            ),
           ],
         ),
       ),

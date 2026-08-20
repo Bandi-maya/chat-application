@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../data/services/chaty_backend_service.dart';
+import '../../data/services/username_login_service.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/persistence/preferences_storage.dart';
 import '../../ui/core/theme/theme_controller.dart';
+import '../../ui/core/validators/chaty_validators.dart';
 import '../chats/main_navigation_shell.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
@@ -25,6 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
+  final UsernameLoginService _loginService = UsernameLoginService();
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
@@ -44,8 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final backend = locator<ChatyBackendService>();
-      final user = await backend.login(
+      final user = await _loginService.login(
         identifier: _identifierController.text.trim(),
         password: _passwordController.text,
       );
@@ -67,13 +68,22 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String _friendlyError(Object error) {
     final value = error.toString().replaceFirst('Exception: ', '');
-    if (value.contains('Invalid login credentials') || value.contains('invalid_credentials')) {
-      return 'Incorrect email or password.';
+    if (value.toLowerCase().contains('invalid') ||
+        value.contains('Incorrect') ||
+        value.contains('401')) {
+      return 'Incorrect email/username or password.';
     }
     if (value.contains('Email not confirmed')) {
       return 'Confirm your email first, then sign in.';
     }
     return value;
+  }
+
+  String? _validateIdentifier(String? raw) {
+    final value = raw?.trim() ?? '';
+    if (value.isEmpty) return 'Enter your email or username';
+    if (value.contains('@')) return ChatyValidators.validateEmail(value);
+    return ChatyValidators.validateUsername(value);
   }
 
   @override
@@ -107,24 +117,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Login to continue using the app.',
+                      'Sign in with your email address or Chaty username.',
                       style: TextStyle(color: theme.secondaryTextColor, fontSize: 14),
                     ),
                     const SizedBox(height: 36),
                     AuthTextField(
-                      label: 'Email',
-                      hintText: 'Enter your registered email',
+                      label: 'Email or username',
+                      hintText: 'name@example.com or @username',
                       controller: _identifierController,
                       theme: theme,
                       keyboardType: TextInputType.emailAddress,
-                      validator: (value) {
-                        final email = value?.trim() ?? '';
-                        if (email.isEmpty) return 'Please enter your email';
-                        if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
-                          return 'Please enter a valid email address';
-                        }
-                        return null;
-                      },
+                      validator: _validateIdentifier,
                     ),
                     const SizedBox(height: 20),
                     AuthTextField(
@@ -144,7 +147,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) return 'Please enter your password';
-                        if (value.length < 8) return 'Password must be at least 8 characters';
+                        if (value.length < 6) return 'Password must be at least 6 characters';
                         return null;
                       },
                     ),
@@ -194,7 +197,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          "Didn't have account? ",
+                          "Don't have an account? ",
                           style: TextStyle(color: theme.secondaryTextColor, fontSize: 13.5),
                         ),
                         GestureDetector(

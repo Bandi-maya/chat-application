@@ -52,10 +52,12 @@ class AppIconController extends ChangeNotifier {
   static const String _launcherPreferenceKey = 'chaty_launcher_icon_v1';
   static const String _brandSourcePreferenceKey = 'chaty_brand_source_v1';
   static const String _customBrandPathPreferenceKey = 'chaty_custom_brand_icon_path_v1';
+  static const String _customHomeShortcutPreferenceKey = 'chaty_custom_home_shortcut_v1';
 
   LauncherIconVariant _launcherIcon = LauncherIconVariant.original;
   BrandIconSource _brandIconSource = BrandIconSource.bundled;
   String? _customBrandIconPath;
+  bool _customHomeShortcutApplied = false;
   bool _initialized = false;
   bool _isApplyingLauncherIcon = false;
   bool _isSavingCustomBrandIcon = false;
@@ -64,6 +66,7 @@ class AppIconController extends ChangeNotifier {
   LauncherIconVariant get launcherIcon => _launcherIcon;
   BrandIconSource get brandIconSource => _brandIconSource;
   String? get customBrandIconPath => _customBrandIconPath;
+  bool get customHomeShortcutApplied => _customHomeShortcutApplied;
   bool get initialized => _initialized;
   bool get isApplyingLauncherIcon => _isApplyingLauncherIcon;
   bool get isSavingCustomBrandIcon => _isSavingCustomBrandIcon;
@@ -78,14 +81,17 @@ class AppIconController extends ChangeNotifier {
         ? BrandIconSource.custom
         : BrandIconSource.bundled;
     _customBrandIconPath = prefs.getString(_customBrandPathPreferenceKey);
+    _customHomeShortcutApplied = prefs.getBool(_customHomeShortcutPreferenceKey) ?? false;
 
     if (_brandIconSource == BrandIconSource.custom) {
       final path = _customBrandIconPath;
       if (path == null || path.isEmpty || !File(path).existsSync()) {
         _brandIconSource = BrandIconSource.bundled;
         _customBrandIconPath = null;
+        _customHomeShortcutApplied = false;
         await prefs.setString(_brandSourcePreferenceKey, BrandIconSource.bundled.name);
         await prefs.remove(_customBrandPathPreferenceKey);
+        await prefs.setBool(_customHomeShortcutPreferenceKey, false);
       }
     }
 
@@ -167,11 +173,30 @@ class AppIconController extends ChangeNotifier {
       if (await target.exists()) await target.delete();
       await temporary.rename(target.path);
 
+      var homeShortcutApplied = false;
+      if (!kIsWeb && Platform.isAndroid) {
+        try {
+          final result = await _channel.invokeMethod<String>('applyCustomHomeShortcut', <String, dynamic>{
+            'imagePath': target.path,
+            'label': 'Chaty',
+          });
+          homeShortcutApplied = result == 'requested' || result == 'updated';
+          if (result == 'unsupported') {
+            _lastError = 'The image is applied inside Chaty, but this Android launcher does not support custom pinned Home Screen shortcuts.';
+          }
+        } catch (error) {
+          debugPrint('Custom Home Screen shortcut failed: $error');
+          _lastError = 'The image is applied inside Chaty, but Android could not add or update the custom Home Screen shortcut.';
+        }
+      }
+
       _customBrandIconPath = target.path;
       _brandIconSource = BrandIconSource.custom;
+      _customHomeShortcutApplied = homeShortcutApplied;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_brandSourcePreferenceKey, BrandIconSource.custom.name);
       await prefs.setString(_customBrandPathPreferenceKey, target.path);
+      await prefs.setBool(_customHomeShortcutPreferenceKey, homeShortcutApplied);
       return true;
     } catch (error) {
       _lastError = 'The custom brand icon could not be saved.';
@@ -193,11 +218,20 @@ class AppIconController extends ChangeNotifier {
         debugPrint('Custom brand icon cleanup failed: $error');
       }
     }
+    if (!kIsWeb && Platform.isAndroid) {
+      try {
+        await _channel.invokeMethod<void>('removeCustomHomeShortcut');
+      } catch (error) {
+        debugPrint('Custom Home Screen shortcut cleanup failed: $error');
+      }
+    }
     _customBrandIconPath = null;
+    _customHomeShortcutApplied = false;
     _brandIconSource = BrandIconSource.bundled;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_brandSourcePreferenceKey, BrandIconSource.bundled.name);
     await prefs.remove(_customBrandPathPreferenceKey);
+    await prefs.setBool(_customHomeShortcutPreferenceKey, false);
     notifyListeners();
   }
 
