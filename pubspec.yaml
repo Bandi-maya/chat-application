@@ -28,6 +28,13 @@ dependencies:
   just_audio: ^0.10.5
   share_plus: ^13.3.0
   flutter_image_compress: ^2.5.1
+  animated_emoji: ^3.3.0
+  emoji_picker_flutter: ^4.5.3
+  flutter_map: ^8.3.1
+  latlong2: ^0.10.1
+  mobile_scanner: ^7.4.0
+  qr_flutter: ^4.1.0
+  video_player: ^2.14.0
 
 dev_dependencies:
   flutter_test:
