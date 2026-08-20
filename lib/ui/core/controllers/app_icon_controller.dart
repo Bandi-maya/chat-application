@@ -108,6 +108,14 @@ class AppIconController extends ChangeNotifier {
             'alias': _launcherIcon.androidAlias,
           });
         }
+
+        if (_brandIconSource == BrandIconSource.custom) {
+          final pinned = await _channel.invokeMethod<bool>('isCustomHomeShortcutPinned') ?? false;
+          if (pinned != _customHomeShortcutApplied) {
+            _customHomeShortcutApplied = pinned;
+            await prefs.setBool(_customHomeShortcutPreferenceKey, pinned);
+          }
+        }
       } catch (error) {
         _lastError = 'Unable to verify the launcher icon on this device.';
         debugPrint('Launcher icon initialization failed: $error');
@@ -181,11 +189,11 @@ class AppIconController extends ChangeNotifier {
           });
           homeShortcutApplied = result == 'requested' || result == 'updated';
           if (result == 'unsupported') {
-            _lastError = 'The image is applied inside Chaty, but this Android launcher does not support custom pinned Home Screen shortcuts.';
+            _lastError = 'The custom icon is active inside Chaty, but this Android launcher does not support pinned Home Screen icons.';
           }
         } catch (error) {
           debugPrint('Custom Home Screen shortcut failed: $error');
-          _lastError = 'The image is applied inside Chaty, but Android could not add or update the custom Home Screen shortcut.';
+          _lastError = 'The custom icon is active inside Chaty, but Android could not add or update its Home Screen launcher icon.';
         }
       }
 

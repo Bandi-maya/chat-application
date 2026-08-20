@@ -6,7 +6,9 @@ import 'package:chat/data/services/chaty_backend_service.dart';
 import 'package:chat/features/auth/welcome_screen.dart';
 import 'package:chat/features/chats/main_navigation_shell.dart';
 import 'package:chat/injection/locator.dart';
+import 'package:chat/ui/core/controllers/app_icon_controller.dart';
 import 'package:chat/ui/core/theme/theme_controller.dart';
+import 'package:chat/ui/core/widgets/chaty_brand_icon.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -49,9 +51,18 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = locator<ThemeController>().globalTheme;
+    final appIconController = locator<AppIconController>();
     return Scaffold(
       backgroundColor: theme.backgroundColor,
-      body: const SizedBox.expand(),
+      body: Center(
+        child: ClipOval(
+          child: ChatyBrandIcon(
+            controller: appIconController,
+            size: 112,
+            borderRadius: 56,
+          ),
+        ),
+      ),
     );
   }
 }
