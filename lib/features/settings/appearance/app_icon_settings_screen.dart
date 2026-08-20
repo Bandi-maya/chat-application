@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -23,31 +22,60 @@ class AppIconSettingsScreen extends StatefulWidget {
   State<AppIconSettingsScreen> createState() => _AppIconSettingsScreenState();
 }
 
-class _AppIconSettingsScreenState extends State<AppIconSettingsScreen> {
+class _AppIconSettingsScreenState extends State<AppIconSettingsScreen>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      widget.appIconController.refreshNativeLauncherState();
+    }
+  }
+
   Future<void> _selectLauncherIcon(LauncherIconVariant variant) async {
-    if (widget.appIconController.isBusy || variant == widget.appIconController.launcherIcon) return;
+    final controller = widget.appIconController;
+    if (controller.isBusy ||
+        (controller.brandIconSource == BrandIconSource.bundled &&
+            variant == controller.launcherIcon)) {
+      return;
+    }
 
     final shouldApply = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text('Use ${variant.title} icon?'),
         content: const Text(
-          'This changes Chaty’s real Android launcher icon and uses the same design for Chaty branding inside the app.',
+          'This switches Chaty back to a packaged Android launcher icon. Your saved custom image is kept so you can return to it later.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Apply')),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Apply'),
+          ),
         ],
       ),
     );
     if (shouldApply != true || !mounted) return;
 
-    final success = await widget.appIconController.applyLauncherIcon(variant);
+    final success = await controller.applyLauncherIcon(variant);
     if (!mounted) return;
     if (!success) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(widget.appIconController.lastError ?? 'Launcher icon change failed.')));
+      _showError(controller.lastError ?? 'Launcher icon change failed.');
       return;
     }
 
@@ -57,59 +85,93 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Launcher icon applied'),
         content: const Text(
-          'Android launchers can cache icons briefly. Restart Chaty now to finish the visual refresh, or continue using the app.',
+          'Some launchers cache packaged icons briefly. Restart Chaty now if you want to force a clean app restart.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Continue')),
-          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Restart now')),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Continue'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Restart now'),
+          ),
         ],
       ),
     );
     if (restart == true) await SystemNavigator.pop();
   }
 
-  Future<void> _pickCustomImage() async {
+  Future<void> _openCustomSourcePicker() async {
     if (widget.appIconController.isBusy) return;
+
+    final source = await showModalBottomSheet<CustomIconInputSource>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                child: Text(
+                  'Choose custom icon image',
+                  style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text('Photos'),
+                subtitle: const Text('Use Android’s private photo picker'),
+                onTap: () => Navigator.of(sheetContext).pop(CustomIconInputSource.photos),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_camera_outlined),
+                title: const Text('Camera'),
+                subtitle: const Text('Capture a new image for the icon'),
+                onTap: () => Navigator.of(sheetContext).pop(CustomIconInputSource.camera),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+    await _loadCustomImage(source);
+  }
+
+  Future<void> _loadCustomImage(CustomIconInputSource source) async {
+    final controller = widget.appIconController;
+    final preparedPath = await controller.pickCustomIconImage(source);
+    if (!mounted) return;
+    if (preparedPath == null || preparedPath.isEmpty) {
+      if (controller.lastError != null) _showError(controller.lastError!);
+      return;
+    }
+
+    final preparedFile = File(preparedPath);
     try {
-      final files = await FilePicker.pickFiles(type: FileType.image);
-      if (!mounted || files.isEmpty) return;
-      final selected = files.single;
-      final selectedPath = selected.path;
-      if (selectedPath == null || selectedPath.isEmpty) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('This image is not accessible as a local file on this device.')),
-        );
+      if (!await preparedFile.exists()) {
+        _showError('The selected image is no longer available.');
+        return;
+      }
+      final bytes = await preparedFile.readAsBytes();
+      if (bytes.isEmpty) {
+        _showError('The selected image is empty or corrupted.');
         return;
       }
 
-      final source = File(selectedPath);
-      if (!await source.exists()) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('The selected image no longer exists.')));
-        return;
-      }
-
-      const maxInputBytes = 25 * 1024 * 1024;
-      final fileSize = await source.length();
-      if (fileSize > maxInputBytes) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Choose an image smaller than 25 MB.')),
-        );
-        return;
-      }
-      if (fileSize < 1024) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Choose a valid image file.')));
-        return;
-      }
-
-      final bytes = await source.readAsBytes();
       final decoded = await decodeImageFromList(bytes);
-      if (decoded.width < 128 || decoded.height < 128) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Use an image that is at least 128 × 128 pixels.')));
+      final width = decoded.width;
+      final height = decoded.height;
+      decoded.dispose();
+      if (width < 128 || height < 128) {
+        _showError('Use an image that is at least 128 × 128 pixels.');
         return;
       }
 
@@ -118,29 +180,97 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen> {
         MaterialPageRoute<void>(
           builder: (_) => _CustomBrandIconEditor(
             imageBytes: bytes,
-            controller: widget.appIconController,
+            controller: controller,
           ),
         ),
       );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('The selected image could not be opened.')));
+    } catch (error) {
+      if (mounted) _showError('The selected image could not be opened.');
+    } finally {
+      try {
+        if (await preparedFile.exists()) await preparedFile.delete();
+      } catch (_) {
+        // Temporary picker files are best-effort cleanup only.
+      }
     }
+  }
+
+  Future<void> _activateSavedCustomIcon() async {
+    final controller = widget.appIconController;
+    if (controller.isBusy) return;
+    if (!controller.hasSavedCustomIcon) {
+      await _openCustomSourcePicker();
+      return;
+    }
+
+    final success = await controller.activateSavedCustomIcon();
+    if (!mounted) return;
+    if (!success) {
+      _showError(controller.lastError ?? 'Could not activate the saved custom icon.');
+      return;
+    }
+    _showCustomStateMessage();
   }
 
   Future<void> _removeCustomIcon() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Remove custom brand icon?'),
-        content: const Text('Chaty will return to the currently selected bundled app icon inside the app.'),
+        title: const Text('Remove custom icon?'),
+        content: const Text(
+          'The saved custom image will be deleted and Chaty will return to the selected packaged launcher icon.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Remove')),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Remove'),
+          ),
         ],
       ),
     );
-    if (confirmed == true) await widget.appIconController.removeCustomBrandIcon();
+    if (confirmed == true) {
+      await widget.appIconController.removeCustomBrandIcon();
+    }
+  }
+
+  void _showCustomStateMessage() {
+    final state = widget.appIconController.customLauncherState;
+    final message = switch (state) {
+      CustomLauncherState.active => 'Custom Chaty launcher icon is active.',
+      CustomLauncherState.pending =>
+        'Approve “Add to Home screen” in the Android launcher to activate the custom icon.',
+      CustomLauncherState.unsupported =>
+        'This launcher cannot pin a custom Home icon. The selected image is still used inside Chaty.',
+      CustomLauncherState.failed =>
+        'The custom image was saved, but Android could not activate the Home launcher entry.',
+      CustomLauncherState.inactive => 'Custom image saved.',
+    };
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  String _launcherStatus(AppIconController controller) {
+    if (controller.brandIconSource != BrandIconSource.custom) {
+      return 'Launcher: ${controller.launcherIcon.title}';
+    }
+    return switch (controller.customLauncherState) {
+      CustomLauncherState.active => 'Launcher: Custom active',
+      CustomLauncherState.pending => 'Launcher: Waiting for Home-screen approval',
+      CustomLauncherState.unsupported => 'Launcher: ${controller.launcherIcon.title} fallback',
+      CustomLauncherState.failed => 'Launcher: ${controller.launcherIcon.title} recovery',
+      CustomLauncherState.inactive => 'Launcher: ${controller.launcherIcon.title} fallback',
+    };
   }
 
   @override
@@ -165,13 +295,13 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen> {
                       children: [
                         Text(
                           controller.brandIconSource == BrandIconSource.custom
-                              ? 'Custom Chaty brand'
+                              ? 'Custom Chaty icon'
                               : controller.launcherIcon.title,
                           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Launcher: ${controller.launcherIcon.title}',
+                          _launcherStatus(controller),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         if (controller.isBusy) ...[
@@ -185,15 +315,16 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen> {
               ),
             ),
             ChatySettingsSection(
-              title: 'Chaty launcher icons',
-              description: 'These designs are bundled into the Android app, so Android can switch the real Home Screen/app-drawer icon safely.',
+              title: 'App icon',
+              description:
+                  'Choose one of Chaty’s packaged launcher icons or use your own photo as a temporary custom Home-screen identity.',
               children: [
                 Padding(
                   padding: const EdgeInsets.all(12),
                   child: GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: LauncherIconVariant.values.length,
+                    itemCount: LauncherIconVariant.values.length + 1,
                     gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                       maxCrossAxisExtent: 150,
                       mainAxisExtent: 132,
@@ -201,8 +332,20 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen> {
                       mainAxisSpacing: 10,
                     ),
                     itemBuilder: (context, index) {
+                      if (index == LauncherIconVariant.values.length) {
+                        return _CustomIconOption(
+                          controller: controller,
+                          selected: controller.brandIconSource == BrandIconSource.custom,
+                          enabled: !controller.isBusy,
+                          onTap: controller.hasSavedCustomIcon
+                              ? _activateSavedCustomIcon
+                              : _openCustomSourcePicker,
+                        );
+                      }
+
                       final variant = LauncherIconVariant.values[index];
-                      final selected = controller.launcherIcon == variant;
+                      final selected = controller.brandIconSource == BrandIconSource.bundled &&
+                          controller.launcherIcon == variant;
                       return _LauncherIconOption(
                         variant: variant,
                         selected: selected,
@@ -212,35 +355,53 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen> {
                     },
                   ),
                 ),
-                if (controller.launcherIcon != LauncherIconVariant.original)
+                if (controller.launcherIcon != LauncherIconVariant.original ||
+                    controller.brandIconSource == BrandIconSource.custom)
                   ChatySettingsTile(
                     icon: Icons.restore_rounded,
                     title: 'Restore original launcher icon',
-                    subtitle: 'Return Chaty to the default launcher design',
-                    onTap: controller.isBusy ? null : () => _selectLauncherIcon(LauncherIconVariant.original),
+                    subtitle: 'Use Chaty’s original packaged icon',
+                    onTap: controller.isBusy
+                        ? null
+                        : () => _selectLauncherIcon(LauncherIconVariant.original),
                   ),
               ],
             ),
             ChatySettingsSection(
-              title: 'Custom Chaty brand icon',
-              description: 'Upload, crop, zoom, pan and rotate your own image. Android does not permit an arbitrary runtime file to become a normal launcher resource, so custom uploads are used for Chaty branding inside the app while the launcher keeps your selected bundled icon.',
+              title: 'Custom icon',
+              description:
+                  'Photos use Android’s private Photo Picker. Camera capture uses a temporary FileProvider URI. The cropped result is copied into Chaty’s private storage and persists until you replace, remove, or uninstall the app.',
               children: [
                 ChatySettingsTile(
                   icon: Icons.add_photo_alternate_outlined,
-                  title: controller.brandIconSource == BrandIconSource.custom ? 'Replace custom image' : 'Upload image',
-                  subtitle: 'Crop and adjust a square Chaty brand image',
-                  onTap: controller.isBusy ? null : _pickCustomImage,
+                  title: controller.hasSavedCustomIcon ? 'Change custom image' : 'Choose custom image',
+                  subtitle: 'Photo Picker or Camera • crop, zoom and rotate',
+                  onTap: controller.isBusy ? null : _openCustomSourcePicker,
                 ),
-                if (controller.brandIconSource == BrandIconSource.custom)
+                if (controller.hasSavedCustomIcon &&
+                    controller.brandIconSource != BrandIconSource.custom)
                   ChatySettingsTile(
-                    icon: Icons.restore_rounded,
+                    icon: Icons.mobile_friendly_rounded,
+                    title: 'Use saved custom icon',
+                    subtitle: 'Re-activate the existing custom image without selecting it again',
+                    onTap: controller.isBusy ? null : _activateSavedCustomIcon,
+                  ),
+                if (controller.hasSavedCustomIcon)
+                  ChatySettingsTile(
+                    icon: Icons.delete_outline_rounded,
                     iconColor: Colors.orangeAccent,
                     title: 'Remove custom image',
-                    subtitle: 'Return in-app branding to ${controller.launcherIcon.title}',
+                    subtitle: 'Delete the saved custom icon and restore packaged branding',
                     onTap: controller.isBusy ? null : _removeCustomIcon,
                   ),
               ],
             ),
+            if (controller.customLauncherState == CustomLauncherState.pending)
+              const ChatyInfoTile(
+                message:
+                    'Custom icon is prepared. Complete the Android launcher’s “Add to Home screen” confirmation. Chaty keeps the packaged launcher entry enabled until approval succeeds.',
+                icon: Icons.pending_actions_rounded,
+              ),
             if (controller.lastError != null)
               ChatyInfoTile(
                 message: controller.lastError!,
@@ -297,17 +458,7 @@ class _LauncherIconOption extends StatelessWidget {
                   clipBehavior: Clip.none,
                   children: [
                     LauncherIconPreview(variant: variant, size: 64, borderRadius: 15),
-                    if (selected)
-                      Positioned(
-                        right: -5,
-                        top: -5,
-                        child: Container(
-                          width: 22,
-                          height: 22,
-                          decoration: BoxDecoration(color: scheme.primary, shape: BoxShape.circle),
-                          child: Icon(Icons.check_rounded, size: 15, color: scheme.onPrimary),
-                        ),
-                      ),
+                    if (selected) _SelectedBadge(scheme: scheme),
                   ],
                 ),
                 const SizedBox(height: 9),
@@ -315,12 +466,132 @@ class _LauncherIconOption extends StatelessWidget {
                   variant.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12.5, fontWeight: selected ? FontWeight.w800 : FontWeight.w600),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  ),
                 ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _CustomIconOption extends StatelessWidget {
+  final AppIconController controller;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _CustomIconOption({
+    required this.controller,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final path = controller.customBrandIconPath;
+    final hasPreview = controller.hasSavedCustomIcon && path != null;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: 'Custom launcher icon',
+      child: Material(
+        color: selected ? scheme.primaryContainer.withValues(alpha: 0.45) : scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(16),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: selected ? scheme.primary : scheme.outlineVariant.withValues(alpha: 0.35),
+                width: selected ? 1.5 : 1,
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(15),
+                      child: SizedBox(
+                        width: 64,
+                        height: 64,
+                        child: hasPreview
+                            ? Image.file(
+                                File(path),
+                                fit: BoxFit.cover,
+                                gaplessPlayback: true,
+                                errorBuilder: (_, _, _) => _CustomPlaceholder(scheme: scheme),
+                              )
+                            : _CustomPlaceholder(scheme: scheme),
+                      ),
+                    ),
+                    if (selected) _SelectedBadge(scheme: scheme),
+                  ],
+                ),
+                const SizedBox(height: 9),
+                Text(
+                  'Custom',
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CustomPlaceholder extends StatelessWidget {
+  final ColorScheme scheme;
+
+  const _CustomPlaceholder({required this.scheme});
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: scheme.surfaceContainerHighest,
+      child: Center(
+        child: Icon(Icons.add_photo_alternate_outlined, color: scheme.primary, size: 30),
+      ),
+    );
+  }
+}
+
+class _SelectedBadge extends StatelessWidget {
+  final ColorScheme scheme;
+
+  const _SelectedBadge({required this.scheme});
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      right: -5,
+      top: -5,
+      child: Container(
+        width: 22,
+        height: 22,
+        decoration: BoxDecoration(color: scheme.primary, shape: BoxShape.circle),
+        child: Icon(Icons.check_rounded, size: 15, color: scheme.onPrimary),
       ),
     );
   }
@@ -364,7 +635,7 @@ class _CustomBrandIconEditorState extends State<_CustomBrandIconEditor> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Apply custom app icon?'),
         content: const Text(
-          'This will set your cropped image as the custom Chaty app icon.',
+          'Chaty will save this crop privately and ask Android to create or update the custom Home-screen launcher entry.',
         ),
         actions: [
           TextButton(
@@ -387,34 +658,14 @@ class _CustomBrandIconEditorState extends State<_CustomBrandIconEditor> {
       if (boundary == null) throw StateError('Preview is not ready.');
       final image = await boundary.toImage(pixelRatio: 3);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
       final png = byteData?.buffer.asUint8List();
       if (png == null || png.isEmpty) throw StateError('Could not encode image.');
+
       final success = await widget.controller.saveCustomBrandIcon(png);
       if (!mounted) return;
       if (success) {
         Navigator.of(context).pop();
-
-        final restart = await showDialog<bool>(
-          context: context,
-          barrierDismissible: false,
-          builder: (dialogContext) => AlertDialog(
-            title: const Text('App icon applied'),
-            content: const Text(
-              'Android launchers can cache icons briefly. Restart Chaty now to finish the visual refresh, or continue using the app.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const Text('Continue'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(dialogContext).pop(true),
-                child: const Text('Restart now'),
-              ),
-            ],
-          ),
-        );
-        if (restart == true) await SystemNavigator.pop();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(widget.controller.lastError ?? 'Could not save custom image.')),
@@ -422,7 +673,9 @@ class _CustomBrandIconEditorState extends State<_CustomBrandIconEditor> {
       }
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not create the cropped icon.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not create the cropped icon.')),
+      );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -445,7 +698,7 @@ class _CustomBrandIconEditorState extends State<_CustomBrandIconEditor> {
           child: Column(
             children: [
               Text(
-                'Drag to reposition. Pinch to zoom. Keep important details inside the guide.',
+                'Drag to reposition. Pinch to zoom. The circle and rounded-square guides show common launcher masks.',
                 style: Theme.of(context).textTheme.bodyMedium,
                 textAlign: TextAlign.center,
               ),
@@ -484,7 +737,11 @@ class _CustomBrandIconEditorState extends State<_CustomBrandIconEditor> {
                           ),
                         ),
                         IgnorePointer(
-                          child: CustomPaint(painter: _SafeAreaGuidePainter(color: scheme.onSurface.withValues(alpha: 0.48))),
+                          child: CustomPaint(
+                            painter: _SafeAreaGuidePainter(
+                              color: scheme.onSurface.withValues(alpha: 0.48),
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -496,7 +753,9 @@ class _CustomBrandIconEditorState extends State<_CustomBrandIconEditor> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _saving ? null : () => setState(() => _quarterTurns = (_quarterTurns - 1) % 4),
+                      onPressed: _saving
+                          ? null
+                          : () => setState(() => _quarterTurns = (_quarterTurns - 1) % 4),
                       icon: const Icon(Icons.rotate_left_rounded),
                       label: const Text('Rotate left'),
                     ),
@@ -504,7 +763,9 @@ class _CustomBrandIconEditorState extends State<_CustomBrandIconEditor> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _saving ? null : () => setState(() => _quarterTurns = (_quarterTurns + 1) % 4),
+                      onPressed: _saving
+                          ? null
+                          : () => setState(() => _quarterTurns = (_quarterTurns + 1) % 4),
                       icon: const Icon(Icons.rotate_right_rounded),
                       label: const Text('Rotate right'),
                     ),
@@ -518,9 +779,13 @@ class _CustomBrandIconEditorState extends State<_CustomBrandIconEditor> {
                 child: FilledButton.icon(
                   onPressed: _saving ? null : _apply,
                   icon: _saving
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
                       : const Icon(Icons.check_rounded),
-                  label: Text(_saving ? 'Applying…' : 'Apply custom brand icon'),
+                  label: Text(_saving ? 'Applying…' : 'Apply custom icon'),
                 ),
               ),
             ],
@@ -552,7 +817,12 @@ class _SafeAreaGuidePainter extends CustomPainter {
     );
     final circleInset = size.shortestSide * 0.18;
     canvas.drawOval(
-      Rect.fromLTWH(circleInset, circleInset, size.width - circleInset * 2, size.height - circleInset * 2),
+      Rect.fromLTWH(
+        circleInset,
+        circleInset,
+        size.width - circleInset * 2,
+        size.height - circleInset * 2,
+      ),
       paint,
     );
   }

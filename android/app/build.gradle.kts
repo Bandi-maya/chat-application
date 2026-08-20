@@ -34,6 +34,13 @@ android {
     }
 }
 
+dependencies {
+    // Native Photo Picker / Activity Result contracts used by the custom icon flow.
+    implementation("androidx.activity:activity-ktx:1.13.0")
+    // Normalizes gallery/camera orientation before Flutter's crop editor sees the image.
+    implementation("androidx.exifinterface:exifinterface:1.4.2")
+}
+
 kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
