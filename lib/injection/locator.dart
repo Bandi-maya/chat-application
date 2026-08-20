@@ -2,6 +2,7 @@ import 'package:get_it/get_it.dart';
 import 'package:chat/ui/core/theme/theme_controller.dart';
 import 'package:chat/data/repositories/mock_data_store.dart';
 import 'package:chat/data/services/chaty_backend_service.dart';
+import 'package:chat/data/services/contact_relationship_service.dart';
 import 'package:chat/data/services/local_lock_service.dart';
 import 'package:chat/ui/core/controllers/app_icon_controller.dart';
 import 'package:chat/ui/core/controllers/chaty_preferences_controller.dart';
@@ -22,6 +23,7 @@ void setupLocator() {
   locator.registerLazySingleton<ChatyNotificationService>(() => ChatyNotificationService());
   locator.registerLazySingleton<AppIconController>(() => AppIconController());
   locator.registerLazySingleton<LocalLockService>(() => LocalLockService());
+  locator.registerLazySingleton<ContactRelationshipService>(() => ContactRelationshipService());
 
   locator.registerFactory<MessageAutomationService>(
     () => MessageAutomationService(
