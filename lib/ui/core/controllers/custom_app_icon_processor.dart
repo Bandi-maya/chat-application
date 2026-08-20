@@ -42,7 +42,7 @@ class CustomAppIconProcessor {
       if (await target.exists()) {
         await target.delete();
       }
-      return temporary.rename(target.path);
+      return await temporary.rename(target.path);
     } finally {
       codec.dispose();
     }
