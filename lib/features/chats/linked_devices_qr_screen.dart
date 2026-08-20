@@ -8,6 +8,7 @@ import '../../data/repositories/mock_data_store.dart';
 import '../../data/services/contact_relationship_service.dart';
 import '../../domain/models/other_models.dart';
 import '../../ui/core/controllers/chaty_preferences_controller.dart';
+import '../../ui/core/theme/theme_config.dart';
 import '../../ui/core/theme/theme_controller.dart';
 import '../chats/chat_detail_screen.dart';
 
@@ -16,6 +17,9 @@ class LinkedDevicesQrScreen extends StatefulWidget {
   final ContactRelationshipService relationshipService;
   final ChatyPreferencesController preferencesController;
   final ThemeController themeController;
+  final int initialIndex;
+  final bool qrOnly;
+  final bool devicesOnly;
 
   const LinkedDevicesQrScreen({
     super.key,
@@ -23,6 +27,9 @@ class LinkedDevicesQrScreen extends StatefulWidget {
     required this.relationshipService,
     required this.preferencesController,
     required this.themeController,
+    this.initialIndex = 0,
+    this.qrOnly = false,
+    this.devicesOnly = false,
   });
 
   @override
@@ -30,7 +37,7 @@ class LinkedDevicesQrScreen extends StatefulWidget {
 }
 
 class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen> with SingleTickerProviderStateMixin {
-  late final TabController _tabs;
+  late final TabController? _tabs;
   final MobileScannerController _scanner = MobileScannerController(
     formats: const <BarcodeFormat>[BarcodeFormat.qrCode],
     detectionSpeed: DetectionSpeed.noDuplicates,
@@ -43,13 +50,20 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen> with Sing
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 3, vsync: this);
-    _loadDevices();
+    if (widget.devicesOnly) {
+      _tabs = null;
+      _loadDevices();
+    } else if (widget.qrOnly) {
+      _tabs = TabController(length: 2, vsync: this, initialIndex: widget.initialIndex.clamp(0, 1));
+    } else {
+      _tabs = TabController(length: 3, vsync: this, initialIndex: widget.initialIndex.clamp(0, 2));
+      _loadDevices();
+    }
   }
 
   @override
   void dispose() {
-    _tabs.dispose();
+    _tabs?.dispose();
     unawaited(_scanner.dispose());
     super.dispose();
   }
@@ -146,9 +160,134 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen> with Sing
     return 'Active ${value.day}/${value.month}/${value.year}';
   }
 
+  Widget _buildDevicesView(ThemeConfig theme) {
+    return RefreshIndicator(
+      onRefresh: _loadDevices,
+      child: _loadingDevices
+          ? ListView(children: const [SizedBox(height: 220), Center(child: CircularProgressIndicator())])
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                if (_error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(_error!, style: TextStyle(color: theme.dangerColor))),
+                Text('Devices signed into this Chaty account', style: TextStyle(color: theme.primaryTextColor, fontWeight: FontWeight.w800, fontSize: 16)),
+                const SizedBox(height: 8),
+                ..._devices.map((device) => Card(
+                      color: theme.surfaceColor,
+                      child: ListTile(
+                        leading: CircleAvatar(backgroundColor: theme.cardColor, child: Icon(Icons.devices_other_rounded, color: theme.accentColor)),
+                        title: Text(device.deviceName, style: TextStyle(color: theme.primaryTextColor, fontWeight: FontWeight.w700)),
+                        subtitle: Text('${device.platform}${device.location.isEmpty ? '' : ' • ${device.location}'}\n${_lastActive(device)}', style: TextStyle(color: theme.secondaryTextColor)),
+                        isThreeLine: true,
+                        trailing: device.isCurrentDevice
+                            ? Chip(label: const Text('This device'), backgroundColor: theme.accentColor.withValues(alpha: 0.12))
+                            : IconButton(tooltip: 'Log out device', onPressed: () => _revoke(device), icon: Icon(Icons.logout_rounded, color: theme.dangerColor)),
+                      ),
+                    )),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildMyQrView(ThemeConfig theme) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+              child: QrImageView(data: _myQrPayload, size: 245, version: QrVersions.auto),
+            ),
+            const SizedBox(height: 18),
+            Text(widget.dataStore.currentUser.displayName, style: TextStyle(color: theme.primaryTextColor, fontWeight: FontWeight.w800, fontSize: 20)),
+            const SizedBox(height: 4),
+            Text('@${widget.dataStore.currentUser.username}', style: TextStyle(color: theme.secondaryTextColor)),
+            const SizedBox(height: 14),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Text(
+                'Another Chaty user can scan this code to open a direct conversation. Messaging works immediately; voice/video calls remain locked until both people accept the contact request.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: theme.secondaryTextColor, height: 1.45),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScannerView() {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        MobileScanner(controller: _scanner, onDetect: _handleBarcode),
+        Positioned(
+          left: 24,
+          right: 24,
+          top: 28,
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.68), borderRadius: BorderRadius.circular(14)),
+            child: const Text('Scan a Chaty contact QR code', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+          ),
+        ),
+        Center(
+          child: Container(
+            width: 250,
+            height: 250,
+            decoration: BoxDecoration(border: Border.all(color: Colors.white, width: 3), borderRadius: BorderRadius.circular(24)),
+          ),
+        ),
+        if (_scanBusy)
+          ColoredBox(color: Colors.black38, child: const Center(child: CircularProgressIndicator(color: Colors.white))),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = widget.themeController.globalTheme;
+
+    if (widget.devicesOnly) {
+      return Scaffold(
+        backgroundColor: theme.backgroundColor,
+        appBar: AppBar(
+          backgroundColor: theme.surfaceColor,
+          foregroundColor: theme.primaryTextColor,
+          title: const Text('Linked devices'),
+        ),
+        body: _buildDevicesView(theme),
+      );
+    }
+
+    if (widget.qrOnly) {
+      return Scaffold(
+        backgroundColor: theme.backgroundColor,
+        appBar: AppBar(
+          backgroundColor: theme.surfaceColor,
+          foregroundColor: theme.primaryTextColor,
+          title: const Text('QR Code & Scan'),
+          bottom: TabBar(
+            controller: _tabs,
+            tabs: const [
+              Tab(icon: Icon(Icons.qr_code_2_rounded), text: 'My QR'),
+              Tab(icon: Icon(Icons.qr_code_scanner_rounded), text: 'Scan'),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          controller: _tabs,
+          children: [
+            _buildMyQrView(theme),
+            _buildScannerView(),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: theme.backgroundColor,
       appBar: AppBar(
@@ -167,84 +306,9 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen> with Sing
       body: TabBarView(
         controller: _tabs,
         children: [
-          RefreshIndicator(
-            onRefresh: _loadDevices,
-            child: _loadingDevices
-                ? ListView(children: const [SizedBox(height: 220), Center(child: CircularProgressIndicator())])
-                : ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      if (_error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(_error!, style: TextStyle(color: theme.dangerColor))),
-                      Text('Devices signed into this Chaty account', style: TextStyle(color: theme.primaryTextColor, fontWeight: FontWeight.w800, fontSize: 16)),
-                      const SizedBox(height: 8),
-                      ..._devices.map((device) => Card(
-                            color: theme.surfaceColor,
-                            child: ListTile(
-                              leading: CircleAvatar(backgroundColor: theme.cardColor, child: Icon(Icons.devices_other_rounded, color: theme.accentColor)),
-                              title: Text(device.deviceName, style: TextStyle(color: theme.primaryTextColor, fontWeight: FontWeight.w700)),
-                              subtitle: Text('${device.platform}${device.location.isEmpty ? '' : ' • ${device.location}'}\n${_lastActive(device)}', style: TextStyle(color: theme.secondaryTextColor)),
-                              isThreeLine: true,
-                              trailing: device.isCurrentDevice
-                                  ? Chip(label: const Text('This device'), backgroundColor: theme.accentColor.withValues(alpha: 0.12))
-                                  : IconButton(tooltip: 'Log out device', onPressed: () => _revoke(device), icon: Icon(Icons.logout_rounded, color: theme.dangerColor)),
-                            ),
-                          )),
-                    ],
-                  ),
-          ),
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
-                    child: QrImageView(data: _myQrPayload, size: 245, version: QrVersions.auto),
-                  ),
-                  const SizedBox(height: 18),
-                  Text(widget.dataStore.currentUser.displayName, style: TextStyle(color: theme.primaryTextColor, fontWeight: FontWeight.w800, fontSize: 20)),
-                  const SizedBox(height: 4),
-                  Text('@${widget.dataStore.currentUser.username}', style: TextStyle(color: theme.secondaryTextColor)),
-                  const SizedBox(height: 14),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 420),
-                    child: Text(
-                      'Another Chaty user can scan this code to open a direct conversation. Messaging works immediately; voice/video calls remain locked until both people accept the contact request.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: theme.secondaryTextColor, height: 1.45),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Stack(
-            fit: StackFit.expand,
-            children: [
-              MobileScanner(controller: _scanner, onDetect: _handleBarcode),
-              Positioned(
-                left: 24,
-                right: 24,
-                top: 28,
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.68), borderRadius: BorderRadius.circular(14)),
-                  child: const Text('Scan a Chaty contact QR code', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                ),
-              ),
-              Center(
-                child: Container(
-                  width: 250,
-                  height: 250,
-                  decoration: BoxDecoration(border: Border.all(color: Colors.white, width: 3), borderRadius: BorderRadius.circular(24)),
-                ),
-              ),
-              if (_scanBusy)
-                ColoredBox(color: Colors.black38, child: const Center(child: CircularProgressIndicator(color: Colors.white))),
-            ],
-          ),
+          _buildDevicesView(theme),
+          _buildMyQrView(theme),
+          _buildScannerView(),
         ],
       ),
     );

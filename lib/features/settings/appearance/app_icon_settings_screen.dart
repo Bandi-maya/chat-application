@@ -358,6 +358,28 @@ class _CustomBrandIconEditorState extends State<_CustomBrandIconEditor> {
 
   Future<void> _apply() async {
     if (_saving) return;
+
+    final shouldApply = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Apply custom app icon?'),
+        content: const Text(
+          'This will set your cropped image as the custom Chaty app icon.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
+    );
+    if (shouldApply != true || !mounted) return;
+
     setState(() => _saving = true);
     try {
       await WidgetsBinding.instance.endOfFrame;
@@ -371,6 +393,28 @@ class _CustomBrandIconEditorState extends State<_CustomBrandIconEditor> {
       if (!mounted) return;
       if (success) {
         Navigator.of(context).pop();
+
+        final restart = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('App icon applied'),
+            content: const Text(
+              'Android launchers can cache icons briefly. Restart Chaty now to finish the visual refresh, or continue using the app.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Continue'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Restart now'),
+              ),
+            ],
+          ),
+        );
+        if (restart == true) await SystemNavigator.pop();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(widget.controller.lastError ?? 'Could not save custom image.')),

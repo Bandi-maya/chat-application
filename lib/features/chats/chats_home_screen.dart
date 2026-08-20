@@ -225,6 +225,19 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     ));
   }
 
+  void _openQrScreen({int initialIndex = 1}) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => LinkedDevicesQrScreen(
+        dataStore: widget.dataStore,
+        relationshipService: _relationships,
+        preferencesController: widget.preferencesController,
+        themeController: widget.themeController,
+        initialIndex: initialIndex,
+        qrOnly: true,
+      ),
+    ));
+  }
+
   void _openLinkedDevices() {
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => LinkedDevicesQrScreen(
@@ -232,6 +245,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         relationshipService: _relationships,
         preferencesController: widget.preferencesController,
         themeController: widget.themeController,
+        devicesOnly: true,
       ),
     ));
   }
@@ -259,9 +273,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               return true;
           }
         }).toList(growable: false);
+        final archived = conversations.where((c) => c.isArchived).toList(growable: false);
         final pinned = conversations.where((c) => c.isPinned && !c.isArchived).toList(growable: false);
         final recent = conversations.where((c) => !c.isPinned && !c.isArchived).toList(growable: false);
         final entries = <Object>[];
+        if (archived.isNotEmpty && !_isSearchOpen) entries.add(_ArchivedEntry(archivedCount: archived.length));
         if (pinned.isNotEmpty) entries..add(const _ConversationSection('PINNED'))..addAll(pinned);
         if (recent.isNotEmpty) {
           if (pinned.isNotEmpty) entries.add(const _ConversationSection('MESSAGES'));
@@ -361,6 +377,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                           itemCount: entries.length,
                           itemBuilder: (context, index) {
                             final entry = entries[index];
+                            if (entry is _ArchivedEntry) {
+                              return _archivedTile(entry.archivedCount, theme);
+                            }
                             return entry is _ConversationSection ? _SectionLabel(label: entry.label, theme: theme) : _conversationTile(entry as Conversation, theme);
                           },
                         ),
@@ -382,12 +401,60 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     );
   }
 
+  Widget _archivedTile(int count, ThemeConfig theme) {
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => _ArchivedChatsScreen(
+            dataStore: widget.dataStore,
+            preferencesController: widget.preferencesController,
+            themeController: widget.themeController,
+            notificationService: widget.notificationService,
+          ),
+        ));
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Icon(Icons.archive_outlined, color: theme.secondaryTextColor, size: 22),
+            const SizedBox(width: 24),
+            Expanded(
+              child: Text(
+                'Archived',
+                style: TextStyle(
+                  color: theme.primaryTextColor,
+                  fontSize: 16 * theme.fontScale,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Text(
+              '$count',
+              style: TextStyle(
+                color: theme.accentColor,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _standardAppBar(ThemeConfig theme, HomePreferences homePrefs) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 4, 6),
       child: Row(children: [
         Expanded(child: Text(widget.pageTitle ?? 'Chaty', style: TextStyle(color: theme.primaryTextColor, fontSize: 24 * theme.fontScale, fontWeight: FontWeight.w800, letterSpacing: -0.5))),
         if (homePrefs.showCameraIcon) IconButton(tooltip: 'Camera', color: theme.primaryTextColor, onPressed: () => _openGlobalSearch(theme), icon: const Icon(Icons.camera_alt_outlined)),
+        IconButton(
+          tooltip: 'QR / Scan',
+          color: theme.primaryTextColor,
+          onPressed: () => _openQrScreen(initialIndex: 1),
+          icon: const Icon(Icons.qr_code_scanner_rounded),
+        ),
         IconButton(tooltip: _isSearchOpen ? 'Close search' : 'Search chats', color: theme.primaryTextColor, onPressed: _toggleSearch, icon: Icon(_isSearchOpen ? Icons.close_rounded : Icons.search_rounded)),
         IconButton(tooltip: 'Toggle light / dark', color: theme.primaryTextColor, onPressed: widget.themeController.toggleBrightness, icon: Icon(theme.brightness == Brightness.dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded)),
         PopupMenuButton<String>(
@@ -398,18 +465,10 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               case 'linked':
                 _openLinkedDevices();
                 break;
-              case 'new_chat':
-                Navigator.of(context).push(MaterialPageRoute(builder: (_) => NewChatScreen(theme: theme, dataStore: widget.dataStore, preferencesController: widget.preferencesController)));
-                break;
-              case 'search':
-                _openGlobalSearch(theme);
-                break;
             }
           },
           itemBuilder: (_) => const [
-            PopupMenuItem(value: 'linked', child: ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.devices_rounded), title: Text('Linked devices & QR'))),
-            PopupMenuItem(value: 'new_chat', child: ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.chat_bubble_outline_rounded), title: Text('New chat'))),
-            PopupMenuItem(value: 'search', child: ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.search_rounded), title: Text('Search'))),
+            PopupMenuItem(value: 'linked', child: ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.devices_rounded), title: Text('Linked devices'))),
           ],
         ),
       ]),
@@ -422,27 +481,83 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     final anyUnmuted = selected.any((c) => !c.isMuted);
     final anyUnlocked = _selectedConversationIds.any((id) => !widget.preferencesController.isConversationLocked(id));
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       color: theme.cardColor,
       child: Row(children: [
-        IconButton(tooltip: 'Clear selection', icon: const Icon(Icons.arrow_back_rounded), color: theme.primaryTextColor, onPressed: _clearSelection),
+        IconButton(
+          tooltip: 'Clear selection',
+          icon: const Icon(Icons.arrow_back_rounded),
+          color: theme.primaryTextColor,
+          onPressed: _clearSelection,
+        ),
         Text('${_selectedConversationIds.length}', style: TextStyle(color: theme.primaryTextColor, fontSize: 19, fontWeight: FontWeight.w800)),
         const Spacer(),
-        IconButton(tooltip: anyUnpinned ? 'Pin' : 'Unpin', onPressed: _togglePinSelected, icon: Icon(anyUnpinned ? Icons.push_pin_outlined : Icons.push_pin_rounded)),
-        IconButton(tooltip: 'Delete', onPressed: _deleteSelected, icon: const Icon(Icons.delete_outline_rounded)),
-        IconButton(tooltip: anyUnmuted ? 'Mute' : 'Unmute', onPressed: _toggleMuteSelected, icon: Icon(anyUnmuted ? Icons.volume_off_outlined : Icons.volume_up_outlined)),
-        IconButton(tooltip: 'Archive', onPressed: _toggleArchiveSelected, icon: const Icon(Icons.archive_outlined)),
-        IconButton(tooltip: anyUnlocked ? 'Lock chat' : 'Unlock chat', onPressed: _toggleLockSelected, icon: Icon(anyUnlocked ? Icons.lock_outline_rounded : Icons.lock_open_rounded)),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          tooltip: anyUnpinned ? 'Pin' : 'Unpin',
+          onPressed: _togglePinSelected,
+          icon: Icon(anyUnpinned ? Icons.push_pin_outlined : Icons.push_pin_rounded, color: theme.primaryTextColor),
+        ),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          tooltip: 'Delete',
+          onPressed: _deleteSelected,
+          icon: Icon(Icons.delete_outline_rounded, color: theme.primaryTextColor),
+        ),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          tooltip: anyUnmuted ? 'Mute' : 'Unmute',
+          onPressed: _toggleMuteSelected,
+          icon: Icon(anyUnmuted ? Icons.volume_off_outlined : Icons.volume_up_outlined, color: theme.primaryTextColor),
+        ),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          tooltip: 'Archive',
+          onPressed: _toggleArchiveSelected,
+          icon: Icon(Icons.archive_outlined, color: theme.primaryTextColor),
+        ),
         PopupMenuButton<String>(
+          tooltip: 'More actions',
+          icon: Icon(Icons.more_vert_rounded, color: theme.primaryTextColor),
           onSelected: (value) {
+            if (value == 'lock') _toggleLockSelected();
             if (value == 'unread') _markSelectedReadUnread(markAsUnread: true);
             if (value == 'read') _markSelectedReadUnread(markAsUnread: false);
             if (value == 'all') _selectAll(visible);
           },
-          itemBuilder: (_) => const [
-            PopupMenuItem(value: 'unread', child: Text('Mark as unread')),
-            PopupMenuItem(value: 'read', child: Text('Mark as read')),
-            PopupMenuItem(value: 'all', child: Text('Select all')),
+          itemBuilder: (_) => [
+            PopupMenuItem(
+              value: 'lock',
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(anyUnlocked ? Icons.lock_outline_rounded : Icons.lock_open_rounded),
+                title: Text(anyUnlocked ? 'Lock chat' : 'Unlock chat'),
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'unread',
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.mark_chat_unread_outlined),
+                title: Text('Mark as unread'),
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'read',
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.mark_chat_read_outlined),
+                title: Text('Mark as read'),
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'all',
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.select_all_rounded),
+                title: Text('Select all'),
+              ),
+            ),
           ],
         ),
       ]),
@@ -522,6 +637,11 @@ class _ConversationSection {
   const _ConversationSection(this.label);
 }
 
+class _ArchivedEntry {
+  final int archivedCount;
+  const _ArchivedEntry({required this.archivedCount});
+}
+
 class _SectionLabel extends StatelessWidget {
   final String label;
   final ThemeConfig theme;
@@ -553,6 +673,232 @@ class _EmptyChats extends StatelessWidget {
           FilledButton.icon(onPressed: onSearch, icon: const Icon(Icons.search_rounded), label: const Text('Find people')),
         ]),
       ),
+    );
+  }
+}
+
+class _ArchivedChatsScreen extends StatefulWidget {
+  final MockDataStore dataStore;
+  final ChatyPreferencesController preferencesController;
+  final ThemeController themeController;
+  final ChatyNotificationService notificationService;
+
+  const _ArchivedChatsScreen({
+    required this.dataStore,
+    required this.preferencesController,
+    required this.themeController,
+    required this.notificationService,
+  });
+
+  @override
+  State<_ArchivedChatsScreen> createState() => _ArchivedChatsScreenState();
+}
+
+class _ArchivedChatsScreenState extends State<_ArchivedChatsScreen> {
+  final Set<String> _selectedConversationIds = <String>{};
+
+  void _clearSelection() => setState(() => _selectedConversationIds.clear());
+
+  void _toggleSelection(String id) {
+    setState(() {
+      if (_selectedConversationIds.contains(id)) {
+        _selectedConversationIds.remove(id);
+      } else {
+        _selectedConversationIds.add(id);
+      }
+    });
+  }
+
+  void _unarchiveSelected() {
+    for (final id in List<String>.from(_selectedConversationIds)) {
+      widget.dataStore.toggleArchiveConversation(id);
+    }
+    _clearSelection();
+  }
+
+  Future<void> _deleteSelected() async {
+    final count = _selectedConversationIds.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete $count chat${count == 1 ? '' : 's'}?'),
+        content: const Text('This removes the selected conversations for this account.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    for (final id in List<String>.from(_selectedConversationIds)) {
+      widget.dataStore.deleteConversation(id);
+    }
+    _clearSelection();
+  }
+
+  String _formatMessageTime(DateTime value) {
+    final now = DateTime.now();
+    final local = value.toLocal();
+    if (now.year == local.year && now.month == local.month && now.day == local.day) {
+      return '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    }
+    final yesterday = now.subtract(const Duration(days: 1));
+    if (yesterday.year == local.year && yesterday.month == local.month && yesterday.day == local.day) return 'Yesterday';
+    return '${local.day}/${local.month}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: widget.dataStore,
+      builder: (context, _) {
+        final theme = widget.themeController.globalTheme;
+        final archived = widget.dataStore.conversations.where((c) => c.isArchived).toList(growable: false);
+        final isSelectionMode = _selectedConversationIds.isNotEmpty;
+
+        return Scaffold(
+          backgroundColor: theme.backgroundColor,
+          appBar: isSelectionMode
+              ? AppBar(
+                  backgroundColor: theme.cardColor,
+                  foregroundColor: theme.primaryTextColor,
+                  leading: IconButton(
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    onPressed: _clearSelection,
+                  ),
+                  title: Text('${_selectedConversationIds.length}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                  actions: [
+                    IconButton(
+                      tooltip: 'Unarchive',
+                      icon: const Icon(Icons.unarchive_outlined),
+                      onPressed: _unarchiveSelected,
+                    ),
+                    IconButton(
+                      tooltip: 'Delete',
+                      icon: const Icon(Icons.delete_outline_rounded),
+                      onPressed: _deleteSelected,
+                    ),
+                  ],
+                )
+              : AppBar(
+                  backgroundColor: theme.surfaceColor,
+                  foregroundColor: theme.primaryTextColor,
+                  title: const Text('Archived'),
+                ),
+          body: archived.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.archive_outlined, size: 56, color: theme.secondaryTextColor),
+                      const SizedBox(height: 16),
+                      Text('No archived chats', style: TextStyle(color: theme.primaryTextColor, fontSize: 18, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 8),
+                      Text('Chats you archive will appear here', style: TextStyle(color: theme.secondaryTextColor)),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: archived.length,
+                  itemBuilder: (context, index) {
+                    final conversation = archived[index];
+                    final isSelected = _selectedConversationIds.contains(conversation.id);
+
+                    return InkWell(
+                      onTap: () {
+                        if (isSelectionMode) {
+                          _toggleSelection(conversation.id);
+                        } else {
+                          Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => ChatDetailScreen(
+                              conversationId: conversation.id,
+                              theme: theme,
+                              dataStore: widget.dataStore,
+                              preferencesController: widget.preferencesController,
+                              themeController: widget.themeController,
+                            ),
+                          ));
+                        }
+                      },
+                      onLongPress: () {
+                        HapticFeedback.mediumImpact();
+                        _toggleSelection(conversation.id);
+                      },
+                      child: Container(
+                        color: isSelected ? theme.accentColor.withValues(alpha: 0.12) : Colors.transparent,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        child: Row(
+                          children: [
+                            ChatyAvatar(
+                              initials: conversation.avatarInitials ?? conversation.title.characters.take(2).toString().toUpperCase(),
+                              color: conversation.avatarColorHex == null ? theme.accentColor : Color(int.parse(conversation.avatarColorHex!)),
+                              size: 48,
+                              shape: 'circle',
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          conversation.title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: theme.primaryTextColor,
+                                            fontSize: 15 * theme.fontScale,
+                                            fontWeight: conversation.unreadCount > 0 ? FontWeight.w800 : FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      Text(
+                                        _formatMessageTime(conversation.lastMessageTime),
+                                        style: TextStyle(
+                                          color: conversation.unreadCount > 0 ? theme.accentColor : theme.secondaryTextColor,
+                                          fontSize: 11.5,
+                                          fontWeight: conversation.unreadCount > 0 ? FontWeight.w700 : FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          conversation.lastMessageText.isEmpty ? 'No messages' : conversation.lastMessageText,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: conversation.unreadCount > 0 ? theme.primaryTextColor : theme.secondaryTextColor,
+                                            fontSize: 12.5 * theme.fontScale,
+                                          ),
+                                        ),
+                                      ),
+                                      if (conversation.unreadCount > 0)
+                                        Container(
+                                          margin: const EdgeInsets.only(left: 6),
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(color: theme.accentColor, borderRadius: BorderRadius.circular(10)),
+                                          child: Text('${conversation.unreadCount}', style: TextStyle(color: theme.onAccentColor, fontSize: 10.5, fontWeight: FontWeight.w800)),
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        );
+      },
     );
   }
 }

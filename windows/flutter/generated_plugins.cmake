@@ -4,8 +4,10 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   app_links
+  emoji_picker_flutter
   flutter_secure_storage_windows
   geolocator_windows
+  local_auth_windows
   permission_handler_windows
   record_windows
   share_plus
