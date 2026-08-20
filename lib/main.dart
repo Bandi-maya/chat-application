@@ -10,6 +10,7 @@ import 'package:chat/data/services/chaty_notification_service.dart';
 import 'package:chat/data/services/contact_relationship_service.dart';
 import 'package:chat/data/services/local_lock_service.dart';
 import 'package:chat/data/services/message_automation_service.dart';
+import 'package:chat/data/services/rich_chat_realtime_service.dart';
 import 'package:chat/domain/models/user_profile.dart';
 import 'package:chat/features/auth/create_new_password_screen.dart';
 import 'package:chat/features/auth/splash_screen.dart';
@@ -64,6 +65,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   late final LocalLockService _lockService;
   late final ChatyNotificationService _notificationService;
   late final ContactRelationshipService _relationshipService;
+  late final RichChatRealtimeService _richRealtime;
   late final MessageAutomationService _automationService;
   late final StreamSubscription<AuthState> _authUiSubscription;
   bool _recoveryRouteOpen = false;
@@ -82,15 +84,14 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     _lockService = locator<LocalLockService>();
     _notificationService = locator<ChatyNotificationService>();
     _relationshipService = locator<ContactRelationshipService>();
+    _richRealtime = locator<RichChatRealtimeService>();
     _preferencesController.addListener(_handleSecurityPreferenceChanged);
     _automationService = MessageAutomationService(
       preferencesController: _preferencesController,
       dataStore: locator<MockDataStore>(),
     );
     _authUiSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(_handleAuthUiEvent);
-    if (Supabase.instance.client.auth.currentSession != null) {
-      unawaited(_registerCurrentDevice());
-    }
+    if (Supabase.instance.client.auth.currentSession != null) unawaited(_registerCurrentDevice());
   }
 
   Future<void> _registerCurrentDevice() async {
@@ -105,9 +106,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     if (_preferencesController.security.isAppLockEnabled) return;
     _initialAppLockScheduled = false;
     _backgroundedAt = null;
-    if (_appLockRequired && mounted) {
-      setState(() => _appLockRequired = false);
-    }
+    if (_appLockRequired && mounted) setState(() => _appLockRequired = false);
   }
 
   void _scheduleInitialAppLockIfNeeded() {
@@ -122,19 +121,12 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
 
   Duration _autoLockDelay(String value) {
     switch (value) {
-      case '15s':
-        return const Duration(seconds: 15);
-      case '30s':
-        return const Duration(seconds: 30);
-      case '1m':
-        return const Duration(minutes: 1);
-      case '5m':
-        return const Duration(minutes: 5);
-      case '15m':
-        return const Duration(minutes: 15);
-      case 'Immediately':
-      default:
-        return Duration.zero;
+      case '15s': return const Duration(seconds: 15);
+      case '30s': return const Duration(seconds: 30);
+      case '1m': return const Duration(minutes: 1);
+      case '5m': return const Duration(minutes: 5);
+      case '15m': return const Duration(minutes: 15);
+      default: return Duration.zero;
     }
   }
 
@@ -146,16 +138,13 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     final backgroundedAt = _backgroundedAt;
     _backgroundedAt = null;
     if (backgroundedAt == null) return;
-    final elapsed = DateTime.now().difference(backgroundedAt);
-    final delay = _autoLockDelay(_preferencesController.security.autoLockTimeout);
-    if (elapsed >= delay && mounted && !_appLockRequired) {
+    if (DateTime.now().difference(backgroundedAt) >= _autoLockDelay(_preferencesController.security.autoLockTimeout) && mounted && !_appLockRequired) {
       setState(() => _appLockRequired = true);
     }
   }
 
   void _handleAppUnlocked() {
-    if (!mounted) return;
-    setState(() => _appLockRequired = false);
+    if (mounted) setState(() => _appLockRequired = false);
   }
 
   void _handleAuthUiEvent(AuthState state) {
@@ -180,10 +169,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
       _backgroundedAt = null;
       if (mounted && _appLockRequired) setState(() => _appLockRequired = false);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _rootNavigatorKey.currentState?.pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const WelcomeScreen()),
-          (route) => false,
-        );
+        _rootNavigatorKey.currentState?.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const WelcomeScreen()), (route) => false);
       });
     }
   }
@@ -200,7 +186,6 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-
     if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden || state == AppLifecycleState.detached) {
       _backgroundedAt ??= DateTime.now();
     } else if (state == AppLifecycleState.resumed) {
@@ -235,7 +220,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge(<Listenable>[_themeController, _preferencesController, _appearanceController, _backend]),
+      listenable: Listenable.merge(<Listenable>[_themeController, _preferencesController, _appearanceController, _backend, _richRealtime]),
       builder: (context, _) {
         _scheduleInitialAppLockIfNeeded();
         final currentTheme = GbThemeOverrides.resolve(_themeController.globalTheme, _preferencesController);
@@ -246,9 +231,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
           theme: currentTheme.toThemeData(),
           builder: (context, child) {
             final media = MediaQuery.of(context);
-            final scaled = media.copyWith(
-              textScaler: TextScaler.linear((media.textScaler.scale(1.0) * _appearanceController.textScale).clamp(0.8, 1.6)),
-            );
+            final scaled = media.copyWith(textScaler: TextScaler.linear((media.textScaler.scale(1.0) * _appearanceController.textScale).clamp(0.8, 1.6)));
             final appContent = MediaQuery(
               data: scaled,
               child: ChatyEventToastOverlay(
@@ -264,9 +247,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
                 ),
               ),
             );
-            final shouldShowLock = _backend.isAuthenticated &&
-                _preferencesController.security.isAppLockEnabled &&
-                _appLockRequired;
+            final shouldShowLock = _backend.isAuthenticated && _preferencesController.security.isAppLockEnabled && _appLockRequired;
             if (!shouldShowLock) return appContent;
             return Stack(
               fit: StackFit.expand,

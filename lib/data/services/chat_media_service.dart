@@ -31,7 +31,7 @@ class ChatMediaService {
 
   Future<List<MessageAttachment>> pickAndUploadMultiple({required String conversationId, required String type}) async {
     final limit = _preferences.gbDouble('Img_share_limit', fallback: 30).clamp(1, 100).round();
-    final picked = await FilePicker.pickFiles(type: _pickerType(type));
+    final picked = await FilePicker.pickFiles(type: _pickerType(type), allowMultiple: true);
     if (picked.isEmpty) return <MessageAttachment>[];
     if (picked.length > limit) throw Exception('You selected ${picked.length} files; your configured send limit is $limit.');
     final result = <MessageAttachment>[];
@@ -78,9 +78,7 @@ class ChatMediaService {
               mimeType = 'image/jpeg';
             }
           }
-        } catch (_) {
-          // Keep original image if the platform encoder cannot process it.
-        }
+        } catch (_) {}
       }
     }
 
