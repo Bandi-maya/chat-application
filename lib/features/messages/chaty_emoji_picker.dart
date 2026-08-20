@@ -24,7 +24,6 @@ class _ChatyEmojiPickerSheet extends StatefulWidget {
 
 class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet> with SingleTickerProviderStateMixin {
   late final TabController _tabController;
-  final TextEditingController _searchController = TextEditingController();
 
   static final List<AnimatedEmojiData> _animated = <AnimatedEmojiData>[
     AnimatedEmojis.thumbsUp,
@@ -37,7 +36,7 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet> with Sin
     AnimatedEmojis.laughing,
     AnimatedEmojis.joy,
     AnimatedEmojis.heartEyes,
-    AnimatedEmojis.partingFace,
+    AnimatedEmojis.partyingFace,
   ];
 
   @override
@@ -49,7 +48,6 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet> with Sin
   @override
   void dispose() {
     _tabController.dispose();
-    _searchController.dispose();
     super.dispose();
   }
 
@@ -170,7 +168,7 @@ AnimatedEmojiData? chatyAnimatedEmojiForUnicode(String value) {
     AnimatedEmojis.laughing,
     AnimatedEmojis.joy,
     AnimatedEmojis.heartEyes,
-    AnimatedEmojis.partingFace,
+    AnimatedEmojis.partyingFace,
   ]) {
     if (emoji.toUnicodeEmoji() == value) return emoji;
   }
