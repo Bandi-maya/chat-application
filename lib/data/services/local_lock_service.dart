@@ -197,7 +197,7 @@ class LocalLockService {
     final values = pattern.split('-').where((value) => value.isNotEmpty).toList(growable: false);
     if (values.length < 4) return false;
     final parsed = values.map(int.tryParse).toList(growable: false);
-    if (parsed.any((value) => value == null || value! < 0 || value > 8)) return false;
+    if (parsed.any((value) => value == null || value < 0 || value > 8)) return false;
     return parsed.toSet().length == parsed.length;
   }
 
