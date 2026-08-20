@@ -88,7 +88,7 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
     final biometric = await _lockService.canUseBiometrics();
     var hasCredential = true;
     if (method == 'PIN' || method == 'Pattern' || method == 'Password') {
-      hasCredential = await _lockService.hasCredential(method) || (_legacySecret(method)?.isNotEmpty ?? false);
+      hasCredential = await _lockService.hasCredential(method);
     }
     if (!mounted) return;
     setState(() {
@@ -96,20 +96,6 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
       _biometricAvailable = biometric;
       _hasConfiguredCredential = hasCredential;
     });
-  }
-
-  String? _legacySecret(String method) {
-    final security = widget.preferencesController.security;
-    switch (method) {
-      case 'PIN':
-        return security.pinCode;
-      case 'Pattern':
-        return security.patternCode;
-      case 'Password':
-        return security.password;
-      default:
-        return null;
-    }
   }
 
   void _completeUnlock() {
@@ -153,11 +139,7 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
       _busy = true;
       _errorMessage = '';
     });
-    final valid = await _lockService.verifyCredential(
-      method,
-      value,
-      legacySecret: _legacySecret(method),
-    );
+    final valid = await _lockService.verifyCredential(method, value);
     if (!mounted) return;
     if (valid) {
       _completeUnlock();
@@ -321,7 +303,7 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                     ],
                     if (!_hasConfiguredCredential && (method == 'PIN' || method == 'Pattern' || method == 'Password')) ...[
                       Text(
-                        'This lock method has not been configured on this device yet.',
+                        'This lock method has not been configured securely on this device yet.',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyMedium,
                       ),
