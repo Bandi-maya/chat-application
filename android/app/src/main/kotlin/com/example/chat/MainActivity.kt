@@ -12,11 +12,14 @@ import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterFragmentActivity() {
+open class MainActivity : FlutterFragmentActivity() {
     private val launcherChannel = "chaty/launcher_icon"
     private val customShortcutId = "chaty-custom-home"
+    private val nativePreferencesName = "chaty_launcher_native"
+    private val launcherPreferenceKey = "selected_launcher"
+    private val customImagePathPreferenceKey = "custom_image_path"
 
-    private val launcherAliases: LinkedHashMap<String, String>
+    private val launcherComponents: LinkedHashMap<String, String>
         get() = linkedMapOf(
             "original" to "$packageName.LauncherOriginal",
             "minimal" to "$packageName.LauncherMinimal",
@@ -33,7 +36,7 @@ class MainActivity : FlutterFragmentActivity() {
                 "getCurrentLauncherIcon" -> result.success(getCurrentLauncherIcon())
                 "setLauncherIcon" -> {
                     val alias = call.argument<String>("alias")
-                    if (alias.isNullOrBlank() || !launcherAliases.containsKey(alias)) {
+                    if (alias.isNullOrBlank() || !launcherComponents.containsKey(alias)) {
                         result.error("invalid_alias", "Unknown launcher icon alias.", null)
                         return@setMethodCallHandler
                     }
@@ -50,6 +53,14 @@ class MainActivity : FlutterFragmentActivity() {
                         result.success("original")
                     } catch (error: Exception) {
                         result.error("launcher_icon_reset_failed", error.message, null)
+                    }
+                }
+                "restartApp" -> {
+                    try {
+                        restartApp()
+                        result.success(null)
+                    } catch (error: Exception) {
+                        result.error("restart_failed", error.message, null)
                     }
                 }
                 "applyCustomHomeShortcut" -> {
@@ -78,20 +89,31 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 
+    private fun nativePreferences() = getSharedPreferences(nativePreferencesName, MODE_PRIVATE)
+
+    private fun componentFor(alias: String): ComponentName {
+        val className = launcherComponents[alias] ?: error("Unknown launcher icon alias: $alias")
+        return ComponentName(this, className)
+    }
+
     private fun getCurrentLauncherIcon(): String? {
-        for ((alias, className) in launcherAliases) {
-            val state = packageManager.getComponentEnabledSetting(ComponentName(this, className))
+        for ((alias, _) in launcherComponents) {
+            val state = packageManager.getComponentEnabledSetting(componentFor(alias))
             val enabled = state == PackageManager.COMPONENT_ENABLED_STATE_ENABLED ||
                 (state == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT && alias == "original")
-            if (enabled) return alias
+            if (enabled) {
+                nativePreferences().edit().putString(launcherPreferenceKey, alias).apply()
+                return alias
+            }
         }
-        return null
+
+        val persisted = nativePreferences().getString(launcherPreferenceKey, null)
+        return persisted?.takeIf(launcherComponents::containsKey)
     }
 
     private fun setComponent(alias: String, state: Int) {
-        val className = launcherAliases[alias] ?: error("Unknown launcher icon alias: $alias")
         packageManager.setComponentEnabledSetting(
-            ComponentName(this, className),
+            componentFor(alias),
             state,
             PackageManager.DONT_KILL_APP,
         )
@@ -99,22 +121,57 @@ class MainActivity : FlutterFragmentActivity() {
 
     private fun setLauncherIcon(alias: String) {
         val previous = getCurrentLauncherIcon() ?: "original"
-        if (previous == alias) return
+        if (previous == alias) {
+            nativePreferences().edit().putString(launcherPreferenceKey, alias).apply()
+            return
+        }
 
         try {
-            setComponent(alias, PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
-            for (candidate in launcherAliases.keys) {
-                if (candidate == alias) continue
-                setComponent(candidate, PackageManager.COMPONENT_ENABLED_STATE_DISABLED)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val changes = launcherComponents.keys.map { candidate ->
+                    PackageManager.ComponentEnabledSetting(
+                        componentFor(candidate),
+                        if (candidate == alias) {
+                            PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                        } else {
+                            PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+                        },
+                        PackageManager.DONT_KILL_APP,
+                    )
+                }
+                packageManager.setComponentEnabledSettings(changes)
+            } else {
+                // Enable the replacement first so older launchers never observe a
+                // moment where Chaty has no launchable component.
+                setComponent(alias, PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
+                for (candidate in launcherComponents.keys) {
+                    if (candidate != alias) {
+                        setComponent(candidate, PackageManager.COMPONENT_ENABLED_STATE_DISABLED)
+                    }
+                }
             }
+            nativePreferences().edit().putString(launcherPreferenceKey, alias).apply()
         } catch (error: Exception) {
             runCatching { setComponent(previous, PackageManager.COMPONENT_ENABLED_STATE_ENABLED) }
-            for (candidate in launcherAliases.keys) {
-                if (candidate == previous) continue
-                runCatching { setComponent(candidate, PackageManager.COMPONENT_ENABLED_STATE_DISABLED) }
+            for (candidate in launcherComponents.keys) {
+                if (candidate != previous) {
+                    runCatching { setComponent(candidate, PackageManager.COMPONENT_ENABLED_STATE_DISABLED) }
+                }
             }
+            nativePreferences().edit().putString(launcherPreferenceKey, previous).apply()
             throw error
         }
+    }
+
+    private fun restartApp() {
+        val selected = getCurrentLauncherIcon() ?: "original"
+        val launchIntent = Intent(Intent.ACTION_MAIN).apply {
+            component = componentFor(selected)
+            addCategory(Intent.CATEGORY_LAUNCHER)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        }
+        startActivity(launchIntent)
+        finishAffinity()
     }
 
     private fun applyCustomHomeShortcut(imagePath: String, label: String): String {
@@ -132,6 +189,8 @@ class MainActivity : FlutterFragmentActivity() {
             .setIntent(launchIntent)
             .build()
 
+        nativePreferences().edit().putString(customImagePathPreferenceKey, imagePath).apply()
+
         val isAlreadyPinned = shortcutManager.pinnedShortcuts.any { it.id == customShortcutId }
         return if (isAlreadyPinned) {
             shortcutManager.updateShortcuts(listOf(shortcut))
@@ -145,6 +204,7 @@ class MainActivity : FlutterFragmentActivity() {
     }
 
     private fun removeCustomHomeShortcut() {
+        nativePreferences().edit().remove(customImagePathPreferenceKey).apply()
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val shortcutManager = getSystemService(ShortcutManager::class.java) ?: return
         shortcutManager.disableShortcuts(
@@ -153,3 +213,14 @@ class MainActivity : FlutterFragmentActivity() {
         )
     }
 }
+
+// These launcher activities intentionally contain no product logic. Keeping the
+// historical component names preserves Android's stored enabled/disabled state
+// across upgrades while allowing every bundled icon to own a matching native
+// launch theme and launch_background drawable.
+class LauncherOriginal : MainActivity()
+class LauncherMinimal : MainActivity()
+class LauncherBubble : MainActivity()
+class LauncherMidnight : MainActivity()
+class LauncherOcean : MainActivity()
+class LauncherViolet : MainActivity()

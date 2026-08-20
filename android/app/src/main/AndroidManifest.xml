@@ -55,83 +55,119 @@
             </intent-filter>
         </activity>
 
-        <activity-alias
+        <activity
             android:name=".LauncherOriginal"
             android:enabled="true"
             android:exported="true"
             android:icon="@drawable/ic_launcher_original"
             android:label="Chaty"
-            android:targetActivity=".MainActivity">
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchThemeOriginal"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-        </activity-alias>
+        </activity>
 
-        <activity-alias
+        <activity
             android:name=".LauncherMinimal"
             android:enabled="false"
             android:exported="true"
             android:icon="@drawable/ic_launcher_minimal"
             android:label="Chaty"
-            android:targetActivity=".MainActivity">
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchThemeMinimal"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-        </activity-alias>
+        </activity>
 
-        <activity-alias
+        <activity
             android:name=".LauncherBubble"
             android:enabled="false"
             android:exported="true"
             android:icon="@drawable/ic_launcher_bubble"
             android:label="Chaty"
-            android:targetActivity=".MainActivity">
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchThemeBubble"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-        </activity-alias>
+        </activity>
 
-        <activity-alias
+        <activity
             android:name=".LauncherMidnight"
             android:enabled="false"
             android:exported="true"
             android:icon="@drawable/ic_launcher_midnight"
             android:label="Chaty"
-            android:targetActivity=".MainActivity">
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchThemeMidnight"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-        </activity-alias>
+        </activity>
 
-        <activity-alias
+        <activity
             android:name=".LauncherOcean"
             android:enabled="false"
             android:exported="true"
             android:icon="@drawable/ic_launcher_ocean"
             android:label="Chaty"
-            android:targetActivity=".MainActivity">
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchThemeOcean"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-        </activity-alias>
+        </activity>
 
-        <activity-alias
+        <activity
             android:name=".LauncherViolet"
             android:enabled="false"
             android:exported="true"
             android:icon="@drawable/ic_launcher_violet"
             android:label="Chaty"
-            android:targetActivity=".MainActivity">
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchThemeViolet"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-        </activity-alias>
+        </activity>
 
         <meta-data
             android:name="flutterEmbedding"

@@ -1,10 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  Keep the pre-Flutter window neutral. Runtime custom images cannot be injected
-  into an APK XML drawable after installation. Chaty's first Flutter frame
-  renders the persisted bundled/custom BrandIcon instead, so startup never
-  flashes an unrelated fixed launcher asset.
--->
+<!-- Default/deep-link fallback. Launcher entry points use icon-specific variants. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@android:color/black" />
+    <item android:drawable="@drawable/ic_launcher_original" android:gravity="center" />
 </layer-list>
