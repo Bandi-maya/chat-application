@@ -8,6 +8,7 @@ class CustomAppIconProcessor {
   const CustomAppIconProcessor._();
 
   static const int outputSize = 512;
+  static const double adaptiveSafeZoneFraction = 0.82;
 
   static Future<File> persistSquarePng(
     Uint8List sourcePng, {
@@ -21,21 +22,49 @@ class CustomAppIconProcessor {
       );
     }
 
-    final codec = await ui.instantiateImageCodec(
-      sourcePng,
-      targetWidth: outputSize,
-      targetHeight: outputSize,
-      allowUpscaling: true,
-    );
-
+    final codec = await ui.instantiateImageCodec(sourcePng);
+    ui.Image? sourceImage;
+    ui.Image? launcherImage;
     try {
       final frame = await codec.getNextFrame();
-      final byteData = await frame.image.toByteData(format: ui.ImageByteFormat.png);
-      frame.image.dispose();
+      sourceImage = frame.image;
 
+      final recorder = ui.PictureRecorder();
+      final canvas = ui.Canvas(recorder);
+      final paint = ui.Paint()
+        ..isAntiAlias = true
+        ..filterQuality = ui.FilterQuality.high;
+
+      final sourceWidth = sourceImage.width.toDouble();
+      final sourceHeight = sourceImage.height.toDouble();
+      final squareSide = sourceWidth < sourceHeight ? sourceWidth : sourceHeight;
+      final sourceRect = ui.Rect.fromLTWH(
+        (sourceWidth - squareSide) / 2,
+        (sourceHeight - squareSide) / 2,
+        squareSide,
+        squareSide,
+      );
+
+      final safeSize = outputSize * adaptiveSafeZoneFraction;
+      final safeOffset = (outputSize - safeSize) / 2;
+      final destinationRect = ui.Rect.fromLTWH(
+        safeOffset,
+        safeOffset,
+        safeSize,
+        safeSize,
+      );
+
+      canvas.drawColor(const ui.Color(0x00000000), ui.BlendMode.src);
+      canvas.drawImageRect(sourceImage, sourceRect, destinationRect, paint);
+
+      final picture = recorder.endRecording();
+      launcherImage = await picture.toImage(outputSize, outputSize);
+      picture.dispose();
+
+      final byteData = await launcherImage.toByteData(format: ui.ImageByteFormat.png);
       final normalized = byteData?.buffer.asUint8List();
       if (normalized == null || normalized.isEmpty) {
-        throw StateError('Unable to encode the processed custom app icon.');
+        throw StateError('Unable to encode the processed adaptive launcher icon.');
       }
 
       final root = await getApplicationSupportDirectory();
@@ -49,7 +78,7 @@ class CustomAppIconProcessor {
       final safeId = (presetId ?? 'custom_${DateTime.now().microsecondsSinceEpoch}')
           .replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
       final target = File(
-        '${directory.path}${Platform.pathSeparator}$safeId.png',
+        '${directory.path}${Platform.pathSeparator}$safeId.launcher.png',
       );
       final temporary = File('${target.path}.tmp');
 
@@ -59,6 +88,8 @@ class CustomAppIconProcessor {
       }
       return await temporary.rename(target.path);
     } finally {
+      launcherImage?.dispose();
+      sourceImage?.dispose();
       codec.dispose();
     }
   }
