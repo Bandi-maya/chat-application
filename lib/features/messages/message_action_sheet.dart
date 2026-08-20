@@ -1,7 +1,9 @@
+import 'package:animated_emoji/animated_emoji.dart';
 import 'package:flutter/material.dart';
+
 import '../../domain/models/chat_message.dart';
 import '../../ui/core/theme/theme_config.dart';
-
+import 'chaty_emoji_picker.dart';
 
 class MessageActionSheet extends StatelessWidget {
   final ChatMessage message;
@@ -33,9 +35,14 @@ class MessageActionSheet extends StatelessWidget {
     required this.onReport,
   });
 
+  Future<void> _openAllReactions(BuildContext context) async {
+    final emoji = await ChatyEmojiPicker.show(context, reactionMode: true);
+    if (emoji != null && emoji.isNotEmpty) onReact(emoji);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final quickEmojis = ['👍', '❤️', '🔥', '🎉', '🛡️', '👀', '🚀', '⚡'];
+    final quickEmojis = <String>['👍', '❤️', '🔥', '🎉', '👀', '🚀'];
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -45,128 +52,109 @@ class MessageActionSheet extends StatelessWidget {
       ),
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Handle bar
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: theme.secondaryTextColor.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.secondaryTextColor.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 14),
-
-            // Quick reactions row
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-              decoration: BoxDecoration(
-                color: theme.cardColor,
-                borderRadius: BorderRadius.circular(30),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: quickEmojis.map((emoji) {
-                  return InkWell(
-                    onTap: () {
-                      Navigator.pop(context);
-                      onReact(emoji);
-                    },
-                    borderRadius: BorderRadius.circular(20),
-                    child: Padding(
-                      padding: const EdgeInsets.all(6.0),
-                      child: Text(emoji, style: const TextStyle(fontSize: 22)),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 8),
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    ...quickEmojis.map((emoji) {
+                      final animated = chatyAnimatedEmojiForUnicode(emoji);
+                      return InkWell(
+                        onTap: () => onReact(emoji),
+                        borderRadius: BorderRadius.circular(24),
+                        child: SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: Center(
+                            child: animated == null
+                                ? Text(emoji, style: const TextStyle(fontSize: 23))
+                                : AnimatedEmoji(animated, size: 31),
+                          ),
+                        ),
+                      );
+                    }),
+                    InkWell(
+                      onTap: () => _openAllReactions(context),
+                      borderRadius: BorderRadius.circular(24),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: theme.surfaceColor,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.add_rounded, color: theme.primaryTextColor, size: 24),
+                      ),
                     ),
-                  );
-                }).toList(),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 14),
-
-            // Action Items
-            _buildActionTile(
-              icon: Icons.reply_rounded,
-              label: 'Reply',
-              theme: theme,
-              onTap: () {
-                Navigator.pop(context);
-                onReply();
-              },
-            ),
-            _buildActionTile(
-              icon: Icons.task_alt_rounded,
-              label: 'Create Task from Message',
-              color: theme.accentColor,
-              theme: theme,
-              onTap: () {
-                Navigator.pop(context);
-                onCreateTask();
-              },
-            ),
-            _buildActionTile(
-              icon: message.isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
-              label: message.isPinned ? 'Unpin Message' : 'Pin Message',
-              theme: theme,
-              onTap: () {
-                Navigator.pop(context);
-                onPin();
-              },
-            ),
-            _buildActionTile(
-              icon: message.isStarred ? Icons.star_border_rounded : Icons.star_rounded,
-              label: message.isStarred ? 'Unstar' : 'Star Message',
-              theme: theme,
-              onTap: () {
-                Navigator.pop(context);
-                onStar();
-              },
-            ),
-            _buildActionTile(
-              icon: Icons.content_copy_rounded,
-              label: 'Copy Text',
-              theme: theme,
-              onTap: () {
-                Navigator.pop(context);
-                onCopy();
-              },
-            ),
-            _buildActionTile(
-              icon: Icons.delete_outline_rounded,
-              label: 'Delete for me',
-              color: theme.dangerColor,
-              theme: theme,
-              onTap: () {
-                Navigator.pop(context);
-                onDeleteForMe();
-              },
-            ),
-            if (isMe && onDeleteForEveryone != null)
+              const SizedBox(height: 14),
+              _buildActionTile(icon: Icons.reply_rounded, label: 'Reply', theme: theme, onTap: onReply),
               _buildActionTile(
-                icon: Icons.delete_forever_rounded,
-                label: 'Delete for everyone',
+                icon: Icons.task_alt_rounded,
+                label: 'Create Task from Message',
+                color: theme.accentColor,
+                theme: theme,
+                onTap: onCreateTask,
+              ),
+              _buildActionTile(
+                icon: message.isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
+                label: message.isPinned ? 'Unpin Message' : 'Pin Message',
+                theme: theme,
+                onTap: onPin,
+              ),
+              _buildActionTile(
+                icon: message.isStarred ? Icons.star_border_rounded : Icons.star_rounded,
+                label: message.isStarred ? 'Unstar' : 'Star Message',
+                theme: theme,
+                onTap: onStar,
+              ),
+              _buildActionTile(icon: Icons.content_copy_rounded, label: 'Copy Text', theme: theme, onTap: onCopy),
+              _buildActionTile(
+                icon: Icons.delete_outline_rounded,
+                label: 'Delete for me',
                 color: theme.dangerColor,
                 theme: theme,
-                onTap: () {
-                  Navigator.pop(context);
-                  onDeleteForEveryone!();
-                },
+                onTap: onDeleteForMe,
               ),
-            _buildActionTile(
-              icon: Icons.report_problem_outlined,
-              label: 'Report Message (consented disclosure)',
-              color: theme.secondaryTextColor,
-              theme: theme,
-              onTap: () {
-                Navigator.pop(context);
-                onReport();
-              },
-            ),
-          ],
+              if (isMe && onDeleteForEveryone != null)
+                _buildActionTile(
+                  icon: Icons.delete_forever_rounded,
+                  label: 'Delete for everyone',
+                  color: theme.dangerColor,
+                  theme: theme,
+                  onTap: onDeleteForEveryone!,
+                ),
+              _buildActionTile(
+                icon: Icons.report_problem_outlined,
+                label: 'Report Message',
+                color: theme.secondaryTextColor,
+                theme: theme,
+                onTap: onReport,
+              ),
+            ],
+          ),
         ),
       ),
     );
