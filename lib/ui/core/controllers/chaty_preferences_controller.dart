@@ -280,6 +280,20 @@ class ChatyPreferencesController extends ChangeNotifier {
 
   void toggleFavorite(String settingKey) { if (_starredFavorites.contains(settingKey)) { _starredFavorites.remove(settingKey); } else { _starredFavorites.add(settingKey); } _persist(); notifyListeners(); }
   bool isFavorite(String settingKey) => _starredFavorites.contains(settingKey);
+  
+  bool isConversationLocked(String conversationId) => _security.lockedConversationIds.contains(conversationId);
+
+  void toggleLockConversation(String conversationId, {bool? lock}) {
+    final list = List<String>.from(_security.lockedConversationIds);
+    final shouldLock = lock ?? !list.contains(conversationId);
+    if (shouldLock) {
+      if (!list.contains(conversationId)) list.add(conversationId);
+    } else {
+      list.remove(conversationId);
+    }
+    updateSecurity(_security.copyWith(lockedConversationIds: list), logTitle: shouldLock ? 'Lock Chat' : 'Unlock Chat');
+  }
+
   void clearPreferenceHistory() { _history.clear(); notifyListeners(); }
 
   void _logHistory(String key, String title, dynamic prevVal, dynamic newVal) {

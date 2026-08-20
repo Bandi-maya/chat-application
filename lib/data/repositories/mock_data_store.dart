@@ -187,6 +187,10 @@ class MockDataStore extends ChangeNotifier {
 
   void markAsRead(String conversationId) => unawaited(_backend.markAsRead(conversationId));
 
+  void markAsUnread(String conversationId) => unawaited(_backend.markAsUnread(conversationId));
+
+  void deleteConversation(String conversationId) => unawaited(_backend.deleteConversation(conversationId));
+
   void togglePinConversation(String conversationId) {
     final conversation = conversations.where((item) => item.id == conversationId).firstOrNull;
     if (conversation != null) _backend.setConversationState(conversationId, 'pinned', !conversation.isPinned);

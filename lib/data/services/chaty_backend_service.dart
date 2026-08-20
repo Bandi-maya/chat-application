@@ -601,6 +601,32 @@ class ChatyBackendService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> markAsUnread(String conversationId) async {
+    final current = _conversationsById[conversationId];
+    if (current != null) {
+      _conversationsById[conversationId] = current.copyWith(unreadCount: current.unreadCount > 0 ? current.unreadCount : 1);
+      notifyListeners();
+    }
+    try {
+      await _client.rpc('mark_conversation_unread', params: <String, dynamic>{'p_conversation_id': conversationId});
+    } catch (_) {}
+  }
+
+  Future<void> deleteConversation(String conversationId) async {
+    _conversationsById.remove(conversationId);
+    _messagesByChatId.remove(conversationId);
+    notifyListeners();
+    try {
+      await _client.rpc('delete_conversation', params: <String, dynamic>{'p_conversation_id': conversationId});
+    } catch (_) {
+      try {
+        await _client.from('conversations').delete().eq('id', conversationId);
+      } catch (_) {}
+    }
+    await _loadConversations();
+    notifyListeners();
+  }
+
   void setConversationState(String conversationId, String field, bool value) {
     unawaited(_setConversationStateAsync(conversationId, field, value));
   }

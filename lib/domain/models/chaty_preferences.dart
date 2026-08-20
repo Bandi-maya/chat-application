@@ -162,6 +162,7 @@ class SecurityPreferences {
   final bool disablePatternVibration;
   final String autoLockTimeout; // 'Immediately', '15s', '30s', '1m', '5m', '15m'
   final bool hideLockNotificationContent;
+  final List<String> lockedConversationIds;
 
   const SecurityPreferences({
     this.isAppLockEnabled = false,
@@ -175,6 +176,7 @@ class SecurityPreferences {
     this.disablePatternVibration = false,
     this.autoLockTimeout = '1m',
     this.hideLockNotificationContent = true,
+    this.lockedConversationIds = const [],
   });
 
   SecurityPreferences copyWith({
@@ -189,6 +191,7 @@ class SecurityPreferences {
     bool? disablePatternVibration,
     String? autoLockTimeout,
     bool? hideLockNotificationContent,
+    List<String>? lockedConversationIds,
   }) {
     return SecurityPreferences(
       isAppLockEnabled: isAppLockEnabled ?? this.isAppLockEnabled,
@@ -202,6 +205,7 @@ class SecurityPreferences {
       disablePatternVibration: disablePatternVibration ?? this.disablePatternVibration,
       autoLockTimeout: autoLockTimeout ?? this.autoLockTimeout,
       hideLockNotificationContent: hideLockNotificationContent ?? this.hideLockNotificationContent,
+      lockedConversationIds: lockedConversationIds ?? this.lockedConversationIds,
     );
   }
 
@@ -217,6 +221,7 @@ class SecurityPreferences {
     'disablePatternVibration': disablePatternVibration,
     'autoLockTimeout': autoLockTimeout,
     'hideLockNotificationContent': hideLockNotificationContent,
+    'lockedConversationIds': lockedConversationIds,
   };
 
   factory SecurityPreferences.fromMap(Map<String, dynamic> map) => SecurityPreferences(
@@ -231,6 +236,7 @@ class SecurityPreferences {
     disablePatternVibration: map['disablePatternVibration'] as bool? ?? false,
     autoLockTimeout: map['autoLockTimeout'] as String? ?? '1m',
     hideLockNotificationContent: map['hideLockNotificationContent'] as bool? ?? true,
+    lockedConversationIds: (map['lockedConversationIds'] as List?)?.map((e) => e.toString()).toList() ?? const [],
   );
 }
 
@@ -256,12 +262,12 @@ class HomePreferences {
   const HomePreferences({
     this.homeStyle = 'Chaty Default',
     this.enableStoriesStrip = false,
-    this.storiesStyle = 'Squircle',
+    this.storiesStyle = 'Circular',
     this.separateChatsAndGroups = false,
     this.myNameOverride = 'Alex Rivera',
     this.disableStatusUnderName = false,
     this.hideHomeProfilePic = false,
-    this.avatarShape = 'squircle',
+    this.avatarShape = 'circle',
     this.ghostMode = false,
     this.airplaneModeSimulator = false,
     this.showSearchBar = true,
@@ -332,12 +338,12 @@ class HomePreferences {
   factory HomePreferences.fromMap(Map<String, dynamic> map) => HomePreferences(
         homeStyle: map['homeStyle'] ?? 'Chaty Default',
         enableStoriesStrip: map['enableStoriesStrip'] ?? true,
-        storiesStyle: map['storiesStyle'] ?? 'Squircle',
+        storiesStyle: map['storiesStyle'] ?? 'Circular',
         separateChatsAndGroups: map['separateChatsAndGroups'] ?? false,
         myNameOverride: map['myNameOverride'] ?? 'Alex Rivera',
         disableStatusUnderName: map['disableStatusUnderName'] ?? false,
         hideHomeProfilePic: map['hideHomeProfilePic'] ?? false,
-        avatarShape: map['avatarShape'] ?? 'squircle',
+        avatarShape: map['avatarShape'] ?? 'circle',
         ghostMode: map['ghostMode'] ?? false,
         airplaneModeSimulator: map['airplaneModeSimulator'] ?? false,
         showSearchBar: map['showSearchBar'] ?? true,
