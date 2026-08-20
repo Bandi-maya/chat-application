@@ -79,7 +79,7 @@ open class MainActivity : FlutterFragmentActivity() {
             }
         }
 
-    protected val launcherManager: LauncherIconManager by lazy {
+    private val launcherManager: LauncherIconManager by lazy {
         LauncherIconManager(this)
     }
 
