@@ -170,7 +170,7 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen> with Sing
           RefreshIndicator(
             onRefresh: _loadDevices,
             child: _loadingDevices
-                ? const ListView(children: [SizedBox(height: 220), Center(child: CircularProgressIndicator())])
+                ? ListView(children: const [SizedBox(height: 220), Center(child: CircularProgressIndicator())])
                 : ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
