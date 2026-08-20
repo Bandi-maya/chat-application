@@ -3,6 +3,7 @@ name: Chaty Android Production
 on:
   push:
     branches:
+      - main
       - production-supabase
   pull_request:
     branches:
