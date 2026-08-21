@@ -6,11 +6,14 @@ import 'package:uuid/uuid.dart';
 
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/chat_task.dart';
+import '../../domain/models/preferences.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/other_models.dart';
 import '../../domain/models/user_profile.dart';
+import '../../injection/locator.dart';
+import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/realtime/realtime_event_bus.dart';
-import '../../ui/core/validators/chaty_validators.dart';
+import '../../ui/core/validators/input_validators.dart';
 
 class AuthSession {
   final String userId;
@@ -46,7 +49,8 @@ class ChatyBackendService extends ChangeNotifier {
   AuthSession? _currentSession;
   final Map<String, UserProfile> _usersById = <String, UserProfile>{};
   final Map<String, Conversation> _conversationsById = <String, Conversation>{};
-  final Map<String, List<ChatMessage>> _messagesByChatId = <String, List<ChatMessage>>{};
+  final Map<String, List<ChatMessage>> _messagesByChatId =
+      <String, List<ChatMessage>>{};
   final List<ChatTask> _tasks = <ChatTask>[];
   final List<CallRecord> _calls = <CallRecord>[];
   final List<UpdateStory> _stories = <UpdateStory>[];
@@ -58,10 +62,12 @@ class ChatyBackendService extends ChangeNotifier {
   bool _isHydrating = false;
 
   bool get isInitialized => _isInitialized;
-  bool get isAuthenticated => _client.auth.currentSession != null && _currentUser != null;
+  bool get isAuthenticated =>
+      _client.auth.currentSession != null && _currentUser != null;
   UserProfile? get currentUser => _currentUser;
   AuthSession? get currentSession => _currentSession;
-  List<UserProfile> get allUsers => List<UserProfile>.unmodifiable(_usersById.values);
+  List<UserProfile> get allUsers =>
+      List<UserProfile>.unmodifiable(_usersById.values);
 
   List<Conversation> get conversations {
     final values = _conversationsById.values.toList();
@@ -75,7 +81,8 @@ class ChatyBackendService extends ChangeNotifier {
   List<ChatTask> get tasks => List<ChatTask>.unmodifiable(_tasks);
   List<CallRecord> get calls => List<CallRecord>.unmodifiable(_calls);
   List<UpdateStory> get stories => List<UpdateStory>.unmodifiable(_stories);
-  List<LinkedDevice> get currentUserDevices => List<LinkedDevice>.unmodifiable(_linkedDevices);
+  List<LinkedDevice> get currentUserDevices =>
+      List<LinkedDevice>.unmodifiable(_linkedDevices);
 
   Future<void> initialize() async {
     if (_isInitialized) return;
@@ -109,12 +116,17 @@ class ChatyBackendService extends ChangeNotifier {
   }
 
   AuthSession _mapSession(Session session) {
-    final expiresSeconds = session.expiresAt ??
-        DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch ~/ 1000;
+    final expiresSeconds =
+        session.expiresAt ??
+        DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch ~/
+            1000;
     return AuthSession(
       userId: session.user.id,
       token: session.accessToken,
-      expiresAt: DateTime.fromMillisecondsSinceEpoch(expiresSeconds * 1000, isUtc: true),
+      expiresAt: DateTime.fromMillisecondsSinceEpoch(
+        expiresSeconds * 1000,
+        isUtc: true,
+      ),
       deviceId: 'device_${session.user.id.substring(0, 8)}',
     );
   }
@@ -139,7 +151,11 @@ class ChatyBackendService extends ChangeNotifier {
     final user = _client.auth.currentUser;
     if (user == null) return;
 
-    final row = await _client.from('profiles').select().eq('id', user.id).single();
+    final row = await _client
+        .from('profiles')
+        .select()
+        .eq('id', user.id)
+        .single();
     final profile = _profileFromRow(
       Map<String, dynamic>.from(row),
       email: user.email ?? '',
@@ -172,7 +188,9 @@ class ChatyBackendService extends ChangeNotifier {
 
       final conversation = Conversation(
         id: id,
-        type: row['kind'] == 'group' ? ConversationType.group : ConversationType.direct,
+        type: row['kind'] == 'group'
+            ? ConversationType.group
+            : ConversationType.direct,
         title: row['title']?.toString() ?? 'Conversation',
         participantIds: participantIds,
         adminIds: adminIds,
@@ -227,11 +245,12 @@ class ChatyBackendService extends ChangeNotifier {
       },
     );
     final rows = _asRows(raw);
-    final messages = rows
-        .where((row) => row['is_hidden'] != true)
-        .map(_messageFromRow)
-        .toList()
-      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    final messages =
+        rows
+            .where((row) => row['is_hidden'] != true)
+            .map(_messageFromRow)
+            .toList()
+          ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
     _messagesByChatId[conversationId] = messages;
   }
 
@@ -300,7 +319,9 @@ class ChatyBackendService extends ChangeNotifier {
     _reconcileTimer = Timer(const Duration(milliseconds: 120), () async {
       try {
         await _hydrateAuthenticatedState();
-        eventBus.publish(RealtimeEvent(type: RealtimeEventType.conversationUpdated));
+        eventBus.publish(
+          RealtimeEvent(type: RealtimeEventType.conversationUpdated),
+        );
       } catch (error, stackTrace) {
         debugPrint('Chaty realtime reconciliation failed: $error\n$stackTrace');
       }
@@ -330,7 +351,8 @@ class ChatyBackendService extends ChangeNotifier {
     if (usernameError != null) throw Exception(usernameError);
     final passwordError = ChatyValidators.validatePassword(password);
     if (passwordError != null) throw Exception(passwordError);
-    if (displayName.trim().length < 2) throw Exception('Display name is required.');
+    if (displayName.trim().length < 2)
+      throw Exception('Display name is required.');
     if (email.trim().isEmpty || !email.contains('@')) {
       throw Exception('A valid email is required for account verification.');
     }
@@ -384,7 +406,9 @@ class ChatyBackendService extends ChangeNotifier {
   }) async {
     final value = identifier.trim();
     if (!value.contains('@')) {
-      throw Exception('Sign in with your registered email address. Username discovery remains available after login.');
+      throw Exception(
+        'Sign in with your registered email address. Username discovery remains available after login.',
+      );
     }
     final response = await _client.auth.signInWithPassword(
       email: value.toLowerCase(),
@@ -404,7 +428,9 @@ class ChatyBackendService extends ChangeNotifier {
     String email = '',
     String displayName = '',
   }) async {
-    throw Exception('$provider sign-in is not configured on the Chaty Supabase project yet. Use email/password sign-in.');
+    throw Exception(
+      '$provider sign-in is not configured on the Chaty Supabase project yet. Use email/password sign-in.',
+    );
   }
 
   Future<void> resetPassword(String email) async {
@@ -419,7 +445,9 @@ class ChatyBackendService extends ChangeNotifier {
     if (error != null) return false;
     final raw = await _client.rpc(
       'is_username_available',
-      params: <String, dynamic>{'p_username': ChatyValidators.normalizeUsername(username)},
+      params: <String, dynamic>{
+        'p_username': ChatyValidators.normalizeUsername(username),
+      },
     );
     return raw == true;
   }
@@ -436,10 +464,16 @@ class ChatyBackendService extends ChangeNotifier {
     }).toList();
   }
 
-  Future<List<UserProfile>> searchUsersRemote(String query, {bool includeSelf = false}) async {
+  Future<List<UserProfile>> searchUsersRemote(
+    String query, {
+    bool includeSelf = false,
+  }) async {
     final trimmed = query.trim();
     if (trimmed.length < 2) return <UserProfile>[];
-    final raw = await _client.rpc('search_profiles', params: <String, dynamic>{'p_query': trimmed});
+    final raw = await _client.rpc(
+      'search_profiles',
+      params: <String, dynamic>{'p_query': trimmed},
+    );
     final results = _asRows(raw).map(_profileFromRow).toList();
     for (final profile in results) {
       _usersById[profile.id] = profile;
@@ -449,7 +483,9 @@ class ChatyBackendService extends ChangeNotifier {
     return results;
   }
 
-  Future<Conversation> getOrCreateDirectConversationAsync(UserProfile otherUser) async {
+  Future<Conversation> getOrCreateDirectConversationAsync(
+    UserProfile otherUser,
+  ) async {
     if (_currentUser == null) throw Exception('Authentication required.');
     final raw = await _client.rpc(
       'create_direct_conversation',
@@ -475,7 +511,9 @@ class ChatyBackendService extends ChangeNotifier {
         }
       }
     }
-    throw StateError('Conversation is not loaded. Use getOrCreateDirectConversationAsync().');
+    throw StateError(
+      'Conversation is not loaded. Use getOrCreateDirectConversationAsync().',
+    );
   }
 
   Future<Conversation> createGroup({
@@ -499,7 +537,9 @@ class ChatyBackendService extends ChangeNotifier {
   }
 
   List<ChatMessage> getMessages(String conversationId) =>
-      List<ChatMessage>.unmodifiable(_messagesByChatId[conversationId] ?? const <ChatMessage>[]);
+      List<ChatMessage>.unmodifiable(
+        _messagesByChatId[conversationId] ?? const <ChatMessage>[],
+      );
 
   Future<ChatMessage> sendMessage({
     required String conversationId,
@@ -510,17 +550,23 @@ class ChatyBackendService extends ChangeNotifier {
     String? replyToPreviewText,
     String? replyToSenderName,
     String? linkedTaskId,
+    Map<String, dynamic>? extraMetadata,
   }) async {
     final me = _currentUser;
     if (me == null) throw Exception('Authentication required.');
-    if (!_conversationsById.containsKey(conversationId)) throw Exception('Conversation not found.');
+    if (!_conversationsById.containsKey(conversationId))
+      throw Exception('Conversation not found.');
 
     final clientMessageId = _uuid.v4();
     final metadata = <String, dynamic>{
       if (replyToMessageId != null) 'reply_to_message_id': replyToMessageId,
-      if (replyToPreviewText != null) 'reply_to_preview_text': replyToPreviewText,
+      if (replyToPreviewText != null)
+        'reply_to_preview_text': replyToPreviewText,
       if (replyToSenderName != null) 'reply_to_sender_name': replyToSenderName,
       if (linkedTaskId != null) 'linked_task_id': linkedTaskId,
+      // Arbitrary caller extras (view_once / forwarded flags) persist to the
+      // server metadata JSON so recipients observe them via realtime sync.
+      ...?extraMetadata,
       if (attachment != null)
         'attachment': <String, dynamic>{
           'id': attachment.id,
@@ -543,7 +589,10 @@ class ChatyBackendService extends ChangeNotifier {
       },
     );
     final messageId = raw?.toString() ?? '';
-    await Future.wait<void>(<Future<void>>[_loadMessages(conversationId), _loadConversations()]);
+    await Future.wait<void>(<Future<void>>[
+      _loadMessages(conversationId),
+      _loadConversations(),
+    ]);
     notifyListeners();
 
     final result = _messagesByChatId[conversationId]!.firstWhere(
@@ -559,12 +608,14 @@ class ChatyBackendService extends ChangeNotifier {
         deliveryState: DeliveryState.sent,
       ),
     );
-    eventBus.publish(RealtimeEvent(
-      type: RealtimeEventType.messageCreated,
-      conversationId: conversationId,
-      userId: me.id,
-      payload: <String, dynamic>{'messageId': result.id},
-    ));
+    eventBus.publish(
+      RealtimeEvent(
+        type: RealtimeEventType.messageCreated,
+        conversationId: conversationId,
+        userId: me.id,
+        payload: <String, dynamic>{'messageId': result.id},
+      ),
+    );
     return result;
   }
 
@@ -572,43 +623,102 @@ class ChatyBackendService extends ChangeNotifier {
     unawaited(_toggleReactionAsync(conversationId, messageId, emoji));
   }
 
-  Future<void> _toggleReactionAsync(String conversationId, String messageId, String emoji) async {
-    await _client.rpc('toggle_message_reaction', params: <String, dynamic>{
-      'p_message_id': messageId,
-      'p_emoji': emoji,
-    });
+  Future<void> _toggleReactionAsync(
+    String conversationId,
+    String messageId,
+    String emoji,
+  ) async {
+    await _client.rpc(
+      'toggle_message_reaction',
+      params: <String, dynamic>{'p_message_id': messageId, 'p_emoji': emoji},
+    );
     await _loadMessages(conversationId);
     notifyListeners();
   }
 
-  void deleteMessage(String conversationId, String messageId, {bool forEveryone = false}) {
+  void deleteMessage(
+    String conversationId,
+    String messageId, {
+    bool forEveryone = false,
+  }) {
     unawaited(_deleteMessageAsync(conversationId, messageId, forEveryone));
   }
 
-  Future<void> _deleteMessageAsync(String conversationId, String messageId, bool forEveryone) async {
-    await _client.rpc('delete_chat_message', params: <String, dynamic>{
-      'p_message_id': messageId,
-      'p_for_everyone': forEveryone,
-    });
-    await Future.wait<void>(<Future<void>>[_loadMessages(conversationId), _loadConversations()]);
+  Future<void> _deleteMessageAsync(
+    String conversationId,
+    String messageId,
+    bool forEveryone,
+  ) async {
+    await _client.rpc(
+      'delete_chat_message',
+      params: <String, dynamic>{
+        'p_message_id': messageId,
+        'p_for_everyone': forEveryone,
+      },
+    );
+    await Future.wait<void>(<Future<void>>[
+      _loadMessages(conversationId),
+      _loadConversations(),
+    ]);
     notifyListeners();
   }
 
   Future<void> markAsRead(String conversationId) async {
-    await _client.rpc('mark_conversation_read', params: <String, dynamic>{'p_conversation_id': conversationId});
-    await _loadConversations();
-    if (_messagesByChatId.containsKey(conversationId)) await _loadMessages(conversationId);
+    if (_shouldSendReadReceipts(conversationId)) {
+      await _client.rpc(
+        'mark_conversation_read',
+        params: <String, dynamic>{'p_conversation_id': conversationId},
+      );
+      await _loadConversations();
+      if (_messagesByChatId.containsKey(conversationId))
+        await _loadMessages(conversationId);
+    } else {
+      // Read receipts suppressed (privacy toggle off, ghost mode, or blue-ticks-
+      // after-reply not yet satisfied). Clear the local unread badge without
+      // broadcasting a read receipt to the sender.
+      final current = _conversationsById[conversationId];
+      if (current != null && current.unreadCount != 0) {
+        _conversationsById[conversationId] = current.copyWith(unreadCount: 0);
+      }
+    }
     notifyListeners();
+  }
+
+  /// Whether opening [conversationId] should broadcast a read receipt to the
+  /// sender. Honors the Read Receipts privacy toggle, Ghost Mode, and the
+  /// "send blue ticks only after I reply" option. Defaults to sending when the
+  /// preferences controller is not yet registered (fail-open to legacy behavior).
+  bool _shouldSendReadReceipts(String conversationId) {
+    if (!locator.isRegistered<ChatyPreferencesController>()) return true;
+    final prefs = locator<ChatyPreferencesController>();
+    if (prefs.home.ghostMode || prefs.gbBool('yo_want_ghostmode')) return false;
+    if (!prefs.privacy.readReceipts) return false;
+    if (prefs.privacy.showBlueTicksAfterReply) {
+      final myId = _client.auth.currentUser?.id;
+      final msgs = _messagesByChatId[conversationId];
+      if (myId != null &&
+          msgs != null &&
+          msgs.isNotEmpty &&
+          !msgs.any((m) => m.senderId == myId)) {
+        return false; // no outgoing message in this thread yet
+      }
+    }
+    return true;
   }
 
   Future<void> markAsUnread(String conversationId) async {
     final current = _conversationsById[conversationId];
     if (current != null) {
-      _conversationsById[conversationId] = current.copyWith(unreadCount: current.unreadCount > 0 ? current.unreadCount : 1);
+      _conversationsById[conversationId] = current.copyWith(
+        unreadCount: current.unreadCount > 0 ? current.unreadCount : 1,
+      );
       notifyListeners();
     }
     try {
-      await _client.rpc('mark_conversation_unread', params: <String, dynamic>{'p_conversation_id': conversationId});
+      await _client.rpc(
+        'mark_conversation_unread',
+        params: <String, dynamic>{'p_conversation_id': conversationId},
+      );
     } catch (_) {}
   }
 
@@ -617,7 +727,10 @@ class ChatyBackendService extends ChangeNotifier {
     _messagesByChatId.remove(conversationId);
     notifyListeners();
     try {
-      await _client.rpc('delete_conversation', params: <String, dynamic>{'p_conversation_id': conversationId});
+      await _client.rpc(
+        'delete_conversation',
+        params: <String, dynamic>{'p_conversation_id': conversationId},
+      );
     } catch (_) {
       try {
         await _client.from('conversations').delete().eq('id', conversationId);
@@ -631,26 +744,46 @@ class ChatyBackendService extends ChangeNotifier {
     unawaited(_setConversationStateAsync(conversationId, field, value));
   }
 
-  Future<void> _setConversationStateAsync(String conversationId, String field, bool value) async {
-    await _client.rpc('set_conversation_state', params: <String, dynamic>{
-      'p_conversation_id': conversationId,
-      'p_field': field,
-      'p_value': value,
-    });
+  Future<void> _setConversationStateAsync(
+    String conversationId,
+    String field,
+    bool value,
+  ) async {
+    await _client.rpc(
+      'set_conversation_state',
+      params: <String, dynamic>{
+        'p_conversation_id': conversationId,
+        'p_field': field,
+        'p_value': value,
+      },
+    );
     await _loadConversations();
     notifyListeners();
   }
 
-  void setMessageState(String conversationId, String messageId, String field, bool value) {
+  void setMessageState(
+    String conversationId,
+    String messageId,
+    String field,
+    bool value,
+  ) {
     unawaited(_setMessageStateAsync(conversationId, messageId, field, value));
   }
 
-  Future<void> _setMessageStateAsync(String conversationId, String messageId, String field, bool value) async {
-    await _client.rpc('set_message_user_state', params: <String, dynamic>{
-      'p_message_id': messageId,
-      'p_field': field,
-      'p_value': value,
-    });
+  Future<void> _setMessageStateAsync(
+    String conversationId,
+    String messageId,
+    String field,
+    bool value,
+  ) async {
+    await _client.rpc(
+      'set_message_user_state',
+      params: <String, dynamic>{
+        'p_message_id': messageId,
+        'p_field': field,
+        'p_value': value,
+      },
+    );
     await _loadMessages(conversationId);
     notifyListeners();
   }
@@ -661,10 +794,15 @@ class ChatyBackendService extends ChangeNotifier {
       _conversationsById[conversationId] = current.copyWith(draftText: draft);
       notifyListeners();
     }
-    unawaited(_client.rpc('set_conversation_draft', params: <String, dynamic>{
-      'p_conversation_id': conversationId,
-      'p_draft': draft,
-    }));
+    unawaited(
+      _client.rpc(
+        'set_conversation_draft',
+        params: <String, dynamic>{
+          'p_conversation_id': conversationId,
+          'p_draft': draft,
+        },
+      ),
+    );
   }
 
   Future<ChatTask> createTask({
@@ -678,22 +816,26 @@ class ChatyBackendService extends ChangeNotifier {
     List<String> labels = const <String>[],
   }) async {
     final clientTaskId = _uuid.v4();
-    final raw = await _client.rpc('create_chat_task', params: <String, dynamic>{
-      'p_conversation_id': sourceConversationId,
-      'p_client_task_id': clientTaskId,
-      'p_title': title.trim(),
-      'p_assignee_ids': assigneeIds,
-      'p_priority': _taskPriorityToDatabase(priority),
-      'p_due_at': dueAt.toUtc().toIso8601String(),
-      'p_description': description.trim(),
-      'p_labels': labels,
-      'p_source_message_id': sourceMessageId,
-    });
+    final raw = await _client.rpc(
+      'create_chat_task',
+      params: <String, dynamic>{
+        'p_conversation_id': sourceConversationId,
+        'p_client_task_id': clientTaskId,
+        'p_title': title.trim(),
+        'p_assignee_ids': assigneeIds,
+        'p_priority': _taskPriorityToDatabase(priority),
+        'p_due_at': dueAt.toUtc().toIso8601String(),
+        'p_description': description.trim(),
+        'p_labels': labels,
+        'p_source_message_id': sourceMessageId,
+      },
+    );
     final id = raw?.toString() ?? '';
     await Future.wait<void>(<Future<void>>[
       _loadTasks(),
       _loadConversations(),
-      if (_messagesByChatId.containsKey(sourceConversationId)) _loadMessages(sourceConversationId),
+      if (_messagesByChatId.containsKey(sourceConversationId))
+        _loadMessages(sourceConversationId),
     ]);
     notifyListeners();
     return _tasks.firstWhere((task) => task.id == id);
@@ -704,10 +846,13 @@ class ChatyBackendService extends ChangeNotifier {
   }
 
   Future<void> _updateTaskStatusAsync(String taskId, TaskStatus status) async {
-    await _client.rpc('update_task_status', params: <String, dynamic>{
-      'p_task_id': taskId,
-      'p_status': _taskStatusToDatabase(status),
-    });
+    await _client.rpc(
+      'update_task_status',
+      params: <String, dynamic>{
+        'p_task_id': taskId,
+        'p_status': _taskStatusToDatabase(status),
+      },
+    );
     await _loadTasks();
     await _refreshLoadedMessageTimelines();
     notifyListeners();
@@ -718,16 +863,19 @@ class ChatyBackendService extends ChangeNotifier {
     if (authUser == null || authUser.id != updated.id) {
       throw Exception('You can only update the signed-in profile.');
     }
-    await _client.from('profiles').update(<String, dynamic>{
-      'username': ChatyValidators.normalizeUsername(updated.username),
-      'display_name': updated.displayName.trim(),
-      'about': updated.about.trim(),
-      'phone': updated.phone.trim(),
-      'avatar_initials': updated.avatarInitials,
-      'avatar_color_hex': updated.avatarColorHex,
-      'presence': _presenceToDatabase(updated.presence),
-      'last_seen_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', authUser.id);
+    await _client
+        .from('profiles')
+        .update(<String, dynamic>{
+          'username': ChatyValidators.normalizeUsername(updated.username),
+          'display_name': updated.displayName.trim(),
+          'about': updated.about.trim(),
+          'phone': updated.phone.trim(),
+          'avatar_initials': updated.avatarInitials,
+          'avatar_color_hex': updated.avatarColorHex,
+          'presence': _presenceToDatabase(updated.presence),
+          'last_seen_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', authUser.id);
     await _loadCurrentProfile();
     notifyListeners();
   }
@@ -735,14 +883,50 @@ class ChatyBackendService extends ChangeNotifier {
   Future<void> setPresence(PresenceState presence) async {
     final authUser = _client.auth.currentUser;
     if (authUser == null) return;
-    await _client.from('profiles').update(<String, dynamic>{
-      'presence': _presenceToDatabase(presence),
-      'last_seen_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', authUser.id);
+    final privacy = _currentPrivacy();
+    final update = <String, dynamic>{
+      'presence': _presenceToDatabase(
+        _effectivePublishedPresence(presence, privacy),
+      ),
+    };
+    // "Freeze Last Seen" means the timestamp contacts read must stop moving, so
+    // we only advance last_seen_at when the user has NOT frozen it.
+    if (privacy == null || !privacy.freezeLastSeen) {
+      update['last_seen_at'] = DateTime.now().toUtc().toIso8601String();
+    }
+    await _client.from('profiles').update(update).eq('id', authUser.id);
+  }
+
+  /// Current privacy preferences, or null when the controller is not yet
+  /// registered (fail-open to legacy behavior during early startup).
+  PrivacyPreferences? _currentPrivacy() {
+    if (!locator.isRegistered<ChatyPreferencesController>()) return null;
+    return locator<ChatyPreferencesController>().privacy;
+  }
+
+  /// When the user hides their online status from everyone (last-seen audience
+  /// "Nobody" with online mirroring it), we must not broadcast an "online"
+  /// presence at all — downgrade it to offline before publishing.
+  PresenceState _effectivePublishedPresence(
+    PresenceState presence,
+    PrivacyPreferences? privacy,
+  ) {
+    if (privacy == null) return presence;
+    final onlineHiddenFromAll =
+        privacy.hideLastSeenAudience == 'Nobody' &&
+        privacy.hideOnlineAudience == 'Same as Last Seen';
+    if (onlineHiddenFromAll &&
+        (presence == PresenceState.online ||
+            presence == PresenceState.typing)) {
+      return PresenceState.offline;
+    }
+    return presence;
   }
 
   void addStory(String content) {
-    throw UnsupportedError('Status publishing requires the production media/status service.');
+    throw UnsupportedError(
+      'Status publishing requires the production media/status service.',
+    );
   }
 
   void markStoryViewed(String storyId) {}
@@ -755,7 +939,9 @@ class ChatyBackendService extends ChangeNotifier {
   }) {}
 
   void revokeLinkedDevice(String deviceId) {
-    _linkedDevices.removeWhere((device) => device.id == deviceId && !device.isCurrentDevice);
+    _linkedDevices.removeWhere(
+      (device) => device.id == deviceId && !device.isCurrentDevice,
+    );
     notifyListeners();
   }
 
@@ -771,7 +957,11 @@ class ChatyBackendService extends ChangeNotifier {
     await logout();
   }
 
-  UserProfile _profileFromRow(Map<String, dynamic> row, {String email = '', String phone = ''}) {
+  UserProfile _profileFromRow(
+    Map<String, dynamic> row, {
+    String email = '',
+    String phone = '',
+  }) {
     return UserProfile(
       id: row['id']?.toString() ?? '',
       displayName: row['display_name']?.toString() ?? 'Chaty User',
@@ -796,10 +986,12 @@ class ChatyBackendService extends ChangeNotifier {
     if (rawReactions is List) {
       for (final raw in rawReactions) {
         final item = _stringDynamicMap(raw);
-        reactions.add(MessageReaction(
-          emoji: item['emoji']?.toString() ?? '',
-          userIds: _stringList(item['user_ids']),
-        ));
+        reactions.add(
+          MessageReaction(
+            emoji: item['emoji']?.toString() ?? '',
+            userIds: _stringList(item['user_ids']),
+          ),
+        );
       }
     }
 
@@ -813,7 +1005,9 @@ class ChatyBackendService extends ChangeNotifier {
       conversationId: row['conversation_id']?.toString() ?? '',
       senderId: senderId,
       type: _messageTypeFromDatabase(row['type']?.toString()),
-      text: deletedAt == null ? (row['body']?.toString() ?? '') : 'This message was deleted',
+      text: deletedAt == null
+          ? (row['body']?.toString() ?? '')
+          : 'This message was deleted',
       attachment: attachmentJson.isEmpty
           ? null
           : MessageAttachment(
@@ -827,11 +1021,15 @@ class ChatyBackendService extends ChangeNotifier {
       replyToMessageId: metadata['reply_to_message_id']?.toString(),
       replyToPreviewText: metadata['reply_to_preview_text']?.toString(),
       replyToSenderName: metadata['reply_to_sender_name']?.toString(),
-      linkedTaskId: metadata['task_id']?.toString() ?? metadata['linked_task_id']?.toString(),
+      linkedTaskId:
+          metadata['task_id']?.toString() ??
+          metadata['linked_task_id']?.toString(),
       reactions: reactions,
       createdAt: _date(row['created_at']) ?? DateTime.now(),
       editedAt: _date(row['edited_at']),
-      deliveryState: isMine ? (isReadByOther ? DeliveryState.read : DeliveryState.sent) : DeliveryState.delivered,
+      deliveryState: isMine
+          ? (isReadByOther ? DeliveryState.read : DeliveryState.sent)
+          : DeliveryState.delivered,
       isPinned: row['is_pinned'] == true,
       isStarred: row['is_starred'] == true,
       isDeletedForEveryone: deletedAt != null,
@@ -860,7 +1058,10 @@ class ChatyBackendService extends ChangeNotifier {
 
   static List<Map<String, dynamic>> _asRows(dynamic value) {
     if (value is! List) return <Map<String, dynamic>>[];
-    return value.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+    return value
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
   }
 
   static Map<String, dynamic> _stringDynamicMap(dynamic value) {
@@ -885,93 +1086,144 @@ class ChatyBackendService extends ChangeNotifier {
   }
 
   static String _initials(String name) {
-    final words = name.trim().split(RegExp(r'\s+')).where((word) => word.isNotEmpty).toList();
+    final words = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((word) => word.isNotEmpty)
+        .toList();
     if (words.isEmpty) return 'CU';
-    if (words.length == 1) return words.first.substring(0, words.first.length >= 2 ? 2 : 1).toUpperCase();
+    if (words.length == 1)
+      return words.first
+          .substring(0, words.first.length >= 2 ? 2 : 1)
+          .toUpperCase();
     return '${words.first[0]}${words.last[0]}'.toUpperCase();
   }
 
   static PresenceState _presenceFromDatabase(String? value) {
     switch (value) {
-      case 'online': return PresenceState.online;
-      case 'away': return PresenceState.away;
-      case 'typing': return PresenceState.typing;
-      default: return PresenceState.offline;
+      case 'online':
+        return PresenceState.online;
+      case 'away':
+        return PresenceState.away;
+      case 'typing':
+        return PresenceState.typing;
+      default:
+        return PresenceState.offline;
     }
   }
 
   static String _presenceToDatabase(PresenceState value) {
     switch (value) {
-      case PresenceState.online: return 'online';
-      case PresenceState.away: return 'away';
-      case PresenceState.typing: return 'typing';
-      case PresenceState.offline: return 'offline';
+      case PresenceState.online:
+        return 'online';
+      case PresenceState.away:
+        return 'away';
+      case PresenceState.typing:
+        return 'typing';
+      case PresenceState.offline:
+        return 'offline';
     }
   }
 
   static MessageType _messageTypeFromDatabase(String? value) {
     switch (value) {
-      case 'image': return MessageType.image;
-      case 'video': return MessageType.video;
-      case 'audio': return MessageType.audio;
-      case 'document': return MessageType.document;
-      case 'location': return MessageType.location;
-      case 'contact': return MessageType.contact;
-      case 'task': return MessageType.taskCard;
-      case 'system': return MessageType.system;
-      default: return MessageType.text;
+      case 'image':
+        return MessageType.image;
+      case 'video':
+        return MessageType.video;
+      case 'audio':
+        return MessageType.audio;
+      case 'document':
+        return MessageType.document;
+      case 'location':
+        return MessageType.location;
+      case 'contact':
+        return MessageType.contact;
+      case 'task':
+        return MessageType.taskCard;
+      case 'system':
+        return MessageType.system;
+      default:
+        return MessageType.text;
     }
   }
 
   static String _messageTypeToDatabase(MessageType value) {
     switch (value) {
-      case MessageType.image: return 'image';
-      case MessageType.video: return 'video';
-      case MessageType.audio: return 'audio';
-      case MessageType.document: return 'document';
-      case MessageType.location: return 'location';
-      case MessageType.contact: return 'contact';
-      case MessageType.taskCard: return 'task';
-      case MessageType.system: return 'system';
-      case MessageType.text: return 'text';
+      case MessageType.image:
+        return 'image';
+      case MessageType.video:
+        return 'video';
+      case MessageType.audio:
+        return 'audio';
+      case MessageType.document:
+        return 'document';
+      case MessageType.location:
+        return 'location';
+      case MessageType.contact:
+        return 'contact';
+      case MessageType.taskCard:
+        return 'task';
+      case MessageType.system:
+        return 'system';
+      case MessageType.text:
+        return 'text';
     }
   }
 
   static TaskPriority _taskPriorityFromDatabase(String? value) {
     switch (value) {
-      case 'low': return TaskPriority.low;
-      case 'high': return TaskPriority.high;
-      case 'urgent': return TaskPriority.urgent;
-      default: return TaskPriority.medium;
+      case 'low':
+        return TaskPriority.low;
+      case 'high':
+        return TaskPriority.high;
+      case 'urgent':
+        return TaskPriority.urgent;
+      default:
+        return TaskPriority.medium;
     }
   }
 
   static String _taskPriorityToDatabase(TaskPriority value) {
     switch (value) {
-      case TaskPriority.low: return 'low';
-      case TaskPriority.medium: return 'normal';
-      case TaskPriority.high: return 'high';
-      case TaskPriority.urgent: return 'urgent';
+      case TaskPriority.low:
+        return 'low';
+      case TaskPriority.medium:
+        return 'normal';
+      case TaskPriority.high:
+        return 'high';
+      case TaskPriority.urgent:
+        return 'urgent';
     }
   }
 
   static TaskStatus _taskStatusFromDatabase(String? value) {
     switch (value) {
-      case 'in_progress': return TaskStatus.inProgress;
-      case 'completed': return TaskStatus.completed;
-      case 'cancelled': return TaskStatus.archived;
-      default: return TaskStatus.inbox;
+      case 'in_progress':
+        return TaskStatus.inProgress;
+      case 'completed':
+        return TaskStatus.completed;
+      case 'cancelled':
+        return TaskStatus.archived;
+      default:
+        return TaskStatus.inbox;
     }
   }
 
   static String _taskStatusToDatabase(TaskStatus value) {
     switch (value) {
-      case TaskStatus.inProgress: return 'in_progress';
-      case TaskStatus.completed: return 'completed';
-      case TaskStatus.archived: return 'cancelled';
-      case TaskStatus.blocked: return 'in_progress';
-      case TaskStatus.assigned: return 'todo';
-      case TaskStatus.inbox: return 'todo';
+      case TaskStatus.inProgress:
+        return 'in_progress';
+      case TaskStatus.completed:
+        return 'completed';
+      case TaskStatus.archived:
+        return 'cancelled';
+      case TaskStatus.blocked:
+        return 'in_progress';
+      case TaskStatus.assigned:
+        return 'todo';
+      case TaskStatus.inbox:
+        return 'todo';
     }
   }
 }

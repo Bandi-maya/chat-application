@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -8,16 +7,13 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import '../../../ui/core/controllers/app_icon_controller.dart';
-import '../../../ui/core/design_system/chaty_settings_primitives.dart';
-import '../../../ui/core/widgets/chaty_brand_icon.dart';
+import '../../../ui/core/design_system/settings_primitives.dart';
+import '../../../ui/core/widgets/app_brand_icon.dart';
 
 class AppIconSettingsScreen extends StatefulWidget {
   final AppIconController appIconController;
 
-  const AppIconSettingsScreen({
-    super.key,
-    required this.appIconController,
-  });
+  const AppIconSettingsScreen({super.key, required this.appIconController});
 
   @override
   State<AppIconSettingsScreen> createState() => _AppIconSettingsScreenState();
@@ -164,21 +160,27 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen>
                 child: Text(
                   'Add custom app icon',
                   style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library_outlined),
                 title: const Text('Photos'),
-                subtitle: const Text('Choose an image with Android Photo Picker'),
-                onTap: () => Navigator.of(sheetContext).pop(CustomIconInputSource.photos),
+                subtitle: const Text(
+                  'Choose an image with Android Photo Picker',
+                ),
+                onTap: () => Navigator.of(
+                  sheetContext,
+                ).pop(CustomIconInputSource.photos),
               ),
               ListTile(
                 leading: const Icon(Icons.photo_camera_outlined),
                 title: const Text('Camera'),
                 subtitle: const Text('Capture a new image'),
-                onTap: () => Navigator.of(sheetContext).pop(CustomIconInputSource.camera),
+                onTap: () => Navigator.of(
+                  sheetContext,
+                ).pop(CustomIconInputSource.camera),
               ),
             ],
           ),
@@ -222,10 +224,8 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen>
       if (!mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) => _CustomBrandIconEditor(
-            imageBytes: bytes,
-            controller: controller,
-          ),
+          builder: (_) =>
+              _CustomBrandIconEditor(imageBytes: bytes, controller: controller),
         ),
       );
     } catch (_) {
@@ -284,7 +284,8 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen>
         final customPresets = controller.customIconPresets
             .where((preset) => preset.exists)
             .toList(growable: false);
-        final totalTiles = LauncherIconVariant.values.length + customPresets.length + 1;
+        final totalTiles =
+            LauncherIconVariant.values.length + customPresets.length + 1;
 
         return ChatySettingsPage(
           title: 'App Icon',
@@ -339,18 +340,20 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen>
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: totalTiles,
-                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 150,
-                      mainAxisExtent: 132,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
-                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 150,
+                          mainAxisExtent: 132,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                        ),
                     itemBuilder: (context, index) {
                       if (index < LauncherIconVariant.values.length) {
                         final variant = LauncherIconVariant.values[index];
                         final selected =
-                            controller.brandIconSource == BrandIconSource.bundled &&
-                                controller.launcherIcon == variant;
+                            controller.brandIconSource ==
+                                BrandIconSource.bundled &&
+                            controller.launcherIcon == variant;
                         return _LauncherIconOption(
                           variant: variant,
                           selected: selected,
@@ -359,12 +362,14 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen>
                         );
                       }
 
-                      final customIndex = index - LauncherIconVariant.values.length;
+                      final customIndex =
+                          index - LauncherIconVariant.values.length;
                       if (customIndex < customPresets.length) {
                         final preset = customPresets[customIndex];
                         final selected =
-                            controller.brandIconSource == BrandIconSource.custom &&
-                                controller.activeCustomPresetId == preset.id;
+                            controller.brandIconSource ==
+                                BrandIconSource.custom &&
+                            controller.activeCustomPresetId == preset.id;
                         return _SavedCustomIconOption(
                           preset: preset,
                           selected: selected,
@@ -389,7 +394,8 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen>
                     subtitle: 'Use Chaty’s original packaged icon',
                     onTap: controller.isBusy
                         ? null
-                        : () => _selectLauncherIcon(LauncherIconVariant.original),
+                        : () =>
+                              _selectLauncherIcon(LauncherIconVariant.original),
                   ),
               ],
             ),
@@ -446,11 +452,7 @@ class _LauncherIconOption extends StatelessWidget {
       enabled: enabled,
       label: variant.title,
       onTap: onTap,
-      child: LauncherIconPreview(
-        variant: variant,
-        size: 64,
-        borderRadius: 15,
-      ),
+      child: LauncherIconPreview(variant: variant, size: 64, borderRadius: 15),
     );
   }
 }
@@ -501,10 +503,7 @@ class _AddCustomIconOption extends StatelessWidget {
   final bool enabled;
   final VoidCallback onTap;
 
-  const _AddCustomIconOption({
-    required this.enabled,
-    required this.onTap,
-  });
+  const _AddCustomIconOption({required this.enabled, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -655,13 +654,15 @@ class _CustomBrandIconEditorState extends State<_CustomBrandIconEditor> {
     try {
       await WidgetsBinding.instance.endOfFrame;
       final boundary =
-          _captureKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+          _captureKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
       if (boundary == null) throw StateError('Preview is not ready.');
       final image = await boundary.toImage(pixelRatio: 3);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       image.dispose();
       final png = byteData?.buffer.asUint8List();
-      if (png == null || png.isEmpty) throw StateError('Could not encode image.');
+      if (png == null || png.isEmpty)
+        throw StateError('Could not encode image.');
 
       final success = await widget.controller.saveCustomBrandIcon(png);
       if (!mounted) return;
@@ -750,7 +751,9 @@ class _CustomBrandIconEditorState extends State<_CustomBrandIconEditor> {
                     tooltip: 'Rotate left',
                     onPressed: _saving
                         ? null
-                        : () => setState(() => _quarterTurns = (_quarterTurns + 3) % 4),
+                        : () => setState(
+                            () => _quarterTurns = (_quarterTurns + 3) % 4,
+                          ),
                     icon: const Icon(Icons.rotate_left_rounded),
                   ),
                   const SizedBox(width: 12),
@@ -758,7 +761,9 @@ class _CustomBrandIconEditorState extends State<_CustomBrandIconEditor> {
                     tooltip: 'Rotate right',
                     onPressed: _saving
                         ? null
-                        : () => setState(() => _quarterTurns = (_quarterTurns + 1) % 4),
+                        : () => setState(
+                            () => _quarterTurns = (_quarterTurns + 1) % 4,
+                          ),
                     icon: const Icon(Icons.rotate_right_rounded),
                   ),
                 ],

@@ -1,9 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../../../ui/core/design_system/chaty_settings_primitives.dart';
-import '../../../ui/core/controllers/chaty_preferences_controller.dart';
-import '../../../data/services/chaty_notification_service.dart';
+import '../../../data/services/notification_service.dart';
+import '../../../data/services/local_lock_service.dart';
+import '../../../injection/locator.dart';
+import '../../../ui/core/controllers/preferences_controller.dart';
+import '../../../ui/core/design_system/settings_primitives.dart';
 
+/// System Permissions & Hardware screen.
+///
+/// Every control here reflects and mutates REAL operating-system state:
+/// permission statuses are read through `permission_handler`, biometric
+/// availability through `local_auth` (via [LocalLockService]), and the "fetch
+/// location" action uses `geolocator` to read the device's actual GPS fix.
+/// The OS never lets an app silently revoke its own permission, so a granted
+/// toggle deep-links to system settings instead of pretending to turn off.
 class SystemPermissionsScreen extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
   final ChatyNotificationService notificationService;
@@ -15,152 +26,267 @@ class SystemPermissionsScreen extends StatefulWidget {
   });
 
   @override
-  State<SystemPermissionsScreen> createState() => _SystemPermissionsScreenState();
+  State<SystemPermissionsScreen> createState() =>
+      _SystemPermissionsScreenState();
 }
 
-class _SystemPermissionsScreenState extends State<SystemPermissionsScreen> {
-  bool _notificationGranted = true;
-  bool _cameraGranted = true;
-  bool _microphoneGranted = true;
-  bool _mediaPhotosGranted = true;
-  bool _locationGranted = true;
-  bool _contactsGranted = true;
-  bool _biometricsGranted = true;
+class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
+    with WidgetsBindingObserver {
+  // Real OS permission statuses. Null means "not read yet" (checking), so the
+  // UI never claims a permission is granted before actually asking the system.
+  PermissionStatus? _notification;
+  PermissionStatus? _photos;
+  PermissionStatus? _location;
+  PermissionStatus? _camera;
+  PermissionStatus? _microphone;
+  PermissionStatus? _contacts;
+  // Biometrics have no grant/revoke permission; report real hardware
+  // availability via local_auth instead of faking a toggle.
+  bool _biometricsAvailable = false;
+  bool _loading = true;
 
-  void _requestOrToggle(String name, bool currentVal, ValueChanged<bool> onToggle) {
-    if (!currentVal) {
-      onToggle(true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$name permission granted successfully!'),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    } else {
-      onToggle(false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$name permission revoked.'),
-          backgroundColor: Colors.redAccent,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+  LocalLockService get _lock => locator<LocalLockService>();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refreshAll();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Re-read after returning from the system settings page so the switches
+    // reflect any change the user made outside the app.
+    if (state == AppLifecycleState.resumed) {
+      _refreshAll();
     }
   }
 
-  void _sendTestPushNotification() {
+  Future<void> _refreshAll() async {
+    final notification = await _safeStatus(Permission.notification);
+    final photos = await _safeStatus(Permission.photos);
+    final location = await _safeStatus(Permission.locationWhenInUse);
+    final camera = await _safeStatus(Permission.camera);
+    final microphone = await _safeStatus(Permission.microphone);
+    final contacts = await _safeStatus(Permission.contacts);
+    var biometrics = false;
+    try {
+      biometrics = await _lock.canUseBiometrics();
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() {
+      _notification = notification;
+      _photos = photos;
+      _location = location;
+      _camera = camera;
+      _microphone = microphone;
+      _contacts = contacts;
+      _biometricsAvailable = biometrics;
+      _loading = false;
+    });
+  }
+
+  Future<PermissionStatus?> _safeStatus(Permission permission) async {
+    try {
+      return await permission.status;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool _granted(PermissionStatus? status) =>
+      status != null && (status.isGranted || status.isLimited);
+
+  void _snack(String message, {Color? color}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<void> _toggle(Permission permission, PermissionStatus? status) async {
+    try {
+      if (_granted(status)) {
+        // The OS does not allow an app to revoke its own permission; the user
+        // must do it from system settings. Send them there honestly.
+        _snack('Turn this off from system settings.');
+        await openAppSettings();
+        return;
+      }
+      if (status != null && status.isPermanentlyDenied) {
+        _snack('This permission is blocked. Enable it in system settings.');
+        await openAppSettings();
+      } else {
+        await permission.request();
+      }
+    } catch (_) {
+      _snack('Could not update this permission.', color: Colors.redAccent);
+    } finally {
+      await _refreshOne(permission);
+    }
+  }
+
+  Future<void> _refreshOne(Permission permission) async {
+    final status = await _safeStatus(permission);
+    if (!mounted) return;
+    setState(() {
+      if (permission == Permission.notification) {
+        _notification = status;
+      } else if (permission == Permission.photos) {
+        _photos = status;
+      } else if (permission == Permission.locationWhenInUse) {
+        _location = status;
+      } else if (permission == Permission.camera) {
+        _camera = status;
+      } else if (permission == Permission.microphone) {
+        _microphone = status;
+      } else if (permission == Permission.contacts) {
+        _contacts = status;
+      }
+    });
+  }
+
+  void _sendTestNotification() {
     widget.notificationService.triggerEventNotification(
-      title: 'Chaty Push Notification',
-      body: 'Push service connected. End-to-end encryption key verified.',
+      title: 'Chaty test notification',
+      body: 'This is a sample notification from Chaty.',
       icon: Icons.notifications_active_rounded,
       color: Colors.indigoAccent,
     );
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Push notification dispatched!')),
-    );
+    _snack('Test notification sent.');
   }
 
-  void _testMediaAccess() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
+  Future<void> _fetchLocation() async {
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _snack(
+          'Location services are turned off on this device.',
+          color: Colors.redAccent,
+        );
+        return;
+      }
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        _snack('Location permission was denied.', color: Colors.redAccent);
+        return;
+      }
+      final position = await Geolocator.getCurrentPosition();
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.location_on_rounded, color: Colors.redAccent),
+              SizedBox(width: 8),
+              Expanded(child: Text('Current GPS location')),
+            ],
+          ),
+          content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
-                children: [
-                  Icon(Icons.perm_media_rounded, color: Colors.blueAccent),
-                  SizedBox(width: 10),
-                  Text('Media & Gallery Picker Access', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-                ],
+              Text(
+                'Latitude: ${position.latitude.toStringAsFixed(5)}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 12),
-              const Text('Device photo gallery and media file access permissions are active.'),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Photo selected: chaty_wallpaper_hd.png (1080x2400)')),
-                      );
-                    },
-                    icon: const Icon(Icons.photo_library_rounded),
-                    label: const Text('Pick Image'),
-                  ),
-                  const SizedBox(width: 12),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Video selected: demo_recording.mp4 (4K 60fps)')),
-                      );
-                    },
-                    icon: const Icon(Icons.video_library_rounded),
-                    label: const Text('Pick Video'),
-                  ),
-                ],
+              Text(
+                'Longitude: ${position.longitude.toStringAsFixed(5)}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Accuracy: ${position.accuracy.toStringAsFixed(0)} m',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
               ),
             ],
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
+            ),
+          ],
         ),
-      ),
+      );
+    } catch (error) {
+      _snack('Could not read location: $error', color: Colors.redAccent);
+    } finally {
+      await _refreshOne(Permission.locationWhenInUse);
+    }
+  }
+
+  Future<void> _testBiometrics() async {
+    if (!_biometricsAvailable) {
+      _snack(
+        'No biometrics are enrolled on this device.',
+        color: Colors.redAccent,
+      );
+      return;
+    }
+    final ok = await _lock.authenticateBiometric(
+      reason: 'Verify your identity for Chaty',
+    );
+    _snack(
+      ok
+          ? 'Biometric verification succeeded.'
+          : 'Biometric verification failed or cancelled.',
+      color: ok ? Colors.green : Colors.redAccent,
     );
   }
 
-  void _testLocationAccess() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.location_on_rounded, color: Colors.redAccent),
-            SizedBox(width: 8),
-            Text('GPS Location Coordinates'),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Live GPS Location Fix Acquired:'),
-            SizedBox(height: 10),
-            Text('• Latitude: 37.7749° N', style: TextStyle(fontWeight: FontWeight.bold)),
-            Text('• Longitude: -122.4194° W', style: TextStyle(fontWeight: FontWeight.bold)),
-            Text('• Accuracy: High (GPS + GLONASS)', style: TextStyle(fontSize: 12, color: Colors.grey)),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Location shared into active chat!')),
-              );
-            },
-            child: const Text('Share Location'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _requestAll() async {
+    try {
+      final results = await <Permission>[
+        Permission.notification,
+        Permission.photos,
+        Permission.locationWhenInUse,
+        Permission.camera,
+        Permission.microphone,
+        Permission.contacts,
+      ].request();
+      final grantedCount = results.values
+          .where((s) => s.isGranted || s.isLimited)
+          .length;
+      _snack(
+        '$grantedCount of ${results.length} permissions granted.',
+        color: grantedCount == results.length ? Colors.green : null,
+      );
+    } catch (_) {
+      _snack('Could not request permissions.', color: Colors.redAccent);
+    } finally {
+      await _refreshAll();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return ChatySettingsPage(
       title: 'App Permissions & Hardware',
-      subtitle: 'Push Notifications, Media, Location, Camera & Audio',
+      subtitle: 'Notifications, media, location, camera, mic & more',
+      trailingHeaderWidget: IconButton(
+        tooltip: 'Re-check permissions',
+        icon: const Icon(Icons.refresh_rounded),
+        onPressed: _loading ? null : _refreshAll,
+      ),
       children: [
-        // Live Preview Card
+        // Live status center, driven by the real permission statuses above.
         ChatyPreviewCard(
           title: 'Permission Status Center',
           child: Column(
@@ -170,38 +296,80 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _buildStatusChip('Notifications', _notificationGranted, Icons.notifications_active_rounded),
-                  _buildStatusChip('Media & Photos', _mediaPhotosGranted, Icons.perm_media_rounded),
-                  _buildStatusChip('Location', _locationGranted, Icons.location_on_rounded),
-                  _buildStatusChip('Camera', _cameraGranted, Icons.camera_alt_rounded),
-                  _buildStatusChip('Microphone', _microphoneGranted, Icons.mic_rounded),
-                  _buildStatusChip('Contacts', _contactsGranted, Icons.contacts_rounded),
-                  _buildStatusChip('Biometrics', _biometricsGranted, Icons.fingerprint_rounded),
+                  _buildStatusChip(
+                    'Notifications',
+                    _loading ? null : _granted(_notification),
+                    Icons.notifications_active_rounded,
+                  ),
+                  _buildStatusChip(
+                    'Media & Photos',
+                    _loading ? null : _granted(_photos),
+                    Icons.perm_media_rounded,
+                  ),
+                  _buildStatusChip(
+                    'Location',
+                    _loading ? null : _granted(_location),
+                    Icons.location_on_rounded,
+                  ),
+                  _buildStatusChip(
+                    'Camera',
+                    _loading ? null : _granted(_camera),
+                    Icons.camera_alt_rounded,
+                  ),
+                  _buildStatusChip(
+                    'Microphone',
+                    _loading ? null : _granted(_microphone),
+                    Icons.mic_rounded,
+                  ),
+                  _buildStatusChip(
+                    'Contacts',
+                    _loading ? null : _granted(_contacts),
+                    Icons.contacts_rounded,
+                  ),
+                  _buildStatusChip(
+                    'Biometrics',
+                    _loading ? null : _biometricsAvailable,
+                    Icons.fingerprint_rounded,
+                  ),
                 ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                _loading
+                    ? 'Checking current permission status...'
+                    : 'Tap a permission to grant it, or manage it in system settings.',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
+                ),
               ),
             ],
           ),
         ),
 
-        // 1. Push Notifications
+        // 1. Notifications
         ChatySettingsSection(
           title: 'Push Notifications & Alerts',
-          description: 'Receive real-time instant alerts for calls, mentions, and incoming messages.',
+          description:
+              'Receive alerts for calls, mentions, and incoming messages.',
           children: [
-            ChatySwitchTile(
+            _permissionSwitch(
               icon: Icons.notifications_active_rounded,
-              iconColor: Colors.indigoAccent,
-              title: 'Push Notification Permission',
-              subtitle: 'Allow Chaty to display push alerts and heads-up notifications',
-              value: _notificationGranted,
-              onChanged: (val) => _requestOrToggle('Push Notification', _notificationGranted, (v) => setState(() => _notificationGranted = v)),
+              color: Colors.indigoAccent,
+              title: 'Notification Permission',
+              subtitle:
+                  'Allow Chaty to display alerts and heads-up notifications',
+              permission: Permission.notification,
+              status: _notification,
             ),
             ChatySettingsTile(
               icon: Icons.send_rounded,
               iconColor: Colors.cyanAccent,
-              title: 'Send Push Notification Now',
-              subtitle: 'Trigger a simulated incoming push alert',
-              onTap: _sendTestPushNotification,
+              title: 'Send a test notification',
+              subtitle: 'Display a sample Chaty notification now',
+              onTap: _sendTestNotification,
             ),
           ],
         ),
@@ -209,122 +377,109 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen> {
         // 2. Media, Photos & Storage
         ChatySettingsSection(
           title: 'Media, Photos & File System',
-          description: 'Allows sharing images, videos, audio notes, and attachments in chats.',
+          description:
+              'Share images, videos, audio notes, and attachments in chats.',
           children: [
-            ChatySwitchTile(
+            _permissionSwitch(
               icon: Icons.perm_media_rounded,
-              iconColor: Colors.lightBlueAccent,
-              title: 'Media & Photo Library Permission',
-              subtitle: 'Access device gallery to send photos and high-definition video',
-              value: _mediaPhotosGranted,
-              onChanged: (val) => _requestOrToggle('Media & Photos', _mediaPhotosGranted, (v) => setState(() => _mediaPhotosGranted = v)),
-            ),
-            ChatySettingsTile(
-              icon: Icons.photo_library_rounded,
-              iconColor: Colors.blueAccent,
-              title: 'Test Gallery & Media Picker',
-              subtitle: 'Open simulated image and video selector',
-              onTap: _testMediaAccess,
+              color: Colors.lightBlueAccent,
+              title: 'Media & Photo Library',
+              subtitle: 'Access the gallery to send photos and video',
+              permission: Permission.photos,
+              status: _photos,
             ),
           ],
         ),
 
-        // 3. Precise Location
+        // 3. Location
         ChatySettingsSection(
           title: 'Location & Map Coordinates',
-          description: 'Send live location fixes or drop pins directly in conversations.',
+          description:
+              'Share your live location or drop a pin in a conversation.',
           children: [
-            ChatySwitchTile(
+            _permissionSwitch(
               icon: Icons.location_on_rounded,
-              iconColor: Colors.redAccent,
-              title: 'Precise GPS Location Permission',
-              subtitle: 'Access device coordinates to share live location in chats',
-              value: _locationGranted,
-              onChanged: (val) => _requestOrToggle('Location', _locationGranted, (v) => setState(() => _locationGranted = v)),
+              color: Colors.redAccent,
+              title: 'Location Permission',
+              subtitle: 'Access device GPS to share your location in chats',
+              permission: Permission.locationWhenInUse,
+              status: _location,
             ),
             ChatySettingsTile(
               icon: Icons.my_location_rounded,
               iconColor: Colors.amberAccent,
-              title: 'Fetch & Share Current Location',
-              subtitle: 'Query GPS sensor coordinates',
-              onTap: _testLocationAccess,
+              title: 'Fetch current location',
+              subtitle: 'Read your real GPS coordinates now',
+              onTap: _fetchLocation,
             ),
           ],
         ),
 
-        // 4. Hardware Sensors & Privacy
+        // 4. Hardware sensors
         ChatySettingsSection(
-          title: 'Hardware & Hardware Sensors',
-          description: 'Control camera, audio microphone, contacts, and biometric sensor access.',
+          title: 'Hardware & Sensors',
+          description:
+              'Control camera, microphone, contacts, and biometric access.',
           children: [
-            ChatySwitchTile(
+            _permissionSwitch(
               icon: Icons.camera_alt_rounded,
-              iconColor: Colors.purpleAccent,
-              title: 'Camera Access',
+              color: Colors.purpleAccent,
+              title: 'Camera',
               subtitle: 'Take photos, record stories and start video calls',
-              value: _cameraGranted,
-              onChanged: (val) => _requestOrToggle('Camera', _cameraGranted, (v) => setState(() => _cameraGranted = v)),
+              permission: Permission.camera,
+              status: _camera,
             ),
-            ChatySwitchTile(
+            _permissionSwitch(
               icon: Icons.mic_rounded,
-              iconColor: Colors.deepOrangeAccent,
-              title: 'Microphone & Audio',
+              color: Colors.deepOrangeAccent,
+              title: 'Microphone',
               subtitle: 'Record voice messages and voice calls',
-              value: _microphoneGranted,
-              onChanged: (val) => _requestOrToggle('Microphone', _microphoneGranted, (v) => setState(() => _microphoneGranted = v)),
+              permission: Permission.microphone,
+              status: _microphone,
             ),
-            ChatySwitchTile(
+            _permissionSwitch(
               icon: Icons.contacts_rounded,
-              iconColor: Colors.greenAccent,
-              title: 'Address Book & Contacts',
-              subtitle: 'Discover which friends are on Chaty',
-              value: _contactsGranted,
-              onChanged: (val) => _requestOrToggle('Contacts', _contactsGranted, (v) => setState(() => _contactsGranted = v)),
+              color: Colors.greenAccent,
+              title: 'Contacts',
+              subtitle: 'Discover which of your contacts are on Chaty',
+              permission: Permission.contacts,
+              status: _contacts,
             ),
-            ChatySwitchTile(
+            ChatySettingsTile(
               icon: Icons.fingerprint_rounded,
               iconColor: Colors.tealAccent,
-              title: 'Biometrics & Fingerprint Sensor',
-              subtitle: 'Unlock Chaty App Lock using biometric authentication',
-              value: _biometricsGranted,
-              onChanged: (val) => _requestOrToggle('Biometrics', _biometricsGranted, (v) => setState(() => _biometricsGranted = v)),
+              title: 'Biometrics & Fingerprint',
+              subtitle: _biometricsAvailable
+                  ? 'Tap to test biometric unlock'
+                  : 'No enrolled biometrics detected on this device',
+              badgeText: _loading
+                  ? null
+                  : (_biometricsAvailable ? 'Available' : 'Unavailable'),
+              badgeColor: _biometricsAvailable ? Colors.green : Colors.grey,
+              onTap: _testBiometrics,
             ),
           ],
         ),
 
-        // 5. Bulk Permission Actions
+        // 5. Bulk actions
         ChatySettingsSection(
           title: 'All System Permissions',
           children: [
             ChatySettingsTile(
-              icon: Icons.check_circle_rounded,
+              icon: Icons.done_all_rounded,
               iconColor: Colors.greenAccent,
-              title: 'Grant All Permissions',
-              subtitle: 'Allow Notifications, Media, Location, Camera & Audio at once',
-              onTap: () async {
-                try {
-                  await [
-                    Permission.contacts,
-                    Permission.notification,
-                    Permission.camera,
-                    Permission.microphone,
-                    Permission.photos,
-                    Permission.storage,
-                  ].request();
-                } catch (_) {}
-                setState(() {
-                  _notificationGranted = true;
-                  _cameraGranted = true;
-                  _microphoneGranted = true;
-                  _mediaPhotosGranted = true;
-                  _locationGranted = true;
-                  _contactsGranted = true;
-                  _biometricsGranted = true;
-                });
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('All system permissions requested & granted!'), backgroundColor: Colors.green),
-                );
+              title: 'Request all permissions',
+              subtitle:
+                  'Prompt for notifications, media, location, camera, mic & contacts',
+              onTap: _requestAll,
+            ),
+            ChatySettingsTile(
+              icon: Icons.settings_rounded,
+              iconColor: Colors.blueGrey,
+              title: 'Open system settings',
+              subtitle: 'Manage every Chaty permission directly in the OS',
+              onTap: () {
+                openAppSettings();
               },
             ),
           ],
@@ -333,36 +488,55 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen> {
     );
   }
 
-  Widget _buildStatusChip(String label, bool granted, IconData icon) {
+  Widget _permissionSwitch({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+    required Permission permission,
+    required PermissionStatus? status,
+  }) {
+    final granted = _granted(status);
+    final blocked = status != null && status.isPermanentlyDenied && !granted;
+    return ChatySwitchTile(
+      icon: icon,
+      iconColor: color,
+      title: title,
+      subtitle: blocked ? '$subtitle (blocked in settings)' : subtitle,
+      value: granted,
+      onChanged: (_) => _toggle(permission, status),
+    );
+  }
+
+  Widget _buildStatusChip(String label, bool? granted, IconData icon) {
+    final Color color = granted == null
+        ? Colors.blueGrey
+        : (granted ? Colors.green : Colors.red);
+    final IconData trailingIcon = granted == null
+        ? Icons.hourglass_bottom_rounded
+        : (granted ? Icons.check : Icons.close);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: granted ? Colors.green.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: granted ? Colors.greenAccent : Colors.redAccent,
-          width: 1,
-        ),
+        border: Border.all(color: color, width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: granted ? Colors.greenAccent : Colors.redAccent),
+          Icon(icon, size: 14, color: color),
           const SizedBox(width: 5),
           Text(
             label,
             style: TextStyle(
               fontSize: 11.5,
               fontWeight: FontWeight.w600,
-              color: granted ? Colors.greenAccent : Colors.redAccent,
+              color: color,
             ),
           ),
           const SizedBox(width: 4),
-          Icon(
-            granted ? Icons.check : Icons.close,
-            size: 12,
-            color: granted ? Colors.greenAccent : Colors.redAccent,
-          ),
+          Icon(trailingIcon, size: 12, color: color),
         ],
       ),
     );

@@ -2,16 +2,13 @@ import 'package:flutter/material.dart';
 import '../../../../ui/core/theme/theme_config.dart';
 import '../../../../ui/core/theme/theme_controller.dart';
 import '../../../../ui/core/theme/theme_presets.dart';
-import '../../../ui/core/design_system/chaty_settings_primitives.dart';
-import '../../../ui/core/design_system/chaty_color_picker.dart';
+import '../../../ui/core/design_system/settings_primitives.dart';
+import '../../../ui/core/design_system/color_picker.dart';
 
 class ChatyThemeEditorScreen extends StatefulWidget {
   final ThemeController themeController;
 
-  const ChatyThemeEditorScreen({
-    super.key,
-    required this.themeController,
-  });
+  const ChatyThemeEditorScreen({super.key, required this.themeController});
 
   @override
   State<ChatyThemeEditorScreen> createState() => _ChatyThemeEditorScreenState();
@@ -36,7 +33,12 @@ class _ChatyThemeEditorScreenState extends State<ChatyThemeEditorScreen> {
     );
   }
 
-  void _pickColor(String name, Color current, ValueChanged<Color> onSelected, {Color? bgContext}) async {
+  void _pickColor(
+    String name,
+    Color current,
+    ValueChanged<Color> onSelected, {
+    Color? bgContext,
+  }) async {
     final picked = await ChatyColorPickerModal.show(
       context,
       title: name,
@@ -62,7 +64,8 @@ class _ChatyThemeEditorScreenState extends State<ChatyThemeEditorScreen> {
         // Presets Carousel Section
         ChatySettingsSection(
           title: 'Bundled Theme Presets',
-          description: 'Select a high-craft preset optimized for dark & light environments.',
+          description:
+              'Select a high-craft preset optimized for dark & light environments.',
           children: [
             SizedBox(
               height: 110,
@@ -73,7 +76,8 @@ class _ChatyThemeEditorScreenState extends State<ChatyThemeEditorScreen> {
                 separatorBuilder: (context, index) => const SizedBox(width: 12),
                 itemBuilder: (context, idx) {
                   final preset = ThemePresets.all[idx];
-                  final isSelected = widget.themeController.globalTheme.id == preset.id;
+                  final isSelected =
+                      widget.themeController.globalTheme.id == preset.id;
                   return GestureDetector(
                     onTap: () {
                       setState(() => _editingTheme = preset);
@@ -86,7 +90,9 @@ class _ChatyThemeEditorScreenState extends State<ChatyThemeEditorScreen> {
                         color: preset.surfaceColor,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: isSelected ? theme.colorScheme.primary : theme.dividerColor.withValues(alpha: 0.2),
+                          color: isSelected
+                              ? theme.colorScheme.primary
+                              : theme.dividerColor.withValues(alpha: 0.2),
                           width: isSelected ? 2.5 : 1,
                         ),
                       ),
@@ -96,9 +102,23 @@ class _ChatyThemeEditorScreenState extends State<ChatyThemeEditorScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Container(width: 14, height: 14, decoration: BoxDecoration(color: preset.accentColor, shape: BoxShape.circle)),
+                              Container(
+                                width: 14,
+                                height: 14,
+                                decoration: BoxDecoration(
+                                  color: preset.accentColor,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
                               const SizedBox(width: 4),
-                              Container(width: 14, height: 14, decoration: BoxDecoration(color: preset.outgoingBubbleColor, shape: BoxShape.circle)),
+                              Container(
+                                width: 14,
+                                height: 14,
+                                decoration: BoxDecoration(
+                                  color: preset.outgoingBubbleColor,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 8),
@@ -106,13 +126,19 @@ class _ChatyThemeEditorScreenState extends State<ChatyThemeEditorScreen> {
                             preset.name,
                             style: TextStyle(
                               fontSize: 12,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.w500,
                               color: preset.primaryTextColor,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
                           if (isSelected)
-                            Icon(Icons.check_circle_rounded, size: 14, color: theme.colorScheme.primary),
+                            Icon(
+                              Icons.check_circle_rounded,
+                              size: 14,
+                              color: theme.colorScheme.primary,
+                            ),
                         ],
                       ),
                     ),
@@ -130,22 +156,41 @@ class _ChatyThemeEditorScreenState extends State<ChatyThemeEditorScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: _editingTheme.surfaceColor,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
                   children: [
-                    Text('Chaty Live Preview', style: TextStyle(color: _editingTheme.primaryTextColor, fontWeight: FontWeight.bold)),
+                    Text(
+                      'Chaty Live Preview',
+                      style: TextStyle(
+                        color: _editingTheme.primaryTextColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const Spacer(),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: _editingTheme.accentColor,
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: const Text('NEW', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'NEW',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -162,7 +207,10 @@ class _ChatyThemeEditorScreenState extends State<ChatyThemeEditorScreen> {
                   ),
                   child: Text(
                     'Incoming message with custom token colors!',
-                    style: TextStyle(color: _editingTheme.incomingTextColor, fontSize: 13),
+                    style: TextStyle(
+                      color: _editingTheme.incomingTextColor,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ),
@@ -178,7 +226,10 @@ class _ChatyThemeEditorScreenState extends State<ChatyThemeEditorScreen> {
                   ),
                   child: Text(
                     'Outgoing message preview text',
-                    style: TextStyle(color: _editingTheme.outgoingTextColor, fontSize: 13),
+                    style: TextStyle(
+                      color: _editingTheme.outgoingTextColor,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ),
@@ -189,52 +240,77 @@ class _ChatyThemeEditorScreenState extends State<ChatyThemeEditorScreen> {
         // Color Token Controls
         ChatySettingsSection(
           title: 'Color Tokens & Overrides',
-          description: 'Customize core brand colors. Real-time updates update live UI.',
+          description:
+              'Customize core brand colors. Real-time updates update live UI.',
           children: [
             ChatyColorTile(
               title: 'Accent Brand Color',
-              subtitle: 'Primary action color across app buttons and highlights',
+              subtitle:
+                  'Primary action color across app buttons and highlights',
               color: _editingTheme.accentColor,
-              onTap: () => _pickColor('Accent Color', _editingTheme.accentColor, (c) {
-                _editingTheme = _editingTheme.copyWith(accentColor: c);
-                _applyTheme(_editingTheme);
-              }),
+              onTap: () =>
+                  _pickColor('Accent Color', _editingTheme.accentColor, (c) {
+                    _editingTheme = _editingTheme.copyWith(accentColor: c);
+                    _applyTheme(_editingTheme);
+                  }),
             ),
             ChatyColorTile(
               title: 'App Background',
               subtitle: 'Scaffold background surface',
               color: _editingTheme.backgroundColor,
-              onTap: () => _pickColor('App Background', _editingTheme.backgroundColor, (c) {
-                _editingTheme = _editingTheme.copyWith(backgroundColor: c);
-                _applyTheme(_editingTheme);
-              }),
+              onTap: () => _pickColor(
+                'App Background',
+                _editingTheme.backgroundColor,
+                (c) {
+                  _editingTheme = _editingTheme.copyWith(backgroundColor: c);
+                  _applyTheme(_editingTheme);
+                },
+              ),
             ),
             ChatyColorTile(
               title: 'Surface / Card Color',
               subtitle: 'Container and card background color',
               color: _editingTheme.surfaceColor,
-              onTap: () => _pickColor('Surface Color', _editingTheme.surfaceColor, (c) {
-                _editingTheme = _editingTheme.copyWith(surfaceColor: c, cardColor: c);
-                _applyTheme(_editingTheme);
-              }),
+              onTap: () =>
+                  _pickColor('Surface Color', _editingTheme.surfaceColor, (c) {
+                    _editingTheme = _editingTheme.copyWith(
+                      surfaceColor: c,
+                      cardColor: c,
+                    );
+                    _applyTheme(_editingTheme);
+                  }),
             ),
             ChatyColorTile(
               title: 'Incoming Message Bubble',
               subtitle: 'Received message background color',
               color: _editingTheme.incomingBubbleColor,
-              onTap: () => _pickColor('Incoming Bubble Color', _editingTheme.incomingBubbleColor, (c) {
-                _editingTheme = _editingTheme.copyWith(incomingBubbleColor: c);
-                _applyTheme(_editingTheme);
-              }, bgContext: _editingTheme.backgroundColor),
+              onTap: () => _pickColor(
+                'Incoming Bubble Color',
+                _editingTheme.incomingBubbleColor,
+                (c) {
+                  _editingTheme = _editingTheme.copyWith(
+                    incomingBubbleColor: c,
+                  );
+                  _applyTheme(_editingTheme);
+                },
+                bgContext: _editingTheme.backgroundColor,
+              ),
             ),
             ChatyColorTile(
               title: 'Outgoing Message Bubble',
               subtitle: 'Sent message background color',
               color: _editingTheme.outgoingBubbleColor,
-              onTap: () => _pickColor('Outgoing Bubble Color', _editingTheme.outgoingBubbleColor, (c) {
-                _editingTheme = _editingTheme.copyWith(outgoingBubbleColor: c);
-                _applyTheme(_editingTheme);
-              }, bgContext: _editingTheme.backgroundColor),
+              onTap: () => _pickColor(
+                'Outgoing Bubble Color',
+                _editingTheme.outgoingBubbleColor,
+                (c) {
+                  _editingTheme = _editingTheme.copyWith(
+                    outgoingBubbleColor: c,
+                  );
+                  _applyTheme(_editingTheme);
+                },
+                bgContext: _editingTheme.backgroundColor,
+              ),
             ),
           ],
         ),

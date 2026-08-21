@@ -2,18 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../../../data/services/local_lock_service.dart';
 import '../../../injection/locator.dart';
-import '../../../ui/core/controllers/chaty_preferences_controller.dart';
-import '../../../ui/core/design_system/chaty_settings_primitives.dart';
+import '../../../ui/core/controllers/preferences_controller.dart';
+import '../../../ui/core/design_system/settings_primitives.dart';
 import 'app_lock_overlay.dart';
 import 'lock_credential_setup_modal.dart';
 
 class SecurityCenterScreen extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
 
-  const SecurityCenterScreen({
-    super.key,
-    required this.preferencesController,
-  });
+  const SecurityCenterScreen({super.key, required this.preferencesController});
 
   @override
   State<SecurityCenterScreen> createState() => _SecurityCenterScreenState();
@@ -136,7 +133,11 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
               child: const Text(
                 '05423 89104 33812 77192\n44901 88321 00192 44381',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13),
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -148,7 +149,10 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
           ],
         ),
         actions: [
-          ElevatedButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Verified')),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Verified'),
+          ),
         ],
       ),
     );
@@ -165,7 +169,8 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
       children: [
         ChatySettingsSection(
           title: 'Encryption & Trust Model',
-          description: 'All conversations in Chaty utilize local end-to-end encryption simulation.',
+          description:
+              'All conversations in Chaty utilize local end-to-end encryption simulation.',
           children: [
             ChatySettingsTile(
               icon: Icons.shield_rounded,
@@ -187,7 +192,8 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
         ),
         ChatySettingsSection(
           title: 'Chaty App Lock',
-          description: 'Require a local credential or operating-system authentication before Chaty can be used.',
+          description:
+              'Require a local credential or operating-system authentication before Chaty can be used.',
           children: [
             ChatySwitchTile(
               icon: Icons.lock_rounded,
@@ -215,14 +221,17 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
                       ? 'Uses enrolled fingerprint / face authentication from this device'
                       : 'No enrolled biometric is currently available',
                   badgeText: _biometricAvailable ? 'READY' : 'UNAVAILABLE',
-                  badgeColor: _biometricAvailable ? Colors.greenAccent : Colors.orangeAccent,
+                  badgeColor: _biometricAvailable
+                      ? Colors.greenAccent
+                      : Colors.orangeAccent,
                   onTap: () => _configureMethod('Biometric'),
                 ),
               if (security.lockMethod == 'Device Credential')
                 ChatySettingsTile(
                   icon: Icons.phonelink_lock_rounded,
                   title: 'Device screen lock',
-                  subtitle: 'Use the PIN, pattern, password, or biometric managed by Android/iOS',
+                  subtitle:
+                      'Use the PIN, pattern, password, or biometric managed by Android/iOS',
                   onTap: () => _configureMethod('Device Credential'),
                 ),
               if (security.lockMethod == 'PIN') ...[
@@ -236,7 +245,8 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
                 ChatySettingsTile(
                   icon: Icons.pin_rounded,
                   title: 'Change PIN Code',
-                  subtitle: '$_pinLength-digit PIN stored securely on this device',
+                  subtitle:
+                      '$_pinLength-digit PIN stored securely on this device',
                   onTap: () => _configureMethod('PIN', pinLength: _pinLength),
                 ),
               ],
@@ -244,7 +254,8 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
                 ChatySettingsTile(
                   icon: Icons.password_rounded,
                   title: 'Change Lock Password',
-                  subtitle: 'Password is hashed and stored in secure device storage',
+                  subtitle:
+                      'Password is hashed and stored in secure device storage',
                   onTap: () => _configureMethod('Password'),
                 ),
               if (security.lockMethod == 'Pattern') ...[
@@ -258,19 +269,22 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
                   title: 'Make Pattern Invisible',
                   subtitle: 'Hide pattern lines while drawing',
                   value: security.makePatternInvisible,
-                  onChanged: (value) => widget.preferencesController.updateSecurity(
-                    security.copyWith(makePatternInvisible: value),
-                    logTitle: 'Pattern visibility',
-                  ),
+                  onChanged: (value) =>
+                      widget.preferencesController.updateSecurity(
+                        security.copyWith(makePatternInvisible: value),
+                        logTitle: 'Pattern visibility',
+                      ),
                 ),
                 ChatySwitchTile(
                   title: 'Disable Pattern Vibration',
-                  subtitle: 'Turn off haptic feedback while drawing the pattern',
+                  subtitle:
+                      'Turn off haptic feedback while drawing the pattern',
                   value: security.disablePatternVibration,
-                  onChanged: (value) => widget.preferencesController.updateSecurity(
-                    security.copyWith(disablePatternVibration: value),
-                    logTitle: 'Pattern vibration',
-                  ),
+                  onChanged: (value) =>
+                      widget.preferencesController.updateSecurity(
+                        security.copyWith(disablePatternVibration: value),
+                        logTitle: 'Pattern vibration',
+                      ),
                 ),
               ],
               ChatyChoiceTile<String>(
@@ -278,32 +292,37 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
                 options: _autoLockOptions,
                 selectedOption: security.autoLockTimeout,
                 optionLabel: (value) => value,
-                onSelected: (value) => widget.preferencesController.updateSecurity(
-                  security.copyWith(autoLockTimeout: value),
-                  logTitle: 'Auto Lock Timeout',
-                ),
+                onSelected: (value) =>
+                    widget.preferencesController.updateSecurity(
+                      security.copyWith(autoLockTimeout: value),
+                      logTitle: 'Auto Lock Timeout',
+                    ),
               ),
               ChatySwitchTile(
                 icon: Icons.notifications_paused_rounded,
                 title: 'Hide Notification Content when Locked',
-                subtitle: 'Conceal message body text while the application is locked',
+                subtitle:
+                    'Conceal message body text while the application is locked',
                 value: security.hideLockNotificationContent,
-                onChanged: (value) => widget.preferencesController.updateSecurity(
-                  security.copyWith(hideLockNotificationContent: value),
-                  logTitle: 'Lock notification privacy',
-                ),
+                onChanged: (value) =>
+                    widget.preferencesController.updateSecurity(
+                      security.copyWith(hideLockNotificationContent: value),
+                      logTitle: 'Lock notification privacy',
+                    ),
               ),
               ChatySettingsTile(
                 icon: Icons.lock_open_rounded,
                 iconColor: Colors.deepOrangeAccent,
                 title: 'Test Lock Screen',
-                subtitle: 'Run the same authentication gate used by the application',
+                subtitle:
+                    'Run the same authentication gate used by the application',
                 onTap: () => AppLockOverlayModal.show(
                   context,
                   preferencesController: widget.preferencesController,
                   lockService: _lockService,
                   title: 'Test Chaty Lock',
-                  reason: 'Authenticate to verify your Chaty Lock configuration',
+                  reason:
+                      'Authenticate to verify your Chaty Lock configuration',
                 ),
               ),
             ],
@@ -311,7 +330,8 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
         ),
         ChatySettingsSection(
           title: 'Chat Lock',
-          description: 'Locked conversations require the same verified local authentication before their messages open.',
+          description:
+              'Locked conversations require the same verified local authentication before their messages open.',
           children: [
             ChatySettingsTile(
               icon: Icons.chat_bubble_outline_rounded,
@@ -327,10 +347,14 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
             ChatySettingsTile(
               icon: Icons.verified_user_outlined,
               title: 'Chat Lock Authentication',
-              subtitle: 'Uses ${security.lockMethod}. Chat Lock works even when full App Lock is disabled.',
+              subtitle:
+                  'Uses ${security.lockMethod}. Chat Lock works even when full App Lock is disabled.',
               onTap: () async {
-                final configured = await _hasConfiguredMethod(security.lockMethod);
-                if (!configured && mounted) await _configureMethod(security.lockMethod);
+                final configured = await _hasConfiguredMethod(
+                  security.lockMethod,
+                );
+                if (!configured && mounted)
+                  await _configureMethod(security.lockMethod);
               },
             ),
           ],

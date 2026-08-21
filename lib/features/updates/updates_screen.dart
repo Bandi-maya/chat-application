@@ -4,10 +4,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../ui/core/theme/theme_config.dart';
 import '../../data/repositories/mock_data_store.dart';
 import '../../data/services/status_service.dart';
-import '../../ui/core/controllers/chaty_preferences_controller.dart';
+import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/widgets/app_avatar.dart';
-import '../../injection/locator.dart';
-import '../../../ui/core/theme/theme_controller.dart';
+import '../../ui/core/design_system/design_system.dart';
 
 class UpdatesScreen extends StatefulWidget {
   final ThemeConfig theme;
@@ -29,7 +28,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
   final StatusService _statusService = StatusService();
 
   Future<void> _openComposer() async {
-    final theme = locator<ThemeController>().globalTheme;
+    final themeData = Theme.of(context);
     final textController = TextEditingController();
     String? busyType;
 
@@ -53,7 +52,11 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
               } catch (error) {
                 if (sheetContext.mounted) {
                   ScaffoldMessenger.of(sheetContext).showSnackBar(
-                    SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+                    SnackBar(
+                      content: Text(
+                        error.toString().replaceFirst('Exception: ', ''),
+                      ),
+                    ),
                   );
                 }
               } finally {
@@ -69,7 +72,11 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
               } catch (error) {
                 if (sheetContext.mounted) {
                   ScaffoldMessenger.of(sheetContext).showSnackBar(
-                    SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+                    SnackBar(
+                      content: Text(
+                        error.toString().replaceFirst('Exception: ', ''),
+                      ),
+                    ),
                   );
                 }
               } finally {
@@ -77,16 +84,26 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
               }
             }
 
+            final isDark = themeData.brightness == Brightness.dark;
+
             return Container(
               padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 14,
-                bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+                left: ChatySpacing.lg,
+                right: ChatySpacing.lg,
+                top: ChatySpacing.md,
+                bottom: MediaQuery.of(sheetContext).viewInsets.bottom + ChatySpacing.lg,
               ),
               decoration: BoxDecoration(
-                color: theme.surfaceColor,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                color: isDark ? const Color(0xFF18181B) : Colors.white,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(ChatyRadius.sheet),
+                ),
+                border: Border(
+                  top: BorderSide(
+                    color: isDark ? const Color(0xFF27272A) : const Color(0xFFE4E4E7),
+                    width: 1.0,
+                  ),
+                ),
               ),
               child: SafeArea(
                 top: false,
@@ -96,91 +113,78 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                   children: [
                     Center(
                       child: Container(
-                        width: 38,
+                        width: 36,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: theme.secondaryTextColor.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(4),
+                          color: themeData.colorScheme.onSurface.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(ChatyRadius.full),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: ChatySpacing.base),
                     Text(
-                      'Create update',
-                      style: TextStyle(
-                        color: theme.primaryTextColor,
-                        fontSize: 19,
-                        fontWeight: FontWeight.w800,
-                      ),
+                      'New Update',
+                      style: ChatyTypography.headline(themeData.colorScheme.onSurface),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: ChatySpacing.xs),
                     Text(
                       'Updates expire automatically after 24 hours.',
-                      style: TextStyle(color: theme.secondaryTextColor, fontSize: 12.5),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: textController,
-                      minLines: 2,
-                      maxLines: 5,
-                      maxLength: 500,
-                      style: TextStyle(color: theme.primaryTextColor),
-                      decoration: InputDecoration(
-                        hintText: 'Write an update or add a caption…',
-                        hintStyle: TextStyle(color: theme.secondaryTextColor),
-                        filled: true,
-                        fillColor: theme.cardColor,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
+                      style: ChatyTypography.caption(
+                        themeData.colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
+                    const SizedBox(height: ChatySpacing.base),
+                    ChatyInput(
+                      controller: textController,
+                      hintText: 'Write an update or add a caption…',
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: ChatySpacing.base),
+                    Row(
                       children: [
-                        _ComposerAction(
-                          icon: Icons.image_rounded,
-                          label: 'Image',
-                          busy: busyType == 'image',
-                          onTap: busyType == null ? () => publishMedia('image') : null,
+                        Expanded(
+                          child: _ComposerAction(
+                            icon: Icons.image_rounded,
+                            label: 'Photo',
+                            busy: busyType == 'image',
+                            onTap: busyType == null ? () => publishMedia('image') : null,
+                          ),
                         ),
-                        _ComposerAction(
-                          icon: Icons.videocam_rounded,
-                          label: 'Video',
-                          busy: busyType == 'video',
-                          onTap: busyType == null ? () => publishMedia('video') : null,
+                        const SizedBox(width: ChatySpacing.sm),
+                        Expanded(
+                          child: _ComposerAction(
+                            icon: Icons.videocam_rounded,
+                            label: 'Video',
+                            busy: busyType == 'video',
+                            onTap: busyType == null ? () => publishMedia('video') : null,
+                          ),
                         ),
-                        _ComposerAction(
-                          icon: Icons.graphic_eq_rounded,
-                          label: 'Audio',
-                          busy: busyType == 'audio',
-                          onTap: busyType == null ? () => publishMedia('audio') : null,
+                        const SizedBox(width: ChatySpacing.sm),
+                        Expanded(
+                          child: _ComposerAction(
+                            icon: Icons.graphic_eq_rounded,
+                            label: 'Audio',
+                            busy: busyType == 'audio',
+                            onTap: busyType == null ? () => publishMedia('audio') : null,
+                          ),
                         ),
-                        _ComposerAction(
-                          icon: Icons.description_rounded,
-                          label: 'File',
-                          busy: busyType == 'document',
-                          onTap: busyType == null ? () => publishMedia('document') : null,
+                        const SizedBox(width: ChatySpacing.sm),
+                        Expanded(
+                          child: _ComposerAction(
+                            icon: Icons.description_rounded,
+                            label: 'File',
+                            busy: busyType == 'document',
+                            onTap: busyType == null ? () => publishMedia('document') : null,
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 18),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: busyType == null ? publishText : null,
-                        icon: busyType == 'text'
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.send_rounded),
-                        label: const Text('Publish text update'),
-                      ),
+                    const SizedBox(height: ChatySpacing.lg),
+                    ChatyPrimaryButton(
+                      text: 'Publish Update',
+                      icon: Icons.send_rounded,
+                      isLoading: busyType == 'text',
+                      onPressed: busyType == null ? publishText : null,
                     ),
                   ],
                 ),
@@ -194,7 +198,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
   }
 
   Future<void> _openStatus(StatusRecord status) async {
-    final theme = locator<ThemeController>().globalTheme;
+    final themeData = Theme.of(context);
     String? signedUrl;
     if (status.hasMedia) {
       try {
@@ -207,41 +211,59 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
       context: context,
       builder: (dialogContext) {
         return Dialog.fullscreen(
-          backgroundColor: theme.backgroundColor,
+          backgroundColor: themeData.scaffoldBackgroundColor,
           child: SafeArea(
             child: Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: ChatySpacing.sm,
+                    vertical: ChatySpacing.xs,
+                  ),
                   child: Row(
                     children: [
-                      IconButton(
+                      ChatyBackButton(
                         onPressed: () => Navigator.of(dialogContext).pop(),
-                        icon: const Icon(Icons.chevron_left_rounded),
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: ChatySpacing.sm),
                       AppAvatar(
-                        initials: widget.dataStore.getUser(status.userId)?.avatarInitials ?? 'CU',
-                        colorHex: widget.dataStore.getUser(status.userId)?.avatarColorHex ?? '0xFF6366F1',
-                        size: 36,
+                        initials:
+                            widget.dataStore
+                                .getUser(status.userId)
+                                ?.avatarInitials ??
+                            'U',
+                        colorHex:
+                            widget.dataStore
+                                .getUser(status.userId)
+                                ?.avatarColorHex ??
+                            '0xFF6366F1',
+                        size: 38,
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: ChatySpacing.sm),
                       Expanded(
                         child: Text(
                           status.userId == widget.dataStore.currentUser.id
                               ? 'My Status'
-                              : widget.dataStore.getUser(status.userId)?.displayName ?? 'Chaty User',
-                          style: TextStyle(color: theme.primaryTextColor, fontWeight: FontWeight.w700),
+                              : widget.dataStore
+                                        .getUser(status.userId)
+                                        ?.displayName ??
+                                    'Contact',
+                          style: ChatyTypography.title(
+                            themeData.colorScheme.onSurface,
+                          ),
                         ),
                       ),
                       if (status.userId == widget.dataStore.currentUser.id)
-                        IconButton(
+                        ChatyIconButton(
+                          icon: Icons.delete_outline_rounded,
                           tooltip: 'Delete status',
+                          color: const Color(0xFFEF4444),
                           onPressed: () async {
                             await _statusService.deleteStatus(status);
-                            if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+                            if (dialogContext.mounted) {
+                              Navigator.of(dialogContext).pop();
+                            }
                           },
-                          icon: Icon(Icons.delete_outline_rounded, color: theme.dangerColor),
                         ),
                     ],
                   ),
@@ -249,20 +271,25 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                 Expanded(
                   child: Center(
                     child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: _statusContent(status, signedUrl, theme),
+                      padding: const EdgeInsets.all(ChatySpacing.lg),
+                      child: _statusContent(status, signedUrl, themeData),
                     ),
                   ),
                 ),
                 if (status.text.isNotEmpty)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                    padding: const EdgeInsets.fromLTRB(
+                      ChatySpacing.xl,
+                      0,
+                      ChatySpacing.xl,
+                      ChatySpacing.xl,
+                    ),
                     child: Text(
                       status.text,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: theme.primaryTextColor,
-                        fontSize: 17,
+                        color: themeData.colorScheme.onSurface,
+                        fontSize: 16,
                         height: 1.4,
                         fontWeight: FontWeight.w600,
                       ),
@@ -276,28 +303,45 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
     );
   }
 
-  Widget _statusContent(StatusRecord status, String? signedUrl, ThemeConfig theme) {
+  Widget _statusContent(
+    StatusRecord status,
+    String? signedUrl,
+    ThemeData themeData,
+  ) {
     if (status.mediaType == 'text') {
       return Text(
         status.text,
         textAlign: TextAlign.center,
         style: TextStyle(
-          color: theme.primaryTextColor,
-          fontSize: 28,
+          color: themeData.colorScheme.onSurface,
+          fontSize: 26,
           height: 1.35,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.5,
         ),
       );
     }
     if (signedUrl == null) {
-      return Text('Unable to load this update.', style: TextStyle(color: theme.secondaryTextColor));
+      return Text(
+        'Unable to load this update.',
+        style: ChatyTypography.caption(
+          themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+        ),
+      );
     }
     if (status.mediaType == 'image') {
       return InteractiveViewer(
-        child: Image.network(
-          signedUrl,
-          fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => Icon(Icons.broken_image_outlined, size: 80, color: theme.secondaryTextColor),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(ChatyRadius.card),
+          child: Image.network(
+            signedUrl,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => Icon(
+              Icons.broken_image_outlined,
+              size: 72,
+              color: themeData.colorScheme.onSurface.withValues(alpha: 0.4),
+            ),
+          ),
         ),
       );
     }
@@ -310,18 +354,22 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 92, color: theme.accentColor),
-        const SizedBox(height: 18),
+        Icon(icon, size: 84, color: themeData.colorScheme.primary),
+        const SizedBox(height: ChatySpacing.base),
         Text(
           status.mediaName ?? status.mediaType,
           textAlign: TextAlign.center,
-          style: TextStyle(color: theme.primaryTextColor, fontSize: 16, fontWeight: FontWeight.w700),
+          style: ChatyTypography.title(themeData.colorScheme.onSurface),
         ),
-        const SizedBox(height: 18),
-        FilledButton.icon(
-          onPressed: () => launchUrl(Uri.parse(signedUrl), mode: LaunchMode.externalApplication),
-          icon: const Icon(Icons.open_in_new_rounded),
-          label: const Text('Open securely'),
+        const SizedBox(height: ChatySpacing.base),
+        ChatyPrimaryButton(
+          text: 'Open Securely',
+          icon: Icons.open_in_new_rounded,
+          width: 200,
+          onPressed: () => launchUrl(
+            Uri.parse(signedUrl),
+            mode: LaunchMode.externalApplication,
+          ),
         ),
       ],
     );
@@ -337,160 +385,254 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = locator<ThemeController>().globalTheme;
+    final themeData = Theme.of(context);
+    final isDark = themeData.brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: theme.backgroundColor,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+    return ChatyScaffold(
+      safeAreaTop: true,
+      safeAreaBottom: false,
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                ChatySpacing.base,
+                ChatySpacing.md,
+                ChatySpacing.base,
+                ChatySpacing.sm,
+              ),
               child: Text(
                 'Updates',
-                style: TextStyle(
-                  color: theme.primaryTextColor,
-                  fontSize: 22 * theme.fontScale,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
+                style: ChatyTypography.headline(
+                  themeData.colorScheme.onSurface,
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(18),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: ChatySpacing.base),
+            sliver: SliverToBoxAdapter(
+              child: ChatyCard(
+                padding: const EdgeInsets.all(ChatySpacing.sm),
                 onTap: _openComposer,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    children: [
-                      Stack(
-                        children: [
-                          AppAvatar(
-                            initials: widget.dataStore.currentUser.avatarInitials,
-                            colorHex: widget.dataStore.currentUser.avatarColorHex,
-                            size: 52,
-                          ),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: BoxDecoration(
-                                color: theme.accentColor,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: theme.backgroundColor, width: 2),
+                child: Row(
+                  children: [
+                    Stack(
+                      children: [
+                        AppAvatar(
+                          initials:
+                              widget.dataStore.currentUser.avatarInitials,
+                          colorHex:
+                              widget.dataStore.currentUser.avatarColorHex,
+                          size: 48,
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              color: themeData.colorScheme.primary,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isDark
+                                    ? const Color(0xFF18181B)
+                                    : Colors.white,
+                                width: 2,
                               ),
-                              child: Icon(Icons.add_rounded, color: theme.onAccentColor, size: 14),
+                            ),
+                            child: const Icon(
+                              Icons.add_rounded,
+                              color: Colors.white,
+                              size: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: ChatySpacing.base),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.preferencesController.home.myNameOverride
+                                    .isNotEmpty
+                                ? widget.preferencesController
+                                      .home.myNameOverride
+                                : 'My Status',
+                            style: ChatyTypography.title(
+                              themeData.colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Share photo, video, audio or thought',
+                            style: ChatyTypography.caption(
+                              themeData.colorScheme.onSurface.withValues(
+                                alpha: 0.6,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('My Status', style: TextStyle(color: theme.primaryTextColor, fontSize: 16, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 2),
-                            Text('Share text, image, video, audio or a file', style: TextStyle(color: theme.secondaryTextColor, fontSize: 12.5)),
-                          ],
-                        ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: themeData.colorScheme.onSurface.withValues(
+                        alpha: 0.35,
                       ),
-                      Icon(Icons.chevron_right_rounded, color: theme.secondaryTextColor),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                ChatySpacing.base + 4,
+                ChatySpacing.lg,
+                ChatySpacing.base,
+                ChatySpacing.xs,
+              ),
               child: Text(
                 'RECENT UPDATES',
                 style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: theme.secondaryTextColor,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: themeData.colorScheme.primary,
                   letterSpacing: 0.8,
                 ),
               ),
             ),
-            Expanded(
-              child: StreamBuilder<List<StatusRecord>>(
-                stream: _statusService.watchActiveStatuses(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-                    return Center(child: CircularProgressIndicator(color: theme.accentColor));
-                  }
-                  if (snapshot.hasError) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Text(
-                          'Unable to load updates.\n${snapshot.error}',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: theme.secondaryTextColor),
-                        ),
+          ),
+          StreamBuilder<List<StatusRecord>>(
+            stream: _statusService.watchActiveStatuses(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting &&
+                  !snapshot.hasData) {
+                return const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: CircularProgressIndicator(strokeWidth: 2.2),
+                  ),
+                );
+              }
+              final statuses = snapshot.data ?? const <StatusRecord>[];
+              if (statuses.isEmpty) {
+                return SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(ChatySpacing.xl),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.auto_awesome_rounded,
+                            size: 40,
+                            color: themeData.colorScheme.onSurface.withValues(
+                              alpha: 0.3,
+                            ),
+                          ),
+                          const SizedBox(height: ChatySpacing.sm),
+                          Text(
+                            'No recent updates',
+                            style: ChatyTypography.caption(
+                              themeData.colorScheme.onSurface.withValues(
+                                alpha: 0.55,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    );
-                  }
-                  final statuses = snapshot.data ?? const <StatusRecord>[];
-                  if (statuses.isEmpty) {
-                    return Center(
-                      child: Text('No active updates', style: TextStyle(color: theme.secondaryTextColor)),
-                    );
-                  }
-                  return ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    itemCount: statuses.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 2),
-                    itemBuilder: (context, index) {
-                      final status = statuses[index];
-                      final user = widget.dataStore.getUser(status.userId);
-                      final isMine = status.userId == widget.dataStore.currentUser.id;
-                      return ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        leading: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: theme.accentColor, width: 2.5),
-                          ),
-                          child: AppAvatar(
-                            initials: isMine ? widget.dataStore.currentUser.avatarInitials : user?.avatarInitials ?? 'CU',
-                            colorHex: isMine ? widget.dataStore.currentUser.avatarColorHex : user?.avatarColorHex ?? '0xFF6366F1',
-                            size: 44,
-                          ),
+                    ),
+                  ),
+                );
+              }
+              return SliverPadding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: ChatySpacing.base,
+                  vertical: ChatySpacing.xs,
+                ),
+                sliver: SliverToBoxAdapter(
+                  child: ChatyGroupedSection(
+                    children: [
+                      for (int i = 0; i < statuses.length; i++) ...[
+                        Builder(
+                          builder: (context) {
+                            final status = statuses[i];
+                            final user = widget.dataStore.getUser(
+                              status.userId,
+                            );
+                            final isMine =
+                                status.userId ==
+                                widget.dataStore.currentUser.id;
+
+                            return ChatyListTile(
+                              leading: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: themeData.colorScheme.primary,
+                                    width: 2.0,
+                                  ),
+                                ),
+                                child: AppAvatar(
+                                  initials: isMine
+                                      ? widget.dataStore.currentUser
+                                            .avatarInitials
+                                      : user?.avatarInitials ?? 'U',
+                                  colorHex: isMine
+                                      ? widget.dataStore.currentUser
+                                            .avatarColorHex
+                                      : user?.avatarColorHex ?? '0xFF6366F1',
+                                  size: 40,
+                                ),
+                              ),
+                              title: Text(
+                                isMine
+                                    ? 'My Status'
+                                    : user?.displayName ?? 'Contact',
+                                style: ChatyTypography.title(
+                                  themeData.colorScheme.onSurface,
+                                ),
+                              ),
+                              subtitle: Text(
+                                status.text.isNotEmpty
+                                    ? status.text
+                                    : status.mediaName ?? status.mediaType,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: ChatyTypography.caption(
+                                  themeData.colorScheme.onSurface.withValues(
+                                    alpha: 0.6,
+                                  ),
+                                ),
+                              ),
+                              trailing: Text(
+                                _relativeTime(status.createdAt),
+                                style: ChatyTypography.caption(
+                                  themeData.colorScheme.onSurface.withValues(
+                                    alpha: 0.45,
+                                  ),
+                                ),
+                              ),
+                              onTap: () => _openStatus(status),
+                            );
+                          },
                         ),
-                        title: Text(
-                          isMine ? 'My Status' : user?.displayName ?? 'Chaty User',
-                          style: TextStyle(color: theme.primaryTextColor, fontWeight: FontWeight.w600),
-                        ),
-                        subtitle: Text(
-                          status.text.isNotEmpty ? status.text : status.mediaName ?? status.mediaType,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: theme.secondaryTextColor, fontSize: 12.5),
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(_relativeTime(status.createdAt), style: TextStyle(color: theme.secondaryTextColor, fontSize: 11)),
-                            const SizedBox(width: 4),
-                            Icon(Icons.chevron_right_rounded, color: theme.secondaryTextColor),
-                          ],
-                        ),
-                        onTap: () => _openStatus(status),
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 80)),
+        ],
       ),
     );
   }
@@ -511,12 +653,42 @@ class _ComposerAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ActionChip(
-      onPressed: onTap,
-      avatar: busy
-          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-          : Icon(icon, size: 18),
-      label: Text(label),
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Material(
+      color: isDark ? const Color(0xFF27272A) : const Color(0xFFF4F4F5),
+      borderRadius: BorderRadius.circular(ChatyRadius.md),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(ChatyRadius.md),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (busy)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                Icon(icon, size: 20, color: theme.colorScheme.primary),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
+

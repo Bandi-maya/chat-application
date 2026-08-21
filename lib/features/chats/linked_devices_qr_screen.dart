@@ -7,9 +7,9 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../data/repositories/mock_data_store.dart';
 import '../../data/services/contact_relationship_service.dart';
 import '../../domain/models/other_models.dart';
-import '../../ui/core/controllers/chaty_preferences_controller.dart';
-import '../../ui/core/theme/theme_config.dart';
+import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/theme/theme_controller.dart';
+import '../../ui/core/design_system/design_system.dart';
 import '../chats/chat_detail_screen.dart';
 
 class LinkedDevicesQrScreen extends StatefulWidget {
@@ -36,7 +36,8 @@ class LinkedDevicesQrScreen extends StatefulWidget {
   State<LinkedDevicesQrScreen> createState() => _LinkedDevicesQrScreenState();
 }
 
-class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen> with SingleTickerProviderStateMixin {
+class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen>
+    with SingleTickerProviderStateMixin {
   late final TabController? _tabs;
   final MobileScannerController _scanner = MobileScannerController(
     formats: const <BarcodeFormat>[BarcodeFormat.qrCode],
@@ -54,9 +55,17 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen> with Sing
       _tabs = null;
       _loadDevices();
     } else if (widget.qrOnly) {
-      _tabs = TabController(length: 2, vsync: this, initialIndex: widget.initialIndex.clamp(0, 1));
+      _tabs = TabController(
+        length: 2,
+        vsync: this,
+        initialIndex: widget.initialIndex.clamp(0, 1),
+      );
     } else {
-      _tabs = TabController(length: 3, vsync: this, initialIndex: widget.initialIndex.clamp(0, 2));
+      _tabs = TabController(
+        length: 3,
+        vsync: this,
+        initialIndex: widget.initialIndex.clamp(0, 2),
+      );
       _loadDevices();
     }
   }
@@ -93,10 +102,18 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen> with Sing
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Log out ${device.deviceName}?'),
-        content: const Text('This device will be marked revoked and removed from your active device list.'),
+        content: const Text(
+          'This device will be marked revoked and removed from your active device list.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Log out')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Log out'),
+          ),
         ],
       ),
     );
@@ -105,46 +122,86 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen> with Sing
       await widget.relationshipService.revokeDevice(device.id);
       await _loadDevices();
     } catch (error) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$error')));
+      }
     }
   }
 
-  String get _myQrPayload => 'chaty://contact/${widget.dataStore.currentUser.username}';
+  String get _myQrPayload =>
+      'chaty://contact/${widget.dataStore.currentUser.username}';
 
   Future<void> _handleBarcode(BarcodeCapture capture) async {
     if (_scanBusy) return;
-    final raw = capture.barcodes.map((barcode) => barcode.rawValue).whereType<String>().firstOrNull;
+    final raw = capture.barcodes
+        .map((barcode) => barcode.rawValue)
+        .whereType<String>()
+        .firstOrNull;
     if (raw == null || raw.isEmpty) return;
     final uri = Uri.tryParse(raw);
-    if (uri == null || uri.scheme.toLowerCase() != 'chaty' || uri.host.toLowerCase() != 'contact' || uri.pathSegments.isEmpty) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This is not a Chaty contact QR code.')));
+    if (uri == null ||
+        uri.scheme.toLowerCase() != 'chaty' ||
+        uri.host.toLowerCase() != 'contact' ||
+        uri.pathSegments.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This is not a Chaty contact QR code.')),
+        );
+      }
       return;
     }
-    final username = Uri.decodeComponent(uri.pathSegments.first).replaceFirst('@', '').trim();
+    final username = Uri.decodeComponent(
+      uri.pathSegments.first,
+    ).replaceFirst('@', '').trim();
     if (username.isEmpty) return;
-    if (username.toLowerCase() == widget.dataStore.currentUser.username.toLowerCase()) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This QR belongs to your current account.')));
+    if (username.toLowerCase() ==
+        widget.dataStore.currentUser.username.toLowerCase()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This QR belongs to your current account.'),
+          ),
+        );
+      }
       return;
     }
     setState(() => _scanBusy = true);
     try {
       final results = await widget.dataStore.searchUsersRemote(username);
-      final user = results.where((item) => item.username.toLowerCase() == username.toLowerCase()).firstOrNull;
-      if (user == null) throw Exception('Chaty user @$username could not be found.');
-      final conversation = await widget.dataStore.getOrCreateDirectConversation(user);
+      final user = results
+          .where(
+            (item) => item.username.toLowerCase() == username.toLowerCase(),
+          )
+          .firstOrNull;
+      if (user == null) {
+        throw Exception('Chaty user @$username could not be found.');
+      }
+      final conversation = await widget.dataStore.getOrCreateDirectConversation(
+        user,
+      );
       if (!mounted) return;
       await _scanner.stop();
-      Navigator.of(context).pushReplacement(MaterialPageRoute(
-        builder: (_) => ChatDetailScreen(
-          conversationId: conversation.id,
-          theme: widget.themeController.globalTheme,
-          dataStore: widget.dataStore,
-          preferencesController: widget.preferencesController,
-          themeController: widget.themeController,
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => ChatDetailScreen(
+            conversationId: conversation.id,
+            theme: widget.themeController.globalTheme,
+            dataStore: widget.dataStore,
+            preferencesController: widget.preferencesController,
+            themeController: widget.themeController,
+          ),
         ),
-      ));
+      );
     } catch (error) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error.toString().replaceFirst('Exception: ', '')),
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _scanBusy = false);
     }
@@ -160,57 +217,148 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen> with Sing
     return 'Active ${value.day}/${value.month}/${value.year}';
   }
 
-  Widget _buildDevicesView(ThemeConfig theme) {
+  Widget _buildDevicesView(ThemeData themeData) {
     return RefreshIndicator(
       onRefresh: _loadDevices,
       child: _loadingDevices
-          ? ListView(children: const [SizedBox(height: 220), Center(child: CircularProgressIndicator())])
+          ? ListView(
+              children: const [
+                SizedBox(height: 220),
+                Center(child: CircularProgressIndicator(strokeWidth: 2.2)),
+              ],
+            )
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(
+                horizontal: ChatySpacing.base,
+                vertical: ChatySpacing.md,
+              ),
               children: [
-                if (_error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(_error!, style: TextStyle(color: theme.dangerColor))),
-                Text('Devices signed into this Chaty account', style: TextStyle(color: theme.primaryTextColor, fontWeight: FontWeight.w800, fontSize: 16)),
-                const SizedBox(height: 8),
-                ..._devices.map((device) => Card(
-                      color: theme.surfaceColor,
-                      child: ListTile(
-                        leading: CircleAvatar(backgroundColor: theme.cardColor, child: Icon(Icons.devices_other_rounded, color: theme.accentColor)),
-                        title: Text(device.deviceName, style: TextStyle(color: theme.primaryTextColor, fontWeight: FontWeight.w700)),
-                        subtitle: Text('${device.platform}${device.location.isEmpty ? '' : ' • ${device.location}'}\n${_lastActive(device)}', style: TextStyle(color: theme.secondaryTextColor)),
-                        isThreeLine: true,
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: ChatySpacing.md),
+                    child: Text(
+                      _error!,
+                      style: TextStyle(color: themeData.colorScheme.error),
+                    ),
+                  ),
+                ChatyGroupedSection(
+                  title: 'Active Devices',
+                  children: [
+                    for (final device in _devices)
+                      ChatyListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(ChatySpacing.sm),
+                          decoration: BoxDecoration(
+                            color: themeData.colorScheme.primary.withValues(
+                              alpha: 0.12,
+                            ),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.devices_other_rounded,
+                            color: themeData.colorScheme.primary,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          device.deviceName,
+                          style: TextStyle(
+                            color: themeData.colorScheme.onSurface,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                        subtitle: Text(
+                          '${device.platform}${device.location.isEmpty ? '' : ' • ${device.location}'}\n${_lastActive(device)}',
+                          style: ChatyTypography.caption(
+                            themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+                          ),
+                        ),
                         trailing: device.isCurrentDevice
-                            ? Chip(label: const Text('This device'), backgroundColor: theme.accentColor.withValues(alpha: 0.12))
-                            : IconButton(tooltip: 'Log out device', onPressed: () => _revoke(device), icon: Icon(Icons.logout_rounded, color: theme.dangerColor)),
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: themeData.colorScheme.primary
+                                      .withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(
+                                    ChatyRadius.full,
+                                  ),
+                                ),
+                                child: Text(
+                                  'This Device',
+                                  style: TextStyle(
+                                    color: themeData.colorScheme.primary,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              )
+                            : ChatyIconButton(
+                                tooltip: 'Log out device',
+                                icon: Icons.logout_rounded,
+                                color: const Color(0xFFEF4444),
+                                onPressed: () => _revoke(device),
+                              ),
                       ),
-                    )),
+                  ],
+                ),
               ],
             ),
     );
   }
 
-  Widget _buildMyQrView(ThemeConfig theme) {
+  Widget _buildMyQrView(ThemeData themeData) {
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(ChatySpacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
-              child: QrImageView(data: _myQrPayload, size: 245, version: QrVersions.auto),
+              padding: const EdgeInsets.all(ChatySpacing.lg),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(ChatyRadius.xl),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: QrImageView(
+                data: _myQrPayload,
+                size: 230,
+                version: QrVersions.auto,
+              ),
             ),
-            const SizedBox(height: 18),
-            Text(widget.dataStore.currentUser.displayName, style: TextStyle(color: theme.primaryTextColor, fontWeight: FontWeight.w800, fontSize: 20)),
-            const SizedBox(height: 4),
-            Text('@${widget.dataStore.currentUser.username}', style: TextStyle(color: theme.secondaryTextColor)),
-            const SizedBox(height: 14),
+            const SizedBox(height: ChatySpacing.lg),
+            Text(
+              widget.dataStore.currentUser.displayName,
+              style: ChatyTypography.headline(themeData.colorScheme.onSurface),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              '@${widget.dataStore.currentUser.username}',
+              style: ChatyTypography.caption(
+                themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+            const SizedBox(height: ChatySpacing.md),
             ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
+              constraints: const BoxConstraints(maxWidth: 380),
               child: Text(
-                'Another Chaty user can scan this code to open a direct conversation. Messaging works immediately; voice/video calls remain locked until both people accept the contact request.',
+                'Scan this code to start an instant encrypted chat without phone numbers.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: theme.secondaryTextColor, height: 1.45),
+                style: TextStyle(
+                  color: themeData.colorScheme.onSurface.withValues(alpha: 0.65),
+                  fontSize: 13.5,
+                  height: 1.45,
+                ),
               ),
             ),
           ],
@@ -229,49 +377,72 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen> with Sing
           right: 24,
           top: 28,
           child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.68), borderRadius: BorderRadius.circular(14)),
-            child: const Text('Scan a Chaty contact QR code', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(ChatyRadius.full),
+            ),
+            child: const Text(
+              'Point camera at a Chaty contact QR code',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ),
         Center(
           child: Container(
-            width: 250,
-            height: 250,
-            decoration: BoxDecoration(border: Border.all(color: Colors.white, width: 3), borderRadius: BorderRadius.circular(24)),
+            width: 240,
+            height: 240,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.white, width: 2.5),
+              borderRadius: BorderRadius.circular(ChatyRadius.xl),
+            ),
           ),
         ),
         if (_scanBusy)
-          ColoredBox(color: Colors.black38, child: const Center(child: CircularProgressIndicator(color: Colors.white))),
+          ColoredBox(
+            color: Colors.black45,
+            child: const Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 2.2,
+                color: Colors.white,
+              ),
+            ),
+          ),
       ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = widget.themeController.globalTheme;
+    final themeData = Theme.of(context);
 
     if (widget.devicesOnly) {
-      return Scaffold(
-        backgroundColor: theme.backgroundColor,
-        appBar: AppBar(
-          backgroundColor: theme.surfaceColor,
-          foregroundColor: theme.primaryTextColor,
-          title: const Text('Linked devices'),
+      return ChatyScaffold(
+        appBar: const ChatyAppBar(
+          title: 'Linked Devices',
+          leading: ChatyBackButton(),
         ),
-        body: _buildDevicesView(theme),
+        body: _buildDevicesView(themeData),
       );
     }
 
     if (widget.qrOnly) {
-      return Scaffold(
-        backgroundColor: theme.backgroundColor,
-        appBar: AppBar(
-          backgroundColor: theme.surfaceColor,
-          foregroundColor: theme.primaryTextColor,
-          title: const Text('QR Code & Scan'),
+      return ChatyScaffold(
+        appBar: ChatyAppBar(
+          title: 'QR Code & Scanner',
+          leading: const ChatyBackButton(),
           bottom: TabBar(
             controller: _tabs,
+            indicatorColor: themeData.colorScheme.primary,
+            labelColor: themeData.colorScheme.primary,
+            unselectedLabelColor: themeData.colorScheme.onSurface.withValues(
+              alpha: 0.55,
+            ),
             tabs: const [
               Tab(icon: Icon(Icons.qr_code_2_rounded), text: 'My QR'),
               Tab(icon: Icon(Icons.qr_code_scanner_rounded), text: 'Scan'),
@@ -280,22 +451,22 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen> with Sing
         ),
         body: TabBarView(
           controller: _tabs,
-          children: [
-            _buildMyQrView(theme),
-            _buildScannerView(),
-          ],
+          children: [_buildMyQrView(themeData), _buildScannerView()],
         ),
       );
     }
 
-    return Scaffold(
-      backgroundColor: theme.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: theme.surfaceColor,
-        foregroundColor: theme.primaryTextColor,
-        title: const Text('Linked devices & QR'),
+    return ChatyScaffold(
+      appBar: ChatyAppBar(
+        title: 'Linked Devices & QR',
+        leading: const ChatyBackButton(),
         bottom: TabBar(
           controller: _tabs,
+          indicatorColor: themeData.colorScheme.primary,
+          labelColor: themeData.colorScheme.primary,
+          unselectedLabelColor: themeData.colorScheme.onSurface.withValues(
+            alpha: 0.55,
+          ),
           tabs: const [
             Tab(icon: Icon(Icons.devices_rounded), text: 'Devices'),
             Tab(icon: Icon(Icons.qr_code_2_rounded), text: 'My QR'),
@@ -306,11 +477,12 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen> with Sing
       body: TabBarView(
         controller: _tabs,
         children: [
-          _buildDevicesView(theme),
-          _buildMyQrView(theme),
+          _buildDevicesView(themeData),
+          _buildMyQrView(themeData),
           _buildScannerView(),
         ],
       ),
     );
   }
 }
+

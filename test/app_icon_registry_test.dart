@@ -3,7 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('launcher icon registry ids are unique and round-trip', () {
-    final ids = LauncherIconVariant.values.map((variant) => variant.id).toList();
+    final ids = LauncherIconVariant.values
+        .map((variant) => variant.id)
+        .toList();
     expect(ids.toSet().length, ids.length);
 
     for (final variant in LauncherIconVariant.values) {

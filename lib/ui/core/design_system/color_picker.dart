@@ -71,7 +71,12 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
   }
 
   String _colorToHex(Color color) {
-    return color.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase().substring(2);
+    return color
+        .toARGB32()
+        .toRadixString(16)
+        .padLeft(8, '0')
+        .toUpperCase()
+        .substring(2);
   }
 
   void _updateFromHex(String text) {
@@ -92,7 +97,9 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
     final double bgLum = bg.computeLuminance();
 
     // Pick crisp dark or crisp white based on background luminance
-    Color adjusted = bgLum > 0.5 ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    Color adjusted = bgLum > 0.5
+        ? const Color(0xFF0F172A)
+        : const Color(0xFFF8FAFC);
     setState(() {
       _color = adjusted;
       _hexController.text = _colorToHex(_color);
@@ -103,7 +110,10 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final contrastRatio = widget.backgroundContextColor != null
-        ? ThemeConfig.calculateContrastRatio(_color, widget.backgroundContextColor!)
+        ? ThemeConfig.calculateContrastRatio(
+            _color,
+            widget.backgroundContextColor!,
+          )
         : null;
     final hasContrastWarning = contrastRatio != null && contrastRatio < 4.5;
 
@@ -137,7 +147,10 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
               Expanded(
                 child: Text(
                   widget.title,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               IconButton(
@@ -153,7 +166,9 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
             decoration: BoxDecoration(
               color: widget.backgroundContextColor ?? theme.cardColor,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: theme.dividerColor.withValues(alpha: 0.2)),
+              border: Border.all(
+                color: theme.dividerColor.withValues(alpha: 0.2),
+              ),
             ),
             child: Row(
               children: [
@@ -169,17 +184,26 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
                 ),
                 if (contrastRatio != null) ...[
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: (hasContrastWarning ? Colors.redAccent : Colors.green).withValues(alpha: 0.15),
+                      color:
+                          (hasContrastWarning ? Colors.redAccent : Colors.green)
+                              .withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       children: [
                         Icon(
-                          hasContrastWarning ? Icons.warning_amber_rounded : Icons.check_circle_rounded,
+                          hasContrastWarning
+                              ? Icons.warning_amber_rounded
+                              : Icons.check_circle_rounded,
                           size: 14,
-                          color: hasContrastWarning ? Colors.redAccent : Colors.green,
+                          color: hasContrastWarning
+                              ? Colors.redAccent
+                              : Colors.green,
                         ),
                         const SizedBox(width: 4),
                         Text(
@@ -187,7 +211,9 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: hasContrastWarning ? Colors.redAccent : Colors.green,
+                            color: hasContrastWarning
+                                ? Colors.redAccent
+                                : Colors.green,
                           ),
                         ),
                       ],
@@ -210,14 +236,22 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
                 TextButton.icon(
                   onPressed: _autoFixContrast,
                   icon: const Icon(Icons.auto_fix_high_rounded, size: 16),
-                  label: const Text('Auto Fix Contrast', style: TextStyle(fontSize: 12)),
-                  style: TextButton.styleFrom(foregroundColor: theme.colorScheme.primary),
+                  label: const Text(
+                    'Auto Fix Contrast',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: theme.colorScheme.primary,
+                  ),
                 ),
               ],
             ),
           ],
           const SizedBox(height: 16),
-          const Text('Preset Swatches', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          const Text(
+            'Preset Swatches',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
           const SizedBox(height: 10),
           Wrap(
             spacing: 12,
@@ -246,7 +280,9 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
                       ? Icon(
                           Icons.check_rounded,
                           size: 20,
-                          color: c.computeLuminance() > 0.5 ? Colors.black : Colors.white,
+                          color: c.computeLuminance() > 0.5
+                              ? Colors.black
+                              : Colors.white,
                         )
                       : null,
                 ),
@@ -262,7 +298,9 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
                   decoration: InputDecoration(
                     labelText: 'HEX Color',
                     prefixText: '# ',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   onChanged: _updateFromHex,
                 ),
@@ -272,11 +310,19 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: theme.colorScheme.primary,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 onPressed: () => widget.onColorSelected(_color),
-                child: const Text('Apply Color', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text(
+                  'Apply Color',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),

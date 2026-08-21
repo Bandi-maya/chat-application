@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+
+import '../../../injection/locator.dart';
+import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/theme/theme_config.dart';
+import '../../ui/core/design_system/design_system.dart';
 
 class MockCallScreen extends StatefulWidget {
   final ThemeConfig theme;
@@ -45,47 +49,69 @@ class _MockCallScreenState extends State<MockCallScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = widget.theme;
+    // Real consumers for the 'Calls appearance' GB keys.
+    final prefs = locator<ChatyPreferencesController>();
+    final callsBackground =
+        prefs.gbColor('ModCallsBackground') ?? const Color(0xFF09090B);
+    final callsText = prefs.gbColor('ModCallsTextColor');
+    final callsIcon = prefs.gbColor('ModCallsIconColors');
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: callsBackground,
       body: SafeArea(
         child: Column(
           children: [
-            const SizedBox(height: 20),
+            const SizedBox(height: ChatySpacing.base),
             // Header Security Info
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white12,
-                borderRadius: BorderRadius.circular(20),
+              padding: const EdgeInsets.symmetric(
+                horizontal: ChatySpacing.md,
+                vertical: 6,
               ),
-              child: const Row(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(ChatyRadius.full),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+              ),
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.lock_rounded, color: Color(0xFF10B981), size: 14),
-                  SizedBox(width: 6),
+                  Icon(
+                    Icons.lock_rounded,
+                    color: callsIcon ?? const Color(0xFF10B981),
+                    size: 14,
+                  ),
+                  const SizedBox(width: 6),
                   Text(
-                    'Direct Peer-to-Peer Encrypted Call',
-                    style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                    'Direct E2E Encrypted Call',
+                    style: TextStyle(
+                      color: callsText ?? Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 36),
+            const SizedBox(height: ChatySpacing.xl),
 
             // Caller Info
             Text(
               widget.title,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: callsText ?? Colors.white,
                 fontSize: 24,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: ChatySpacing.xs),
             Text(
               _formatDuration(_secondsElapsed),
-              style: const TextStyle(color: Colors.white70, fontSize: 16),
+              style: TextStyle(
+                color: (callsText ?? Colors.white).withValues(alpha: 0.65),
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
             ),
 
             const Spacer(),
@@ -93,30 +119,46 @@ class _MockCallScreenState extends State<MockCallScreen> {
             // Video Preview or Avatar
             if (_isVideoOn)
               Container(
-                margin: const EdgeInsets.all(24),
+                margin: const EdgeInsets.symmetric(
+                  horizontal: ChatySpacing.lg,
+                  vertical: ChatySpacing.base,
+                ),
                 height: 280,
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: Colors.black45,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: theme.accentColor.withValues(alpha: 0.4)),
+                  color: const Color(0xFF18181B),
+                  borderRadius: BorderRadius.circular(ChatyRadius.xl),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.12),
+                  ),
                 ),
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    const Icon(Icons.videocam_rounded, size: 64, color: Colors.white38),
+                    const Icon(
+                      Icons.videocam_rounded,
+                      size: 64,
+                      color: Colors.white24,
+                    ),
                     Positioned(
                       bottom: 12,
                       left: 12,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
-                          color: Colors.black54,
-                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.black.withValues(alpha: 0.65),
+                          borderRadius: BorderRadius.circular(ChatyRadius.sm),
                         ),
                         child: Text(
                           widget.title,
-                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ),
@@ -125,17 +167,23 @@ class _MockCallScreenState extends State<MockCallScreen> {
               )
             else
               Container(
-                width: 120,
-                height: 120,
+                width: 110,
+                height: 110,
                 decoration: BoxDecoration(
-                  color: theme.accentColor.withValues(alpha: 0.2),
+                  color: theme.accentColor.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                   border: Border.all(color: theme.accentColor, width: 2),
                 ),
                 child: Center(
                   child: Text(
-                    widget.title.isNotEmpty ? widget.title.substring(0, 2).toUpperCase() : 'CALL',
-                    style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold),
+                    widget.title.isNotEmpty
+                        ? widget.title.substring(0, 2).toUpperCase()
+                        : 'CALL',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
@@ -144,29 +192,38 @@ class _MockCallScreenState extends State<MockCallScreen> {
 
             // Call Controls Toolbar
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-              decoration: const BoxDecoration(
-                color: Color(0xFF1E293B),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+              padding: const EdgeInsets.symmetric(
+                horizontal: ChatySpacing.xl,
+                vertical: ChatySpacing.lg,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFF18181B),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(ChatyRadius.xl),
+                ),
+                border: Border(
+                  top: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+                ),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  // Mute
                   _buildCallBtn(
                     icon: _isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
                     isActive: _isMuted,
                     onTap: () => setState(() => _isMuted = !_isMuted),
                   ),
-                  // Video toggle
                   _buildCallBtn(
-                    icon: _isVideoOn ? Icons.videocam_rounded : Icons.videocam_off_rounded,
+                    icon: _isVideoOn
+                        ? Icons.videocam_rounded
+                        : Icons.videocam_off_rounded,
                     isActive: _isVideoOn,
                     onTap: () => setState(() => _isVideoOn = !_isVideoOn),
                   ),
-                  // Speaker
                   _buildCallBtn(
-                    icon: _isSpeakerOn ? Icons.volume_up_rounded : Icons.volume_down_rounded,
+                    icon: _isSpeakerOn
+                        ? Icons.volume_up_rounded
+                        : Icons.volume_down_rounded,
                     isActive: _isSpeakerOn,
                     onTap: () => setState(() => _isSpeakerOn = !_isSpeakerOn),
                   ),
@@ -174,12 +231,16 @@ class _MockCallScreenState extends State<MockCallScreen> {
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(ChatySpacing.md),
                       decoration: const BoxDecoration(
                         color: Color(0xFFEF4444),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.call_end_rounded, color: Colors.white, size: 28),
+                      child: const Icon(
+                        Icons.call_end_rounded,
+                        color: Colors.white,
+                        size: 26,
+                      ),
                     ),
                   ),
                 ],
@@ -191,6 +252,11 @@ class _MockCallScreenState extends State<MockCallScreen> {
     );
   }
 
+  /// Real consumer: `ModCallsIconColors` tints the in-call control icons.
+  Color get _callsIconColor =>
+      locator<ChatyPreferencesController>().gbColor('ModCallsIconColors') ??
+      Colors.white;
+
   Widget _buildCallBtn({
     required IconData icon,
     required bool isActive,
@@ -199,13 +265,16 @@ class _MockCallScreenState extends State<MockCallScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(ChatySpacing.md),
         decoration: BoxDecoration(
-          color: isActive ? Colors.white24 : Colors.white10,
+          color: isActive
+              ? Colors.white.withValues(alpha: 0.22)
+              : Colors.white.withValues(alpha: 0.08),
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: Colors.white, size: 24),
+        child: Icon(icon, color: _callsIconColor, size: 22),
       ),
     );
   }
 }
+

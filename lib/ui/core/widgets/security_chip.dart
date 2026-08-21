@@ -5,11 +5,7 @@ class SecurityChip extends StatelessWidget {
   final EncryptionStatus status;
   final VoidCallback? onTap;
 
-  const SecurityChip({
-    super.key,
-    required this.status,
-    this.onTap,
-  });
+  const SecurityChip({super.key, required this.status, this.onTap});
 
   @override
   Widget build(BuildContext context) {

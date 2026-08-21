@@ -1,6 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import '../controllers/chaty_preferences_controller.dart';
+import '../controllers/preferences_controller.dart';
 
 class ClickParticle {
   final Offset position;
@@ -36,7 +36,8 @@ class ClickParticleOverlay extends StatefulWidget {
   State<ClickParticleOverlay> createState() => _ClickParticleOverlayState();
 }
 
-class _ClickParticleOverlayState extends State<ClickParticleOverlay> with SingleTickerProviderStateMixin {
+class _ClickParticleOverlayState extends State<ClickParticleOverlay>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animController;
   final List<ClickParticle> _particles = [];
   final Random _random = Random();
@@ -44,9 +45,10 @@ class _ClickParticleOverlayState extends State<ClickParticleOverlay> with Single
   @override
   void initState() {
     super.initState();
-    _animController = AnimationController(vsync: this, duration: const Duration(seconds: 1))
-      ..addListener(_tick)
-      ..repeat();
+    _animController =
+        AnimationController(vsync: this, duration: const Duration(seconds: 1))
+          ..addListener(_tick)
+          ..repeat();
   }
 
   @override
@@ -120,7 +122,10 @@ class _ClickParticlePainter extends CustomPainter {
       final textPainter = TextPainter(
         text: TextSpan(
           text: p.symbol,
-          style: TextStyle(fontSize: 16 * p.scale, color: Colors.white.withValues(alpha: p.opacity)),
+          style: TextStyle(
+            fontSize: 16 * p.scale,
+            color: Colors.white.withValues(alpha: p.opacity),
+          ),
         ),
         textDirection: TextDirection.ltr,
       )..layout();

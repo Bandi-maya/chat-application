@@ -3,15 +3,15 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../domain/models/user_profile.dart';
-import 'chaty_backend_service.dart';
+import 'backend_service.dart';
 
 /// Authenticates with either the registered email address or the public Chaty
 /// username. Username-to-email resolution happens inside the dedicated Supabase
 /// Edge Function; the client never receives another user's email address.
 class UsernameLoginService {
   UsernameLoginService({SupabaseClient? client, ChatyBackendService? backend})
-      : _client = client ?? Supabase.instance.client,
-        _backend = backend ?? ChatyBackendService();
+    : _client = client ?? Supabase.instance.client,
+      _backend = backend ?? ChatyBackendService();
 
   final SupabaseClient _client;
   final ChatyBackendService _backend;
@@ -52,6 +52,8 @@ class UsernameLoginService {
       if (_backend.isAuthenticated && profile != null) return profile;
       await Future<void>.delayed(const Duration(milliseconds: 80));
     }
-    throw Exception('Your secure session was created, but the profile could not be loaded.');
+    throw Exception(
+      'Your secure session was created, but the profile could not be loaded.',
+    );
   }
 }

@@ -10,28 +10,15 @@ enum MessageType {
   system,
 }
 
-enum DeliveryState {
-  queued,
-  sending,
-  sent,
-  delivered,
-  read,
-  failed,
-}
+enum DeliveryState { queued, sending, sent, delivered, read, failed }
 
 class MessageReaction {
   final String emoji;
   final List<String> userIds;
 
-  const MessageReaction({
-    required this.emoji,
-    required this.userIds,
-  });
+  const MessageReaction({required this.emoji, required this.userIds});
 
-  MessageReaction copyWith({
-    String? emoji,
-    List<String>? userIds,
-  }) {
+  MessageReaction copyWith({String? emoji, List<String>? userIds}) {
     return MessageReaction(
       emoji: emoji ?? this.emoji,
       userIds: userIds ?? this.userIds,

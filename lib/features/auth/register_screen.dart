@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../data/services/chaty_backend_service.dart';
+import '../../data/services/backend_service.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/persistence/preferences_storage.dart';
 import '../../ui/core/theme/theme_controller.dart';
@@ -59,7 +59,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (_isLoading) return;
     if (_formKey.currentState?.validate() != true) return;
     if (_usernameAvailable != true) {
-      setState(() => _errorMessage = 'Choose an available username before creating the account.');
+      setState(
+        () => _errorMessage =
+            'Choose an available username before creating the account.',
+      );
       return;
     }
 
@@ -132,13 +135,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } on TimeoutException {
       if (!mounted) return;
       setState(() {
-        _errorMessage = 'Verification is taking too long. Check your connection, then sign in with the same email and password.';
+        _errorMessage =
+            'Verification is taking too long. Check your connection, then sign in with the same email and password.';
         _isLoading = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = 'Email verification is still pending. Tap the confirmation link in the newest email, then sign in with the same credentials.';
+        _errorMessage =
+            'Email verification is still pending. Tap the confirmation link in the newest email, then sign in with the same credentials.';
         _isLoading = false;
       });
     }
@@ -146,9 +151,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   String _friendlyError(Object error) {
     final value = error.toString().replaceFirst('Exception: ', '');
-    if (value.contains('already registered')) return 'An account already exists for this email. Sign in instead.';
-    if (value.contains('already taken')) return 'That username was just taken. Choose one of the available suggestions.';
-    if (value.contains('rate limit')) return 'Too many attempts. Wait a moment and try again.';
+    if (value.contains('already registered'))
+      return 'An account already exists for this email. Sign in instead.';
+    if (value.contains('already taken'))
+      return 'That username was just taken. Choose one of the available suggestions.';
+    if (value.contains('rate limit'))
+      return 'Too many attempts. Wait a moment and try again.';
     return value;
   }
 
@@ -161,7 +169,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24.0,
+              vertical: 20.0,
+            ),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 440),
               child: Form(
@@ -184,7 +195,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const SizedBox(height: 6),
                     Text(
                       'Create your Chaty account with a unique public username.',
-                      style: TextStyle(color: theme.secondaryTextColor, fontSize: 14),
+                      style: TextStyle(
+                        color: theme.secondaryTextColor,
+                        fontSize: 14,
+                      ),
                     ),
                     const SizedBox(height: 32),
                     AuthTextField(
@@ -196,7 +210,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       validator: (value) {
                         final email = value?.trim() ?? '';
                         if (email.isEmpty) return 'Please enter your email';
-                        final valid = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email);
+                        final valid = RegExp(
+                          r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
+                        ).hasMatch(email);
                         if (!valid) return 'Please enter a valid email address';
                         return null;
                       },
@@ -209,15 +225,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       onAvailabilityChanged: (value) {
                         if (mounted) setState(() => _usernameAvailable = value);
                       },
-                      style: TextStyle(color: theme.primaryTextColor, fontSize: 14),
+                      style: TextStyle(
+                        color: theme.primaryTextColor,
+                        fontSize: 14,
+                      ),
                       decoration: InputDecoration(
                         labelText: 'Username',
                         hintText: 'Choose a unique username',
                         filled: true,
                         fillColor: theme.cardColor,
                         labelStyle: TextStyle(color: theme.secondaryTextColor),
-                        hintStyle: TextStyle(color: theme.secondaryTextColor.withValues(alpha: 0.65)),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(theme.cornerRadius)),
+                        hintStyle: TextStyle(
+                          color: theme.secondaryTextColor.withValues(
+                            alpha: 0.65,
+                          ),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(
+                            theme.cornerRadius,
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 18),
@@ -230,16 +257,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       textInputAction: TextInputAction.done,
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                          color: theme.secondaryTextColor.withValues(alpha: 0.6),
+                          _obscurePassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          color: theme.secondaryTextColor.withValues(
+                            alpha: 0.6,
+                          ),
                           size: 20,
                         ),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        onPressed: () => setState(
+                          () => _obscurePassword = !_obscurePassword,
+                        ),
                       ),
                       validator: (value) {
                         final password = value ?? '';
-                        if (password.isEmpty) return 'Please enter your password';
-                        if (password.length < 8) return 'Password must be at least 8 characters';
+                        if (password.isEmpty)
+                          return 'Please enter your password';
+                        if (password.length < 8)
+                          return 'Password must be at least 8 characters';
                         if (!RegExp(r'[A-Z]').hasMatch(password) ||
                             !RegExp(r'[a-z]').hasMatch(password) ||
                             !RegExp(r'[0-9]').hasMatch(password)) {
@@ -277,7 +312,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       children: [
                         Text(
                           'Already have an account? ',
-                          style: TextStyle(color: theme.secondaryTextColor, fontSize: 13.5),
+                          style: TextStyle(
+                            color: theme.secondaryTextColor,
+                            fontSize: 13.5,
+                          ),
                         ),
                         GestureDetector(
                           onTap: () => Navigator.of(context).pop(),

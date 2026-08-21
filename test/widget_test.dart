@@ -1,9 +1,14 @@
-import 'package:flutter_test/flutter_test.dart';
+import 'package:chat/domain/models/chat_message.dart';
+import 'package:chat/domain/models/preferences.dart';
+import 'package:chat/features/messages/emoji_picker_modal.dart';
+import 'package:chat/features/messages/message_bubble.dart';
+import 'package:chat/features/settings/settings_search_delegate.dart';
+import 'package:chat/ui/core/controllers/preferences_controller.dart';
+import 'package:chat/ui/core/design_system/settings_primitives.dart';
+import 'package:chat/ui/core/gb/gb_theme_overrides.dart';
 import 'package:chat/ui/core/theme/theme_presets.dart';
-import 'package:chat/domain/models/chaty_preferences.dart';
-import 'package:chat/ui/core/controllers/chaty_preferences_controller.dart';
-
-
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -12,8 +17,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  group('Theme Engine Tests', () {
-
+  group('Theme Engine & Token Validation Tests', () {
     test('Midnight preset loads with dark brightness and valid colors', () {
       final theme = ThemePresets.midnight;
       expect(theme.id, 'midnight');
@@ -34,6 +38,17 @@ void main() {
         expect(p.id.isNotEmpty, isTrue);
       }
     });
+
+    test(
+      'GbThemeOverrides safely respects user color overrides with contrast guard',
+      () {
+        final prefs = ChatyPreferencesController();
+        final base = ThemePresets.midnight;
+        final resolved = GbThemeOverrides.resolve(base, prefs);
+        expect(resolved.id, base.id);
+        expect(resolved.hasContrastIssue, isFalse);
+      },
+    );
   });
 
   group('Chaty Preferences Domain & State Tests', () {
@@ -49,11 +64,18 @@ void main() {
 
     test('Updating preferences persists in controller state', () {
       final prefs = ChatyPreferencesController();
-      prefs.updatePrivacy(prefs.privacy.copyWith(freezeLastSeen: true, antiViewOnce: true));
+      prefs.updatePrivacy(
+        prefs.privacy.copyWith(freezeLastSeen: true, antiViewOnce: true),
+      );
       expect(prefs.privacy.freezeLastSeen, isTrue);
       expect(prefs.privacy.antiViewOnce, isTrue);
 
-      prefs.updateConversation(prefs.conversation.copyWith(bubbleShape: 'Card', sidebarPosition: 'Left'));
+      prefs.updateConversation(
+        prefs.conversation.copyWith(
+          bubbleShape: 'Card',
+          sidebarPosition: 'Left',
+        ),
+      );
       expect(prefs.conversation.bubbleShape, 'Card');
       expect(prefs.conversation.sidebarPosition, 'Left');
     });
@@ -73,6 +95,214 @@ void main() {
       expect(restored.antiViewOnce, isTrue);
       expect(restored.showBlueTicksAfterReply, isTrue);
       expect(restored.typingIndicators, isFalse);
+    });
+
+    test('Home preferences roundtrip correctly', () {
+      final original = const HomePreferences(
+        homeStyle: 'Compact',
+        enableStoriesStrip: true,
+        separateChatsAndGroups: true,
+        ghostMode: true,
+      );
+      final map = original.toMap();
+      final restored = HomePreferences.fromMap(map);
+      expect(restored.homeStyle, 'Compact');
+      expect(restored.enableStoriesStrip, isTrue);
+      expect(restored.separateChatsAndGroups, isTrue);
+      expect(restored.ghostMode, isTrue);
+    });
+
+    test('Notification preferences roundtrip correctly', () {
+      final original = const NotificationPreferences(
+        enableGlobalNotifications: true,
+        showMessagePreview: false,
+        notifyContactOnline: false,
+      );
+      final map = original.toMap();
+      final restored = NotificationPreferences.fromMap(map);
+      expect(restored.enableGlobalNotifications, isTrue);
+      expect(restored.showMessagePreview, isFalse);
+      expect(restored.notifyContactOnline, isFalse);
+    });
+
+    test(
+      'Security preferences roundtrip correctly and never serialize secrets',
+      () {
+        const original = SecurityPreferences(
+          isAppLockEnabled: true,
+          lockMethod: 'PIN',
+          autoLockTimeout: '30s',
+          makePatternInvisible: true,
+          hideLockNotificationContent: true,
+          lockedConversationIds: ['conv_1', 'conv_2'],
+        );
+        final map = original.toMap();
+
+        // SECURITY: the synced/persisted blob must never carry plaintext
+        // credentials. Real credentials live only in secure storage.
+        for (final secretField in const [
+          'pinCode',
+          'password',
+          'patternCode',
+          'recoveryQuestion',
+          'recoveryAnswer',
+        ]) {
+          expect(
+            map.containsKey(secretField),
+            isFalse,
+            reason: 'Security blob must not serialize "$secretField"',
+          );
+        }
+
+        final restored = SecurityPreferences.fromMap(map);
+        expect(restored.isAppLockEnabled, isTrue);
+        expect(restored.lockMethod, 'PIN');
+        expect(restored.autoLockTimeout, '30s');
+        expect(restored.makePatternInvisible, isTrue);
+        expect(restored.hideLockNotificationContent, isTrue);
+        expect(
+          restored.lockedConversationIds,
+          containsAll(['conv_1', 'conv_2']),
+        );
+      },
+    );
+  });
+
+  group('Animated Emoji & Expression Engine Tests', () {
+    test('chatyAnimatedEmojiForUnicode detects supported animated emojis', () {
+      expect(chatyAnimatedEmojiForUnicode('❤️'), isNotNull);
+      expect(chatyAnimatedEmojiForUnicode('🔥'), isNotNull);
+      expect(chatyAnimatedEmojiForUnicode('👍'), isNotNull);
+      expect(chatyAnimatedEmojiForUnicode('😂'), isNotNull);
+      expect(chatyAnimatedEmojiForUnicode('random text'), isNull);
+    });
+  });
+
+  group('Message Bubble & Settings Consumer Widget Tests', () {
+    testWidgets(
+      'MessageBubble renders delivery state and custom corner radius',
+      (tester) async {
+        final msg = ChatMessage(
+          id: 'msg_1',
+          conversationId: 'conv_1',
+          senderId: 'usr_me',
+          text: 'Hello from Chaty production test!',
+          deliveryState: DeliveryState.read,
+          createdAt: DateTime.now(),
+        );
+
+        final theme = ThemePresets.midnight.copyWith(cornerRadius: 18.0);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: MessageBubble(
+                message: msg,
+                isMe: true,
+                theme: theme,
+                onLongPress: () {},
+              ),
+            ),
+          ),
+        );
+
+        expect(find.text('Hello from Chaty production test!'), findsOneWidget);
+        expect(find.byIcon(Icons.done_all_rounded), findsOneWidget);
+      },
+    );
+
+    testWidgets('ChatyChoiceTile selects option and triggers callback', (
+      tester,
+    ) async {
+      String selected = 'Rounded';
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) => ChatyChoiceTile<String>(
+                title: 'Bubble Shape Geometry',
+                options: const ['Rounded', 'Compact', 'Classic'],
+                selectedOption: selected,
+                optionLabel: (s) => s,
+                onSelected: (val) => setState(() => selected = val),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Bubble Shape Geometry'), findsOneWidget);
+      expect(find.text('Rounded'), findsOneWidget);
+      await tester.tap(find.text('Compact'));
+      await tester.pump();
+      expect(selected, 'Compact');
+    });
+
+    testWidgets('ChatySliderTile updates value on slider change', (
+      tester,
+    ) async {
+      double value = 16.0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) => ChatySliderTile(
+                title: 'Bubble Corner Radius',
+                value: value,
+                min: 4.0,
+                max: 24.0,
+                divisions: 20,
+                valueFormatter: (v) => '${v.toInt()}px',
+                onChanged: (v) => setState(() => value = v),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Bubble Corner Radius'), findsOneWidget);
+      expect(find.text('16px'), findsOneWidget);
+    });
+  });
+
+  group('Settings Search & Keyword Matching Tests', () {
+    test('SettingsSearchDelegate matches keywords and titles accurately', () {
+      final items = [
+        const SettingsSearchResult(
+          title: 'Privacy',
+          category: 'Privacy & Security',
+          description:
+              'Last seen, receipts, deleted messages and status privacy',
+          icon: Icons.visibility_off_rounded,
+          destination: SizedBox(),
+          keywords: ['blue tick', 'read receipt', 'freeze last seen'],
+        ),
+        const SettingsSearchResult(
+          title: 'Themes',
+          category: 'Appearance',
+          description: 'Dark, light and custom theme presets',
+          icon: Icons.palette_rounded,
+          destination: SizedBox(),
+          keywords: ['amoled', 'dark mode', 'true black'],
+        ),
+      ];
+
+      final delegate = SettingsSearchDelegate(allSettings: items);
+      delegate.query = 'blue tick';
+      expect(
+        items
+            .where((i) => i.keywords.any((k) => k.contains(delegate.query)))
+            .length,
+        1,
+      );
+
+      delegate.query = 'amoled';
+      expect(
+        items
+            .where((i) => i.keywords.any((k) => k.contains(delegate.query)))
+            .length,
+        1,
+      );
     });
   });
 }

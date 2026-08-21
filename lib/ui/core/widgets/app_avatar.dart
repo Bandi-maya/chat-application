@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../../domain/models/user_profile.dart';
 
+import '../../../domain/models/user_profile.dart';
+import '../design_system/components/chaty_kit.dart';
+
+/// Thin adapter over [ChatyAvatarCore] (the kit's canonical avatar) so all
+/// legacy call sites get the flat premium-iOS paint automatically.
 class AppAvatar extends StatelessWidget {
   final String initials;
   final String? colorHex;
@@ -21,7 +25,9 @@ class AppAvatar extends StatelessWidget {
     if (hex == null || hex.isEmpty) return const Color(0xFF6366F1);
     try {
       final clean = hex.replaceAll('#', '').replaceAll('0x', '');
-      return Color(int.parse(clean.length == 6 ? 'FF$clean' : clean, radix: 16));
+      return Color(
+        int.parse(clean.length == 6 ? 'FF$clean' : clean, radix: 16),
+      );
     } catch (_) {
       return const Color(0xFF6366F1);
     }
@@ -42,57 +48,24 @@ class AppAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = _parseColor(colorHex);
+    final ringColor = Theme.of(context).scaffoldBackgroundColor;
     return Stack(
+      clipBehavior: Clip.none,
       children: [
-        Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                bg,
-                bg.withValues(alpha: 0.75),
-              ],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: bg.withValues(alpha: 0.25),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Center(
-            child: Text(
-              initials,
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: size * 0.4,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
+        ChatyAvatarCore(
+          initials: initials,
+          color: _parseColor(colorHex),
+          size: size,
         ),
         if (showOnlineBadge)
           Positioned(
-            right: 0,
-            bottom: 0,
-            child: Container(
-              width: size * 0.32,
-              height: size * 0.32,
-              decoration: BoxDecoration(
-                color: _getPresenceColor(),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Theme.of(context).scaffoldBackgroundColor,
-                  width: 2,
-                ),
-              ),
+            right: -1,
+            bottom: -1,
+            child: ChatyOnlineDot(
+              active: true,
+              avatarSize: size,
+              color: _getPresenceColor(),
+              ringColor: ringColor,
             ),
           ),
       ],

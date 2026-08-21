@@ -427,7 +427,64 @@ class ThemePresets {
     cornerRadius: 20.0,
   );
 
+  /// WhatsApp iOS (light) — the app's default identity. Authentic palette:
+  /// white list chrome, #D9FDD3 outgoing bubbles, #111B21 ink, #667781 gray,
+  /// #25D366 green accents, tail-less 18px bubbles, plain background.
+  static const whatsappIosLight = ThemeConfig(
+    id: 'whatsapp_ios_light',
+    name: 'WhatsApp iOS',
+    brightness: Brightness.light,
+    accentColor: Color(0xFF25D366),
+    backgroundColor: Color(0xFFFFFFFF),
+    surfaceColor: Color(0xFFFFFFFF),
+    cardColor: Color(0xFFF6F6F6),
+    primaryTextColor: Color(0xFF111B21),
+    secondaryTextColor: Color(0xFF667781),
+    outgoingBubbleColor: Color(0xFFD9FDD3),
+    incomingBubbleColor: Color(0xFFFFFFFF),
+    outgoingTextColor: Color(0xFF111B21),
+    incomingTextColor: Color(0xFF111B21),
+    linkColor: Color(0xFF027EB5),
+    dangerColor: Color(0xFFEA4335),
+    successColor: Color(0xFF25D366),
+    cornerRadius: 14.0,
+    density: 1.0,
+    fontScale: 1.0,
+    bubbleStyle: AppBubbleStyle.rounded,
+    bubbleRadius: 18.0,
+    wallpaperId: 'none',
+  );
+
+  /// WhatsApp iOS (dark) — #0B141A canvas, #111B21 chrome, #202C33 panels,
+  /// #005C4B outgoing bubbles, #53BDEB links/ticks.
+  static const whatsappIosDark = ThemeConfig(
+    id: 'whatsapp_ios_dark',
+    name: 'WhatsApp iOS Dark',
+    brightness: Brightness.dark,
+    accentColor: Color(0xFF21C063),
+    backgroundColor: Color(0xFF0B141A),
+    surfaceColor: Color(0xFF111B21),
+    cardColor: Color(0xFF202C33),
+    primaryTextColor: Color(0xFFE9EDEF),
+    secondaryTextColor: Color(0xFF8696A0),
+    outgoingBubbleColor: Color(0xFF005C4B),
+    incomingBubbleColor: Color(0xFF202C33),
+    outgoingTextColor: Color(0xFFE9EDEF),
+    incomingTextColor: Color(0xFFE9EDEF),
+    linkColor: Color(0xFF53BDEB),
+    dangerColor: Color(0xFFEF4444),
+    successColor: Color(0xFF21C063),
+    cornerRadius: 14.0,
+    density: 1.0,
+    fontScale: 1.0,
+    bubbleStyle: AppBubbleStyle.rounded,
+    bubbleRadius: 18.0,
+    wallpaperId: 'none',
+  );
+
   static const List<ThemeConfig> all = <ThemeConfig>[
+    whatsappIosLight,
+    whatsappIosDark,
     monochromeDark,
     monochromeLight,
     midnight,
@@ -451,11 +508,16 @@ class ThemePresets {
   ];
 
   static ThemeConfig getSystemDefaultTheme([Brightness? platformBrightness]) {
-    final brightness = platformBrightness ?? WidgetsBinding.instance.platformDispatcher.platformBrightness;
-    return brightness == Brightness.light ? monochromeLight : monochromeDark;
+    final brightness =
+        platformBrightness ??
+        WidgetsBinding.instance.platformDispatcher.platformBrightness;
+    return brightness == Brightness.light ? whatsappIosLight : whatsappIosDark;
   }
 
   static ThemeConfig getById(String id) {
-    return all.firstWhere((theme) => theme.id == id, orElse: () => monochromeDark);
+    return all.firstWhere(
+      (theme) => theme.id == id,
+      orElse: () => monochromeDark,
+    );
   }
 }

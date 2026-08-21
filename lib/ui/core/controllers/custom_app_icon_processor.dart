@@ -37,7 +37,9 @@ class CustomAppIconProcessor {
 
       final sourceWidth = sourceImage.width.toDouble();
       final sourceHeight = sourceImage.height.toDouble();
-      final squareSide = sourceWidth < sourceHeight ? sourceWidth : sourceHeight;
+      final squareSide = sourceWidth < sourceHeight
+          ? sourceWidth
+          : sourceHeight;
       final sourceRect = ui.Rect.fromLTWH(
         (sourceWidth - squareSide) / 2,
         (sourceHeight - squareSide) / 2,
@@ -61,10 +63,14 @@ class CustomAppIconProcessor {
       launcherImage = await picture.toImage(outputSize, outputSize);
       picture.dispose();
 
-      final byteData = await launcherImage.toByteData(format: ui.ImageByteFormat.png);
+      final byteData = await launcherImage.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
       final normalized = byteData?.buffer.asUint8List();
       if (normalized == null || normalized.isEmpty) {
-        throw StateError('Unable to encode the processed adaptive launcher icon.');
+        throw StateError(
+          'Unable to encode the processed adaptive launcher icon.',
+        );
       }
 
       final root = await getApplicationSupportDirectory();
@@ -75,8 +81,9 @@ class CustomAppIconProcessor {
         await directory.create(recursive: true);
       }
 
-      final safeId = (presetId ?? 'custom_${DateTime.now().microsecondsSinceEpoch}')
-          .replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      final safeId =
+          (presetId ?? 'custom_${DateTime.now().microsecondsSinceEpoch}')
+              .replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
       final target = File(
         '${directory.path}${Platform.pathSeparator}$safeId.launcher.png',
       );

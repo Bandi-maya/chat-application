@@ -1,6 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import '../controllers/chaty_preferences_controller.dart';
+import '../controllers/preferences_controller.dart';
 
 class FallingItem {
   double x;
@@ -33,10 +33,12 @@ class FallingParticlesOverlay extends StatefulWidget {
   });
 
   @override
-  State<FallingParticlesOverlay> createState() => _FallingParticlesOverlayState();
+  State<FallingParticlesOverlay> createState() =>
+      _FallingParticlesOverlayState();
 }
 
-class _FallingParticlesOverlayState extends State<FallingParticlesOverlay> with SingleTickerProviderStateMixin {
+class _FallingParticlesOverlayState extends State<FallingParticlesOverlay>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   final List<FallingItem> _items = [];
   final Random _random = Random();
@@ -44,9 +46,10 @@ class _FallingParticlesOverlayState extends State<FallingParticlesOverlay> with 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 10))
-      ..addListener(_updateParticles)
-      ..repeat();
+    _controller =
+        AnimationController(vsync: this, duration: const Duration(seconds: 10))
+          ..addListener(_updateParticles)
+          ..repeat();
   }
 
   @override
@@ -110,10 +113,13 @@ class _FallingParticlesOverlayState extends State<FallingParticlesOverlay> with 
   @override
   Widget build(BuildContext context) {
     final fx = widget.preferencesController.effects;
-    final bool active = fx.enableFallingParticles &&
+    final bool active =
+        fx.enableFallingParticles &&
         (fx.fallingParticleScope == 'Both' ||
-            (fx.fallingParticleScope == 'Home only' && widget.currentScope == 'Home') ||
-            (fx.fallingParticleScope == 'Chat only' && widget.currentScope == 'Chat'));
+            (fx.fallingParticleScope == 'Home only' &&
+                widget.currentScope == 'Home') ||
+            (fx.fallingParticleScope == 'Chat only' &&
+                widget.currentScope == 'Chat'));
 
     return Stack(
       children: [
@@ -141,12 +147,18 @@ class _FallingPainter extends CustomPainter {
       final textPainter = TextPainter(
         text: TextSpan(
           text: item.symbol,
-          style: TextStyle(fontSize: item.size, color: Colors.white.withValues(alpha: item.opacity)),
+          style: TextStyle(
+            fontSize: item.size,
+            color: Colors.white.withValues(alpha: item.opacity),
+          ),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
 
-      textPainter.paint(canvas, Offset(item.x * size.width, item.y * size.height));
+      textPainter.paint(
+        canvas,
+        Offset(item.x * size.width, item.y * size.height),
+      );
     }
   }
 

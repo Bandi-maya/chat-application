@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 
-import '../controllers/chaty_preferences_controller.dart';
+import '../controllers/preferences_controller.dart';
 import '../theme/theme_config.dart';
 
 class GbThemeOverrides {
   const GbThemeOverrides._();
 
-  static ThemeConfig resolve(ThemeConfig base, ChatyPreferencesController prefs) {
+  static ThemeConfig resolve(
+    ThemeConfig base,
+    ChatyPreferencesController prefs,
+  ) {
     Color? firstColor(List<String> keys) {
       for (final key in keys) {
         final value = prefs.gbColor(key);
@@ -29,27 +32,48 @@ class GbThemeOverrides {
       'ConvoBack',
     ]);
     final surface = firstColor(<String>['ModChatColor', 'BGColor']);
-    final primaryText = firstColor(<String>['ModConTextColor', 'HomeBarText', 'ModContactNameColor']);
+    final primaryText = firstColor(<String>[
+      'ModConTextColor',
+      'HomeBarText',
+      'ModContactNameColor',
+    ]);
     final outgoingBubble = firstColor(<String>['ModChatRightBubble']);
     final incomingBubble = firstColor(<String>['ModChatLeftBubble']);
-    final outgoingText = firstColor(<String>['ModChatBubbleText', 'date_right_color']);
-    final incomingText = firstColor(<String>['ModChatBubbleTextLeft', 'date_left_color']);
+    final outgoingText = firstColor(<String>[
+      'ModChatBubbleText',
+      'date_right_color',
+    ]);
+    final incomingText = firstColor(<String>[
+      'ModChatBubbleTextLeft',
+      'date_left_color',
+    ]);
     final link = firstColor(<String>['ModChatBubbleHyperlinks']);
 
     final textSize = prefs.gbDouble('text_size_pick', fallback: 15);
-    final fontScale = (base.fontScale * (textSize / 15)).clamp(0.78, 1.6).toDouble();
-    final bubbleStyle = _bubbleStyle(prefs.gbString('bubble_style', fallback: '')) ?? base.bubbleStyle;
+    final fontScale = (base.fontScale * (textSize / 15))
+        .clamp(0.78, 1.6)
+        .toDouble();
+    // Resolve the bubble geometry from the GB catalog key first (legacy/mod
+    // themes), then fall back to the structured Conversation "bubble shape"
+    // picker, and finally the base theme. Previously only the GB key was read,
+    // so the structured picker was write-only.
+    final bubbleStyle =
+        _bubbleStyle(prefs.gbString('bubble_style', fallback: '')) ??
+        _bubbleStyle(prefs.conversation.bubbleShape) ??
+        base.bubbleStyle;
 
     final candidate = base.copyWith(
       accentColor: accent,
       backgroundColor: background,
       surfaceColor: surface,
-      cardColor: surface == null ? null : Color.alphaBlend(
-        base.brightness == Brightness.dark
-            ? Colors.white.withValues(alpha: 0.045)
-            : Colors.black.withValues(alpha: 0.025),
-        surface,
-      ),
+      cardColor: surface == null
+          ? null
+          : Color.alphaBlend(
+              base.brightness == Brightness.dark
+                  ? Colors.white.withValues(alpha: 0.045)
+                  : Colors.black.withValues(alpha: 0.025),
+              surface,
+            ),
       primaryTextColor: primaryText,
       outgoingBubbleColor: outgoingBubble,
       incomingBubbleColor: incomingBubble,
@@ -58,6 +82,8 @@ class GbThemeOverrides {
       linkColor: link,
       fontScale: fontScale,
       bubbleStyle: bubbleStyle,
+      tickStyle: prefs.conversation.tickStyle,
+      bubbleRadius: prefs.conversation.bubbleRadius,
     );
 
     // Never accept a custom override that makes core text unreadable. If a
@@ -65,26 +91,53 @@ class GbThemeOverrides {
     // token for that surface while preserving the other valid overrides.
     return candidate.hasContrastIssue
         ? candidate.copyWith(
-            primaryTextColor: _ensureContrast(candidate.primaryTextColor, candidate.backgroundColor, base.primaryTextColor),
-            outgoingTextColor: _ensureContrast(candidate.outgoingTextColor, candidate.outgoingBubbleColor, base.outgoingTextColor),
-            incomingTextColor: _ensureContrast(candidate.incomingTextColor, candidate.incomingBubbleColor, base.incomingTextColor),
+            primaryTextColor: _ensureContrast(
+              candidate.primaryTextColor,
+              candidate.backgroundColor,
+              base.primaryTextColor,
+            ),
+            outgoingTextColor: _ensureContrast(
+              candidate.outgoingTextColor,
+              candidate.outgoingBubbleColor,
+              base.outgoingTextColor,
+            ),
+            incomingTextColor: _ensureContrast(
+              candidate.incomingTextColor,
+              candidate.incomingBubbleColor,
+              base.incomingTextColor,
+            ),
           )
         : candidate;
   }
 
   static AppBubbleStyle? _bubbleStyle(String raw) {
     final value = raw.toLowerCase();
+    if (value.isEmpty) return null;
     if (value.contains('pill')) return AppBubbleStyle.pill;
-    if (value.contains('compact') || value.contains('square') || value.contains('card')) return AppBubbleStyle.softSquare;
-    if (value.contains('tail-less') || value.contains('tailless')) return AppBubbleStyle.rounded;
-    if (value.contains('tail')) return AppBubbleStyle.sharpTail;
-    if (value.contains('round') || value.contains('squircle')) return AppBubbleStyle.rounded;
+    if (value.contains('compact') ||
+        value.contains('square') ||
+        value.contains('card') ||
+        value.contains('minimal')) {
+      return AppBubbleStyle.softSquare;
+    }
+    if (value.contains('tail-less') || value.contains('tailless'))
+      return AppBubbleStyle.rounded;
+    if (value.contains('tail') || value.contains('classic'))
+      return AppBubbleStyle.sharpTail;
+    if (value.contains('round') || value.contains('squircle'))
+      return AppBubbleStyle.rounded;
     return null;
   }
 
-  static Color _ensureContrast(Color foreground, Color background, Color fallback) {
-    if (ThemeConfig.calculateContrastRatio(foreground, background) >= 3.5) return foreground;
-    if (ThemeConfig.calculateContrastRatio(fallback, background) >= 3.5) return fallback;
+  static Color _ensureContrast(
+    Color foreground,
+    Color background,
+    Color fallback,
+  ) {
+    if (ThemeConfig.calculateContrastRatio(foreground, background) >= 3.5)
+      return foreground;
+    if (ThemeConfig.calculateContrastRatio(fallback, background) >= 3.5)
+      return fallback;
     return background.computeLuminance() > 0.45 ? Colors.black : Colors.white;
   }
 }

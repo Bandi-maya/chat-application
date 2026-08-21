@@ -37,7 +37,8 @@ class LockCredentialSetupModal extends StatefulWidget {
   }
 
   @override
-  State<LockCredentialSetupModal> createState() => _LockCredentialSetupModalState();
+  State<LockCredentialSetupModal> createState() =>
+      _LockCredentialSetupModalState();
 }
 
 class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
@@ -64,7 +65,8 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
     final primary = _primaryController.text;
     final confirmation = _confirmController.text;
     if (_isPin) {
-      if (!RegExp(r'^\d+$').hasMatch(primary) || primary.length != widget.pinLength) {
+      if (!RegExp(r'^\d+$').hasMatch(primary) ||
+          primary.length != widget.pinLength) {
         setState(() => _error = 'Enter exactly ${widget.pinLength} digits.');
         return;
       }
@@ -99,7 +101,10 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
   }
 
   Future<void> _handlePattern(String pattern) async {
-    final nodes = pattern.split('-').where((value) => value.isNotEmpty).toList(growable: false);
+    final nodes = pattern
+        .split('-')
+        .where((value) => value.isNotEmpty)
+        .toList(growable: false);
     if (nodes.length < 4) {
       setState(() => _error = 'Connect at least 4 points.');
       return;
@@ -144,8 +149,12 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
       _error = '';
     });
     final success = _isBiometric
-        ? await widget.lockService.authenticateBiometric(reason: 'Verify your biometric to enable Chaty Lock')
-        : await widget.lockService.authenticateDeviceCredential(reason: 'Verify your device screen lock to enable Chaty Lock');
+        ? await widget.lockService.authenticateBiometric(
+            reason: 'Verify your biometric to enable Chaty Lock',
+          )
+        : await widget.lockService.authenticateDeviceCredential(
+            reason: 'Verify your device screen lock to enable Chaty Lock',
+          );
     if (!mounted) return;
     if (success) {
       Navigator.of(context).pop(true);
@@ -183,12 +192,12 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
                     _isPattern
                         ? Icons.pattern_rounded
                         : _isBiometric
-                            ? Icons.fingerprint_rounded
-                            : _isDeviceCredential
-                                ? Icons.phonelink_lock_rounded
-                                : _isPassword
-                                    ? Icons.password_rounded
-                                    : Icons.pin_rounded,
+                        ? Icons.fingerprint_rounded
+                        : _isDeviceCredential
+                        ? Icons.phonelink_lock_rounded
+                        : _isPassword
+                        ? Icons.password_rounded
+                        : Icons.pin_rounded,
                     color: theme.colorScheme.primary,
                   ),
                 ),
@@ -197,16 +206,23 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Set up ${widget.method}', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                      Text(
+                        'Set up ${widget.method}',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       const SizedBox(height: 3),
                       Text(
                         _isPattern
-                            ? (_firstPattern == null ? 'Draw a pattern, then draw it again.' : 'Draw the same pattern again to confirm.')
+                            ? (_firstPattern == null
+                                  ? 'Draw a pattern, then draw it again.'
+                                  : 'Draw the same pattern again to confirm.')
                             : _isBiometric
-                                ? 'Chaty uses the biometric enrolled on this device.'
-                                : _isDeviceCredential
-                                    ? 'Use the device PIN, pattern, password, or biometric managed by the operating system.'
-                                    : 'Create a local credential used only for Chaty.',
+                            ? 'Chaty uses the biometric enrolled on this device.'
+                            : _isDeviceCredential
+                            ? 'Use the device PIN, pattern, password, or biometric managed by the operating system.'
+                            : 'Create a local credential used only for Chaty.',
                         style: theme.textTheme.bodySmall,
                       ),
                     ],
@@ -222,7 +238,10 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
                   color: theme.colorScheme.errorContainer,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Text(_error, style: TextStyle(color: theme.colorScheme.onErrorContainer)),
+                child: Text(
+                  _error,
+                  style: TextStyle(color: theme.colorScheme.onErrorContainer),
+                ),
               ),
               const SizedBox(height: 16),
             ],
@@ -240,7 +259,9 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
             else if (_isBiometric || _isDeviceCredential) ...[
               const SizedBox(height: 8),
               Icon(
-                _isBiometric ? Icons.fingerprint_rounded : Icons.phonelink_lock_rounded,
+                _isBiometric
+                    ? Icons.fingerprint_rounded
+                    : Icons.phonelink_lock_rounded,
                 size: 86,
                 color: theme.colorScheme.primary,
               ),
@@ -248,21 +269,42 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
               FilledButton.icon(
                 onPressed: _busy ? null : _verifyNativeMethod,
                 icon: _busy
-                    ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                    : Icon(_isBiometric ? Icons.fingerprint_rounded : Icons.verified_user_rounded),
-                label: Text(_busy ? 'Verifying…' : (_isBiometric ? 'Verify biometric' : 'Verify device lock')),
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        _isBiometric
+                            ? Icons.fingerprint_rounded
+                            : Icons.verified_user_rounded,
+                      ),
+                label: Text(
+                  _busy
+                      ? 'Verifying…'
+                      : (_isBiometric
+                            ? 'Verify biometric'
+                            : 'Verify device lock'),
+                ),
               ),
             ] else ...[
               TextField(
                 controller: _primaryController,
                 enabled: !_busy,
                 obscureText: _isPassword,
-                keyboardType: _isPin ? TextInputType.number : TextInputType.visiblePassword,
+                keyboardType: _isPin
+                    ? TextInputType.number
+                    : TextInputType.visiblePassword,
                 maxLength: _isPin ? widget.pinLength : null,
-                inputFormatters: _isPin ? <TextInputFormatter>[FilteringTextInputFormatter.digitsOnly] : null,
+                inputFormatters: _isPin
+                    ? <TextInputFormatter>[
+                        FilteringTextInputFormatter.digitsOnly,
+                      ]
+                    : null,
                 autofillHints: const <String>[],
                 decoration: InputDecoration(
-                  labelText: _isPin ? '${widget.pinLength}-digit PIN' : 'Password',
+                  labelText: _isPin
+                      ? '${widget.pinLength}-digit PIN'
+                      : 'Password',
                   border: const OutlineInputBorder(),
                 ),
               ),
@@ -271,9 +313,15 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
                 controller: _confirmController,
                 enabled: !_busy,
                 obscureText: true,
-                keyboardType: _isPin ? TextInputType.number : TextInputType.visiblePassword,
+                keyboardType: _isPin
+                    ? TextInputType.number
+                    : TextInputType.visiblePassword,
                 maxLength: _isPin ? widget.pinLength : null,
-                inputFormatters: _isPin ? <TextInputFormatter>[FilteringTextInputFormatter.digitsOnly] : null,
+                inputFormatters: _isPin
+                    ? <TextInputFormatter>[
+                        FilteringTextInputFormatter.digitsOnly,
+                      ]
+                    : null,
                 autofillHints: const <String>[],
                 onSubmitted: (_) => _saveTextCredential(),
                 decoration: const InputDecoration(
@@ -285,7 +333,10 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
               FilledButton(
                 onPressed: _busy ? null : _saveTextCredential,
                 child: _busy
-                    ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Text('Save credential'),
               ),
             ],
@@ -293,7 +344,9 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
             Text(
               'Chaty never sends your local lock PIN, password, or pattern to the messaging backend.',
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),

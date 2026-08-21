@@ -4,7 +4,7 @@ import 'package:chat/domain/models/conversation.dart';
 import 'package:chat/domain/models/user_profile.dart';
 import 'package:chat/ui/core/commands/chat_command_parser.dart';
 import 'package:chat/ui/core/realtime/realtime_event_bus.dart';
-import 'package:chat/ui/core/validators/chaty_validators.dart';
+import 'package:chat/ui/core/validators/input_validators.dart';
 
 void main() {
   group('ChatyValidators Unit Tests', () {
@@ -15,14 +15,17 @@ void main() {
       expect(ChatyValidators.validateUsername('abc'), isNull);
     });
 
-    test('Username validation rejects invalid patterns and reserved keywords', () {
-      expect(ChatyValidators.validateUsername('ab'), isNotNull);
-      expect(ChatyValidators.validateUsername('admin'), isNotNull);
-      expect(ChatyValidators.validateUsername('root'), isNotNull);
-      expect(ChatyValidators.validateUsername('support'), isNotNull);
-      expect(ChatyValidators.validateUsername('chaty'), isNotNull);
-      expect(ChatyValidators.validateUsername('user!name'), isNotNull);
-    });
+    test(
+      'Username validation rejects invalid patterns and reserved keywords',
+      () {
+        expect(ChatyValidators.validateUsername('ab'), isNotNull);
+        expect(ChatyValidators.validateUsername('admin'), isNotNull);
+        expect(ChatyValidators.validateUsername('root'), isNotNull);
+        expect(ChatyValidators.validateUsername('support'), isNotNull);
+        expect(ChatyValidators.validateUsername('chaty'), isNotNull);
+        expect(ChatyValidators.validateUsername('user!name'), isNotNull);
+      },
+    );
 
     test('Email validator enforces valid email patterns', () {
       expect(ChatyValidators.validateEmail('maya@chaty.app'), isNull);

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../data/services/local_lock_service.dart';
 import '../../../injection/locator.dart';
-import '../../../ui/core/controllers/chaty_preferences_controller.dart';
+import '../../../ui/core/controllers/preferences_controller.dart';
 import 'lock_credential_setup_modal.dart';
 import 'pattern_lock_pad.dart';
 
@@ -41,15 +41,19 @@ class AppLockOverlayModal extends StatefulWidget {
         reason: reason,
         onUnlocked: () => Navigator.of(ctx).pop(true),
       ),
-      transitionBuilder: (context, animation, secondaryAnimation, child) => FadeTransition(
-        opacity: CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
-        child: ScaleTransition(
-          scale: Tween<double>(begin: 0.985, end: 1).animate(
-            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+      transitionBuilder: (context, animation, secondaryAnimation, child) =>
+          FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            ),
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.985, end: 1).animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+              ),
+              child: child,
+            ),
           ),
-          child: child,
-        ),
-      ),
     );
   }
 
@@ -67,13 +71,16 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
   bool _nativePromptStarted = false;
   int _pinLength = 4;
 
-  LocalLockService get _lockService => widget.lockService ?? locator<LocalLockService>();
+  LocalLockService get _lockService =>
+      widget.lockService ?? locator<LocalLockService>();
 
   @override
   void initState() {
     super.initState();
     _loadCapabilities();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _startNativeMethodIfNeeded());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _startNativeMethodIfNeeded(),
+    );
   }
 
   @override
@@ -217,7 +224,9 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
               }),
               IconButton(
                 tooltip: 'Use biometric',
-                onPressed: _busy || !_biometricAvailable ? null : () => _runNativeAuthentication('Biometric'),
+                onPressed: _busy || !_biometricAvailable
+                    ? null
+                    : () => _runNativeAuthentication('Biometric'),
                 icon: const Icon(Icons.fingerprint_rounded, size: 30),
               ),
               _NumberKey(
@@ -228,7 +237,12 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                 tooltip: 'Delete digit',
                 onPressed: _busy || _enteredPin.isEmpty
                     ? null
-                    : () => setState(() => _enteredPin = _enteredPin.substring(0, _enteredPin.length - 1)),
+                    : () => setState(
+                        () => _enteredPin = _enteredPin.substring(
+                          0,
+                          _enteredPin.length - 1,
+                        ),
+                      ),
                 icon: const Icon(Icons.backspace_outlined),
               ),
             ],
@@ -261,28 +275,39 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                       width: 74,
                       height: 74,
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                        color: theme.colorScheme.primary.withValues(
+                          alpha: 0.12,
+                        ),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         method == 'Biometric'
                             ? Icons.fingerprint_rounded
                             : method == 'Pattern'
-                                ? Icons.pattern_rounded
-                                : method == 'Device Credential'
-                                    ? Icons.phonelink_lock_rounded
-                                    : Icons.lock_rounded,
+                            ? Icons.pattern_rounded
+                            : method == 'Device Credential'
+                            ? Icons.phonelink_lock_rounded
+                            : Icons.lock_rounded,
                         size: 36,
                         color: theme.colorScheme.primary,
                       ),
                     ),
                     const SizedBox(height: 18),
-                    Text(widget.title, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+                    Text(
+                      widget.title,
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     Text(
-                      method == 'Device Credential' ? 'Use your device screen lock to continue' : 'Use $method to continue',
+                      method == 'Device Credential'
+                          ? 'Use your device screen lock to continue'
+                          : 'Use $method to continue',
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                     const SizedBox(height: 22),
                     if (_errorMessage.isNotEmpty) ...[
@@ -296,12 +321,17 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                         child: Text(
                           _errorMessage,
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: theme.colorScheme.onErrorContainer),
+                          style: TextStyle(
+                            color: theme.colorScheme.onErrorContainer,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),
                     ],
-                    if (!_hasConfiguredCredential && (method == 'PIN' || method == 'Pattern' || method == 'Password')) ...[
+                    if (!_hasConfiguredCredential &&
+                        (method == 'PIN' ||
+                            method == 'Pattern' ||
+                            method == 'Password')) ...[
                       Text(
                         'This lock method has not been configured securely on this device yet.',
                         textAlign: TextAlign.center,
@@ -319,12 +349,15 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                       PatternLockPad(
                         hideTrace: security.makePatternInvisible,
                         enableHaptics: !security.disablePatternVibration,
-                        onPatternComplete: (pattern) => _verifySecret('Pattern', pattern),
+                        onPatternComplete: (pattern) =>
+                            _verifySecret('Pattern', pattern),
                       ),
                       if (_biometricAvailable) ...[
                         const SizedBox(height: 8),
                         TextButton.icon(
-                          onPressed: _busy ? null : () => _runNativeAuthentication('Biometric'),
+                          onPressed: _busy
+                              ? null
+                              : () => _runNativeAuthentication('Biometric'),
                           icon: const Icon(Icons.fingerprint_rounded),
                           label: const Text('Use biometric instead'),
                         ),
@@ -335,7 +368,8 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                         enabled: !_busy,
                         obscureText: true,
                         autofocus: true,
-                        onSubmitted: (value) => _verifySecret('Password', value),
+                        onSubmitted: (value) =>
+                            _verifySecret('Password', value),
                         decoration: const InputDecoration(
                           labelText: 'Password',
                           border: OutlineInputBorder(),
@@ -343,14 +377,26 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                       ),
                       const SizedBox(height: 14),
                       FilledButton(
-                        onPressed: _busy ? null : () => _verifySecret('Password', _passwordController.text),
+                        onPressed: _busy
+                            ? null
+                            : () => _verifySecret(
+                                'Password',
+                                _passwordController.text,
+                              ),
                         child: _busy
-                            ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                            ? const SizedBox.square(
+                                dimension: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
                             : const Text('Unlock'),
                       ),
                       if (_biometricAvailable)
                         TextButton.icon(
-                          onPressed: _busy ? null : () => _runNativeAuthentication('Biometric'),
+                          onPressed: _busy
+                              ? null
+                              : () => _runNativeAuthentication('Biometric'),
                           icon: const Icon(Icons.fingerprint_rounded),
                           label: const Text('Use biometric instead'),
                         ),
@@ -361,8 +407,16 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                       else
                         FilledButton.icon(
                           onPressed: () => _runNativeAuthentication(method),
-                          icon: Icon(method == 'Device Credential' ? Icons.phonelink_lock_rounded : Icons.fingerprint_rounded),
-                          label: Text(method == 'Device Credential' ? 'Authenticate with device lock' : 'Scan biometric'),
+                          icon: Icon(
+                            method == 'Device Credential'
+                                ? Icons.phonelink_lock_rounded
+                                : Icons.fingerprint_rounded,
+                          ),
+                          label: Text(
+                            method == 'Device Credential'
+                                ? 'Authenticate with device lock'
+                                : 'Scan biometric',
+                          ),
                         ),
                     ],
                   ],
@@ -392,7 +446,12 @@ class _NumberKey extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(22),
         child: Center(
-          child: Text(label, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+          child: Text(
+            label,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ),
       ),
     );

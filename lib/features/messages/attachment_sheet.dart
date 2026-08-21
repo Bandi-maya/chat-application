@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../ui/core/theme/theme_config.dart';
+import '../../ui/core/design_system/design_system.dart';
 
 class AttachmentSheet extends StatelessWidget {
   final ThemeConfig theme;
@@ -22,11 +23,21 @@ class AttachmentSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeData = Theme.of(context);
+    final isDark = themeData.brightness == Brightness.dark;
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 26),
+      padding: const EdgeInsets.fromLTRB(
+        ChatySpacing.lg,
+        ChatySpacing.md,
+        ChatySpacing.lg,
+        ChatySpacing.xl,
+      ),
       decoration: BoxDecoration(
-        color: theme.surfaceColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+        color: isDark ? const Color(0xFF18181B) : Colors.white,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(ChatyRadius.xl),
+        ),
       ),
       child: SafeArea(
         top: false,
@@ -35,65 +46,77 @@ class AttachmentSheet extends StatelessWidget {
           children: [
             Container(
               width: 38,
-              height: 4,
+              height: 4.5,
               decoration: BoxDecoration(
-                color: theme.secondaryTextColor.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(3),
+                color: themeData.colorScheme.onSurface.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(ChatyRadius.full),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: ChatySpacing.lg),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _option(
+                  context: context,
                   icon: Icons.photo_library_rounded,
                   label: 'Gallery',
                   color: const Color(0xFF8B5CF6),
-                  onTap: () => _closeAnd(context, () => onMediaRequested('image')),
+                  onTap: () =>
+                      _closeAnd(context, () => onMediaRequested('image')),
                 ),
                 _option(
+                  context: context,
                   icon: Icons.videocam_rounded,
                   label: 'Video',
                   color: const Color(0xFFEC4899),
-                  onTap: () => _closeAnd(context, () => onMediaRequested('video')),
+                  onTap: () =>
+                      _closeAnd(context, () => onMediaRequested('video')),
                 ),
                 _option(
+                  context: context,
                   icon: Icons.insert_drive_file_rounded,
                   label: 'Document',
                   color: const Color(0xFF3B82F6),
-                  onTap: () => _closeAnd(context, () => onMediaRequested('document')),
+                  onTap: () =>
+                      _closeAnd(context, () => onMediaRequested('document')),
                 ),
                 _option(
+                  context: context,
                   icon: Icons.headphones_rounded,
                   label: 'Audio',
                   color: const Color(0xFFF59E0B),
-                  onTap: () => _closeAnd(context, () => onMediaRequested('audio')),
+                  onTap: () =>
+                      _closeAnd(context, () => onMediaRequested('audio')),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: ChatySpacing.base),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _option(
+                  context: context,
                   icon: Icons.location_on_rounded,
                   label: 'Location',
                   color: const Color(0xFF10B981),
                   onTap: () => _closeAnd(context, onLocationRequested),
                 ),
                 _option(
+                  context: context,
                   icon: Icons.person_rounded,
                   label: 'Contact',
                   color: const Color(0xFF06B6D4),
                   onTap: () => _closeAnd(context, onContactRequested),
                 ),
                 _option(
+                  context: context,
                   icon: Icons.poll_rounded,
                   label: 'Poll',
                   color: const Color(0xFF6366F1),
                   onTap: () => _closeAnd(context, onPollRequested),
                 ),
                 _option(
+                  context: context,
                   icon: Icons.task_alt_rounded,
                   label: 'Task',
                   color: const Color(0xFFEF4444),
@@ -101,14 +124,12 @@ class AttachmentSheet extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: ChatySpacing.lg),
             Text(
-              'Files are selected from the device and uploaded to the private Chaty conversation bucket.',
+              'Files and attachments are end-to-end encrypted before storage.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: theme.secondaryTextColor,
-                fontSize: 11.5,
-                height: 1.35,
+              style: ChatyTypography.caption(
+                themeData.colorScheme.onSurface.withValues(alpha: 0.5),
               ),
             ),
           ],
@@ -118,35 +139,37 @@ class AttachmentSheet extends StatelessWidget {
   }
 
   Widget _option({
+    required BuildContext context,
     required IconData icon,
     required String label,
     required Color color,
     required VoidCallback onTap,
   }) {
+    final themeData = Theme.of(context);
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(ChatyRadius.md),
       onTap: onTap,
       child: SizedBox(
-        width: 68,
+        width: 72,
         child: Column(
           children: [
             Container(
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(16),
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(ChatyRadius.md),
               ),
-              child: Icon(icon, color: color, size: 25),
+              child: Icon(icon, color: color, size: 24),
             ),
-            const SizedBox(height: 7),
+            const SizedBox(height: ChatySpacing.xs),
             Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: theme.primaryTextColor,
-                fontSize: 11.5,
+                color: themeData.colorScheme.onSurface,
+                fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
             ),

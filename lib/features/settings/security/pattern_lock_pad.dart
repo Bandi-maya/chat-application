@@ -39,10 +39,7 @@ class _PatternLockPadState extends State<PatternLockPad> {
     return List<Offset>.generate(9, (index) {
       final column = index % 3;
       final row = index ~/ 3;
-      return Offset(
-        cellWidth * (column + 0.5),
-        cellHeight * (row + 0.5),
-      );
+      return Offset(cellWidth * (column + 0.5), cellHeight * (row + 0.5));
     });
   }
 
@@ -75,7 +72,9 @@ class _PatternLockPadState extends State<PatternLockPad> {
   @override
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme.primary;
-    final muted = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.22);
+    final muted = Theme.of(
+      context,
+    ).colorScheme.onSurface.withValues(alpha: 0.22);
 
     return SizedBox.square(
       dimension: widget.size,
@@ -145,7 +144,8 @@ class _PatternPainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     if (!hideTrace && selected.isNotEmpty) {
-      final path = Path()..moveTo(centers[selected.first].dx, centers[selected.first].dy);
+      final path = Path()
+        ..moveTo(centers[selected.first].dx, centers[selected.first].dy);
       for (final index in selected.skip(1)) {
         path.lineTo(centers[index].dx, centers[index].dy);
       }
@@ -156,7 +156,9 @@ class _PatternPainter extends CustomPainter {
     for (var index = 0; index < centers.length; index++) {
       final isSelected = selected.contains(index);
       final outer = Paint()
-        ..color = isSelected ? activeColor.withValues(alpha: 0.18) : inactiveColor.withValues(alpha: 0.22)
+        ..color = isSelected
+            ? activeColor.withValues(alpha: 0.18)
+            : inactiveColor.withValues(alpha: 0.22)
         ..style = PaintingStyle.fill;
       final border = Paint()
         ..color = isSelected ? activeColor : inactiveColor

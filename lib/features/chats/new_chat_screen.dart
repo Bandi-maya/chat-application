@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 
 import '../../data/repositories/mock_data_store.dart';
 import '../../domain/models/user_profile.dart';
-import '../../ui/core/controllers/chaty_preferences_controller.dart';
+import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/theme/theme_config.dart';
 import '../../ui/core/widgets/app_avatar.dart';
+import '../../ui/core/design_system/design_system.dart';
 import 'chat_detail_screen.dart';
 
 class NewChatScreen extends StatefulWidget {
@@ -113,8 +114,9 @@ class _NewChatScreenState extends State<NewChatScreen> {
     if (_isLoading) return;
     setState(() => _isLoading = true);
     try {
-      final conversation =
-          await widget.dataStore.getOrCreateDirectConversation(user);
+      final conversation = await widget.dataStore.getOrCreateDirectConversation(
+        user,
+      );
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
@@ -138,44 +140,63 @@ class _NewChatScreenState extends State<NewChatScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(error.toString().replaceFirst('Exception: ', '')),
-        backgroundColor: widget.theme.dangerColor,
+        backgroundColor: const Color(0xFFEF4444),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = widget.theme;
-    return Scaffold(
-      backgroundColor: theme.backgroundColor,
-      appBar: AppBar(
-        title: Text(
-          _isCreatingGroup
-              ? 'New Group (${_selectedGroupMembers.length})'
-              : 'New Chat',
+    final themeData = Theme.of(context);
+    final isDark = themeData.brightness == Brightness.dark;
+
+    return ChatyScaffold(
+      appBar: ChatyAppBar(
+        title: _isCreatingGroup
+            ? 'New Group (${_selectedGroupMembers.length})'
+            : 'New Conversation',
+        leading: ChatyBackButton(
+          onPressed: () {
+            if (_isCreatingGroup) {
+              setState(() {
+                _isCreatingGroup = false;
+                _selectedGroupMembers.clear();
+              });
+            } else {
+              Navigator.of(context).maybePop();
+            }
+          },
         ),
         actions: [
           if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.all(18),
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: ChatySpacing.base),
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2.2),
+                ),
               ),
             ),
           if (_isCreatingGroup && !_isLoading)
-            TextButton(
-              onPressed: _selectedGroupMembers.isNotEmpty
-                  ? _finishGroupCreation
-                  : null,
-              child: Text(
-                'Create',
-                style: TextStyle(
-                  color: _selectedGroupMembers.isNotEmpty
-                      ? theme.accentColor
-                      : theme.secondaryTextColor,
-                  fontWeight: FontWeight.bold,
+            Padding(
+              padding: const EdgeInsets.only(right: ChatySpacing.sm),
+              child: TextButton(
+                onPressed: _selectedGroupMembers.isNotEmpty
+                    ? _finishGroupCreation
+                    : null,
+                child: Text(
+                  'Create',
+                  style: TextStyle(
+                    color: _selectedGroupMembers.isNotEmpty
+                        ? themeData.colorScheme.primary
+                        : themeData.colorScheme.onSurface.withValues(
+                            alpha: 0.35,
+                          ),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
                 ),
               ),
             ),
@@ -184,114 +205,150 @@ class _NewChatScreenState extends State<NewChatScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(
+              horizontal: ChatySpacing.base,
+              vertical: ChatySpacing.sm,
+            ),
             child: Column(
               children: [
                 if (_isCreatingGroup) ...[
-                  TextField(
+                  ChatyInput(
                     controller: _groupNameCtrl,
-                    style: TextStyle(color: theme.primaryTextColor),
-                    maxLength: 100,
-                    decoration: InputDecoration(
-                      counterText: '',
-                      hintText: 'Enter group subject...',
-                      hintStyle: TextStyle(color: theme.secondaryTextColor),
-                      filled: true,
-                      fillColor: theme.cardColor,
-                      prefixIcon: const Icon(Icons.group_work_rounded),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(theme.cornerRadius),
-                        borderSide: BorderSide.none,
-                      ),
+                    hintText: 'Enter group subject...',
+                    prefixIcon: Icon(
+                      Icons.group_work_rounded,
+                      color: themeData.colorScheme.primary,
+                      size: 20,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: ChatySpacing.sm),
                 ],
-                TextField(
+                ChatyInput(
                   controller: _searchCtrl,
                   onChanged: _onSearchChanged,
-                  style: TextStyle(color: theme.primaryTextColor),
-                  decoration: InputDecoration(
-                    hintText: 'Search @username or display name...',
-                    hintStyle: TextStyle(color: theme.secondaryTextColor),
-                    filled: true,
-                    fillColor: theme.cardColor,
-                    prefixIcon: const Icon(Icons.search_rounded),
-                    suffixIcon: _searchCtrl.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.close_rounded),
-                            onPressed: () {
-                              _searchCtrl.clear();
-                              _onSearchChanged('');
-                            },
-                          )
-                        : null,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
+                  hintText: 'Search @username or name...',
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    color: themeData.colorScheme.onSurface.withValues(
+                      alpha: 0.45,
                     ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(theme.cornerRadius),
-                      borderSide: BorderSide.none,
-                    ),
+                    size: 20,
                   ),
+                  suffixIcon: _searchCtrl.text.isNotEmpty
+                      ? ChatyIconButton(
+                          icon: Icons.close_rounded,
+                          size: 32,
+                          iconSize: 18,
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            _onSearchChanged('');
+                          },
+                        )
+                      : null,
                 ),
               ],
             ),
           ),
-          if (!_isCreatingGroup)
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: theme.accentColor.withValues(alpha: 0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.group_add_rounded,
-                  color: theme.accentColor,
-                  size: 22,
+          if (!_isCreatingGroup) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: ChatySpacing.base,
+                vertical: ChatySpacing.xs,
+              ),
+              child: ChatyCard(
+                padding: EdgeInsets.zero,
+                onTap: () => setState(() => _isCreatingGroup = true),
+                child: ChatyListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(ChatySpacing.sm),
+                    decoration: BoxDecoration(
+                      color: themeData.colorScheme.primary.withValues(
+                        alpha: 0.12,
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.group_add_rounded,
+                      color: themeData.colorScheme.primary,
+                      size: 20,
+                    ),
+                  ),
+                  title: Text(
+                    'Create New Group',
+                    style: TextStyle(
+                      color: themeData.colorScheme.onSurface,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Start an encrypted group with multiple members',
+                    style: ChatyTypography.caption(
+                      themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  trailing: Icon(
+                    Icons.chevron_right_rounded,
+                    color: themeData.colorScheme.onSurface.withValues(
+                      alpha: 0.35,
+                    ),
+                  ),
                 ),
               ),
-              title: Text(
-                'Create New Group',
-                style: TextStyle(
-                  color: theme.primaryTextColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14.5 * theme.fontScale,
-                ),
-              ),
-              subtitle: Text(
-                'Add multiple Chaty users with server-enforced membership',
-                style: TextStyle(
-                  color: theme.secondaryTextColor,
-                  fontSize: 12,
-                ),
-              ),
-              onTap: () => setState(() => _isCreatingGroup = true),
             ),
-          const Divider(height: 1),
+            const SizedBox(height: ChatySpacing.xs),
+          ],
           Expanded(
             child: _results.isEmpty && !_isLoading
                 ? Center(
                     child: Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Text(
-                        _searchCtrl.text.trim().length < 2
-                            ? 'Search for another Chaty user by username or name.'
-                            : 'No matching Chaty users found.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: theme.secondaryTextColor),
+                      padding: const EdgeInsets.all(ChatySpacing.xl),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.person_search_rounded,
+                            size: 48,
+                            color: themeData.colorScheme.onSurface.withValues(
+                              alpha: 0.3,
+                            ),
+                          ),
+                          const SizedBox(height: ChatySpacing.base),
+                          Text(
+                            _searchCtrl.text.trim().length < 2
+                                ? 'Search for contacts by name or @handle.'
+                                : 'No matching contacts found.',
+                            textAlign: TextAlign.center,
+                            style: ChatyTypography.caption(
+                              themeData.colorScheme.onSurface.withValues(
+                                alpha: 0.6,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   )
                 : ListView.separated(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: ChatySpacing.base,
+                      vertical: ChatySpacing.xs,
+                    ),
                     itemCount: _results.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    separatorBuilder: (_, __) => Divider(
+                      height: 1,
+                      thickness: 1,
+                      indent: 64,
+                      color: isDark
+                          ? const Color(0xFF27272A)
+                          : const Color(0xFFE4E4E7),
+                    ),
                     itemBuilder: (context, index) {
                       final user = _results[index];
-                      final isSelected = _selectedGroupMembers.contains(user.id);
-                      return ListTile(
+                      final isSelected = _selectedGroupMembers.contains(
+                        user.id,
+                      );
+                      return ChatyListTile(
                         leading: AppAvatar(
                           initials: user.avatarInitials,
                           colorHex: user.avatarColorHex,
@@ -302,29 +359,36 @@ class _NewChatScreenState extends State<NewChatScreen> {
                         title: Text(
                           user.displayName,
                           style: TextStyle(
-                            color: theme.primaryTextColor,
-                            fontSize: 14 * theme.fontScale,
+                            color: themeData.colorScheme.onSurface,
+                            fontSize: 15,
                             fontWeight: FontWeight.w600,
+                            letterSpacing: -0.2,
                           ),
                         ),
                         subtitle: Text(
-                          '@${user.username} • ${user.about}',
+                          '@${user.username}${user.about.isNotEmpty ? ' • ${user.about}' : ''}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: theme.secondaryTextColor,
-                            fontSize: 12,
+                          style: ChatyTypography.caption(
+                            themeData.colorScheme.onSurface.withValues(
+                              alpha: 0.6,
+                            ),
                           ),
                         ),
                         trailing: _isCreatingGroup
                             ? Checkbox(
                                 value: isSelected,
-                                activeColor: theme.accentColor,
+                                activeColor: themeData.colorScheme.primary,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
                                 onChanged: (_) => _toggleMember(user.id),
                               )
-                            : const Icon(
-                                Icons.chat_bubble_outline_rounded,
-                                size: 18,
+                            : Icon(
+                                Icons.chevron_right_rounded,
+                                size: 20,
+                                color: themeData.colorScheme.onSurface
+                                    .withValues(alpha: 0.35),
                               ),
                         onTap: _isCreatingGroup
                             ? () => _toggleMember(user.id)
@@ -346,3 +410,4 @@ class _NewChatScreenState extends State<NewChatScreen> {
     });
   }
 }
+

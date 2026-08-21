@@ -7,6 +7,7 @@ import '../../domain/models/chat_task.dart';
 import '../../domain/models/user_profile.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/widgets/status_badge.dart';
+import '../../ui/core/design_system/design_system.dart';
 
 class TaskDetailScreen extends StatefulWidget {
   final ChatTask task;
@@ -46,7 +47,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   UserProfile? _user(String id) {
-    if (id == widget.dataStore.currentUser.id) return widget.dataStore.currentUser;
+    if (id == widget.dataStore.currentUser.id) {
+      return widget.dataStore.currentUser;
+    }
     return widget.dataStore.getUser(id);
   }
 
@@ -60,155 +63,312 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = widget.theme;
     final task = widget.task;
     final creator = _user(task.creatorId);
+    final themeData = Theme.of(context);
 
-    return Scaffold(
-      backgroundColor: theme.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: theme.surfaceColor,
-        foregroundColor: theme.primaryTextColor,
-        automaticallyImplyLeading: false,
-        leading: IconButton(
-          tooltip: 'Back',
-          onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.chevron_left_rounded),
-        ),
-        title: const Text('Task details'),
+    return ChatyScaffold(
+      appBar: const ChatyAppBar(
+        title: 'Task Details',
+        leading: ChatyBackButton(),
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+          padding: const EdgeInsets.symmetric(
+            horizontal: ChatySpacing.base,
+            vertical: ChatySpacing.md,
+          ),
           children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.cardColor,
-                borderRadius: BorderRadius.circular(theme.cornerRadius),
-                border: Border.all(color: theme.surfaceColor),
-              ),
+            ChatyCard(
+              padding: const EdgeInsets.all(ChatySpacing.lg),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                    spacing: ChatySpacing.sm,
+                    runSpacing: ChatySpacing.sm,
                     children: [
                       StatusBadge(status: task.status),
                       PriorityBadge(priority: task.priority),
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: ChatySpacing.md),
                   Text(
                     task.title,
-                    style: TextStyle(
-                      color: theme.primaryTextColor,
-                      fontSize: 21,
-                      height: 1.2,
-                      fontWeight: FontWeight.w800,
+                    style: ChatyTypography.headline(
+                      themeData.colorScheme.onSurface,
                     ),
                   ),
                   if (task.description.isNotEmpty) ...[
-                    const SizedBox(height: 10),
+                    const SizedBox(height: ChatySpacing.sm),
                     Text(
                       task.description,
-                      style: TextStyle(color: theme.secondaryTextColor, fontSize: 14, height: 1.45),
+                      style: TextStyle(
+                        color: themeData.colorScheme.onSurface.withValues(
+                          alpha: 0.75,
+                        ),
+                        fontSize: 14.5,
+                        height: 1.45,
+                      ),
                     ),
                   ],
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            _TreeCard(
-              theme: theme,
-              title: 'task.json',
+            const SizedBox(height: ChatySpacing.base),
+            ChatyGroupedSection(
+              title: 'Task Properties',
               children: [
-                _TreeLine(theme: theme, depth: 0, keyText: 'id', valueText: task.id),
-                _TreeLine(theme: theme, depth: 0, keyText: 'createdBy', valueText: creator?.displayName ?? task.creatorId),
-                _TreeLine(theme: theme, depth: 0, keyText: 'createdAt', valueText: _formatDate(task.createdAt)),
-                _TreeLine(theme: theme, depth: 0, keyText: 'updatedAt', valueText: _formatDate(task.updatedAt)),
-                _TreeLine(theme: theme, depth: 0, keyText: 'dueAt', valueText: _formatDate(task.dueAt)),
-                _TreeLine(theme: theme, depth: 0, keyText: 'sourceConversation', valueText: task.sourceConversationId),
-                if (task.sourceMessageId != null)
-                  _TreeLine(theme: theme, depth: 0, keyText: 'sourceMessage', valueText: task.sourceMessageId!),
-                _TreeLine(theme: theme, depth: 0, keyText: 'status', valueText: task.status.name),
-                _TreeLine(theme: theme, depth: 0, keyText: 'priority', valueText: task.priority.name),
-                _TreeLine(theme: theme, depth: 0, keyText: 'assignees', valueText: '[${task.assigneeIds.length}]'),
-                ...task.assigneeIds.map((id) {
-                  final user = _user(id);
-                  return Padding(
-                    padding: const EdgeInsets.only(left: 20, top: 5),
-                    child: Row(
-                      children: [
-                        AppAvatar(
-                          initials: user?.avatarInitials ?? 'CU',
-                          colorHex: user?.avatarColorHex ?? '0xFF6366F1',
-                          size: 24,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            user?.displayName ?? id,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: theme.primaryTextColor, fontSize: 12.5),
-                          ),
-                        ),
-                      ],
+                ChatyListTile(
+                  leading: Icon(
+                    Icons.fingerprint_rounded,
+                    color: themeData.colorScheme.primary,
+                    size: 20,
+                  ),
+                  title: Text(
+                    'Task ID',
+                    style: TextStyle(
+                      color: themeData.colorScheme.onSurface,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
                     ),
-                  );
-                }),
+                  ),
+                  subtitle: Text(
+                    task.id,
+                    style: TextStyle(
+                      color: themeData.colorScheme.onSurface.withValues(
+                        alpha: 0.6,
+                      ),
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                ChatyListTile(
+                  leading: Icon(
+                    Icons.person_outline_rounded,
+                    color: themeData.colorScheme.primary,
+                    size: 20,
+                  ),
+                  title: Text(
+                    'Created By',
+                    style: TextStyle(
+                      color: themeData.colorScheme.onSurface,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  subtitle: Text(
+                    creator?.displayName ?? task.creatorId,
+                    style: ChatyTypography.caption(
+                      themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ),
+                ChatyListTile(
+                  leading: Icon(
+                    Icons.calendar_today_outlined,
+                    color: themeData.colorScheme.primary,
+                    size: 20,
+                  ),
+                  title: Text(
+                    'Created At',
+                    style: TextStyle(
+                      color: themeData.colorScheme.onSurface,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  subtitle: Text(
+                    _formatDate(task.createdAt),
+                    style: ChatyTypography.caption(
+                      themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ),
+                ChatyListTile(
+                  leading: const Icon(
+                    Icons.alarm_rounded,
+                    color: Color(0xFFF59E0B),
+                    size: 20,
+                  ),
+                  title: Text(
+                    'Due Date',
+                    style: TextStyle(
+                      color: themeData.colorScheme.onSurface,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  subtitle: Text(
+                    _formatDate(task.dueAt),
+                    style: ChatyTypography.caption(
+                      themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ),
+                if (task.assigneeIds.isNotEmpty)
+                  ChatyListTile(
+                    leading: Icon(
+                      Icons.group_outlined,
+                      color: themeData.colorScheme.primary,
+                      size: 20,
+                    ),
+                    title: Text(
+                      'Assignees (${task.assigneeIds.length})',
+                      style: TextStyle(
+                        color: themeData.colorScheme.onSurface,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: ChatySpacing.xs),
+                      child: Wrap(
+                        spacing: ChatySpacing.xs,
+                        children: task.assigneeIds.map((id) {
+                          final user = _user(id);
+                          return Chip(
+                            avatar: AppAvatar(
+                              initials: user?.avatarInitials ?? 'U',
+                              colorHex: user?.avatarColorHex ?? '0xFF6366F1',
+                              size: 18,
+                            ),
+                            label: Text(
+                              user?.displayName ?? id,
+                              style: const TextStyle(fontSize: 11.5),
+                            ),
+                            padding: EdgeInsets.zero,
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
                 if (task.labels.isNotEmpty)
-                  _TreeLine(theme: theme, depth: 0, keyText: 'labels', valueText: task.labels.join(', ')),
+                  ChatyListTile(
+                    leading: Icon(
+                      Icons.label_outline_rounded,
+                      color: themeData.colorScheme.primary,
+                      size: 20,
+                    ),
+                    title: Text(
+                      'Labels',
+                      style: TextStyle(
+                        color: themeData.colorScheme.onSurface,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: ChatySpacing.xs),
+                      child: Wrap(
+                        spacing: ChatySpacing.xs,
+                        children: task.labels
+                            .map(
+                              (l) => Chip(
+                                label: Text(
+                                  l,
+                                  style: const TextStyle(fontSize: 11.5),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ),
+                  ),
               ],
             ),
-            const SizedBox(height: 16),
-            _TreeCard(
-              theme: theme,
-              title: 'activity.log',
+            const SizedBox(height: ChatySpacing.base),
+            ChatyGroupedSection(
+              title: 'Activity Timeline',
               children: [
                 FutureBuilder<List<Map<String, dynamic>>>(
                   future: _activityFuture,
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Center(child: CircularProgressIndicator(color: theme.accentColor)),
+                      return const Padding(
+                        padding: EdgeInsets.all(ChatySpacing.base),
+                        child: Center(
+                          child: CircularProgressIndicator(strokeWidth: 2.2),
+                        ),
                       );
                     }
                     if (snapshot.hasError) {
                       return Padding(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(ChatySpacing.base),
                         child: Text(
-                          'Unable to load task activity: ${snapshot.error}',
-                          style: TextStyle(color: theme.dangerColor, fontSize: 12),
+                          'Unable to load activity: ${snapshot.error}',
+                          style: TextStyle(
+                            color: themeData.colorScheme.error,
+                            fontSize: 12.5,
+                          ),
                         ),
                       );
                     }
-                    final rows = snapshot.data ?? const <Map<String, dynamic>>[];
+                    final rows =
+                        snapshot.data ?? const <Map<String, dynamic>>[];
                     if (rows.isEmpty) {
                       return Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Text('No changes recorded yet.', style: TextStyle(color: theme.secondaryTextColor)),
+                        padding: const EdgeInsets.all(ChatySpacing.base),
+                        child: Center(
+                          child: Text(
+                            'No changes recorded yet.',
+                            style: ChatyTypography.caption(
+                              themeData.colorScheme.onSurface.withValues(
+                                alpha: 0.5,
+                              ),
+                            ),
+                          ),
+                        ),
                       );
                     }
                     return Column(
-                      children: rows.map((row) {
-                        final userId = row['user_id']?.toString() ?? '';
-                        final user = _user(userId);
-                        final time = DateTime.tryParse(row['created_at']?.toString() ?? '')?.toLocal();
-                        return _ActivityRow(
-                          theme: theme,
-                          userName: user?.displayName ?? userId,
-                          action: row['action']?.toString() ?? 'updated task',
-                          time: time == null ? '' : _formatDate(time),
-                        );
-                      }).toList(growable: false),
+                      children: rows
+                          .map((row) {
+                            final userId = row['user_id']?.toString() ?? '';
+                            final user = _user(userId);
+                            final time = DateTime.tryParse(
+                              row['created_at']?.toString() ?? '',
+                            )?.toLocal();
+                            return ChatyListTile(
+                              leading: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: themeData.colorScheme.primary
+                                      .withValues(alpha: 0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.history_rounded,
+                                  color: themeData.colorScheme.primary,
+                                  size: 16,
+                                ),
+                              ),
+                              title: Text(
+                                user?.displayName ?? userId,
+                                style: TextStyle(
+                                  color: themeData.colorScheme.onSurface,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13.5,
+                                ),
+                              ),
+                              subtitle: Text(
+                                '${row['action'] ?? 'updated task'}${time != null ? ' • ${_formatDate(time)}' : ''}',
+                                style: ChatyTypography.caption(
+                                  themeData.colorScheme.onSurface.withValues(
+                                    alpha: 0.6,
+                                  ),
+                                ),
+                              ),
+                            );
+                          })
+                          .toList(growable: false),
                     );
                   },
                 ),
               ],
             ),
+            const SizedBox(height: ChatySpacing.xl),
           ],
         ),
       ),
@@ -216,128 +376,3 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 }
 
-class _TreeCard extends StatelessWidget {
-  final ThemeConfig theme;
-  final String title;
-  final List<Widget> children;
-
-  const _TreeCard({required this.theme, required this.title, required this.children});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(theme.cornerRadius),
-        border: Border.all(color: theme.surfaceColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: theme.surfaceColor,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(theme.cornerRadius)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.data_object_rounded, size: 17, color: theme.accentColor),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: theme.primaryTextColor,
-                    fontFamily: 'monospace',
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TreeLine extends StatelessWidget {
-  final ThemeConfig theme;
-  final int depth;
-  final String keyText;
-  final String valueText;
-
-  const _TreeLine({
-    required this.theme,
-    required this.depth,
-    required this.keyText,
-    required this.valueText,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(left: depth * 16.0, bottom: 5),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.chevron_right_rounded, size: 15, color: theme.secondaryTextColor),
-          const SizedBox(width: 3),
-          Text('$keyText: ', style: TextStyle(color: theme.accentColor, fontFamily: 'monospace', fontSize: 12)),
-          Expanded(
-            child: Text(
-              valueText,
-              style: TextStyle(color: theme.primaryTextColor, fontFamily: 'monospace', fontSize: 12),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActivityRow extends StatelessWidget {
-  final ThemeConfig theme;
-  final String userName;
-  final String action;
-  final String time;
-
-  const _ActivityRow({required this.theme, required this.userName, required this.action, required this.time});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Column(
-            children: [
-              Icon(Icons.circle, size: 9, color: theme.accentColor),
-              Container(width: 1, height: 34, color: theme.surfaceColor),
-            ],
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(userName, style: TextStyle(color: theme.primaryTextColor, fontWeight: FontWeight.w700, fontSize: 12.5)),
-                const SizedBox(height: 2),
-                Text(action, style: TextStyle(color: theme.secondaryTextColor, fontFamily: 'monospace', fontSize: 11.5)),
-                if (time.isNotEmpty)
-                  Text(time, style: TextStyle(color: theme.secondaryTextColor.withValues(alpha: 0.7), fontSize: 10.5)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

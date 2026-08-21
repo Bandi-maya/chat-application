@@ -5,10 +5,11 @@ import 'package:flutter/material.dart';
 import '../../data/repositories/mock_data_store.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/user_profile.dart';
-import '../../ui/core/controllers/chaty_preferences_controller.dart';
-import '../../ui/core/design_system/chaty_settings_primitives.dart';
+import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/theme/theme_config.dart';
 import '../../ui/core/theme/theme_controller.dart';
+import '../../ui/core/widgets/app_avatar.dart';
+import '../../ui/core/design_system/design_system.dart';
 import '../chats/chat_detail_screen.dart';
 
 class GlobalSearchScreen extends StatefulWidget {
@@ -103,7 +104,9 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
     if (_isOpeningChat) return;
     setState(() => _isOpeningChat = true);
     try {
-      final conversation = await widget.dataStore.getOrCreateDirectConversation(user);
+      final conversation = await widget.dataStore.getOrCreateDirectConversation(
+        user,
+      );
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
@@ -130,84 +133,109 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = widget.theme;
-    return Scaffold(
-      backgroundColor: theme.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: theme.cardColor,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.primaryTextColor),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: TextField(
-          controller: _searchController,
-          autofocus: true,
-          style: TextStyle(color: theme.primaryTextColor, fontSize: 16),
-          decoration: InputDecoration(
-            hintText: 'Search @username, people, groups...',
-            hintStyle: TextStyle(
-              color: theme.secondaryTextColor.withValues(alpha: 0.6),
+    final themeData = Theme.of(context);
+
+    return ChatyScaffold(
+      appBar: ChatyAppBar(
+        leading: const ChatyBackButton(),
+        titleWidget: Container(
+          height: 40,
+          decoration: BoxDecoration(
+            color: themeData.brightness == Brightness.dark
+                ? const Color(0xFF27272A)
+                : const Color(0xFFF4F4F5),
+            borderRadius: BorderRadius.circular(ChatyRadius.full),
+          ),
+          child: TextField(
+            controller: _searchController,
+            autofocus: true,
+            style: TextStyle(
+              color: themeData.colorScheme.onSurface,
+              fontSize: 15,
             ),
-            border: InputBorder.none,
+            decoration: InputDecoration(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: ChatySpacing.base,
+                vertical: 10,
+              ),
+              hintText: 'Search @username, people, groups...',
+              hintStyle: ChatyTypography.caption(
+                themeData.colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+              border: InputBorder.none,
+              prefixIcon: Icon(
+                Icons.search_rounded,
+                size: 20,
+                color: themeData.colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+            ),
           ),
         ),
         actions: [
           if (_isSearching || _isOpeningChat)
-            Padding(
-              padding: const EdgeInsets.all(16),
+            const Padding(
+              padding: EdgeInsets.all(16),
               child: SizedBox(
                 width: 18,
                 height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(theme.accentColor),
-                ),
+                child: CircularProgressIndicator(strokeWidth: 2),
               ),
             )
           else if (_searchController.text.isNotEmpty)
-            IconButton(
-              icon: Icon(Icons.clear_rounded, color: theme.secondaryTextColor),
+            ChatyIconButton(
+              icon: Icons.clear_rounded,
+              tooltip: 'Clear',
               onPressed: _searchController.clear,
             ),
         ],
       ),
       body: _searchController.text.trim().isEmpty
-          ? _buildEmptyPrompt(theme)
+          ? _buildEmptyPrompt(themeData)
           : ListView(
               physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.symmetric(
+                horizontal: ChatySpacing.base,
+                vertical: ChatySpacing.md,
+              ),
               children: [
-                if (_matchedUsers.isNotEmpty) ...[
-                  _sectionLabel('PEOPLE & USERNAMES', theme),
-                  ..._matchedUsers.map((user) => _buildUserTile(user, theme)),
-                  const SizedBox(height: 12),
-                ],
-                if (_matchedConversations.isNotEmpty) ...[
-                  _sectionLabel('CHATS & GROUPS', theme),
-                  ..._matchedConversations.map(
-                    (conversation) => _buildConversationTile(conversation, theme),
+                if (_matchedUsers.isNotEmpty)
+                  ChatyGroupedSection(
+                    title: 'People & Usernames',
+                    children: [
+                      for (final user in _matchedUsers)
+                        _buildUserTile(user, themeData),
+                    ],
                   ),
-                ],
+                if (_matchedConversations.isNotEmpty)
+                  ChatyGroupedSection(
+                    title: 'Chats & Groups',
+                    children: [
+                      for (final conversation in _matchedConversations)
+                        _buildConversationTile(conversation, themeData),
+                    ],
+                  ),
                 if (!_isSearching &&
                     _matchedUsers.isEmpty &&
                     _matchedConversations.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.all(32),
+                    padding: const EdgeInsets.all(ChatySpacing.xl),
                     child: Center(
                       child: Column(
                         children: [
                           Icon(
                             Icons.search_off_rounded,
                             size: 48,
-                            color: theme.secondaryTextColor.withValues(alpha: 0.5),
+                            color: themeData.colorScheme.onSurface.withValues(
+                              alpha: 0.35,
+                            ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: ChatySpacing.md),
                           Text(
                             'No matches found for "${_searchController.text}"',
-                            style: TextStyle(
-                              color: theme.secondaryTextColor,
-                              fontSize: 14,
+                            style: ChatyTypography.caption(
+                              themeData.colorScheme.onSurface.withValues(
+                                alpha: 0.6,
+                              ),
                             ),
                           ),
                         ],
@@ -219,55 +247,38 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
     );
   }
 
-  Widget _sectionLabel(String value, ThemeConfig theme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Text(
-        value,
-        style: TextStyle(
-          color: theme.accentColor,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 0.8,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyPrompt(ThemeConfig theme) {
+  Widget _buildEmptyPrompt(ThemeData themeData) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
+        padding: const EdgeInsets.symmetric(horizontal: ChatySpacing.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 80,
-              height: 80,
+              width: 76,
+              height: 76,
               decoration: BoxDecoration(
-                color: theme.accentColor.withValues(alpha: 0.1),
+                color: themeData.colorScheme.primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.alternate_email_rounded,
-                size: 40,
-                color: theme.accentColor,
+                size: 38,
+                color: themeData.colorScheme.primary,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: ChatySpacing.base),
             Text(
-              'Username-First Discovery',
-              style: TextStyle(
-                color: theme.primaryTextColor,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              'Username Discovery',
+              style: ChatyTypography.headline(themeData.colorScheme.onSurface),
             ),
             const SizedBox(height: 6),
             Text(
               'Type an @username to find and message another Chaty user without exposing phone numbers.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: theme.secondaryTextColor, fontSize: 13),
+              style: ChatyTypography.caption(
+                themeData.colorScheme.onSurface.withValues(alpha: 0.65),
+              ),
             ),
           ],
         ),
@@ -275,12 +286,12 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
     );
   }
 
-  Widget _buildUserTile(UserProfile user, ThemeConfig theme) {
-    return ListTile(
-      leading: ChatyAvatar(
+  Widget _buildUserTile(UserProfile user, ThemeData themeData) {
+    return ChatyListTile(
+      leading: AppAvatar(
         initials: user.avatarInitials,
-        color: Color(int.parse(user.avatarColorHex)),
-        size: 46,
+        colorHex: user.avatarColorHex,
+        size: 42,
       ),
       title: Row(
         children: [
@@ -289,69 +300,76 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
               user.displayName,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: theme.primaryTextColor,
-                fontWeight: FontWeight.bold,
+                color: themeData.colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
               ),
             ),
           ),
           if (user.isVerified) ...[
             const SizedBox(width: 4),
-            Icon(Icons.verified_rounded, size: 16, color: theme.accentColor),
+            Icon(
+              Icons.verified_rounded,
+              size: 15,
+              color: themeData.colorScheme.primary,
+            ),
           ],
         ],
       ),
       subtitle: Text(
-        '@${user.username} • ${user.about}',
-        style: TextStyle(color: theme.secondaryTextColor, fontSize: 13),
+        '@${user.username}${user.about.isNotEmpty ? ' • ${user.about}' : ''}',
+        style: ChatyTypography.caption(
+          themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+        ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: ElevatedButton.icon(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: theme.accentColor,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          elevation: 0,
-        ),
-        onPressed: _isOpeningChat ? null : () => _startConversationWithUser(user),
-        icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16),
-        label: const Text(
-          'Message',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-        ),
+      trailing: ChatyPrimaryButton(
+        text: 'Message',
+        height: 34,
+        width: 90,
+        isLoading: _isOpeningChat,
+        onPressed: () => _startConversationWithUser(user),
       ),
     );
   }
 
-  Widget _buildConversationTile(Conversation conversation, ThemeConfig theme) {
-    return ListTile(
-      leading: ChatyAvatar(
+  Widget _buildConversationTile(
+    Conversation conversation,
+    ThemeData themeData,
+  ) {
+    return ChatyListTile(
+      leading: AppAvatar(
         initials: conversation.avatarInitials ?? 'CH',
-        color: conversation.avatarColorHex != null
-            ? Color(int.parse(conversation.avatarColorHex!))
-            : theme.accentColor,
-        size: 46,
+        colorHex: conversation.avatarColorHex ?? '0xFF6366F1',
+        size: 42,
       ),
       title: Text(
         conversation.title,
         style: TextStyle(
-          color: theme.primaryTextColor,
-          fontWeight: FontWeight.bold,
+          color: themeData.colorScheme.onSurface,
+          fontWeight: FontWeight.w600,
+          fontSize: 15,
         ),
       ),
       subtitle: Text(
         conversation.lastMessageText,
-        style: TextStyle(color: theme.secondaryTextColor, fontSize: 13),
+        style: ChatyTypography.caption(
+          themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+        ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
+      ),
+      trailing: Icon(
+        Icons.chevron_right_rounded,
+        color: themeData.colorScheme.onSurface.withValues(alpha: 0.35),
       ),
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => ChatDetailScreen(
               conversationId: conversation.id,
-              theme: theme,
+              theme: widget.theme,
               dataStore: widget.dataStore,
               preferencesController: widget.preferencesController,
               themeController: widget.themeController,
@@ -362,3 +380,4 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
     );
   }
 }
+

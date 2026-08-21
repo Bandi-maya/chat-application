@@ -1,0 +1,854 @@
+import 'package:flutter/material.dart';
+import '../tokens/app_tokens.dart';
+
+/// ---------------------------------------------------------------------------
+/// CHATY SCAFFOLD (Standardized background & safe-area handling)
+/// ---------------------------------------------------------------------------
+class ChatyScaffold extends StatelessWidget {
+  final Widget body;
+  final PreferredSizeWidget? appBar;
+  final Widget? bottomNavigationBar;
+  final Widget? floatingActionButton;
+  final Color? backgroundColor;
+  final bool extendBody;
+  final bool extendBodyBehindAppBar;
+  final bool safeAreaTop;
+  final bool safeAreaBottom;
+
+  const ChatyScaffold({
+    super.key,
+    required this.body,
+    this.appBar,
+    this.bottomNavigationBar,
+    this.floatingActionButton,
+    this.backgroundColor,
+    this.extendBody = false,
+    this.extendBodyBehindAppBar = false,
+    this.safeAreaTop = true,
+    this.safeAreaBottom = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      backgroundColor: backgroundColor ?? theme.scaffoldBackgroundColor,
+      appBar: appBar,
+      body: SafeArea(
+        top: safeAreaTop && !extendBodyBehindAppBar,
+        bottom: safeAreaBottom,
+        child: body,
+      ),
+      bottomNavigationBar: bottomNavigationBar,
+      floatingActionButton: floatingActionButton,
+      extendBody: extendBody,
+      extendBodyBehindAppBar: extendBodyBehindAppBar,
+    );
+  }
+}
+
+/// ---------------------------------------------------------------------------
+/// CHATY BACK BUTTON (Apple HIG styled leading chevron)
+/// ---------------------------------------------------------------------------
+class ChatyBackButton extends StatefulWidget {
+  final VoidCallback? onPressed;
+  final Color? color;
+  final Color? backgroundColor;
+  final double size;
+
+  const ChatyBackButton({
+    super.key,
+    this.onPressed,
+    this.color,
+    this.backgroundColor,
+    this.size = 34.0,
+  });
+
+  @override
+  State<ChatyBackButton> createState() => _ChatyBackButtonState();
+}
+
+class _ChatyBackButtonState extends State<ChatyBackButton> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final fg = widget.color ?? theme.colorScheme.onSurface;
+    final bg =
+        widget.backgroundColor ??
+        (isDark
+            ? const Color(0xFF1E293B).withValues(alpha: 0.8)
+            : const Color(0xFFF1F5F9));
+    final border = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+
+    return AnimatedScale(
+      scale: _isPressed ? ChatyMotion.activeIconScale : 1.0,
+      duration: ChatyMotion.instant,
+      curve: ChatyMotion.enter,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            ChatyMotion.selection();
+            if (widget.onPressed != null) {
+              widget.onPressed!();
+            } else {
+              Navigator.of(context).maybePop();
+            }
+          },
+          onTapDown: (_) => setState(() => _isPressed = true),
+          onTapUp: (_) => setState(() => _isPressed = false),
+          onTapCancel: () => setState(() => _isPressed = false),
+          borderRadius: BorderRadius.circular(ChatyRadius.full),
+          child: Container(
+            width: widget.size,
+            height: widget.size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: bg,
+              border: Border.all(color: border, width: 0.8),
+            ),
+            alignment: Alignment.center,
+            child: Icon(Icons.chevron_left_rounded, size: 24, color: fg),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// ---------------------------------------------------------------------------
+/// CHATY APP BAR (Restrained, clear typography & uniform height)
+/// ---------------------------------------------------------------------------
+class ChatyAppBar extends StatelessWidget implements PreferredSizeWidget {
+  final String? title;
+  final Widget? titleWidget;
+  final String? subtitle;
+  final List<Widget>? actions;
+  final Widget? leading;
+  final bool automaticallyImplyLeading;
+  final bool centerTitle;
+  final Color? backgroundColor;
+  final Color? foregroundColor;
+  final double elevation;
+  final PreferredSizeWidget? bottom;
+
+  const ChatyAppBar({
+    super.key,
+    this.title,
+    this.titleWidget,
+    this.subtitle,
+    this.actions,
+    this.leading,
+    this.automaticallyImplyLeading = true,
+    this.centerTitle = false,
+    this.backgroundColor,
+    this.foregroundColor,
+    this.elevation = 0,
+    this.bottom,
+  });
+
+  @override
+  Size get preferredSize =>
+      Size.fromHeight(kToolbarHeight + (bottom?.preferredSize.height ?? 0.0));
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final canPop = Navigator.of(context).canPop();
+
+    Widget? leadingWidget = leading;
+    if (leadingWidget == null && automaticallyImplyLeading && canPop) {
+      leadingWidget = const Center(
+        child: Padding(
+          padding: EdgeInsets.only(left: ChatySpacing.sm),
+          child: ChatyBackButton(),
+        ),
+      );
+    }
+
+    Widget? titleContent = titleWidget;
+    if (titleContent == null && title != null) {
+      titleContent = Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: centerTitle
+            ? CrossAxisAlignment.center
+            : CrossAxisAlignment.start,
+        children: [
+          Text(
+            title!,
+            style: ChatyTypography.title(
+              foregroundColor ?? theme.colorScheme.onSurface,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 1),
+            Text(
+              subtitle!,
+              style: ChatyTypography.caption(
+                (foregroundColor ?? theme.colorScheme.onSurface).withValues(
+                  alpha: 0.65,
+                ),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ],
+      );
+    }
+
+    return AppBar(
+      title: titleContent,
+      leading: leadingWidget,
+      leadingWidth: (leadingWidget != null) ? 56.0 : null,
+      automaticallyImplyLeading: false,
+      actions: actions != null
+          ? [...actions!, const SizedBox(width: ChatySpacing.sm)]
+          : null,
+      centerTitle: centerTitle,
+      backgroundColor: backgroundColor ?? theme.scaffoldBackgroundColor,
+      foregroundColor: foregroundColor ?? theme.colorScheme.onSurface,
+      elevation: elevation,
+      scrolledUnderElevation: 0.5,
+      surfaceTintColor: Colors.transparent,
+      bottom: bottom,
+    );
+  }
+}
+
+/// ---------------------------------------------------------------------------
+/// CHATY BUTTONS (Primary, Secondary, Text, Icon with tactile scale)
+/// ---------------------------------------------------------------------------
+class ChatyPrimaryButton extends StatefulWidget {
+  final String text;
+  final IconData? icon;
+  final VoidCallback? onPressed;
+  final bool isLoading;
+  final Color? backgroundColor;
+  final Color? foregroundColor;
+  final double height;
+  final double? width;
+  final double borderRadius;
+
+  const ChatyPrimaryButton({
+    super.key,
+    required this.text,
+    this.icon,
+    this.onPressed,
+    this.isLoading = false,
+    this.backgroundColor,
+    this.foregroundColor,
+    this.height = ChatyTouchTargets.buttonHeight,
+    this.width = double.infinity,
+    this.borderRadius = ChatyRadius.lg,
+  });
+
+  @override
+  State<ChatyPrimaryButton> createState() => _ChatyPrimaryButtonState();
+}
+
+class _ChatyPrimaryButtonState extends State<ChatyPrimaryButton> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isEnabled = widget.onPressed != null && !widget.isLoading;
+    final bg = widget.backgroundColor ?? theme.colorScheme.primary;
+    final fg = widget.foregroundColor ?? Colors.white;
+
+    return AnimatedScale(
+      scale: _isPressed && isEnabled ? ChatyMotion.activeScale : 1.0,
+      duration: ChatyMotion.instant,
+      curve: ChatyMotion.enter,
+      child: SizedBox(
+        height: widget.height,
+        width: widget.width,
+        child: ElevatedButton(
+          onPressed: isEnabled
+              ? () {
+                  ChatyMotion.selection();
+                  widget.onPressed?.call();
+                }
+              : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: bg,
+            foregroundColor: fg,
+            disabledBackgroundColor: bg.withValues(alpha: 0.45),
+            disabledForegroundColor: fg.withValues(alpha: 0.6),
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: ChatySpacing.lg),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(widget.borderRadius),
+            ),
+          ),
+          child: Listener(
+            onPointerDown: (_) {
+              if (isEnabled) setState(() => _isPressed = true);
+            },
+            onPointerUp: (_) {
+              if (_isPressed) setState(() => _isPressed = false);
+            },
+            onPointerCancel: (_) {
+              if (_isPressed) setState(() => _isPressed = false);
+            },
+            child: AnimatedSwitcher(
+              duration: ChatyMotion.fast,
+              child: widget.isLoading
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.2,
+                        valueColor: AlwaysStoppedAnimation<Color>(fg),
+                      ),
+                    )
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (widget.icon != null) ...[
+                          Icon(widget.icon, size: ChatyIconSize.md, color: fg),
+                          const SizedBox(width: ChatySpacing.sm),
+                        ],
+                        Text(
+                          widget.text,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -0.2,
+                            color: fg,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ChatySecondaryButton extends StatefulWidget {
+  final String text;
+  final IconData? icon;
+  final VoidCallback? onPressed;
+  final Color? borderColor;
+  final Color? textColor;
+  final double height;
+  final double? width;
+  final double borderRadius;
+
+  const ChatySecondaryButton({
+    super.key,
+    required this.text,
+    this.icon,
+    this.onPressed,
+    this.borderColor,
+    this.textColor,
+    this.height = ChatyTouchTargets.buttonHeight,
+    this.width = double.infinity,
+    this.borderRadius = ChatyRadius.lg,
+  });
+
+  @override
+  State<ChatySecondaryButton> createState() => _ChatySecondaryButtonState();
+}
+
+class _ChatySecondaryButtonState extends State<ChatySecondaryButton> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final isEnabled = widget.onPressed != null;
+    final border =
+        widget.borderColor ??
+        (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0));
+    final fg = widget.textColor ?? theme.colorScheme.onSurface;
+
+    return AnimatedScale(
+      scale: _isPressed && isEnabled ? ChatyMotion.activeScale : 1.0,
+      duration: ChatyMotion.instant,
+      curve: ChatyMotion.enter,
+      child: SizedBox(
+        height: widget.height,
+        width: widget.width,
+        child: OutlinedButton(
+          onPressed: isEnabled
+              ? () {
+                  ChatyMotion.selection();
+                  widget.onPressed?.call();
+                }
+              : null,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: fg,
+            side: BorderSide(color: border, width: 1.2),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(widget.borderRadius),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: ChatySpacing.lg),
+          ),
+          child: Listener(
+            onPointerDown: (_) {
+              if (isEnabled) setState(() => _isPressed = true);
+            },
+            onPointerUp: (_) {
+              if (_isPressed) setState(() => _isPressed = false);
+            },
+            onPointerCancel: (_) {
+              if (_isPressed) setState(() => _isPressed = false);
+            },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (widget.icon != null) ...[
+                  Icon(widget.icon, size: ChatyIconSize.md, color: fg),
+                  const SizedBox(width: ChatySpacing.sm),
+                ],
+                Text(
+                  widget.text,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
+                    color: fg,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ChatyIconButton extends StatefulWidget {
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final String? tooltip;
+  final Color? color;
+  final Color? backgroundColor;
+  final double size;
+  final double iconSize;
+
+  const ChatyIconButton({
+    super.key,
+    required this.icon,
+    required this.onPressed,
+    this.tooltip,
+    this.color,
+    this.backgroundColor,
+    this.size = ChatyTouchTargets.minTouchTarget,
+    this.iconSize = ChatyIconSize.md,
+  });
+
+  @override
+  State<ChatyIconButton> createState() => _ChatyIconButtonState();
+}
+
+class _ChatyIconButtonState extends State<ChatyIconButton> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final iconColor = widget.color ?? theme.colorScheme.onSurface;
+
+    Widget button = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: widget.onPressed != null
+            ? () {
+                ChatyMotion.selection();
+                widget.onPressed!();
+              }
+            : null,
+        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapUp: (_) => setState(() => _isPressed = false),
+        onTapCancel: () => setState(() => _isPressed = false),
+        borderRadius: BorderRadius.circular(ChatyRadius.full),
+        child: Container(
+          width: widget.size,
+          height: widget.size,
+          decoration: BoxDecoration(
+            color: widget.backgroundColor ?? Colors.transparent,
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: AnimatedScale(
+            scale: _isPressed && widget.onPressed != null
+                ? ChatyMotion.activeIconScale
+                : 1.0,
+            duration: ChatyMotion.instant,
+            curve: ChatyMotion.enter,
+            child: Icon(
+              widget.icon,
+              size: widget.iconSize,
+              color: widget.onPressed != null
+                  ? iconColor
+                  : iconColor.withValues(alpha: 0.35),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (widget.tooltip != null) {
+      button = Tooltip(message: widget.tooltip!, child: button);
+    }
+
+    return button;
+  }
+}
+
+/// ---------------------------------------------------------------------------
+/// CHATY CARDS & GROUPED SECTIONS (Reduced noise, balanced geometry)
+/// ---------------------------------------------------------------------------
+class ChatyCard extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final EdgeInsetsGeometry margin;
+  final Color? backgroundColor;
+  final Color? borderColor;
+  final double borderRadius;
+  final VoidCallback? onTap;
+
+  const ChatyCard({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(ChatySpacing.base),
+    this.margin = EdgeInsets.zero,
+    this.backgroundColor,
+    this.borderColor,
+    this.borderRadius = ChatyRadius.card,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final bg =
+        backgroundColor ?? (isDark ? const Color(0xFF18181B) : Colors.white);
+    final border =
+        borderColor ??
+        (isDark ? const Color(0xFF27272A) : const Color(0xFFE4E4E7));
+
+    Widget card = Container(
+      margin: margin,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(borderRadius),
+        border: Border.all(color: border, width: 1.0),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: Padding(padding: padding, child: child),
+      ),
+    );
+
+    if (onTap != null) {
+      card = InkWell(
+        onTap: () {
+          ChatyMotion.selection();
+          onTap!();
+        },
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: card,
+      );
+    }
+
+    return card;
+  }
+}
+
+class ChatyGroupedSection extends StatelessWidget {
+  final String? title;
+  final String? description;
+  final List<Widget> children;
+  final EdgeInsetsGeometry margin;
+
+  const ChatyGroupedSection({
+    super.key,
+    this.title,
+    this.description,
+    required this.children,
+    this.margin = const EdgeInsets.only(bottom: ChatySpacing.base),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final border = isDark ? const Color(0xFF27272A) : const Color(0xFFE4E4E7);
+    final bg = isDark ? const Color(0xFF18181B) : Colors.white;
+
+    return Padding(
+      padding: margin,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (title != null) ...[
+            Padding(
+              padding: const EdgeInsets.only(
+                left: ChatySpacing.md,
+                bottom: ChatySpacing.sm,
+              ),
+              child: Text(
+                title!.toUpperCase(),
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.0,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+            ),
+          ],
+          Container(
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(ChatyRadius.card),
+              border: Border.all(color: border, width: 1.0),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(ChatyRadius.card),
+              child: Column(
+                children: [
+                  for (int i = 0; i < children.length; i++) ...[
+                    children[i],
+                    if (i < children.length - 1)
+                      Divider(
+                        height: 1,
+                        thickness: 1,
+                        indent: ChatySpacing.base,
+                        endIndent: ChatySpacing.base,
+                        color: border.withValues(alpha: 0.6),
+                      ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          if (description != null) ...[
+            Padding(
+              padding: const EdgeInsets.only(
+                left: ChatySpacing.md,
+                right: ChatySpacing.md,
+                top: ChatySpacing.xs,
+              ),
+              child: Text(
+                description!,
+                style: ChatyTypography.caption(
+                  theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// ---------------------------------------------------------------------------
+/// CHATY LIST TILE (Clean, uniform row architecture)
+/// ---------------------------------------------------------------------------
+class ChatyListTile extends StatelessWidget {
+  final Widget? leading;
+  final Widget title;
+  final Widget? subtitle;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+  final EdgeInsetsGeometry contentPadding;
+
+  const ChatyListTile({
+    super.key,
+    this.leading,
+    required this.title,
+    this.subtitle,
+    this.trailing,
+    this.onTap,
+    this.onLongPress,
+    this.contentPadding = const EdgeInsets.symmetric(
+      horizontal: ChatySpacing.base,
+      vertical: ChatySpacing.md,
+    ),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap != null
+          ? () {
+              ChatyMotion.selection();
+              onTap!();
+            }
+          : null,
+      onLongPress: onLongPress != null
+          ? () {
+              ChatyMotion.medium();
+              onLongPress!();
+            }
+          : null,
+      child: Padding(
+        padding: contentPadding,
+        child: Row(
+          children: [
+            if (leading != null) ...[
+              leading!,
+              const SizedBox(width: ChatySpacing.base),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  title,
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    subtitle!,
+                  ],
+                ],
+              ),
+            ),
+            if (trailing != null) ...[
+              const SizedBox(width: ChatySpacing.sm),
+              trailing!,
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// ---------------------------------------------------------------------------
+/// CHATY TEXT INPUT (Standardized form fields & search)
+/// ---------------------------------------------------------------------------
+class ChatyInput extends StatelessWidget {
+  final String? label;
+  final String? hintText;
+  final TextEditingController? controller;
+  final bool obscureText;
+  final Widget? prefixIcon;
+  final Widget? suffixIcon;
+  final TextInputType keyboardType;
+  final TextInputAction textInputAction;
+  final String? Function(String?)? validator;
+  final ValueChanged<String>? onChanged;
+  final FocusNode? focusNode;
+  final bool autofocus;
+  final bool enabled;
+  final int maxLines;
+
+  const ChatyInput({
+    super.key,
+    this.label,
+    this.hintText,
+    this.controller,
+    this.obscureText = false,
+    this.prefixIcon,
+    this.suffixIcon,
+    this.keyboardType = TextInputType.text,
+    this.textInputAction = TextInputAction.next,
+    this.validator,
+    this.onChanged,
+    this.focusNode,
+    this.autofocus = false,
+    this.enabled = true,
+    this.maxLines = 1,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final fill = isDark ? const Color(0xFF18181B) : const Color(0xFFF4F4F5);
+    final border = isDark ? const Color(0xFF27272A) : const Color(0xFFE4E4E7);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (label != null) ...[
+          Text(
+            label!,
+            style: TextStyle(
+              color: theme.colorScheme.onSurface,
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.1,
+            ),
+          ),
+          const SizedBox(height: ChatySpacing.xs),
+        ],
+        TextFormField(
+          controller: controller,
+          enabled: enabled,
+          obscureText: obscureText,
+          keyboardType: keyboardType,
+          textInputAction: textInputAction,
+          validator: validator,
+          onChanged: onChanged,
+          focusNode: focusNode,
+          autofocus: autofocus,
+          maxLines: maxLines,
+          style: TextStyle(
+            color: theme.colorScheme.onSurface,
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
+          decoration: InputDecoration(
+            hintText: hintText,
+            hintStyle: TextStyle(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
+              fontSize: 14.5,
+              fontWeight: FontWeight.w400,
+            ),
+            filled: true,
+            fillColor: fill,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: ChatySpacing.base,
+              vertical: 14,
+            ),
+            prefixIcon: prefixIcon,
+            suffixIcon: suffixIcon,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(ChatyRadius.lg),
+              borderSide: BorderSide(color: border, width: 1.0),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(ChatyRadius.lg),
+              borderSide: BorderSide(color: border, width: 1.0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(ChatyRadius.lg),
+              borderSide: BorderSide(
+                color: theme.colorScheme.primary,
+                width: 1.6,
+              ),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(ChatyRadius.lg),
+              borderSide: BorderSide(
+                color: theme.colorScheme.error,
+                width: 1.2,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}

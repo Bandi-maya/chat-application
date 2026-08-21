@@ -9,36 +9,66 @@ import 'package:uuid/uuid.dart';
 
 import '../../domain/models/chat_message.dart';
 import '../../injection/locator.dart';
-import '../../ui/core/controllers/chaty_preferences_controller.dart';
+import '../../ui/core/controllers/preferences_controller.dart';
 
 class ChatMediaService {
-  ChatMediaService({SupabaseClient? client, ChatyPreferencesController? preferences})
-      : _client = client ?? Supabase.instance.client,
-        _preferences = preferences ?? locator<ChatyPreferencesController>();
+  ChatMediaService({
+    SupabaseClient? client,
+    ChatyPreferencesController? preferences,
+  }) : _client = client ?? Supabase.instance.client,
+       _preferences = preferences ?? locator<ChatyPreferencesController>();
 
   static const String bucket = 'chat-media';
   final SupabaseClient _client;
   final ChatyPreferencesController _preferences;
   final Uuid _uuid = const Uuid();
 
-  Future<MessageAttachment?> pickAndUpload({required String conversationId, required String type}) async {
+  Future<MessageAttachment?> pickAndUpload({
+    required String conversationId,
+    required String type,
+  }) async {
     final picked = await FilePicker.pickFile(type: _pickerType(type));
     if (picked == null) return null;
     final sourcePath = picked.path;
-    if (sourcePath == null || sourcePath.isEmpty) throw Exception('The selected file is not accessible on this device.');
-    return uploadFile(conversationId: conversationId, type: type, sourcePath: sourcePath, displayName: picked.name);
+    if (sourcePath == null || sourcePath.isEmpty)
+      throw Exception('The selected file is not accessible on this device.');
+    return uploadFile(
+      conversationId: conversationId,
+      type: type,
+      sourcePath: sourcePath,
+      displayName: picked.name,
+    );
   }
 
-  Future<List<MessageAttachment>> pickAndUploadMultiple({required String conversationId, required String type}) async {
-    final limit = _preferences.gbDouble('Img_share_limit', fallback: 30).clamp(1, 100).round();
-    final picked = await FilePicker.pickFiles(type: _pickerType(type), allowMultiple: true);
+  Future<List<MessageAttachment>> pickAndUploadMultiple({
+    required String conversationId,
+    required String type,
+  }) async {
+    final limit = _preferences
+        .gbDouble('Img_share_limit', fallback: 30)
+        .clamp(1, 100)
+        .round();
+    final picked = await FilePicker.pickFiles(
+      type: _pickerType(type),
+      allowMultiple: true,
+    );
     if (picked.isEmpty) return <MessageAttachment>[];
-    if (picked.length > limit) throw Exception('You selected ${picked.length} files; your configured send limit is $limit.');
+    if (picked.length > limit)
+      throw Exception(
+        'You selected ${picked.length} files; your configured send limit is $limit.',
+      );
     final result = <MessageAttachment>[];
     for (final item in picked) {
       final path = item.path;
       if (path == null || path.isEmpty) continue;
-      result.add(await uploadFile(conversationId: conversationId, type: type, sourcePath: path, displayName: item.name));
+      result.add(
+        await uploadFile(
+          conversationId: conversationId,
+          type: type,
+          sourcePath: path,
+          displayName: item.name,
+        ),
+      );
     }
     return result;
   }
@@ -51,12 +81,16 @@ class ChatMediaService {
     int durationSeconds = 0,
   }) async {
     var file = File(sourcePath);
-    if (!await file.exists()) throw Exception('The selected file no longer exists.');
+    if (!await file.exists())
+      throw Exception('The selected file no longer exists.');
     var rawName = displayName ?? sourcePath.split(Platform.pathSeparator).last;
     var mimeType = lookupMimeType(sourcePath) ?? _fallbackMimeForType(type);
 
     if (type == 'image' && mimeType != 'image/gif') {
-      final quality = _preferences.gbDouble('Img_highres_seek', fallback: 85).clamp(10, 100).round();
+      final quality = _preferences
+          .gbDouble('Img_highres_seek', fallback: 85)
+          .clamp(10, 100)
+          .round();
       if (quality < 100) {
         try {
           final temp = await getTemporaryDirectory();
@@ -87,7 +121,9 @@ class ChatMediaService {
     final maxBytes = _maxBytes(type);
     if (size > maxBytes) {
       final limitMb = (maxBytes / (1024 * 1024)).round();
-      throw Exception('This $type exceeds your configured $limitMb MB media limit.');
+      throw Exception(
+        'This $type exceeds your configured $limitMb MB media limit.',
+      );
     }
 
     final authUser = _client.auth.currentUser;
@@ -95,11 +131,17 @@ class ChatMediaService {
     final safeName = _safeFileName(rawName);
     final objectPath = '${authUser.id}/$conversationId/${_uuid.v4()}_$safeName';
 
-    await _client.storage.from(bucket).upload(
-      objectPath,
-      file,
-      fileOptions: FileOptions(cacheControl: '3600', upsert: false, contentType: mimeType),
-    );
+    await _client.storage
+        .from(bucket)
+        .upload(
+          objectPath,
+          file,
+          fileOptions: FileOptions(
+            cacheControl: '3600',
+            upsert: false,
+            contentType: mimeType,
+          ),
+        );
 
     return MessageAttachment(
       id: _uuid.v4(),
@@ -118,9 +160,15 @@ class ChatMediaService {
     return configured.clamp(1, 2048).round() * 1024 * 1024;
   }
 
-  Future<String> createSignedUrl(String objectPath, {int expiresInSeconds = 900}) async {
-    if (objectPath.trim().isEmpty) throw Exception('Attachment path is missing.');
-    return _client.storage.from(bucket).createSignedUrl(objectPath, expiresInSeconds);
+  Future<String> createSignedUrl(
+    String objectPath, {
+    int expiresInSeconds = 900,
+  }) async {
+    if (objectPath.trim().isEmpty)
+      throw Exception('Attachment path is missing.');
+    return _client.storage
+        .from(bucket)
+        .createSignedUrl(objectPath, expiresInSeconds);
   }
 
   Future<void> deleteOwnAttachment(String objectPath) async {
@@ -138,9 +186,13 @@ class ChatMediaService {
   }
 
   static String _safeFileName(String source) {
-    final cleaned = source.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_').replaceAll(RegExp(r'_+'), '_');
+    final cleaned = source
+        .replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_')
+        .replaceAll(RegExp(r'_+'), '_');
     if (cleaned.isEmpty) return 'attachment';
-    return cleaned.length > 120 ? cleaned.substring(cleaned.length - 120) : cleaned;
+    return cleaned.length > 120
+        ? cleaned.substring(cleaned.length - 120)
+        : cleaned;
   }
 
   static String _fallbackMimeForType(String type) {

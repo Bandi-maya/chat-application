@@ -1,22 +1,16 @@
 import 'package:flutter/material.dart';
-import '../../../ui/core/theme/theme_config.dart';
 import '../../domain/models/other_models.dart';
 import '../../data/repositories/mock_data_store.dart';
 import '../../ui/core/widgets/app_avatar.dart';
+import '../../ui/core/design_system/design_system.dart';
+import '../../ui/core/theme/theme_config.dart';
 import 'mock_call_screen.dart';
-
-import '../../injection/locator.dart';
-import '../../../ui/core/theme/theme_controller.dart';
 
 class CallsScreen extends StatelessWidget {
   final ThemeConfig theme;
   final MockDataStore dataStore;
 
-  const CallsScreen({
-    super.key,
-    required this.theme,
-    required this.dataStore,
-  });
+  const CallsScreen({super.key, required this.theme, required this.dataStore});
 
   String _formatCallTime(DateTime dt) {
     final hour = dt.hour.toString().padLeft(2, '0');
@@ -26,148 +20,220 @@ class CallsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = locator<ThemeController>().globalTheme;
     final calls = dataStore.calls;
+    final themeData = Theme.of(context);
+    final isDark = themeData.brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: theme.backgroundColor,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Text(
-                'Calls & Audio Logs',
-                style: TextStyle(
-                  color: theme.primaryTextColor,
-                  fontSize: 24 * theme.fontScale,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                ),
+    return ChatyScaffold(
+      safeAreaTop: true,
+      safeAreaBottom: false,
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                ChatySpacing.base,
+                ChatySpacing.md,
+                ChatySpacing.base,
+                ChatySpacing.sm,
               ),
-            ),
-            Expanded(
-              child: calls.isEmpty
-                  ? Center(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(28.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(24),
-                              decoration: BoxDecoration(
-                                color: theme.accentColor.withValues(alpha: 0.12),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.phone_callback_rounded,
-                                size: 54,
-                                color: theme.accentColor,
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            Text(
-                              'No calls yet',
-                              style: TextStyle(
-                                color: theme.primaryTextColor,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Voice and end-to-end encrypted video call logs will appear here.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: theme.secondaryTextColor,
-                                fontSize: 13.5,
-                                height: 1.4,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: calls.length,
-                      separatorBuilder: (context, index) => const Divider(height: 1),
-                      itemBuilder: (context, index) {
-
-                  final call = calls[index];
-                  final caller = dataStore.getUserById(call.callerId);
-                  final isMissed = call.direction == CallDirection.missed;
-
-                  return ListTile(
-                    leading: AppAvatar(
-                      initials: caller?.avatarInitials ?? 'U',
-                      colorHex: caller?.avatarColorHex,
-                      size: 44,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Calls',
+                    style: ChatyTypography.headline(
+                      themeData.colorScheme.onSurface,
                     ),
-                    title: Text(
-                      caller?.displayName ?? 'Secure Caller',
-                      style: TextStyle(
-                        color: isMissed ? theme.dangerColor : theme.primaryTextColor,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14.5 * theme.fontScale,
-                      ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: ChatySpacing.sm,
+                      vertical: 4,
                     ),
-                    subtitle: Row(
+                    decoration: BoxDecoration(
+                      color: themeData.colorScheme.primary.withValues(
+                        alpha: 0.12,
+                      ),
+                      borderRadius: BorderRadius.circular(ChatyRadius.full),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          call.direction == CallDirection.incoming
-                              ? Icons.call_received_rounded
-                              : call.direction == CallDirection.outgoing
-                                  ? Icons.call_made_rounded
-                                  : Icons.call_missed_rounded,
+                          Icons.lock_rounded,
                           size: 13,
-                          color: isMissed ? theme.dangerColor : theme.secondaryTextColor,
+                          color: themeData.colorScheme.primary,
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          '${_formatCallTime(call.timestamp)} • ${call.durationSeconds > 0 ? '${call.durationSeconds}s' : 'Missed'}',
-                          style: TextStyle(color: theme.secondaryTextColor, fontSize: 12),
+                          'Encrypted',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: themeData.colorScheme.primary,
+                          ),
                         ),
                       ],
                     ),
-                    trailing: IconButton(
-                      icon: Icon(
-                        call.type == CallType.video ? Icons.videocam_rounded : Icons.call_rounded,
-                        color: theme.accentColor,
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => MockCallScreen(
-                              theme: theme,
-                              title: caller?.displayName ?? 'Contact',
-                              isVideo: call.type == CallType.video,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  );
-                },
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 70.0),
-        child: FloatingActionButton(
-          backgroundColor: theme.accentColor,
-          foregroundColor: theme.onAccentColor,
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Starting new encrypted call... Select contact.')),
-            );
-          },
-          child: const Icon(Icons.add_call),
-        ),
+          ),
+          if (calls.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(ChatySpacing.xl),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(ChatySpacing.lg),
+                        decoration: BoxDecoration(
+                          color: themeData.colorScheme.primary.withValues(
+                            alpha: 0.08,
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.phone_callback_rounded,
+                          size: 48,
+                          color: themeData.colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(height: ChatySpacing.base),
+                      Text(
+                        'No recent calls',
+                        style: ChatyTypography.title(
+                          themeData.colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: ChatySpacing.xs),
+                      Text(
+                        'Voice and video calls with your contacts will appear here with peer-to-peer security.',
+                        textAlign: TextAlign.center,
+                        style: ChatyTypography.caption(
+                          themeData.colorScheme.onSurface.withValues(
+                            alpha: 0.6,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: ChatySpacing.base,
+                vertical: ChatySpacing.sm,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: ChatyGroupedSection(
+                  children: [
+                    for (int i = 0; i < calls.length; i++) ...[
+                      Builder(
+                        builder: (context) {
+                          final call = calls[i];
+                          final caller = dataStore.getUserById(call.callerId);
+                          final isMissed =
+                              call.direction == CallDirection.missed;
+                          final isVideo = call.type == CallType.video;
+
+                          return ChatyListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: ChatySpacing.base,
+                              vertical: ChatySpacing.md,
+                            ),
+                            leading: AppAvatar(
+                              initials: caller?.avatarInitials ?? 'U',
+                              colorHex: caller?.avatarColorHex,
+                              size: 42,
+                            ),
+                            title: Text(
+                              caller?.displayName ?? 'Secure Caller',
+                              style: TextStyle(
+                                color: isMissed
+                                    ? const Color(0xFFEF4444)
+                                    : themeData.colorScheme.onSurface,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                            subtitle: Row(
+                              children: [
+                                Icon(
+                                  call.direction == CallDirection.incoming
+                                      ? Icons.call_received_rounded
+                                      : call.direction == CallDirection.outgoing
+                                      ? Icons.call_made_rounded
+                                      : Icons.call_missed_rounded,
+                                  size: 14,
+                                  color: isMissed
+                                      ? const Color(0xFFEF4444)
+                                      : themeData.colorScheme.onSurface
+                                            .withValues(alpha: 0.55),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${_formatCallTime(call.timestamp)} • ${call.durationSeconds > 0 ? '${call.durationSeconds}s' : 'Missed'}',
+                                  style: ChatyTypography.caption(
+                                    themeData.colorScheme.onSurface.withValues(
+                                      alpha: 0.6,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            trailing: ChatyIconButton(
+                              icon: isVideo
+                                  ? Icons.videocam_rounded
+                                  : Icons.call_rounded,
+                              size: 38,
+                              iconSize: 20,
+                              backgroundColor:
+                                  isDark
+                                      ? const Color(0xFF27272A)
+                                      : const Color(0xFFF4F4F5),
+                              color: themeData.colorScheme.primary,
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => MockCallScreen(
+                                      theme: theme,
+                                      title: caller?.displayName ?? 'Contact',
+                                      isVideo: isVideo,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => MockCallScreen(
+                                    theme: theme,
+                                    title: caller?.displayName ?? 'Contact',
+                                    isVideo: isVideo,
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          const SliverToBoxAdapter(child: SizedBox(height: 80)),
+        ],
       ),
     );
   }

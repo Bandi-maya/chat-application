@@ -16,8 +16,8 @@ class LocalLockService {
   LocalLockService({
     LocalAuthentication? localAuthentication,
     FlutterSecureStorage? secureStorage,
-  })  : _localAuthentication = localAuthentication ?? LocalAuthentication(),
-        _secureStorage = secureStorage ?? const FlutterSecureStorage();
+  }) : _localAuthentication = localAuthentication ?? LocalAuthentication(),
+       _secureStorage = secureStorage ?? const FlutterSecureStorage();
 
   static const String _prefix = 'chaty.local_lock.v2';
   static const String _pinLengthKey = '$_prefix.pin_length';
@@ -41,17 +41,25 @@ class LocalLockService {
       case 'password':
         return 'password';
       default:
-        throw ArgumentError.value(method, 'method', 'Unsupported local credential method');
+        throw ArgumentError.value(
+          method,
+          'method',
+          'Unsupported local credential method',
+        );
     }
   }
 
-  String _hashKey(String method) => '$_prefix.${_normalizedMethod(method)}.hash';
-  String _saltKey(String method) => '$_prefix.${_normalizedMethod(method)}.salt';
+  String _hashKey(String method) =>
+      '$_prefix.${_normalizedMethod(method)}.hash';
+  String _saltKey(String method) =>
+      '$_prefix.${_normalizedMethod(method)}.salt';
 
   Future<bool> hasCredential(String method) async {
     try {
-      return (await _secureStorage.read(key: _hashKey(method)))?.isNotEmpty == true &&
-          (await _secureStorage.read(key: _saltKey(method)))?.isNotEmpty == true;
+      return (await _secureStorage.read(key: _hashKey(method)))?.isNotEmpty ==
+              true &&
+          (await _secureStorage.read(key: _saltKey(method)))?.isNotEmpty ==
+              true;
     } catch (_) {
       return false;
     }
@@ -59,7 +67,9 @@ class LocalLockService {
 
   Future<int> getPinLength() async {
     try {
-      final value = int.tryParse(await _secureStorage.read(key: _pinLengthKey) ?? '');
+      final value = int.tryParse(
+        await _secureStorage.read(key: _pinLengthKey) ?? '',
+      );
       return value == 6 ? 6 : 4;
     } catch (_) {
       return 4;
@@ -71,12 +81,17 @@ class LocalLockService {
     await _secureStorage.write(key: _pinLengthKey, value: '$safeLength');
   }
 
-  Future<void> setCredential(String method, String secret, {int? pinLength}) async {
+  Future<void> setCredential(
+    String method,
+    String secret, {
+    int? pinLength,
+  }) async {
     final normalized = _normalizedMethod(method);
     if (secret.isEmpty) throw ArgumentError('Credential must not be empty.');
     if (normalized == 'pin') {
       final expectedLength = pinLength == 6 ? 6 : 4;
-      if (!RegExp(r'^\d+$').hasMatch(secret) || secret.length != expectedLength) {
+      if (!RegExp(r'^\d+$').hasMatch(secret) ||
+          secret.length != expectedLength) {
         throw ArgumentError('PIN must contain exactly $expectedLength digits.');
       }
       await setPinLength(expectedLength);
@@ -89,10 +104,19 @@ class LocalLockService {
     }
 
     final salt = List<int>.generate(_saltLength, (_) => _random.nextInt(256));
-    final derived = await _pbkdf2.deriveKeyFromPassword(password: secret, nonce: salt);
+    final derived = await _pbkdf2.deriveKeyFromPassword(
+      password: secret,
+      nonce: salt,
+    );
     final bytes = await derived.extractBytes();
-    await _secureStorage.write(key: _saltKey(normalized), value: base64Encode(salt));
-    await _secureStorage.write(key: _hashKey(normalized), value: base64Encode(bytes));
+    await _secureStorage.write(
+      key: _saltKey(normalized),
+      value: base64Encode(salt),
+    );
+    await _secureStorage.write(
+      key: _hashKey(normalized),
+      value: base64Encode(bytes),
+    );
   }
 
   Future<bool> verifyCredential(String method, String secret) async {
@@ -104,7 +128,10 @@ class LocalLockService {
 
       final salt = base64Decode(encodedSalt);
       final expected = base64Decode(encodedHash);
-      final derived = await _pbkdf2.deriveKeyFromPassword(password: secret, nonce: salt);
+      final derived = await _pbkdf2.deriveKeyFromPassword(
+        password: secret,
+        nonce: salt,
+      );
       final actual = await derived.extractBytes();
       return _constantTimeBytesEqual(actual, expected);
     } catch (_) {
@@ -131,7 +158,9 @@ class LocalLockService {
     }
   }
 
-  Future<bool> authenticateBiometric({String reason = 'Authenticate to unlock Chaty'}) async {
+  Future<bool> authenticateBiometric({
+    String reason = 'Authenticate to unlock Chaty',
+  }) async {
     try {
       if (!await canUseBiometrics()) return false;
       return await _localAuthentication.authenticate(
@@ -150,7 +179,9 @@ class LocalLockService {
     }
   }
 
-  Future<bool> authenticateDeviceCredential({String reason = 'Use your device lock to unlock Chaty'}) async {
+  Future<bool> authenticateDeviceCredential({
+    String reason = 'Use your device lock to unlock Chaty',
+  }) async {
     try {
       if (!await _localAuthentication.isDeviceSupported()) return false;
       return await _localAuthentication.authenticate(
@@ -176,10 +207,14 @@ class LocalLockService {
   }
 
   bool _isValidPattern(String pattern) {
-    final values = pattern.split('-').where((value) => value.isNotEmpty).toList(growable: false);
+    final values = pattern
+        .split('-')
+        .where((value) => value.isNotEmpty)
+        .toList(growable: false);
     if (values.length < 4) return false;
     final parsed = values.map(int.tryParse).toList(growable: false);
-    if (parsed.any((value) => value == null || value < 0 || value > 8)) return false;
+    if (parsed.any((value) => value == null || value < 0 || value > 8))
+      return false;
     return parsed.toSet().length == parsed.length;
   }
 

@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../ui/core/controllers/chaty_preferences_controller.dart';
+import '../../ui/core/controllers/preferences_controller.dart';
 import '../repositories/mock_data_store.dart';
 import 'gb_feature_backend_service.dart';
 
@@ -21,7 +21,10 @@ class MessageAutomationService {
     required this.dataStore,
   }) {
     preferencesController.addListener(_onPreferencesChanged);
-    _syncTimer = Timer.periodic(const Duration(seconds: 30), (_) => unawaited(_sync()));
+    _syncTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => unawaited(_sync()),
+    );
     unawaited(_sync());
   }
 

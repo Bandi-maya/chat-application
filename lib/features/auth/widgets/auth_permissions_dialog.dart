@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../ui/core/theme/theme_controller.dart';
 import '../../../../injection/locator.dart';
-import '../../../../data/services/chaty_notification_service.dart';
+import '../../../../data/services/notification_service.dart';
 
 class AuthPermissionsDialog extends StatefulWidget {
   const AuthPermissionsDialog({super.key});
@@ -92,7 +92,9 @@ class _AuthPermissionsDialogState extends State<AuthPermissionsDialog> {
                 width: 44,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : const Color(0xFFCBD5E1),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -107,7 +109,11 @@ class _AuthPermissionsDialogState extends State<AuthPermissionsDialog> {
                     color: theme.accentColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Icon(Icons.shield_rounded, color: theme.accentColor, size: 28),
+                  child: Icon(
+                    Icons.shield_rounded,
+                    color: theme.accentColor,
+                    size: 28,
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(

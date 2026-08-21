@@ -1,7 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../domain/models/chaty_preferences.dart';
+import '../../domain/models/preferences.dart';
 
 class ServerScheduledMessage {
   final String id;
@@ -24,7 +24,8 @@ class ServerScheduledMessage {
 }
 
 class GbFeatureBackendService {
-  GbFeatureBackendService({SupabaseClient? client}) : _client = client ?? Supabase.instance.client;
+  GbFeatureBackendService({SupabaseClient? client})
+    : _client = client ?? Supabase.instance.client;
 
   final SupabaseClient _client;
   final Uuid _uuid = const Uuid();
@@ -37,8 +38,13 @@ class GbFeatureBackendService {
 
   Future<void> synchronizeAutomation(MessageAutomationPreferences prefs) async {
     final userId = _userId;
+    // The master Auto-Reply switch gates every rule. When it is off, rules are
+    // persisted (so the user's list survives) but pushed as disabled so the
+    // server-side responder never fires for any of them.
+    final masterEnabled = prefs.enableAutoReply;
     for (final rule in prefs.autoReplyRules) {
-      if (rule.keyword.trim().isEmpty || rule.responseMessage.trim().isEmpty) continue;
+      if (rule.keyword.trim().isEmpty || rule.responseMessage.trim().isEmpty)
+        continue;
       final existing = await _client
           .from('auto_reply_rules')
           .select('id')
@@ -53,14 +59,17 @@ class GbFeatureBackendService {
           'keyword': rule.keyword.trim(),
           'response_body': rule.responseMessage.trim(),
           'scope': _scope(rule.recipientFilter),
-          'enabled': rule.enabled,
+          'enabled': masterEnabled && rule.enabled,
         });
       } else {
-        await _client.from('auto_reply_rules').update(<String, dynamic>{
-          'scope': _scope(rule.recipientFilter),
-          'enabled': rule.enabled,
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        }).eq('id', existing['id']);
+        await _client
+            .from('auto_reply_rules')
+            .update(<String, dynamic>{
+              'scope': _scope(rule.recipientFilter),
+              'enabled': masterEnabled && rule.enabled,
+              'updated_at': DateTime.now().toUtc().toIso8601String(),
+            })
+            .eq('id', existing['id']);
       }
     }
 
@@ -78,43 +87,75 @@ class GbFeatureBackendService {
     }
   }
 
-  Future<String> createAutoReplyRule({required String keyword, required String response, String scope = 'all'}) async {
-    final row = await _client.from('auto_reply_rules').insert(<String, dynamic>{
-      'user_id': _userId,
-      'keyword': keyword.trim(),
-      'response_body': response.trim(),
-      'scope': scope,
-      'enabled': true,
-    }).select('id').single();
+  Future<String> createAutoReplyRule({
+    required String keyword,
+    required String response,
+    String scope = 'all',
+  }) async {
+    final row = await _client
+        .from('auto_reply_rules')
+        .insert(<String, dynamic>{
+          'user_id': _userId,
+          'keyword': keyword.trim(),
+          'response_body': response.trim(),
+          'scope': scope,
+          'enabled': true,
+        })
+        .select('id')
+        .single();
     return row['id'].toString();
   }
 
   Future<void> deleteAutoReplyRule(String ruleId) async {
-    await _client.from('auto_reply_rules').delete().eq('id', ruleId).eq('user_id', _userId);
+    await _client
+        .from('auto_reply_rules')
+        .delete()
+        .eq('id', ruleId)
+        .eq('user_id', _userId);
   }
 
-  Future<void> deleteAutoReplyRuleBySignature(String keyword, String response) async {
-    await _client.from('auto_reply_rules').delete().eq('user_id', _userId).ilike('keyword', keyword.trim()).eq('response_body', response.trim());
+  Future<void> deleteAutoReplyRuleBySignature(
+    String keyword,
+    String response,
+  ) async {
+    await _client
+        .from('auto_reply_rules')
+        .delete()
+        .eq('user_id', _userId)
+        .ilike('keyword', keyword.trim())
+        .eq('response_body', response.trim());
   }
 
-  Future<String> scheduleMessage({required String conversationId, required String body, required DateTime scheduledAt}) async {
-    final raw = await _client.rpc('schedule_message', params: <String, dynamic>{
-      'p_conversation_id': conversationId,
-      'p_body': body.trim(),
-      'p_scheduled_at': scheduledAt.toUtc().toIso8601String(),
-      'p_metadata': <String, dynamic>{'source': 'chaty_scheduler'},
-    });
+  Future<String> scheduleMessage({
+    required String conversationId,
+    required String body,
+    required DateTime scheduledAt,
+  }) async {
+    final raw = await _client.rpc(
+      'schedule_message',
+      params: <String, dynamic>{
+        'p_conversation_id': conversationId,
+        'p_body': body.trim(),
+        'p_scheduled_at': scheduledAt.toUtc().toIso8601String(),
+        'p_metadata': <String, dynamic>{'source': 'chaty_scheduler'},
+      },
+    );
     return raw.toString();
   }
 
   Future<void> cancelScheduledMessage(String id) async {
-    await _client.rpc('cancel_scheduled_message', params: <String, dynamic>{'p_id': id});
+    await _client.rpc(
+      'cancel_scheduled_message',
+      params: <String, dynamic>{'p_id': id},
+    );
   }
 
   Future<List<ServerScheduledMessage>> getScheduledMessages() async {
     final rows = await _client
         .from('scheduled_messages')
-        .select('id,conversation_id,body,scheduled_at,state,executed_at,last_error')
+        .select(
+          'id,conversation_id,body,scheduled_at,state,executed_at,last_error',
+        )
         .eq('user_id', _userId)
         .order('scheduled_at', ascending: false);
     return (rows as List)
@@ -125,49 +166,80 @@ class GbFeatureBackendService {
             id: row['id'].toString(),
             conversationId: row['conversation_id'].toString(),
             body: row['body']?.toString() ?? '',
-            scheduledAt: DateTime.parse(row['scheduled_at'].toString()).toLocal(),
+            scheduledAt: DateTime.parse(
+              row['scheduled_at'].toString(),
+            ).toLocal(),
             state: row['state']?.toString() ?? 'pending',
-            executedAt: row['executed_at'] == null ? null : DateTime.tryParse(row['executed_at'].toString())?.toLocal(),
+            executedAt: row['executed_at'] == null
+                ? null
+                : DateTime.tryParse(row['executed_at'].toString())?.toLocal(),
             lastError: row['last_error']?.toString(),
           );
         })
         .toList(growable: false);
   }
 
-  Future<String> upsertQuickReply({required String shortcut, required String title, required String content}) async {
-    final row = await _client.from('quick_reply_templates').upsert(<String, dynamic>{
-      'user_id': _userId,
-      'shortcut': shortcut.trim(),
-      'title': title.trim(),
-      'content': content.trim(),
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }, onConflict: 'user_id,shortcut').select('id').single();
+  Future<String> upsertQuickReply({
+    required String shortcut,
+    required String title,
+    required String content,
+  }) async {
+    final row = await _client
+        .from('quick_reply_templates')
+        .upsert(<String, dynamic>{
+          'user_id': _userId,
+          'shortcut': shortcut.trim(),
+          'title': title.trim(),
+          'content': content.trim(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        }, onConflict: 'user_id,shortcut')
+        .select('id')
+        .single();
     return row['id'].toString();
   }
 
   Future<void> deleteQuickReply(String shortcut) async {
-    await _client.from('quick_reply_templates').delete().eq('user_id', _userId).eq('shortcut', shortcut.trim());
+    await _client
+        .from('quick_reply_templates')
+        .delete()
+        .eq('user_id', _userId)
+        .eq('shortcut', shortcut.trim());
   }
 
   Future<List<Map<String, dynamic>>> getBlockedUsers() async {
     final raw = await _client.rpc('get_my_blocked_users');
     if (raw is! List) return <Map<String, dynamic>>[];
-    return raw.whereType<Map>().map((row) => Map<String, dynamic>.from(row)).toList(growable: false);
+    return raw
+        .whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row))
+        .toList(growable: false);
   }
 
   Future<void> blockUser(String userId) async {
-    await _client.rpc('block_user', params: <String, dynamic>{'p_user_id': userId});
+    await _client.rpc(
+      'block_user',
+      params: <String, dynamic>{'p_user_id': userId},
+    );
   }
 
   Future<void> unblockUser(String userId) async {
-    await _client.rpc('unblock_user', params: <String, dynamic>{'p_user_id': userId});
+    await _client.rpc(
+      'unblock_user',
+      params: <String, dynamic>{'p_user_id': userId},
+    );
   }
 
-  Future<int> massSend({required List<String> conversationIds, required String body}) async {
-    final raw = await _client.rpc('mass_send_message', params: <String, dynamic>{
-      'p_conversation_ids': conversationIds,
-      'p_body': body.trim(),
-    });
+  Future<int> massSend({
+    required List<String> conversationIds,
+    required String body,
+  }) async {
+    final raw = await _client.rpc(
+      'mass_send_message',
+      params: <String, dynamic>{
+        'p_conversation_ids': conversationIds,
+        'p_body': body.trim(),
+      },
+    );
     return raw is int ? raw : int.tryParse(raw?.toString() ?? '') ?? 0;
   }
 
@@ -177,13 +249,16 @@ class GbFeatureBackendService {
     required String body,
     Map<String, dynamic> metadata = const <String, dynamic>{},
   }) async {
-    final raw = await _client.rpc('send_message', params: <String, dynamic>{
-      'p_conversation_id': conversationId,
-      'p_client_message_id': _uuid.v4(),
-      'p_body': body,
-      'p_type': type,
-      'p_metadata': metadata,
-    });
+    final raw = await _client.rpc(
+      'send_message',
+      params: <String, dynamic>{
+        'p_conversation_id': conversationId,
+        'p_client_message_id': _uuid.v4(),
+        'p_body': body,
+        'p_type': type,
+        'p_metadata': metadata,
+      },
+    );
     return raw.toString();
   }
 
@@ -193,34 +268,56 @@ class GbFeatureBackendService {
     required List<String> options,
     bool allowMultiple = false,
   }) async {
-    final clean = options.map((value) => value.trim()).where((value) => value.isNotEmpty).toList(growable: false);
-    if (clean.length < 2) throw Exception('A poll requires at least two options.');
-    final raw = await _client.rpc('create_poll', params: <String, dynamic>{
-      'p_conversation_id': conversationId,
-      'p_client_message_id': _uuid.v4(),
-      'p_question': question.trim(),
-      'p_options': clean,
-      'p_allow_multiple': allowMultiple,
-    });
+    final clean = options
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toList(growable: false);
+    if (clean.length < 2)
+      throw Exception('A poll requires at least two options.');
+    final raw = await _client.rpc(
+      'create_poll',
+      params: <String, dynamic>{
+        'p_conversation_id': conversationId,
+        'p_client_message_id': _uuid.v4(),
+        'p_question': question.trim(),
+        'p_options': clean,
+        'p_allow_multiple': allowMultiple,
+      },
+    );
     return raw.toString();
   }
 
-  Future<void> votePoll({required String messageId, required String optionId}) async {
-    await _client.rpc('vote_poll', params: <String, dynamic>{'p_message_id': messageId, 'p_option_id': optionId});
+  Future<void> votePoll({
+    required String messageId,
+    required String optionId,
+  }) async {
+    await _client.rpc(
+      'vote_poll',
+      params: <String, dynamic>{
+        'p_message_id': messageId,
+        'p_option_id': optionId,
+      },
+    );
   }
 
   Future<void> setTyping(String conversationId, bool isTyping) async {
-    await _client.rpc('set_typing_state', params: <String, dynamic>{
-      'p_conversation_id': conversationId,
-      'p_is_typing': isTyping,
-    });
+    await _client.rpc(
+      'set_typing_state',
+      params: <String, dynamic>{
+        'p_conversation_id': conversationId,
+        'p_is_typing': isTyping,
+      },
+    );
   }
 
   Future<void> editMessage(String messageId, String body) async {
-    await _client.rpc('edit_chat_message', params: <String, dynamic>{
-      'p_message_id': messageId,
-      'p_body': body.trim(),
-    });
+    await _client.rpc(
+      'edit_chat_message',
+      params: <String, dynamic>{
+        'p_message_id': messageId,
+        'p_body': body.trim(),
+      },
+    );
   }
 
   static String _scope(String recipientFilter) {

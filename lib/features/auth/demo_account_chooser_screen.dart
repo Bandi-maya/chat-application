@@ -3,6 +3,7 @@ import '../../../ui/core/theme/theme_controller.dart';
 import '../../data/repositories/mock_data_store.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../domain/models/user_profile.dart';
+import '../../ui/core/design_system/design_system.dart';
 import 'profile_setup_screen.dart';
 import '../../injection/locator.dart';
 
@@ -73,49 +74,46 @@ class DemoAccountChooserScreen extends StatelessWidget {
       ),
     ];
 
-    return Scaffold(
-      backgroundColor: theme.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Choose Demo Account'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+    return ChatyScaffold(
+      appBar: const ChatyAppBar(
+        title: 'Choose Demo Account',
+        leading: ChatyBackButton(),
       ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: const EdgeInsets.symmetric(
+            horizontal: ChatySpacing.base,
+            vertical: ChatySpacing.md,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Select a demo account to explore Chaty',
+                'Select an identity to test multi-device synced chats, tasks, and calls in sandbox mode.',
                 style: TextStyle(
-                  fontSize: 18.0,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.blue,
+                  fontSize: 14.0,
+                  color: theme.secondaryTextColor,
+                  height: 1.4,
                 ),
               ),
-              const SizedBox(height: 24.0),
+              const SizedBox(height: ChatySpacing.lg),
               Expanded(
-                child: ListView.builder(
-                  itemCount: allUsers.length,
-                  itemBuilder: (context, index) {
-                    final user = allUsers[index];
-                    return _DemoAccountTile(
-                      user: user,
-                      onTap: () {
-                        // Simulate login by setting current user in data store
-                        dataStore.switchDemoAccount(user);
-                        // Navigate to profile setup to complete the demo
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => ProfileSetupScreen(),
-                          ),
-                        );
-                      },
-                    );
-                  },
+                child: ChatyGroupedSection(
+                  title: 'Available Sandbox Profiles',
+                  children: [
+                    for (final user in allUsers)
+                      _DemoAccountTile(
+                        user: user,
+                        onTap: () {
+                          dataStore.switchDemoAccount(user);
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const ProfileSetupScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                  ],
                 ),
               ),
             ],
@@ -130,15 +128,12 @@ class _DemoAccountTile extends StatelessWidget {
   final UserProfile user;
   final VoidCallback onTap;
 
-  const _DemoAccountTile({
-    required this.user,
-    required this.onTap,
-  });
+  const _DemoAccountTile({required this.user, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final theme = locator<ThemeController>().globalTheme;
-    return ListTile(
+    return ChatyListTile(
       leading: AppAvatar(
         initials: user.avatarInitials,
         colorHex: user.avatarColorHex,
@@ -150,16 +145,22 @@ class _DemoAccountTile extends StatelessWidget {
         style: TextStyle(
           color: theme.primaryTextColor,
           fontWeight: FontWeight.w600,
+          fontSize: 15,
         ),
       ),
       subtitle: Text(
-        user.about,
-        style: TextStyle(
-          color: theme.secondaryTextColor,
-        ),
+        '${user.username} • ${user.about}',
+        style: TextStyle(color: theme.secondaryTextColor, fontSize: 13),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
-      trailing: Icon(Icons.arrow_forward_ios, size: 16.0, color: theme.secondaryTextColor),
+      trailing: Icon(
+        Icons.chevron_right_rounded,
+        size: 20.0,
+        color: theme.secondaryTextColor.withValues(alpha: 0.5),
+      ),
       onTap: onTap,
     );
   }
 }
+

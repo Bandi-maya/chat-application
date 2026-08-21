@@ -10,10 +10,7 @@ import 'widgets/auth_components.dart';
 class OtpVerificationScreen extends StatefulWidget {
   final String email;
 
-  const OtpVerificationScreen({
-    super.key,
-    required this.email,
-  });
+  const OtpVerificationScreen({super.key, required this.email});
 
   @override
   State<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
@@ -22,8 +19,10 @@ class OtpVerificationScreen extends StatefulWidget {
 class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   final List<TextEditingController> _controllers =
       List<TextEditingController>.generate(6, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes =
-      List<FocusNode>.generate(6, (_) => FocusNode());
+  final List<FocusNode> _focusNodes = List<FocusNode>.generate(
+    6,
+    (_) => FocusNode(),
+  );
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -38,12 +37,15 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     super.dispose();
   }
 
-  String get currentOtp => _controllers.map((controller) => controller.text).join();
+  String get currentOtp =>
+      _controllers.map((controller) => controller.text).join();
 
   Future<void> _handleVerify() async {
     if (_isLoading) return;
     if (currentOtp.length != 6) {
-      setState(() => _errorMessage = 'Enter the complete 6-digit verification code.');
+      setState(
+        () => _errorMessage = 'Enter the complete 6-digit verification code.',
+      );
       return;
     }
 
@@ -59,7 +61,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         type: OtpType.email,
       );
       if (response.session == null) {
-        throw const AuthException('The verification code could not create a session.');
+        throw const AuthException(
+          'The verification code could not create a session.',
+        );
       }
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -124,11 +128,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                 children: [
                   const AuthBackButton(),
                   const SizedBox(height: 12),
-                  AuthIllustration(
-                    type: 'otp',
-                    theme: theme,
-                    height: 190,
-                  ),
+                  AuthIllustration(type: 'otp', theme: theme, height: 190),
                   const SizedBox(height: 16),
                   Text(
                     'Enter verification code',

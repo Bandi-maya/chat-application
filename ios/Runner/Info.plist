@@ -28,6 +28,16 @@
 	<true/>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Chaty uses Face ID to unlock the app and protected chats when you enable biometric security.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Chaty uses the camera to take photos, record video, and start video calls.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Chaty uses the microphone to record voice messages and for voice and video calls.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Chaty accesses your contacts to help you find friends who are already on Chaty.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Chaty accesses your photo library so you can share photos and videos in chats.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Chaty uses your location so you can share where you are in a conversation.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -2,13 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'package:chat/data/services/chaty_backend_service.dart';
+import 'package:chat/data/services/backend_service.dart';
 import 'package:chat/features/auth/welcome_screen.dart';
 import 'package:chat/features/chats/main_navigation_shell.dart';
 import 'package:chat/injection/locator.dart';
 import 'package:chat/ui/core/controllers/app_icon_controller.dart';
 import 'package:chat/ui/core/theme/theme_controller.dart';
-import 'package:chat/ui/core/widgets/chaty_brand_icon.dart';
+import 'package:chat/ui/core/widgets/app_brand_icon.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});

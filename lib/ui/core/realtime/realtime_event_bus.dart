@@ -51,8 +51,9 @@ class RealtimeEventBus {
   }
 
   Stream<RealtimeEvent> forConversation(String conversationId) {
-    return _eventController.stream
-        .where((event) => event.conversationId == conversationId);
+    return _eventController.stream.where(
+      (event) => event.conversationId == conversationId,
+    );
   }
 
   void publish(RealtimeEvent event) {
@@ -64,7 +65,9 @@ class RealtimeEventBus {
   void emitTyping(String conversationId, String userId, bool isTyping) {
     publish(
       RealtimeEvent(
-        type: isTyping ? RealtimeEventType.typingStarted : RealtimeEventType.typingStopped,
+        type: isTyping
+            ? RealtimeEventType.typingStarted
+            : RealtimeEventType.typingStopped,
         conversationId: conversationId,
         userId: userId,
         payload: {'isTyping': isTyping},

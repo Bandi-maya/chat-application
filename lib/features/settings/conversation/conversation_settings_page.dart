@@ -1,6 +1,11 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import '../../../ui/core/design_system/chaty_settings_primitives.dart';
-import '../../../ui/core/controllers/chaty_preferences_controller.dart';
+import 'package:path_provider/path_provider.dart';
+
+import '../../../ui/core/design_system/settings_primitives.dart';
+import '../../../ui/core/controllers/preferences_controller.dart';
 
 class ConversationSettingsPage extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
@@ -11,10 +16,43 @@ class ConversationSettingsPage extends StatefulWidget {
   });
 
   @override
-  State<ConversationSettingsPage> createState() => _ConversationSettingsPageState();
+  State<ConversationSettingsPage> createState() =>
+      _ConversationSettingsPageState();
 }
 
 class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
+  /// Real CONTROL side for wallpaperType 'Image': picks an image via
+  /// file_picker and copies it into the app documents directory so it
+  /// survives cache cleanup, then persists the path for the consumer.
+  Future<void> _pickWallpaperImage() async {
+    try {
+      final picked = await FilePicker.pickFile(
+        type: FileType.image,
+      );
+      final sourcePath = picked?.path;
+      if (sourcePath == null || sourcePath.isEmpty) return;
+      final docs = await getApplicationDocumentsDirectory();
+      var ext = sourcePath.contains('.') ? sourcePath.split('.').last.toLowerCase() : 'png';
+      if (!RegExp(r'^[a-z0-9]{2,5}$').hasMatch(ext)) ext = 'png';
+      final target = File(
+        '${docs.path}/chaty_wallpaper_${DateTime.now().millisecondsSinceEpoch}.$ext',
+      );
+      await File(sourcePath).copy(target.path);
+      if (!mounted) return;
+      widget.preferencesController.updateConversation(
+        widget.preferencesController.conversation.copyWith(
+          wallpaperType: 'Image',
+          wallpaperPath: target.path,
+        ),
+        logTitle: 'Wallpaper Image',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not import that image.')),
+      );
+    }
+  }
   static const List<String> _bubbleShapes = [
     'Rounded',
     'Compact',
@@ -51,14 +89,7 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
     'ProfileBlur',
   ];
 
-  static const List<double> _playbackSpeeds = [
-    0.5,
-    0.75,
-    1.0,
-    1.25,
-    1.5,
-    2.0,
-  ];
+  static const List<double> _playbackSpeeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
   @override
   Widget build(BuildContext context) {
@@ -76,7 +107,10 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
             children: [
               Text(
                 'Shape: ${conv.bubbleShape} • Radius: ${conv.bubbleRadius.toInt()}px • Ticks: ${conv.tickStyle} • Wallpaper: ${conv.wallpaperType}',
-                style: TextStyle(fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).textTheme.bodySmall?.color,
+                ),
               ),
               const SizedBox(height: 8),
               Container(
@@ -84,7 +118,11 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.2)),
+                  border: Border.all(
+                    color: Theme.of(
+                      context,
+                    ).dividerColor.withValues(alpha: 0.2),
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -95,9 +133,14 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
                         padding: EdgeInsets.all(conv.bubblePadding),
                         decoration: BoxDecoration(
                           color: Theme.of(context).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(conv.bubbleRadius),
+                          borderRadius: BorderRadius.circular(
+                            conv.bubbleRadius,
+                          ),
                         ),
-                        child: const Text('Incoming message sample with active styling.', style: TextStyle(fontSize: 13)),
+                        child: const Text(
+                          'Incoming message sample with active styling.',
+                          style: TextStyle(fontSize: 13),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -107,14 +150,26 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
                         padding: EdgeInsets.all(conv.bubblePadding),
                         decoration: BoxDecoration(
                           color: Theme.of(context).colorScheme.primary,
-                          borderRadius: BorderRadius.circular(conv.bubbleRadius),
+                          borderRadius: BorderRadius.circular(
+                            conv.bubbleRadius,
+                          ),
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text('Outgoing reply!', style: TextStyle(color: Colors.white, fontSize: 13)),
+                            Text(
+                              'Outgoing reply!',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                              ),
+                            ),
                             SizedBox(width: 6),
-                            Icon(Icons.done_all_rounded, size: 14, color: Colors.cyanAccent),
+                            Icon(
+                              Icons.done_all_rounded,
+                              size: 14,
+                              color: Colors.cyanAccent,
+                            ),
                           ],
                         ),
                       ),
@@ -129,7 +184,8 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
         // Bubbles and Ticks Section
         ChatySettingsSection(
           title: 'Bubbles & Ticks',
-          description: 'Customize chat bubble geometry, colors, padding, and tick markers.',
+          description:
+              'Customize chat bubble geometry, colors, padding, and tick markers.',
           children: [
             ChatyChoiceTile<String>(
               title: 'Bubble Shape Geometry',
@@ -176,13 +232,15 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
         // Quick Contact Sidebar
         ChatySettingsSection(
           title: 'Quick Contact Sidebar',
-          description: 'Docked sidebar panel for rapid contact navigation in chat.',
+          description:
+              'Docked sidebar panel for rapid contact navigation in chat.',
           children: [
             ChatySwitchTile(
               icon: Icons.dock_rounded,
               iconColor: Colors.tealAccent,
               title: 'Enable Quick Contact Sidebar',
-              subtitle: 'Show quick contact switcher panel inside active conversations',
+              subtitle:
+                  'Show quick contact switcher panel inside active conversations',
               value: conv.enableQuickContactSidebar,
               onChanged: (val) {
                 widget.preferencesController.updateConversation(
@@ -231,7 +289,8 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
               icon: Icons.touch_app_rounded,
               iconColor: Colors.amberAccent,
               title: 'iOS-Style Context Popup Menu',
-              subtitle: 'Use modern iOS-style floating menu on message long-press',
+              subtitle:
+                  'Use modern iOS-style floating menu on message long-press',
               value: conv.iosStylePopupMenu,
               onChanged: (val) {
                 widget.preferencesController.updateConversation(
@@ -271,6 +330,30 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
                 );
               },
             ),
+            if (conv.wallpaperType == 'Image') ...[
+              ChatySettingsTile(
+                icon: Icons.image_rounded,
+                iconColor: Colors.pinkAccent,
+                title: 'Choose background image',
+                subtitle: conv.wallpaperPath.isEmpty
+                    ? 'No image selected yet'
+                    : 'Custom image imported',
+                onTap: () => _pickWallpaperImage(),
+              ),
+              if (conv.wallpaperPath.isNotEmpty)
+                ChatySettingsTile(
+                  icon: Icons.delete_sweep_rounded,
+                  iconColor: Colors.redAccent,
+                  title: 'Remove custom image',
+                  subtitle: 'Fall back to the themed gradient background',
+                  onTap: () {
+                    widget.preferencesController.updateConversation(
+                      conv.copyWith(wallpaperPath: ''),
+                      logTitle: 'Wallpaper Image Removed',
+                    );
+                  },
+                ),
+            ],
             ChatyChoiceTile<double>(
               title: 'Voice Note Speed',
               options: _playbackSpeeds,

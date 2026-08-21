@@ -19,13 +19,17 @@ class VoiceNoteService {
   bool _recording = false;
 
   bool get isRecording => _recording;
-  Duration get elapsed => _startedAt == null ? Duration.zero : DateTime.now().difference(_startedAt!);
+  Duration get elapsed => _startedAt == null
+      ? Duration.zero
+      : DateTime.now().difference(_startedAt!);
 
   Future<void> start() async {
     if (_recording) return;
-    if (!await _recorder.hasPermission()) throw Exception('Microphone permission is required.');
+    if (!await _recorder.hasPermission())
+      throw Exception('Microphone permission is required.');
     final directory = await getTemporaryDirectory();
-    final path = '${directory.path}/chaty_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    final path =
+        '${directory.path}/chaty_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
     await _recorder.start(
       const RecordConfig(
         encoder: AudioEncoder.aacLc,
@@ -50,7 +54,8 @@ class VoiceNoteService {
     _recording = false;
     _startedAt = null;
     _path = null;
-    if (recordedPath == null || recordedPath.isEmpty || started == null) return false;
+    if (recordedPath == null || recordedPath.isEmpty || started == null)
+      return false;
     final seconds = DateTime.now().difference(started).inSeconds;
     if (seconds < 1) {
       await _deleteQuietly(recordedPath);

@@ -2,18 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../ui/core/theme/theme_controller.dart';
+import '../../../ui/core/theme/theme_config.dart';
 import '../../data/repositories/mock_data_store.dart';
-import '../../data/services/chaty_notification_service.dart';
+import '../../data/services/notification_service.dart';
 import '../../domain/models/conversation.dart';
 import '../../ui/core/controllers/appearance_variant_controller.dart';
-import '../../ui/core/controllers/chaty_preferences_controller.dart';
+import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/gb/gb_theme_overrides.dart';
 import '../calls/calls_screen.dart';
 import '../settings/settings_root_screen.dart';
 import '../tasks/tasks_screen.dart';
 import '../updates/updates_screen.dart';
 import 'chats_home_screen.dart';
-import 'package:chat/injection/locator.dart';
+import '../../injection/locator.dart';
+import '../../ui/core/design_system/design_system.dart';
+import '../../ui/core/widgets/app_avatar.dart';
 
 class MainNavigationShell extends StatefulWidget {
   const MainNavigationShell({super.key});
@@ -39,12 +42,18 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     }
     final now = DateTime.now();
     final previous = _lastExitAttempt;
-    if (previous == null || now.difference(previous) > const Duration(seconds: 2)) {
+    if (previous == null ||
+        now.difference(previous) > const Duration(seconds: 2)) {
       _lastExitAttempt = now;
       if (mounted) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
-          ..showSnackBar(const SnackBar(content: Text('Press back again to exit Chaty'), duration: Duration(seconds: 2)));
+          ..showSnackBar(
+            const SnackBar(
+              content: Text('Press back again to exit Chaty'),
+              duration: Duration(seconds: 2),
+            ),
+          );
       }
       return;
     }
@@ -60,20 +69,57 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     final notificationService = locator<ChatyNotificationService>();
 
     return ListenableBuilder(
-      listenable: Listenable.merge(<Listenable>[themeController, preferencesController, appearanceController, dataStore]),
+      listenable: Listenable.merge(<Listenable>[
+        themeController,
+        preferencesController,
+        appearanceController,
+        dataStore,
+      ]),
       builder: (context, _) {
-        final theme = GbThemeOverrides.resolve(themeController.globalTheme, preferencesController);
-        final separateGroups = preferencesController.home.separateChatsAndGroups ||
-            preferencesController.gbBool('enable_grp_separationV2');
+        final theme = GbThemeOverrides.resolve(
+          themeController.globalTheme,
+          preferencesController,
+        );
+        // Single source of truth: the structured Home setting. The GB
+        // 'enable_grp_separationV2' toggle writes straight into it via the
+        // controller sync, so a stale or directly-set GB value can no
+        // longer force the Groups tab while 'Separate chats and groups'
+        // is off in Settings.
+        final separateGroups =
+            preferencesController.home.separateChatsAndGroups;
 
         final navItems = <_NavDestinationItem>[
-          const _NavDestinationItem(label: 'Chats', icon: Icons.chat_bubble_outline_rounded, activeIcon: Icons.chat_bubble_rounded),
+          const _NavDestinationItem(
+            label: 'Chats',
+            icon: Icons.chat_bubble_outline_rounded,
+            activeIcon: Icons.chat_bubble_rounded,
+          ),
           if (separateGroups)
-            const _NavDestinationItem(label: 'Groups', icon: Icons.groups_outlined, activeIcon: Icons.groups_rounded),
-          const _NavDestinationItem(label: 'Updates', icon: Icons.update_outlined, activeIcon: Icons.update_rounded),
-          const _NavDestinationItem(label: 'Tasks', icon: Icons.checklist_rtl_rounded, activeIcon: Icons.checklist_rounded),
-          const _NavDestinationItem(label: 'Calls', icon: Icons.call_outlined, activeIcon: Icons.call_rounded),
-          const _NavDestinationItem(label: 'Settings', icon: Icons.settings_outlined, activeIcon: Icons.settings_rounded),
+            const _NavDestinationItem(
+              label: 'Groups',
+              icon: Icons.groups_outlined,
+              activeIcon: Icons.groups_rounded,
+            ),
+          const _NavDestinationItem(
+            label: 'Updates',
+            icon: Icons.update_outlined,
+            activeIcon: Icons.update_rounded,
+          ),
+          const _NavDestinationItem(
+            label: 'Tasks',
+            icon: Icons.checklist_rtl_rounded,
+            activeIcon: Icons.checklist_rounded,
+          ),
+          const _NavDestinationItem(
+            label: 'Calls',
+            icon: Icons.call_outlined,
+            activeIcon: Icons.call_rounded,
+          ),
+          const _NavDestinationItem(
+            label: 'Settings',
+            icon: Icons.settings_outlined,
+            activeIcon: Icons.settings_rounded,
+          ),
         ];
 
         final screens = <Widget>[
@@ -96,7 +142,11 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               forcedType: ConversationType.group,
               pageTitle: 'Groups',
             ),
-          UpdatesScreen(theme: theme, dataStore: dataStore, preferencesController: preferencesController),
+          UpdatesScreen(
+            theme: theme,
+            dataStore: dataStore,
+            preferencesController: preferencesController,
+          ),
           TasksScreen(theme: theme, dataStore: dataStore),
           CallsScreen(theme: theme, dataStore: dataStore),
           SettingsRootScreen(
@@ -122,9 +172,91 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final navIndex = appearanceController.navigationIndex;
-              final forceRail = <int>{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 17, 18}.contains(navIndex);
-              final useRail = constraints.maxWidth >= (forceRail ? 720 : 900);
-              final content = IndexedStack(index: effectiveIndex, children: screens);
+              final forceRail = <int>{
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                17,
+                18,
+              }.contains(navIndex);
+              final autoRail = constraints.maxWidth >= (forceRail ? 720 : 900);
+              final navMode = themeController.navigationMode;
+
+              // 1. TOP WHATSAPP-STYLE GREEN TAB BAR (Image 1)
+              if (navMode == AppNavigationMode.topWhatsAppBar) {
+                return _buildTopWhatsAppShell(
+                  theme: theme,
+                  screens: screens,
+                  navItems: navItems,
+                  selectedIndex: effectiveIndex,
+                );
+              }
+
+              // 2. FLOATING DARK ISLAND RAIL (Image 2)
+              if (navMode == AppNavigationMode.floatingIslandRail) {
+                return _buildFloatingIslandRailShell(
+                  theme: theme,
+                  content: IndexedStack(index: effectiveIndex, children: screens),
+                  navItems: navItems,
+                  selectedIndex: effectiveIndex,
+                );
+              }
+
+              // 3. 3D PERSPECTIVE DRAWER MENU (Image 3)
+              if (navMode == AppNavigationMode.perspective3DDrawer) {
+                return _build3DPerspectiveDrawerShell(
+                  theme: theme,
+                  screens: screens,
+                  navItems: navItems,
+                  selectedIndex: effectiveIndex,
+                );
+              }
+
+              // 4. MODERN SIDE MENU DRAWER (Image 4 & 5)
+              if (navMode == AppNavigationMode.modernSideMenu) {
+                return _buildModernSideMenuShell(
+                  theme: theme,
+                  screens: screens,
+                  navItems: navItems,
+                  selectedIndex: effectiveIndex,
+                );
+              }
+
+              // 5. STANDARD BOTTOM NAVIGATION / GESTURE TABS / ADAPTIVE RAIL
+              final layoutMode = themeController.layoutMode;
+              final useRail =
+                  navMode == AppNavigationMode.compactRail ||
+                  (navMode != AppNavigationMode.gestureTabs &&
+                      (layoutMode == UILayoutMode.tabletDesktop || autoRail));
+              Widget content = IndexedStack(
+                index: effectiveIndex,
+                children: screens,
+              );
+              if (navMode == AppNavigationMode.gestureTabs) {
+                content = GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onHorizontalDragEnd: (details) {
+                    final velocity = details.primaryVelocity ?? 0;
+                    if (velocity <= -220) {
+                      _selectRootDestination(
+                        (effectiveIndex + 1).clamp(0, screens.length - 1),
+                      );
+                    } else if (velocity >= 220) {
+                      _selectRootDestination(
+                        (effectiveIndex - 1).clamp(0, screens.length - 1),
+                      );
+                    }
+                  },
+                  child: content,
+                );
+              }
               if (useRail) {
                 return _buildRailShell(
                   theme: theme,
@@ -149,6 +281,319 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // 1. Top WhatsApp Style Tab Bar (Image 1)
+  // ---------------------------------------------------------------------------
+  Widget _buildTopWhatsAppShell({
+    required dynamic theme,
+    required List<Widget> screens,
+    required List<_NavDestinationItem> navItems,
+    required int selectedIndex,
+  }) {
+    const brandGreen = Color(0xFF005C4B);
+    const indicatorWhite = Colors.white;
+
+    return DefaultTabController(
+      length: navItems.length,
+      initialIndex: selectedIndex,
+      child: Scaffold(
+        backgroundColor: theme.backgroundColor,
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              Container(
+                color: brandGreen,
+                child: TabBar(
+                  isScrollable: navItems.length > 4,
+                  indicatorColor: indicatorWhite,
+                  indicatorWeight: 3.5,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white.withValues(alpha: 0.72),
+                  labelStyle: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    letterSpacing: 0.2,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                  ),
+                  tabs: navItems.map((item) => Tab(text: item.label)).toList(),
+                  onTap: _selectRootDestination,
+                ),
+              ),
+              Expanded(
+                child: IndexedStack(index: selectedIndex, children: screens),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 2. Floating Island Rail (Image 2)
+  // ---------------------------------------------------------------------------
+  Widget _buildFloatingIslandRailShell({
+    required dynamic theme,
+    required Widget content,
+    required List<_NavDestinationItem> navItems,
+    required int selectedIndex,
+  }) {
+    return Scaffold(
+      backgroundColor: theme.backgroundColor,
+      body: SafeArea(
+        child: Row(
+          children: [
+            Container(
+              width: 68,
+              margin: const EdgeInsets.fromLTRB(10, 12, 0, 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0B0F19),
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    blurRadius: 18,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 14),
+                  // Traffic dots indicator
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      CircleAvatar(radius: 3.5, backgroundColor: Color(0xFFEF4444)),
+                      SizedBox(width: 4),
+                      CircleAvatar(radius: 3.5, backgroundColor: Color(0xFFF59E0B)),
+                      SizedBox(width: 4),
+                      CircleAvatar(radius: 3.5, backgroundColor: Color(0xFF10B981)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Logo mark
+                  const Icon(Icons.bolt_rounded, color: Color(0xFF10B981), size: 24),
+                  const SizedBox(height: 16),
+                  const Divider(color: Color(0xFF1E293B), height: 1, indent: 12, endIndent: 12),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: navItems.length,
+                      itemBuilder: (context, i) {
+                        final item = navItems[i];
+                        final isSel = selectedIndex == i;
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+                          child: InkWell(
+                            onTap: () => _selectRootDestination(i),
+                            borderRadius: BorderRadius.circular(16),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: isSel ? const Color(0xFF10B981) : Colors.transparent,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Icon(
+                                isSel ? item.activeIcon : item.icon,
+                                size: 20,
+                                color: isSel ? Colors.black : const Color(0xFF94A3B8),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const Divider(color: Color(0xFF1E293B), height: 1, indent: 12, endIndent: 12),
+                  const SizedBox(height: 12),
+                  const CircleAvatar(
+                    radius: 16,
+                    backgroundColor: Color(0xFF1E293B),
+                    child: Text('R', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                  ),
+                  const SizedBox(height: 14),
+                ],
+              ),
+            ),
+            Expanded(child: content),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 3. 3D Perspective Drawer (Image 3)
+  // ---------------------------------------------------------------------------
+  Widget _build3DPerspectiveDrawerShell({
+    required dynamic theme,
+    required List<Widget> screens,
+    required List<_NavDestinationItem> navItems,
+    required int selectedIndex,
+  }) {
+    return _PerspectiveDrawerScaffold(
+      theme: theme,
+      selectedIndex: selectedIndex,
+      navItems: navItems,
+      onSelect: _selectRootDestination,
+      child: IndexedStack(index: selectedIndex, children: screens),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 4. Modern Side Menu Drawer (Image 4 & 5)
+  // ---------------------------------------------------------------------------
+  Widget _buildModernSideMenuShell({
+    required dynamic theme,
+    required List<Widget> screens,
+    required List<_NavDestinationItem> navItems,
+    required int selectedIndex,
+  }) {
+    final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
+    final isDark = theme.brightness == Brightness.dark;
+    final prefs = locator<ChatyPreferencesController>();
+    final dataStore = locator<MockDataStore>();
+    final user = dataStore.currentUser;
+
+    final displayName = prefs.home.myNameOverride.isNotEmpty
+        ? prefs.home.myNameOverride
+        : user.displayName.isNotEmpty
+            ? user.displayName
+            : 'Chaty User';
+
+    return Scaffold(
+      key: scaffoldKey,
+      backgroundColor: theme.backgroundColor,
+      drawer: Drawer(
+        backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFF1E293B),
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    AppAvatar(
+                      initials: user.avatarInitials.isNotEmpty ? user.avatarInitials : 'CU',
+                      colorHex: user.avatarColorHex,
+                      size: 48,
+                      showOnlineBadge: true,
+                      presence: user.presence,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            displayName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Text(
+                            '@${user.username.isNotEmpty ? user.username : 'chaty'}',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.65),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: Color(0xFF334155), height: 1),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                  itemCount: navItems.length,
+                  itemBuilder: (context, i) {
+                    final item = navItems[i];
+                    final isSel = selectedIndex == i;
+                    return ListTile(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      selected: isSel,
+                      selectedTileColor: theme.accentColor.withValues(alpha: 0.16),
+                      leading: Icon(
+                        isSel ? item.activeIcon : item.icon,
+                        color: isSel ? theme.accentColor : const Color(0xFF94A3B8),
+                      ),
+                      title: Text(
+                        item.label,
+                        style: TextStyle(
+                          color: isSel ? Colors.white : const Color(0xFFE2E8F0),
+                          fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                        ),
+                      ),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _selectRootDestination(i);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            // Integrated top navigation header bar (no floating button overlaying content)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: theme.surfaceColor,
+                border: Border(
+                  bottom: BorderSide(
+                    color: isDark ? const Color(0xFF27272A) : const Color(0xFFE4E4E7),
+                    width: 0.8,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.menu_rounded),
+                    color: theme.primaryTextColor,
+                    tooltip: 'Open Menu',
+                    onPressed: () => scaffoldKey.currentState?.openDrawer(),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    navItems[selectedIndex].label,
+                    style: TextStyle(
+                      color: theme.primaryTextColor,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                ],
+              ),
+            ),
+            Expanded(
+              child: IndexedStack(index: selectedIndex, children: screens),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildRailShell({
     required dynamic theme,
     required Widget content,
@@ -159,8 +604,30 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   }) {
     final index = appearance.navigationIndex;
     final compact = <int>{1, 2, 6, 7, 15, 19}.contains(index);
-    final showAllLabels = <int>{0, 3, 4, 8, 9, 17, 18}.contains(index) && maxWidth >= 900;
-    final indicatorRadius = <double>[18, 12, 8, 24, 10, 20, 8, 30, 14, 20, 16, 24, 12, 22, 14, 8, 24, 10, 16, 8][index];
+    final showAllLabels =
+        <int>{0, 3, 4, 8, 9, 17, 18}.contains(index) && maxWidth >= 900;
+    final indicatorRadius = <double>[
+      18,
+      12,
+      8,
+      24,
+      10,
+      20,
+      8,
+      30,
+      14,
+      20,
+      16,
+      24,
+      12,
+      22,
+      14,
+      8,
+      24,
+      10,
+      16,
+      8,
+    ][index];
 
     return Scaffold(
       backgroundColor: theme.backgroundColor,
@@ -175,15 +642,38 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               extended: showAllLabels,
               groupAlignment: <int>{5, 16}.contains(index) ? 0 : -0.72,
               backgroundColor: theme.surfaceColor,
-              indicatorColor: theme.accentColor.withValues(alpha: <int>{2, 7, 9, 19}.contains(index) ? 0.08 : 0.16),
-              indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(indicatorRadius)),
-              selectedIconTheme: IconThemeData(color: theme.accentColor, size: compact ? 20 : 23),
-              unselectedIconTheme: IconThemeData(color: theme.secondaryTextColor, size: compact ? 19 : 21),
-              selectedLabelTextStyle: TextStyle(color: theme.primaryTextColor, fontWeight: FontWeight.w700),
-              unselectedLabelTextStyle: TextStyle(color: theme.secondaryTextColor),
-              labelType: showAllLabels ? NavigationRailLabelType.none : NavigationRailLabelType.selected,
+              indicatorColor: theme.accentColor.withValues(
+                alpha: <int>{2, 7, 9, 19}.contains(index) ? 0.08 : 0.16,
+              ),
+              indicatorShape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(indicatorRadius),
+              ),
+              selectedIconTheme: IconThemeData(
+                color: theme.accentColor,
+                size: compact ? 20 : 23,
+              ),
+              unselectedIconTheme: IconThemeData(
+                color: theme.secondaryTextColor,
+                size: compact ? 19 : 21,
+              ),
+              selectedLabelTextStyle: TextStyle(
+                color: theme.primaryTextColor,
+                fontWeight: FontWeight.w700,
+              ),
+              unselectedLabelTextStyle: TextStyle(
+                color: theme.secondaryTextColor,
+              ),
+              labelType: showAllLabels
+                  ? NavigationRailLabelType.none
+                  : NavigationRailLabelType.selected,
               destinations: navItems
-                  .map((item) => NavigationRailDestination(icon: Icon(item.icon), selectedIcon: Icon(item.activeIcon), label: Text(item.label)))
+                  .map(
+                    (item) => NavigationRailDestination(
+                      icon: Icon(item.icon),
+                      selectedIcon: Icon(item.activeIcon),
+                      label: Text(item.label),
+                    ),
+                  )
                   .toList(growable: false),
             ),
             VerticalDivider(width: 1, color: theme.cardColor),
@@ -201,61 +691,155 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     required List<_NavDestinationItem> navItems,
     required int selectedIndex,
   }) {
-    final index = appearance.bottomBarIndex;
-    final radius = <double>[32, 14, 25, 22, 28, 30, 18, 12, 8, 22, 16, 20, 4, 10, 34, 27, 18, 0, 14, 10][index];
-    final sideMargin = <double>[12, 0, 28, 18, 12, 18, 36, 8, 0, 18, 8, 16, 0, 4, 8, 24, 14, 0, 10, 6][index];
-    final bottomMargin = <double>[10, 0, 10, 12, 10, 12, 12, 6, 0, 10, 7, 12, 0, 4, 10, 12, 10, 0, 8, 5][index];
-    final requestedHeight = <double>[60, 64, 54, 58, 60, 60, 54, 60, 50, 64, 58, 60, 58, 52, 64, 54, 60, 58, 58, 52][index];
-    final height = requestedHeight < 56 ? 56.0 : requestedHeight;
-    final compact = <int>{2, 6, 8, 13, 15, 19}.contains(index);
-    final showLabels = navItems.length <= 5 && !<int>{6, 8, 13, 19}.contains(index);
-    final selectedFilled = !<int>{4, 8, 12, 17}.contains(index);
+    final styleName = appearance.bottomBarStyle;
+    final isDark = theme.brightness == Brightness.dark;
+    final accent = theme.accentColor as Color;
+    final surface = theme.surfaceColor as Color;
+    final bg = theme.backgroundColor as Color;
+
+    // Sizing & layout properties per style
+    final double sideMargin = switch (styleName) {
+      'Floating Pill' => 16.0,
+      'Active Pill Chip' => 14.0,
+      'Top Indicator Line' => 0.0,
+      'Bottom Indicator Dot' => 0.0,
+      'Circle Accent Pop' => 12.0,
+      'Curved Notch Teardrop' => 0.0,
+      'Floating Dynamic Island' => 20.0,
+      'Raised Center Action' => 0.0,
+      'Segmented Glass Dock' => 14.0,
+      'Minimal Icon Dock' => 24.0,
+      'Classic Label Bar' => 0.0,
+      'Soft Square Tile' => 0.0,
+      _ => 14.0,
+    };
+
+    final double bottomMargin = switch (styleName) {
+      'Floating Pill' => 12.0,
+      'Active Pill Chip' => 10.0,
+      'Top Indicator Line' => 0.0,
+      'Bottom Indicator Dot' => 0.0,
+      'Circle Accent Pop' => 10.0,
+      'Curved Notch Teardrop' => 0.0,
+      'Floating Dynamic Island' => 14.0,
+      'Raised Center Action' => 0.0,
+      'Segmented Glass Dock' => 10.0,
+      'Minimal Icon Dock' => 12.0,
+      'Classic Label Bar' => 0.0,
+      'Soft Square Tile' => 0.0,
+      _ => 8.0,
+    };
+
+    final double barHeight = switch (styleName) {
+      'Floating Pill' => 64.0,
+      'Active Pill Chip' => 62.0,
+      'Top Indicator Line' => 60.0,
+      'Bottom Indicator Dot' => 60.0,
+      'Circle Accent Pop' => 64.0,
+      'Curved Notch Teardrop' => 62.0,
+      'Floating Dynamic Island' => 60.0,
+      'Raised Center Action' => 64.0,
+      'Segmented Glass Dock' => 62.0,
+      'Minimal Icon Dock' => 56.0,
+      'Classic Label Bar' => 62.0,
+      'Soft Square Tile' => 60.0,
+      _ => 60.0,
+    };
+
+    final double barRadius = switch (styleName) {
+      'Floating Pill' => 32.0,
+      'Active Pill Chip' => 24.0,
+      'Top Indicator Line' => 0.0,
+      'Bottom Indicator Dot' => 0.0,
+      'Circle Accent Pop' => 26.0,
+      'Curved Notch Teardrop' => 0.0,
+      'Floating Dynamic Island' => 30.0,
+      'Raised Center Action' => 0.0,
+      'Segmented Glass Dock' => 22.0,
+      'Minimal Icon Dock' => 28.0,
+      'Classic Label Bar' => 0.0,
+      'Soft Square Tile' => 0.0,
+      _ => 20.0,
+    };
+
+    final barBg = switch (styleName) {
+      'Floating Dynamic Island' =>
+        isDark ? const Color(0xFF0F172A) : const Color(0xFF1E293B),
+      'Segmented Glass Dock' => surface.withValues(alpha: isDark ? 0.85 : 0.92),
+      _ => surface,
+    };
+
+    final border = switch (styleName) {
+      'Segmented Glass Dock' => Border.all(
+        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        width: 1.2,
+      ),
+      'Floating Pill' || 'Active Pill Chip' || 'Floating Dynamic Island' => Border.all(
+        color: isDark
+            ? const Color(0xFF334155).withValues(alpha: 0.6)
+            : const Color(0xFFE2E8F0),
+        width: 0.8,
+      ),
+      'Top Indicator Line' || 'Bottom Indicator Dot' || 'Curved Notch Teardrop' || 'Classic Label Bar' || 'Soft Square Tile' =>
+        Border(
+          top: BorderSide(
+            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+            width: 1.0,
+          ),
+        ),
+      _ => Border.all(
+        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        width: 0.8,
+      ),
+    };
+
+    final hasShadow = sideMargin > 0;
 
     return Scaffold(
       extendBody: false,
-      backgroundColor: theme.backgroundColor,
+      backgroundColor: bg,
       body: content,
       bottomNavigationBar: SafeArea(
         top: false,
         child: Padding(
           padding: EdgeInsets.fromLTRB(sideMargin, 0, sideMargin, bottomMargin),
           child: SizedBox(
-            height: height,
+            height: barHeight,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOutCubic,
-              padding: EdgeInsets.symmetric(horizontal: compact ? 2 : 6, vertical: compact ? 3 : 6),
               decoration: BoxDecoration(
-                color: theme.surfaceColor,
-                borderRadius: BorderRadius.circular(radius),
-                border: Border.all(
-                  color: <int>{4, 16}.contains(index) ? theme.accentColor.withValues(alpha: 0.35) : theme.cardColor,
-                  width: <int>{4, 16}.contains(index) ? 1.3 : 1,
-                ),
-                boxShadow: sideMargin > 0
-                    ? <BoxShadow>[
+                color: barBg,
+                borderRadius: BorderRadius.circular(barRadius),
+                border: border,
+                boxShadow: hasShadow
+                    ? [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: theme.brightness == Brightness.dark ? 0.26 : 0.09),
-                          blurRadius: <int>{3, 5, 9, 16}.contains(index) ? 24 : 14,
-                          offset: const Offset(0, 6),
+                          color: Colors.black.withValues(
+                            alpha: isDark ? 0.35 : 0.08,
+                          ),
+                          blurRadius: 18,
+                          offset: const Offset(0, 5),
                         ),
                       ]
-                    : const <BoxShadow>[],
+                    : null,
               ),
               child: Row(
-                mainAxisSize: MainAxisSize.max,
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: List.generate(navItems.length, (navItemIndex) {
-                  final item = navItems[navItemIndex];
-                  return _buildBottomItem(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: List.generate(navItems.length, (i) {
+                  final item = navItems[i];
+                  final isSelected = selectedIndex == i;
+                  final isCenter = (navItems.length % 2 == 1) && (i == navItems.length ~/ 2);
+
+                  return _buildCustomNavItem(
                     item: item,
-                    isSelected: selectedIndex == navItemIndex,
+                    isSelected: isSelected,
+                    isCenter: isCenter,
+                    styleName: styleName,
                     theme: theme,
-                    compact: compact,
-                    showLabel: showLabels,
-                    selectedFilled: selectedFilled,
-                    styleIndex: index,
-                    onTap: () => _selectRootDestination(navItemIndex),
+                    accent: accent,
+                    isDark: isDark,
+                    onTap: () => _selectRootDestination(i),
                   );
                 }),
               ),
@@ -266,73 +850,567 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     );
   }
 
-  Widget _buildBottomItem({
+  Widget _buildCustomNavItem({
     required _NavDestinationItem item,
     required bool isSelected,
+    required bool isCenter,
+    required String styleName,
     required dynamic theme,
-    required bool compact,
-    required bool showLabel,
-    required bool selectedFilled,
-    required int styleIndex,
+    required Color accent,
+    required bool isDark,
     required VoidCallback onTap,
   }) {
-    final iconColor = isSelected ? theme.accentColor : theme.secondaryTextColor;
-    final fill = isSelected && selectedFilled ? theme.accentColor.withValues(alpha: 0.13) : Colors.transparent;
-    final radius = <int>{1, 7, 12, 17}.contains(styleIndex) ? 10.0 : 24.0;
-    return Flexible(
+    final unselectedFg = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
+    return Expanded(
       child: Tooltip(
         message: item.label,
-        child: Semantics(
-          button: true,
-          selected: isSelected,
-          label: item.label,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(radius),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
+        child: InkWell(
+          onTap: () {
+            ChatyMotion.selection();
+            onTap();
+          },
+          borderRadius: BorderRadius.circular(20),
+          child: Center(
+            child: switch (styleName) {
+              // 1. ACTIVE PILL CHIP (Image 2 dark portfolio & Image 1 row 2)
+              'Active Pill Chip' => AnimatedContainer(
+                duration: const Duration(milliseconds: 240),
                 curve: Curves.easeOutCubic,
-                padding: EdgeInsets.symmetric(horizontal: compact ? 6 : 8, vertical: compact ? 5 : 6),
-                decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(radius)),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isSelected ? 14 : 8,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? accent.withValues(alpha: isDark ? 0.22 : 0.14)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(30),
+                  border: isSelected
+                      ? Border.all(color: accent.withValues(alpha: 0.3), width: 1)
+                      : null,
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(isSelected ? item.activeIcon : item.icon, color: iconColor, size: compact ? 19 : 21),
-                    if (isSelected && showLabel && MediaQuery.sizeOf(context).width >= 380 && navItemsCanShowLabel(styleIndex)) ...[
-                      const SizedBox(width: 5),
-                      Flexible(
-                        child: Text(
-                          item.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.fade,
-                          softWrap: false,
-                          style: TextStyle(
-                            color: theme.primaryTextColor,
-                            fontSize: compact ? 10.5 : 11.5,
-                            fontWeight: FontWeight.w700,
-                          ),
+                    Icon(
+                      isSelected ? item.activeIcon : item.icon,
+                      size: 20,
+                      color: isSelected ? accent : unselectedFg,
+                    ),
+                    if (isSelected) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        item.label,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: accent,
                         ),
                       ),
                     ],
                   ],
                 ),
               ),
-            ),
+
+              // 2. TOP INDICATOR LINE (Image 1 top right & Image 3, 5)
+              'Top Indicator Line' => Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOutCubic,
+                    width: isSelected ? 26 : 0,
+                    height: 3.5,
+                    decoration: BoxDecoration(
+                      color: isSelected ? accent : Colors.transparent,
+                      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(3)),
+                    ),
+                  ),
+                  Icon(
+                    isSelected ? item.activeIcon : item.icon,
+                    size: 22,
+                    color: isSelected ? accent : unselectedFg,
+                  ),
+                  Text(
+                    item.label,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      color: isSelected ? accent : unselectedFg,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                ],
+              ),
+
+              // 3. BOTTOM INDICATOR DOT / DASH (Image 1 top left & Image 5)
+              'Bottom Indicator Dot' => Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    isSelected ? item.activeIcon : item.icon,
+                    size: 22,
+                    color: isSelected ? accent : unselectedFg,
+                  ),
+                  const SizedBox(height: 4),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOutCubic,
+                    width: isSelected ? 5.5 : 0,
+                    height: isSelected ? 5.5 : 0,
+                    decoration: BoxDecoration(
+                      color: isSelected ? accent : Colors.transparent,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ],
+              ),
+
+              // 4. CIRCLE ACCENT POP (Image 1 bottom row, Image 4)
+              'Circle Accent Pop' => AnimatedScale(
+                scale: isSelected ? 1.0 : 0.95,
+                duration: const Duration(milliseconds: 180),
+                child: Container(
+                  width: isSelected ? 42 : 36,
+                  height: isSelected ? 42 : 36,
+                  decoration: BoxDecoration(
+                    color: isSelected ? accent : Colors.transparent,
+                    shape: BoxShape.circle,
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: accent.withValues(alpha: 0.35),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Icon(
+                    isSelected ? item.activeIcon : item.icon,
+                    size: 20,
+                    color: isSelected ? Colors.white : unselectedFg,
+                  ),
+                ),
+              ),
+
+              // 5. CURVED NOTCH TEARDROP (Image 3 middle left, Image 5)
+              'Curved Notch Teardrop' => Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    width: isSelected ? 28 : 0,
+                    height: isSelected ? 5 : 0,
+                    decoration: BoxDecoration(
+                      color: isSelected ? accent : Colors.transparent,
+                      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
+                    ),
+                  ),
+                  Icon(
+                    isSelected ? item.activeIcon : item.icon,
+                    size: 21,
+                    color: isSelected ? accent : unselectedFg,
+                  ),
+                  Text(
+                    item.label,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      color: isSelected ? accent : unselectedFg,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                ],
+              ),
+
+              // 6. FLOATING DYNAMIC ISLAND (Image 2 dark capsule)
+              'Floating Dynamic Island' => AnimatedContainer(
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+                padding: EdgeInsets.symmetric(
+                  horizontal: isSelected ? 12 : 8,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected ? const Color(0xFF22C55E) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isSelected ? item.activeIcon : item.icon,
+                      size: 19,
+                      color: isSelected ? Colors.black : const Color(0xFF94A3B8),
+                    ),
+                    if (isSelected) ...[
+                      const SizedBox(width: 5),
+                      Text(
+                        item.label,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              // 7. RAISED CENTER ACTION (Image 4 center button)
+              'Raised Center Action' => isCenter
+                  ? Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [accent, accent.withValues(alpha: 0.85)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: accent.withValues(alpha: 0.4),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        item.activeIcon,
+                        size: 24,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          isSelected ? item.activeIcon : item.icon,
+                          size: 20,
+                          color: isSelected ? accent : unselectedFg,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          item.label,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            color: isSelected ? accent : unselectedFg,
+                          ),
+                        ),
+                      ],
+                    ),
+
+              // 8. SEGMENTED GLASS DOCK (Frosted look with subtle inner border)
+              'Segmented Glass Dock' => AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutCubic,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? accent.withValues(alpha: isDark ? 0.25 : 0.15)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
+                  border: isSelected
+                      ? Border.all(color: accent.withValues(alpha: 0.4), width: 1)
+                      : null,
+                ),
+                child: Icon(
+                  isSelected ? item.activeIcon : item.icon,
+                  size: 21,
+                  color: isSelected ? accent : unselectedFg,
+                ),
+              ),
+
+              // 9. MINIMAL ICON DOCK (Image 1 top left)
+              'Minimal Icon Dock' => AnimatedScale(
+                scale: isSelected ? 1.15 : 1.0,
+                duration: const Duration(milliseconds: 180),
+                child: Icon(
+                  isSelected ? item.activeIcon : item.icon,
+                  size: 22,
+                  color: isSelected ? accent : unselectedFg,
+                ),
+              ),
+
+              // 10. CLASSIC LABEL BAR (Standard native tabs)
+              'Classic Label Bar' => Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    isSelected ? item.activeIcon : item.icon,
+                    size: 21,
+                    color: isSelected ? accent : unselectedFg,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    item.label,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      color: isSelected ? accent : unselectedFg,
+                    ),
+                  ),
+                ],
+              ),
+
+              // 11. SOFT SQUARE TILE (Image 3 middle row)
+              'Soft Square Tile' => AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? accent.withValues(alpha: isDark ? 0.2 : 0.12)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isSelected ? item.activeIcon : item.icon,
+                      size: 19,
+                      color: isSelected ? accent : unselectedFg,
+                    ),
+                    Text(
+                      item.label,
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected ? accent : unselectedFg,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // 12. FLOATING PILL (Default smooth floating capsule)
+              _ => AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? accent.withValues(alpha: isDark ? 0.2 : 0.12)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isSelected ? item.activeIcon : item.icon,
+                      size: 20,
+                      color: isSelected ? accent : unselectedFg,
+                    ),
+                    if (isSelected) ...[
+                      const SizedBox(width: 5),
+                      Text(
+                        item.label,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: accent,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            },
           ),
         ),
       ),
     );
   }
-
-  bool navItemsCanShowLabel(int styleIndex) => !<int>{6, 8, 13, 19}.contains(styleIndex);
 }
 
 class _NavDestinationItem {
   final String label;
   final IconData icon;
   final IconData activeIcon;
-  const _NavDestinationItem({required this.label, required this.icon, required this.activeIcon});
+  const _NavDestinationItem({
+    required this.label,
+    required this.icon,
+    required this.activeIcon,
+  });
+}
+
+class _PerspectiveDrawerScaffold extends StatefulWidget {
+  final dynamic theme;
+  final int selectedIndex;
+  final List<_NavDestinationItem> navItems;
+  final ValueChanged<int> onSelect;
+  final Widget child;
+
+  const _PerspectiveDrawerScaffold({
+    required this.theme,
+    required this.selectedIndex,
+    required this.navItems,
+    required this.onSelect,
+    required this.child,
+  });
+
+  @override
+  State<_PerspectiveDrawerScaffold> createState() => _PerspectiveDrawerScaffoldState();
+}
+
+class _PerspectiveDrawerScaffoldState extends State<_PerspectiveDrawerScaffold>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 280));
+    _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    if (_ctrl.isCompleted) {
+      _ctrl.reverse();
+    } else {
+      _ctrl.forward();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.theme.brightness == Brightness.dark;
+    final bgDark = const Color(0xFF18181B);
+
+    return Scaffold(
+      backgroundColor: bgDark,
+      body: AnimatedBuilder(
+        animation: _anim,
+        builder: (context, _) {
+          final val = _anim.value;
+          final slide = 220.0 * val;
+          final scale = 1.0 - (0.18 * val);
+          final angle = -0.12 * val;
+
+          return Stack(
+            children: [
+              // Left Menu Content
+              SafeArea(
+                child: Container(
+                  width: 210,
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Side Menu',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: widget.navItems.length,
+                          itemBuilder: (context, i) {
+                            final item = widget.navItems[i];
+                            final isSel = widget.selectedIndex == i;
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: ListTile(
+                                dense: true,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                selected: isSel,
+                                selectedTileColor: Colors.white.withValues(alpha: 0.1),
+                                leading: Icon(
+                                  isSel ? item.activeIcon : item.icon,
+                                  color: isSel ? Colors.white : Colors.white70,
+                                  size: 20,
+                                ),
+                                title: Text(
+                                  item.label,
+                                  style: TextStyle(
+                                    color: isSel ? Colors.white : Colors.white70,
+                                    fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                onTap: () {
+                                  widget.onSelect(i);
+                                  _ctrl.reverse();
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Perspective Transformed Foreground Screen
+              Transform(
+                transform: Matrix4.identity()
+                  ..translate(slide)
+                  ..scale(scale)
+                  ..setEntry(3, 2, 0.001)
+                  ..rotateY(angle),
+                alignment: Alignment.centerLeft,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(val * 28),
+                  child: Stack(
+                    children: [
+                      widget.child,
+                      Positioned(
+                        left: 12,
+                        top: 12 + MediaQuery.paddingOf(context).top,
+                        child: GestureDetector(
+                          onTap: _toggle,
+                          child: Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.15),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              val > 0.5 ? Icons.close_rounded : Icons.menu_rounded,
+                              size: 20,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 }

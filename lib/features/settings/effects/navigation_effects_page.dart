@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../../ui/core/design_system/chaty_settings_primitives.dart';
-import '../../../ui/core/controllers/chaty_preferences_controller.dart';
+import '../../../ui/core/design_system/settings_primitives.dart';
+import '../../../ui/core/controllers/preferences_controller.dart';
 
 class NavigationEffectsPage extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
 
-  const NavigationEffectsPage({
-    super.key,
-    required this.preferencesController,
-  });
+  const NavigationEffectsPage({super.key, required this.preferencesController});
 
   @override
   State<NavigationEffectsPage> createState() => _NavigationEffectsPageState();
@@ -26,14 +23,7 @@ class _NavigationEffectsPageState extends State<NavigationEffectsPage> {
     'None',
   ];
 
-  static const List<String> _clickSymbols = [
-    '✨',
-    '❤️',
-    '🔥',
-    '⚡',
-    '⭐',
-    '🌸',
-  ];
+  static const List<String> _clickSymbols = ['✨', '❤️', '🔥', '⚡', '⭐', '🌸'];
 
   static const List<String> _fallingObjects = [
     'Stars',
@@ -42,11 +32,7 @@ class _NavigationEffectsPageState extends State<NavigationEffectsPage> {
     'Leaves',
   ];
 
-  static const List<String> _fallingScopes = [
-    'Home only',
-    'Chat only',
-    'Both',
-  ];
+  static const List<String> _fallingScopes = ['Home only', 'Chat only', 'Both'];
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +50,10 @@ class _NavigationEffectsPageState extends State<NavigationEffectsPage> {
             children: [
               Text(
                 'Transition: ${fx.pageTransitionStyle} • Click Particles: ${fx.enableClickParticles ? "${fx.clickParticleSymbol} Active" : "Off"} • Falling: ${fx.enableFallingParticles ? "${fx.fallingParticleObject} Active" : "Off"}',
-                style: TextStyle(fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).textTheme.bodySmall?.color,
+                ),
               ),
               const SizedBox(height: 8),
               Container(
@@ -72,25 +61,54 @@ class _NavigationEffectsPageState extends State<NavigationEffectsPage> {
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.2)),
+                  border: Border.all(
+                    color: Theme.of(
+                      context,
+                    ).dividerColor.withValues(alpha: 0.2),
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
                       children: [
-                        Text(fx.enableClickParticles ? fx.clickParticleSymbol : '✨', style: const TextStyle(fontSize: 22)),
+                        Text(
+                          fx.enableClickParticles
+                              ? fx.clickParticleSymbol
+                              : '✨',
+                          style: const TextStyle(fontSize: 22),
+                        ),
                         const SizedBox(width: 10),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Interactive Particle FX: ${fx.enableClickParticles ? "On" : "Disabled"}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                            Text('Transition: ${fx.pageTransitionStyle}', style: TextStyle(fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color)),
+                            Text(
+                              'Interactive Particle FX: ${fx.enableClickParticles ? "On" : "Disabled"}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                            Text(
+                              'Transition: ${fx.pageTransitionStyle}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.bodySmall?.color,
+                              ),
+                            ),
                           ],
                         ),
                       ],
                     ),
-                    Icon(Icons.animation_rounded, color: fx.enableClickParticles ? Colors.amberAccent : Colors.grey, size: 24),
+                    Icon(
+                      Icons.animation_rounded,
+                      color: fx.enableClickParticles
+                          ? Colors.amberAccent
+                          : Colors.grey,
+                      size: 24,
+                    ),
                   ],
                 ),
               ),
@@ -101,7 +119,8 @@ class _NavigationEffectsPageState extends State<NavigationEffectsPage> {
         // Page Transitions
         ChatySettingsSection(
           title: 'Page Transitions',
-          description: 'Custom route animation style applied across Chaty navigation.',
+          description:
+              'Custom route animation style applied across Chaty navigation.',
           children: [
             ChatyChoiceTile<String>(
               title: 'Route Transition Style',
@@ -121,7 +140,8 @@ class _NavigationEffectsPageState extends State<NavigationEffectsPage> {
         // Interactive Click Particles
         ChatySettingsSection(
           title: 'Interactive Tap Particles',
-          description: 'Generates decorative particle splashes whenever you tap the screen.',
+          description:
+              'Generates decorative particle splashes whenever you tap the screen.',
           children: [
             ChatySwitchTile(
               icon: Icons.auto_awesome_rounded,
@@ -171,7 +191,8 @@ class _NavigationEffectsPageState extends State<NavigationEffectsPage> {
         // Decorative Falling Particles
         ChatySettingsSection(
           title: 'Decorative Falling Particles',
-          description: 'Ambient particles drifting downwards on application screens.',
+          description:
+              'Ambient particles drifting downwards on application screens.',
           children: [
             ChatySwitchTile(
               icon: Icons.ac_unit_rounded,

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'tokens/app_tokens.dart';
+import 'components/app_components.dart';
+import 'components/chaty_kit.dart';
 
 /// Comprehensive Chaty Settings UI Primitives & Design System Tokens
 
@@ -23,28 +26,46 @@ class ChatySettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: Column(
+    final canPop = Navigator.of(context).canPop();
+    return ChatyScaffold(
+      appBar: ChatyAppBar(
+        automaticallyImplyLeading: canPop,
+        leading: canPop ? const ChatyBackButton() : const SizedBox.shrink(),
+        titleWidget: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            Text(
+              title,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 16.5,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
             if (subtitle != null)
               Text(
                 subtitle!,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
+                style: ChatyTypography.caption(
+                  theme.colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
           ],
         ),
-        actions: trailingHeaderWidget != null ? [trailingHeaderWidget!, const SizedBox(width: 8)] : null,
+        actions: trailingHeaderWidget != null
+            ? [
+                trailingHeaderWidget!,
+                const SizedBox(width: ChatySpacing.sm),
+              ]
+            : null,
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(
+            horizontal: ChatySpacing.base,
+            vertical: ChatySpacing.md,
+          ),
           children: children,
         ),
       ),
@@ -53,6 +74,7 @@ class ChatySettingsPage extends StatelessWidget {
     );
   }
 }
+
 
 class ChatySettingsSection extends StatelessWidget {
   final String? title;
@@ -86,24 +108,29 @@ class ChatySettingsSection extends StatelessWidget {
             ),
           ),
         ],
-        ChatySettingsCard(
-          children: children,
-        ),
+        ChatySettingsCard(children: children),
         if (description != null) ...[
           Padding(
-            padding: const EdgeInsets.only(left: 14, right: 14, top: 6, bottom: 12),
+            padding: const EdgeInsets.only(
+              left: 14,
+              right: 14,
+              top: 6,
+              bottom: 12,
+            ),
             child: Text(
               description!,
               style: TextStyle(
                 fontSize: 12,
-                color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.65),
+                color: theme.textTheme.bodyMedium?.color?.withValues(
+                  alpha: 0.65,
+                ),
                 height: 1.35,
               ),
             ),
           ),
         ] else ...[
           const SizedBox(height: 12),
-        ]
+        ],
       ],
     );
   }
@@ -137,9 +164,7 @@ class ChatySettingsCard extends StatelessWidget {
       ),
       child: Padding(
         padding: padding ?? EdgeInsets.zero,
-        child: Column(
-          children: _buildSeparatedChildren(children, theme),
-        ),
+        child: Column(children: _buildSeparatedChildren(children, theme)),
       ),
     );
   }
@@ -149,7 +174,9 @@ class ChatySettingsCard extends StatelessWidget {
     final List<Widget> result = [];
     for (int i = 0; i < list.length; i++) {
       result.add(list[i]);
-      if (i < list.length - 1 && list[i] is! ChatySectionDivider && list[i + 1] is! ChatySectionDivider) {
+      if (i < list.length - 1 &&
+          list[i] is! ChatySectionDivider &&
+          list[i + 1] is! ChatySectionDivider) {
         result.add(
           Divider(
             height: 1,
@@ -222,7 +249,9 @@ class ChatySettingsTile extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14.5,
                 fontWeight: FontWeight.w600,
-                color: enabled ? theme.textTheme.bodyLarge?.color : theme.disabledColor,
+                color: enabled
+                    ? theme.textTheme.bodyLarge?.color
+                    : theme.disabledColor,
               ),
             ),
           ),
@@ -237,11 +266,21 @@ class ChatySettingsTile extends StatelessWidget {
               subtitle!,
               style: TextStyle(
                 fontSize: 12.5,
-                color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
+                color: theme.textTheme.bodyMedium?.color?.withValues(
+                  alpha: 0.7,
+                ),
               ),
             )
           : null,
-      trailing: trailing ?? (onTap != null ? Icon(Icons.chevron_right_rounded, color: theme.hintColor, size: 20) : null),
+      trailing:
+          trailing ??
+          (onTap != null
+              ? Icon(
+                  Icons.chevron_right_rounded,
+                  color: theme.hintColor,
+                  size: 20,
+                )
+              : null),
     );
   }
 }
@@ -354,7 +393,9 @@ class ChatySliderTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final displayVal = valueFormatter != null ? valueFormatter!(value) : value.toStringAsFixed(1);
+    final displayVal = valueFormatter != null
+        ? valueFormatter!(value)
+        : value.toStringAsFixed(1);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -378,7 +419,10 @@ class ChatySliderTile extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               Container(
@@ -402,7 +446,12 @@ class ChatySliderTile extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               subtitle!,
-              style: TextStyle(fontSize: 12, color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7)),
+              style: TextStyle(
+                fontSize: 12,
+                color: theme.textTheme.bodyMedium?.color?.withValues(
+                  alpha: 0.7,
+                ),
+              ),
             ),
           ],
           const SizedBox(height: 4),
@@ -447,13 +496,20 @@ class ChatyRadioTile<T> extends StatelessWidget {
         style: TextStyle(
           fontSize: 14.5,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-          color: isSelected ? theme.colorScheme.primary : theme.textTheme.bodyLarge?.color,
+          color: isSelected
+              ? theme.colorScheme.primary
+              : theme.textTheme.bodyLarge?.color,
         ),
       ),
       subtitle: subtitle != null
           ? Text(
               subtitle!,
-              style: TextStyle(fontSize: 12, color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.65)),
+              style: TextStyle(
+                fontSize: 12,
+                color: theme.textTheme.bodyMedium?.color?.withValues(
+                  alpha: 0.65,
+                ),
+              ),
             )
           : null,
       trailing: Radio<T>(
@@ -494,12 +550,20 @@ class ChatyChoiceTile<T> extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600)),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
+          ),
           if (subtitle != null) ...[
             const SizedBox(height: 2),
             Text(
               subtitle!,
-              style: TextStyle(fontSize: 12, color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7)),
+              style: TextStyle(
+                fontSize: 12,
+                color: theme.textTheme.bodyMedium?.color?.withValues(
+                  alpha: 0.7,
+                ),
+              ),
             ),
           ],
           const SizedBox(height: 8),
@@ -517,7 +581,9 @@ class ChatyChoiceTile<T> extends StatelessWidget {
                 selectedColor: theme.colorScheme.primary.withValues(alpha: 0.2),
                 backgroundColor: theme.cardColor,
                 labelStyle: TextStyle(
-                  color: isSel ? theme.colorScheme.primary : theme.textTheme.bodyMedium?.color,
+                  color: isSel
+                      ? theme.colorScheme.primary
+                      : theme.textTheme.bodyMedium?.color,
                   fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
                   fontSize: 12.5,
                 ),
@@ -605,7 +671,11 @@ class ChatyInfoTile extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(fontSize: 12.5, color: effectiveColor, height: 1.35),
+              style: TextStyle(
+                fontSize: 12.5,
+                color: effectiveColor,
+                height: 1.35,
+              ),
             ),
           ),
         ],
@@ -634,7 +704,11 @@ class ChatyDangerTile extends StatelessWidget {
       title: title,
       subtitle: subtitle,
       onTap: onTap,
-      trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.redAccent, size: 16),
+      trailing: const Icon(
+        Icons.arrow_forward_ios_rounded,
+        color: Colors.redAccent,
+        size: 16,
+      ),
     );
   }
 }
@@ -643,11 +717,7 @@ class ChatyPreviewCard extends StatelessWidget {
   final String title;
   final Widget child;
 
-  const ChatyPreviewCard({
-    super.key,
-    required this.title,
-    required this.child,
-  });
+  const ChatyPreviewCard({super.key, required this.title, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -673,7 +743,9 @@ class ChatyPreviewCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: theme.cardColor,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: theme.dividerColor.withValues(alpha: 0.15)),
+            border: Border.all(
+              color: theme.dividerColor.withValues(alpha: 0.15),
+            ),
           ),
           child: child,
         ),
@@ -700,11 +772,7 @@ class ChatyBadge extends StatelessWidget {
   final String text;
   final Color? color;
 
-  const ChatyBadge({
-    super.key,
-    required this.text,
-    this.color,
-  });
+  const ChatyBadge({super.key, required this.text, this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -731,11 +799,7 @@ class ChatySwitch extends StatelessWidget {
   final bool value;
   final ValueChanged<bool>? onChanged;
 
-  const ChatySwitch({
-    super.key,
-    required this.value,
-    required this.onChanged,
-  });
+  const ChatySwitch({super.key, required this.value, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -803,31 +867,11 @@ class ChatyAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    BorderRadius radius;
-    if (shape == 'squircle') {
-      radius = BorderRadius.circular(size * 0.35);
-    } else if (shape == 'roundedSquare') {
-      radius = BorderRadius.circular(size * 0.22);
-    } else {
-      radius = BorderRadius.circular(size * 0.5);
-    }
-
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: radius,
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        initials,
-        style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-          fontSize: size * 0.4,
-        ),
-      ),
+    return ChatyAvatarCore(
+      initials: initials,
+      color: color,
+      size: size,
+      shape: shape,
     );
   }
 }

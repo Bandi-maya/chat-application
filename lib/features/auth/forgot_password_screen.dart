@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../data/services/chaty_backend_service.dart';
+import '../../data/services/backend_service.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/theme/theme_controller.dart';
 import 'widgets/auth_components.dart';
@@ -105,7 +105,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       validator: (value) {
                         final email = value?.trim() ?? '';
                         if (email.isEmpty) return 'Please enter your email';
-                        if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+                        if (!RegExp(
+                          r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
+                        ).hasMatch(email)) {
                           return 'Please enter a valid email';
                         }
                         return null;
@@ -126,7 +128,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       ),
                     const SizedBox(height: 12),
                     AuthPrimaryButton(
-                      text: _emailSent ? 'Resend Recovery Email' : 'Send Recovery Email',
+                      text: _emailSent
+                          ? 'Resend Recovery Email'
+                          : 'Send Recovery Email',
                       onPressed: _handleSendRecovery,
                       isLoading: _isLoading,
                       theme: theme,

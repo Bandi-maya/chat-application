@@ -2,15 +2,19 @@ import 'package:flutter/material.dart';
 
 import '../../../data/repositories/mock_data_store.dart';
 import '../../../data/services/gb_feature_backend_service.dart';
-import '../../../domain/models/chaty_preferences.dart';
-import '../../../ui/core/controllers/chaty_preferences_controller.dart';
-import '../../../ui/core/design_system/chaty_settings_primitives.dart';
+import '../../../domain/models/preferences.dart';
+import '../../../ui/core/controllers/preferences_controller.dart';
+import '../../../ui/core/design_system/settings_primitives.dart';
 
 class MessageManagementPage extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
   final MockDataStore dataStore;
 
-  const MessageManagementPage({super.key, required this.preferencesController, required this.dataStore});
+  const MessageManagementPage({
+    super.key,
+    required this.preferencesController,
+    required this.dataStore,
+  });
 
   @override
   State<MessageManagementPage> createState() => _MessageManagementPageState();
@@ -29,7 +33,9 @@ class _MessageManagementPageState extends State<MessageManagementPage> {
 
   Future<void> _sync() async {
     try {
-      await _server.synchronizeAutomation(widget.preferencesController.automation);
+      await _server.synchronizeAutomation(
+        widget.preferencesController.automation,
+      );
       if (mounted) _refreshScheduled();
     } catch (_) {}
   }
@@ -42,53 +48,98 @@ class _MessageManagementPageState extends State<MessageManagementPage> {
     final keywordCtrl = TextEditingController();
     final messageCtrl = TextEditingController();
     String scope = 'all';
-    final payload = await showDialog<({String keyword, String response, String scope})>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Add auto-reply rule'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: keywordCtrl, decoration: const InputDecoration(labelText: 'Keyword trigger', hintText: 'busy, help, pricing')),
-              const SizedBox(height: 12),
-              TextField(controller: messageCtrl, maxLines: 3, decoration: const InputDecoration(labelText: 'Automatic response')),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: scope,
-                decoration: const InputDecoration(labelText: 'Scope'),
-                items: const [
-                  DropdownMenuItem(value: 'all', child: Text('All conversations')),
-                  DropdownMenuItem(value: 'direct', child: Text('Direct chats only')),
-                  DropdownMenuItem(value: 'group', child: Text('Groups only')),
+    final payload =
+        await showDialog<({String keyword, String response, String scope})>(
+          context: context,
+          builder: (ctx) => StatefulBuilder(
+            builder: (context, setDialogState) => AlertDialog(
+              title: const Text('Add auto-reply rule'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: keywordCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Keyword trigger',
+                      hintText: 'busy, help, pricing',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: messageCtrl,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: 'Automatic response',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: scope,
+                    decoration: const InputDecoration(labelText: 'Scope'),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'all',
+                        child: Text('All conversations'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'direct',
+                        child: Text('Direct chats only'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'group',
+                        child: Text('Groups only'),
+                      ),
+                    ],
+                    onChanged: (value) =>
+                        setDialogState(() => scope = value ?? 'all'),
+                  ),
                 ],
-                onChanged: (value) => setDialogState(() => scope = value ?? 'all'),
               ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            FilledButton(
-              onPressed: () {
-                final keyword = keywordCtrl.text.trim();
-                final response = messageCtrl.text.trim();
-                if (keyword.isNotEmpty && response.isNotEmpty) Navigator.pop(ctx, (keyword: keyword, response: response, scope: scope));
-              },
-              child: const Text('Add rule'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final keyword = keywordCtrl.text.trim();
+                    final response = messageCtrl.text.trim();
+                    if (keyword.isNotEmpty && response.isNotEmpty)
+                      Navigator.pop(ctx, (
+                        keyword: keyword,
+                        response: response,
+                        scope: scope,
+                      ));
+                  },
+                  child: const Text('Add rule'),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
+          ),
+        );
     keywordCtrl.dispose();
     messageCtrl.dispose();
     if (payload == null) return;
     try {
-      final id = await _server.createAutoReplyRule(keyword: payload.keyword, response: payload.response, scope: payload.scope);
+      final id = await _server.createAutoReplyRule(
+        keyword: payload.keyword,
+        response: payload.response,
+        scope: payload.scope,
+      );
       final auto = widget.preferencesController.automation;
       final next = List<AutoReplyRule>.from(auto.autoReplyRules)
-        ..add(AutoReplyRule(id: id, keyword: payload.keyword, responseMessage: payload.response, recipientFilter: payload.scope));
-      widget.preferencesController.updateAutomation(auto.copyWith(autoReplyRules: next), logTitle: 'Add server auto-reply rule');
+        ..add(
+          AutoReplyRule(
+            id: id,
+            keyword: payload.keyword,
+            responseMessage: payload.response,
+            recipientFilter: payload.scope,
+          ),
+        );
+      widget.preferencesController.updateAutomation(
+        auto.copyWith(autoReplyRules: next),
+        logTitle: 'Add server auto-reply rule',
+      );
       _toast('Auto-reply rule is active on the server.');
     } catch (error) {
       _toast('Unable to add rule: $error');
@@ -100,11 +151,18 @@ class _MessageManagementPageState extends State<MessageManagementPage> {
       if (rule.id.length == 36) {
         await _server.deleteAutoReplyRule(rule.id);
       } else {
-        await _server.deleteAutoReplyRuleBySignature(rule.keyword, rule.responseMessage);
+        await _server.deleteAutoReplyRuleBySignature(
+          rule.keyword,
+          rule.responseMessage,
+        );
       }
       final auto = widget.preferencesController.automation;
       widget.preferencesController.updateAutomation(
-        auto.copyWith(autoReplyRules: auto.autoReplyRules.where((item) => item.id != rule.id).toList()),
+        auto.copyWith(
+          autoReplyRules: auto.autoReplyRules
+              .where((item) => item.id != rule.id)
+              .toList(),
+        ),
         logTitle: 'Delete server auto-reply rule',
       );
     } catch (error) {
@@ -131,20 +189,41 @@ class _MessageManagementPageState extends State<MessageManagementPage> {
                 initialValue: conversationId,
                 decoration: const InputDecoration(labelText: 'Conversation'),
                 items: widget.dataStore.conversations
-                    .map((conversation) => DropdownMenuItem(value: conversation.id, child: Text(conversation.title, overflow: TextOverflow.ellipsis)))
+                    .map(
+                      (conversation) => DropdownMenuItem(
+                        value: conversation.id,
+                        child: Text(
+                          conversation.title,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
                     .toList(growable: false),
-                onChanged: (value) => setDialogState(() => conversationId = value ?? conversationId),
+                onChanged: (value) => setDialogState(
+                  () => conversationId = value ?? conversationId,
+                ),
               ),
               const SizedBox(height: 12),
-              TextField(controller: textCtrl, maxLines: 4, decoration: const InputDecoration(labelText: 'Message')),
+              TextField(
+                controller: textCtrl,
+                maxLines: 4,
+                decoration: const InputDecoration(labelText: 'Message'),
+              ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
             FilledButton(
               onPressed: () {
                 final body = textCtrl.text.trim();
-                if (body.isNotEmpty) Navigator.pop(ctx, (conversationId: conversationId, body: body));
+                if (body.isNotEmpty)
+                  Navigator.pop(ctx, (
+                    conversationId: conversationId,
+                    body: body,
+                  ));
               },
               child: const Text('Choose time'),
             ),
@@ -163,21 +242,47 @@ class _MessageManagementPageState extends State<MessageManagementPage> {
       initialDate: initial,
     );
     if (date == null || !mounted) return;
-    final time = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(initial));
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+    );
     if (time == null) return;
-    final scheduledAt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    final scheduledAt = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
     if (!scheduledAt.isAfter(DateTime.now())) {
       _toast('Choose a future date and time.');
       return;
     }
 
     try {
-      final id = await _server.scheduleMessage(conversationId: payload.conversationId, body: payload.body, scheduledAt: scheduledAt);
-      final conversation = widget.dataStore.conversations.firstWhere((item) => item.id == payload.conversationId);
+      final id = await _server.scheduleMessage(
+        conversationId: payload.conversationId,
+        body: payload.body,
+        scheduledAt: scheduledAt,
+      );
+      final conversation = widget.dataStore.conversations.firstWhere(
+        (item) => item.id == payload.conversationId,
+      );
       final auto = widget.preferencesController.automation;
       final next = List<ScheduledMessageEntry>.from(auto.scheduledMessages)
-        ..add(ScheduledMessageEntry(id: id, recipientId: conversation.id, recipientName: conversation.title, text: payload.body, scheduledAt: scheduledAt));
-      widget.preferencesController.updateAutomation(auto.copyWith(scheduledMessages: next), logTitle: 'Schedule server message');
+        ..add(
+          ScheduledMessageEntry(
+            id: id,
+            recipientId: conversation.id,
+            recipientName: conversation.title,
+            text: payload.body,
+            scheduledAt: scheduledAt,
+          ),
+        );
+      widget.preferencesController.updateAutomation(
+        auto.copyWith(scheduledMessages: next),
+        logTitle: 'Schedule server message',
+      );
       _refreshScheduled();
       _toast('Scheduled on the server for ${_formatDateTime(scheduledAt)}.');
     } catch (error) {
@@ -205,21 +310,46 @@ class _MessageManagementPageState extends State<MessageManagementPage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: shortcutCtrl, decoration: const InputDecoration(labelText: 'Shortcut', hintText: '#thanks')),
+            TextField(
+              controller: shortcutCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Shortcut',
+                hintText: '#thanks',
+              ),
+            ),
             const SizedBox(height: 8),
-            TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Title')),
+            TextField(
+              controller: titleCtrl,
+              decoration: const InputDecoration(labelText: 'Title'),
+            ),
             const SizedBox(height: 8),
-            TextField(controller: contentCtrl, maxLines: 3, decoration: const InputDecoration(labelText: 'Template content')),
+            TextField(
+              controller: contentCtrl,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: 'Template content'),
+            ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () {
               final shortcut = shortcutCtrl.text.trim();
               final content = contentCtrl.text.trim();
               if (shortcut.isNotEmpty && content.isNotEmpty) {
-                Navigator.pop(ctx, QuickReplyTemplate(shortcut: shortcut, title: titleCtrl.text.trim().isEmpty ? shortcut : titleCtrl.text.trim(), content: content));
+                Navigator.pop(
+                  ctx,
+                  QuickReplyTemplate(
+                    shortcut: shortcut,
+                    title: titleCtrl.text.trim().isEmpty
+                        ? shortcut
+                        : titleCtrl.text.trim(),
+                    content: content,
+                  ),
+                );
               }
             },
             child: const Text('Save'),
@@ -232,12 +362,19 @@ class _MessageManagementPageState extends State<MessageManagementPage> {
     contentCtrl.dispose();
     if (template == null) return;
     try {
-      await _server.upsertQuickReply(shortcut: template.shortcut, title: template.title, content: template.content);
+      await _server.upsertQuickReply(
+        shortcut: template.shortcut,
+        title: template.title,
+        content: template.content,
+      );
       final auto = widget.preferencesController.automation;
       final next = List<QuickReplyTemplate>.from(auto.quickReplies)
         ..removeWhere((item) => item.shortcut == template.shortcut)
         ..add(template);
-      widget.preferencesController.updateAutomation(auto.copyWith(quickReplies: next), logTitle: 'Save server quick reply');
+      widget.preferencesController.updateAutomation(
+        auto.copyWith(quickReplies: next),
+        logTitle: 'Save server quick reply',
+      );
     } catch (error) {
       _toast('Unable to save quick reply: $error');
     }
@@ -258,29 +395,43 @@ class _MessageManagementPageState extends State<MessageManagementPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(controller: bodyCtrl, maxLines: 3, decoration: const InputDecoration(labelText: 'Message')),
+                TextField(
+                  controller: bodyCtrl,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'Message'),
+                ),
                 const SizedBox(height: 10),
                 Flexible(
                   child: ListView(
                     shrinkWrap: true,
-                    children: conversations.map((conversation) {
-                      return CheckboxListTile(
-                        value: selected.contains(conversation.id),
-                        title: Text(conversation.title),
-                        onChanged: (value) => update(() => value == true ? selected.add(conversation.id) : selected.remove(conversation.id)),
-                      );
-                    }).toList(growable: false),
+                    children: conversations
+                        .map((conversation) {
+                          return CheckboxListTile(
+                            value: selected.contains(conversation.id),
+                            title: Text(conversation.title),
+                            onChanged: (value) => update(
+                              () => value == true
+                                  ? selected.add(conversation.id)
+                                  : selected.remove(conversation.id),
+                            ),
+                          );
+                        })
+                        .toList(growable: false),
                   ),
                 ),
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
             FilledButton(
               onPressed: () {
                 final body = bodyCtrl.text.trim();
-                if (selected.isNotEmpty && body.isNotEmpty) Navigator.pop(ctx, (ids: selected.toList(), body: body));
+                if (selected.isNotEmpty && body.isNotEmpty)
+                  Navigator.pop(ctx, (ids: selected.toList(), body: body));
               },
               child: const Text('Send'),
             ),
@@ -291,7 +442,10 @@ class _MessageManagementPageState extends State<MessageManagementPage> {
     bodyCtrl.dispose();
     if (result == null) return;
     try {
-      final sent = await _server.massSend(conversationIds: result.ids, body: result.body);
+      final sent = await _server.massSend(
+        conversationIds: result.ids,
+        body: result.body,
+      );
       _toast('Message sent to $sent conversation${sent == 1 ? '' : 's'}.');
     } catch (error) {
       _toast('Mass send failed: $error');
@@ -307,7 +461,8 @@ class _MessageManagementPageState extends State<MessageManagementPage> {
       children: [
         ChatySettingsSection(
           title: 'Auto-reply automation',
-          description: 'Rules execute in Supabase after matching incoming messages, even when the app is backgrounded.',
+          description:
+              'Rules execute in Supabase after matching incoming messages, even when the app is backgrounded.',
           children: [
             ChatySwitchTile(
               icon: Icons.reply_all_rounded,
@@ -316,63 +471,124 @@ class _MessageManagementPageState extends State<MessageManagementPage> {
               subtitle: 'Account-level master switch',
               value: auto.enableAutoReply,
               onChanged: (value) {
-                widget.preferencesController.updateAutomation(auto.copyWith(enableAutoReply: value), logTitle: 'Enable server auto reply');
+                widget.preferencesController.updateAutomation(
+                  auto.copyWith(enableAutoReply: value),
+                  logTitle: 'Enable server auto reply',
+                );
                 _sync();
               },
             ),
-            ...auto.autoReplyRules.map((rule) => ChatySettingsTile(
-              icon: Icons.subtitles_rounded,
-              title: 'Trigger: "${rule.keyword}"',
-              subtitle: 'Reply: ${rule.responseMessage}',
-              badgeText: rule.enabled ? 'ACTIVE' : 'OFF',
-              badgeColor: rule.enabled ? Colors.greenAccent : Colors.grey,
-              trailing: IconButton(icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent), onPressed: () => _deleteRule(rule)),
-            )),
-            ChatySettingsTile(icon: Icons.add_circle_outline_rounded, title: 'Add server auto-reply rule', onTap: _addAutoReplyRule),
+            ...auto.autoReplyRules.map(
+              (rule) => ChatySettingsTile(
+                icon: Icons.subtitles_rounded,
+                title: 'Trigger: "${rule.keyword}"',
+                subtitle: 'Reply: ${rule.responseMessage}',
+                badgeText: rule.enabled ? 'ACTIVE' : 'OFF',
+                badgeColor: rule.enabled ? Colors.greenAccent : Colors.grey,
+                trailing: IconButton(
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Colors.redAccent,
+                  ),
+                  onPressed: () => _deleteRule(rule),
+                ),
+              ),
+            ),
+            ChatySettingsTile(
+              icon: Icons.add_circle_outline_rounded,
+              title: 'Add server auto-reply rule',
+              onTap: _addAutoReplyRule,
+            ),
           ],
         ),
         ChatySettingsSection(
           title: 'Message scheduler',
-          description: 'Scheduled messages are persisted and processed every minute on the server.',
+          description:
+              'Scheduled messages are persisted and processed every minute on the server.',
           children: [
             FutureBuilder<List<ServerScheduledMessage>>(
               future: _scheduledFuture,
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) return const ListTile(title: Text('Loading scheduled messages…'), trailing: CircularProgressIndicator());
-                if (snapshot.hasError) return ListTile(title: const Text('Unable to load scheduler'), subtitle: Text('${snapshot.error}'));
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  return const ListTile(
+                    title: Text('Loading scheduled messages…'),
+                    trailing: CircularProgressIndicator(),
+                  );
+                if (snapshot.hasError)
+                  return ListTile(
+                    title: const Text('Unable to load scheduler'),
+                    subtitle: Text('${snapshot.error}'),
+                  );
                 final items = snapshot.data ?? const <ServerScheduledMessage>[];
-                if (items.isEmpty) return const ListTile(title: Text('No scheduled messages'));
+                if (items.isEmpty)
+                  return const ListTile(title: Text('No scheduled messages'));
                 return Column(
-                  children: items.map((entry) {
-                    final conv = widget.dataStore.conversations.where((item) => item.id == entry.conversationId).firstOrNull;
-                    return ChatySettingsTile(
-                      icon: Icons.schedule_rounded,
-                      title: conv?.title ?? 'Conversation',
-                      subtitle: '${entry.body}\n${_formatDateTime(entry.scheduledAt)}${entry.lastError == null ? '' : ' • ${entry.lastError}'}',
-                      badgeText: entry.state.toUpperCase(),
-                      badgeColor: entry.state == 'sent' ? Colors.greenAccent : entry.state == 'failed' ? Colors.redAccent : Colors.amberAccent,
-                      trailing: entry.state == 'pending' ? IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => _cancelScheduled(entry)) : null,
-                    );
-                  }).toList(growable: false),
+                  children: items
+                      .map((entry) {
+                        final conv = widget.dataStore.conversations
+                            .where((item) => item.id == entry.conversationId)
+                            .firstOrNull;
+                        return ChatySettingsTile(
+                          icon: Icons.schedule_rounded,
+                          title: conv?.title ?? 'Conversation',
+                          subtitle:
+                              '${entry.body}\n${_formatDateTime(entry.scheduledAt)}${entry.lastError == null ? '' : ' • ${entry.lastError}'}',
+                          badgeText: entry.state.toUpperCase(),
+                          badgeColor: entry.state == 'sent'
+                              ? Colors.greenAccent
+                              : entry.state == 'failed'
+                              ? Colors.redAccent
+                              : Colors.amberAccent,
+                          trailing: entry.state == 'pending'
+                              ? IconButton(
+                                  icon: const Icon(Icons.close_rounded),
+                                  onPressed: () => _cancelScheduled(entry),
+                                )
+                              : null,
+                        );
+                      })
+                      .toList(growable: false),
                 );
               },
             ),
-            ChatySettingsTile(icon: Icons.alarm_add_rounded, title: 'Schedule new message', subtitle: 'Choose conversation, date and time', onTap: _scheduleMessage),
+            ChatySettingsTile(
+              icon: Icons.alarm_add_rounded,
+              title: 'Schedule new message',
+              subtitle: 'Choose conversation, date and time',
+              onTap: _scheduleMessage,
+            ),
           ],
         ),
         ChatySettingsSection(
           title: 'Mass sender',
-          description: 'Send one message to selected conversations. Server-side membership and configured forwarding limits are enforced.',
+          description:
+              'Send one message to selected conversations. Server-side membership and configured forwarding limits are enforced.',
           children: [
-            ChatySettingsTile(icon: Icons.send_time_extension_rounded, title: 'Open mass sender', subtitle: 'Select multiple conversations', onTap: _massSend),
+            ChatySettingsTile(
+              icon: Icons.send_time_extension_rounded,
+              title: 'Open mass sender',
+              subtitle: 'Select multiple conversations',
+              onTap: _massSend,
+            ),
           ],
         ),
         ChatySettingsSection(
           title: 'Quick replies',
-          description: 'Templates synchronize with your Chaty account and remain available across sessions.',
+          description:
+              'Templates synchronize with your Chaty account and remain available across sessions.',
           children: [
-            ...auto.quickReplies.map((template) => ChatySettingsTile(icon: Icons.bolt_rounded, title: '${template.shortcut} (${template.title})', subtitle: template.content)),
-            ChatySettingsTile(icon: Icons.add_rounded, title: 'Add quick reply template', onTap: _addQuickReply),
+            ...auto.quickReplies.map(
+              (template) => ChatySettingsTile(
+                icon: Icons.bolt_rounded,
+                title: '${template.shortcut} (${template.title})',
+                subtitle: template.content,
+              ),
+            ),
+            ChatySettingsTile(
+              icon: Icons.add_rounded,
+              title: 'Add quick reply template',
+              onTap: _addQuickReply,
+            ),
           ],
         ),
       ],

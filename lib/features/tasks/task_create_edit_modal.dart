@@ -5,6 +5,7 @@ import '../../data/repositories/mock_data_store.dart';
 import '../../domain/models/chat_task.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/user_profile.dart';
+import '../../ui/core/design_system/design_system.dart';
 
 class TaskCreateEditModal extends StatefulWidget {
   final ThemeConfig theme;
@@ -41,7 +42,9 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
   void initState() {
     super.initState();
     final task = widget.existingTask;
-    _titleCtrl = TextEditingController(text: task?.title ?? widget.initialTitle ?? '');
+    _titleCtrl = TextEditingController(
+      text: task?.title ?? widget.initialTitle ?? '',
+    );
     _descCtrl = TextEditingController(text: task?.description ?? '');
 
     if (task != null) {
@@ -56,7 +59,10 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
         orElse: () => '',
       );
       _selectedAssigneeIds = <String>[
-        if (otherParticipant != null && otherParticipant.isNotEmpty) otherParticipant else me,
+        if (otherParticipant != null && otherParticipant.isNotEmpty)
+          otherParticipant
+        else
+          me,
       ];
     }
 
@@ -157,7 +163,6 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = widget.theme;
     final currentUser = widget.dataStore.currentUser;
     final conv = widget.dataStore.conversations.firstWhere(
       (conversation) => conversation.id == widget.sourceConversationId,
@@ -178,11 +183,21 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
         .whereType<UserProfile>()
         .toList();
 
+    final themeData = Theme.of(context);
+    final isDark = themeData.brightness == Brightness.dark;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: EdgeInsets.only(
+        left: ChatySpacing.lg,
+        right: ChatySpacing.lg,
+        top: ChatySpacing.md,
+        bottom: MediaQuery.of(context).viewInsets.bottom + ChatySpacing.lg,
+      ),
       decoration: BoxDecoration(
-        color: theme.surfaceColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        color: isDark ? const Color(0xFF18181B) : Colors.white,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(ChatyRadius.xl),
+        ),
       ),
       child: SafeArea(
         top: false,
@@ -193,147 +208,161 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
             children: [
               Center(
                 child: Container(
-                  width: 36,
-                  height: 4,
+                  width: 38,
+                  height: 4.5,
                   decoration: BoxDecoration(
-                    color: theme.secondaryTextColor.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
+                    color: themeData.colorScheme.onSurface.withValues(
+                      alpha: 0.2,
+                    ),
+                    borderRadius: BorderRadius.circular(ChatyRadius.full),
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: ChatySpacing.base),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    widget.existingTask != null ? 'Edit Task' : 'Create Task (/task)',
-                    style: TextStyle(
-                      color: theme.primaryTextColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                    widget.existingTask != null ? 'Edit Task' : 'New Task',
+                    style: ChatyTypography.headline(
+                      themeData.colorScheme.onSurface,
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
+                  ChatyIconButton(
+                    icon: Icons.close_rounded,
+                    tooltip: 'Close',
                     onPressed: _isSaving ? null : () => Navigator.pop(context),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              TextField(
+              const SizedBox(height: ChatySpacing.base),
+              ChatyInput(
                 controller: _titleCtrl,
                 enabled: !_isSaving,
-                maxLength: 140,
-                style: TextStyle(color: theme.primaryTextColor, fontSize: 14.5),
-                decoration: InputDecoration(
-                  labelText: 'Task Title',
-                  counterText: '',
-                  labelStyle: TextStyle(color: theme.secondaryTextColor),
-                  filled: true,
-                  fillColor: theme.cardColor,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(theme.cornerRadius)),
-                ),
+                hintText: 'Task Title',
+                prefixIcon: const Icon(Icons.check_box_outlined, size: 20),
               ),
-              const SizedBox(height: 14),
-              TextField(
+              const SizedBox(height: ChatySpacing.md),
+              ChatyInput(
                 controller: _descCtrl,
                 enabled: !_isSaving,
+                hintText: 'Description & instructions (optional)',
                 maxLines: 3,
-                maxLength: 2000,
-                style: TextStyle(color: theme.primaryTextColor, fontSize: 13.5),
-                decoration: InputDecoration(
-                  labelText: 'Description / Instructions',
-                  labelStyle: TextStyle(color: theme.secondaryTextColor),
-                  filled: true,
-                  fillColor: theme.cardColor,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(theme.cornerRadius)),
-                ),
+                prefixIcon: const Icon(Icons.notes_rounded, size: 20),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: ChatySpacing.base),
               Text(
                 'Assign To',
-                style: TextStyle(color: theme.primaryTextColor, fontSize: 13, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  color: themeData.colorScheme.onSurface,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
-                widget.existingTask == null
-                    ? 'New tasks default to the other participant. Select yourself only when you want the task assigned to you.'
-                    : 'Update who is responsible for this task.',
-                style: TextStyle(color: theme.secondaryTextColor, fontSize: 11.5),
+                'Select who is responsible for this task:',
+                style: ChatyTypography.caption(
+                  themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: ChatySpacing.sm),
               Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: ChatySpacing.sm,
+                runSpacing: ChatySpacing.sm,
                 children: [
                   ...candidateAssignees.map((candidate) {
                     final selected = _selectedAssigneeIds.contains(candidate.id);
                     return FilterChip(
-                      avatar: Icon(selected ? Icons.check_circle_rounded : Icons.person_outline_rounded, size: 17),
+                      avatar: Icon(
+                        selected
+                            ? Icons.check_circle_rounded
+                            : Icons.person_outline_rounded,
+                        size: 16,
+                      ),
                       label: Text(candidate.displayName.split(' ').first),
                       selected: selected,
-                      selectedColor: theme.accentColor.withValues(alpha: 0.25),
-                      onSelected: _isSaving ? null : (value) => _setAssignee(candidate.id, value),
+                      selectedColor: themeData.colorScheme.primary.withValues(
+                        alpha: 0.2,
+                      ),
+                      onSelected: _isSaving
+                          ? null
+                          : (value) => _setAssignee(candidate.id, value),
                     );
                   }),
                   FilterChip(
-                    avatar: const Icon(Icons.person_rounded, size: 17),
-                    label: Text('Me (${currentUser.displayName.split(' ').first})'),
+                    avatar: const Icon(Icons.person_rounded, size: 16),
+                    label: Text(
+                      'Me (${currentUser.displayName.split(' ').first})',
+                    ),
                     selected: _selectedAssigneeIds.contains(currentUser.id),
-                    selectedColor: theme.accentColor.withValues(alpha: 0.25),
-                    onSelected: _isSaving ? null : (selected) => _setAssignee(currentUser.id, selected),
+                    selectedColor: themeData.colorScheme.primary.withValues(
+                      alpha: 0.2,
+                    ),
+                    onSelected: _isSaving
+                        ? null
+                        : (selected) => _setAssignee(currentUser.id, selected),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: ChatySpacing.base),
               Text(
                 'Priority',
-                style: TextStyle(color: theme.primaryTextColor, fontSize: 13, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  color: themeData.colorScheme.onSurface,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: ChatySpacing.sm),
               SegmentedButton<TaskPriority>(
                 segments: const <ButtonSegment<TaskPriority>>[
-                  ButtonSegment<TaskPriority>(value: TaskPriority.low, label: Text('Low')),
-                  ButtonSegment<TaskPriority>(value: TaskPriority.medium, label: Text('Med')),
-                  ButtonSegment<TaskPriority>(value: TaskPriority.high, label: Text('High')),
-                  ButtonSegment<TaskPriority>(value: TaskPriority.urgent, label: Text('Urgent')),
+                  ButtonSegment<TaskPriority>(
+                    value: TaskPriority.low,
+                    label: Text('Low'),
+                  ),
+                  ButtonSegment<TaskPriority>(
+                    value: TaskPriority.medium,
+                    label: Text('Med'),
+                  ),
+                  ButtonSegment<TaskPriority>(
+                    value: TaskPriority.high,
+                    label: Text('High'),
+                  ),
+                  ButtonSegment<TaskPriority>(
+                    value: TaskPriority.urgent,
+                    label: Text('Urgent'),
+                  ),
                 ],
                 selected: <TaskPriority>{_priority},
-                onSelectionChanged: _isSaving ? null : (value) => setState(() => _priority = value.first),
+                onSelectionChanged: _isSaving
+                    ? null
+                    : (value) => setState(() => _priority = value.first),
               ),
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
+              const SizedBox(height: ChatySpacing.base),
+              ChatySecondaryButton(
+                text:
+                    'Due ${_dueDate.day.toString().padLeft(2, '0')}/${_dueDate.month.toString().padLeft(2, '0')}/${_dueDate.year}',
+                icon: Icons.event_rounded,
                 onPressed: _isSaving ? null : _pickDueDate,
-                icon: const Icon(Icons.event_rounded),
-                label: Text(
-                  'Due ${_dueDate.day.toString().padLeft(2, '0')}/'
-                  '${_dueDate.month.toString().padLeft(2, '0')}/${_dueDate.year}',
-                ),
               ),
               if (_errorMessage != null) ...[
-                const SizedBox(height: 14),
-                Text(_errorMessage!, style: TextStyle(color: theme.dangerColor, fontSize: 13)),
+                const SizedBox(height: ChatySpacing.sm),
+                Text(
+                  _errorMessage!,
+                  style: TextStyle(
+                    color: themeData.colorScheme.error,
+                    fontSize: 13,
+                  ),
+                ),
               ],
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.accentColor,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(theme.cornerRadius)),
-                ),
-                onPressed: _isSaving ? null : _saveTask,
-                icon: _isSaving
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Icon(Icons.check_rounded, size: 18),
-                label: Text(
-                  _isSaving ? 'Saving…' : 'Save and Share in Chat',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
+              const SizedBox(height: ChatySpacing.lg),
+              ChatyPrimaryButton(
+                text: widget.existingTask == null
+                    ? 'Create & Share in Chat'
+                    : 'Save Changes',
+                isLoading: _isSaving,
+                onPressed: _saveTask,
               ),
             ],
           ),
@@ -345,10 +374,13 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
   void _setAssignee(String userId, bool selected) {
     setState(() {
       if (selected) {
-        if (!_selectedAssigneeIds.contains(userId)) _selectedAssigneeIds.add(userId);
+        if (!_selectedAssigneeIds.contains(userId)) {
+          _selectedAssigneeIds.add(userId);
+        }
       } else {
         _selectedAssigneeIds.remove(userId);
       }
     });
   }
 }
+

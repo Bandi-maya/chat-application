@@ -1,13 +1,6 @@
-enum ConversationType {
-  direct,
-  group,
-}
+enum ConversationType { direct, group }
 
-enum EncryptionStatus {
-  encrypted,
-  verificationNeeded,
-  demoMode,
-}
+enum EncryptionStatus { encrypted, verificationNeeded, demoMode }
 
 class Conversation {
   final String id;

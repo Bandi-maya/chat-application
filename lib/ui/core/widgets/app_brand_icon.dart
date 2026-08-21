@@ -27,11 +27,7 @@ class LauncherIconPreview extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(color: palette.$1),
           child: Center(
-            child: Icon(
-              palette.$3,
-              size: size * 0.54,
-              color: palette.$2,
-            ),
+            child: Icon(palette.$3, size: size * 0.54, color: palette.$2),
           ),
         ),
       ),
@@ -41,17 +37,41 @@ class LauncherIconPreview extends StatelessWidget {
   static (Color, Color, IconData) _paletteFor(LauncherIconVariant variant) {
     switch (variant) {
       case LauncherIconVariant.original:
-        return (const Color(0xFF13B982), Colors.white, Icons.chat_bubble_rounded);
+        return (
+          const Color(0xFF13B982),
+          Colors.white,
+          Icons.chat_bubble_rounded,
+        );
       case LauncherIconVariant.minimal:
-        return (const Color(0xFF17212B), const Color(0xFFEAF2F5), Icons.chat_bubble_outline_rounded);
+        return (
+          const Color(0xFF17212B),
+          const Color(0xFFEAF2F5),
+          Icons.chat_bubble_outline_rounded,
+        );
       case LauncherIconVariant.bubble:
-        return (const Color(0xFF006D5B), const Color(0xFFE8FFF7), Icons.forum_rounded);
+        return (
+          const Color(0xFF006D5B),
+          const Color(0xFFE8FFF7),
+          Icons.forum_rounded,
+        );
       case LauncherIconVariant.midnight:
-        return (const Color(0xFF0B1220), const Color(0xFF5EEAD4), Icons.mode_comment_rounded);
+        return (
+          const Color(0xFF0B1220),
+          const Color(0xFF5EEAD4),
+          Icons.mode_comment_rounded,
+        );
       case LauncherIconVariant.ocean:
-        return (const Color(0xFF075985), const Color(0xFFE0F2FE), Icons.chat_rounded);
+        return (
+          const Color(0xFF075985),
+          const Color(0xFFE0F2FE),
+          Icons.chat_rounded,
+        );
       case LauncherIconVariant.violet:
-        return (const Color(0xFF5B21B6), const Color(0xFFF3E8FF), Icons.sms_rounded);
+        return (
+          const Color(0xFF5B21B6),
+          const Color(0xFFF3E8FF),
+          Icons.sms_rounded,
+        );
     }
   }
 }

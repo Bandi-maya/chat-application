@@ -3,7 +3,10 @@ import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/material.dart';
 
 class ChatyEmojiPicker {
-  static Future<String?> show(BuildContext context, {bool reactionMode = false}) {
+  static Future<String?> show(
+    BuildContext context, {
+    bool reactionMode = false,
+  }) {
     return showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -22,7 +25,8 @@ class _ChatyEmojiPickerSheet extends StatefulWidget {
   State<_ChatyEmojiPickerSheet> createState() => _ChatyEmojiPickerSheetState();
 }
 
-class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet> with SingleTickerProviderStateMixin {
+class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
   static final List<AnimatedEmojiData> _animated = <AnimatedEmojiData>[
@@ -54,7 +58,8 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet> with Sin
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final height = MediaQuery.sizeOf(context).height * (widget.reactionMode ? 0.58 : 0.68);
+    final height =
+        MediaQuery.sizeOf(context).height * (widget.reactionMode ? 0.58 : 0.68);
     return SizedBox(
       height: height.clamp(360.0, 620.0),
       child: Column(
@@ -66,7 +71,9 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet> with Sin
                 Expanded(
                   child: Text(
                     widget.reactionMode ? 'Choose reaction' : 'Choose emoji',
-                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
                 IconButton(
@@ -89,7 +96,8 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet> with Sin
               controller: _tabController,
               children: [
                 EmojiPicker(
-                  onEmojiSelected: (category, emoji) => Navigator.of(context).pop(emoji.emoji),
+                  onEmojiSelected: (category, emoji) =>
+                      Navigator.of(context).pop(emoji.emoji),
                   config: Config(
                     height: height - 105,
                     checkPlatformCompatibility: true,
@@ -104,7 +112,9 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet> with Sin
                       iconColorSelected: theme.colorScheme.primary,
                       indicatorColor: theme.colorScheme.primary,
                     ),
-                    bottomActionBarConfig: const BottomActionBarConfig(enabled: true),
+                    bottomActionBarConfig: const BottomActionBarConfig(
+                      enabled: true,
+                    ),
                     searchViewConfig: SearchViewConfig(
                       backgroundColor: theme.colorScheme.surface,
                       buttonIconColor: theme.colorScheme.primary,
@@ -113,7 +123,8 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet> with Sin
                 ),
                 _AnimatedEmojiGrid(
                   values: _animated,
-                  onSelected: (emoji) => Navigator.of(context).pop(emoji.toUnicodeEmoji()),
+                  onSelected: (emoji) =>
+                      Navigator.of(context).pop(emoji.toUnicodeEmoji()),
                 ),
               ],
             ),
@@ -143,7 +154,9 @@ class _AnimatedEmojiGrid extends StatelessWidget {
       itemBuilder: (context, index) {
         final emoji = values[index];
         return Material(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+          color: Theme.of(
+            context,
+          ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
           borderRadius: BorderRadius.circular(16),
           child: InkWell(
             onTap: () => onSelected(emoji),

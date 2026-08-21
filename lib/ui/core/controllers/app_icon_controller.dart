@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -8,24 +7,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'custom_app_icon_processor.dart';
 
-enum LauncherIconVariant {
-  original,
-  minimal,
-  bubble,
-  midnight,
-  ocean,
-  violet,
-}
+enum LauncherIconVariant { original, minimal, bubble, midnight, ocean, violet }
 
 enum BrandIconSource { bundled, custom }
 
-enum CustomLauncherState {
-  inactive,
-  pending,
-  active,
-  failed,
-  unsupported,
-}
+enum CustomLauncherState { inactive, pending, active, failed, unsupported }
 
 enum CustomIconInputSource { photos, camera }
 
@@ -43,10 +29,10 @@ class CustomIconPreset {
   bool get exists => path.isNotEmpty && File(path).existsSync();
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'id': id,
-        'path': path,
-        'createdAt': createdAt,
-      };
+    'id': id,
+    'path': path,
+    'createdAt': createdAt,
+  };
 
   static CustomIconPreset? fromJson(dynamic value) {
     if (value is! Map) return null;
@@ -98,10 +84,14 @@ class AppIconController extends ChangeNotifier {
   static const MethodChannel _channel = MethodChannel('chaty/launcher_icon');
   static const String _launcherPreferenceKey = 'chaty_launcher_icon_v1';
   static const String _brandSourcePreferenceKey = 'chaty_brand_source_v1';
-  static const String _customBrandPathPreferenceKey = 'chaty_custom_brand_icon_path_v1';
-  static const String _customHomeShortcutPreferenceKey = 'chaty_custom_home_shortcut_v1';
-  static const String _customLibraryPreferenceKey = 'chaty_custom_icon_library_v2';
-  static const String _activeCustomPresetPreferenceKey = 'chaty_active_custom_icon_v2';
+  static const String _customBrandPathPreferenceKey =
+      'chaty_custom_brand_icon_path_v1';
+  static const String _customHomeShortcutPreferenceKey =
+      'chaty_custom_home_shortcut_v1';
+  static const String _customLibraryPreferenceKey =
+      'chaty_custom_icon_library_v2';
+  static const String _activeCustomPresetPreferenceKey =
+      'chaty_active_custom_icon_v2';
 
   LauncherIconVariant _launcherIcon = LauncherIconVariant.original;
   BrandIconSource _brandIconSource = BrandIconSource.bundled;
@@ -121,10 +111,13 @@ class AppIconController extends ChangeNotifier {
   CustomLauncherState get customLauncherState => _customLauncherState;
   String? get customBrandIconPath => _customBrandIconPath;
   String? get activeCustomPresetId => _activeCustomPresetId;
-  List<CustomIconPreset> get customIconPresets => List.unmodifiable(_customIconPresets);
+  List<CustomIconPreset> get customIconPresets =>
+      List.unmodifiable(_customIconPresets);
   bool get customHomeShortcutApplied => _customHomeShortcutApplied;
-  bool get customLauncherModeActive => _customLauncherState == CustomLauncherState.active;
-  bool get hasSavedCustomIcon => _customIconPresets.any((preset) => preset.exists);
+  bool get customLauncherModeActive =>
+      _customLauncherState == CustomLauncherState.active;
+  bool get hasSavedCustomIcon =>
+      _customIconPresets.any((preset) => preset.exists);
   bool get initialized => _initialized;
   bool get isApplyingLauncherIcon => _isApplyingLauncherIcon;
   bool get isSavingCustomBrandIcon => _isSavingCustomBrandIcon;
@@ -147,9 +140,10 @@ class AppIconController extends ChangeNotifier {
       prefs.getString(_launcherPreferenceKey),
     );
     _brandIconSource =
-        prefs.getString(_brandSourcePreferenceKey) == BrandIconSource.custom.name
-            ? BrandIconSource.custom
-            : BrandIconSource.bundled;
+        prefs.getString(_brandSourcePreferenceKey) ==
+            BrandIconSource.custom.name
+        ? BrandIconSource.custom
+        : BrandIconSource.bundled;
     _customHomeShortcutApplied =
         prefs.getBool(_customHomeShortcutPreferenceKey) ?? false;
 
@@ -160,10 +154,14 @@ class AppIconController extends ChangeNotifier {
     _activeCustomPresetId = prefs.getString(_activeCustomPresetPreferenceKey);
     _syncActiveCustomPath();
 
-    if (_brandIconSource == BrandIconSource.custom && activeCustomPreset == null) {
+    if (_brandIconSource == BrandIconSource.custom &&
+        activeCustomPreset == null) {
       _brandIconSource = BrandIconSource.bundled;
       _customLauncherState = CustomLauncherState.inactive;
-      await prefs.setString(_brandSourcePreferenceKey, BrandIconSource.bundled.name);
+      await prefs.setString(
+        _brandSourcePreferenceKey,
+        BrandIconSource.bundled.name,
+      );
     }
 
     await refreshNativeLauncherState(notify: false);
@@ -190,7 +188,9 @@ class AppIconController extends ChangeNotifier {
   Future<void> _migrateLegacyCustomIcon(SharedPreferences prefs) async {
     if (_customIconPresets.isNotEmpty) return;
     final legacyPath = prefs.getString(_customBrandPathPreferenceKey);
-    if (legacyPath == null || legacyPath.isEmpty || !File(legacyPath).existsSync()) {
+    if (legacyPath == null ||
+        legacyPath.isEmpty ||
+        !File(legacyPath).existsSync()) {
       return;
     }
     final preset = CustomIconPreset(
@@ -228,8 +228,9 @@ class AppIconController extends ChangeNotifier {
     _isRefreshingNativeState = true;
     try {
       final prefs = await SharedPreferences.getInstance();
-      final activeAlias =
-          await _channel.invokeMethod<String>('getCurrentLauncherIcon');
+      final activeAlias = await _channel.invokeMethod<String>(
+        'getCurrentLauncherIcon',
+      );
       if (activeAlias != null && activeAlias.isNotEmpty) {
         final nativeVariant = LauncherIconVariantMetadata.fromId(activeAlias);
         _launcherIcon = nativeVariant;
@@ -237,16 +238,19 @@ class AppIconController extends ChangeNotifier {
       }
 
       final nativeState =
-          await _channel.invokeMethod<String>('getCustomLauncherState') ?? 'inactive';
+          await _channel.invokeMethod<String>('getCustomLauncherState') ??
+          'inactive';
       _customLauncherState = _stateFromNative(nativeState);
       _customHomeShortcutApplied =
-          await _channel.invokeMethod<bool>('isCustomHomeShortcutPinned') ?? false;
+          await _channel.invokeMethod<bool>('isCustomHomeShortcutPinned') ??
+          false;
       await prefs.setBool(
         _customHomeShortcutPreferenceKey,
         _customHomeShortcutApplied,
       );
 
-      if (_brandIconSource == BrandIconSource.custom && activeCustomPreset == null) {
+      if (_brandIconSource == BrandIconSource.custom &&
+          activeCustomPreset == null) {
         _brandIconSource = BrandIconSource.bundled;
         _customLauncherState = CustomLauncherState.inactive;
         await prefs.setString(
@@ -421,7 +425,8 @@ class AppIconController extends ChangeNotifier {
   }
 
   Future<bool> activateSavedCustomIcon() async {
-    final preset = activeCustomPreset ??
+    final preset =
+        activeCustomPreset ??
         (_customIconPresets.where((preset) => preset.exists).isNotEmpty
             ? _customIconPresets.where((preset) => preset.exists).last
             : null);
@@ -443,7 +448,8 @@ class AppIconController extends ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     _customHomeShortcutApplied =
-        await _channel.invokeMethod<bool>('isCustomHomeShortcutPinned') ?? false;
+        await _channel.invokeMethod<bool>('isCustomHomeShortcutPinned') ??
+        false;
     await prefs.setBool(
       _customHomeShortcutPreferenceKey,
       _customHomeShortcutApplied,
@@ -459,7 +465,9 @@ class AppIconController extends ChangeNotifier {
   }
 
   Future<void> removeCustomPreset(String presetId) async {
-    final index = _customIconPresets.indexWhere((preset) => preset.id == presetId);
+    final index = _customIconPresets.indexWhere(
+      (preset) => preset.id == presetId,
+    );
     if (index < 0) return;
     final removed = _customIconPresets.removeAt(index);
     final wasActive = _activeCustomPresetId == presetId;
@@ -479,7 +487,9 @@ class AppIconController extends ChangeNotifier {
       return;
     }
 
-    final remaining = _customIconPresets.where((preset) => preset.exists).toList();
+    final remaining = _customIconPresets
+        .where((preset) => preset.exists)
+        .toList();
     if (remaining.isNotEmpty) {
       final next = remaining.last;
       _activeCustomPresetId = next.id;

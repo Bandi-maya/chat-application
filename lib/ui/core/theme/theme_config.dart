@@ -1,25 +1,18 @@
 import 'package:flutter/material.dart';
 
-enum UILayoutMode {
-  classic,
-  compact,
-  expressive,
-  focus,
-  tabletDesktop,
-}
+enum UILayoutMode { classic, compact, expressive, focus, tabletDesktop }
 
 enum AppNavigationMode {
   bottomNav,
-  compactRail,
+  topWhatsAppBar,
+  floatingIslandRail,
+  perspective3DDrawer,
+  modernSideMenu,
   gestureTabs,
+  compactRail,
 }
 
-enum AppBubbleStyle {
-  rounded,
-  softSquare,
-  pill,
-  sharpTail,
-}
+enum AppBubbleStyle { rounded, softSquare, pill, sharpTail }
 
 class ThemeConfig {
   final String id;
@@ -44,7 +37,11 @@ class ThemeConfig {
   final AppNavigationMode navigationMode;
   final UILayoutMode layoutMode;
   final AppBubbleStyle bubbleStyle;
-  final String wallpaperId; // 'none', 'subtle_dots', 'geometric', 'gradient_mesh', 'constellation'
+  final String
+  tickStyle; // 'Default', 'Double Check', 'iOS Style', 'Minimal', 'Neon'
+  final double bubbleRadius; // corner radius applied to chat bubbles only
+  final String
+  wallpaperId; // 'none', 'subtle_dots', 'geometric', 'gradient_mesh', 'constellation'
   final double animationLevel; // 0.0 to 1.0
   final bool highContrast;
 
@@ -71,10 +68,23 @@ class ThemeConfig {
     this.navigationMode = AppNavigationMode.bottomNav,
     this.layoutMode = UILayoutMode.classic,
     this.bubbleStyle = AppBubbleStyle.rounded,
+    this.tickStyle = 'Default',
+    this.bubbleRadius = 16.0,
     this.wallpaperId = 'subtle_dots',
     this.animationLevel = 1.0,
     this.highContrast = false,
   });
+
+  /// Fraction of the available width a chat bubble may occupy, derived from
+  /// the UI layout preset. Consumed by MessageBubble so the Layout Mode
+  /// setting has a real, visible effect (distinct bubble widths per preset).
+  double get bubbleMaxWidthFactor => switch (layoutMode) {
+    UILayoutMode.classic => 0.80,
+    UILayoutMode.compact => 0.72,
+    UILayoutMode.expressive => 0.86,
+    UILayoutMode.focus => 0.66,
+    UILayoutMode.tabletDesktop => 0.80,
+  };
 
   ThemeConfig copyWith({
     String? id,
@@ -99,6 +109,8 @@ class ThemeConfig {
     AppNavigationMode? navigationMode,
     UILayoutMode? layoutMode,
     AppBubbleStyle? bubbleStyle,
+    String? tickStyle,
+    double? bubbleRadius,
     String? wallpaperId,
     double? animationLevel,
     bool? highContrast,
@@ -126,6 +138,8 @@ class ThemeConfig {
       navigationMode: navigationMode ?? this.navigationMode,
       layoutMode: layoutMode ?? this.layoutMode,
       bubbleStyle: bubbleStyle ?? this.bubbleStyle,
+      tickStyle: tickStyle ?? this.tickStyle,
+      bubbleRadius: bubbleRadius ?? this.bubbleRadius,
       wallpaperId: wallpaperId ?? this.wallpaperId,
       animationLevel: animationLevel ?? this.animationLevel,
       highContrast: highContrast ?? this.highContrast,
@@ -142,13 +156,26 @@ class ThemeConfig {
   }
 
   bool get hasContrastIssue {
-    final double textRatio = calculateContrastRatio(primaryTextColor, backgroundColor);
-    final double outgoingBubbleRatio = calculateContrastRatio(outgoingTextColor, outgoingBubbleColor);
-    final double incomingBubbleRatio = calculateContrastRatio(incomingTextColor, incomingBubbleColor);
-    return textRatio < 4.5 || outgoingBubbleRatio < 3.5 || incomingBubbleRatio < 3.5;
+    final double textRatio = calculateContrastRatio(
+      primaryTextColor,
+      backgroundColor,
+    );
+    final double outgoingBubbleRatio = calculateContrastRatio(
+      outgoingTextColor,
+      outgoingBubbleColor,
+    );
+    final double incomingBubbleRatio = calculateContrastRatio(
+      incomingTextColor,
+      incomingBubbleColor,
+    );
+    return textRatio < 4.5 ||
+        outgoingBubbleRatio < 3.5 ||
+        incomingBubbleRatio < 3.5;
   }
 
-  Color get onAccentColor => accentColor.computeLuminance() > 0.5 ? const Color(0xFF000000) : const Color(0xFFFFFFFF);
+  Color get onAccentColor => accentColor.computeLuminance() > 0.5
+      ? const Color(0xFF000000)
+      : const Color(0xFFFFFFFF);
   Color get onSurfaceColor => primaryTextColor;
   Color get onBackgroundColor => primaryTextColor;
 
@@ -164,7 +191,7 @@ class ThemeConfig {
       final lightCard = const Color(0xFFFFFFFF);
       final lightPrimaryText = const Color(0xFF09090B);
       final lightSecondaryText = const Color(0xFF71717A);
-      
+
       final adaptedAccent = accentColor.computeLuminance() > 0.85
           ? const Color(0xFF09090B)
           : accentColor;
@@ -180,7 +207,9 @@ class ThemeConfig {
         incomingBubbleColor: const Color(0xFFF4F4F5),
         incomingTextColor: const Color(0xFF09090B),
         outgoingBubbleColor: adaptedAccent,
-        outgoingTextColor: adaptedAccent.computeLuminance() > 0.5 ? Colors.black : Colors.white,
+        outgoingTextColor: adaptedAccent.computeLuminance() > 0.5
+            ? Colors.black
+            : Colors.white,
       );
     } else {
       // Transition from Light -> Dark
@@ -254,7 +283,9 @@ class ThemeConfig {
           elevation: 1,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(cornerRadius > 14 ? cornerRadius : 16),
+            borderRadius: BorderRadius.circular(
+              cornerRadius > 14 ? cornerRadius : 16,
+            ),
           ),
           textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
         ),
@@ -264,24 +295,33 @@ class ThemeConfig {
           foregroundColor: primaryTextColor,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           side: BorderSide(
-            color: brightness == Brightness.dark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+            color: brightness == Brightness.dark
+                ? const Color(0xFF334155)
+                : const Color(0xFFE2E8F0),
             width: 1.4,
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(cornerRadius > 14 ? cornerRadius : 16),
+            borderRadius: BorderRadius.circular(
+              cornerRadius > 14 ? cornerRadius : 16,
+            ),
           ),
           textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: (brightness == Brightness.dark && accentColor.computeLuminance() > 0.8)
+          foregroundColor:
+              (brightness == Brightness.dark &&
+                  accentColor.computeLuminance() > 0.8)
               ? primaryTextColor
               : accentColor,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
-          textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 14.5,
+          ),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -289,7 +329,9 @@ class ThemeConfig {
           backgroundColor: accentColor,
           foregroundColor: onAccentColor,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(cornerRadius > 14 ? cornerRadius : 16),
+            borderRadius: BorderRadius.circular(
+              cornerRadius > 14 ? cornerRadius : 16,
+            ),
           ),
           textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
         ),
@@ -298,23 +340,20 @@ class ThemeConfig {
         backgroundColor: accentColor,
         foregroundColor: onAccentColor,
         elevation: 3,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: surfaceColor,
         selectedColor: accentColor.withValues(alpha: 0.2),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        labelStyle: TextStyle(
+          color: primaryTextColor,
+          fontWeight: FontWeight.w600,
         ),
-        labelStyle: TextStyle(color: primaryTextColor, fontWeight: FontWeight.w600),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: surfaceColor,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: surfaceColor,
@@ -325,17 +364,24 @@ class ThemeConfig {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: surfaceColor,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(
-            color: brightness == Brightness.dark ? const Color(0xFF27272A) : const Color(0xFFE4E4E7),
+            color: brightness == Brightness.dark
+                ? const Color(0xFF27272A)
+                : const Color(0xFFE4E4E7),
           ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(
-            color: brightness == Brightness.dark ? const Color(0xFF27272A) : const Color(0xFFE4E4E7),
+            color: brightness == Brightness.dark
+                ? const Color(0xFF27272A)
+                : const Color(0xFFE4E4E7),
           ),
         ),
         focusedBorder: OutlineInputBorder(
@@ -344,15 +390,195 @@ class ThemeConfig {
         ),
       ),
       textTheme: TextTheme(
-        headlineLarge: TextStyle(color: primaryTextColor, fontSize: 28 * fontScale, fontWeight: FontWeight.bold, letterSpacing: -0.5),
-        headlineMedium: TextStyle(color: primaryTextColor, fontSize: 22 * fontScale, fontWeight: FontWeight.bold, letterSpacing: -0.3),
-        titleLarge: TextStyle(color: primaryTextColor, fontSize: 18 * fontScale, fontWeight: FontWeight.w600),
-        titleMedium: TextStyle(color: primaryTextColor, fontSize: 15 * fontScale, fontWeight: FontWeight.w600),
-        bodyLarge: TextStyle(color: primaryTextColor, fontSize: 15 * fontScale, height: 1.35),
-        bodyMedium: TextStyle(color: secondaryTextColor, fontSize: 13.5 * fontScale, height: 1.35),
-        labelLarge: TextStyle(color: primaryTextColor, fontSize: 13.5 * fontScale, fontWeight: FontWeight.w600),
-        labelSmall: TextStyle(color: secondaryTextColor, fontSize: 11 * fontScale),
+        headlineLarge: TextStyle(
+          color: primaryTextColor,
+          fontSize: 28 * fontScale,
+          fontWeight: FontWeight.bold,
+          letterSpacing: -0.5,
+        ),
+        headlineMedium: TextStyle(
+          color: primaryTextColor,
+          fontSize: 22 * fontScale,
+          fontWeight: FontWeight.bold,
+          letterSpacing: -0.3,
+        ),
+        titleLarge: TextStyle(
+          color: primaryTextColor,
+          fontSize: 18 * fontScale,
+          fontWeight: FontWeight.w600,
+        ),
+        titleMedium: TextStyle(
+          color: primaryTextColor,
+          fontSize: 15 * fontScale,
+          fontWeight: FontWeight.w600,
+        ),
+        bodyLarge: TextStyle(
+          color: primaryTextColor,
+          fontSize: 15 * fontScale,
+          height: 1.35,
+        ),
+        bodyMedium: TextStyle(
+          color: secondaryTextColor,
+          fontSize: 13.5 * fontScale,
+          height: 1.35,
+        ),
+        labelLarge: TextStyle(
+          color: primaryTextColor,
+          fontSize: 13.5 * fontScale,
+          fontWeight: FontWeight.w600,
+        ),
+        labelSmall: TextStyle(
+          color: secondaryTextColor,
+          fontSize: 11 * fontScale,
+        ),
       ),
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Serialization
+  //
+  // Self-contained (does NOT depend on ThemePresets, to avoid an import cycle):
+  // colors are stored as 32-bit ARGB ints via [Color.toARGB32] and rebuilt with
+  // the `Color(int)` constructor; enums are stored by `.name` and rebuilt by a
+  // name lookup that falls back to the same default the constructor uses. Every
+  // field read is corruption-tolerant so a partially-written or hand-edited blob
+  // can never throw — missing/invalid fields fall back to sensible dark
+  // (monochrome-dark family) defaults, matching the constructor defaults.
+  // ---------------------------------------------------------------------------
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'name': name,
+    'brightness': brightness == Brightness.light ? 'light' : 'dark',
+    'accentColor': accentColor.toARGB32(),
+    'backgroundColor': backgroundColor.toARGB32(),
+    'surfaceColor': surfaceColor.toARGB32(),
+    'cardColor': cardColor.toARGB32(),
+    'primaryTextColor': primaryTextColor.toARGB32(),
+    'secondaryTextColor': secondaryTextColor.toARGB32(),
+    'outgoingBubbleColor': outgoingBubbleColor.toARGB32(),
+    'incomingBubbleColor': incomingBubbleColor.toARGB32(),
+    'outgoingTextColor': outgoingTextColor.toARGB32(),
+    'incomingTextColor': incomingTextColor.toARGB32(),
+    'linkColor': linkColor.toARGB32(),
+    'dangerColor': dangerColor.toARGB32(),
+    'successColor': successColor.toARGB32(),
+    'cornerRadius': cornerRadius,
+    'density': density,
+    'fontScale': fontScale,
+    'navigationMode': navigationMode.name,
+    'layoutMode': layoutMode.name,
+    'bubbleStyle': bubbleStyle.name,
+    'tickStyle': tickStyle,
+    'bubbleRadius': bubbleRadius,
+    'wallpaperId': wallpaperId,
+    'animationLevel': animationLevel,
+    'highContrast': highContrast,
+  };
+
+  factory ThemeConfig.fromMap(Map<String, dynamic> map) {
+    return ThemeConfig(
+      id: map['id'] is String && (map['id'] as String).isNotEmpty
+          ? map['id'] as String
+          : 'monochromeDark',
+      name: map['name'] is String && (map['name'] as String).isNotEmpty
+          ? map['name'] as String
+          : 'Monochrome Dark',
+      brightness: (map['brightness'] == 'light')
+          ? Brightness.light
+          : Brightness.dark,
+      accentColor: _color(map['accentColor'], const Color(0xFFFFFFFF)),
+      backgroundColor: _color(map['backgroundColor'], const Color(0xFF000000)),
+      surfaceColor: _color(map['surfaceColor'], const Color(0xFF121212)),
+      cardColor: _color(map['cardColor'], const Color(0xFF1C1C1E)),
+      primaryTextColor: _color(
+        map['primaryTextColor'],
+        const Color(0xFFFFFFFF),
+      ),
+      secondaryTextColor: _color(
+        map['secondaryTextColor'],
+        const Color(0xFFA1A1AA),
+      ),
+      outgoingBubbleColor: _color(
+        map['outgoingBubbleColor'],
+        const Color(0xFF27272A),
+      ),
+      incomingBubbleColor: _color(
+        map['incomingBubbleColor'],
+        const Color(0xFF18181B),
+      ),
+      outgoingTextColor: _color(
+        map['outgoingTextColor'],
+        const Color(0xFFFFFFFF),
+      ),
+      incomingTextColor: _color(
+        map['incomingTextColor'],
+        const Color(0xFFF4F4F5),
+      ),
+      linkColor: _color(map['linkColor'], const Color(0xFF60A5FA)),
+      dangerColor: _color(map['dangerColor'], const Color(0xFFEF4444)),
+      successColor: _color(map['successColor'], const Color(0xFF22C55E)),
+      cornerRadius: _double(map['cornerRadius'], 16.0),
+      density: _double(map['density'], 1.0),
+      fontScale: _double(map['fontScale'], 1.0),
+      navigationMode: _enumByName(
+        AppNavigationMode.values,
+        map['navigationMode'],
+        AppNavigationMode.bottomNav,
+      ),
+      layoutMode: _enumByName(
+        UILayoutMode.values,
+        map['layoutMode'],
+        UILayoutMode.classic,
+      ),
+      bubbleStyle: _enumByName(
+        AppBubbleStyle.values,
+        map['bubbleStyle'],
+        AppBubbleStyle.rounded,
+      ),
+      tickStyle:
+          map['tickStyle'] is String && (map['tickStyle'] as String).isNotEmpty
+          ? map['tickStyle'] as String
+          : 'Default',
+      bubbleRadius: _double(map['bubbleRadius'], 16.0),
+      wallpaperId: map['wallpaperId'] is String
+          ? map['wallpaperId'] as String
+          : 'subtle_dots',
+      animationLevel: _double(map['animationLevel'], 1.0).clamp(0.0, 1.0),
+      highContrast: map['highContrast'] == true,
+    );
+  }
+
+  static Color _color(dynamic value, Color fallback) {
+    if (value is int) return Color(value);
+    if (value is num) return Color(value.toInt());
+    if (value is String) {
+      final parsed = int.tryParse(value);
+      if (parsed != null) return Color(parsed);
+    }
+    return fallback;
+  }
+
+  static double _double(dynamic value, double fallback) {
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      final parsed = double.tryParse(value);
+      if (parsed != null) return parsed;
+    }
+    return fallback;
+  }
+
+  static T _enumByName<T extends Enum>(
+    List<T> values,
+    dynamic name,
+    T fallback,
+  ) {
+    if (name is String) {
+      for (final v in values) {
+        if (v.name == name) return v;
+      }
+    }
+    return fallback;
   }
 }

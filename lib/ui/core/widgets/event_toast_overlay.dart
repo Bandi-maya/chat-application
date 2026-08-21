@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../../data/services/chaty_notification_service.dart';
-import '../controllers/chaty_preferences_controller.dart';
+import '../../../data/services/notification_service.dart';
+import '../controllers/preferences_controller.dart';
 
 class ChatyEventToastOverlay extends StatefulWidget {
   final ChatyNotificationService notificationService;
@@ -44,7 +44,8 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
   void _onNotificationChanged() {
     final latest = widget.notificationService.latest;
     if (latest == null || latest.id == _lastNotificationId) return;
-    if (!widget.preferencesController.notification.enableGlobalNotifications) return;
+    if (!widget.preferencesController.notification.enableGlobalNotifications)
+      return;
     _hideTimer?.cancel();
     if (mounted) {
       setState(() {
@@ -52,14 +53,18 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
         _visible = latest;
       });
     }
-    final seconds = widget.preferencesController.gbInt('event_toast_duration_seconds', fallback: 3).clamp(2, 8);
+    final seconds = widget.preferencesController
+        .gbInt('event_toast_duration_seconds', fallback: 3)
+        .clamp(2, 8);
     _hideTimer = Timer(Duration(seconds: seconds), () {
       if (mounted && _visible?.id == latest.id) setState(() => _visible = null);
     });
   }
 
   Alignment _alignment() {
-    switch (widget.preferencesController.gbString('event_toast_position', fallback: 'Top').toLowerCase()) {
+    switch (widget.preferencesController
+        .gbString('event_toast_position', fallback: 'Top')
+        .toLowerCase()) {
       case 'center':
         return Alignment.center;
       case 'bottom':
@@ -70,10 +75,14 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
   }
 
   EdgeInsets _padding(BuildContext context) {
-    final position = widget.preferencesController.gbString('event_toast_position', fallback: 'Top').toLowerCase();
+    final position = widget.preferencesController
+        .gbString('event_toast_position', fallback: 'Top')
+        .toLowerCase();
     final safe = MediaQuery.paddingOf(context);
-    if (position == 'bottom') return EdgeInsets.fromLTRB(14, 12, 14, safe.bottom + 92);
-    if (position == 'center') return const EdgeInsets.symmetric(horizontal: 20, vertical: 20);
+    if (position == 'bottom')
+      return EdgeInsets.fromLTRB(14, 12, 14, safe.bottom + 92);
+    if (position == 'center')
+      return const EdgeInsets.symmetric(horizontal: 20, vertical: 20);
     return EdgeInsets.fromLTRB(14, safe.top + 10, 14, 12);
   }
 
@@ -111,7 +120,9 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
               opacity: notification == null ? 0 : 1,
               duration: const Duration(milliseconds: 160),
               child: AnimatedSlide(
-                offset: notification == null ? const Offset(0, -0.08) : Offset.zero,
+                offset: notification == null
+                    ? const Offset(0, -0.08)
+                    : Offset.zero,
                 duration: const Duration(milliseconds: 180),
                 curve: Curves.easeOutCubic,
                 child: notification == null
@@ -126,23 +137,37 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
                             shadowColor: Colors.black.withValues(alpha: 0.18),
                             borderRadius: BorderRadius.circular(18),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 11,
+                              ),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(18),
-                                border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.65)),
+                                border: Border.all(
+                                  color: theme.colorScheme.outlineVariant
+                                      .withValues(alpha: 0.65),
+                                ),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  if (widget.preferencesController.notification.showSenderAvatar &&
+                                  if (widget
+                                          .preferencesController
+                                          .notification
+                                          .showSenderAvatar &&
                                       notification.avatarInitials != null) ...[
                                     CircleAvatar(
                                       radius: 20,
-                                      backgroundColor: _avatarColor(notification),
+                                      backgroundColor: _avatarColor(
+                                        notification,
+                                      ),
                                       foregroundColor: Colors.white,
                                       child: Text(
                                         notification.avatarInitials!,
-                                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 12,
+                                        ),
                                       ),
                                     ),
                                   ] else
@@ -150,32 +175,57 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
                                       width: 40,
                                       height: 40,
                                       decoration: BoxDecoration(
-                                        color: notification.color.withValues(alpha: 0.14),
+                                        color: notification.color.withValues(
+                                          alpha: 0.14,
+                                        ),
                                         shape: BoxShape.circle,
                                       ),
-                                      child: Icon(notification.icon, color: notification.color, size: 21),
+                                      child: Icon(
+                                        notification.icon,
+                                        color: notification.color,
+                                        size: 21,
+                                      ),
                                     ),
                                   const SizedBox(width: 11),
                                   Flexible(
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          widget.preferencesController.notification.showSenderName
+                                          widget
+                                                  .preferencesController
+                                                  .notification
+                                                  .showSenderName
                                               ? notification.title
                                               : 'Chaty',
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                                          style: theme.textTheme.titleSmall
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w800,
+                                                // GB toast `_tc` text tint.
+                                                color: notification.textColor,
+                                              ),
                                         ),
-                                        if (widget.preferencesController.notification.showMessagePreview) ...[
+                                        if (widget
+                                            .preferencesController
+                                            .notification
+                                            .showMessagePreview) ...[
                                           const SizedBox(height: 2),
                                           Text(
                                             notification.body,
                                             maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
-                                            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                                            style: theme.textTheme.bodySmall
+                                                ?.copyWith(
+                                                  color: notification
+                                                      .textColor ??
+                                                      theme
+                                                          .colorScheme
+                                                          .onSurfaceVariant,
+                                                ),
                                           ),
                                         ],
                                       ],

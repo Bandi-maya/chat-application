@@ -4,7 +4,7 @@ import '../../data/services/username_login_service.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/persistence/preferences_storage.dart';
 import '../../ui/core/theme/theme_controller.dart';
-import '../../ui/core/validators/chaty_validators.dart';
+import '../../ui/core/validators/input_validators.dart';
 import '../chats/main_navigation_shell.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
@@ -13,10 +13,7 @@ import 'widgets/auth_components.dart';
 class LoginScreen extends StatefulWidget {
   final bool autoPromptPermissions;
 
-  const LoginScreen({
-    super.key,
-    this.autoPromptPermissions = true,
-  });
+  const LoginScreen({super.key, this.autoPromptPermissions = true});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -95,7 +92,10 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24.0,
+              vertical: 20.0,
+            ),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 440),
               child: Form(
@@ -118,7 +118,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 6),
                     Text(
                       'Sign in with your email address or Chaty username.',
-                      style: TextStyle(color: theme.secondaryTextColor, fontSize: 14),
+                      style: TextStyle(
+                        color: theme.secondaryTextColor,
+                        fontSize: 14,
+                      ),
                     ),
                     const SizedBox(height: 36),
                     AuthTextField(
@@ -139,15 +142,23 @@ class _LoginScreenState extends State<LoginScreen> {
                       textInputAction: TextInputAction.done,
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                          color: theme.secondaryTextColor.withValues(alpha: 0.6),
+                          _obscurePassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          color: theme.secondaryTextColor.withValues(
+                            alpha: 0.6,
+                          ),
                           size: 20,
                         ),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        onPressed: () => setState(
+                          () => _obscurePassword = !_obscurePassword,
+                        ),
                       ),
                       validator: (value) {
-                        if (value == null || value.isEmpty) return 'Please enter your password';
-                        if (value.length < 6) return 'Password must be at least 6 characters';
+                        if (value == null || value.isEmpty)
+                          return 'Please enter your password';
+                        if (value.length < 6)
+                          return 'Password must be at least 6 characters';
                         return null;
                       },
                     ),
@@ -175,7 +186,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: TextButton(
                         onPressed: () {
                           Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                            MaterialPageRoute(
+                              builder: (_) => const ForgotPasswordScreen(),
+                            ),
                           );
                         },
                         child: Text(
@@ -198,12 +211,17 @@ class _LoginScreenState extends State<LoginScreen> {
                       children: [
                         Text(
                           "Don't have an account? ",
-                          style: TextStyle(color: theme.secondaryTextColor, fontSize: 13.5),
+                          style: TextStyle(
+                            color: theme.secondaryTextColor,
+                            fontSize: 13.5,
+                          ),
                         ),
                         GestureDetector(
                           onTap: () {
                             Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                              MaterialPageRoute(
+                                builder: (_) => const RegisterScreen(),
+                              ),
                             );
                           },
                           child: Text(

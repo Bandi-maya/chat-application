@@ -1,9 +1,4 @@
-enum PresenceState {
-  online,
-  away,
-  offline,
-  typing,
-}
+enum PresenceState { online, away, offline, typing }
 
 class UserProfile {
   final String id;

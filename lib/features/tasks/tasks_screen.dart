@@ -5,26 +5,22 @@ import '../../domain/models/chat_task.dart';
 import '../../data/repositories/mock_data_store.dart';
 import '../../ui/core/widgets/status_badge.dart';
 import '../../ui/core/widgets/app_avatar.dart';
+import '../../ui/core/design_system/design_system.dart';
 import 'task_create_edit_modal.dart';
 import 'task_detail_screen.dart';
-import '../../injection/locator.dart';
-import '../../../ui/core/theme/theme_controller.dart';
 
 class TasksScreen extends StatefulWidget {
   final ThemeConfig theme;
   final MockDataStore dataStore;
 
-  const TasksScreen({
-    super.key,
-    required this.theme,
-    required this.dataStore,
-  });
+  const TasksScreen({super.key, required this.theme, required this.dataStore});
 
   @override
   State<TasksScreen> createState() => _TasksScreenState();
 }
 
-class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStateMixin {
+class _TasksScreenState extends State<TasksScreen>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabCtrl;
   String _selectedPriorityFilter = 'All';
 
@@ -63,7 +59,9 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
     final conversations = widget.dataStore.conversations;
     if (conversations.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Start a conversation before creating an action item.')),
+        const SnackBar(
+          content: Text('Start a conversation before creating an action item.'),
+        ),
       );
       return;
     }
@@ -98,208 +96,292 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
-    final theme = locator<ThemeController>().globalTheme;
+    final themeData = Theme.of(context);
+    final isDark = themeData.brightness == Brightness.dark;
     final dataStore = widget.dataStore;
     final allTasks = dataStore.tasks;
 
-    return Scaffold(
-      backgroundColor: theme.backgroundColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Tasks & Action Items',
-                      style: TextStyle(
-                        color: theme.primaryTextColor,
-                        fontSize: 22 * theme.fontScale,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                      ),
+    return ChatyScaffold(
+      safeAreaTop: true,
+      safeAreaBottom: false,
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              ChatySpacing.base,
+              ChatySpacing.md,
+              ChatySpacing.base,
+              ChatySpacing.xs,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Action Items',
+                    style: ChatyTypography.headline(
+                      themeData.colorScheme.onSurface,
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'Create task',
-                    icon: const Icon(Icons.add_task_rounded),
-                    onPressed: () => _createTask(theme),
-                  ),
-                ],
-              ),
-            ),
-            TabBar(
-              controller: _tabCtrl,
-              labelColor: theme.accentColor,
-              unselectedLabelColor: theme.secondaryTextColor,
-              indicatorColor: theme.accentColor,
-              tabs: const [
-                Tab(icon: Icon(Icons.list_alt_rounded, size: 18), text: 'Task List'),
-                Tab(icon: Icon(Icons.view_kanban_outlined, size: 18), text: 'Kanban Board'),
+                ),
+                ChatyIconButton(
+                  icon: Icons.add_task_rounded,
+                  tooltip: 'Create task',
+                  backgroundColor:
+                      isDark
+                          ? const Color(0xFF27272A)
+                          : const Color(0xFFF4F4F5),
+                  color: themeData.colorScheme.primary,
+                  onPressed: () => _createTask(widget.theme),
+                ),
               ],
             ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
-                child: Row(
-                  children: ['All', 'Urgent', 'High', 'Med', 'Low'].map((p) {
-                    final isSelected = _selectedPriorityFilter == p;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: Text(p),
-                        selected: isSelected,
-                        selectedColor: theme.accentColor.withValues(alpha: 0.25),
-                        backgroundColor: theme.cardColor,
-                        labelStyle: TextStyle(
-                          color: isSelected ? theme.accentColor : theme.secondaryTextColor,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          fontSize: 12,
-                        ),
-                        onSelected: (value) {
-                          if (value) setState(() => _selectedPriorityFilter = p);
-                        },
-                      ),
-                    );
-                  }).toList(growable: false),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: ChatySpacing.base),
+            child: TabBar(
+              controller: _tabCtrl,
+              labelColor: themeData.colorScheme.primary,
+              unselectedLabelColor: themeData.colorScheme.onSurface.withValues(
+                alpha: 0.55,
+              ),
+              indicatorColor: themeData.colorScheme.primary,
+              indicatorWeight: 2.5,
+              tabs: const [
+                Tab(
+                  icon: Icon(Icons.list_alt_rounded, size: 18),
+                  text: 'Task List',
                 ),
+                Tab(
+                  icon: Icon(Icons.view_kanban_outlined, size: 18),
+                  text: 'Kanban Board',
+                ),
+              ],
+            ),
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(
+                ChatySpacing.base,
+                ChatySpacing.sm,
+                ChatySpacing.base,
+                ChatySpacing.xs,
+              ),
+              child: Row(
+                children: ['All', 'Urgent', 'High', 'Med', 'Low']
+                    .map((p) {
+                      final isSelected = _selectedPriorityFilter == p;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: ChatySpacing.sm),
+                        child: ChoiceChip(
+                          label: Text(p),
+                          selected: isSelected,
+                          selectedColor: themeData.colorScheme.primary.withValues(
+                            alpha: 0.15,
+                          ),
+                          backgroundColor:
+                              isDark
+                                  ? const Color(0xFF18181B)
+                                  : const Color(0xFFF4F4F5),
+                          labelStyle: TextStyle(
+                            color: isSelected
+                                ? themeData.colorScheme.primary
+                                : themeData.colorScheme.onSurface.withValues(
+                                    alpha: 0.65,
+                                  ),
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            fontSize: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              ChatyRadius.full,
+                            ),
+                          ),
+                          side: BorderSide(
+                            color: isSelected
+                                ? themeData.colorScheme.primary
+                                : (isDark
+                                      ? const Color(0xFF27272A)
+                                      : const Color(0xFFE4E4E7)),
+                          ),
+                          onSelected: (value) {
+                            if (value) {
+                              setState(() => _selectedPriorityFilter = p);
+                            }
+                          },
+                        ),
+                      );
+                    })
+                    .toList(growable: false),
               ),
             ),
-            Expanded(
-              child: TabBarView(
-                controller: _tabCtrl,
-                children: [
-                  _buildListView(allTasks, theme, dataStore),
-                  _buildKanbanView(allTasks, theme, dataStore),
-                ],
-              ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabCtrl,
+              children: [
+                _buildListView(allTasks, widget.theme, dataStore, themeData),
+                _buildKanbanView(allTasks, widget.theme, dataStore, themeData),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   List<ChatTask> _filtered(List<ChatTask> tasks) {
-    return tasks.where((task) {
-      if (_selectedPriorityFilter == 'Urgent') return task.priority == TaskPriority.urgent;
-      if (_selectedPriorityFilter == 'High') return task.priority == TaskPriority.high;
-      if (_selectedPriorityFilter == 'Med') return task.priority == TaskPriority.medium;
-      if (_selectedPriorityFilter == 'Low') return task.priority == TaskPriority.low;
-      return true;
-    }).toList(growable: false);
+    return tasks
+        .where((task) {
+          if (_selectedPriorityFilter == 'Urgent') {
+            return task.priority == TaskPriority.urgent;
+          }
+          if (_selectedPriorityFilter == 'High') {
+            return task.priority == TaskPriority.high;
+          }
+          if (_selectedPriorityFilter == 'Med') {
+            return task.priority == TaskPriority.medium;
+          }
+          if (_selectedPriorityFilter == 'Low') {
+            return task.priority == TaskPriority.low;
+          }
+          return true;
+        })
+        .toList(growable: false);
   }
 
-  Widget _buildListView(List<ChatTask> tasks, ThemeConfig theme, MockDataStore dataStore) {
+  Widget _buildListView(
+    List<ChatTask> tasks,
+    ThemeConfig theme,
+    MockDataStore dataStore,
+    ThemeData themeData,
+  ) {
     final filtered = _filtered(tasks);
-    if (filtered.isEmpty) return _emptyState(theme);
+    if (filtered.isEmpty) return _emptyState(themeData);
 
     return ListView.separated(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(
+        horizontal: ChatySpacing.base,
+        vertical: ChatySpacing.sm,
+      ),
       itemCount: filtered.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (_, __) => const SizedBox(height: ChatySpacing.sm),
       itemBuilder: (context, index) {
         final task = filtered[index];
         final isOverdue = task.isOverdue;
-        return InkWell(
-          borderRadius: BorderRadius.circular(theme.cornerRadius),
+
+        return ChatyCard(
+          padding: const EdgeInsets.all(ChatySpacing.base),
+          borderColor: isOverdue ? const Color(0xFFEF4444).withValues(alpha: 0.4) : null,
           onTap: () => _openTask(task, theme),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: theme.cardColor,
-              borderRadius: BorderRadius.circular(theme.cornerRadius),
-              border: Border.all(
-                color: isOverdue ? theme.dangerColor.withValues(alpha: 0.5) : theme.surfaceColor,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    StatusBadge(status: task.status),
-                    const SizedBox(width: 8),
-                    PriorityBadge(priority: task.priority),
-                    const Spacer(),
-                    if (isOverdue)
-                      Text(
-                        'OVERDUE',
-                        style: TextStyle(color: theme.dangerColor, fontSize: 10, fontWeight: FontWeight.w800),
-                      ),
-                    Icon(Icons.chevron_right_rounded, color: theme.secondaryTextColor),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  task.title,
-                  style: TextStyle(
-                    color: theme.primaryTextColor,
-                    fontSize: 15 * theme.fontScale,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (task.description.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    task.description,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: theme.secondaryTextColor, fontSize: 13 * theme.fontScale),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    ...task.assigneeIds.take(4).map((id) {
-                      final contact = dataStore.getUser(id);
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 5),
-                        child: AppAvatar(
-                          initials: contact?.avatarInitials ?? 'CU',
-                          colorHex: contact?.avatarColorHex ?? '0xFF6366F1',
-                          size: 26,
-                        ),
-                      );
-                    }),
-                    const Spacer(),
-                    Text(
-                      'Due ${task.dueAt.day}/${task.dueAt.month}',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  StatusBadge(status: task.status),
+                  const SizedBox(width: 8),
+                  PriorityBadge(priority: task.priority),
+                  const Spacer(),
+                  if (isOverdue)
+                    const Text(
+                      'OVERDUE',
                       style: TextStyle(
-                        color: isOverdue ? theme.dangerColor : theme.secondaryTextColor,
-                        fontSize: 11.5,
-                        fontWeight: isOverdue ? FontWeight.bold : FontWeight.normal,
+                        color: Color(0xFFEF4444),
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
                       ),
                     ),
-                  ],
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: themeData.colorScheme.onSurface.withValues(alpha: 0.35),
+                  ),
+                ],
+              ),
+              const SizedBox(height: ChatySpacing.sm),
+              Text(
+                task.title,
+                style: TextStyle(
+                  color: themeData.colorScheme.onSurface,
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              if (task.description.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  task.description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: ChatyTypography.caption(
+                    themeData.colorScheme.onSurface.withValues(alpha: 0.65),
+                  ),
                 ),
               ],
-            ),
+              const SizedBox(height: ChatySpacing.md),
+              Row(
+                children: [
+                  ...task.assigneeIds.take(4).map((id) {
+                    final contact = dataStore.getUser(id);
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 5),
+                      child: AppAvatar(
+                        initials: contact?.avatarInitials ?? 'U',
+                        colorHex: contact?.avatarColorHex ?? '0xFF6366F1',
+                        size: 24,
+                      ),
+                    );
+                  }),
+                  const Spacer(),
+                  Text(
+                    'Due ${task.dueAt.day}/${task.dueAt.month}',
+                    style: TextStyle(
+                      color: isOverdue
+                          ? const Color(0xFFEF4444)
+                          : themeData.colorScheme.onSurface.withValues(alpha: 0.55),
+                      fontSize: 12,
+                      fontWeight: isOverdue ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         );
       },
     );
   }
 
-  Widget _emptyState(ThemeConfig theme) {
+  Widget _emptyState(ThemeData themeData) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(28),
+        padding: const EdgeInsets.all(ChatySpacing.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.task_alt_rounded, size: 54, color: theme.accentColor),
-            const SizedBox(height: 18),
-            Text('No action items yet', style: TextStyle(color: theme.primaryTextColor, fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
+            Icon(
+              Icons.task_alt_rounded,
+              size: 48,
+              color: themeData.colorScheme.primary,
+            ),
+            const SizedBox(height: ChatySpacing.base),
             Text(
-              'Create a task from a chat with /task, from a message, or with the add button.',
+              'No action items yet',
+              style: ChatyTypography.title(themeData.colorScheme.onSurface),
+            ),
+            const SizedBox(height: ChatySpacing.xs),
+            Text(
+              'Create an action item from any message or using the add button.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: theme.secondaryTextColor, height: 1.4),
+              style: ChatyTypography.caption(
+                themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
             ),
           ],
         ),
@@ -307,8 +389,14 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildKanbanView(List<ChatTask> tasks, ThemeConfig theme, MockDataStore dataStore) {
+  Widget _buildKanbanView(
+    List<ChatTask> tasks,
+    ThemeConfig theme,
+    MockDataStore dataStore,
+    ThemeData themeData,
+  ) {
     final filtered = _filtered(tasks);
+    final isDark = themeData.brightness == Brightness.dark;
     final columns = <(TaskStatus, String)>[
       (TaskStatus.inbox, 'Inbox'),
       (TaskStatus.assigned, 'Assigned'),
@@ -318,127 +406,201 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columnWidth = constraints.maxWidth < 500 ? constraints.maxWidth * 0.82 : 280.0;
+        final columnWidth = constraints.maxWidth < 500
+            ? constraints.maxWidth * 0.82
+            : 280.0;
         return SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(ChatySpacing.base),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: columns.map((column) {
-              final status = column.$1;
-              final title = column.$2;
-              final columnTasks = filtered.where((task) => task.status == status).toList(growable: false);
-              return DragTarget<ChatTask>(
-                onWillAcceptWithDetails: (details) => details.data.status != status,
-                onAcceptWithDetails: (details) => _moveTask(details.data, status),
-                builder: (context, candidates, rejected) {
-                  final highlighted = candidates.isNotEmpty;
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 160),
-                    width: columnWidth,
-                    constraints: BoxConstraints(minHeight: constraints.maxHeight - 24),
-                    margin: const EdgeInsets.only(right: 12),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: highlighted
-                          ? theme.accentColor.withValues(alpha: 0.12)
-                          : theme.cardColor.withValues(alpha: 0.65),
-                      borderRadius: BorderRadius.circular(theme.cornerRadius),
-                      border: Border.all(
-                        color: highlighted ? theme.accentColor : theme.surfaceColor,
-                        width: highlighted ? 1.5 : 1,
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+            children: columns
+                .map((column) {
+                  final status = column.$1;
+                  final title = column.$2;
+                  final columnTasks = filtered
+                      .where((task) => task.status == status)
+                      .toList(growable: false);
+                  return DragTarget<ChatTask>(
+                    onWillAcceptWithDetails: (details) =>
+                        details.data.status != status,
+                    onAcceptWithDetails: (details) =>
+                        _moveTask(details.data, status),
+                    builder: (context, candidates, rejected) {
+                      final highlighted = candidates.isNotEmpty;
+                      return AnimatedContainer(
+                        duration: ChatyMotion.standard,
+                        curve: ChatyMotion.standardEasing,
+                        width: columnWidth,
+                        constraints: BoxConstraints(
+                          minHeight: constraints.maxHeight - 24,
+                        ),
+                        margin: const EdgeInsets.only(right: ChatySpacing.md),
+                        padding: const EdgeInsets.all(ChatySpacing.md),
+                        decoration: BoxDecoration(
+                          color: highlighted
+                              ? themeData.colorScheme.primary.withValues(alpha: 0.1)
+                              : (isDark
+                                    ? const Color(0xFF18181B)
+                                    : const Color(0xFFF4F4F5)),
+                          borderRadius: BorderRadius.circular(ChatyRadius.card),
+                          border: Border.all(
+                            color: highlighted
+                                ? themeData.colorScheme.primary
+                                : (isDark
+                                      ? const Color(0xFF27272A)
+                                      : const Color(0xFFE4E4E7)),
+                            width: highlighted ? 1.5 : 1.0,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Text(title, style: TextStyle(color: theme.primaryTextColor, fontWeight: FontWeight.bold, fontSize: 14)),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    title,
+                                    style: TextStyle(
+                                      color: themeData.colorScheme.onSurface,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isDark
+                                        ? const Color(0xFF27272A)
+                                        : const Color(0xFFE4E4E7),
+                                    borderRadius: BorderRadius.circular(
+                                      ChatyRadius.full,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    '${columnTasks.length}',
+                                    style: TextStyle(
+                                      color: themeData.colorScheme.onSurface,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                              decoration: BoxDecoration(color: theme.surfaceColor, borderRadius: BorderRadius.circular(10)),
-                              child: Text('${columnTasks.length}', style: TextStyle(color: theme.secondaryTextColor, fontSize: 11, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: ChatySpacing.md),
+                            if (columnTasks.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: ChatySpacing.xl,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'Drop tasks here',
+                                    style: ChatyTypography.caption(
+                                      themeData.colorScheme.onSurface
+                                          .withValues(alpha: 0.45),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ...columnTasks.map(
+                              (task) => _kanbanCard(task, theme, themeData),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 10),
-                        if (columnTasks.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 28),
-                            child: Center(
-                              child: Text('Drop tasks here', style: TextStyle(color: theme.secondaryTextColor, fontSize: 12)),
-                            ),
-                          ),
-                        ...columnTasks.map((task) => _kanbanCard(task, theme)),
-                      ],
-                    ),
+                      );
+                    },
                   );
-                },
-              );
-            }).toList(growable: false),
+                })
+                .toList(growable: false),
           ),
         );
       },
     );
   }
 
-  Widget _kanbanCard(ChatTask task, ThemeConfig theme) {
+  Widget _kanbanCard(ChatTask task, ThemeConfig theme, ThemeData themeData) {
     final previous = _previous(task.status);
     final next = _next(task.status);
-    final card = Material(
-      color: theme.cardColor,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => _openTask(task, theme),
-        child: Padding(
-          padding: const EdgeInsets.all(11),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                task.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: theme.primaryTextColor, fontWeight: FontWeight.w700, fontSize: 13 * theme.fontScale),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  PriorityBadge(priority: task.priority),
-                  const Spacer(),
-                  if (previous != null)
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      tooltip: 'Move back',
-                      onPressed: () => _moveTask(task, previous),
-                      icon: Icon(Icons.chevron_left_rounded, size: 20, color: theme.accentColor),
-                    ),
-                  if (next != null)
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      tooltip: 'Move forward',
-                      onPressed: () => _moveTask(task, next),
-                      icon: Icon(Icons.chevron_right_rounded, size: 20, color: theme.accentColor),
-                    ),
-                ],
-              ),
-            ],
+    final isDark = themeData.brightness == Brightness.dark;
+
+    final card = Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF27272A) : Colors.white,
+        borderRadius: BorderRadius.circular(ChatyRadius.md),
+        border: Border.all(
+          color: isDark ? const Color(0xFF3F3F46) : const Color(0xFFE4E4E7),
+          width: 1.0,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(ChatyRadius.md),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(ChatyRadius.md),
+          onTap: () => _openTask(task, theme),
+          child: Padding(
+            padding: const EdgeInsets.all(ChatySpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  task.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: themeData.colorScheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13.5,
+                  ),
+                ),
+                const SizedBox(height: ChatySpacing.sm),
+                Row(
+                  children: [
+                    PriorityBadge(priority: task.priority),
+                    const Spacer(),
+                    if (previous != null)
+                      ChatyIconButton(
+                        size: 28,
+                        iconSize: 18,
+                        tooltip: 'Move back',
+                        onPressed: () => _moveTask(task, previous),
+                        icon: Icons.chevron_left_rounded,
+                        color: themeData.colorScheme.primary,
+                      ),
+                    if (next != null)
+                      ChatyIconButton(
+                        size: 28,
+                        iconSize: 18,
+                        tooltip: 'Move forward',
+                        onPressed: () => _moveTask(task, next),
+                        icon: Icons.chevron_right_rounded,
+                        color: themeData.colorScheme.primary,
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 9),
+      padding: const EdgeInsets.only(bottom: ChatySpacing.sm),
       child: LongPressDraggable<ChatTask>(
         data: task,
         feedback: Material(
           color: Colors.transparent,
-          child: SizedBox(width: 240, child: Opacity(opacity: 0.92, child: card)),
+          child: SizedBox(
+            width: 240,
+            child: Opacity(opacity: 0.92, child: card),
+          ),
         ),
         childWhenDragging: Opacity(opacity: 0.35, child: card),
         child: card,
@@ -446,3 +608,4 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
     );
   }
 }
+

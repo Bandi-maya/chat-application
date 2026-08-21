@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import '../../../../ui/core/design_system/design_system.dart';
 import '../../../../ui/core/theme/theme_config.dart';
 import '../../../../injection/locator.dart';
-import '../../../../data/services/chaty_backend_service.dart';
+import '../../../../data/services/backend_service.dart';
 import '../../../../data/repositories/mock_data_store.dart';
 import '../../../../ui/core/persistence/preferences_storage.dart';
 import '../../chats/main_navigation_shell.dart';
 
-/// Circular back button as shown on top-left of each screen in the design
+/// Circular back button as shown on top-left of each screen in the design.
+/// Delegates to the shared [ChatyBackButton] so every screen uses the same
+/// size (34) and chevron (24) as the Updates screen.
 class AuthBackButton extends StatelessWidget {
   final VoidCallback? onPressed;
 
@@ -14,31 +17,9 @@ class AuthBackButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     return Align(
       alignment: Alignment.centerLeft,
-      child: GestureDetector(
-        onTap: onPressed ?? () => Navigator.of(context).maybePop(),
-        child: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-            border: Border.all(
-              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-              width: 1.2,
-            ),
-          ),
-          child: Icon(
-            Icons.chevron_left_rounded,
-            size: 26,
-            color: isDark ? Colors.white : const Color(0xFF0F172A),
-          ),
-        ),
-      ),
+      child: ChatyBackButton(onPressed: onPressed),
     );
   }
 }
@@ -111,43 +92,41 @@ class AuthTextField extends StatelessWidget {
             fillColor: isDark
                 ? const Color(0xFF1E293B).withValues(alpha: 0.8)
                 : const Color(0xFFF3F4F6),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 18,
+              vertical: 16,
+            ),
             prefixIcon: prefixIcon,
             suffixIcon: suffixIcon,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
-                color: isDark ? const Color(0xFF334155) : const Color(0xFFE5E7EB),
+                color: isDark
+                    ? const Color(0xFF334155)
+                    : const Color(0xFFE5E7EB),
                 width: 1.0,
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
-                color: isDark ? const Color(0xFF334155) : const Color(0xFFE5E7EB),
+                color: isDark
+                    ? const Color(0xFF334155)
+                    : const Color(0xFFE5E7EB),
                 width: 1.0,
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(
-                color: theme.accentColor,
-                width: 1.8,
-              ),
+              borderSide: BorderSide(color: theme.accentColor, width: 1.8),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(
-                color: theme.dangerColor,
-                width: 1.2,
-              ),
+              borderSide: BorderSide(color: theme.dangerColor, width: 1.2),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(
-                color: theme.dangerColor,
-                width: 1.8,
-              ),
+              borderSide: BorderSide(color: theme.dangerColor, width: 1.8),
             ),
           ),
         ),
@@ -194,7 +173,9 @@ class AuthPrimaryButton extends StatelessWidget {
                 height: 22,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.2,
-                  valueColor: AlwaysStoppedAnimation<Color>(theme.onAccentColor),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    theme.onAccentColor,
+                  ),
                 ),
               )
             : Text(
@@ -329,7 +310,9 @@ class AuthSocialRow extends StatelessWidget {
                 width: 38,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF3F3F46) : const Color(0xFFCBD5E1),
+                  color: isDark
+                      ? const Color(0xFF3F3F46)
+                      : const Color(0xFFCBD5E1),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -341,12 +324,16 @@ class AuthSocialRow extends StatelessWidget {
                     height: 36,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isDark ? const Color(0xFF27272A) : const Color(0xFFF1F5F9),
+                      color: isDark
+                          ? const Color(0xFF27272A)
+                          : const Color(0xFFF1F5F9),
                     ),
                     child: Icon(
                       provLower == 'google'
                           ? Icons.g_mobiledata_rounded
-                          : (provLower == 'apple' ? Icons.apple : Icons.facebook),
+                          : (provLower == 'apple'
+                                ? Icons.apple
+                                : Icons.facebook),
                       size: 24,
                       color: theme.primaryTextColor,
                     ),
@@ -392,13 +379,17 @@ class AuthSocialRow extends StatelessWidget {
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Signed in successfully as $displayName! 🎉'),
+                        content: Text(
+                          'Signed in successfully as $displayName! 🎉',
+                        ),
                         backgroundColor: const Color(0xFF10B981),
                       ),
                     );
 
                     Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const MainNavigationShell()),
+                      MaterialPageRoute(
+                        builder: (_) => const MainNavigationShell(),
+                      ),
                       (route) => false,
                     );
                   } catch (e) {
@@ -415,10 +406,14 @@ class AuthSocialRow extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF27272A) : const Color(0xFFF8FAFC),
+                    color: isDark
+                        ? const Color(0xFF27272A)
+                        : const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isDark ? const Color(0xFF3F3F46) : const Color(0xFFE2E8F0),
+                      color: isDark
+                          ? const Color(0xFF3F3F46)
+                          : const Color(0xFFE2E8F0),
                     ),
                   ),
                   child: Row(
@@ -457,7 +452,11 @@ class AuthSocialRow extends StatelessWidget {
                           ],
                         ),
                       ),
-                      Icon(Icons.arrow_forward_ios_rounded, size: 14, color: theme.secondaryTextColor),
+                      Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 14,
+                        color: theme.secondaryTextColor,
+                      ),
                     ],
                   ),
                 ),
@@ -490,7 +489,9 @@ class AuthSocialRow extends StatelessWidget {
                       );
 
                       Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (_) => const MainNavigationShell()),
+                        MaterialPageRoute(
+                          builder: (_) => const MainNavigationShell(),
+                        ),
                         (route) => false,
                       );
                     } catch (e) {
@@ -530,7 +531,9 @@ class AuthSocialRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = theme.brightness == Brightness.dark;
     final cardBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC);
-    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final borderColor = isDark
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -585,12 +588,7 @@ class AuthSocialRow extends StatelessWidget {
           border: Border.all(color: borderColor, width: 1.2),
         ),
         alignment: Alignment.center,
-        child: customWidget ??
-            Icon(
-              icon,
-              size: 26,
-              color: iconColor,
-            ),
+        child: customWidget ?? Icon(icon, size: 26, color: iconColor),
       ),
     );
   }
@@ -599,9 +597,7 @@ class AuthSocialRow extends StatelessWidget {
     return Container(
       width: 22,
       height: 22,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-      ),
+      decoration: const BoxDecoration(shape: BoxShape.circle),
       child: const Center(
         child: Text(
           'G',
@@ -705,16 +701,15 @@ class AuthIllustration extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: Center(
-                  child: Icon(
-                    mainIcon,
-                    size: 40,
-                    color: iconColor,
-                  ),
+                  child: Icon(mainIcon, size: 40, color: iconColor),
                 ),
               ),
               const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: theme.accentColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),

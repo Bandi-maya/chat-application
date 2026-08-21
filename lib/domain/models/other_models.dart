@@ -1,13 +1,6 @@
-enum CallType {
-  voice,
-  video,
-}
+enum CallType { voice, video }
 
-enum CallDirection {
-  incoming,
-  outgoing,
-  missed,
-}
+enum CallDirection { incoming, outgoing, missed }
 
 class CallRecord {
   final String id;
@@ -78,7 +71,8 @@ class UpdateStory {
 class LinkedDevice {
   final String id;
   final String deviceName;
-  final String platform; // 'Android 14', 'iOS 18', 'macOS Sonoma', 'Windows 11', 'Chrome Web'
+  final String
+  platform; // 'Android 14', 'iOS 18', 'macOS Sonoma', 'Windows 11', 'Chrome Web'
   final String location;
   final DateTime lastActiveAt;
   final bool isCurrentDevice;

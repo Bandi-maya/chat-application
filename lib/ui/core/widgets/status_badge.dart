@@ -5,11 +5,7 @@ class StatusBadge extends StatelessWidget {
   final TaskStatus status;
   final TaskPriority? priority;
 
-  const StatusBadge({
-    super.key,
-    required this.status,
-    this.priority,
-  });
+  const StatusBadge({super.key, required this.status, this.priority});
 
   @override
   Widget build(BuildContext context) {
@@ -59,11 +55,7 @@ class StatusBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          color: fg,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-        ),
+        style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -111,7 +103,11 @@ class PriorityBadge extends StatelessWidget {
           const SizedBox(width: 3),
           Text(
             text,
-            style: TextStyle(color: col, fontSize: 10.5, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: col,
+              fontSize: 10.5,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),

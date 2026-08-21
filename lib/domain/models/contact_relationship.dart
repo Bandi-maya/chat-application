@@ -40,16 +40,16 @@ class ContactPrivacyOverride {
   }
 
   Map<String, dynamic> toDatabaseMap() => <String, dynamic>{
-        'owner_user_id': ownerUserId,
-        'target_user_id': targetUserId,
-        'hide_delivery_receipts': hideDeliveryReceipts,
-        'hide_read_receipts': hideReadReceipts,
-        'hide_typing': hideTyping,
-        'hide_recording': hideRecording,
-        'hide_online': hideOnline,
-        'hide_last_seen': hideLastSeen,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      };
+    'owner_user_id': ownerUserId,
+    'target_user_id': targetUserId,
+    'hide_delivery_receipts': hideDeliveryReceipts,
+    'hide_read_receipts': hideReadReceipts,
+    'hide_typing': hideTyping,
+    'hide_recording': hideRecording,
+    'hide_online': hideOnline,
+    'hide_last_seen': hideLastSeen,
+    'updated_at': DateTime.now().toUtc().toIso8601String(),
+  };
 
   factory ContactPrivacyOverride.fromDatabaseMap(Map<String, dynamic> map) {
     return ContactPrivacyOverride(

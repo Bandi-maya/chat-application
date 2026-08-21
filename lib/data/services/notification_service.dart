@@ -6,6 +6,8 @@ class ChatyEventNotification {
   final String body;
   final IconData icon;
   final Color color;
+  /// Optional custom text tint for title/body (GB toast `_tc` keys).
+  final Color? textColor;
   final DateTime timestamp;
   final String? userId;
   final String? avatarInitials;
@@ -17,6 +19,7 @@ class ChatyEventNotification {
     required this.body,
     this.icon = Icons.notifications_active_rounded,
     this.color = const Color(0xFF6366F1),
+    this.textColor,
     required this.timestamp,
     this.userId,
     this.avatarInitials,
@@ -25,16 +28,20 @@ class ChatyEventNotification {
 }
 
 class ChatyNotificationService extends ChangeNotifier {
-  final List<ChatyEventNotification> _notifications = <ChatyEventNotification>[];
+  final List<ChatyEventNotification> _notifications =
+      <ChatyEventNotification>[];
 
-  List<ChatyEventNotification> get notifications => List<ChatyEventNotification>.unmodifiable(_notifications);
-  ChatyEventNotification? get latest => _notifications.isEmpty ? null : _notifications.first;
+  List<ChatyEventNotification> get notifications =>
+      List<ChatyEventNotification>.unmodifiable(_notifications);
+  ChatyEventNotification? get latest =>
+      _notifications.isEmpty ? null : _notifications.first;
 
   void triggerEventNotification({
     required String title,
     required String body,
     IconData icon = Icons.notifications_rounded,
     Color color = const Color(0xFF6366F1),
+    Color? textColor,
     String? userId,
     String? avatarInitials,
     String? avatarColorHex,
@@ -45,13 +52,15 @@ class ChatyNotificationService extends ChangeNotifier {
       body: body,
       icon: icon,
       color: color,
+      textColor: textColor,
       timestamp: DateTime.now(),
       userId: userId,
       avatarInitials: avatarInitials,
       avatarColorHex: avatarColorHex,
     );
     _notifications.insert(0, notification);
-    if (_notifications.length > 100) _notifications.removeRange(100, _notifications.length);
+    if (_notifications.length > 100)
+      _notifications.removeRange(100, _notifications.length);
     notifyListeners();
   }
 

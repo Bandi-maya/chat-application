@@ -9,13 +9,11 @@ import 'widgets/auth_components.dart';
 class CreateNewPasswordScreen extends StatefulWidget {
   final String email;
 
-  const CreateNewPasswordScreen({
-    super.key,
-    required this.email,
-  });
+  const CreateNewPasswordScreen({super.key, required this.email});
 
   @override
-  State<CreateNewPasswordScreen> createState() => _CreateNewPasswordScreenState();
+  State<CreateNewPasswordScreen> createState() =>
+      _CreateNewPasswordScreenState();
 }
 
 class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
@@ -105,7 +103,10 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
                     const SizedBox(height: 8),
                     Text(
                       'Create a new unique password.',
-                      style: TextStyle(color: theme.secondaryTextColor, fontSize: 14),
+                      style: TextStyle(
+                        color: theme.secondaryTextColor,
+                        fontSize: 14,
+                      ),
                     ),
                     const SizedBox(height: 36),
                     AuthTextField(
@@ -119,7 +120,9 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
                           _obscurePassword
                               ? Icons.visibility_off_outlined
                               : Icons.visibility_outlined,
-                          color: theme.secondaryTextColor.withValues(alpha: 0.6),
+                          color: theme.secondaryTextColor.withValues(
+                            alpha: 0.6,
+                          ),
                           size: 20,
                         ),
                         onPressed: () => setState(
@@ -152,12 +155,13 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
                           _obscureConfirm
                               ? Icons.visibility_off_outlined
                               : Icons.visibility_outlined,
-                          color: theme.secondaryTextColor.withValues(alpha: 0.6),
+                          color: theme.secondaryTextColor.withValues(
+                            alpha: 0.6,
+                          ),
                           size: 20,
                         ),
-                        onPressed: () => setState(
-                          () => _obscureConfirm = !_obscureConfirm,
-                        ),
+                        onPressed: () =>
+                            setState(() => _obscureConfirm = !_obscureConfirm),
                       ),
                       validator: (value) => value == null || value.isEmpty
                           ? 'Please confirm your password'

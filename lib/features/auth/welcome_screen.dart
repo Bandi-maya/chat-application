@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/app_icon_controller.dart';
 import '../../ui/core/theme/theme_controller.dart';
-import '../../ui/core/widgets/chaty_brand_icon.dart';
+import '../../ui/core/widgets/app_brand_icon.dart';
 import 'login_screen.dart';
 import 'register_screen.dart';
 import 'widgets/auth_components.dart';
@@ -77,7 +77,9 @@ class WelcomeScreen extends StatelessWidget {
               AuthSecondaryButton(
                 text: 'Register',
                 onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => const RegisterScreen()),
+                  MaterialPageRoute<void>(
+                    builder: (_) => const RegisterScreen(),
+                  ),
                 ),
                 theme: theme,
               ),

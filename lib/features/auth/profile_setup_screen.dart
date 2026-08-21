@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../ui/core/theme/theme_controller.dart';
 import '../../data/repositories/mock_data_store.dart';
 import '../../ui/core/widgets/app_avatar.dart';
+import '../../ui/core/design_system/design_system.dart';
 import '../../features/chats/main_navigation_shell.dart';
 import '../../injection/locator.dart';
 
@@ -56,17 +57,18 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     final theme = themeController.globalTheme;
     final user = dataStore.currentUser;
 
-    return Scaffold(
-      backgroundColor: theme.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Complete Profile'),
+    return ChatyScaffold(
+      appBar: const ChatyAppBar(
+        title: 'Complete Profile',
+        leading: ChatyBackButton(),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.all(ChatySpacing.base),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const SizedBox(height: ChatySpacing.md),
               Center(
                 child: Stack(
                   children: [
@@ -83,91 +85,71 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         decoration: BoxDecoration(
                           color: theme.accentColor,
                           shape: BoxShape.circle,
-                          border: Border.all(color: theme.backgroundColor, width: 2),
+                          border: Border.all(
+                            color: theme.backgroundColor,
+                            width: 2.5,
+                          ),
                         ),
                         child: Icon(
                           Icons.camera_alt_rounded,
                           color: theme.onAccentColor,
-                          size: 18,
+                          size: 16,
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 32),
-              TextField(
-                controller: _nameCtrl,
-                style: TextStyle(color: theme.primaryTextColor),
-                decoration: InputDecoration(
-                  labelText: 'Display Name',
-                  labelStyle: TextStyle(color: theme.secondaryTextColor),
-                  prefixIcon: Icon(Icons.person_outline_rounded, color: theme.accentColor),
-                  filled: true,
-                  fillColor: theme.cardColor,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
+              const SizedBox(height: ChatySpacing.xl),
+              ChatyGroupedSection(
+                title: 'Public Identity',
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(ChatySpacing.md),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ChatyInput(
+                          label: 'Display Name',
+                          hintText: 'Your public name',
+                          controller: _nameCtrl,
+                          prefixIcon: const Icon(
+                            Icons.person_outline_rounded,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(height: ChatySpacing.md),
+                        ChatyInput(
+                          label: 'Username',
+                          hintText: 'e.g. @bandi_maya',
+                          controller: _usernameCtrl,
+                          prefixIcon: const Icon(
+                            Icons.alternate_email_rounded,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(height: ChatySpacing.md),
+                        ChatyInput(
+                          label: 'About / Status',
+                          hintText: 'Write a short bio or status...',
+                          controller: _aboutCtrl,
+                          maxLines: 3,
+                          prefixIcon: const Icon(
+                            Icons.info_outline_rounded,
+                            size: 20,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _usernameCtrl,
-                style: TextStyle(color: theme.primaryTextColor),
-                decoration: InputDecoration(
-                  labelText: 'Username',
-                  labelStyle: TextStyle(color: theme.secondaryTextColor),
-                  prefixIcon: Icon(Icons.alternate_email_rounded, color: theme.accentColor),
-                  filled: true,
-                  fillColor: theme.cardColor,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _aboutCtrl,
-                maxLines: 3,
-                style: TextStyle(color: theme.primaryTextColor),
-                decoration: InputDecoration(
-                  labelText: 'About / Status',
-                  labelStyle: TextStyle(color: theme.secondaryTextColor),
-                  alignLabelWithHint: true,
-                  prefixIcon: Padding(
-                    padding: const EdgeInsets.only(bottom: 40),
-                    child: Icon(Icons.info_outline_rounded, color: theme.accentColor),
-                  ),
-                  filled: true,
-                  fillColor: theme.cardColor,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.accentColor,
-                  foregroundColor: theme.onAccentColor,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
+              const SizedBox(height: ChatySpacing.xl),
+              ChatyPrimaryButton(
+                text: 'Enter Chaty',
                 onPressed: _saveAndEnterHome,
-                child: Text(
-                  'Enter Chaty',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: theme.onAccentColor,
-                  ),
-                ),
               ),
+              const SizedBox(height: ChatySpacing.lg),
             ],
           ),
         ),
@@ -175,3 +157,4 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     );
   }
 }
+

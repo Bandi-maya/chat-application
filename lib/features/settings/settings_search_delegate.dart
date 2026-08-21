@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../ui/core/design_system/components/app_components.dart';
 
 class SettingsSearchResult {
   final String title;
@@ -6,6 +7,7 @@ class SettingsSearchResult {
   final String description;
   final IconData icon;
   final Widget destination;
+  final List<String> keywords;
 
   const SettingsSearchResult({
     required this.title,
@@ -13,6 +15,7 @@ class SettingsSearchResult {
     required this.description,
     required this.icon,
     required this.destination,
+    this.keywords = const [],
   });
 }
 
@@ -34,9 +37,11 @@ class SettingsSearchDelegate extends SearchDelegate<SettingsSearchResult?> {
 
   @override
   Widget? buildLeading(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.arrow_back_rounded),
-      onPressed: () => close(context, null),
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: ChatyBackButton(
+        onPressed: () => close(context, null),
+      ),
     );
   }
 
@@ -53,7 +58,8 @@ class SettingsSearchDelegate extends SearchDelegate<SettingsSearchResult?> {
         : allSettings.where((item) {
             return item.title.toLowerCase().contains(clean) ||
                 item.category.toLowerCase().contains(clean) ||
-                item.description.toLowerCase().contains(clean);
+                item.description.toLowerCase().contains(clean) ||
+                item.keywords.any((k) => k.toLowerCase().contains(clean));
           }).toList();
 
     if (matches.isEmpty) {
@@ -63,7 +69,10 @@ class SettingsSearchDelegate extends SearchDelegate<SettingsSearchResult?> {
           children: [
             const Icon(Icons.search_off_rounded, size: 48, color: Colors.grey),
             const SizedBox(height: 12),
-            Text('No settings found for "$query"', style: const TextStyle(color: Colors.grey)),
+            Text(
+              'No settings found for "$query"',
+              style: const TextStyle(color: Colors.grey),
+            ),
           ],
         ),
       );
@@ -74,13 +83,21 @@ class SettingsSearchDelegate extends SearchDelegate<SettingsSearchResult?> {
       itemBuilder: (ctx, idx) {
         final item = matches[idx];
         return ListTile(
-          leading: Icon(item.icon, color: Theme.of(context).colorScheme.primary),
-          title: Text(item.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+          leading: Icon(
+            item.icon,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          title: Text(
+            item.title,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
           subtitle: Text('${item.category} • ${item.description}'),
           trailing: const Icon(Icons.chevron_right_rounded),
           onTap: () {
             close(context, item);
-            Navigator.of(context).push(MaterialPageRoute(builder: (_) => item.destination));
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => item.destination));
           },
         );
       },

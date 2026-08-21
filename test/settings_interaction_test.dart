@@ -1,9 +1,11 @@
-import 'package:chat/ui/core/design_system/chaty_settings_primitives.dart';
+import 'package:chat/ui/core/design_system/settings_primitives.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('settings switch row reacts immediately to a row tap', (tester) async {
+  testWidgets('settings switch row reacts immediately to a row tap', (
+    tester,
+  ) async {
     var value = false;
     await tester.pumpWidget(
       MaterialApp(

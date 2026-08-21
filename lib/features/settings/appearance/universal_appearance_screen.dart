@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../../injection/locator.dart';
+import '../../../ui/core/controllers/app_icon_controller.dart';
 import '../../../ui/core/controllers/appearance_variant_controller.dart';
-import '../../../ui/core/controllers/chaty_preferences_controller.dart';
+import 'app_icon_settings_screen.dart';
+import '../../../ui/core/controllers/preferences_controller.dart';
+import '../../../ui/core/design_system/components/app_components.dart';
 import '../../../ui/core/theme/theme_controller.dart';
+import '../theme_editor_screen.dart';
 
 class UniversalAppearanceScreen extends StatelessWidget {
   final ChatyPreferencesController preferencesController;
@@ -29,10 +33,9 @@ class UniversalAppearanceScreen extends StatelessWidget {
             backgroundColor: theme.surfaceColor,
             foregroundColor: theme.primaryTextColor,
             surfaceTintColor: Colors.transparent,
-            leading: IconButton(
-              tooltip: 'Back',
-              onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.chevron_left_rounded),
+            leading: const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: ChatyBackButton(),
             ),
             title: const Text('Look & feel'),
           ),
@@ -45,52 +48,66 @@ class UniversalAppearanceScreen extends StatelessWidget {
                 const SizedBox(height: 18),
                 Text(
                   'Customize components',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Preview a component first, then apply it. Your current choice stays active until you confirm a new one.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        height: 1.4,
-                      ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    height: 1.4,
+                  ),
                 ),
                 const SizedBox(height: 12),
-                _VariantSection(
-                  kind: _PreviewKind.navigation,
-                  title: 'Navigation style',
-                  subtitle: 'Phone, split-screen and large-screen navigation',
-                  value: controller.navigationStyle,
-                  options: AppearanceVariantController.navigationStyles,
-                  icon: Icons.view_sidebar_outlined,
-                  onSelected: controller.setNavigationStyle,
+                // REAL control: navigation layout (Compact Rail / Gesture
+                // Tabs / Bottom Nav) lives in the theme editor and is fully
+                // wired. The old write-only 'Navigation style' / 'Bottom bar
+                // style' pickers here never changed anything app-wide and
+                // were removed; this tile takes you to the real one.
+                ListTile(
+                  leading: const Icon(Icons.view_sidebar_outlined),
+                  title: const Text('Navigation layout architecture'),
+                  subtitle: const Text(
+                    'Bottom nav, Top WhatsApp bar, 3D Drawer, Side menu & Island rail',
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => ThemeEditorScreen(
+                        themeController: locator<ThemeController>(),
+                      ),
+                    ),
+                  ),
+                ),
+                // REAL control: the app icon is managed by the dedicated
+                // App Icon system (launcher variants + custom uploaded icon).
+                // The old write-only 'icon language' choice lists lived here;
+                // they never changed anything app-wide and were removed.
+                ListTile(
+                  leading: const Icon(Icons.apps_rounded),
+                  title: const Text('App icon'),
+                  subtitle: const Text(
+                    'Launcher style, custom uploaded icon & preview',
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => AppIconSettingsScreen(
+                        appIconController: locator<AppIconController>(),
+                      ),
+                    ),
+                  ),
                 ),
                 _VariantSection(
                   kind: _PreviewKind.bottomBar,
-                  title: 'Bottom bar style',
-                  subtitle: 'Primary navigation appearance on phones',
+                  title: 'Bottom navigation bar design',
+                  subtitle: '12 unique animated navigation bar layouts',
                   value: controller.bottomBarStyle,
                   options: AppearanceVariantController.bottomBarStyles,
-                  icon: Icons.space_bar_rounded,
+                  icon: Icons.dock_rounded,
                   onSelected: controller.setBottomBarStyle,
-                ),
-                _VariantSection(
-                  kind: _PreviewKind.appIcon,
-                  title: 'In-app icon language',
-                  subtitle: 'Visual identity used on branded app surfaces',
-                  value: controller.appIconStyle,
-                  options: AppearanceVariantController.appIconStyles,
-                  icon: Icons.apps_rounded,
-                  onSelected: controller.setAppIconStyle,
-                ),
-                _VariantSection(
-                  kind: _PreviewKind.notification,
-                  title: 'Notification icon language',
-                  subtitle: 'Notification and alert visual identity',
-                  value: controller.notificationIconStyle,
-                  options: AppearanceVariantController.notificationIconStyles,
-                  icon: Icons.notifications_active_outlined,
-                  onSelected: controller.setNotificationIconStyle,
                 ),
                 _VariantSection(
                   kind: _PreviewKind.typography,
@@ -141,7 +158,9 @@ class _AppearanceOverview extends StatelessWidget {
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.55)),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.55),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -155,31 +174,36 @@ class _AppearanceOverview extends StatelessWidget {
                   color: scheme.primaryContainer,
                   borderRadius: BorderRadius.circular(13),
                 ),
-                child: Icon(Icons.visibility_outlined, color: scheme.onPrimaryContainer),
+                child: Icon(
+                  Icons.visibility_outlined,
+                  color: scheme.onPrimaryContainer,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Current appearance', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                    const Text(
+                      'Current appearance',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
                     const SizedBox(height: 2),
                     Text(
-                      '${controller.bottomBarStyle} • ${controller.typographyStyle}',
+                      controller.typographyStyle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 16),
-          _OptionPreview(
-            kind: _PreviewKind.bottomBar,
-            value: controller.bottomBarStyle,
-            options: AppearanceVariantController.bottomBarStyles,
           ),
         ],
       ),
@@ -240,7 +264,11 @@ class _VariantSection extends StatelessWidget {
                       color: scheme.primaryContainer,
                       borderRadius: BorderRadius.circular(13),
                     ),
-                    child: Icon(icon, color: scheme.onPrimaryContainer, size: 21),
+                    child: Icon(
+                      icon,
+                      color: scheme.onPrimaryContainer,
+                      size: 21,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -248,20 +276,28 @@ class _VariantSection extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                        Text(
+                          title,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
                         const SizedBox(height: 2),
                         Text(
                           subtitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: scheme.onSurfaceVariant),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           value,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: scheme.primary, fontSize: 12.5, fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            color: scheme.primary,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ],
                     ),
@@ -337,9 +373,19 @@ class _VariantPickerSheetState extends State<_VariantPickerSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(widget.title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                      Text(
+                        widget.title,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Text('Preview before applying', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+                      Text(
+                        'Preview before applying',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -374,7 +420,9 @@ class _VariantPickerSheetState extends State<_VariantPickerSheet> {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Material(
-                    color: active ? scheme.primaryContainer.withValues(alpha: 0.55) : Colors.transparent,
+                    color: active
+                        ? scheme.primaryContainer.withValues(alpha: 0.55)
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(14),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(14),
@@ -382,15 +430,36 @@ class _VariantPickerSheetState extends State<_VariantPickerSheet> {
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(minHeight: 52),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           child: Row(
                             children: [
                               SizedBox(
                                 width: 34,
-                                child: Text('${index + 1}'.padLeft(2, '0'), style: Theme.of(context).textTheme.labelSmall),
+                                child: Text(
+                                  '${index + 1}'.padLeft(2, '0'),
+                                  style: Theme.of(context).textTheme.labelSmall,
+                                ),
                               ),
-                              Expanded(child: Text(option, style: TextStyle(fontWeight: active ? FontWeight.w800 : FontWeight.w500))),
-                              if (active) Icon(Icons.check_circle_rounded, color: scheme.primary) else const Icon(Icons.chevron_right_rounded),
+                              Expanded(
+                                child: Text(
+                                  option,
+                                  style: TextStyle(
+                                    fontWeight: active
+                                        ? FontWeight.w800
+                                        : FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                              if (active)
+                                Icon(
+                                  Icons.check_circle_rounded,
+                                  color: scheme.primary,
+                                )
+                              else
+                                const Icon(Icons.chevron_right_rounded),
                             ],
                           ),
                         ),
@@ -402,10 +471,19 @@ class _VariantPickerSheetState extends State<_VariantPickerSheet> {
             ),
           ),
           Container(
-            padding: EdgeInsets.fromLTRB(16, 10, 16, 10 + MediaQuery.viewPaddingOf(context).bottom),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              10,
+              16,
+              10 + MediaQuery.viewPaddingOf(context).bottom,
+            ),
             decoration: BoxDecoration(
               color: scheme.surface,
-              border: Border(top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.5))),
+              border: Border(
+                top: BorderSide(
+                  color: scheme.outlineVariant.withValues(alpha: 0.5),
+                ),
+              ),
             ),
             child: Row(
               children: [
@@ -421,7 +499,11 @@ class _VariantPickerSheetState extends State<_VariantPickerSheet> {
                   child: FilledButton.icon(
                     onPressed: () => Navigator.of(context).pop(_candidate),
                     icon: const Icon(Icons.check_rounded),
-                    label: Text(_candidate == widget.currentValue ? 'Keep current' : 'Apply'),
+                    label: Text(
+                      _candidate == widget.currentValue
+                          ? 'Keep current'
+                          : 'Apply',
+                    ),
                   ),
                 ),
               ],
@@ -460,7 +542,9 @@ class _OptionPreview extends StatelessWidget {
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.65)),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.65),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -475,7 +559,12 @@ class _OptionPreview extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
-              Text('Preview', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+              Text(
+                'Preview',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -506,28 +595,208 @@ class _OptionPreview extends StatelessWidget {
 
   Widget _bottomBarPreview(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final radiusValues = <double>[30, 14, 24, 22, 28, 30, 18, 12, 8, 20, 16, 20, 4, 10, 32, 26, 18, 0, 14, 10];
-    final radius = radiusValues[_index.clamp(0, radiusValues.length - 1)];
-    final compact = <int>{2, 6, 8, 13, 15, 19}.contains(_index);
-    final showLabels = !<int>{6, 8, 13, 19}.contains(_index);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = scheme.primary;
+
     return Container(
-      height: compact ? 52 : 60,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+      height: 64,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: scheme.outlineVariant),
+        color: switch (value) {
+          'Floating Dynamic Island' => const Color(0xFF0B0F19),
+          'Segmented Glass Dock' => scheme.surface.withValues(alpha: 0.85),
+          _ => scheme.surface,
+        },
+        borderRadius: BorderRadius.circular(
+          switch (value) {
+            'Floating Pill' || 'Floating Dynamic Island' || 'Active Pill Chip' => 28,
+            'Top Indicator Line' || 'Classic Label Bar' => 12,
+            'Circle Accent Pop' => 24,
+            'Soft Square Tile' => 16,
+            _ => 20,
+          },
+        ),
+        border: Border.all(
+          color: value == 'Floating Dynamic Island'
+              ? const Color(0xFF1E293B)
+              : scheme.outlineVariant.withValues(alpha: 0.6),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _PreviewDestination(icon: Icons.chat_bubble_rounded, label: 'Chats', selected: true, showLabel: showLabels),
-          const _PreviewDestination(icon: Icons.update_rounded, label: 'Updates'),
-          const _PreviewDestination(icon: Icons.checklist_rounded, label: 'Tasks'),
-          const _PreviewDestination(icon: Icons.call_rounded, label: 'Calls'),
-          const _PreviewDestination(icon: Icons.settings_rounded, label: 'Settings'),
+          // Active Tab 1
+          _buildSampleActiveTab(context, primary, value),
+          // Inactive Tab 2
+          Icon(
+            Icons.update_rounded,
+            size: 20,
+            color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+          ),
+          // Inactive Tab 3
+          Icon(
+            Icons.checklist_rounded,
+            size: 20,
+            color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+          ),
+          // Inactive Tab 4
+          Icon(
+            Icons.call_rounded,
+            size: 20,
+            color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+          ),
         ],
       ),
     );
+  }
+
+  Widget _buildSampleActiveTab(BuildContext context, Color accent, String style) {
+    switch (style) {
+      case 'Active Pill Chip':
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.chat_bubble_rounded, size: 18, color: accent),
+              const SizedBox(width: 5),
+              Text(
+                'Chats',
+                style: TextStyle(
+                  color: accent,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11.5,
+                ),
+              ),
+            ],
+          ),
+        );
+      case 'Circle Accent Pop':
+        return Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: accent,
+            boxShadow: [
+              BoxShadow(
+                color: accent.withValues(alpha: 0.35),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.chat_bubble_rounded,
+            size: 18,
+            color: Colors.white,
+          ),
+        );
+      case 'Top Indicator Line':
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              width: 22,
+              height: 3,
+              decoration: BoxDecoration(
+                color: accent,
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(2),
+                ),
+              ),
+            ),
+            Icon(Icons.chat_bubble_rounded, size: 20, color: accent),
+          ],
+        );
+      case 'Bottom Indicator Dot':
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.chat_bubble_rounded, size: 20, color: accent),
+            const SizedBox(height: 3),
+            Container(
+              width: 4.5,
+              height: 4.5,
+              decoration: BoxDecoration(
+                color: accent,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ],
+        );
+      case 'Raised Center Action':
+        return Transform.translate(
+          offset: const Offset(0, -6),
+          child: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [accent, accent.withValues(alpha: 0.8)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: accent.withValues(alpha: 0.4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.chat_bubble_rounded,
+              size: 20,
+              color: Colors.white,
+            ),
+          ),
+        );
+      case 'Soft Square Tile':
+        return Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(Icons.chat_bubble_rounded, size: 18, color: accent),
+        );
+      default:
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.chat_bubble_rounded, size: 18, color: accent),
+              const SizedBox(width: 4),
+              Text(
+                'Chats',
+                style: TextStyle(
+                  color: accent,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        );
+    }
   }
 
   Widget _navigationPreview(BuildContext context) {
@@ -546,7 +815,9 @@ class _OptionPreview extends StatelessWidget {
             Container(
               width: _index == 8 ? 88 : 48,
               padding: const EdgeInsets.symmetric(vertical: 6),
-              decoration: BoxDecoration(border: Border(right: BorderSide(color: scheme.outlineVariant))),
+              decoration: BoxDecoration(
+                border: Border(right: BorderSide(color: scheme.outlineVariant)),
+              ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: const [
@@ -558,7 +829,12 @@ class _OptionPreview extends StatelessWidget {
             ),
             Expanded(
               child: Center(
-                child: Text('Chat content', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+                child: Text(
+                  'Chat content',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
               ),
             ),
           ],
@@ -584,7 +860,14 @@ class _OptionPreview extends StatelessWidget {
           const SizedBox(height: 12),
           Align(
             alignment: Alignment.centerLeft,
-            child: Container(width: 110, height: 8, decoration: BoxDecoration(color: scheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(8))),
+            child: Container(
+              width: 110,
+              height: 8,
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
           ),
         ],
       ),
@@ -600,7 +883,13 @@ class _OptionPreview extends StatelessWidget {
         color: selected ? scheme.primaryContainer : Colors.transparent,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Text(label, style: TextStyle(fontSize: 11, fontWeight: selected ? FontWeight.w800 : FontWeight.w500)),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+        ),
+      ),
     );
   }
 
@@ -624,11 +913,18 @@ class _OptionPreview extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(notification ? 'New message' : 'Chaty', style: const TextStyle(fontWeight: FontWeight.w800)),
+              Text(
+                notification ? 'New message' : 'Chaty',
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
               const SizedBox(height: 4),
               Text(
-                notification ? 'This is how the selected notification identity reads at a glance.' : 'This icon identity is used on supported in-app surfaces.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                notification
+                    ? 'This is how the selected notification identity reads at a glance.'
+                    : 'This icon identity is used on supported in-app surfaces.',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
               ),
             ],
           ),
@@ -639,16 +935,44 @@ class _OptionPreview extends StatelessWidget {
 
   Widget _typographyPreview(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    const scales = <double>[1.0, 0.94, 1.04, 1.02, 1.0, 1.0, 1.02, 1.03, 0.96, 0.98, 0.90, 1.10, 1.18, 0.96, 0.98, 1.02, 1.0, 1.0, 1.04, 0.96];
+    const scales = <double>[
+      1.0,
+      0.94,
+      1.04,
+      1.02,
+      1.0,
+      1.0,
+      1.02,
+      1.03,
+      0.96,
+      0.98,
+      0.90,
+      1.10,
+      1.18,
+      0.96,
+      0.98,
+      1.02,
+      1.0,
+      1.0,
+      1.04,
+      0.96,
+    ];
     final scale = scales[_index.clamp(0, scales.length - 1)];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('A clear conversation', style: TextStyle(fontSize: 18 * scale, fontWeight: FontWeight.w800)),
+        Text(
+          'A clear conversation',
+          style: TextStyle(fontSize: 18 * scale, fontWeight: FontWeight.w800),
+        ),
         const SizedBox(height: 4),
         Text(
           'Messages, labels and actions remain readable without crowding the screen.',
-          style: TextStyle(fontSize: 13 * scale, height: 1.35, color: scheme.onSurfaceVariant),
+          style: TextStyle(
+            fontSize: 13 * scale,
+            height: 1.35,
+            color: scheme.onSurfaceVariant,
+          ),
         ),
       ],
     );
@@ -678,14 +1002,22 @@ class _OptionPreview extends StatelessWidget {
         Container(
           width: 56,
           height: 56,
-          decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(16)),
+          decoration: BoxDecoration(
+            color: scheme.primaryContainer,
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Icon(icon, color: scheme.onPrimaryContainer, size: 28),
         ),
         const SizedBox(width: 14),
         Expanded(
           child: Text(
-            entering ? 'Screen content enters with this motion profile.' : 'Screen content leaves with this motion profile.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant, height: 1.4),
+            entering
+                ? 'Screen content enters with this motion profile.'
+                : 'Screen content leaves with this motion profile.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+              height: 1.4,
+            ),
           ),
         ),
       ],
@@ -737,45 +1069,4 @@ class _OptionPreview extends StatelessWidget {
     Icons.contrast_rounded,
     Icons.center_focus_strong_rounded,
   ];
-}
-
-class _PreviewDestination extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final bool showLabel;
-
-  const _PreviewDestination({
-    required this.icon,
-    required this.label,
-    this.selected = false,
-    this.showLabel = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Expanded(
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 42),
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        decoration: BoxDecoration(
-          color: selected ? scheme.primaryContainer : Colors.transparent,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 18, color: selected ? scheme.primary : scheme.onSurfaceVariant),
-            if (selected && showLabel) ...[
-              const SizedBox(width: 4),
-              Flexible(
-                child: Text(label, maxLines: 1, overflow: TextOverflow.fade, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
 }

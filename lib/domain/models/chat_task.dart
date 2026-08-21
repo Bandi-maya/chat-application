@@ -1,18 +1,6 @@
-enum TaskStatus {
-  inbox,
-  assigned,
-  inProgress,
-  blocked,
-  completed,
-  archived,
-}
+enum TaskStatus { inbox, assigned, inProgress, blocked, completed, archived }
 
-enum TaskPriority {
-  low,
-  medium,
-  high,
-  urgent,
-}
+enum TaskPriority { low, medium, high, urgent }
 
 class TaskActivity {
   final String id;

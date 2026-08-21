@@ -5,26 +5,31 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:chat/data/repositories/mock_data_store.dart';
-import 'package:chat/data/services/chaty_backend_service.dart';
-import 'package:chat/data/services/chaty_notification_service.dart';
+import 'package:chat/data/services/backend_service.dart';
+import 'package:chat/data/services/notification_service.dart';
 import 'package:chat/data/services/contact_relationship_service.dart';
 import 'package:chat/data/services/local_lock_service.dart';
 import 'package:chat/data/services/message_automation_service.dart';
 import 'package:chat/data/services/rich_chat_realtime_service.dart';
+import 'package:chat/data/services/status_service.dart';
 import 'package:chat/domain/models/user_profile.dart';
 import 'package:chat/features/auth/create_new_password_screen.dart';
 import 'package:chat/features/auth/splash_screen.dart';
 import 'package:chat/features/auth/welcome_screen.dart';
+import 'package:chat/features/calls/mock_call_screen.dart';
 import 'package:chat/features/settings/security/app_lock_overlay.dart';
 import 'package:chat/features/settings/security/security_center_screen.dart';
 import 'package:chat/injection/locator.dart';
 import 'package:chat/ui/core/controllers/app_icon_controller.dart';
 import 'package:chat/ui/core/controllers/appearance_variant_controller.dart';
-import 'package:chat/ui/core/controllers/chaty_preferences_controller.dart';
+import 'package:chat/ui/core/controllers/preferences_controller.dart';
 import 'package:chat/ui/core/gb/gb_theme_overrides.dart';
+import 'package:chat/ui/core/theme/theme_config.dart';
+import 'package:chat/ui/core/theme/chaty_page_transitions.dart';
 import 'package:chat/ui/core/theme/theme_controller.dart';
 import 'package:chat/ui/core/theme/theme_presets.dart';
-import 'package:chat/ui/core/widgets/chaty_event_toast_overlay.dart';
+import 'package:chat/ui/core/widgets/app_avatar.dart';
+import 'package:chat/ui/core/widgets/event_toast_overlay.dart';
 import 'package:chat/ui/core/widgets/click_particle_overlay.dart';
 import 'package:chat/ui/core/widgets/falling_particles_overlay.dart';
 
@@ -47,6 +52,9 @@ Future<void> main() async {
     debug: !kReleaseMode,
   );
   setupLocator();
+  // Load persisted display/theme state before the first frame so there is no
+  // theme flash on launch and the user's chosen theme survives restarts.
+  await locator<ThemeController>().init();
   await locator<AppIconController>().initialize();
   runApp(const ChatyApp());
 }
@@ -68,6 +76,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   late final ContactRelationshipService _relationshipService;
   late final RichChatRealtimeService _richRealtime;
   late final MessageAutomationService _automationService;
+  late final StatusService _statusService;
   late final StreamSubscription<AuthState> _authUiSubscription;
   bool _recoveryRouteOpen = false;
   bool _appLockRequired = false;
@@ -91,12 +100,18 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     _relationshipService = locator<ContactRelationshipService>();
     _richRealtime = locator<RichChatRealtimeService>();
     _preferencesController.addListener(_handleSecurityPreferenceChanged);
+    _statusService = StatusService();
+    if (Supabase.instance.client.auth.currentSession != null) {
+      _statusService.startRevocationWatch();
+    }
     _automationService = MessageAutomationService(
       preferencesController: _preferencesController,
       dataStore: locator<MockDataStore>(),
     );
-    _authUiSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(_handleAuthUiEvent);
-    if (Supabase.instance.client.auth.currentSession != null) unawaited(_registerCurrentDevice());
+    _authUiSubscription = Supabase.instance.client.auth.onAuthStateChange
+        .listen(_handleAuthUiEvent);
+    if (Supabase.instance.client.auth.currentSession != null)
+      unawaited(_registerCurrentDevice());
   }
 
   Future<void> _registerCurrentDevice() async {
@@ -132,32 +147,50 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   }
 
   void _scheduleInitialAppLockIfNeeded() {
-    if (!_backend.isAuthenticated || !_preferencesController.security.isAppLockEnabled) return;
-    if (_freshLoginSession || _initialAppLockScheduled || _appLockRequired || _checkingLockCapability) return;
+    if (!_backend.isAuthenticated ||
+        !_preferencesController.security.isAppLockEnabled)
+      return;
+    if (_freshLoginSession ||
+        _initialAppLockScheduled ||
+        _appLockRequired ||
+        _checkingLockCapability)
+      return;
     _checkingLockCapability = true;
     unawaited(() async {
       final ready = await _isCurrentLockMethodReady();
       if (!mounted) return;
       _checkingLockCapability = false;
-      if (!ready || _freshLoginSession || !_backend.isAuthenticated || !_preferencesController.security.isAppLockEnabled) return;
+      if (!ready ||
+          _freshLoginSession ||
+          !_backend.isAuthenticated ||
+          !_preferencesController.security.isAppLockEnabled)
+        return;
       _initialAppLockScheduled = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || _freshLoginSession || !_backend.isAuthenticated || !_preferencesController.security.isAppLockEnabled) return;
+        if (!mounted ||
+            _freshLoginSession ||
+            !_backend.isAuthenticated ||
+            !_preferencesController.security.isAppLockEnabled)
+          return;
         setState(() => _appLockRequired = true);
       });
     }());
   }
 
   void _schedulePostLoginAppLockPrompt() {
-    if (_postLoginAppLockPromptScheduled || _postLoginAppLockPromptShown) return;
+    if (_postLoginAppLockPromptScheduled || _postLoginAppLockPromptShown)
+      return;
     _postLoginAppLockPromptScheduled = true;
     Future<void>.delayed(const Duration(milliseconds: 650), () async {
       _postLoginAppLockPromptScheduled = false;
-      if (!mounted || !_backend.isAuthenticated || _postLoginAppLockPromptShown) return;
+      if (!mounted || !_backend.isAuthenticated || _postLoginAppLockPromptShown)
+        return;
       _postLoginAppLockPromptShown = true;
 
       // If App Lock is already correctly configured there is nothing to ask.
-      if (_preferencesController.security.isAppLockEnabled && await _isCurrentLockMethodReady()) return;
+      if (_preferencesController.security.isAppLockEnabled &&
+          await _isCurrentLockMethodReady())
+        return;
       if (!mounted) return;
       final navigator = _rootNavigatorKey.currentState;
       final context = _rootNavigatorKey.currentContext;
@@ -192,7 +225,9 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
       if (openSettings == true && mounted) {
         navigator.push(
           MaterialPageRoute(
-            builder: (_) => SecurityCenterScreen(preferencesController: _preferencesController),
+            builder: (_) => SecurityCenterScreen(
+              preferencesController: _preferencesController,
+            ),
           ),
         );
       }
@@ -217,21 +252,27 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   }
 
   void _applyAutoLockOnResume() {
-    if (!_backend.isAuthenticated || !_preferencesController.security.isAppLockEnabled) {
+    if (!_backend.isAuthenticated ||
+        !_preferencesController.security.isAppLockEnabled) {
       _backgroundedAt = null;
       return;
     }
     final backgroundedAt = _backgroundedAt;
     _backgroundedAt = null;
     if (backgroundedAt == null) return;
-    if (DateTime.now().difference(backgroundedAt) < _autoLockDelay(_preferencesController.security.autoLockTimeout)) return;
+    if (DateTime.now().difference(backgroundedAt) <
+        _autoLockDelay(_preferencesController.security.autoLockTimeout))
+      return;
     if (_appLockRequired || _checkingLockCapability) return;
     _checkingLockCapability = true;
     unawaited(() async {
       final ready = await _isCurrentLockMethodReady();
       if (!mounted) return;
       _checkingLockCapability = false;
-      if (ready && _backend.isAuthenticated && _preferencesController.security.isAppLockEnabled && !_appLockRequired) {
+      if (ready &&
+          _backend.isAuthenticated &&
+          _preferencesController.security.isAppLockEnabled &&
+          !_appLockRequired) {
         setState(() => _appLockRequired = true);
       }
     }());
@@ -243,7 +284,8 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
 
   void _handleAuthUiEvent(AuthState state) {
     if (state.session != null) unawaited(_registerCurrentDevice());
-    if (state.event == AuthChangeEvent.passwordRecovery && !_recoveryRouteOpen) {
+    if (state.event == AuthChangeEvent.passwordRecovery &&
+        !_recoveryRouteOpen) {
       _recoveryRouteOpen = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final navigator = _rootNavigatorKey.currentState;
@@ -252,13 +294,20 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
           return;
         }
         navigator.pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => CreateNewPasswordScreen(email: state.session?.user.email ?? '')),
+          MaterialPageRoute(
+            builder: (_) =>
+                CreateNewPasswordScreen(email: state.session?.user.email ?? ''),
+          ),
           (route) => false,
         );
       });
       return;
     }
     if (state.event == AuthChangeEvent.signedIn) {
+      // Real consumer wiring: status-revocation alerts run app-wide while
+      // signed in and are torn down on sign-out / account switch.
+      _statusService.resetRevocationTracking();
+      _statusService.startRevocationWatch();
       // A successful login must always enter Chaty first. App Lock is opt-in
       // and configured from Settings, never used as a post-login blocker.
       _freshLoginSession = true;
@@ -268,6 +317,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
       _schedulePostLoginAppLockPrompt();
     }
     if (state.event == AuthChangeEvent.signedOut) {
+      _statusService.stopRevocationWatch();
       _freshLoginSession = false;
       _initialAppLockScheduled = false;
       _postLoginAppLockPromptScheduled = false;
@@ -275,7 +325,10 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
       _backgroundedAt = null;
       if (mounted && _appLockRequired) setState(() => _appLockRequired = false);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _rootNavigatorKey.currentState?.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const WelcomeScreen()), (route) => false);
+        _rootNavigatorKey.currentState?.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+          (route) => false,
+        );
       });
     }
   }
@@ -283,16 +336,22 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   @override
   void didChangePlatformBrightness() {
     super.didChangePlatformBrightness();
-    final brightness = WidgetsBinding.instance.platformDispatcher.platformBrightness;
-    if (_themeController.globalTheme.id == 'monochrome_dark' || _themeController.globalTheme.id == 'monochrome_light') {
-      _themeController.setGlobalTheme(ThemePresets.getSystemDefaultTheme(brightness));
+    final brightness =
+        WidgetsBinding.instance.platformDispatcher.platformBrightness;
+    if (_themeController.globalTheme.id == 'monochrome_dark' ||
+        _themeController.globalTheme.id == 'monochrome_light') {
+      _themeController.setGlobalTheme(
+        ThemePresets.getSystemDefaultTheme(brightness),
+      );
     }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden || state == AppLifecycleState.detached) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
       _backgroundedAt ??= DateTime.now();
     } else if (state == AppLifecycleState.resumed) {
       // Once the user leaves and returns, a deliberately configured App Lock
@@ -303,8 +362,12 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     }
 
     if (!_backend.isAuthenticated) return;
-    final airplane = _preferencesController.home.airplaneModeSimulator || _preferencesController.gbBool('yo_want_airplanemode');
-    final ghost = _preferencesController.home.ghostMode || _preferencesController.gbBool('yo_want_ghostmode');
+    final airplane =
+        _preferencesController.home.airplaneModeSimulator ||
+        _preferencesController.gbBool('yo_want_airplanemode');
+    final ghost =
+        _preferencesController.home.ghostMode ||
+        _preferencesController.gbBool('yo_want_ghostmode');
     final alwaysOnline = _preferencesController.gbBool('always_online');
     if (airplane || ghost) {
       unawaited(_backend.setPresence(PresenceState.offline));
@@ -312,7 +375,9 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     }
     if (state == AppLifecycleState.resumed || alwaysOnline) {
       unawaited(_backend.setPresence(PresenceState.online));
-    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.detached || state == AppLifecycleState.hidden) {
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
       unawaited(_backend.setPresence(PresenceState.offline));
     }
   }
@@ -323,24 +388,49 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     _preferencesController.removeListener(_handleSecurityPreferenceChanged);
     unawaited(_authUiSubscription.cancel());
     _automationService.dispose();
+    _statusService.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge(<Listenable>[_themeController, _preferencesController, _appearanceController, _backend, _richRealtime]),
+      listenable: Listenable.merge(<Listenable>[
+        _themeController,
+        _preferencesController,
+        _appearanceController,
+        _backend,
+        _richRealtime,
+      ]),
       builder: (context, _) {
         _scheduleInitialAppLockIfNeeded();
-        final currentTheme = GbThemeOverrides.resolve(_themeController.globalTheme, _preferencesController);
+        final currentTheme = GbThemeOverrides.resolve(
+          _themeController.globalTheme,
+          _preferencesController,
+        );
         return MaterialApp(
           navigatorKey: _rootNavigatorKey,
           title: 'Chaty',
           debugShowCheckedModeBanner: false,
-          theme: currentTheme.toThemeData(),
+          // Real consumer for the Appearance screen's entry/exit animation
+          // settings: every MaterialPageRoute opens with the chosen entry
+          // motion while the covered screen recedes with the exit motion.
+          // The controller is in this widget's Listenable.merge, so
+          // changing the setting applies to the next route immediately.
+          theme: currentTheme.toThemeData().copyWith(
+            pageTransitionsTheme: ChatyTransitions.build(
+              entry: _appearanceController.entryAnimation,
+              exit: _appearanceController.exitAnimation,
+            ),
+          ),
           builder: (context, child) {
             final media = MediaQuery.of(context);
-            final scaled = media.copyWith(textScaler: TextScaler.linear((media.textScaler.scale(1.0) * _appearanceController.textScale).clamp(0.8, 1.6)));
+            final scaled = media.copyWith(
+              textScaler: TextScaler.linear(
+                (media.textScaler.scale(1.0) * _appearanceController.textScale)
+                    .clamp(0.8, 1.6),
+              ),
+            );
             final appContent = MediaQuery(
               data: scaled,
               child: ChatyEventToastOverlay(
@@ -356,25 +446,175 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
                 ),
               ),
             );
-            final shouldShowLock = _backend.isAuthenticated && _preferencesController.security.isAppLockEnabled && _appLockRequired;
-            if (!shouldShowLock) return appContent;
+            final shouldShowLock =
+                _backend.isAuthenticated &&
+                _preferencesController.security.isAppLockEnabled &&
+                _appLockRequired;
+            // Real consumer of the Who-Can-Call-Me gate: the realtime
+            // service only surfaces invites that PASSED the privacy gate,
+            // so anything shown here is a call the user is allowed to
+            // receive under their current setting.
+            final incomingCall = _richRealtime.incomingCall;
+            final showIncoming =
+                incomingCall != null && _backend.isAuthenticated;
+            if (!shouldShowLock && !showIncoming) return appContent;
             return Stack(
               fit: StackFit.expand,
               children: [
                 appContent,
-                AppLockOverlayModal(
-                  preferencesController: _preferencesController,
-                  lockService: _lockService,
-                  title: 'Chaty Locked',
-                  reason: 'Authenticate to unlock Chaty',
-                  onUnlocked: _handleAppUnlocked,
-                ),
+                if (showIncoming)
+                  _IncomingCallOverlay(
+                    call: incomingCall,
+                    theme: currentTheme,
+                    onAccept: () {
+                      _richRealtime.respondToIncomingCall(true);
+                      _rootNavigatorKey.currentState?.push(
+                        MaterialPageRoute(
+                          builder: (_) => MockCallScreen(
+                            theme: currentTheme,
+                            title: incomingCall.displayName,
+                            isVideo: incomingCall.isVideo,
+                          ),
+                        ),
+                      );
+                    },
+                    onDecline: () =>
+                        _richRealtime.respondToIncomingCall(false),
+                  ),
+                if (shouldShowLock)
+                  AppLockOverlayModal(
+                    preferencesController: _preferencesController,
+                    lockService: _lockService,
+                    title: 'Chaty Locked',
+                    reason: 'Authenticate to unlock Chaty',
+                    onUnlocked: _handleAppUnlocked,
+                  ),
               ],
             );
           },
           home: const SplashScreen(),
         );
       },
+    );
+  }
+}
+
+/// App-level ringing card for incoming calls that passed the recipient's
+/// Who-Can-Call-Me gate. Accept answers (opens the call screen and notifies
+/// the caller); decline notifies the caller immediately.
+class _IncomingCallOverlay extends StatelessWidget {
+  final IncomingCall call;
+  final ThemeConfig theme;
+  final VoidCallback onAccept;
+  final VoidCallback onDecline;
+
+  const _IncomingCallOverlay({
+    required this.call,
+    required this.theme,
+    required this.onAccept,
+    required this.onDecline,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: SafeArea(
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          decoration: BoxDecoration(
+            color: theme.surfaceColor,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: theme.accentColor.withValues(alpha: 0.4)),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.35),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  AppAvatar(
+                    initials: call.avatarInitials ?? call.displayName.characters.take(2).toString().toUpperCase(),
+                    colorHex: call.avatarColorHex ?? '0xFF6366F1',
+                    size: 44,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          call.displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: theme.primaryTextColor,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15.5,
+                          ),
+                        ),
+                        Text(
+                          call.isVideo
+                              ? 'Incoming video call'
+                              : 'Incoming voice call',
+                          style: TextStyle(
+                            color: theme.secondaryTextColor,
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    call.isVideo
+                        ? Icons.videocam_rounded
+                        : Icons.call_rounded,
+                    color: theme.accentColor,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: theme.dangerColor,
+                        side: BorderSide(
+                          color: theme.dangerColor.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      onPressed: onDecline,
+                      icon: const Icon(Icons.call_end_rounded),
+                      label: const Text('Decline'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: theme.successColor,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: onAccept,
+                      icon: const Icon(Icons.call_rounded),
+                      label: const Text('Accept'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../../data/repositories/mock_data_store.dart';
-import '../../data/services/chaty_backend_service.dart';
-import '../../data/services/chaty_notification_service.dart';
+import '../../data/services/backend_service.dart';
+import '../../data/services/notification_service.dart';
 import '../../domain/models/user_profile.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/app_icon_controller.dart';
-import '../../ui/core/controllers/chaty_preferences_controller.dart';
-import '../../ui/core/design_system/chaty_settings_primitives.dart';
+import '../../ui/core/controllers/preferences_controller.dart';
+import '../../ui/core/design_system/settings_primitives.dart';
 import '../../ui/core/theme/theme_controller.dart';
-import '../../ui/core/validators/chaty_validators.dart';
+import '../../ui/core/validators/input_validators.dart';
 import '../../ui/core/widgets/app_avatar.dart';
-import '../../ui/core/widgets/chaty_brand_icon.dart';
+import '../../ui/core/widgets/app_brand_icon.dart';
 import '../../ui/core/widgets/username_availability_field.dart';
 import 'appearance/app_icon_settings_screen.dart';
 import 'appearance/universal_appearance_screen.dart';
@@ -25,7 +25,7 @@ import 'permissions/system_permissions_screen.dart';
 import 'privacy/privacy_center_screen.dart';
 import 'security/security_center_screen.dart';
 import 'settings_search_delegate.dart';
-import 'themes/chaty_theme_editor_screen.dart';
+import 'themes/theme_editor_screen.dart';
 
 class SettingsRootScreen extends StatelessWidget {
   final ChatyPreferencesController preferencesController;
@@ -67,30 +67,74 @@ class SettingsRootScreen extends StatelessWidget {
       SettingsSearchResult(
         title: 'App Icon',
         category: 'Appearance & Personalization',
-        description: 'Change the Android launcher icon or use a custom in-app Chaty brand image',
+        description:
+            'Change the Android launcher icon or use a custom in-app Chaty brand image',
         icon: Icons.apps_rounded,
-        destination: AppIconSettingsScreen(appIconController: _appIconController),
+        destination: AppIconSettingsScreen(
+          appIconController: _appIconController,
+        ),
+        keywords: const ['launcher', 'icon', 'logo', 'badge', 'brand', 'alias'],
       ),
       SettingsSearchResult(
         title: 'Advanced Features',
         category: 'Advanced',
-        description: 'Privacy, media, status, messaging, appearance and behavior controls',
+        description:
+            'Privacy, media, status, messaging, appearance and behavior controls',
         icon: Icons.tune_rounded,
-        destination: _reactive(() => GbFeatureCenterScreen(preferencesController: preferencesController)),
+        destination: _reactive(
+          () => GbFeatureCenterScreen(
+            preferencesController: preferencesController,
+          ),
+        ),
+        keywords: const [
+          'gb',
+          'mod',
+          'tweaks',
+          'advanced',
+          'customization',
+          'power',
+        ],
       ),
       SettingsSearchResult(
         title: 'Privacy',
         category: 'Privacy & Security',
         description: 'Last seen, receipts, deleted messages and status privacy',
         icon: Icons.visibility_off_rounded,
-        destination: _reactive(() => PrivacyCenterScreen(preferencesController: preferencesController)),
+        destination: _reactive(
+          () =>
+              PrivacyCenterScreen(preferencesController: preferencesController),
+        ),
+        keywords: const [
+          'blue tick',
+          'read receipt',
+          'freeze last seen',
+          'ghost',
+          'anti delete',
+          'view once',
+          'incognito',
+          'online status',
+        ],
       ),
       SettingsSearchResult(
         title: 'Security',
         category: 'Privacy & Security',
         description: 'App lock and account security controls',
         icon: Icons.security_rounded,
-        destination: _reactive(() => SecurityCenterScreen(preferencesController: preferencesController)),
+        destination: _reactive(
+          () => SecurityCenterScreen(
+            preferencesController: preferencesController,
+          ),
+        ),
+        keywords: const [
+          'pin',
+          'biometric',
+          'fingerprint',
+          'face unlock',
+          'pattern',
+          'app lock',
+          'password',
+          'lock chat',
+        ],
       ),
       SettingsSearchResult(
         title: 'Themes',
@@ -98,27 +142,79 @@ class SettingsRootScreen extends StatelessWidget {
         description: 'Dark, light and custom theme presets',
         icon: Icons.palette_rounded,
         destination: ChatyThemeEditorScreen(themeController: themeController),
+        keywords: const [
+          'amoled',
+          'dark mode',
+          'light mode',
+          'true black',
+          'midnight',
+          'emerald',
+          'crimson',
+          'color',
+          'palette',
+          'custom theme',
+        ],
       ),
       SettingsSearchResult(
         title: 'Universal Appearance',
         category: 'Appearance & Personalization',
         description: 'Navigation, icons, typography and transitions',
         icon: Icons.auto_awesome_rounded,
-        destination: _reactive(() => UniversalAppearanceScreen(preferencesController: preferencesController)),
+        destination: _reactive(
+          () => UniversalAppearanceScreen(
+            preferencesController: preferencesController,
+          ),
+        ),
+        keywords: const [
+          'font scale',
+          'density',
+          'reduced motion',
+          'effects',
+          'particles',
+          'typography',
+          'transitions',
+        ],
       ),
       SettingsSearchResult(
         title: 'Home Screen',
         category: 'Appearance & Personalization',
         description: 'Search, stories and home layout options',
         icon: Icons.home_outlined,
-        destination: _reactive(() => HomeScreenSettingsPage(preferencesController: preferencesController)),
+        destination: _reactive(
+          () => HomeScreenSettingsPage(
+            preferencesController: preferencesController,
+          ),
+        ),
+        keywords: const [
+          'stories',
+          'separate chats',
+          'groups',
+          'layout',
+          'density',
+          'avatar shape',
+          'ghost mode',
+        ],
       ),
       SettingsSearchResult(
         title: 'Conversation',
         category: 'Chats',
         description: 'Bubbles, sidebar and conversation presentation',
         icon: Icons.chat_bubble_outline_rounded,
-        destination: _reactive(() => ConversationSettingsPage(preferencesController: preferencesController)),
+        destination: _reactive(
+          () => ConversationSettingsPage(
+            preferencesController: preferencesController,
+          ),
+        ),
+        keywords: const [
+          'bubble shape',
+          'bubble radius',
+          'tick style',
+          'double tap reaction',
+          'sidebar',
+          'enter is send',
+          'voice speed',
+          'wallpaper',
+        ],
       ),
       SettingsSearchResult(
         title: 'Notifications',
@@ -131,6 +227,77 @@ class SettingsRootScreen extends StatelessWidget {
             notificationService: notificationService,
           ),
         ),
+        keywords: const [
+          'preview',
+          'alert',
+          'sound',
+          'badge',
+          'vibrate',
+          'channel',
+          'toast',
+          'online alert',
+        ],
+      ),
+      SettingsSearchResult(
+        title: 'Message Automation',
+        category: 'Messaging',
+        description: 'Auto-reply rules, quick replies and scheduled messages',
+        icon: Icons.schedule_send_rounded,
+        destination: _reactive(
+          () => MessageManagementPage(
+            preferencesController: preferencesController,
+            dataStore: dataStore,
+          ),
+        ),
+        keywords: const [
+          'auto reply',
+          'schedule',
+          'quick reply',
+          'template',
+          'bot',
+          'auto response',
+        ],
+      ),
+      SettingsSearchResult(
+        title: 'Navigation Effects & Particles',
+        category: 'Appearance & Personalization',
+        description:
+            'Touch particle effects, screen transitions and falling effects',
+        icon: Icons.animation_rounded,
+        destination: _reactive(
+          () => NavigationEffectsPage(
+            preferencesController: preferencesController,
+          ),
+        ),
+        keywords: const [
+          'particles',
+          'sparkles',
+          'falling stars',
+          'hearts',
+          'touch effect',
+          'page transition',
+        ],
+      ),
+      SettingsSearchResult(
+        title: 'System Permissions',
+        category: 'System',
+        description:
+            'Camera, microphone, storage, contacts and notification permissions',
+        icon: Icons.admin_panel_settings_rounded,
+        destination: _reactive(
+          () => SystemPermissionsScreen(
+            preferencesController: preferencesController,
+            notificationService: notificationService,
+          ),
+        ),
+        keywords: const [
+          'permission',
+          'camera',
+          'microphone',
+          'storage',
+          'contacts',
+          'access',
+        ],
       ),
     ];
   }
@@ -155,11 +322,16 @@ class SettingsRootScreen extends StatelessWidget {
         builder: (sheetContext, setSheetState) {
           Future<void> save() async {
             if (saving || formKey.currentState?.validate() != true) return;
-            final normalized = ChatyValidators.normalizeUsername(usernameController.text);
-            final unchanged = normalized == ChatyValidators.normalizeUsername(user.username);
+            final normalized = ChatyValidators.normalizeUsername(
+              usernameController.text,
+            );
+            final unchanged =
+                normalized == ChatyValidators.normalizeUsername(user.username);
             if (!unchanged && usernameAvailable != true) {
               ScaffoldMessenger.of(sheetContext).showSnackBar(
-                const SnackBar(content: Text('Choose an available username before saving.')),
+                const SnackBar(
+                  content: Text('Choose an available username before saving.'),
+                ),
               );
               return;
             }
@@ -175,7 +347,8 @@ class SettingsRootScreen extends StatelessWidget {
               avatarInitials: _initialsFor(displayName),
             );
             try {
-              if (!unchanged && !await backend.isUsernameAvailable(normalized)) {
+              if (!unchanged &&
+                  !await backend.isUsernameAvailable(normalized)) {
                 if (!sheetContext.mounted) return;
                 setSheetState(() {
                   saving = false;
@@ -190,7 +363,9 @@ class SettingsRootScreen extends StatelessWidget {
               if (context.mounted) {
                 ScaffoldMessenger.of(context)
                   ..hideCurrentSnackBar()
-                  ..showSnackBar(const SnackBar(content: Text('Profile updated.')));
+                  ..showSnackBar(
+                    const SnackBar(content: Text('Profile updated.')),
+                  );
               }
             } catch (error) {
               if (!sheetContext.mounted) return;
@@ -214,7 +389,13 @@ class SettingsRootScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Edit profile', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                    const Text(
+                      'Edit profile',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Text(
                       'Update your profile. Usernames are checked live so you never submit a name that is already taken.',
@@ -226,7 +407,10 @@ class SettingsRootScreen extends StatelessWidget {
                       enabled: !saving,
                       textInputAction: TextInputAction.next,
                       validator: ChatyValidators.validateDisplayName,
-                      decoration: const InputDecoration(labelText: 'Display name', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Display name',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     UsernameAvailabilityField(
@@ -248,10 +432,14 @@ class SettingsRootScreen extends StatelessWidget {
                       enabled: !saving,
                       keyboardType: TextInputType.phone,
                       textInputAction: TextInputAction.next,
-                      validator: (value) => value == null || value.trim().isEmpty
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
                           ? null
                           : ChatyValidators.validatePhone(value),
-                      decoration: const InputDecoration(labelText: 'Phone', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Phone',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
@@ -261,7 +449,10 @@ class SettingsRootScreen extends StatelessWidget {
                       maxLines: 4,
                       maxLength: 256,
                       validator: ChatyValidators.validateBio,
-                      decoration: const InputDecoration(labelText: 'About', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'About',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 14),
                     SizedBox(
@@ -273,7 +464,9 @@ class SettingsRootScreen extends StatelessWidget {
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Icon(Icons.check_rounded),
                         label: Text(saving ? 'Saving…' : 'Save profile'),
@@ -303,9 +496,14 @@ class SettingsRootScreen extends StatelessWidget {
           'Your account will be signed out on this device. Your chats and account data remain on the server.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(dialogContext).colorScheme.error),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+            ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
             child: const Text('Log out'),
           ),
@@ -318,15 +516,23 @@ class SettingsRootScreen extends StatelessWidget {
       await locator<ChatyBackendService>().logout();
     } catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not log out: $error')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not log out: $error')));
     }
   }
 
   static String _initialsFor(String displayName) {
-    final parts = displayName.trim().split(RegExp(r'\s+')).where((part) => part.isNotEmpty).toList();
+    final parts = displayName
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .toList();
     if (parts.isEmpty) return 'CU';
     if (parts.length == 1) {
-      return parts.first.substring(0, parts.first.length >= 2 ? 2 : 1).toUpperCase();
+      return parts.first
+          .substring(0, parts.first.length >= 2 ? 2 : 1)
+          .toUpperCase();
     }
     return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
   }
@@ -337,7 +543,7 @@ class SettingsRootScreen extends StatelessWidget {
     final appIconController = _appIconController;
 
     return ListenableBuilder(
-      listenable: appIconController,
+      listenable: Listenable.merge([appIconController, preferencesController]),
       builder: (context, _) => ChatySettingsPage(
         title: 'Settings',
         subtitle: 'Account, privacy, appearance and app behavior',
@@ -350,21 +556,24 @@ class SettingsRootScreen extends StatelessWidget {
           icon: const Icon(Icons.search_rounded),
         ),
         children: [
-          _ProfileCard(
-            user: user,
-            onEdit: () => _showEditProfile(context),
-          ),
+          _ProfileCard(user: user, onEdit: () => _showEditProfile(context)),
           const SizedBox(height: 8),
           ChatySettingsSection(
             title: 'Appearance & Personalization',
             children: [
               ChatySettingsTile(
-                leading: ChatyBrandIcon(controller: appIconController, size: 36, borderRadius: 10),
+                leading: ChatyBrandIcon(
+                  controller: appIconController,
+                  size: 36,
+                  borderRadius: 10,
+                ),
                 title: 'App Icon',
                 subtitle: 'Launcher: ${appIconController.launcherIcon.title}',
                 onTap: () => _push(
                   context,
-                  () => AppIconSettingsScreen(appIconController: appIconController),
+                  () => AppIconSettingsScreen(
+                    appIconController: appIconController,
+                  ),
                   listenToPreferences: false,
                 ),
               ),
@@ -374,7 +583,8 @@ class SettingsRootScreen extends StatelessWidget {
                 subtitle: 'Dark, light and custom theme presets',
                 onTap: () => _push(
                   context,
-                  () => ChatyThemeEditorScreen(themeController: themeController),
+                  () =>
+                      ChatyThemeEditorScreen(themeController: themeController),
                   listenToPreferences: false,
                 ),
               ),
@@ -384,7 +594,9 @@ class SettingsRootScreen extends StatelessWidget {
                 subtitle: 'Navigation, icons, fonts and motion',
                 onTap: () => _push(
                   context,
-                  () => UniversalAppearanceScreen(preferencesController: preferencesController),
+                  () => UniversalAppearanceScreen(
+                    preferencesController: preferencesController,
+                  ),
                 ),
               ),
               ChatySettingsTile(
@@ -393,7 +605,9 @@ class SettingsRootScreen extends StatelessWidget {
                 subtitle: 'Search, stories and home layout',
                 onTap: () => _push(
                   context,
-                  () => HomeScreenSettingsPage(preferencesController: preferencesController),
+                  () => HomeScreenSettingsPage(
+                    preferencesController: preferencesController,
+                  ),
                 ),
               ),
             ],
@@ -407,7 +621,9 @@ class SettingsRootScreen extends StatelessWidget {
                 subtitle: 'Bubbles, wallpaper and conversation layout',
                 onTap: () => _push(
                   context,
-                  () => ConversationSettingsPage(preferencesController: preferencesController),
+                  () => ConversationSettingsPage(
+                    preferencesController: preferencesController,
+                  ),
                 ),
               ),
               ChatySettingsTile(
@@ -444,28 +660,37 @@ class SettingsRootScreen extends StatelessWidget {
           ChatySettingsSection(
             title: 'Privacy & Security',
             children: [
-              ChatySettingsTile(
-                icon: Icons.visibility_off_rounded,
-                title: 'Privacy',
-                subtitle: 'Last seen, receipts, status and anti-delete options',
-                onTap: () => _push(
-                  context,
-                  () => PrivacyCenterScreen(preferencesController: preferencesController),
+              // "Hide Privacy Option" removes this entry from the menu. It stays
+              // recoverable from Advanced Features (same Saleh_HidePrivacy key).
+              if (!preferencesController.privacy.hidePrivacyOption)
+                ChatySettingsTile(
+                  icon: Icons.visibility_off_rounded,
+                  title: 'Privacy',
+                  subtitle:
+                      'Last seen, receipts, status and anti-delete options',
+                  onTap: () => _push(
+                    context,
+                    () => PrivacyCenterScreen(
+                      preferencesController: preferencesController,
+                    ),
+                  ),
                 ),
-              ),
               ChatySettingsTile(
                 icon: Icons.security_rounded,
                 title: 'Security',
                 subtitle: 'App lock and account protection',
                 onTap: () => _push(
                   context,
-                  () => SecurityCenterScreen(preferencesController: preferencesController),
+                  () => SecurityCenterScreen(
+                    preferencesController: preferencesController,
+                  ),
                 ),
               ),
               ChatySettingsTile(
                 icon: Icons.admin_panel_settings_outlined,
                 title: 'Permissions',
-                subtitle: 'Camera, microphone, media, contacts and notifications',
+                subtitle:
+                    'Camera, microphone, media, contacts and notifications',
                 onTap: () => _push(
                   context,
                   () => SystemPermissionsScreen(
@@ -482,10 +707,13 @@ class SettingsRootScreen extends StatelessWidget {
               ChatySettingsTile(
                 icon: Icons.tune_rounded,
                 title: 'Advanced Features',
-                subtitle: 'Detailed privacy, media, status, messaging and behavior controls',
+                subtitle:
+                    'Detailed privacy, media, status, messaging and behavior controls',
                 onTap: () => _push(
                   context,
-                  () => GbFeatureCenterScreen(preferencesController: preferencesController),
+                  () => GbFeatureCenterScreen(
+                    preferencesController: preferencesController,
+                  ),
                 ),
               ),
               ChatySettingsTile(
@@ -494,7 +722,9 @@ class SettingsRootScreen extends StatelessWidget {
                 subtitle: 'Page transitions and interaction effects',
                 onTap: () => _push(
                   context,
-                  () => NavigationEffectsPage(preferencesController: preferencesController),
+                  () => NavigationEffectsPage(
+                    preferencesController: preferencesController,
+                  ),
                 ),
               ),
             ],
@@ -560,11 +790,17 @@ class _ProfileCard extends StatelessWidget {
           padding: const EdgeInsets.all(15),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.35)),
+            border: Border.all(
+              color: scheme.outlineVariant.withValues(alpha: 0.35),
+            ),
           ),
           child: Row(
             children: [
-              AppAvatar(initials: user.avatarInitials, colorHex: user.avatarColorHex, size: 54),
+              AppAvatar(
+                initials: user.avatarInitials,
+                colorHex: user.avatarColorHex,
+                size: 54,
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -572,10 +808,16 @@ class _ProfileCard extends StatelessWidget {
                   children: [
                     Text(
                       user.displayName,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 2),
-                    Text('@${user.username}', style: Theme.of(context).textTheme.bodySmall),
+                    Text(
+                      '@${user.username}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                     if (user.about.isNotEmpty) ...[
                       const SizedBox(height: 3),
                       Text(

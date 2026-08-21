@@ -1,9 +1,4 @@
-﻿enum ChatCommandType {
-  task,
-  poll,
-  remind,
-  unknown,
-}
+enum ChatCommandType { task, poll, remind, unknown }
 
 class ParsedChatCommand {
   final ChatCommandType type;
@@ -31,8 +26,12 @@ class ChatCommandParser {
     }
 
     final spaceIndex = trimmed.indexOf(' ');
-    final command = spaceIndex == -1 ? trimmed.substring(1) : trimmed.substring(1, spaceIndex);
-    final argument = spaceIndex == -1 ? '' : trimmed.substring(spaceIndex + 1).trim();
+    final command = spaceIndex == -1
+        ? trimmed.substring(1)
+        : trimmed.substring(1, spaceIndex);
+    final argument = spaceIndex == -1
+        ? ''
+        : trimmed.substring(spaceIndex + 1).trim();
 
     switch (command.toLowerCase()) {
       case 'task':
