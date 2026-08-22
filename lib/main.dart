@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:chat/data/repositories/mock_data_store.dart';
 import 'package:chat/data/services/backend_service.dart';
+import 'package:chat/data/services/call_signaling_service.dart';
 import 'package:chat/data/services/notification_service.dart';
 import 'package:chat/data/services/contact_relationship_service.dart';
 import 'package:chat/data/services/local_lock_service.dart';
@@ -15,6 +16,7 @@ import 'package:chat/data/services/rich_chat_realtime_service.dart';
 import 'package:chat/data/services/status_service.dart';
 import 'package:chat/data/services/push_token_service.dart';
 import 'package:chat/data/services/notification_channel_manager.dart';
+import 'package:chat/domain/models/call_state.dart';
 import 'package:chat/domain/models/user_profile.dart';
 import 'package:chat/features/auth/create_new_password_screen.dart';
 import 'package:chat/features/auth/welcome_screen.dart';
@@ -55,8 +57,6 @@ Future<void> main() async {
     debug: !kReleaseMode,
   );
   setupLocator();
-  // Load persisted display/theme state before the first frame so there is no
-  // theme flash on launch and the user's chosen theme survives restarts.
   await locator<ThemeController>().init();
   await locator<AppIconController>().initialize();
   await locator<NotificationChannelManager>().initialize();
@@ -76,6 +76,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   late final ChatyPreferencesController _preferencesController;
   late final AppearanceVariantController _appearanceController;
   late final ChatyBackendService _backend;
+  late final CallSignalingService _callService;
   late final LocalLockService _lockService;
   late final ChatyNotificationService _notificationService;
   late final ContactRelationshipService _relationshipService;
@@ -100,12 +101,15 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     _preferencesController = locator<ChatyPreferencesController>();
     _appearanceController = locator<AppearanceVariantController>();
     _backend = locator<ChatyBackendService>();
-    // Supabase restores persisted auth before runApp. Hydrate application data
-    // independently so a profile/query failure never gets misclassified as an
-    // unauthenticated session and never forces a valid user back to Welcome.
     unawaited(
       _backend.initialize().catchError((Object error, StackTrace stackTrace) {
         debugPrint('Chaty backend bootstrap failed: $error\n$stackTrace');
+      }),
+    );
+    _callService = locator<CallSignalingService>();
+    unawaited(
+      _callService.initialize().catchError((Object error, StackTrace stackTrace) {
+        debugPrint('Chaty call signaling bootstrap failed: $error\n$stackTrace');
       }),
     );
     _lockService = locator<LocalLockService>();
@@ -123,8 +127,9 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     );
     _authUiSubscription = Supabase.instance.client.auth.onAuthStateChange
         .listen(_handleAuthUiEvent);
-    if (Supabase.instance.client.auth.currentSession != null)
+    if (Supabase.instance.client.auth.currentSession != null) {
       unawaited(_registerCurrentDevice());
+    }
   }
 
   Future<void> _registerCurrentDevice() async {
@@ -161,13 +166,15 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
 
   void _scheduleInitialAppLockIfNeeded() {
     if (!_backend.isAuthenticated ||
-        !_preferencesController.security.isAppLockEnabled)
+        !_preferencesController.security.isAppLockEnabled) {
       return;
+    }
     if (_freshLoginSession ||
         _initialAppLockScheduled ||
         _appLockRequired ||
-        _checkingLockCapability)
+        _checkingLockCapability) {
       return;
+    }
     _checkingLockCapability = true;
     unawaited(() async {
       final ready = await _isCurrentLockMethodReady();
@@ -176,34 +183,38 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
       if (!ready ||
           _freshLoginSession ||
           !_backend.isAuthenticated ||
-          !_preferencesController.security.isAppLockEnabled)
+          !_preferencesController.security.isAppLockEnabled) {
         return;
+      }
       _initialAppLockScheduled = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted ||
             _freshLoginSession ||
             !_backend.isAuthenticated ||
-            !_preferencesController.security.isAppLockEnabled)
+            !_preferencesController.security.isAppLockEnabled) {
           return;
+        }
         setState(() => _appLockRequired = true);
       });
     }());
   }
 
   void _schedulePostLoginAppLockPrompt() {
-    if (_postLoginAppLockPromptScheduled || _postLoginAppLockPromptShown)
+    if (_postLoginAppLockPromptScheduled || _postLoginAppLockPromptShown) {
       return;
+    }
     _postLoginAppLockPromptScheduled = true;
     Future<void>.delayed(const Duration(milliseconds: 650), () async {
       _postLoginAppLockPromptScheduled = false;
-      if (!mounted || !_backend.isAuthenticated || _postLoginAppLockPromptShown)
+      if (!mounted || !_backend.isAuthenticated || _postLoginAppLockPromptShown) {
         return;
+      }
       _postLoginAppLockPromptShown = true;
 
-      // If App Lock is already correctly configured there is nothing to ask.
       if (_preferencesController.security.isAppLockEnabled &&
-          await _isCurrentLockMethodReady())
+          await _isCurrentLockMethodReady()) {
         return;
+      }
       if (!mounted) return;
       final navigator = _rootNavigatorKey.currentState;
       final context = _rootNavigatorKey.currentContext;
@@ -274,8 +285,9 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     _backgroundedAt = null;
     if (backgroundedAt == null) return;
     if (DateTime.now().difference(backgroundedAt) <
-        _autoLockDelay(_preferencesController.security.autoLockTimeout))
+        _autoLockDelay(_preferencesController.security.autoLockTimeout)) {
       return;
+    }
     if (_appLockRequired || _checkingLockCapability) return;
     _checkingLockCapability = true;
     unawaited(() async {
@@ -297,8 +309,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
 
   void _handleAuthUiEvent(AuthState state) {
     if (state.session != null) unawaited(_registerCurrentDevice());
-    if (state.event == AuthChangeEvent.passwordRecovery &&
-        !_recoveryRouteOpen) {
+    if (state.event == AuthChangeEvent.passwordRecovery && !_recoveryRouteOpen) {
       _recoveryRouteOpen = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final navigator = _rootNavigatorKey.currentState;
@@ -317,12 +328,8 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
       return;
     }
     if (state.event == AuthChangeEvent.signedIn) {
-      // Real consumer wiring: status-revocation alerts run app-wide while
-      // signed in and are torn down on sign-out / account switch.
       _statusService.resetRevocationTracking();
       _statusService.startRevocationWatch();
-      // A successful login must always enter Chaty first. App Lock is opt-in
-      // and configured from Settings, never used as a post-login blocker.
       _freshLoginSession = true;
       _initialAppLockScheduled = false;
       _backgroundedAt = null;
@@ -368,8 +375,6 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
       _backgroundedAt ??= DateTime.now();
       ProtectedResourceGate.invalidateAllSessions();
     } else if (state == AppLifecycleState.resumed) {
-      // Once the user leaves and returns, a deliberately configured App Lock
-      // behaves normally according to the selected timeout.
       _freshLoginSession = false;
       _applyAutoLockOnResume();
       if (_backend.isAuthenticated) unawaited(_registerCurrentDevice());
@@ -415,6 +420,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
         _appearanceController,
         _backend,
         _richRealtime,
+        _callService,
       ]),
       builder: (context, _) {
         _scheduleInitialAppLockIfNeeded();
@@ -426,11 +432,6 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
           navigatorKey: _rootNavigatorKey,
           title: 'Chaty',
           debugShowCheckedModeBanner: false,
-          // Real consumer for the Appearance screen's entry/exit animation
-          // settings: every MaterialPageRoute opens with the chosen entry
-          // motion while the covered screen recedes with the exit motion.
-          // The controller is in this widget's Listenable.merge, so
-          // changing the setting applies to the next route immediately.
           theme: currentTheme.toThemeData().copyWith(
             pageTransitionsTheme: ChatyTransitions.build(
               entry: _appearanceController.entryAnimation,
@@ -454,9 +455,6 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
               child: ChatyEventToastOverlay(
                 notificationService: _notificationService,
                 preferencesController: _preferencesController,
-                // Real consumer of "Hide Notification Content when Locked":
-                // toasts render UNDER the lock barrier, which is translucent
-                // (α .55), so preview text would be readable while locked.
                 concealWhileLocked:
                     shouldShowLock &&
                     _preferencesController.security.hideLockNotificationContent,
@@ -470,11 +468,15 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
                 ),
               ),
             );
-            // Real consumer of the Who-Can-Call-Me gate: the realtime
-            // service only surfaces invites that PASSED the privacy gate,
-            // so anything shown here is a call the user is allowed to
-            // receive under their current setting.
-            final incomingCall = _richRealtime.incomingCall;
+
+            // The RLS-protected call row is the only ringing source. The server
+            // already enforces block/contact/Who-Can-Call-Me rules before this
+            // state can exist, so a modified Flutter client cannot bypass them.
+            final callSession = _callService.currentSession;
+            final incomingCall =
+                callSession?.state == CallSessionState.incoming
+                ? callSession
+                : null;
             final showIncoming =
                 incomingCall != null && _backend.isAuthenticated;
             if (!shouldShowLock && !showIncoming) return appContent;
@@ -487,16 +489,32 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
                     call: incomingCall,
                     theme: currentTheme,
                     onAccept: () {
-                      _richRealtime.respondToIncomingCall(true);
-                      _rootNavigatorKey.currentState?.push(
-                        MaterialPageRoute(
-                          builder: (_) => OngoingCallScreen(
-                            theme: currentTheme,
-                          ),
-                        ),
-                      );
+                      unawaited(() async {
+                        try {
+                          await _callService.acceptCall();
+                          if (!mounted) return;
+                          _rootNavigatorKey.currentState?.push(
+                            MaterialPageRoute(
+                              builder: (_) => OngoingCallScreen(
+                                theme: currentTheme,
+                              ),
+                            ),
+                          );
+                        } catch (error) {
+                          final callContext = _rootNavigatorKey.currentContext;
+                          if (callContext != null) {
+                            ScaffoldMessenger.of(callContext).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Unable to answer call: ${error.toString().replaceFirst('Exception: ', '')}',
+                                ),
+                              ),
+                            );
+                          }
+                        }
+                      }());
                     },
-                    onDecline: () => _richRealtime.respondToIncomingCall(false),
+                    onDecline: () => unawaited(_callService.declineCall()),
                   ),
                 if (shouldShowLock)
                   AppLockOverlayModal(
@@ -509,9 +527,6 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
               ],
             );
           },
-          // Authentication and profile hydration are separate concerns. A
-          // valid persisted Supabase session remains authenticated while
-          // profile/conversation hydration retries in the background.
           home: Supabase.instance.client.auth.currentSession != null
               ? const MainNavigationShell()
               : const WelcomeScreen(),
@@ -521,11 +536,8 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   }
 }
 
-/// App-level ringing card for incoming calls that passed the recipient's
-/// Who-Can-Call-Me gate. Accept answers (opens the call screen and notifies
-/// the caller); decline notifies the caller immediately.
 class _IncomingCallOverlay extends StatelessWidget {
-  final IncomingCall call;
+  final ChatyCallSession call;
   final ThemeConfig theme;
   final VoidCallback onAccept;
   final VoidCallback onDecline;
@@ -539,6 +551,10 @@ class _IncomingCallOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fallbackInitials = call.remoteDisplayName.characters
+        .take(2)
+        .toString()
+        .toUpperCase();
     return Align(
       alignment: Alignment.bottomCenter,
       child: SafeArea(
@@ -563,13 +579,8 @@ class _IncomingCallOverlay extends StatelessWidget {
               Row(
                 children: [
                   AppAvatar(
-                    initials:
-                        call.avatarInitials ??
-                        call.displayName.characters
-                            .take(2)
-                            .toString()
-                            .toUpperCase(),
-                    colorHex: call.avatarColorHex ?? '0xFF6366F1',
+                    initials: call.remoteAvatarInitials ?? fallbackInitials,
+                    colorHex: call.remoteAvatarColorHex ?? '0xFF6366F1',
                     size: 44,
                   ),
                   const SizedBox(width: 12),
@@ -579,7 +590,7 @@ class _IncomingCallOverlay extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          call.displayName,
+                          call.remoteDisplayName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
