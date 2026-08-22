@@ -1,4 +1,7 @@
 class ChatyValidators {
+  static const int minPasswordLength = 12;
+  static const int maxPasswordLength = 128;
+
   static const Set<String> reservedUsernames = {
     'admin',
     'administrator',
@@ -67,11 +70,23 @@ class ChatyValidators {
     if (value == null || value.isEmpty) {
       return 'Password is required';
     }
-    if (value.length < 6) {
-      return 'Password must be at least 6 characters';
+    if (value.length < minPasswordLength) {
+      return 'Password must be at least $minPasswordLength characters';
     }
-    if (value.length > 128) {
-      return 'Password cannot exceed 128 characters';
+    if (value.length > maxPasswordLength) {
+      return 'Password cannot exceed $maxPasswordLength characters';
+    }
+    if (!RegExp(r'[a-z]').hasMatch(value)) {
+      return 'Password must include a lowercase letter';
+    }
+    if (!RegExp(r'[A-Z]').hasMatch(value)) {
+      return 'Password must include an uppercase letter';
+    }
+    if (!RegExp(r'[0-9]').hasMatch(value)) {
+      return 'Password must include a number';
+    }
+    if (!RegExp(r'''[!@#$%^&*()_+\-=\[\]{};'\\:"|<>?,./`~]''').hasMatch(value)) {
+      return 'Password must include a symbol';
     }
     return null;
   }
