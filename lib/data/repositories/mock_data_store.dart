@@ -43,8 +43,9 @@ class MockDataStore extends ChangeNotifier {
         _startTypingWatch();
       }
     });
-    if (Supabase.instance.client.auth.currentSession != null)
+    if (Supabase.instance.client.auth.currentSession != null) {
       _startTypingWatch();
+    }
     _typingExpiryTimer = Timer.periodic(
       const Duration(seconds: 3),
       (_) => _purgeExpiredTyping(),
@@ -58,24 +59,30 @@ class MockDataStore extends ChangeNotifier {
     _typingSubscription = Supabase.instance.client
         .from('typing_states')
         .stream(primaryKey: const <String>['conversation_id', 'user_id'])
-        .listen((rows) {
-          final next = <String, Map<String, DateTime>>{};
-          for (final row in rows) {
-            if (row['is_typing'] != true) continue;
-            final conversationId = row['conversation_id']?.toString() ?? '';
-            final userId = row['user_id']?.toString() ?? '';
-            final updatedAt = DateTime.tryParse(
-              row['updated_at']?.toString() ?? '',
-            )?.toLocal();
-            if (conversationId.isEmpty || userId.isEmpty || updatedAt == null)
-              continue;
-            (next[conversationId] ??= <String, DateTime>{})[userId] = updatedAt;
-          }
-          _typingByConversation
-            ..clear()
-            ..addAll(next);
-          notifyListeners();
-        }, onError: (_) {});
+        .listen(
+          (rows) {
+            final next = <String, Map<String, DateTime>>{};
+            for (final row in rows) {
+              if (row['is_typing'] != true) continue;
+              final conversationId = row['conversation_id']?.toString() ?? '';
+              final userId = row['user_id']?.toString() ?? '';
+              final updatedAt = DateTime.tryParse(
+                row['updated_at']?.toString() ?? '',
+              )?.toLocal();
+              if (conversationId.isEmpty || userId.isEmpty || updatedAt == null) {
+                continue;
+              }
+              (next[conversationId] ??= <String, DateTime>{})[userId] = updatedAt;
+            }
+            _typingByConversation
+              ..clear()
+              ..addAll(next);
+            notifyListeners();
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            debugPrint('Chaty typing realtime failed: $error\n$stackTrace');
+          },
+        );
   }
 
   void _purgeExpiredTyping() {
@@ -102,23 +109,47 @@ class MockDataStore extends ChangeNotifier {
     super.dispose();
   }
 
-  UserProfile get currentUser =>
-      _backend.currentUser ??
-      UserProfile(
-        id: 'usr_guest',
-        displayName: 'Chaty User',
-        username: 'guest',
-        avatarInitials: 'CU',
-        avatarColorHex: '0xFF6366F1',
-        about: '',
-        presence: PresenceState.offline,
-        lastSeenAt: DateTime.now(),
-        isVerified: false,
-        safetyNumber: '',
-      );
+  UserProfile get currentUser {
+    final hydrated = _backend.currentUser;
+    if (hydrated != null) return hydrated;
+
+    final authUser = Supabase.instance.client.auth.currentUser;
+    if (authUser == null) {
+      throw StateError('No authenticated Chaty user is available.');
+    }
+    final displayName =
+        authUser.userMetadata?['display_name']?.toString().trim();
+    final username = authUser.userMetadata?['username']?.toString().trim();
+    final effectiveName = displayName != null && displayName.isNotEmpty
+        ? displayName
+        : (authUser.email?.split('@').first ?? 'Chaty User');
+    final effectiveUsername = username != null && username.isNotEmpty
+        ? username
+        : (authUser.email?.split('@').first ?? 'user');
+    final compact = effectiveName.replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
+    final initials = compact.isEmpty
+        ? 'CU'
+        : compact.substring(0, compact.length.clamp(1, 2)).toUpperCase();
+
+    return UserProfile(
+      id: authUser.id,
+      displayName: effectiveName,
+      username: effectiveUsername,
+      avatarInitials: initials,
+      avatarColorHex:
+          authUser.userMetadata?['avatar_color_hex']?.toString() ??
+          '0xFF6366F1',
+      about: authUser.userMetadata?['about']?.toString() ?? '',
+      presence: PresenceState.offline,
+      lastSeenAt: DateTime.now(),
+      isVerified: false,
+      email: authUser.email ?? '',
+      phone: authUser.phone ?? '',
+      safetyNumber: '',
+    );
+  }
 
   bool get isAuthenticated => _backend.isAuthenticated;
-  List<UserProfile> get seededAccounts => _backend.allUsers;
   List<UserProfile> get contacts =>
       _backend.allUsers.where((user) => user.id != currentUser.id).toList();
   List<Conversation> get conversations => _backend.conversations;
@@ -235,15 +266,15 @@ class MockDataStore extends ChangeNotifier {
     final conversation = conversations
         .where((item) => item.id == conversationId)
         .firstOrNull;
-    if (conversation != null)
+    if (conversation != null) {
       _backend.setConversationState(
         conversationId,
         'pinned',
         !conversation.isPinned,
       );
+    }
   }
 
-  // --- Per-chat wallpaper overrides (real, locally persisted) ---
   static const String _chatWallpaperKey = 'chaty_chat_wallpapers_v1';
   Map<String, String>? _chatWallpapers;
 
@@ -256,7 +287,8 @@ class MockDataStore extends ChangeNotifier {
       _chatWallpapers = decoded is Map
           ? decoded.map((k, v) => MapEntry(k.toString(), v.toString()))
           : <String, String>{};
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint('Chaty wallpaper preferences failed to load: $error\n$stackTrace');
       _chatWallpapers = <String, String>{};
     }
     return _chatWallpapers!;
@@ -269,17 +301,16 @@ class MockDataStore extends ChangeNotifier {
         _chatWallpaperKey,
         jsonEncode(_chatWallpapers ?? <String, String>{}),
       );
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      debugPrint('Chaty wallpaper preferences failed to save: $error\n$stackTrace');
+    }
   }
 
-  /// Pattern id override for a single chat ('' = unset), consumed by the
-  /// ChatWallpaper layer in the conversation screen.
   Future<String?> loadChatWallpaper(String conversationId) async {
     final map = await _loadChatWallpapers();
     return map[conversationId];
   }
 
-  /// Synchronous read (null until the async load completes).
   String? chatWallpaperSync(String conversationId) =>
       _chatWallpapers?[conversationId];
 
@@ -294,50 +325,54 @@ class MockDataStore extends ChangeNotifier {
     final conversation = conversations
         .where((item) => item.id == conversationId)
         .firstOrNull;
-    if (conversation != null)
+    if (conversation != null) {
       _backend.setConversationState(
         conversationId,
         'archived',
         !conversation.isArchived,
       );
+    }
   }
 
   void toggleMuteConversation(String conversationId) {
     final conversation = conversations
         .where((item) => item.id == conversationId)
         .firstOrNull;
-    if (conversation != null)
+    if (conversation != null) {
       _backend.setConversationState(
         conversationId,
         'muted',
         !conversation.isMuted,
       );
+    }
   }
 
   void togglePinMessage(String conversationId, String messageId) {
     final message = getMessages(
       conversationId,
     ).where((item) => item.id == messageId).firstOrNull;
-    if (message != null)
+    if (message != null) {
       _backend.setMessageState(
         conversationId,
         messageId,
         'pinned',
         !message.isPinned,
       );
+    }
   }
 
   void toggleStarMessage(String conversationId, String messageId) {
     final message = getMessages(
       conversationId,
     ).where((item) => item.id == messageId).firstOrNull;
-    if (message != null)
+    if (message != null) {
       _backend.setMessageState(
         conversationId,
         messageId,
         'starred',
         !message.isStarred,
       );
+    }
   }
 
   void setDraft(String conversationId, String draft) =>
@@ -466,12 +501,6 @@ class MockDataStore extends ChangeNotifier {
   void updateCurrentUser(UserProfile updated) => updateProfile(updated);
   Future<void> updateUser(UserProfile updated) =>
       _backend.updateCurrentUser(updated);
-
-  /// Kept only for binary/source compatibility with old screens. It no longer
-  /// changes identity. Supabase Auth owns the active session.
-  void switchDemoAccount(UserProfile user) {
-    if (user.id == _backend.currentUser?.id) notifyListeners();
-  }
 
   static String _taskPriorityToDatabase(TaskPriority priority) {
     switch (priority) {
