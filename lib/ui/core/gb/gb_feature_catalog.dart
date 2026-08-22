@@ -130,8 +130,10 @@ class GbFeatureCatalog {
     'Audio_sensor':
         'Enable proximity sensor handling during voice-note playback.',
     'Img_highres_seek': 'Set preferred image quality for uploads.',
-    'Up_size_limit': 'Configure maximum video/file upload size.',
-    'abo_saleh_audio_limit_check': 'Configure maximum audio upload size.',
+    'Up_size_limit':
+        'Maximum video/file upload size. Capped at the current 50 MB private-storage limit.',
+    'abo_saleh_audio_limit_check':
+        'Maximum audio upload size. Capped at the current 50 MB private-storage limit.',
     'Img_share_limit': 'Configure maximum images selectable in one send.',
     'key_more_docs_send': 'Allow selecting more documents per send.',
     'Pop_Heds': 'Enable heads-up / floating message alerts.',
@@ -288,7 +290,7 @@ class GbFeatureCatalog {
         if (key == 'text_size_pick') return 15.0;
         if (key == 'pic_chat_size_pickerV2') return 36.0;
         if (key == 'Img_highres_seek') return 85.0;
-        if (key == 'Up_size_limit') return 100.0;
+        if (key == 'Up_size_limit') return 50.0;
         if (key == 'abo_saleh_audio_limit_check') return 50.0;
         if (key == 'Img_share_limit') return 30.0;
         return 1.0;
@@ -303,8 +305,8 @@ class GbFeatureCatalog {
     if (key == 'text_size_pick') return 30;
     if (key == 'pic_chat_size_pickerV2') return 64;
     if (key == 'Img_highres_seek') return 100;
-    if (key == 'Up_size_limit') return 2048;
-    if (key == 'abo_saleh_audio_limit_check') return 512;
+    if (key == 'Up_size_limit') return 50;
+    if (key == 'abo_saleh_audio_limit_check') return 50;
     if (key == 'Img_share_limit') return 100;
     final k = key.toLowerCase();
     if (k.contains('density') || k.contains('intens') || k.contains('speed'))
