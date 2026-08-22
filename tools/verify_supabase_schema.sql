@@ -10,13 +10,20 @@ DECLARE
     'e2ee_device_bundles','e2ee_one_time_prekeys','linked_devices',
     'mass_message_collections','message_device_ciphertexts',
     'message_edit_history','message_reactions','message_receipts',
-    'message_user_state','messages','poll_options','poll_votes','polls',
+    'message_user_state','messages','mls_control_messages',
+    'mls_conversation_groups','mls_devices','mls_group_devices',
+    'mls_key_packages','mls_welcomes','poll_options','poll_votes','polls',
     'profiles','quick_reply_templates','reports','scheduled_messages',
     'status_updates','status_views','task_activity','task_assignees','tasks',
     'typing_states','user_e2ee_keys','user_feature_settings'
   ];
+  mls_tables text[] := ARRAY[
+    'mls_control_messages','mls_conversation_groups','mls_devices',
+    'mls_group_devices','mls_key_packages','mls_welcomes'
+  ];
   missing text[];
   without_rls text[];
+  exposed_mls text[];
 BEGIN
   SELECT array_agg(t)
   INTO missing
@@ -42,14 +49,50 @@ BEGIN
     RAISE EXCEPTION 'Public table count invariant failed';
   END IF;
 
+  SELECT array_agg(t ORDER BY t)
+  INTO exposed_mls
+  FROM unnest(mls_tables) t
+  WHERE has_table_privilege('anon', format('public.%I', t), 'SELECT,INSERT,UPDATE,DELETE')
+     OR has_table_privilege('authenticated', format('public.%I', t), 'SELECT,INSERT,UPDATE,DELETE');
+  IF exposed_mls IS NOT NULL THEN
+    RAISE EXCEPTION 'MLS transport tables are directly exposed to client roles: %', exposed_mls;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='messages'
+      AND column_name='encrypted_payload' AND data_type='text'
+  ) THEN
+    RAISE EXCEPTION 'messages.encrypted_payload is missing';
+  END IF;
+
   IF to_regprocedure('public.create_direct_conversation(uuid)') IS NULL
      OR to_regprocedure('public.get_conversation_messages(uuid,integer,timestamp with time zone)') IS NULL
      OR to_regprocedure('public.send_encrypted_message_v1(uuid,uuid,text,text,jsonb)') IS NULL
      OR to_regprocedure('public.get_e2ee_prekey_bundle(uuid)') IS NULL
      OR to_regprocedure('public.accept_call_session(uuid,text)') IS NULL
      OR to_regprocedure('public.decline_call_session(uuid)') IS NULL
-     OR to_regprocedure('public.end_call_session(uuid)') IS NULL THEN
+     OR to_regprocedure('public.end_call_session(uuid)') IS NULL
+     OR to_regprocedure('public.register_mls_device_v1(text,text,text,text,text,text,jsonb)') IS NULL
+     OR to_regprocedure('public.claim_mls_conversation_key_packages_v1(uuid,text)') IS NULL
+     OR to_regprocedure('public.publish_mls_group_v1(uuid,text,text,text,bigint,text,jsonb)') IS NULL
+     OR to_regprocedure('public.publish_mls_membership_update_v1(uuid,text,text,bigint,text,text,jsonb,jsonb)') IS NULL
+     OR to_regprocedure('public.get_mls_conversation_state_v1(uuid,text,bigint)') IS NULL
+     OR to_regprocedure('public.ack_mls_welcome_v1(uuid,text)') IS NULL
+     OR to_regprocedure('public.send_mls_message_v1(uuid,uuid,text,text,bigint,text)') IS NULL
+     OR to_regprocedure('public.edit_mls_message_v1(uuid,text,text,bigint,text)') IS NULL THEN
     RAISE EXCEPTION 'One or more critical application RPC signatures are missing';
+  END IF;
+
+  IF has_function_privilege('anon', 'public.register_mls_device_v1(text,text,text,text,text,text,jsonb)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.claim_mls_conversation_key_packages_v1(uuid,text)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.publish_mls_group_v1(uuid,text,text,text,bigint,text,jsonb)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.publish_mls_membership_update_v1(uuid,text,text,bigint,text,text,jsonb,jsonb)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.get_mls_conversation_state_v1(uuid,text,bigint)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.ack_mls_welcome_v1(uuid,text)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.send_mls_message_v1(uuid,uuid,text,text,bigint,text)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.edit_mls_message_v1(uuid,text,text,bigint,text)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'An MLS capability RPC is executable by anon';
   END IF;
 
   IF has_function_privilege('anon', 'public.resolve_login_email(text,text)', 'EXECUTE')
@@ -74,8 +117,12 @@ BEGIN
     SELECT 1 FROM pg_constraint
     WHERE conrelid = 'public.e2ee_device_bundles'::regclass
       AND conname = 'e2ee_device_bundles_protocol_suite_check'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.mls_devices'::regclass
+      AND conname = 'mls_devices_protocol_check'
   ) THEN
-    RAISE EXCEPTION 'E2EE schema invariants are missing';
+    RAISE EXCEPTION 'E2EE/MLS schema invariants are missing';
   END IF;
 END
 $$;
