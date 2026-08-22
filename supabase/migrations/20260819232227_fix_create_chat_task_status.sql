@@ -1,5 +1,3 @@
--- `tasks.status` only permits inbox/assigned/in_progress/blocked/completed/archived.
--- The previous RPC inserted `todo`, causing Postgres error 23514.
 create or replace function public.create_chat_task(
   p_conversation_id uuid,
   p_client_task_id uuid,
@@ -44,7 +42,8 @@ begin
   returning id into v_task_id;
 
   if v_task_id is null then
-    select id into v_task_id from public.tasks
+    select id into v_task_id
+    from public.tasks
     where creator_id = v_me and client_task_id = p_client_task_id;
     return v_task_id;
   end if;

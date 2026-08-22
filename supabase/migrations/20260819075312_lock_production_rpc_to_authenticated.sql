@@ -1,0 +1,19 @@
+revoke execute on function public.create_chat_task(uuid,uuid,text,uuid[],text,timestamptz,text,text[],uuid) from anon;
+revoke execute on function public.create_group_conversation(text,uuid[]) from anon;
+revoke execute on function public.create_direct_conversation(uuid) from anon;
+revoke execute on function public.delete_chat_message(uuid,boolean) from anon;
+revoke execute on function public.get_conversation_members(uuid) from anon;
+revoke execute on function public.get_conversation_messages(uuid,integer,timestamptz) from anon;
+revoke execute on function public.get_my_conversations() from anon;
+revoke execute on function public.get_my_tasks() from anon;
+revoke execute on function public.mark_conversation_read(uuid) from anon;
+revoke execute on function public.search_profiles(text) from anon;
+revoke execute on function public.send_message(uuid,uuid,text,text,jsonb) from anon;
+revoke execute on function public.set_conversation_draft(uuid,text) from anon;
+revoke execute on function public.set_conversation_state(uuid,text,boolean) from anon;
+revoke execute on function public.set_message_user_state(uuid,text,boolean) from anon;
+revoke execute on function public.toggle_message_reaction(uuid,text) from anon;
+revoke execute on function public.update_task_status(uuid,text) from anon;
+revoke execute on function public.is_conversation_member(uuid) from anon;
+-- Username availability is the only pre-auth RPC intentionally callable by anon.
+grant execute on function public.is_username_available(text) to anon,authenticated;
