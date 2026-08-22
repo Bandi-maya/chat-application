@@ -1,11 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import '../../domain/models/other_models.dart';
+
 import '../../data/repositories/mock_data_store.dart';
-import '../../ui/core/widgets/app_avatar.dart';
-import '../../ui/core/design_system/design_system.dart';
-import '../../injection/locator.dart';
 import '../../data/services/call_signaling_service.dart';
+import '../../domain/models/other_models.dart';
+import '../../injection/locator.dart';
+import '../../ui/core/design_system/design_system.dart';
+import '../../ui/core/widgets/app_avatar.dart';
 import 'ongoing_call_screen.dart';
 
 class CallsScreen extends StatelessWidget {
@@ -18,6 +19,57 @@ class CallsScreen extends StatelessWidget {
     final hour = dt.hour.toString().padLeft(2, '0');
     final min = dt.minute.toString().padLeft(2, '0');
     return '$hour:$min';
+  }
+
+  Future<void> _startCall(
+    BuildContext context, {
+    required String remoteUserId,
+    required String remoteDisplayName,
+    String? remoteAvatarInitials,
+    String? remoteAvatarColorHex,
+    required bool isVideo,
+  }) async {
+    final callService = locator<CallSignalingService>();
+    try {
+      await callService.initiateCall(
+        remoteUserId: remoteUserId,
+        remoteDisplayName: remoteDisplayName,
+        remoteAvatarInitials: remoteAvatarInitials,
+        remoteAvatarColorHex: remoteAvatarColorHex,
+        isVideo: isVideo,
+      );
+      if (!context.mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => OngoingCallScreen(theme: theme),
+        ),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ChatyToast.show(
+        context,
+        error.toString().replaceFirst('Bad state: ', ''),
+        background: context.colors.error,
+      );
+    }
+  }
+
+  Future<void> _openDebugPreview(BuildContext context) async {
+    if (!kDebugMode) return;
+    final callService = locator<CallSignalingService>();
+    try {
+      await callService.startMockCallForQA(isVideo: true);
+      if (!context.mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => OngoingCallScreen(theme: theme),
+        ),
+      );
+    } catch (error) {
+      if (context.mounted) {
+        ChatyToast.show(context, error.toString(), background: context.colors.error);
+      }
+    }
   }
 
   @override
@@ -45,86 +97,44 @@ class CallsScreen extends StatelessWidget {
                     'Calls',
                     style: ChatyTypography.headline(colors.foreground),
                   ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (kDebugMode)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: InkWell(
+                  if (kDebugMode)
+                    Semantics(
+                      button: true,
+                      label: 'Open local call media preview',
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(ChatyRadius.full),
+                        onTap: () => _openDebugPreview(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: ChatySpacing.sm,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colors.warning.withValues(alpha: 0.14),
                             borderRadius: BorderRadius.circular(ChatyRadius.full),
-                            onTap: () {
-                              final callService = locator<CallSignalingService>();
-                              callService.startMockCallForQA(isVideo: true);
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => OngoingCallScreen(theme: theme),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.bug_report_rounded,
+                                size: 14,
+                                color: colors.warning,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                'Local media QA',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: colors.warning,
                                 ),
-                              );
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: ChatySpacing.sm,
-                                vertical: 4,
                               ),
-                              decoration: BoxDecoration(
-                                color: colors.warning.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(ChatyRadius.full),
-                                border: Border.all(color: colors.warning.withValues(alpha: 0.4)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.bug_report_rounded,
-                                    size: 13,
-                                    color: colors.warning,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'QA Call Preview',
-                                    style: TextStyle(
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w700,
-                                      color: colors.warning,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                            ],
                           ),
                         ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: ChatySpacing.sm,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colors.primary.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(ChatyRadius.full),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.lock_rounded,
-                              size: 13,
-                              color: colors.primary,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Encrypted',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                                color: colors.primary,
-                              ),
-                            ),
-                          ],
-                        ),
                       ),
-                    ],
-                  ),
+                    ),
                 ],
               ),
             ),
@@ -136,20 +146,12 @@ class CallsScreen extends StatelessWidget {
                 icon: Icons.phone_callback_rounded,
                 title: 'No recent calls',
                 message:
-                    'Voice and video calls with your contacts will appear here with peer-to-peer security.',
+                    'Your completed, missed, and declined calls will appear here.',
                 iconColor: colors.primary,
                 titleColor: colors.foreground,
                 messageColor: colors.foregroundSecondary,
-                actionLabel: 'Preview Call',
-                onAction: () {
-                  final callService = locator<CallSignalingService>();
-                  callService.startMockCallForQA(isVideo: true);
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => OngoingCallScreen(theme: theme),
-                    ),
-                  );
-                },
+                actionLabel: kDebugMode ? 'Open local media QA' : null,
+                onAction: kDebugMode ? () => _openDebugPreview(context) : null,
               ),
             )
           else
@@ -165,9 +167,13 @@ class CallsScreen extends StatelessWidget {
                       Builder(
                         builder: (context) {
                           final call = calls[i];
-                          final caller = dataStore.getUserById(call.callerId);
-                          final isMissed =
-                              call.direction == CallDirection.missed;
+                          final currentUserId = dataStore.currentUser.id;
+                          final remoteUserId = call.participantIds.firstWhere(
+                            (id) => id.isNotEmpty && id != currentUserId,
+                            orElse: () => call.callerId,
+                          );
+                          final contact = dataStore.getUserById(remoteUserId);
+                          final isMissed = call.direction == CallDirection.missed;
                           final isVideo = call.type == CallType.video;
 
                           return ChatyListTile(
@@ -176,16 +182,14 @@ class CallsScreen extends StatelessWidget {
                               vertical: ChatySpacing.md,
                             ),
                             leading: AppAvatar(
-                              initials: caller?.avatarInitials ?? 'U',
-                              colorHex: caller?.avatarColorHex,
+                              initials: contact?.avatarInitials ?? 'U',
+                              colorHex: contact?.avatarColorHex,
                               size: 42,
                             ),
                             title: Text(
-                              caller?.displayName ?? 'Secure Caller',
+                              contact?.displayName ?? 'Chaty contact',
                               style: TextStyle(
-                                color: isMissed
-                                    ? colors.error
-                                    : colors.foreground,
+                                color: isMissed ? colors.error : colors.foreground,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 15,
                                 letterSpacing: -0.2,
@@ -197,18 +201,22 @@ class CallsScreen extends StatelessWidget {
                                   call.direction == CallDirection.incoming
                                       ? Icons.call_received_rounded
                                       : call.direction == CallDirection.outgoing
-                                      ? Icons.call_made_rounded
-                                      : Icons.call_missed_rounded,
+                                          ? Icons.call_made_rounded
+                                          : Icons.call_missed_rounded,
                                   size: 14,
                                   color: isMissed
                                       ? colors.error
                                       : colors.foregroundSecondary,
                                 ),
                                 const SizedBox(width: 4),
-                                Text(
-                                  '${_formatCallTime(call.timestamp)} • ${call.durationSeconds > 0 ? '${call.durationSeconds}s' : 'Missed'}',
-                                  style: ChatyTypography.caption(
-                                    colors.foregroundSecondary,
+                                Flexible(
+                                  child: Text(
+                                    '${_formatCallTime(call.timestamp)} • ${call.durationSeconds > 0 ? '${call.durationSeconds}s' : 'No connection'}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: ChatyTypography.caption(
+                                      colors.foregroundSecondary,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -217,45 +225,34 @@ class CallsScreen extends StatelessWidget {
                               icon: isVideo
                                   ? Icons.videocam_rounded
                                   : Icons.call_rounded,
-                              size: 38,
+                              tooltip: isVideo ? 'Video call' : 'Voice call',
+                              size: 44,
                               iconSize: 20,
                               backgroundColor: colors.surfaceSecondary,
                               color: colors.primary,
-                              onPressed: () {
-                                final callService = locator<CallSignalingService>();
-                                callService.initiateCall(
-                                  remoteUserId: call.callerId,
-                                  remoteDisplayName: caller?.displayName ?? 'Contact',
-                                  remoteAvatarInitials: caller?.avatarInitials,
-                                  remoteAvatarColorHex: caller?.avatarColorHex,
-                                  isVideo: isVideo,
-                                );
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (context) => OngoingCallScreen(
-                                      theme: theme,
-                                    ),
-                                  ),
-                                );
-                              },
+                              onPressed: remoteUserId == currentUserId
+                                  ? null
+                                  : () => _startCall(
+                                        context,
+                                        remoteUserId: remoteUserId,
+                                        remoteDisplayName:
+                                            contact?.displayName ?? 'Chaty contact',
+                                        remoteAvatarInitials: contact?.avatarInitials,
+                                        remoteAvatarColorHex: contact?.avatarColorHex,
+                                        isVideo: isVideo,
+                                      ),
                             ),
-                            onTap: () {
-                              final callService = locator<CallSignalingService>();
-                              callService.initiateCall(
-                                remoteUserId: call.callerId,
-                                remoteDisplayName: caller?.displayName ?? 'Contact',
-                                remoteAvatarInitials: caller?.avatarInitials,
-                                remoteAvatarColorHex: caller?.avatarColorHex,
-                                isVideo: isVideo,
-                              );
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => OngoingCallScreen(
-                                    theme: theme,
-                                  ),
-                                ),
-                              );
-                            },
+                            onTap: remoteUserId == currentUserId
+                                ? null
+                                : () => _startCall(
+                                      context,
+                                      remoteUserId: remoteUserId,
+                                      remoteDisplayName:
+                                          contact?.displayName ?? 'Chaty contact',
+                                      remoteAvatarInitials: contact?.avatarInitials,
+                                      remoteAvatarColorHex: contact?.avatarColorHex,
+                                      isVideo: isVideo,
+                                    ),
                           );
                         },
                       ),
