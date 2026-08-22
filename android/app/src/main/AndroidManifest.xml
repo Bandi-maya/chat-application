@@ -3,6 +3,9 @@
     <uses-permission android:name="android.permission.VIBRATE"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA"/>
 
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
@@ -144,6 +147,12 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity-alias>
+
+        <service
+            android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+            android:foregroundServiceType="microphone|camera"
+            android:exported="false"
+            android:stopWithTask="true" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
