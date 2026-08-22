@@ -84,7 +84,8 @@ This verification does **not** prove the application is fully secure or fully E2
 
 - the client Signal-style ratchet/session implementation is still not selected/integrated;
 - encrypted attachment key wrapping is still incomplete;
-- physical-device WebRTC/TURN relay behavior must still be tested across different networks;
+- physical-device WebRTC/TURN relay and Android foreground-call behavior must still be exercised across different networks and lifecycle states;
+- clean-database migration replay/reconciliation remains a separate reproducibility gate;
 - project-level Auth controls such as leaked-password protection require separate verification/configuration;
 - new tables/RPCs must receive the same adversarial treatment when introduced.
 
