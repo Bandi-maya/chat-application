@@ -206,48 +206,83 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen>
   }
 
   Widget _buildDevicesView(ThemeData themeData) {
+    if (_loadingDevices) {
+      return ListView(
+        children: const [
+          SizedBox(height: 220),
+          Center(child: CircularProgressIndicator(strokeWidth: 2.2)),
+        ],
+      );
+    }
+
+    if (_error != null) {
+      return RefreshIndicator(
+        onRefresh: _loadDevices,
+        child: ListView(
+          padding: const EdgeInsets.symmetric(vertical: 40),
+          children: [
+            ChatyEmptyState(
+              icon: Icons.error_outline_rounded,
+              title: 'Could not load devices',
+              message: _error!,
+              actionLabel: 'Try again',
+              onAction: _loadDevices,
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_devices.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _loadDevices,
+        child: ListView(
+          padding: const EdgeInsets.symmetric(vertical: 40),
+          children: [
+            ChatyEmptyState(
+              icon: Icons.devices_rounded,
+              title: 'No linked devices',
+              message:
+                  'Link your computer or tablet by scanning the QR code in the Link Device tab.',
+              actionLabel: _tabs != null ? 'Link new device' : null,
+              onAction: _tabs != null
+                  ? () {
+                      _tabs.animateTo(0);
+                    }
+                  : null,
+            ),
+          ],
+        ),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: _loadDevices,
-      child: _loadingDevices
-          ? ListView(
-              children: const [
-                SizedBox(height: 220),
-                Center(child: CircularProgressIndicator(strokeWidth: 2.2)),
-              ],
-            )
-          : ListView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: ChatySpacing.base,
-                vertical: ChatySpacing.md,
-              ),
-              children: [
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: ChatySpacing.md),
-                    child: Text(
-                      _error!,
-                      style: TextStyle(color: themeData.colorScheme.error),
+      child: ListView(
+        padding: const EdgeInsets.symmetric(
+          horizontal: ChatySpacing.base,
+          vertical: ChatySpacing.md,
+        ),
+        children: [
+          ChatyGroupedSection(
+            title: 'Active Devices',
+            children: [
+              for (final device in _devices)
+                ChatyListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(ChatySpacing.sm),
+                    decoration: BoxDecoration(
+                      color: themeData.colorScheme.primary.withValues(
+                        alpha: 0.12,
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.devices_other_rounded,
+                      color: themeData.colorScheme.primary,
+                      size: 20,
                     ),
                   ),
-                ChatyGroupedSection(
-                  title: 'Active Devices',
-                  children: [
-                    for (final device in _devices)
-                      ChatyListTile(
-                        leading: Container(
-                          padding: const EdgeInsets.all(ChatySpacing.sm),
-                          decoration: BoxDecoration(
-                            color: themeData.colorScheme.primary.withValues(
-                              alpha: 0.12,
-                            ),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.devices_other_rounded,
-                            color: themeData.colorScheme.primary,
-                            size: 20,
-                          ),
-                        ),
                         title: Text(
                           device.deviceName,
                           style: TextStyle(

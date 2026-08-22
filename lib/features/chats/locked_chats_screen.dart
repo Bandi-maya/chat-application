@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:chat/domain/models/conversation.dart';
 import 'package:chat/ui/core/controllers/preferences_controller.dart';
-import 'package:chat/ui/core/theme/app_theme.dart';
+import 'package:chat/ui/core/design_system/design_system.dart';
 import 'package:chat/ui/core/widgets/app_avatar.dart';
 import 'package:chat/data/repositories/mock_data_store.dart';
 import 'package:chat/data/services/local_lock_service.dart';
@@ -345,47 +345,14 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
         ],
       ),
       body: lockedConversations.isEmpty
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: theme.cardColor,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.lock_outline_rounded,
-                        size: 40,
-                        color: theme.secondaryTextColor,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'No Locked Chats',
-                      style: TextStyle(
-                        color: theme.primaryTextColor,
-                        fontSize: 20 * theme.fontScale,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'To lock a chat, long-press any conversation on your chats screen and select Lock Chat, or open Contact Info and toggle Chat Lock.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: theme.secondaryTextColor,
-                        fontSize: 14,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+          ? ChatyEmptyState(
+              icon: Icons.lock_outline_rounded,
+              title: 'No Locked Chats',
+              message:
+                  'To lock a chat, open chat options or Contact Info and toggle Chat Lock with PIN or biometric protection.',
+              iconColor: theme.secondaryTextColor,
+              titleColor: theme.primaryTextColor,
+              messageColor: theme.secondaryTextColor,
             )
           : ListView(
               padding: const EdgeInsets.symmetric(vertical: 8),

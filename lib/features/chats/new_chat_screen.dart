@@ -288,31 +288,25 @@ class _NewChatScreenState extends State<NewChatScreen> {
           ],
           Expanded(
             child: _results.isEmpty && !_isLoading
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(ChatySpacing.xl),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.person_search_rounded,
-                            size: 48,
-                            color: colors.foregroundTertiary,
-                          ),
-                          const SizedBox(height: ChatySpacing.base),
-                          Text(
-                            _searchCtrl.text.trim().length < 2
-                                ? 'Search for contacts by name or @handle.'
-                                : 'No matching contacts found.',
-                            textAlign: TextAlign.center,
-                            style: ChatyTypography.caption(
-                              colors.foregroundSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
+                ? (_searchCtrl.text.trim().length >= 2
+                    ? ChatyNoResultsState(
+                        query: _searchCtrl.text.trim(),
+                        message:
+                            'No contacts or users matched your search keyword.',
+                        onClear: () {
+                          _searchCtrl.clear();
+                          _onSearchChanged('');
+                        },
+                      )
+                    : ChatyEmptyState(
+                        icon: Icons.person_search_rounded,
+                        title: 'Search contacts',
+                        message:
+                            'Enter a name or @username above to start an encrypted conversation.',
+                        iconColor: colors.foregroundTertiary,
+                        titleColor: colors.foreground,
+                        messageColor: colors.foregroundSecondary,
+                      ))
                 : ListView.separated(
                     padding: const EdgeInsets.symmetric(
                       horizontal: ChatySpacing.base,

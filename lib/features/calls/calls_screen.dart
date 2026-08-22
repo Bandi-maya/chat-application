@@ -132,40 +132,24 @@ class CallsScreen extends StatelessWidget {
           if (calls.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(ChatySpacing.xl),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(ChatySpacing.lg),
-                        decoration: BoxDecoration(
-                          color: colors.primary.withValues(alpha: 0.08),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.phone_callback_rounded,
-                          size: 48,
-                          color: colors.primary,
-                        ),
-                      ),
-                      const SizedBox(height: ChatySpacing.base),
-                      Text(
-                        'No recent calls',
-                        style: ChatyTypography.title(colors.foreground),
-                      ),
-                      const SizedBox(height: ChatySpacing.xs),
-                      Text(
-                        'Voice and video calls with your contacts will appear here with peer-to-peer security.',
-                        textAlign: TextAlign.center,
-                        style: ChatyTypography.caption(
-                          colors.foregroundSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              child: ChatyEmptyState(
+                icon: Icons.phone_callback_rounded,
+                title: 'No recent calls',
+                message:
+                    'Voice and video calls with your contacts will appear here with peer-to-peer security.',
+                iconColor: colors.primary,
+                titleColor: colors.foreground,
+                messageColor: colors.foregroundSecondary,
+                actionLabel: 'Preview Call',
+                onAction: () {
+                  final callService = locator<CallSignalingService>();
+                  callService.startMockCallForQA(isVideo: true);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => OngoingCallScreen(theme: theme),
+                    ),
+                  );
+                },
               ),
             )
           else

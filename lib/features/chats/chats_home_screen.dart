@@ -904,12 +904,13 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               onPressed: () => EffectPickerSheet.show(context),
               icon: const Icon(Icons.camera_alt_outlined),
             ),
-          IconButton(
-            tooltip: 'QR / Scan',
-            color: theme.primaryTextColor,
-            onPressed: () => _openQrScreen(initialIndex: 1),
-            icon: const Icon(Icons.qr_code_scanner_rounded),
-          ),
+          if (homePrefs.showDesktopIcon)
+            IconButton(
+              tooltip: 'QR / Scan',
+              color: theme.primaryTextColor,
+              onPressed: () => _openQrScreen(initialIndex: 1),
+              icon: const Icon(Icons.qr_code_scanner_rounded),
+            ),
           if (homePrefs.showSearchBar)
             IconButton(
               tooltip: _isSearchOpen ? 'Close search' : 'Search chats',
@@ -944,27 +945,28 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   : Icons.dark_mode_rounded,
             ),
           ),
-          PopupMenuButton<String>(
-            tooltip: 'More',
-            icon: Icon(Icons.more_vert_rounded, color: theme.primaryTextColor),
-            onSelected: (value) {
-              switch (value) {
-                case 'linked':
-                  _openLinkedDevices();
-                  break;
-              }
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(
-                value: 'linked',
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.devices_rounded),
-                  title: Text('Linked devices'),
+          if (homePrefs.showDesktopIcon)
+            PopupMenuButton<String>(
+              tooltip: 'More',
+              icon: Icon(Icons.more_vert_rounded, color: theme.primaryTextColor),
+              onSelected: (value) {
+                switch (value) {
+                  case 'linked':
+                    _openLinkedDevices();
+                    break;
+                }
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: 'linked',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.devices_rounded),
+                    title: Text('Linked devices'),
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
         ],
       ),
     );
@@ -1406,45 +1408,19 @@ class _EmptyChats extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final groups = forcedType == ConversationType.group;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              groups
-                  ? Icons.groups_outlined
-                  : Icons.chat_bubble_outline_rounded,
-              size: 56,
-              color: theme.accentColor,
-            ),
-            const SizedBox(height: 18),
-            Text(
-              groups ? 'No groups yet' : 'No conversations yet',
-              style: TextStyle(
-                color: theme.primaryTextColor,
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              groups
-                  ? 'Create a group and add people to start a shared conversation.'
-                  : 'Find a user by @username or scan their Chaty QR code to start a conversation.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: theme.secondaryTextColor, height: 1.45),
-            ),
-            const SizedBox(height: 18),
-            FilledButton.icon(
-              onPressed: onSearch,
-              icon: const Icon(Icons.search_rounded),
-              label: const Text('Find people'),
-            ),
-          ],
-        ),
-      ),
+    return ChatyEmptyState(
+      icon: groups
+          ? Icons.groups_outlined
+          : Icons.chat_bubble_outline_rounded,
+      title: groups ? 'No groups yet' : 'No conversations yet',
+      message: groups
+          ? 'Create a group and add people to start a shared conversation.'
+          : 'Find a user by @username or scan their Chaty QR code to start a conversation.',
+      iconColor: theme.accentColor,
+      titleColor: theme.primaryTextColor,
+      messageColor: theme.secondaryTextColor,
+      actionLabel: 'Find people',
+      onAction: onSearch,
     );
   }
 }

@@ -265,22 +265,6 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                         ),
                       ),
                       if (status.userId == widget.dataStore.currentUser.id) ...[
-                        // Real viewer list from status_view_events (owner RLS).
-                        ChatyIconButton(
-                          icon: Icons.remove_red_eye_outlined,
-                          tooltip: 'Viewed by',
-                          color: context.colors.accent,
-                          onPressed: () {
-                            showModalBottomSheet<void>(
-                              context: dialogContext,
-                              showDragHandle: true,
-                              builder: (_) => _StatusViewersSheet(
-                                statusId: status.id,
-                                statusService: _statusService,
-                              ),
-                            );
-                          },
-                        ),
                         ChatyIconButton(
                           icon: Icons.delete_outline_rounded,
                           tooltip: 'Delete status',
@@ -318,9 +302,9 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(
                       ChatySpacing.xl,
-                      0,
+                      ChatySpacing.sm,
                       ChatySpacing.xl,
-                      ChatySpacing.xl,
+                      ChatySpacing.sm,
                     ),
                     child: Text(
                       status.text,
@@ -333,11 +317,106 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                       ),
                     ),
                   ),
+                if (status.userId == widget.dataStore.currentUser.id)
+                  _buildViewsControl(dialogContext, status),
               ],
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildViewsControl(BuildContext dialogContext, StatusRecord status) {
+    return FutureBuilder<List<StatusViewer>>(
+      future: _statusService.viewersFor(status.id),
+      builder: (context, snapshot) {
+        final count = snapshot.data?.length ?? 0;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16, top: 4),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onVerticalDragEnd: (details) {
+              if (details.primaryVelocity != null &&
+                  details.primaryVelocity! < -150) {
+                _openViewersSheet(dialogContext, status.id);
+              }
+            },
+            onTap: () => _openViewersSheet(dialogContext, status.id),
+            child: Semantics(
+              button: true,
+              label: 'Viewed by $count people. Swipe up or tap to see viewers.',
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: context.colors.surfaceElevated.withValues(alpha: 0.85),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: context.colors.borderSubtle,
+                    width: 0.8,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: context.colors.shadow,
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.keyboard_arrow_up_rounded,
+                      size: 16,
+                      color: context.colors.accent,
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.remove_red_eye_outlined,
+                          size: 16,
+                          color: context.colors.accent,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '$count ${count == 1 ? "view" : "views"}',
+                          style: TextStyle(
+                            color: context.colors.foreground,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _openViewersSheet(BuildContext context, String statusId) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: context.colors.surfaceElevated,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _StatusViewersSheet(
+        statusId: statusId,
+        statusService: _statusService,
+      ),
     );
   }
 
@@ -784,16 +863,40 @@ class _StatusViewersSheetState extends State<_StatusViewersSheet> {
                       ),
                     );
                   }
+                  if (snapshot.hasError) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 24,
+                      ),
+                      child: ChatyEmptyState(
+                        icon: Icons.error_outline_rounded,
+                        title: 'Unable to load views',
+                        message:
+                            'Something went wrong while fetching viewers. Please try again.',
+                        actionLabel: 'Retry',
+                        onAction: () {
+                          setState(() {
+                            _viewers = widget.statusService.viewersFor(
+                              widget.statusId,
+                            );
+                          });
+                        },
+                      ),
+                    );
+                  }
                   final viewers = snapshot.data ?? const <StatusViewer>[];
                   if (viewers.isEmpty) {
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-                      child: Text(
-                        'No views yet.',
-                        style: TextStyle(
-                          color: colors.foregroundSecondary,
-                          fontSize: 13.5,
-                        ),
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 24,
+                      ),
+                      child: ChatyEmptyState(
+                        icon: Icons.remove_red_eye_outlined,
+                        title: 'No views yet',
+                        message:
+                            'Views will appear here after someone sees your update.',
                       ),
                     );
                   }

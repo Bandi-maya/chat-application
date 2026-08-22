@@ -456,33 +456,24 @@ class _TasksScreenState extends State<TasksScreen>
   }
 
   Widget _emptyState(ThemeData themeData) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(ChatySpacing.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.task_alt_rounded,
-              size: 48,
-              color: context.colors.primary,
-            ),
-            const SizedBox(height: ChatySpacing.base),
-            Text(
-              'No action items yet',
-              style: ChatyTypography.title(context.colors.foreground),
-            ),
-            const SizedBox(height: ChatySpacing.xs),
-            Text(
-              'Create an action item from any message or using the add button.',
-              textAlign: TextAlign.center,
-              style: ChatyTypography.caption(
-                context.colors.foregroundSecondary,
-              ),
-            ),
-          ],
-        ),
-      ),
+    if (_selectedPriorityFilter != 'All') {
+      return ChatyNoResultsState(
+        query: '$_selectedPriorityFilter Priority',
+        message: 'No tasks found matching the selected priority filter.',
+        clearLabel: 'Show all tasks',
+        onClear: () => setState(() => _selectedPriorityFilter = 'All'),
+      );
+    }
+    return ChatyEmptyState(
+      icon: Icons.task_alt_rounded,
+      title: 'No action items yet',
+      message:
+          'Create an action item from any message or using the create task button.',
+      iconColor: context.colors.primary,
+      titleColor: context.colors.foreground,
+      messageColor: context.colors.foregroundSecondary,
+      actionLabel: 'Create task',
+      onAction: () => _createTask(widget.theme),
     );
   }
 

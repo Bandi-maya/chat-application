@@ -12,6 +12,7 @@ import '../settings/settings_root_screen.dart';
 import '../tasks/tasks_screen.dart';
 import '../updates/updates_screen.dart';
 import 'chats_home_screen.dart';
+import 'linked_devices_qr_screen.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../../ui/core/widgets/app_avatar.dart';
@@ -98,89 +99,134 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           themeController.globalTheme,
           preferencesController,
         );
-        // Single source of truth: the structured Home setting. The GB
-        // 'enable_grp_separationV2' toggle writes straight into it via the
-        // controller sync, so a stale or directly-set GB value can no
-        // longer force the Groups tab while 'Separate chats and groups'
-        // is off in Settings.
+        // Single source of truth: the structured Home setting.
         final separateGroups =
             preferencesController.home.separateChatsAndGroups;
+        final showDesktopIcon = preferencesController.home.showDesktopIcon;
 
-        final navItems = <_NavDestinationItem>[
-          const _NavDestinationItem(
+        // Base candidate destinations
+        final allDestinations = <_NavDestinationItem>[
+          _NavDestinationItem(
+            id: 'chats',
             label: 'Chats',
             icon: Icons.chat_bubble_outline_rounded,
             activeIcon: Icons.chat_bubble_rounded,
-          ),
-          if (separateGroups)
-            const _NavDestinationItem(
-              label: 'Groups',
-              icon: Icons.groups_outlined,
-              activeIcon: Icons.groups_rounded,
-            ),
-          const _NavDestinationItem(
-            label: 'Updates',
-            icon: Icons.update_outlined,
-            activeIcon: Icons.update_rounded,
-          ),
-          const _NavDestinationItem(
-            label: 'Tasks',
-            icon: Icons.checklist_rtl_rounded,
-            activeIcon: Icons.checklist_rounded,
-          ),
-          const _NavDestinationItem(
-            label: 'Calls',
-            icon: Icons.call_outlined,
-            activeIcon: Icons.call_rounded,
-          ),
-          const _NavDestinationItem(
-            label: 'Settings',
-            icon: Icons.settings_outlined,
-            activeIcon: Icons.settings_rounded,
-          ),
-        ];
-
-        final screens = <Widget>[
-          ChatsHomeScreen(
-            theme: theme,
-            dataStore: dataStore,
-            preferencesController: preferencesController,
-            themeController: themeController,
-            notificationService: notificationService,
-            forcedType: separateGroups ? ConversationType.direct : null,
-            pageTitle: separateGroups ? 'Chats' : null,
-          ),
-          if (separateGroups)
-            ChatsHomeScreen(
+            builder: (ctx) => ChatsHomeScreen(
               theme: theme,
               dataStore: dataStore,
               preferencesController: preferencesController,
               themeController: themeController,
               notificationService: notificationService,
-              forcedType: ConversationType.group,
-              pageTitle: 'Groups',
+              forcedType: separateGroups ? ConversationType.direct : null,
+              pageTitle: separateGroups ? 'Chats' : null,
             ),
-          UpdatesScreen(
-            theme: theme,
-            dataStore: dataStore,
-            preferencesController: preferencesController,
           ),
-          TasksScreen(theme: theme, dataStore: dataStore),
-          CallsScreen(theme: theme, dataStore: dataStore),
-          SettingsRootScreen(
-            preferencesController: preferencesController,
-            themeController: themeController,
-            dataStore: dataStore,
-            notificationService: notificationService,
+          if (separateGroups)
+            _NavDestinationItem(
+              id: 'groups',
+              label: 'Groups',
+              icon: Icons.groups_outlined,
+              activeIcon: Icons.groups_rounded,
+              builder: (ctx) => ChatsHomeScreen(
+                theme: theme,
+                dataStore: dataStore,
+                preferencesController: preferencesController,
+                themeController: themeController,
+                notificationService: notificationService,
+                forcedType: ConversationType.group,
+                pageTitle: 'Groups',
+              ),
+            ),
+          _NavDestinationItem(
+            id: 'updates',
+            label: 'Updates',
+            icon: Icons.update_outlined,
+            activeIcon: Icons.update_rounded,
+            builder: (ctx) => UpdatesScreen(
+              theme: theme,
+              dataStore: dataStore,
+              preferencesController: preferencesController,
+            ),
           ),
+          _NavDestinationItem(
+            id: 'tasks',
+            label: 'Tasks',
+            icon: Icons.checklist_rtl_rounded,
+            activeIcon: Icons.checklist_rounded,
+            builder: (ctx) => TasksScreen(theme: theme, dataStore: dataStore),
+          ),
+          _NavDestinationItem(
+            id: 'calls',
+            label: 'Calls',
+            icon: Icons.call_outlined,
+            activeIcon: Icons.call_rounded,
+            builder: (ctx) => CallsScreen(theme: theme, dataStore: dataStore),
+          ),
+          _NavDestinationItem(
+            id: 'settings',
+            label: 'Settings',
+            icon: Icons.settings_outlined,
+            activeIcon: Icons.settings_rounded,
+            builder: (ctx) => SettingsRootScreen(
+              preferencesController: preferencesController,
+              themeController: themeController,
+              dataStore: dataStore,
+              notificationService: notificationService,
+            ),
+          ),
+          if (!showDesktopIcon)
+            _NavDestinationItem(
+              id: 'desktop',
+              label: 'Desktop',
+              icon: Icons.devices_rounded,
+              activeIcon: Icons.devices_rounded,
+              builder: (ctx) => LinkedDevicesQrScreen(
+                dataStore: dataStore,
+                relationshipService: locator(),
+                preferencesController: preferencesController,
+                themeController: themeController,
+                devicesOnly: true,
+              ),
+            ),
         ];
 
-        final effectiveIndex = _currentIndex.clamp(0, screens.length - 1);
+        // Apply max 4 direct navigation items rule:
+        // <= 4: Display all directly
+        // > 4: Display first 3 + More as 4th item
+        final bool hasOverflow = allDestinations.length > 4;
+        final List<_NavDestinationItem> primaryDestinations = hasOverflow
+            ? allDestinations.take(3).toList()
+            : allDestinations;
+        final List<_NavDestinationItem> overflowDestinations = hasOverflow
+            ? allDestinations.skip(3).toList()
+            : const <_NavDestinationItem>[];
+
+        final List<_NavDestinationItem> navItems = [
+          ...primaryDestinations,
+          if (hasOverflow)
+            const _NavDestinationItem(
+              id: 'more',
+              label: 'More',
+              icon: Icons.more_horiz_rounded,
+              activeIcon: Icons.more_horiz_rounded,
+            ),
+        ];
+
+        final List<Widget> screens = allDestinations
+            .map((item) => item.builder(context))
+            .toList(growable: false);
+
+        final effectiveIndex = _currentIndex.clamp(0, allDestinations.length - 1);
         if (effectiveIndex != _currentIndex) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) setState(() => _currentIndex = 0);
           });
         }
+
+        // Active index in bottom navigation bar
+        final int bottomNavSelectedIndex = hasOverflow
+            ? (effectiveIndex < 3 ? effectiveIndex : 3)
+            : effectiveIndex;
 
         return PopScope(
           canPop: false,
@@ -212,7 +258,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 return _buildTopWhatsAppShell(
                   theme: theme,
                   screens: screens,
-                  navItems: navItems,
+                  navItems: allDestinations,
                   selectedIndex: effectiveIndex,
                 );
               }
@@ -230,7 +276,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     },
                     children: screens,
                   ),
-                  navItems: navItems,
+                  navItems: allDestinations,
                   selectedIndex: effectiveIndex,
                 );
               }
@@ -240,7 +286,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 return _build3DPerspectiveDrawerShell(
                   theme: theme,
                   screens: screens,
-                  navItems: navItems,
+                  navItems: allDestinations,
                   selectedIndex: effectiveIndex,
                 );
               }
@@ -250,7 +296,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 return _buildModernSideMenuShell(
                   theme: theme,
                   screens: screens,
-                  navItems: navItems,
+                  navItems: allDestinations,
                   selectedIndex: effectiveIndex,
                 );
               }
@@ -279,7 +325,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   content: content,
                   appearance: appearanceController,
                   maxWidth: constraints.maxWidth,
-                  navItems: navItems,
+                  navItems: allDestinations,
                   selectedIndex: effectiveIndex,
                 );
               }
@@ -288,7 +334,22 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 content: content,
                 appearance: appearanceController,
                 navItems: navItems,
-                selectedIndex: effectiveIndex,
+                selectedIndex: bottomNavSelectedIndex,
+                onDestinationTap: (idx) {
+                  if (hasOverflow && idx == 3) {
+                    _showMoreMenu(
+                      context,
+                      theme: theme,
+                      overflowDestinations: overflowDestinations,
+                      onSelect: (overflowIdx) {
+                        final realIndex = 3 + overflowIdx;
+                        _selectRootDestination(realIndex);
+                      },
+                    );
+                  } else {
+                    _selectRootDestination(idx);
+                  }
+                },
               );
             },
           ),
@@ -759,6 +820,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     required AppearanceVariantController appearance,
     required List<_NavDestinationItem> navItems,
     required int selectedIndex,
+    required ValueChanged<int> onDestinationTap,
   }) {
     final styleName = appearance.bottomBarStyle;
     final isDark = theme.brightness == Brightness.dark;
@@ -898,7 +960,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     theme: theme,
                     accent: accent,
                     isDark: isDark,
-                    onTap: () => _selectRootDestination(i),
+                    onTap: () => onDestinationTap(i),
                   );
                 }),
               ),
@@ -906,6 +968,104 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           ),
         ),
       ),
+    );
+  }
+
+  void _showMoreMenu(
+    BuildContext context, {
+    required dynamic theme,
+    required List<_NavDestinationItem> overflowDestinations,
+    required ValueChanged<int> onSelect,
+  }) {
+    final colors = context.colors;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      showDragHandle: false,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            decoration: BoxDecoration(
+              color: colors.surfaceElevated,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: colors.borderSubtle, width: 0.8),
+              boxShadow: [
+                BoxShadow(
+                  color: colors.shadow,
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 12),
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: colors.foregroundTertiary.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+                  child: Text(
+                    'More',
+                    style: TextStyle(
+                      color: colors.foreground,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                Divider(color: colors.divider, height: 1),
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  itemCount: overflowDestinations.length,
+                  separatorBuilder: (_, index) =>
+                      Divider(color: colors.divider, height: 1, indent: 56),
+                  itemBuilder: (context, i) {
+                    final item = overflowDestinations[i];
+                    return ListTile(
+                      leading: Icon(
+                        item.icon,
+                        color: colors.primary,
+                        size: 22,
+                      ),
+                      title: Text(
+                        item.label,
+                        style: TextStyle(
+                          color: colors.foreground,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                      ),
+                      trailing: Icon(
+                        Icons.chevron_right_rounded,
+                        color: colors.foregroundTertiary,
+                        size: 20,
+                      ),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        onSelect(i);
+                      },
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1322,14 +1482,21 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 }
 
 class _NavDestinationItem {
+  final String id;
   final String label;
   final IconData icon;
   final IconData activeIcon;
+  final Widget Function(BuildContext) builder;
+
   const _NavDestinationItem({
+    this.id = '',
     required this.label,
     required this.icon,
     required this.activeIcon,
+    this.builder = _dummyBuilder,
   });
+
+  static Widget _dummyBuilder(BuildContext context) => const SizedBox.shrink();
 }
 
 class _PerspectiveDrawerScaffold extends StatefulWidget {

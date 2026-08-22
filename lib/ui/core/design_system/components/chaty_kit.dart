@@ -70,6 +70,10 @@ class ChatyEmptyState extends StatelessWidget {
   final Color? iconColor;
   final Color? titleColor;
   final Color? messageColor;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final String? secondaryActionLabel;
+  final VoidCallback? onSecondaryAction;
 
   const ChatyEmptyState({
     super.key,
@@ -79,6 +83,10 @@ class ChatyEmptyState extends StatelessWidget {
     this.iconColor,
     this.titleColor,
     this.messageColor,
+    this.actionLabel,
+    this.onAction,
+    this.secondaryActionLabel,
+    this.onSecondaryAction,
   });
 
   @override
@@ -86,13 +94,13 @@ class ChatyEmptyState extends StatelessWidget {
     final theme = Theme.of(context);
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
-              size: 46,
+              size: 48,
               color:
                   iconColor ??
                   theme.colorScheme.onSurface.withValues(alpha: 0.35),
@@ -115,16 +123,96 @@ class ChatyEmptyState extends StatelessWidget {
                 color:
                     messageColor ??
                     theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                fontSize: 13,
+                fontSize: 13.5,
                 height: 1.35,
               ),
             ),
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: onAction,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                child: Text(
+                  actionLabel!,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13.5,
+                  ),
+                ),
+              ),
+            ],
+            if (secondaryActionLabel != null &&
+                onSecondaryAction != null) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: onSecondaryAction,
+                child: Text(
+                  secondaryActionLabel!,
+                  style: TextStyle(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 }
+
+/// Dedicated state when search / filters match nothing from existing data.
+class ChatyNoResultsState extends StatelessWidget {
+  final String? query;
+  final String? title;
+  final String? message;
+  final IconData icon;
+  final VoidCallback? onClear;
+  final String clearLabel;
+
+  const ChatyNoResultsState({
+    super.key,
+    this.query,
+    this.title,
+    this.message,
+    this.icon = Icons.search_off_rounded,
+    this.onClear,
+    this.clearLabel = 'Clear search',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveTitle =
+        title ??
+        (query != null && query!.isNotEmpty
+            ? 'No results for “$query”'
+            : 'No results found');
+    final effectiveMessage =
+        message ?? 'Try checking for spelling or using different keywords.';
+
+    return ChatyEmptyState(
+      icon: icon,
+      title: effectiveTitle,
+      message: effectiveMessage,
+      actionLabel: onClear != null ? clearLabel : null,
+      onAction: onClear,
+    );
+  }
+}
+
+/// Standardized aliases for cross-module compatibility.
+typedef AppEmptyState = ChatyEmptyState;
+typedef AppNoResultsState = ChatyNoResultsState;
 
 /// One row inside [ChatyMenuSheet].
 class ChatyMenuItem {

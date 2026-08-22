@@ -235,28 +235,14 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
                     _matchedUsers.isEmpty &&
                     _matchedConversations.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.all(ChatySpacing.xl),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.search_off_rounded,
-                            size: 48,
-                            color: themeData.colorScheme.onSurface.withValues(
-                              alpha: 0.35,
-                            ),
-                          ),
-                          const SizedBox(height: ChatySpacing.md),
-                          Text(
-                            'No matches found for "${_searchController.text}"',
-                            style: ChatyTypography.caption(
-                              themeData.colorScheme.onSurface.withValues(
-                                alpha: 0.6,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                    padding: const EdgeInsets.symmetric(vertical: 40),
+                    child: ChatyNoResultsState(
+                      query: _searchController.text.trim(),
+                      message:
+                          'No usernames, contacts, or conversations match your search.',
+                      onClear: () {
+                        _searchController.clear();
+                      },
                     ),
                   ),
               ],
@@ -265,41 +251,14 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
   }
 
   Widget _buildEmptyPrompt(ThemeData themeData) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: ChatySpacing.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 76,
-              height: 76,
-              decoration: BoxDecoration(
-                color: themeData.colorScheme.primary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.alternate_email_rounded,
-                size: 38,
-                color: themeData.colorScheme.primary,
-              ),
-            ),
-            const SizedBox(height: ChatySpacing.base),
-            Text(
-              'Username Discovery',
-              style: ChatyTypography.headline(themeData.colorScheme.onSurface),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Type an @username to find and message another Chaty user without exposing phone numbers.',
-              textAlign: TextAlign.center,
-              style: ChatyTypography.caption(
-                themeData.colorScheme.onSurface.withValues(alpha: 0.65),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return ChatyEmptyState(
+      icon: Icons.alternate_email_rounded,
+      title: 'Username Discovery',
+      message:
+          'Type an @username to find and message another Chaty user without exposing phone numbers.',
+      iconColor: themeData.colorScheme.primary,
+      titleColor: themeData.colorScheme.onSurface,
+      messageColor: themeData.colorScheme.onSurface.withValues(alpha: 0.65),
     );
   }
 

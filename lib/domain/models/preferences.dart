@@ -274,6 +274,7 @@ class HomePreferences {
   final bool airplaneModeSimulator;
   final bool showSearchBar;
   final bool showCameraIcon;
+  final bool showDesktopIcon;
 
   const HomePreferences({
     this.homeStyle = 'Chaty Default',
@@ -286,6 +287,7 @@ class HomePreferences {
     this.airplaneModeSimulator = false,
     this.showSearchBar = true,
     this.showCameraIcon = false,
+    this.showDesktopIcon = true,
   });
 
   HomePreferences copyWith({
@@ -299,6 +301,7 @@ class HomePreferences {
     bool? airplaneModeSimulator,
     bool? showSearchBar,
     bool? showCameraIcon,
+    bool? showDesktopIcon,
   }) {
     return HomePreferences(
       homeStyle: homeStyle ?? this.homeStyle,
@@ -313,6 +316,7 @@ class HomePreferences {
           airplaneModeSimulator ?? this.airplaneModeSimulator,
       showSearchBar: showSearchBar ?? this.showSearchBar,
       showCameraIcon: showCameraIcon ?? this.showCameraIcon,
+      showDesktopIcon: showDesktopIcon ?? this.showDesktopIcon,
     );
   }
 
@@ -327,6 +331,7 @@ class HomePreferences {
     'airplaneModeSimulator': airplaneModeSimulator,
     'showSearchBar': showSearchBar,
     'showCameraIcon': showCameraIcon,
+    'showDesktopIcon': showDesktopIcon,
   };
 
   factory HomePreferences.fromMap(Map<String, dynamic> map) => HomePreferences(
@@ -340,6 +345,7 @@ class HomePreferences {
     airplaneModeSimulator: map['airplaneModeSimulator'] ?? false,
     showSearchBar: map['showSearchBar'] ?? true,
     showCameraIcon: map['showCameraIcon'] ?? false,
+    showDesktopIcon: map['showDesktopIcon'] ?? true,
   );
 }
 

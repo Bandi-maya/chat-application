@@ -321,6 +321,19 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                 );
               },
             ),
+            ChatySwitchTile(
+              icon: Icons.devices_rounded,
+              title: 'Show Desktop Icon',
+              subtitle:
+                  'Display Desktop/Linked Devices shortcut in the top header. When disabled, Desktop is accessible via bottom navigation / More.',
+              value: home.showDesktopIcon,
+              onChanged: (val) {
+                widget.preferencesController.updateHome(
+                  home.copyWith(showDesktopIcon: val),
+                  logTitle: 'Show Desktop Shortcut in Header',
+                );
+              },
+            ),
           ],
         ),
 
