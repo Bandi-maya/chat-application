@@ -106,6 +106,20 @@ class ChatyCallForegroundService {
       }
       if (_startInFlight) return;
       _startInFlight = true;
+
+      final notificationPermission =
+          await FlutterForegroundTask.checkNotificationPermission();
+      if (notificationPermission != NotificationPermission.granted) {
+        final requested =
+            await FlutterForegroundTask.requestNotificationPermission();
+        if (requested != NotificationPermission.granted) {
+          debugPrint(
+            'Chaty active-call notification permission was not granted; '
+            'background call visibility/reliability is not guaranteed.',
+          );
+        }
+      }
+
       await FlutterForegroundTask.startService(
         serviceId: 7401,
         serviceTypes: <ForegroundServiceTypes>[
