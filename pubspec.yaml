@@ -37,6 +37,7 @@ dependencies:
   qr_flutter: ^4.1.0
   video_player: ^2.14.0
   flutter_webrtc: ^1.6.0
+  flutter_foreground_task: ^11.0.1
 
 dev_dependencies:
   flutter_test:
