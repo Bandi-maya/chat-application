@@ -49,6 +49,13 @@ jobs:
       - name: Test
         run: flutter test
 
+      - name: Hosted Auth release preflight
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: dntnxeanubswyswahdnj
+        run: bash tools/check_supabase_auth_security.sh
+
       - name: Build release APK
         run: >-
           flutter build apk --release --no-pub
