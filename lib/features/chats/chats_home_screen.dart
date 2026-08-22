@@ -55,6 +55,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
   late final ContactRelationshipService _relationships;
   String _selectedFilter = 'All';
   bool _isSearchOpen = false;
+  // P4 large-title collapse: 0 = fully expanded, 1 = fully collapsed.
+  double _largeTitleCollapse = 0;
+
+  double get _effectiveTitleCollapse =>
+      (_isSelectionMode || _isSearchOpen) ? 1.0 : _largeTitleCollapse;
 
   bool get _isSelectionMode => _selectedConversationIds.isNotEmpty;
 
@@ -176,24 +181,13 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
 
   Future<void> _deleteSelected() async {
     final count = _selectedConversationIds.length;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Delete $count chat${count == 1 ? '' : 's'}?'),
-        content: const Text(
+    final confirmed = await ChatyConfirmDialog.show(
+      context,
+      title: 'Delete $count chat${count == 1 ? '' : 's'}?',
+      message:
           'This removes the selected conversations for this account. Shared media objects are not silently deleted.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Delete',
+      destructive: true,
     );
     if (confirmed != true) return;
     for (final id in List<String>.from(_selectedConversationIds))
@@ -434,6 +428,36 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   _isSelectionMode
                       ? _selectionAppBar(theme, conversations)
                       : _standardAppBar(theme, homePrefs),
+                  // P4: iOS collapsing LARGE title. Shrinks away as the list
+                  // scrolls; the compact bar title fades in to replace it.
+                  if (!_isSelectionMode)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: SizedBox(
+                        height: (1 - _effectiveTitleCollapse) * 44,
+                        child: Opacity(
+                          opacity: 1 - _effectiveTitleCollapse,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                widget.pageTitle ?? 'Chaty',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: theme.primaryTextColor,
+                                  fontSize: 32 * theme.fontScale,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.5,
+                                  height: 1.0,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   if (!_isSelectionMode) ...[
                     AnimatedSize(
                       duration: const Duration(milliseconds: 180),
@@ -612,18 +636,38 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                     ),
                   ],
                   Expanded(
-                    child: conversations.isEmpty
-                        ? _EmptyChats(
-                            theme: theme,
-                            onSearch: () => _openGlobalSearch(theme),
-                            forcedType: widget.forcedType,
-                          )
-                        // Home Style consumer: 'Tablet Split View' switches to
-                        // list + quick-access pane on wide screens; every
-                        // other style renders the single-column list.
-                        : styleSplitView
-                        ? _splitBody(theme, entries, styleTileDensity)
-                        : _conversationsList(theme, entries, styleTileDensity),
+                    // P4: drives the large-title collapse from the primary
+                    // list scroll (depth 0 + vertical axis only, so the
+                    // horizontal stories strip never triggers it).
+                    child: NotificationListener<ScrollNotification>(
+                      onNotification: (notification) {
+                        if (notification.depth == 0 &&
+                            notification.metrics.axis == Axis.vertical) {
+                          final value = (notification.metrics.pixels / 44)
+                              .clamp(0.0, 1.0);
+                          if ((value - _largeTitleCollapse).abs() > 0.02) {
+                            setState(() => _largeTitleCollapse = value);
+                          }
+                        }
+                        return false;
+                      },
+                      child: conversations.isEmpty
+                          ? _EmptyChats(
+                              theme: theme,
+                              onSearch: () => _openGlobalSearch(theme),
+                              forcedType: widget.forcedType,
+                            )
+                          // Home Style consumer: 'Tablet Split View' switches
+                          // to list + quick-access pane on wide screens; every
+                          // other style renders the single-column list.
+                          : styleSplitView
+                          ? _splitBody(theme, entries, styleTileDensity)
+                          : _conversationsList(
+                              theme,
+                              entries,
+                              styleTileDensity,
+                            ),
+                    ),
                   ),
                 ],
               ),
@@ -671,9 +715,42 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         if (entry is _ArchivedEntry) {
           return _archivedTile(entry.archivedCount, theme);
         }
-        return entry is _ConversationSection
-            ? _SectionLabel(label: entry.label, theme: theme)
-            : _conversationTile(entry as Conversation, theme, density: density);
+        if (entry is _ConversationSection) {
+          return _SectionLabel(label: entry.label, theme: theme);
+        }
+        final conversation = entry as Conversation;
+        // P4: WhatsApp-iOS swipe actions — Pin, Mute, Archive.
+        return ChatySwipeActions(
+          backgroundColor: theme.backgroundColor,
+          actions: [
+            ChatySwipeAction(
+              icon: conversation.isPinned
+                  ? Icons.push_pin_rounded
+                  : Icons.push_pin_outlined,
+              label: conversation.isPinned ? 'Unpin' : 'Pin',
+              color: context.colors.primary,
+              onTriggered: () =>
+                  widget.dataStore.togglePinConversation(conversation.id),
+            ),
+            ChatySwipeAction(
+              icon: conversation.isMuted
+                  ? Icons.notifications_active_rounded
+                  : Icons.notifications_off_rounded,
+              label: conversation.isMuted ? 'Unmute' : 'Mute',
+              color: context.colors.warning,
+              onTriggered: () =>
+                  widget.dataStore.toggleMuteConversation(conversation.id),
+            ),
+            ChatySwipeAction(
+              icon: Icons.archive_outlined,
+              label: 'Archive',
+              color: context.colors.foregroundSecondary,
+              onTriggered: () =>
+                  widget.dataStore.toggleArchiveConversation(conversation.id),
+            ),
+          ],
+          child: _conversationTile(conversation, theme, density: density),
+        );
       },
     );
   }
@@ -769,11 +846,13 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
           Expanded(
             child: Text(
               widget.pageTitle ?? 'Chaty',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: theme.primaryTextColor,
-                fontSize: 24 * theme.fontScale,
+                fontSize: 22 * theme.fontScale,
                 fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
+                letterSpacing: -0.4,
               ),
             ),
           ),
@@ -1022,9 +1101,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                               color: theme.accentColor.withValues(alpha: 0.86),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.check_rounded,
-                              color: Colors.white,
+                              color: theme.onAccentColor,
                               size: 26,
                             ),
                           ),
@@ -1331,24 +1410,12 @@ class _ArchivedChatsScreenState extends State<_ArchivedChatsScreen> {
 
   Future<void> _deleteSelected() async {
     final count = _selectedConversationIds.length;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Delete $count chat${count == 1 ? '' : 's'}?'),
-        content: const Text(
-          'This removes the selected conversations for this account.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await ChatyConfirmDialog.show(
+      context,
+      title: 'Delete $count chat${count == 1 ? '' : 's'}?',
+      message: 'This removes the selected conversations for this account.',
+      confirmLabel: 'Delete',
+      destructive: true,
     );
     if (confirmed != true) return;
     for (final id in List<String>.from(_selectedConversationIds)) {
@@ -1519,7 +1586,7 @@ class _ArchivedChatsScreenState extends State<_ArchivedChatsScreen> {
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
                                             color: theme.primaryTextColor,
-                                            fontSize: 15 * theme.fontScale,
+                                            fontSize: 16 * theme.fontScale,
                                             fontWeight:
                                                 conversation.unreadCount > 0
                                                 ? FontWeight.w800
@@ -1527,20 +1594,13 @@ class _ArchivedChatsScreenState extends State<_ArchivedChatsScreen> {
                                           ),
                                         ),
                                       ),
-                                      Text(
-                                        _formatMessageTime(
+                                      ChatyTimeLabel(
+                                        text: _formatMessageTime(
                                           conversation.lastMessageTime,
                                         ),
-                                        style: TextStyle(
-                                          color: conversation.unreadCount > 0
-                                              ? theme.accentColor
-                                              : theme.secondaryTextColor,
-                                          fontSize: 11.5,
-                                          fontWeight:
-                                              conversation.unreadCount > 0
-                                              ? FontWeight.w700
-                                              : FontWeight.w500,
-                                        ),
+                                        highlight: conversation.unreadCount > 0,
+                                        color: theme.secondaryTextColor,
+                                        highlightColor: theme.accentColor,
                                       ),
                                     ],
                                   ),

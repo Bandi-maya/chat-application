@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../ui/core/design_system/settings_primitives.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/controllers/appearance_variant_controller.dart';
-import '../../../ui/core/theme/theme_controller.dart';
-import '../../../ui/core/theme/theme_config.dart';
+import '../../../ui/core/theme/app_theme.dart';
 import '../../../injection/locator.dart';
 
 class HomeScreenSettingsPage extends StatefulWidget {
@@ -47,6 +46,7 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
   @override
   Widget build(BuildContext context) {
     final home = widget.preferencesController.home;
+    final colors = context.colors;
 
     return ChatySettingsPage(
       title: 'Home Screen Customization',
@@ -62,7 +62,7 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                 'Current Style: ${home.homeStyle} • Stories: ${home.enableStoriesStrip ? "Visible" : "Hidden"} • Avatar: ${home.avatarShape}',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Theme.of(context).textTheme.bodySmall?.color,
+                  color: colors.foregroundSecondary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -71,12 +71,10 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                 decoration: BoxDecoration(
                   color: home.headerBackgroundColorHex != 0
                       ? Color(home.headerBackgroundColorHex)
-                      : Theme.of(context).cardColor,
+                      : colors.surface,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Theme.of(
-                      context,
-                    ).dividerColor.withValues(alpha: 0.2),
+                    color: colors.borderSubtle,
                   ),
                 ),
                 child: Column(
@@ -86,7 +84,7 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                       children: [
                         ChatyAvatar(
                           initials: 'AR',
-                          color: const Color(0xFF6366F1),
+                          color: colors.primary,
                           size: 36,
                           shape: home.avatarShape,
                         ),
@@ -100,15 +98,15 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                               fontWeight: FontWeight.bold,
                               color: home.headerTextColorHex != 0
                                   ? Color(home.headerTextColorHex)
-                                  : null,
+                                  : colors.foreground,
                             ),
                           ),
                         ),
                         if (home.ghostMode)
-                          const Icon(
+                          Icon(
                             Icons.visibility_off_rounded,
                             size: 18,
-                            color: Colors.purpleAccent,
+                            color: colors.accent,
                           ),
                       ],
                     ),
@@ -118,18 +116,18 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                         children: [
                           Container(
                             padding: const EdgeInsets.all(2),
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               gradient: LinearGradient(
                                 colors: [
-                                  Colors.pinkAccent,
-                                  Colors.purpleAccent,
+                                  colors.accent,
+                                  colors.primary,
                                 ],
                               ),
                             ),
                             child: ChatyAvatar(
                               initials: 'ER',
-                              color: const Color(0xFFEC4899),
+                              color: colors.accent,
                               size: 28,
                               shape: home.avatarShape,
                             ),
@@ -137,18 +135,18 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                           const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.all(2),
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               gradient: LinearGradient(
                                 colors: [
-                                  Colors.purpleAccent,
-                                  Colors.blueAccent,
+                                  colors.primary,
+                                  colors.info,
                                 ],
                               ),
                             ),
                             child: ChatyAvatar(
                               initials: 'DC',
-                              color: const Color(0xFF10B981),
+                              color: colors.success,
                               size: 28,
                               shape: home.avatarShape,
                             ),
@@ -156,18 +154,18 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                           const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.all(2),
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               gradient: LinearGradient(
                                 colors: [
-                                  Colors.amberAccent,
-                                  Colors.orangeAccent,
+                                  colors.warning,
+                                  colors.accent,
                                 ],
                               ),
                             ),
                             child: ChatyAvatar(
                               initials: 'ML',
-                              color: const Color(0xFFF59E0B),
+                              color: colors.warning,
                               size: 28,
                               shape: home.avatarShape,
                             ),
@@ -210,7 +208,7 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
           children: [
             ChatySwitchTile(
               icon: Icons.history_edu_rounded,
-              iconColor: Colors.pinkAccent,
+              iconColor: colors.accent,
               title: 'Enable Stories Strip',
               subtitle: 'Show horizontal story avatars on home screen',
               value: home.enableStoriesStrip,
@@ -296,7 +294,7 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
             ),
             ChatySwitchTile(
               icon: Icons.splitscreen_rounded,
-              iconColor: Colors.indigoAccent,
+              iconColor: colors.primary,
               title: 'Separate Chats & Groups',
               subtitle:
                   'Reorganize navigation into Direct Messages & Groups tabs',
@@ -398,7 +396,7 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
           children: [
             ChatySwitchTile(
               icon: Icons.shield_moon_rounded,
-              iconColor: Colors.purpleAccent,
+              iconColor: colors.accent,
               title: 'Ghost Mode',
               subtitle: home.ghostMode
                   ? 'Active: Hidden last seen, hidden online, disabled read receipts & typing indicators.'
@@ -424,7 +422,7 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
             ),
             ChatySwitchTile(
               icon: Icons.airplanemode_active_rounded,
-              iconColor: Colors.amberAccent,
+              iconColor: colors.warning,
               title: 'Airplane Mode Simulator',
               subtitle:
                   'Pauses simulated incoming messages and network state transitions',
@@ -441,4 +439,5 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
       ],
     );
   }
+
 }

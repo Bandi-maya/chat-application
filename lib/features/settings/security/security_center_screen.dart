@@ -4,6 +4,7 @@ import '../../../data/services/local_lock_service.dart';
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/settings_primitives.dart';
+import '../../../ui/core/theme/app_theme.dart';
 import 'app_lock_overlay.dart';
 import 'lock_credential_setup_modal.dart';
 
@@ -111,14 +112,15 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
   }
 
   void _showSafetyNumberDialog() {
+    final colors = context.colors;
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.verified_user_rounded, color: Colors.greenAccent),
-            SizedBox(width: 8),
-            Text('Safety Number Verification'),
+            Icon(Icons.verified_user_rounded, color: colors.success),
+            const SizedBox(width: 8),
+            const Text('Safety Number Verification'),
           ],
         ),
         content: Column(
@@ -127,7 +129,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.black12,
+                color: colors.surfaceSecondary,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Text(
@@ -141,10 +143,10 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Demo Security Model • End-to-end encryption state verified with prekey identity.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(fontSize: 12, color: colors.foregroundSecondary),
             ),
           ],
         ),
@@ -162,6 +164,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
   Widget build(BuildContext context) {
     final security = widget.preferencesController.security;
     final lockedChats = security.lockedConversationIds.length;
+    final colors = context.colors;
 
     return ChatySettingsPage(
       title: 'Security & App Lock',
@@ -174,16 +177,16 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
           children: [
             ChatySettingsTile(
               icon: Icons.shield_rounded,
-              iconColor: Colors.greenAccent,
+              iconColor: colors.success,
               title: 'Demo Security Model',
               subtitle: 'Double-ratchet session status: Active & Verified',
               badgeText: 'ENCRYPTED',
-              badgeColor: Colors.greenAccent,
+              badgeColor: colors.success,
               onTap: _showSafetyNumberDialog,
             ),
             ChatySettingsTile(
               icon: Icons.qr_code_2_rounded,
-              iconColor: Colors.cyanAccent,
+              iconColor: colors.info,
               title: 'Verify Safety Number QR',
               subtitle: 'Simulate key fingerprints for security auditing',
               onTap: _showSafetyNumberDialog,
@@ -197,7 +200,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
           children: [
             ChatySwitchTile(
               icon: Icons.lock_rounded,
-              iconColor: Colors.amberAccent,
+              iconColor: colors.warning,
               title: 'Enable Chaty Lock',
               subtitle: security.isAppLockEnabled
                   ? 'App lock active (${security.lockMethod})'
@@ -222,8 +225,8 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
                       : 'No enrolled biometric is currently available',
                   badgeText: _biometricAvailable ? 'READY' : 'UNAVAILABLE',
                   badgeColor: _biometricAvailable
-                      ? Colors.greenAccent
-                      : Colors.orangeAccent,
+                      ? colors.success
+                      : colors.warning,
                   onTap: () => _configureMethod('Biometric'),
                 ),
               if (security.lockMethod == 'Device Credential')
@@ -312,7 +315,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
               ),
               ChatySettingsTile(
                 icon: Icons.lock_open_rounded,
-                iconColor: Colors.deepOrangeAccent,
+                iconColor: colors.error,
                 title: 'Test Lock Screen',
                 subtitle:
                     'Run the same authentication gate used by the application',
@@ -335,13 +338,13 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
           children: [
             ChatySettingsTile(
               icon: Icons.chat_bubble_outline_rounded,
-              iconColor: Colors.purpleAccent,
+              iconColor: colors.accent,
               title: 'Locked Chats',
               subtitle: lockedChats == 0
                   ? 'No chats locked • Long-press a chat and use the lock action'
                   : '$lockedChats chat${lockedChats == 1 ? '' : 's'} currently protected',
               badgeText: '$lockedChats',
-              badgeColor: lockedChats > 0 ? Colors.purpleAccent : Colors.grey,
+              badgeColor: lockedChats > 0 ? colors.accent : colors.foregroundSecondary,
               onTap: null,
             ),
             ChatySettingsTile(

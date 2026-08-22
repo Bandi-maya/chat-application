@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../ui/core/theme/theme_config.dart';
 import '../../../ui/core/theme/theme_controller.dart';
@@ -22,7 +23,6 @@ import '../../ui/core/design_system/components/app_components.dart';
 import '../../ui/core/gb/gb_theme_overrides.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/widgets/chat_wallpaper.dart';
-import '../../ui/core/widgets/security_chip.dart';
 import '../calls/mock_call_screen.dart';
 import '../messages/attachment_sheet.dart';
 import '../messages/chat_attachment_actions.dart';
@@ -61,6 +61,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final Set<String> _openedViewOnceIds = <String>{};
   final TextEditingController _textCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
+  // --- WhatsApp/Telegram/Instagram scroll logic ---
+  // True while the list is within [_nearBottomThreshold] of the newest
+  // message. Drives the floating down-arrow button, the unseen-count badge,
+  // and whether incoming messages auto-pin the list to the bottom.
+  static const double _nearBottomThreshold = 250;
+  bool _isNearBottom = true;
+  int _pendingBelowCount = 0;
+  int _lastKnownMessageCount = 0;
   late final ChatAttachmentActions _attachments;
   late final VoiceNoteService _voice;
   late final RichChatRealtimeService _realtime;
@@ -77,6 +85,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   bool _voiceBusy = false;
   int _voiceSeconds = 0;
   ContactConnectionStatus _connectionStatus = const ContactConnectionStatus();
+  // Per-chat wallpaper override ('none' | theme pattern ids). Null until the
+  // persisted value loads; consumed by the ChatWallpaper layer.
+  String? _chatWallpaperOverride;
 
   ThemeConfig get _theme => GbThemeOverrides.resolve(
     widget.themeController?.globalTheme ?? widget.theme,
@@ -103,17 +114,28 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     if (conversation != null && conversation.draftText.isNotEmpty)
       _textCtrl.text = conversation.draftText;
     unawaited(_realtime.trackConversation(widget.conversationId));
+    unawaited(_loadChatWallpaperOverride());
+    _scrollCtrl.addListener(_handleScrollChanged);
+    widget.dataStore.addListener(_onDataStoreChanged);
+    _scrollToBottom(animate: false);
     _loadConversation();
+  }
+
+  Future<void> _loadChatWallpaperOverride() async {
+    final value = await widget.dataStore.loadChatWallpaper(
+      widget.conversationId,
+    );
+    if (!mounted || value == null) return;
+    setState(() => _chatWallpaperOverride = value);
   }
 
   Future<void> _loadConversation() async {
     if (mounted) {
       setState(() {
-        _loadingMessages = widget.dataStore
-            .getMessages(widget.conversationId)
-            .isEmpty;
+        _loadingMessages = false;
         _loadError = null;
       });
+      _scrollToBottom(animate: false);
     }
     try {
       await widget.dataStore.ensureConversationLoaded(widget.conversationId);
@@ -122,7 +144,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       await _refreshConnectionStatus();
       if (!mounted) return;
       setState(() => _loadingMessages = false);
-      _scrollToBottom();
+      _scrollToBottom(animate: false);
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -158,6 +180,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     if (_recording)
       unawaited(_realtime.setRecording(widget.conversationId, false));
     widget.dataStore.setDraft(widget.conversationId, _textCtrl.text);
+    _scrollCtrl.removeListener(_handleScrollChanged);
+    widget.dataStore.removeListener(_onDataStoreChanged);
     unawaited(_voice.dispose());
     _textCtrl.dispose();
     _scrollCtrl.dispose();
@@ -358,15 +382,71 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     if (_recording && !_recordLocked) unawaited(_finishVoice());
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool animate = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollCtrl.hasClients)
-        _scrollCtrl.animateTo(
-          _scrollCtrl.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-        );
+      if (_scrollCtrl.hasClients) {
+        if (animate) {
+          _scrollCtrl.animateTo(
+            _scrollCtrl.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+          );
+        } else {
+          _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+        }
+      }
     });
+  }
+
+  int get _currentMessageCount =>
+      widget.dataStore.getMessages(widget.conversationId).length;
+
+  /// Scroll listener: tracks whether the newest message is on screen. This is
+  /// what makes the down-arrow button appear/disappear and decides whether
+  /// incoming messages auto-pin the list.
+  void _handleScrollChanged() {
+    if (!_scrollCtrl.hasClients) return;
+    final position = _scrollCtrl.position;
+    final nearBottom =
+        position.maxScrollExtent - position.pixels < _nearBottomThreshold ||
+        position.maxScrollExtent <= 0;
+    if (nearBottom != _isNearBottom) {
+      setState(() {
+        _isNearBottom = nearBottom;
+        // Reaching the bottom marks everything below as seen.
+        if (nearBottom) {
+          _pendingBelowCount = 0;
+          _lastKnownMessageCount = _currentMessageCount;
+        }
+      });
+    } else if (nearBottom && _pendingBelowCount != 0 && mounted) {
+      setState(() => _pendingBelowCount = 0);
+    }
+  }
+
+  /// Store listener implementing the shared WhatsApp/Telegram/Instagram
+  /// arrival rule:
+  /// - message arrives while pinned to bottom -> keep the list pinned;
+  /// - message arrives while scrolled away -> DON'T move the list, count it
+  ///   in the badge on the floating down-arrow instead;
+  /// - own outgoing messages always scroll down (handled by _sendMessage).
+  void _onDataStoreChanged() {
+    final count = _currentMessageCount;
+    final previous = _lastKnownMessageCount;
+    if (count == previous) return;
+    _lastKnownMessageCount = count;
+    final grew = count > previous;
+    if (!mounted) return;
+    if (!grew) {
+      if (_pendingBelowCount != 0) setState(() => _pendingBelowCount = 0);
+      return;
+    }
+    if (_isNearBottom) {
+      _scrollToBottom();
+      if (_pendingBelowCount != 0) setState(() => _pendingBelowCount = 0);
+    } else {
+      setState(() => _pendingBelowCount += count - previous);
+    }
   }
 
   void _onMessageLongPress(ChatMessage message) {
@@ -912,9 +992,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 : 'Video call • contact acceptance required',
             onPressed: () => _startCall(true),
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: SecurityChip(status: conversation.encryptionStatus),
+          // Chat overflow menu: wallpaper, mute, clear, block and more.
+          IconButton(
+            tooltip: 'Chat options',
+            icon: Icon(
+              Icons.more_vert_rounded,
+              color: theme.primaryTextColor,
+            ),
+            onPressed: () => _openChatMenu(conversation, otherUser),
           ),
         ],
       ),
@@ -922,6 +1007,27 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         top: false,
         child: Column(
           children: [
+            if (!_realtime.isConnected)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+                color: context.colors.warning.withValues(alpha: 0.15),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.wifi_off_rounded, size: 14, color: context.colors.warning),
+                    const SizedBox(width: 6),
+                    Text(
+                      'No internet connection • Working offline with cached media',
+                      style: TextStyle(
+                        fontSize: 11.5 * theme.fontScale,
+                        fontWeight: FontWeight.w600,
+                        color: context.colors.foreground,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Expanded(
               // Wallpaper layer sits behind the transparent message list.
               child: ClipRect(
@@ -932,13 +1038,88 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       theme: theme,
                       wallpaperType:
                           widget.preferencesController.conversation.wallpaperType,
-                      patternId: theme.wallpaperId,
+                      // Per-chat override wins over the theme pattern.
+                      patternId: _chatWallpaperOverride ?? theme.wallpaperId,
                       profileColorHex: conversation.avatarColorHex ??
                           otherUser?.avatarColorHex,
                       imagePath:
                           widget.preferencesController.conversation.wallpaperPath,
                     ),
                     _messagesBody(theme, conversation, messages, showDeleted),
+                    // Floating scroll-to-bottom arrow with unseen count —
+                    // hidden while pinned to bottom or when there is nothing
+                    // to scroll to.
+                    Positioned(
+                      right: 14,
+                      bottom: 12,
+                      child: IgnorePointer(
+                        ignoring: _isNearBottom || messages.isEmpty,
+                        child: AnimatedScale(
+                          scale:
+                              _isNearBottom || messages.isEmpty ? 0.4 : 1.0,
+                          duration: const Duration(milliseconds: 160),
+                          curve: Curves.easeOutBack,
+                          child: AnimatedOpacity(
+                            opacity:
+                                _isNearBottom || messages.isEmpty ? 0.0 : 1.0,
+                            duration: const Duration(milliseconds: 140),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(23),
+                                onTap: () {
+                                  _scrollToBottom();
+                                  setState(() => _pendingBelowCount = 0);
+                                },
+                                child: Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: theme.cardColor,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: theme.surfaceColor,
+                                      width: 1,
+                                    ),
+                                    boxShadow: <BoxShadow>[
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.18,
+                                        ),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      Center(
+                                        child: Icon(
+                                          Icons.keyboard_arrow_down_rounded,
+                                          size: 27,
+                                          color: theme.primaryTextColor,
+                                        ),
+                                      ),
+                                      if (_pendingBelowCount > 0)
+                                        Positioned(
+                                          top: -4,
+                                          right: -5,
+                                          child: ChatyCountBadge(
+                                            count: _pendingBelowCount,
+                                            color: theme.accentColor,
+                                            textColor: theme.onAccentColor,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1247,14 +1428,266 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Chat overflow menu (3-dots in the header): everything below is REAL.
+  // ---------------------------------------------------------------------------
+  void _openChatMenu(Conversation conversation, UserProfile? otherUser) {
+    final theme = _theme;
+    final isDirect =
+        conversation.type == ConversationType.direct && otherUser != null;
+
+    Widget row({
+      required IconData icon,
+      required String label,
+      required VoidCallback onTap,
+      bool destructive = false,
+    }) {
+      final color = destructive ? theme.dangerColor : theme.primaryTextColor;
+      return ListTile(
+        leading: Icon(icon, size: 21, color: destructive ? theme.dangerColor : theme.accentColor),
+        title: Text(label, style: TextStyle(color: color, fontSize: 14.5)),
+        onTap: onTap,
+      );
+    }
+
+    BuildContext sheetCtx = context;
+
+    Future<void> closeAnd(VoidCallback action) async {
+      Navigator.of(sheetCtx).pop();
+      action();
+    }
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        sheetCtx = sheetContext;
+        return SafeArea(
+          child: Container(
+            decoration: BoxDecoration(
+              color: theme.surfaceColor,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(18),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 14),
+                Text(
+                  conversation.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: theme.primaryTextColor,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                row(
+                  icon: isDirect
+                      ? Icons.person_outline_rounded
+                      : Icons.groups_2_rounded,
+                  label: isDirect ? 'View contact info' : 'View group info',
+                  onTap: () => closeAnd(() {
+                    if (isDirect && otherUser != null) {
+                      _openContactInfo(conversation, otherUser);
+                    } else if (!isDirect) {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => GroupInfoScreen(
+                            theme: theme,
+                            dataStore: widget.dataStore,
+                            conversationId: widget.conversationId,
+                          ),
+                        ),
+                      );
+                    }
+                  }),
+                ),
+                row(
+                  icon: Icons.wallpaper_rounded,
+                  label: 'Chat wallpaper',
+                  onTap: () {
+                    Navigator.of(sheetCtx).pop();
+                    _openWallpaperPicker();
+                  },
+                ),
+                row(
+                  icon: conversation.isMuted
+                      ? Icons.notifications_active_rounded
+                      : Icons.notifications_off_rounded,
+                  label: conversation.isMuted ? 'Unmute notifications' : 'Mute notifications',
+                  onTap: () => closeAnd(() =>
+                      widget.dataStore.toggleMuteConversation(conversation.id)),
+                ),
+                row(
+                  icon: Icons.emoji_emotions_outlined,
+                  label: 'Clear recent emojis',
+                  onTap: () => closeAnd(_clearRecentEmojis),
+                ),
+                row(
+                  icon: Icons.delete_sweep_rounded,
+                  label: 'Clear conversation',
+                  destructive: true,
+                  onTap: () => closeAnd(_clearConversation),
+                ),
+                if (isDirect && otherUser != null)
+                  row(
+                    icon: Icons.block_rounded,
+                    label: 'Block ${otherUser.displayName.split(' ').first}',
+                    destructive: true,
+                    onTap: () => closeAnd(() => _blockContact(otherUser)),
+                  ),
+                const SizedBox(height: 10),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Per-chat wallpaper: writes a real override consumed by ChatWallpaper.
+  void _openWallpaperPicker() {
+    final theme = _theme;
+    const options = <(String, String)>[
+      ('none', 'Plain'),
+      ('subtle_dots', 'Subtle Dots'),
+      ('geometric', 'Geometric'),
+      ('gradient_mesh', 'Gradient Mesh'),
+      ('constellation', 'Constellation'),
+    ];
+    final current = _chatWallpaperOverride ?? theme.wallpaperId;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => SafeArea(
+        child: Container(
+          decoration: BoxDecoration(
+            color: theme.surfaceColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 14),
+              Text(
+                'Chat wallpaper',
+                style: TextStyle(
+                  color: theme.primaryTextColor,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                ),
+              ),
+              const SizedBox(height: 4),
+              for (final (id, label) in options)
+                ListTile(
+                  dense: true,
+                  title: Text(
+                    label,
+                    style: TextStyle(color: theme.primaryTextColor),
+                  ),
+                  trailing: current == id
+                      ? Icon(Icons.check_rounded, color: theme.accentColor)
+                      : null,
+                  onTap: () {
+                    widget.dataStore.setChatWallpaper(
+                      widget.conversationId,
+                      id,
+                    );
+                    Navigator.of(sheetContext).pop();
+                  },
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _clearRecentEmojis() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final keys = prefs
+          .getKeys()
+          .where((key) => key.contains('emoji_picker'))
+          .toList();
+      for (final key in keys) {
+        await prefs.remove(key);
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            keys.isEmpty
+                ? 'Recent emojis already empty.'
+                : 'Recent emojis cleared.',
+          ),
+        ),
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _clearConversation() async {
+    final confirmed = await ChatyConfirmDialog.show(
+      context,
+      title: 'Clear conversation?',
+      message: 'All messages will be removed from this chat for you.',
+      confirmLabel: 'Clear',
+      destructive: true,
+    );
+    if (confirmed != true || !mounted) return;
+    final messages = widget.dataStore
+        .getMessages(widget.conversationId)
+        .toList(growable: false);
+    for (final message in messages) {
+      widget.dataStore.deleteMessage(
+        widget.conversationId,
+        message.id,
+        forEveryone: false,
+      );
+    }
+    setState(() {
+      _openedViewOnceIds.clear();
+      _pendingBelowCount = 0;
+      _lastKnownMessageCount = 0;
+    });
+  }
+
+  Future<void> _blockContact(UserProfile contact) async {
+    final confirmed = await ChatyConfirmDialog.show(
+      context,
+      title: 'Block contact?',
+      message:
+          '${contact.displayName} will no longer be able to send you '
+          'messages or call you.',
+      confirmLabel: 'Block',
+      destructive: true,
+    );
+    if (confirmed != true) return;
+    try {
+      await _relationships.setBlocked(contact.id, true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${contact.displayName} was blocked.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not block this contact.')),
+      );
+    }
+  }
+
   Widget _messagesBody(
     ThemeConfig theme,
     Conversation conversation,
     List<ChatMessage> messages,
     bool showDeleted,
   ) {
-    if (_loadingMessages && messages.isEmpty)
-      return _MessageLoadingSkeleton(theme: theme);
     if (_loadError != null && messages.isEmpty) {
       return Center(
         child: Padding(
@@ -1358,33 +1791,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           child: bubble,
         );
       },
-    );
-  }
-}
-
-class _MessageLoadingSkeleton extends StatelessWidget {
-  final ThemeConfig theme;
-  const _MessageLoadingSkeleton({required this.theme});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(14, 18, 14, 12),
-      children: List.generate(7, (index) {
-        final right = index.isOdd;
-        return Align(
-          alignment: right ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            width: index % 3 == 0 ? 210 : 150,
-            height: index % 3 == 0 ? 58 : 42,
-            margin: const EdgeInsets.symmetric(vertical: 5),
-            decoration: BoxDecoration(
-              color: theme.cardColor.withValues(alpha: 0.65),
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-        );
-      }),
     );
   }
 }
@@ -1493,12 +1899,12 @@ class _Composer extends StatelessWidget {
                       ),
                       onPressed: voiceBusy ? null : onVoiceSend,
                       icon: voiceBusy
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 17,
                               height: 17,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color: theme.onAccentColor,
                               ),
                             )
                           : const Icon(Icons.send_rounded, size: 19),

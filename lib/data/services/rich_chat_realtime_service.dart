@@ -117,6 +117,8 @@ class RichChatRealtimeService extends ChangeNotifier {
   Stream<CallResponseEvent> get callResponses =>
       _callResponseController.stream;
 
+  bool get isConnected => _channel != null;
+
   PresenceState presenceFor(String userId) =>
       _presenceByUserId[userId] ?? PresenceState.offline;
   bool isOnline(String userId) {

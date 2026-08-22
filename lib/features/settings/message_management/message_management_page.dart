@@ -5,6 +5,7 @@ import '../../../data/services/gb_feature_backend_service.dart';
 import '../../../domain/models/preferences.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/settings_primitives.dart';
+import '../../../ui/core/theme/app_theme.dart';
 
 class MessageManagementPage extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
@@ -466,7 +467,7 @@ class _MessageManagementPageState extends State<MessageManagementPage> {
           children: [
             ChatySwitchTile(
               icon: Icons.reply_all_rounded,
-              iconColor: Colors.tealAccent,
+              iconColor: context.colors.primary,
               title: 'Enable auto-reply engine',
               subtitle: 'Account-level master switch',
               value: auto.enableAutoReply,
@@ -484,11 +485,11 @@ class _MessageManagementPageState extends State<MessageManagementPage> {
                 title: 'Trigger: "${rule.keyword}"',
                 subtitle: 'Reply: ${rule.responseMessage}',
                 badgeText: rule.enabled ? 'ACTIVE' : 'OFF',
-                badgeColor: rule.enabled ? Colors.greenAccent : Colors.grey,
+                badgeColor: rule.enabled ? context.colors.success : context.colors.foregroundTertiary,
                 trailing: IconButton(
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.delete_outline_rounded,
-                    color: Colors.redAccent,
+                    color: context.colors.error,
                   ),
                   onPressed: () => _deleteRule(rule),
                 ),
@@ -535,10 +536,10 @@ class _MessageManagementPageState extends State<MessageManagementPage> {
                               '${entry.body}\n${_formatDateTime(entry.scheduledAt)}${entry.lastError == null ? '' : ' • ${entry.lastError}'}',
                           badgeText: entry.state.toUpperCase(),
                           badgeColor: entry.state == 'sent'
-                              ? Colors.greenAccent
+                              ? context.colors.success
                               : entry.state == 'failed'
-                              ? Colors.redAccent
-                              : Colors.amberAccent,
+                              ? context.colors.error
+                              : context.colors.warning,
                           trailing: entry.state == 'pending'
                               ? IconButton(
                                   icon: const Icon(Icons.close_rounded),

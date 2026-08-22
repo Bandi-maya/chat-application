@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/theme_config.dart';
+import '../theme/theme_extensions.dart';
 
 class ChatyColorPickerModal extends StatefulWidget {
   final String title;
@@ -98,8 +99,8 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
 
     // Pick crisp dark or crisp white based on background luminance
     Color adjusted = bgLum > 0.5
-        ? const Color(0xFF0F172A)
-        : const Color(0xFFF8FAFC);
+        ? context.colors.foreground
+        : context.colors.onPrimary;
     setState(() {
       _color = adjusted;
       _hexController.text = _colorToHex(_color);
@@ -189,9 +190,10 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color:
-                          (hasContrastWarning ? Colors.redAccent : Colors.green)
-                              .withValues(alpha: 0.15),
+                      color: (hasContrastWarning
+                              ? context.colors.error
+                              : context.colors.success)
+                          .withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -202,8 +204,8 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
                               : Icons.check_circle_rounded,
                           size: 14,
                           color: hasContrastWarning
-                              ? Colors.redAccent
-                              : Colors.green,
+                              ? context.colors.error
+                              : context.colors.success,
                         ),
                         const SizedBox(width: 4),
                         Text(
@@ -212,8 +214,8 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                             color: hasContrastWarning
-                                ? Colors.redAccent
-                                : Colors.green,
+                                ? context.colors.error
+                                : context.colors.success,
                           ),
                         ),
                       ],
@@ -227,10 +229,10 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
             const SizedBox(height: 10),
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Low contrast warning! Text may be hard to read.',
-                    style: TextStyle(color: Colors.redAccent, fontSize: 12),
+                    style: TextStyle(color: context.colors.error, fontSize: 12),
                   ),
                 ),
                 TextButton.icon(
@@ -241,7 +243,7 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
                     style: TextStyle(fontSize: 12),
                   ),
                   style: TextButton.styleFrom(
-                    foregroundColor: theme.colorScheme.primary,
+                    foregroundColor: context.colors.primary,
                   ),
                 ),
               ],
@@ -272,7 +274,7 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
                     color: c,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: isSel ? theme.colorScheme.primary : Colors.white24,
+                      color: isSel ? context.colors.primary : context.colors.border,
                       width: isSel ? 3 : 1.5,
                     ),
                   ),
@@ -308,8 +310,8 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
               const SizedBox(width: 12),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary,
-                  foregroundColor: Colors.white,
+                  backgroundColor: context.colors.primary,
+                  foregroundColor: context.colors.onPrimary,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
                     vertical: 16,
@@ -326,6 +328,7 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
               ),
             ],
           ),
+
         ],
       ),
     );

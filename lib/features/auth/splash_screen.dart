@@ -7,7 +7,6 @@ import 'package:chat/features/auth/welcome_screen.dart';
 import 'package:chat/features/chats/main_navigation_shell.dart';
 import 'package:chat/injection/locator.dart';
 import 'package:chat/ui/core/controllers/app_icon_controller.dart';
-import 'package:chat/ui/core/theme/theme_controller.dart';
 import 'package:chat/ui/core/widgets/app_brand_icon.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -50,16 +49,15 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = locator<ThemeController>().globalTheme;
     final appIconController = locator<AppIconController>();
     return Scaffold(
-      backgroundColor: theme.backgroundColor,
+      backgroundColor: context.colors.background,
       body: Center(
         child: ClipOval(
           child: ChatyBrandIcon(
             controller: appIconController,
-            size: 112,
-            borderRadius: 56,
+            size: 100,
+            borderRadius: 50,
           ),
         ),
       ),

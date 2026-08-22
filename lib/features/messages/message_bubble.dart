@@ -227,7 +227,7 @@ class MessageBubble extends StatelessWidget {
                     .map((e) => e.isEmpty ? '' : e[0])
                     .take(2)
                     .join(),
-                colorHex: '0xFF6366F1',
+                colorHex: null,
                 size: 28,
               ),
             ),

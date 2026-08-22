@@ -232,8 +232,8 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                           ),
                           child: Text(
                             widget.contact.avatarInitials,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: context.colors.onPrimary,
                               fontSize: 28,
                               fontWeight: FontWeight.w700,
                             ),
@@ -247,10 +247,10 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                               width: 16,
                               height: 16,
                               decoration: BoxDecoration(
-                                color: const Color(0xFF10B981),
+                                color: context.colors.success,
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: themeData.scaffoldBackgroundColor,
+                                  color: context.colors.background,
                                   width: 2.5,
                                 ),
                               ),
@@ -263,14 +263,14 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                   Text(
                     widget.contact.displayName,
                     textAlign: TextAlign.center,
-                    style: ChatyTypography.headline(themeData.colorScheme.onSurface),
+                    style: ChatyTypography.headline(context.colors.foreground),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '@${widget.contact.username}',
                     textAlign: TextAlign.center,
                     style: ChatyTypography.caption(
-                      themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+                      context.colors.foregroundSecondary,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -279,8 +279,8 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: widget.realtimeService.isOnline(widget.contact.id)
-                          ? const Color(0xFF10B981)
-                          : themeData.colorScheme.onSurface.withValues(alpha: 0.5),
+                          ? context.colors.success
+                          : context.colors.foregroundSecondary,
                       fontSize: 12.5,
                       fontWeight: FontWeight.w600,
                     ),
@@ -291,7 +291,7 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                       child: Text(
                         widget.contact.about,
                         style: TextStyle(
-                          color: themeData.colorScheme.onSurface,
+                          color: context.colors.foreground,
                           fontSize: 14.5,
                           height: 1.4,
                         ),
@@ -303,7 +303,7 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                     Text(
                       _error!,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: Color(0xFFEF4444), fontSize: 13),
+                      style: TextStyle(color: context.colors.error, fontSize: 13),
                     ),
                   ],
                   const SizedBox(height: ChatySpacing.lg),
@@ -316,8 +316,8 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                               ? Icons.verified_user_rounded
                               : Icons.person_add_alt_1_rounded,
                           color: _connection.callsAllowed
-                              ? const Color(0xFF10B981)
-                              : themeData.colorScheme.primary,
+                              ? context.colors.success
+                              : context.colors.primary,
                         ),
                         title: Text(
                           _connection.callsAllowed
@@ -328,7 +328,7 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                               ? 'Waiting for ${widget.contact.displayName}'
                               : 'Accept this contact',
                           style: TextStyle(
-                            color: themeData.colorScheme.onSurface,
+                            color: context.colors.foreground,
                             fontWeight: FontWeight.w600,
                             fontSize: 15,
                           ),
@@ -338,7 +338,7 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                               ? 'Encrypted voice and video calls are unlocked.'
                               : 'Messaging stays open. Direct calls unlock when both accept.',
                           style: ChatyTypography.caption(
-                            themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+                            context.colors.foregroundSecondary,
                           ),
                         ),
                         trailing: !_connection.myAccepted
@@ -354,9 +354,8 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                                     ? Icons.check_circle_rounded
                                     : Icons.schedule_rounded,
                                 color: _connection.callsAllowed
-                                    ? const Color(0xFF10B981)
-                                    : themeData.colorScheme.onSurface
-                                        .withValues(alpha: 0.4),
+                                    ? context.colors.success
+                                    : context.colors.foregroundTertiary,
                               ),
                       ),
                     ],
@@ -367,12 +366,12 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                       ChatyListTile(
                         leading: Icon(
                           Icons.tune_rounded,
-                          color: themeData.colorScheme.primary,
+                          color: context.colors.primary,
                         ),
                         title: Text(
                           'Individual Privacy Controls',
                           style: TextStyle(
-                            color: themeData.colorScheme.onSurface,
+                            color: context.colors.foreground,
                             fontWeight: FontWeight.w600,
                             fontSize: 15,
                           ),
@@ -380,14 +379,12 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                         subtitle: Text(
                           'Read receipts, typing indicator, recording & online presence',
                           style: ChatyTypography.caption(
-                            themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+                            context.colors.foregroundSecondary,
                           ),
                         ),
                         trailing: Icon(
                           Icons.chevron_right_rounded,
-                          color: themeData.colorScheme.onSurface.withValues(
-                            alpha: 0.35,
-                          ),
+                          color: context.colors.foregroundSecondary,
                         ),
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute(
@@ -403,14 +400,14 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                           _blocked
                               ? Icons.lock_open_rounded
                               : Icons.block_rounded,
-                          color: const Color(0xFFEF4444),
+                          color: context.colors.error,
                         ),
                         title: Text(
                           _blocked
                               ? 'Unblock ${widget.contact.displayName}'
                               : 'Block ${widget.contact.displayName}',
-                          style: const TextStyle(
-                            color: Color(0xFFEF4444),
+                          style: TextStyle(
+                            color: context.colors.error,
                             fontWeight: FontWeight.w600,
                             fontSize: 15,
                           ),
@@ -420,7 +417,7 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                               ? 'Allow messages from this contact again.'
                               : 'Stop receiving messages from this contact.',
                           style: ChatyTypography.caption(
-                            themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+                            context.colors.foregroundSecondary,
                           ),
                         ),
                         onTap: _busy ? null : _toggleBlock,
@@ -437,9 +434,7 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                             child: Text(
                               'No shared media, links or documents yet.',
                               style: ChatyTypography.caption(
-                                themeData.colorScheme.onSurface.withValues(
-                                  alpha: 0.5,
-                                ),
+                                context.colors.foregroundSecondary,
                               ),
                             ),
                           ),
@@ -453,7 +448,7 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                               Text(
                                 '${media.length} Photos & Videos',
                                 style: TextStyle(
-                                  color: themeData.colorScheme.onSurface,
+                                  color: context.colors.foreground,
                                   fontWeight: FontWeight.w700,
                                   fontSize: 13,
                                 ),
@@ -477,9 +472,7 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                                         width: 110,
                                         padding: const EdgeInsets.all(8),
                                         decoration: BoxDecoration(
-                                          color: isDark
-                                              ? const Color(0xFF27272A)
-                                              : const Color(0xFFF4F4F5),
+                                          color: context.colors.surfaceSecondary,
                                           borderRadius: BorderRadius.circular(
                                             ChatyRadius.md,
                                           ),
@@ -493,7 +486,7 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                                                   ? Icons
                                                         .play_circle_outline_rounded
                                                   : Icons.image_outlined,
-                                              color: themeData.colorScheme.primary,
+                                              color: context.colors.primary,
                                               size: 20,
                                             ),
                                             const Spacer(),
@@ -502,7 +495,7 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                               style: TextStyle(
-                                                color: themeData.colorScheme.onSurface,
+                                                color: context.colors.foreground,
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.w600,
                                               ),
@@ -518,6 +511,7 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                           ),
                         ),
                       if (links.isNotEmpty)
+
                         for (final link in links.take(5))
                           ChatyListTile(
                             leading: Icon(

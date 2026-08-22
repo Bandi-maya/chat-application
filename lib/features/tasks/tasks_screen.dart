@@ -1,4 +1,8 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../ui/core/theme/theme_config.dart';
 import '../../domain/models/chat_task.dart';
@@ -24,12 +28,112 @@ class _TasksScreenState extends State<TasksScreen>
   late final TabController _tabCtrl;
   String _selectedPriorityFilter = 'All';
 
+  // P4 Kanban workflow — the five user-facing stages. Enum values reuse the
+  // existing server mapping; only labels and order are ours.
   static const List<TaskStatus> _workflow = <TaskStatus>[
     TaskStatus.inbox,
-    TaskStatus.assigned,
     TaskStatus.inProgress,
+    TaskStatus.assigned,
+    TaskStatus.blocked,
     TaskStatus.completed,
   ];
+
+  static String _stageLabel(TaskStatus status) {
+    switch (status) {
+      case TaskStatus.inbox:
+        return 'Todo';
+      case TaskStatus.inProgress:
+        return 'In Process';
+      case TaskStatus.assigned:
+        return 'In Review';
+      case TaskStatus.blocked:
+        return 'Testing';
+      case TaskStatus.completed:
+        return 'Done';
+      case TaskStatus.archived:
+        return 'Archived';
+    }
+  }
+
+  // --- Task history ("task tree"): every stage transition is recorded
+  // per task and viewable from the card's history button.
+  static const String _historyKey = 'chaty_task_history_v1';
+  static const int _historyCapPerTask = 30;
+
+  Future<Map<String, List<String>>> _loadHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_historyKey);
+      if (raw == null || raw.isEmpty) return <String, List<String>>{};
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      return decoded.map(
+        (key, value) => MapEntry(
+          key,
+          (value as List).map((item) => item.toString()).toList(),
+        ),
+      );
+    } catch (_) {
+      return <String, List<String>>{};
+    }
+  }
+
+  Future<void> _recordMove(ChatTask task, TaskStatus from, TaskStatus to) async {
+    final history = await _loadHistory();
+    final entries = history.putIfAbsent(task.id, () => <String>[]);
+    final now = DateTime.now();
+    final stamp =
+        '${now.day}/${now.month} '
+        '${now.hour.toString().padLeft(2, '0')}:'
+        '${now.minute.toString().padLeft(2, '0')}';
+    entries.insert(0, '${_stageLabel(from)} → ${_stageLabel(to)} • $stamp');
+    while (entries.length > _historyCapPerTask) {
+      entries.removeLast();
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _historyKey,
+        jsonEncode(history.map((k, v) => MapEntry(k, v))),
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _showHistory(ChatTask task) async {
+    final history = await _loadHistory();
+    if (!mounted) return;
+    final entries = history[task.id] ?? const <String>[];
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('History — ${task.title}'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: entries.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 14),
+                  child: Text('No stage changes recorded yet.'),
+                )
+              : ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (final entry in entries)
+                      ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.history_rounded, size: 18),
+                        title: Text(entry, style: const TextStyle(fontSize: 13)),
+                      ),
+                  ],
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -79,7 +183,9 @@ class _TasksScreenState extends State<TasksScreen>
 
   void _moveTask(ChatTask task, TaskStatus target) {
     if (task.status == target) return;
+    final from = task.status;
     widget.dataStore.updateTaskStatus(task.id, target);
+    unawaited(_recordMove(task, from, target));
   }
 
   TaskStatus? _previous(TaskStatus status) {
@@ -97,7 +203,7 @@ class _TasksScreenState extends State<TasksScreen>
   @override
   Widget build(BuildContext context) {
     final themeData = Theme.of(context);
-    final isDark = themeData.brightness == Brightness.dark;
+    final colors = context.colors;
     final dataStore = widget.dataStore;
     final allTasks = dataStore.tasks;
 
@@ -119,18 +225,15 @@ class _TasksScreenState extends State<TasksScreen>
                   child: Text(
                     'Action Items',
                     style: ChatyTypography.headline(
-                      themeData.colorScheme.onSurface,
+                      colors.foreground,
                     ),
                   ),
                 ),
                 ChatyIconButton(
                   icon: Icons.add_task_rounded,
                   tooltip: 'Create task',
-                  backgroundColor:
-                      isDark
-                          ? const Color(0xFF27272A)
-                          : const Color(0xFFF4F4F5),
-                  color: themeData.colorScheme.primary,
+                  backgroundColor: colors.surfaceSecondary,
+                  color: colors.primary,
                   onPressed: () => _createTask(widget.theme),
                 ),
               ],
@@ -140,11 +243,9 @@ class _TasksScreenState extends State<TasksScreen>
             padding: const EdgeInsets.symmetric(horizontal: ChatySpacing.base),
             child: TabBar(
               controller: _tabCtrl,
-              labelColor: themeData.colorScheme.primary,
-              unselectedLabelColor: themeData.colorScheme.onSurface.withValues(
-                alpha: 0.55,
-              ),
-              indicatorColor: themeData.colorScheme.primary,
+              labelColor: colors.primary,
+              unselectedLabelColor: colors.foregroundSecondary,
+              indicatorColor: colors.primary,
               indicatorWeight: 2.5,
               tabs: const [
                 Tab(
@@ -177,19 +278,14 @@ class _TasksScreenState extends State<TasksScreen>
                         child: ChoiceChip(
                           label: Text(p),
                           selected: isSelected,
-                          selectedColor: themeData.colorScheme.primary.withValues(
+                          selectedColor: colors.primary.withValues(
                             alpha: 0.15,
                           ),
-                          backgroundColor:
-                              isDark
-                                  ? const Color(0xFF18181B)
-                                  : const Color(0xFFF4F4F5),
+                          backgroundColor: colors.surfaceSecondary,
                           labelStyle: TextStyle(
                             color: isSelected
-                                ? themeData.colorScheme.primary
-                                : themeData.colorScheme.onSurface.withValues(
-                                    alpha: 0.65,
-                                  ),
+                                ? colors.primary
+                                : colors.foregroundSecondary,
                             fontWeight: isSelected
                                 ? FontWeight.w700
                                 : FontWeight.w500,
@@ -202,10 +298,8 @@ class _TasksScreenState extends State<TasksScreen>
                           ),
                           side: BorderSide(
                             color: isSelected
-                                ? themeData.colorScheme.primary
-                                : (isDark
-                                      ? const Color(0xFF27272A)
-                                      : const Color(0xFFE4E4E7)),
+                                ? colors.primary
+                                : colors.border,
                           ),
                           onSelected: (value) {
                             if (value) {
@@ -219,6 +313,7 @@ class _TasksScreenState extends State<TasksScreen>
               ),
             ),
           ),
+
           Expanded(
             child: TabBarView(
               controller: _tabCtrl,
@@ -275,7 +370,7 @@ class _TasksScreenState extends State<TasksScreen>
 
         return ChatyCard(
           padding: const EdgeInsets.all(ChatySpacing.base),
-          borderColor: isOverdue ? const Color(0xFFEF4444).withValues(alpha: 0.4) : null,
+          borderColor: isOverdue ? context.colors.error.withValues(alpha: 0.4) : null,
           onTap: () => _openTask(task, theme),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -287,10 +382,10 @@ class _TasksScreenState extends State<TasksScreen>
                   PriorityBadge(priority: task.priority),
                   const Spacer(),
                   if (isOverdue)
-                    const Text(
+                    Text(
                       'OVERDUE',
                       style: TextStyle(
-                        color: Color(0xFFEF4444),
+                        color: context.colors.error,
                         fontSize: 10.5,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.5,
@@ -299,7 +394,7 @@ class _TasksScreenState extends State<TasksScreen>
                   const SizedBox(width: 4),
                   Icon(
                     Icons.chevron_right_rounded,
-                    color: themeData.colorScheme.onSurface.withValues(alpha: 0.35),
+                    color: context.colors.foregroundSecondary,
                   ),
                 ],
               ),
@@ -307,7 +402,7 @@ class _TasksScreenState extends State<TasksScreen>
               Text(
                 task.title,
                 style: TextStyle(
-                  color: themeData.colorScheme.onSurface,
+                  color: context.colors.foreground,
                   fontSize: 15.5,
                   fontWeight: FontWeight.w700,
                   letterSpacing: -0.2,
@@ -320,7 +415,7 @@ class _TasksScreenState extends State<TasksScreen>
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: ChatyTypography.caption(
-                    themeData.colorScheme.onSurface.withValues(alpha: 0.65),
+                    context.colors.foregroundSecondary,
                   ),
                 ),
               ],
@@ -333,7 +428,7 @@ class _TasksScreenState extends State<TasksScreen>
                       padding: const EdgeInsets.only(right: 5),
                       child: AppAvatar(
                         initials: contact?.avatarInitials ?? 'U',
-                        colorHex: contact?.avatarColorHex ?? '0xFF6366F1',
+                        colorHex: contact?.avatarColorHex,
                         size: 24,
                       ),
                     );
@@ -343,8 +438,8 @@ class _TasksScreenState extends State<TasksScreen>
                     'Due ${task.dueAt.day}/${task.dueAt.month}',
                     style: TextStyle(
                       color: isOverdue
-                          ? const Color(0xFFEF4444)
-                          : themeData.colorScheme.onSurface.withValues(alpha: 0.55),
+                          ? context.colors.error
+                          : context.colors.foregroundSecondary,
                       fontSize: 12,
                       fontWeight: isOverdue ? FontWeight.w700 : FontWeight.w500,
                     ),
@@ -368,19 +463,19 @@ class _TasksScreenState extends State<TasksScreen>
             Icon(
               Icons.task_alt_rounded,
               size: 48,
-              color: themeData.colorScheme.primary,
+              color: context.colors.primary,
             ),
             const SizedBox(height: ChatySpacing.base),
             Text(
               'No action items yet',
-              style: ChatyTypography.title(themeData.colorScheme.onSurface),
+              style: ChatyTypography.title(context.colors.foreground),
             ),
             const SizedBox(height: ChatySpacing.xs),
             Text(
               'Create an action item from any message or using the add button.',
               textAlign: TextAlign.center,
               style: ChatyTypography.caption(
-                themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+                context.colors.foregroundSecondary,
               ),
             ),
           ],
@@ -396,12 +491,9 @@ class _TasksScreenState extends State<TasksScreen>
     ThemeData themeData,
   ) {
     final filtered = _filtered(tasks);
-    final isDark = themeData.brightness == Brightness.dark;
+    // P4: the five user-facing Kanban stages.
     final columns = <(TaskStatus, String)>[
-      (TaskStatus.inbox, 'Inbox'),
-      (TaskStatus.assigned, 'Assigned'),
-      (TaskStatus.inProgress, 'In Progress'),
-      (TaskStatus.completed, 'Completed'),
+      for (final status in _workflow) (status, _stageLabel(status)),
     ];
 
     return LayoutBuilder(
@@ -439,17 +531,13 @@ class _TasksScreenState extends State<TasksScreen>
                         padding: const EdgeInsets.all(ChatySpacing.md),
                         decoration: BoxDecoration(
                           color: highlighted
-                              ? themeData.colorScheme.primary.withValues(alpha: 0.1)
-                              : (isDark
-                                    ? const Color(0xFF18181B)
-                                    : const Color(0xFFF4F4F5)),
+                              ? context.colors.primary.withValues(alpha: 0.1)
+                              : context.colors.surfaceSecondary,
                           borderRadius: BorderRadius.circular(ChatyRadius.card),
                           border: Border.all(
                             color: highlighted
-                                ? themeData.colorScheme.primary
-                                : (isDark
-                                      ? const Color(0xFF27272A)
-                                      : const Color(0xFFE4E4E7)),
+                                ? context.colors.primary
+                                : context.colors.border,
                             width: highlighted ? 1.5 : 1.0,
                           ),
                         ),
@@ -462,7 +550,7 @@ class _TasksScreenState extends State<TasksScreen>
                                   child: Text(
                                     title,
                                     style: TextStyle(
-                                      color: themeData.colorScheme.onSurface,
+                                      color: context.colors.foreground,
                                       fontWeight: FontWeight.w700,
                                       fontSize: 14,
                                     ),
@@ -474,9 +562,7 @@ class _TasksScreenState extends State<TasksScreen>
                                     vertical: 2,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: isDark
-                                        ? const Color(0xFF27272A)
-                                        : const Color(0xFFE4E4E7),
+                                    color: context.colors.surfaceSecondary,
                                     borderRadius: BorderRadius.circular(
                                       ChatyRadius.full,
                                     ),
@@ -484,7 +570,7 @@ class _TasksScreenState extends State<TasksScreen>
                                   child: Text(
                                     '${columnTasks.length}',
                                     style: TextStyle(
-                                      color: themeData.colorScheme.onSurface,
+                                      color: context.colors.foreground,
                                       fontSize: 11,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -502,8 +588,7 @@ class _TasksScreenState extends State<TasksScreen>
                                   child: Text(
                                     'Drop tasks here',
                                     style: ChatyTypography.caption(
-                                      themeData.colorScheme.onSurface
-                                          .withValues(alpha: 0.45),
+                                      context.colors.foregroundTertiary,
                                     ),
                                   ),
                                 ),
@@ -527,14 +612,13 @@ class _TasksScreenState extends State<TasksScreen>
   Widget _kanbanCard(ChatTask task, ThemeConfig theme, ThemeData themeData) {
     final previous = _previous(task.status);
     final next = _next(task.status);
-    final isDark = themeData.brightness == Brightness.dark;
 
     final card = Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF27272A) : Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(ChatyRadius.md),
         border: Border.all(
-          color: isDark ? const Color(0xFF3F3F46) : const Color(0xFFE4E4E7),
+          color: context.colors.border,
           width: 1.0,
         ),
       ),
@@ -554,7 +638,7 @@ class _TasksScreenState extends State<TasksScreen>
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: themeData.colorScheme.onSurface,
+                    color: context.colors.foreground,
                     fontWeight: FontWeight.w600,
                     fontSize: 13.5,
                   ),
@@ -564,6 +648,18 @@ class _TasksScreenState extends State<TasksScreen>
                   children: [
                     PriorityBadge(priority: task.priority),
                     const Spacer(),
+                    // Task tree: every stage change is recorded and
+                    // viewable here.
+                    IconButton(
+                      tooltip: 'History',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => _showHistory(task),
+                      icon: Icon(
+                        Icons.history_rounded,
+                        size: 18,
+                        color: context.colors.primary,
+                      ),
+                    ),
                     if (previous != null)
                       ChatyIconButton(
                         size: 28,
@@ -571,7 +667,7 @@ class _TasksScreenState extends State<TasksScreen>
                         tooltip: 'Move back',
                         onPressed: () => _moveTask(task, previous),
                         icon: Icons.chevron_left_rounded,
-                        color: themeData.colorScheme.primary,
+                        color: context.colors.primary,
                       ),
                     if (next != null)
                       ChatyIconButton(
@@ -580,7 +676,7 @@ class _TasksScreenState extends State<TasksScreen>
                         tooltip: 'Move forward',
                         onPressed: () => _moveTask(task, next),
                         icon: Icons.chevron_right_rounded,
-                        color: themeData.colorScheme.primary,
+                        color: context.colors.primary,
                       ),
                   ],
                 ),
@@ -590,6 +686,7 @@ class _TasksScreenState extends State<TasksScreen>
         ),
       ),
     );
+
 
     return Padding(
       padding: const EdgeInsets.only(bottom: ChatySpacing.sm),

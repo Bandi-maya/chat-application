@@ -140,7 +140,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(error.toString().replaceFirst('Exception: ', '')),
-        backgroundColor: const Color(0xFFEF4444),
+        backgroundColor: context.colors.error,
       ),
     );
   }
@@ -339,9 +339,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
                       height: 1,
                       thickness: 1,
                       indent: 64,
-                      color: isDark
-                          ? const Color(0xFF27272A)
-                          : const Color(0xFFE4E4E7),
+                      color: context.colors.divider,
                     ),
                     itemBuilder: (context, index) {
                       final user = _results[index];

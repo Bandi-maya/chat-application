@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../data/services/notification_service.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/settings_primitives.dart';
+import '../../../ui/core/design_system/design_system.dart';
+import '../../../ui/core/theme/app_theme.dart';
 
 class NotificationSettingsPage extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
@@ -27,13 +29,13 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
   ];
   static const List<int> _toastDurations = <int>[2, 3, 4, 5, 6, 8];
 
-  void _previewToast() {
+  void _previewToast(BuildContext context) {
     widget.notificationService.triggerEventNotification(
       title: 'Elena is online',
       body:
           'Presence alerts appear here only when the corresponding live event is enabled.',
       icon: Icons.online_prediction_rounded,
-      color: Colors.greenAccent,
+      color: context.colors.success,
       avatarInitials: 'ER',
       avatarColorHex: '0xFFEC4899',
     );
@@ -42,49 +44,100 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
   @override
   Widget build(BuildContext context) {
     final notif = widget.preferencesController.notification;
+    final colors = context.colors;
     final toastPosition = widget.preferencesController.gbString(
       'event_toast_position',
       fallback: 'Top',
     );
-    final duration = widget.preferencesController
-        .gbInt('event_toast_duration_seconds', fallback: 3)
-        .clamp(2, 8);
+    final duration = widget.preferencesController.gbInt(
+      'event_toast_duration_seconds',
+      fallback: 3,
+    );
     final recordingAlert = widget.preferencesController.gbBool(
       'notify_recording_started',
-      fallback: true,
+      fallback: false,
     );
 
     return ChatySettingsPage(
-      title: 'Notification Customization',
-      subtitle: 'Live presence, typing and activity alerts',
+      title: 'Toast & Event Notifications',
+      subtitle: 'Manage live toasts, contact activity alerts and preview styles',
       children: [
-        ChatyPreviewCard(
-          title: 'Live in-app toast preview',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Position: $toastPosition • Duration: ${duration}s • Online: ${notif.notifyContactOnline ? 'On' : 'Off'} • Typing: ${notif.notifyTypingStarted ? 'On' : 'Off'}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).textTheme.bodySmall?.color,
-                ),
-              ),
-              const SizedBox(height: 10),
-              FilledButton.icon(
-                onPressed: _previewToast,
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('Preview toast'),
-              ),
-            ],
-          ),
-        ),
+        // Live Toast Preview
         ChatySettingsSection(
-          title: 'Global alerts',
+          title: 'Live Preview',
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(ChatySpacing.base),
+              child: Column(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(ChatySpacing.base),
+                    decoration: BoxDecoration(
+                      color: colors.surfaceSecondary,
+                      borderRadius: BorderRadius.circular(ChatyRadius.lg),
+                      border: Border.all(
+                        color: colors.borderSubtle,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 20,
+                          backgroundColor: colors.primary,
+                          child: Text(
+                            'ER',
+                            style: TextStyle(
+                              color: colors.onPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: ChatySpacing.md),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Elena is online',
+                                style: ChatyTypography.title(
+                                  colors.foreground,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Presence alerts appear in realtime',
+                                style: ChatyTypography.caption(
+                                  colors.foregroundSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: ChatySpacing.md),
+                  ChatyPrimaryButton(
+                    text: 'Trigger Live Toast Preview',
+                    icon: Icons.play_arrow_rounded,
+                    onPressed: () => _previewToast(context),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+
+        // Master Toggle
+        ChatySettingsSection(
+          title: 'In-app event notifications',
+          description:
+              'Display non-intrusive toasts for incoming live state transitions without interrupting chats.',
           children: [
             ChatySwitchTile(
               icon: Icons.notifications_active_rounded,
-              iconColor: Colors.indigoAccent,
+              iconColor: colors.primary,
               title: 'Enable in-app notifications',
               subtitle:
                   'Allow Chaty to show realtime event banners while the app is open',
@@ -92,30 +145,29 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
               onChanged: (value) =>
                   widget.preferencesController.updateNotification(
                     notif.copyWith(enableGlobalNotifications: value),
-                    logTitle: 'Enable Notifications',
+                    logTitle: 'In-App Notifications',
                   ),
             ),
             ChatySwitchTile(
               icon: Icons.account_circle_rounded,
               title: 'Show sender avatar',
-              subtitle:
-                  'Show the contact avatar on presence and activity toasts',
+              subtitle: 'Display user avatar icon in event toast notifications',
               value: notif.showSenderAvatar,
               onChanged: (value) =>
                   widget.preferencesController.updateNotification(
                     notif.copyWith(showSenderAvatar: value),
-                    logTitle: 'Show Sender Avatar',
+                    logTitle: 'Notification Avatar',
                   ),
             ),
             ChatySwitchTile(
-              icon: Icons.badge_outlined,
+              icon: Icons.badge_rounded,
               title: 'Show sender name',
-              subtitle: 'Display the contact name in event banners',
+              subtitle: 'Include the contact name in the toast title',
               value: notif.showSenderName,
               onChanged: (value) =>
                   widget.preferencesController.updateNotification(
                     notif.copyWith(showSenderName: value),
-                    logTitle: 'Show Sender Name',
+                    logTitle: 'Notification Name',
                   ),
             ),
             ChatySwitchTile(
@@ -138,7 +190,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
           children: [
             ChatySwitchTile(
               icon: Icons.online_prediction_rounded,
-              iconColor: Colors.greenAccent,
+              iconColor: colors.success,
               title: 'Contact online alert',
               subtitle:
                   'Show a toast when a conversation contact changes from offline to online',
@@ -151,7 +203,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
             ),
             ChatySwitchTile(
               icon: Icons.keyboard_alt_outlined,
-              iconColor: Colors.blueAccent,
+              iconColor: colors.info,
               title: 'Typing alert',
               subtitle: 'Show a toast when a contact starts typing',
               value: notif.notifyTypingStarted,
@@ -163,7 +215,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
             ),
             ChatySwitchTile(
               icon: Icons.mic_none_rounded,
-              iconColor: Colors.redAccent,
+              iconColor: colors.error,
               title: 'Recording alert',
               subtitle:
                   'Show a toast when a contact starts recording a voice message',
@@ -177,7 +229,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
             ),
             ChatySwitchTile(
               icon: Icons.visibility_rounded,
-              iconColor: Colors.cyanAccent,
+              iconColor: colors.accent,
               title: 'Status / story viewed alert',
               subtitle:
                   'Notify when the backend records a contact viewing your story',
@@ -190,7 +242,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
             ),
             ChatySwitchTile(
               icon: Icons.delete_sweep_rounded,
-              iconColor: Colors.redAccent,
+              iconColor: colors.error,
               title: 'Message revoked alert',
               subtitle: 'Notify when a contact deletes a message',
               value: notif.notifyMessageDeleted,

@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../domain/models/chat_message.dart';
@@ -234,6 +236,53 @@ class MockDataStore extends ChangeNotifier {
         'pinned',
         !conversation.isPinned,
       );
+  }
+
+  // --- Per-chat wallpaper overrides (real, locally persisted) ---
+  static const String _chatWallpaperKey = 'chaty_chat_wallpapers_v1';
+  Map<String, String>? _chatWallpapers;
+
+  Future<Map<String, String>> _loadChatWallpapers() async {
+    if (_chatWallpapers != null) return _chatWallpapers!;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_chatWallpaperKey);
+      final decoded = raw == null ? null : jsonDecode(raw);
+      _chatWallpapers = decoded is Map
+          ? decoded.map((k, v) => MapEntry(k.toString(), v.toString()))
+          : <String, String>{};
+    } catch (_) {
+      _chatWallpapers = <String, String>{};
+    }
+    return _chatWallpapers!;
+  }
+
+  Future<void> _saveChatWallpapers() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _chatWallpaperKey,
+        jsonEncode(_chatWallpapers ?? <String, String>{}),
+      );
+    } catch (_) {}
+  }
+
+  /// Pattern id override for a single chat ('' = unset), consumed by the
+  /// ChatWallpaper layer in the conversation screen.
+  Future<String?> loadChatWallpaper(String conversationId) async {
+    final map = await _loadChatWallpapers();
+    return map[conversationId];
+  }
+
+  /// Synchronous read (null until the async load completes).
+  String? chatWallpaperSync(String conversationId) =>
+      _chatWallpapers?[conversationId];
+
+  void setChatWallpaper(String conversationId, String patternId) {
+    _chatWallpapers ??= <String, String>{};
+    _chatWallpapers![conversationId] = patternId;
+    unawaited(_saveChatWallpapers());
+    notifyListeners();
   }
 
   void toggleArchiveConversation(String conversationId) {

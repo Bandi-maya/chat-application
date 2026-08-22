@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../ui/core/theme/theme_controller.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/design_system/design_system.dart';
 
@@ -16,12 +15,9 @@ class _ProPricingScreenState extends State<ProPricingScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = locator<ThemeController>().globalTheme;
-    final themeData = Theme.of(context);
-    final isDark = themeData.brightness == Brightness.dark;
+    final colors = context.colors;
 
-    final borderCol = isDark
-        ? const Color(0xFF27272A)
-        : const Color(0xFFE4E4E7);
+    final borderCol = colors.border;
 
     return ChatyScaffold(
       appBar: const ChatyAppBar(
@@ -48,7 +44,7 @@ class _ProPricingScreenState extends State<ProPricingScreen> {
                       'Easily Build Better Chats\nwith Chaty Pro',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: themeData.colorScheme.onSurface,
+                        color: colors.foreground,
                         fontSize: 24,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.5,
@@ -60,7 +56,7 @@ class _ProPricingScreenState extends State<ProPricingScreen> {
                       'Turn ideas into conversations instantly with AI',
                       textAlign: TextAlign.center,
                       style: ChatyTypography.caption(
-                        themeData.colorScheme.onSurface.withValues(alpha: 0.65),
+                        colors.foregroundSecondary,
                       ),
                     ),
                   ],
@@ -73,9 +69,7 @@ class _ProPricingScreenState extends State<ProPricingScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF18181B)
-                        : const Color(0xFFF1F5F9),
+                    color: colors.surfaceSecondary,
                     borderRadius: BorderRadius.circular(ChatyRadius.full),
                     border: Border.all(color: borderCol, width: 1),
                   ),
@@ -93,9 +87,7 @@ class _ProPricingScreenState extends State<ProPricingScreen> {
                           ),
                           decoration: BoxDecoration(
                             color: !_isYearly
-                                ? (isDark
-                                      ? Colors.white
-                                      : const Color(0xFF09090B))
+                                ? colors.surfaceElevated
                                 : Colors.transparent,
                             borderRadius: BorderRadius.circular(
                               ChatyRadius.full,
@@ -105,8 +97,8 @@ class _ProPricingScreenState extends State<ProPricingScreen> {
                             'Monthly',
                             style: TextStyle(
                               color: !_isYearly
-                                  ? (isDark ? Colors.black : Colors.white)
-                                  : theme.secondaryTextColor,
+                                  ? colors.foreground
+                                  : colors.foregroundSecondary,
                               fontSize: 13.5,
                               fontWeight: FontWeight.w700,
                             ),
@@ -125,9 +117,7 @@ class _ProPricingScreenState extends State<ProPricingScreen> {
                           ),
                           decoration: BoxDecoration(
                             color: _isYearly
-                                ? (isDark
-                                      ? Colors.white
-                                      : const Color(0xFF09090B))
+                                ? colors.surfaceElevated
                                 : Colors.transparent,
                             borderRadius: BorderRadius.circular(
                               ChatyRadius.full,
@@ -139,8 +129,8 @@ class _ProPricingScreenState extends State<ProPricingScreen> {
                                 'Yearly',
                                 style: TextStyle(
                                   color: _isYearly
-                                      ? (isDark ? Colors.black : Colors.white)
-                                      : theme.secondaryTextColor,
+                                      ? colors.foreground
+                                      : colors.foregroundSecondary,
                                   fontSize: 13.5,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -152,15 +142,15 @@ class _ProPricingScreenState extends State<ProPricingScreen> {
                                   vertical: 3,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFEF4444),
+                                  color: colors.error,
                                   borderRadius: BorderRadius.circular(
                                     ChatyRadius.sm,
                                   ),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'Save 50%',
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: colors.onError,
                                     fontSize: 10.5,
                                     fontWeight: FontWeight.w800,
                                   ),
@@ -185,7 +175,7 @@ class _ProPricingScreenState extends State<ProPricingScreen> {
                     Text(
                       'Plus',
                       style: TextStyle(
-                        color: themeData.colorScheme.onSurface,
+                        color: colors.foreground,
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
                       ),
@@ -198,7 +188,7 @@ class _ProPricingScreenState extends State<ProPricingScreen> {
                         Text(
                           _isYearly ? '\$10.25' : '\$20.50',
                           style: TextStyle(
-                            color: themeData.colorScheme.onSurface,
+                            color: colors.foreground,
                             fontSize: 32,
                             fontWeight: FontWeight.w900,
                             letterSpacing: -0.5,
@@ -210,9 +200,7 @@ class _ProPricingScreenState extends State<ProPricingScreen> {
                               ? 'Per Month billed annually'
                               : 'Per Month billed monthly',
                           style: ChatyTypography.caption(
-                            themeData.colorScheme.onSurface.withValues(
-                              alpha: 0.6,
-                            ),
+                            colors.foregroundSecondary,
                           ),
                         ),
                       ],
@@ -242,26 +230,26 @@ class _ProPricingScreenState extends State<ProPricingScreen> {
                     Text(
                       'Included Features',
                       style: ChatyTypography.caption(
-                        themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+                        colors.foregroundSecondary,
                       ),
                     ),
                     const SizedBox(height: ChatySpacing.md),
 
                     _buildCheckItem(
-                      themeData,
+                      colors,
                       'Smart AI messaging assistance',
                     ),
                     _buildCheckItem(
-                      themeData,
+                      colors,
                       'Access to Chaty Pro Theme Library',
                     ),
-                    _buildCheckItem(themeData, 'Early access to new features'),
+                    _buildCheckItem(colors, 'Early access to new features'),
                     _buildCheckItem(
-                      themeData,
+                      colors,
                       'Next-generation privacy & encryption tools',
                     ),
                     _buildCheckItem(
-                      themeData,
+                      colors,
                       'Unlimited task and backup synchronization',
                     ),
                   ],
@@ -275,7 +263,7 @@ class _ProPricingScreenState extends State<ProPricingScreen> {
     );
   }
 
-  Widget _buildCheckItem(ThemeData themeData, String text) {
+  Widget _buildCheckItem(AppColors colors, String text) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
@@ -285,12 +273,12 @@ class _ProPricingScreenState extends State<ProPricingScreen> {
             height: 20,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: const Color(0xFF10B981).withValues(alpha: 0.15),
+              color: colors.success.withValues(alpha: 0.15),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.check_rounded,
               size: 14,
-              color: Color(0xFF10B981),
+              color: colors.success,
             ),
           ),
           const SizedBox(width: 12),
@@ -298,7 +286,7 @@ class _ProPricingScreenState extends State<ProPricingScreen> {
             child: Text(
               text,
               style: TextStyle(
-                color: themeData.colorScheme.onSurface,
+                color: colors.foreground,
                 fontSize: 13.5,
                 fontWeight: FontWeight.w500,
               ),

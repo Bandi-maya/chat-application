@@ -187,9 +187,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   ),
                 ),
                 ChatyListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.alarm_rounded,
-                    color: Color(0xFFF59E0B),
+                    color: context.colors.warning,
                     size: 20,
                   ),
                   title: Text(

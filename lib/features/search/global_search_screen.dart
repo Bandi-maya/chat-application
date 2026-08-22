@@ -141,16 +141,14 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
         titleWidget: Container(
           height: 40,
           decoration: BoxDecoration(
-            color: themeData.brightness == Brightness.dark
-                ? const Color(0xFF27272A)
-                : const Color(0xFFF4F4F5),
+            color: context.colors.inputFill,
             borderRadius: BorderRadius.circular(ChatyRadius.full),
           ),
           child: TextField(
             controller: _searchController,
             autofocus: true,
             style: TextStyle(
-              color: themeData.colorScheme.onSurface,
+              color: context.colors.foreground,
               fontSize: 15,
             ),
             decoration: InputDecoration(

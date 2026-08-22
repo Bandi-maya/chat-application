@@ -299,7 +299,7 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen>
                             : ChatyIconButton(
                                 tooltip: 'Log out device',
                                 icon: Icons.logout_rounded,
-                                color: const Color(0xFFEF4444),
+                                color: context.colors.error,
                                 onPressed: () => _revoke(device),
                               ),
                       ),
@@ -311,6 +311,8 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen>
   }
 
   Widget _buildMyQrView(ThemeData themeData) {
+    final colors = context.colors;
+
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(ChatySpacing.lg),
@@ -320,11 +322,11 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen>
             Container(
               padding: const EdgeInsets.all(ChatySpacing.lg),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: colors.surface,
                 borderRadius: BorderRadius.circular(ChatyRadius.xl),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
+                    color: colors.shadow,
                     blurRadius: 20,
                     offset: const Offset(0, 8),
                   ),
@@ -334,18 +336,26 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen>
                 data: _myQrPayload,
                 size: 230,
                 version: QrVersions.auto,
+                eyeStyle: QrEyeStyle(
+                  eyeShape: QrEyeShape.square,
+                  color: colors.foreground,
+                ),
+                dataModuleStyle: QrDataModuleStyle(
+                  dataModuleShape: QrDataModuleShape.square,
+                  color: colors.foreground,
+                ),
               ),
             ),
             const SizedBox(height: ChatySpacing.lg),
             Text(
               widget.dataStore.currentUser.displayName,
-              style: ChatyTypography.headline(themeData.colorScheme.onSurface),
+              style: ChatyTypography.headline(colors.foreground),
             ),
             const SizedBox(height: 2),
             Text(
               '@${widget.dataStore.currentUser.username}',
               style: ChatyTypography.caption(
-                themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+                colors.foregroundSecondary,
               ),
             ),
             const SizedBox(height: ChatySpacing.md),
@@ -355,7 +365,7 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen>
                 'Scan this code to start an instant encrypted chat without phone numbers.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: themeData.colorScheme.onSurface.withValues(alpha: 0.65),
+                  color: colors.foregroundSecondary,
                   fontSize: 13.5,
                   height: 1.45,
                 ),
@@ -368,6 +378,8 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen>
   }
 
   Widget _buildScannerView() {
+    final colors = context.colors;
+
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -379,14 +391,14 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen>
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.72),
+              color: colors.surfaceElevated.withValues(alpha: 0.85),
               borderRadius: BorderRadius.circular(ChatyRadius.full),
             ),
-            child: const Text(
+            child: Text(
               'Point camera at a Chaty contact QR code',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white,
+                color: colors.foreground,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -398,18 +410,18 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen>
             width: 240,
             height: 240,
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.white, width: 2.5),
+              border: Border.all(color: colors.primary, width: 2.5),
               borderRadius: BorderRadius.circular(ChatyRadius.xl),
             ),
           ),
         ),
         if (_scanBusy)
           ColoredBox(
-            color: Colors.black45,
-            child: const Center(
+            color: colors.background.withValues(alpha: 0.6),
+            child: Center(
               child: CircularProgressIndicator(
                 strokeWidth: 2.2,
-                color: Colors.white,
+                color: colors.primary,
               ),
             ),
           ),

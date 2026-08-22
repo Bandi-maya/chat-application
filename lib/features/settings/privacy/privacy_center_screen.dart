@@ -5,6 +5,7 @@ import '../../../data/services/gb_feature_backend_service.dart';
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/settings_primitives.dart';
+import '../../../ui/core/theme/app_theme.dart';
 
 class PrivacyCenterScreen extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
@@ -104,6 +105,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
   @override
   Widget build(BuildContext context) {
     final prefs = widget.preferencesController.privacy;
+    final colors = context.colors;
 
     return ChatySettingsPage(
       title: 'Privacy Center',
@@ -116,7 +118,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
           children: [
             ChatySwitchTile(
               icon: Icons.ac_unit_rounded,
-              iconColor: Colors.lightBlueAccent,
+              iconColor: colors.info,
               title: 'Freeze Last Seen',
               subtitle: prefs.freezeLastSeen
                   ? 'Frozen at ${prefs.frozenLastSeenTime.isNotEmpty ? prefs.frozenLastSeenTime : "now"}. Server updates no longer move this timestamp.'
@@ -166,7 +168,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
           children: [
             ChatySwitchTile(
               icon: Icons.done_all_rounded,
-              iconColor: Colors.blueAccent,
+              iconColor: colors.primary,
               title: 'Read Receipts (Blue Ticks)',
               subtitle:
                   'The server only publishes read receipts when this is enabled.',
@@ -178,7 +180,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
             ),
             ChatySwitchTile(
               icon: Icons.mark_chat_read_rounded,
-              iconColor: Colors.indigoAccent,
+              iconColor: colors.primary,
               title: 'Show Blue Ticks After Reply',
               subtitle:
                   'Opening a chat clears your unread count but publishes receipts only after you reply.',
@@ -190,7 +192,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
             ),
             ChatySwitchTile(
               icon: Icons.edit_note_rounded,
-              iconColor: Colors.orangeAccent,
+              iconColor: colors.warning,
               title: 'Typing Indicators',
               subtitle:
                   'Realtime typing state is published only while this is enabled.',
@@ -202,7 +204,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
             ),
             ChatySwitchTile(
               icon: Icons.mic_none_rounded,
-              iconColor: Colors.redAccent,
+              iconColor: colors.error,
               title: 'Recording Indicators',
               subtitle: 'Allow voice-note recording presence to be shown.',
               value: prefs.recordingIndicators,
@@ -220,7 +222,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
           children: [
             ChatySwitchTile(
               icon: Icons.delete_forever_rounded,
-              iconColor: Colors.deepOrangeAccent,
+              iconColor: colors.error,
               title: 'Anti-Delete Messages',
               subtitle:
                   'Keep the original message visible to you after the sender deletes it.',
@@ -239,7 +241,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
             ),
             ChatySwitchTile(
               icon: Icons.history_toggle_off_rounded,
-              iconColor: Colors.amberAccent,
+              iconColor: colors.warning,
               title: 'Anti-Delete Status / Stories',
               subtitle:
                   'Keep a deleted status available until its normal 24-hour expiry.',
@@ -258,7 +260,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
             ),
             ChatySwitchTile(
               icon: Icons.remove_red_eye_rounded,
-              iconColor: Colors.tealAccent,
+              iconColor: colors.info,
               title: 'Anti View-Once Media',
               subtitle:
                   'Retain opened view-once media in Chaty when the sender permissions allow the stored payload to remain available.',
@@ -277,7 +279,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
             ),
             ChatySwitchTile(
               icon: Icons.notification_important_rounded,
-              iconColor: Colors.purpleAccent,
+              iconColor: colors.accent,
               title: 'Message & Status Revoke Alerts',
               subtitle: 'Notify when a sender revokes a message or status.',
               value: prefs.messageRevokeAlert,
@@ -325,7 +327,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
                       .map(
                         (user) => ChatySettingsTile(
                           icon: Icons.block_rounded,
-                          iconColor: Colors.redAccent,
+                          iconColor: colors.error,
                           title: user['display_name']?.toString() ?? 'User',
                           subtitle: '@${user['username'] ?? ''}',
                           trailing: TextButton(
@@ -349,7 +351,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
             ),
             ChatySettingsTile(
               icon: Icons.person_off_outlined,
-              iconColor: Colors.redAccent,
+              iconColor: colors.error,
               title: 'Block a user',
               subtitle: 'Search Chaty users by name or @username',
               onTap: _openBlockSearch,
@@ -382,7 +384,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
             if (prefs.whoCanCallMe == 'My Contacts Except…')
               ChatySettingsTile(
                 icon: Icons.block_rounded,
-                iconColor: Colors.redAccent,
+                iconColor: colors.error,
                 title: 'Manage call exceptions',
                 subtitle: prefs.whoCanCallMeExceptions.isEmpty
                     ? 'No contacts are excluded from calling you'
@@ -392,7 +394,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
               ),
             ChatySwitchTile(
               icon: Icons.shortcut_rounded,
-              iconColor: Colors.cyanAccent,
+              iconColor: colors.info,
               title: 'Disable Forwarded Tag',
               subtitle:
                   'Do not display a forwarded marker on your outgoing forwarded messages.',
@@ -416,7 +418,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
           children: [
             ChatySwitchTile(
               icon: Icons.visibility_off_rounded,
-              iconColor: Colors.grey,
+              iconColor: colors.foregroundSecondary,
               title: 'Hide Privacy Option from Main Settings',
               subtitle:
                   'Hide this Privacy entry. Restore it through Advanced Features.',
@@ -428,6 +430,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
             ),
           ],
         ),
+
       ],
     );
   }

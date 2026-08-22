@@ -27,54 +27,38 @@ class GbFeatureCatalog {
   const GbFeatureCatalog._();
 
   static const Map<String, String> _categoryKeys = <String, String>{
-    'Home FAB & shortcuts':
-        'hide_fab,ModFabNormalColor,ModFabPressedColor,ModFabTextColor,MetaAI,hide_action_m,hide_action_b,hide_action_s,hide_action_mas,hide_action_a',
     'Navigation & touch effects':
-        'key_pager_animation,key_chats_listanimation,key_chat_animation,tap_effect_enabled,tap_emoji,tap_density,tap_size,tap_duration,fall_effect_enabled,fall_emoji,fall_density,fall_size,fall_speed',
-    'Advanced messaging':
-        'key_send_hidden_msg,key_edit_hidden_msg,key_all_white,key_notsend_msg,key_notreceive_msg,key_noreceive_img,abosaleh_mention_member,key_reply_mention,key_method_endgp,key_hide_unsaved_num',
+        'key_pager_animation,key_chats_listanimation,key_chat_animation,tap_effect_enabled,tap_emoji,fall_effect_enabled,fall_emoji',
     'Chat list rows':
-        'main_text,ModConTextColor,ModContactNameColor,HomeCounterBK,HomeCounterText,ModOnlineColor,ModlastseenColor,ModHomeMentionIndBackground,ModHomeMentionIconColor,key_mas_hide_archive_home,arch_chats_top,onlinechat,onlineDotchat,onlineDotchatColor,elapsed_time',
+        'ModConTextColor,ModContactNameColor,HomeCounterBK,HomeCounterText,ModOnlineColor,ModlastseenColor,key_mas_hide_archive_home,onlinechat,onlineDotchat,onlineDotchatColor',
     'Presence & activity alerts':
-        'abu_saleh_toast_online,abu_saleh_toast_online_Override,abu_saleh_toast_online_view,abu_saleh_toast_online_cs,abu_saleh_toast_online_el,abu_saleh_toast_online_rd,abu_saleh_toast_online_rt,abu_saleh_toast_online_gv,abu_saleh_toast_online_bc,abu_saleh_toast_online_tc,abu_saleh_toast_status,yo_toast_status_override,abu_saleh_toast_status_view,abu_saleh_toast_status_cs,abu_saleh_toast_status_el,abu_saleh_toast_status_rd,abu_saleh_toast_status_rt,abu_saleh_toast_status_gv,abu_saleh_toast_status_bc,abu_saleh_toast_status_tc,abu_saleh_toast_profile,abu_saleh_toast_profile_override,abu_saleh_toast_profile_view,abu_saleh_toast_profile_cs,abu_saleh_toast_profile_el,abu_saleh_toast_profile_rd,abu_saleh_toast_profile_rt,abu_saleh_toast_profile_gv,abu_saleh_toast_profile_bc,abu_saleh_toast_profile_tc,abu_saleh_toast_typing,abu_saleh_toast_typing_override,abu_saleh_toast_typing_view,abu_saleh_toast_typing_cs,abu_saleh_toast_typing_el,abu_saleh_toast_typing_rd,abu_saleh_toast_typing_rt,abu_saleh_toast_typing_gv,abu_saleh_toast_typing_bc,abu_saleh_toast_typing_tc',
-    'Home list visibility':
-        'Hide_div,key_hide_unsaved_num,Hide_contact_picker_section_frequent_chats,Hide_contact_picker_section_other_contacts,Hide_contact_picker_section_recent_chats',
+        'abu_saleh_toast_online,abu_saleh_toast_online_bc,abu_saleh_toast_online_tc,abu_saleh_toast_status,abu_saleh_toast_status_bc,abu_saleh_toast_status_tc,abu_saleh_toast_profile,abu_saleh_toast_profile_bc,abu_saleh_toast_profile_tc,abu_saleh_toast_typing,abu_saleh_toast_typing_bc,abu_saleh_toast_typing_tc',
     'Home header':
-        'ui_home_styleV3,home_stories_key,key_carousel_view,home_stories_style,enable_grp_separationV2,my_name,my_statusd,abu_saleh_hide_list,abu_saleh_research,yo_multi_account_menu,yo_want_ghostmode,yo_want_toolbar_cam,yo_want_nightmode,yo_want_airplanemode,PicHead,disable_hiddenchat_access,ModConColor,pagetitle_picker,pagetitle_sel_picker,tabindicator,tabadgeBKColor,tabadgeTextColor',
-    'Block list maintenance': 'mas_key_cleanlog_blocklist',
-    'Fonts & icons': 'yo_nicon_color,yo_nicons,font,load_customfont',
+        'ui_home_styleV3,home_stories_key,home_stories_style,enable_grp_separationV2,my_name,yo_multi_account_menu,yo_want_ghostmode,yo_want_toolbar_cam,yo_want_airplanemode,ModConColor,tabindicator',
     'Privacy':
-        'yoHideSeen,anti_vw_once,yoDisableFwd,yoCallsPrivacy,yoCustomPrivList,Saleh_HidePrivacy,Saleh_HideCUpdates,stat_cat,abu_saleh_channels,yoHideStatViewV2,yoAntiRevokeStatus,AntiRevokeStatusNotif,Abu_Saleh_Hide_message,disappearing_message_key,key_chat_editview,yoAntiRevoke,AntiRevokeMsgNotif,masdeletionofeveryone,key_show_deltime,abu_saleh_unreaded_chat,yoBlueOnReply,cat_pc,cat_pg,cat_pb',
+        'yoHideSeen,anti_vw_once,yoDisableFwd,yoCallsPrivacy,Saleh_HidePrivacy,Saleh_HideCUpdates,abu_saleh_channels,yoHideStatViewV2,yoAntiRevokeStatus,AntiRevokeStatusNotif,disappearing_message_key,yoAntiRevoke,AntiRevokeMsgNotif,yoBlueOnReply',
     'Status & stories':
-        'home_stories_key,key_carousel_view,home_stories_style,key_status_ui,statuses_bar_bg_picker,statuses_bar_text_picker,key_name_stories,SeenColor,UnSeenColor,key_counter_bg,key_counter_tx,abu_saleh_status_and_photo,enable_statuspage_extras,key_with_thumb,abu9aleh_status_audio,status_wantsendconfirmation,enable_fivminstatus',
-    'Snow & particles':
-        'key_snow_home,hrotation,animation_drawable,intensitas,speed,key_snow_chats,crotation,animation_drawableshatssss,intensitasshatrs,speedshats',
+        'home_stories_key,home_stories_style,abu9aleh_status_audio',
     'Chat bubbles & ticks':
-        'tick_style,bubble_style,text_size_pick,ConvoBack,ModChatRightBubble,ModChatBubbleText,date_right_color,ModChatLeftBubble,ModChatBubbleTextLeft,date_left_color,rvkdmsg_icon_color,quoted_divider_picker,quoted_name_picker,quoted_text_picker,quoted_bg_picker,TxtSelect,read_more',
-    'Avatars in chat':
-        'pic_inside,chat_contactpicV2,chat_mypicV2,pic_chat_size_pickerV2',
-    'Storage & cleanup': 'clear_logs',
+        'tick_style,bubble_style,text_size_pick,ConvoBack,ModChatRightBubble,ModChatBubbleText,date_right_color,ModChatLeftBubble,ModChatBubbleTextLeft,date_left_color',
     'Conversation behavior':
-        'direkt_link_degistir,stkr_wantsendconfirmation,yo_hideinfo,admin_abosaleh,key_admicon_list,key_quick_view,key_quick_position,quickBK,quickText,abu_saleh_key_fab_cahtV2,key_hide_scrollup,key_hide_scrolldown,key_custom_iconup,key_custom_icondown,key_updown_bgcolor,key_updown_iconcolor,MasOption,bubble_more_options_dlg,disableDTTL,inconvo_trans_option,hide_translation_icon,custom_wall,custom_wall_profilepic,Audio_sensor,Audio_ears,abu_saleh_play_voice_note,abu_saleh_forward_tovoice,hazar_bozkurt_sesler_gelenmesaj,hazar_bozkurt_sesler_gidenmesaj',
+        'inconvo_trans_option',
     'Universal behavior':
-        'Language,inconvo_trans_option,trans_def_to,multiChats,Pop_Heds,disable_bcounter,disable_audioheads,fwd_lim_incr,disable_chatswipeV2,always_online,tenor_giphy,clear_logs,cat_img,Img_highres_seek',
+        'inconvo_trans_option,trans_def_to,Pop_Heds,always_online,Img_highres_seek',
     'Conversation colors':
-        'emojipopup_header,emojipopup_icons,emojipopup_body,ModChatBubbleHyperlinks,date_divider_color_picker,date_bubble_color_picker,participant_name_color_picker,seekbar_color_chat_picker,btn_voice_color_chat_picker',
+        'ModChatBubbleHyperlinks',
     'Calls appearance':
         'ModCallsBackground,ModCallsTextColor,ModCallsIconColors',
-    'Media visibility':
-        'yohide_inimages,yohide_invideos,yohide_ingifs,yohide_mediashow',
     'Conversation header':
         'ModChatColor,PicProf,NameProf,Conv_call_btn,statuschat,ModChatGStatusB,ModChatGStatusT',
     'Quick contact':
-        'abu_saleh_quickcontact,key_mas_setBackground_quick,mas_latarkontak2,key_mas_icon_quickcontact,key_mas_border_avatar_quick_contact,mas_lingkaran_kontak2,mas_lingkaran_kontak3,key_mas_setText_contact_name',
+        'abu_saleh_quickcontact',
     'Universal colors':
         'ModConPickColor,HomeBarText,ModConBackColor,list_bg_color,ModDarkConPickColor,ModDarkConPickColorNav',
     'Media limits & quality':
-        'abu9aleh_media_video_player,Abu_Saleh_Previewbtn,abusaleh_media,abu_saleh_image_quality,Up_size_limit,abo_saleh_audio_limit_check,Img_share_limit,key_more_docs_send,enable_fivminstatus',
-    'Widget appearance': 'ModWdgBKColor,ModWdgTitleColor,ModWdgStatusColor',
+        'Up_size_limit,abo_saleh_audio_limit_check,Img_share_limit,key_more_docs_send',
     'Composer appearance':
-        'BGColor,ModChatBtnColor,ModChatEmojiColor,ModChaSendColor,ModChaSendBKColor,ModChatEntry,ModChatTextColor',
+        'BGColor',
   };
 
   static const Map<String, List<String>>

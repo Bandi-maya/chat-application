@@ -290,8 +290,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     required List<_NavDestinationItem> navItems,
     required int selectedIndex,
   }) {
-    const brandGreen = Color(0xFF005C4B);
-    const indicatorWhite = Colors.white;
+    final colors = context.colors;
+    final brandPrimary = theme.accentColor as Color;
+    final indicatorColor = colors.onPrimary;
 
     return DefaultTabController(
       length: navItems.length,
@@ -303,13 +304,13 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           child: Column(
             children: [
               Container(
-                color: brandGreen,
+                color: brandPrimary,
                 child: TabBar(
                   isScrollable: navItems.length > 4,
-                  indicatorColor: indicatorWhite,
+                  indicatorColor: indicatorColor,
                   indicatorWeight: 3.5,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white.withValues(alpha: 0.72),
+                  labelColor: colors.onPrimary,
+                  unselectedLabelColor: colors.onPrimary.withValues(alpha: 0.72),
                   labelStyle: const TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
@@ -342,6 +343,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     required List<_NavDestinationItem> navItems,
     required int selectedIndex,
   }) {
+    final colors = context.colors;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
       backgroundColor: theme.backgroundColor,
       body: SafeArea(
@@ -351,11 +355,11 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               width: 68,
               margin: const EdgeInsets.fromLTRB(10, 12, 0, 12),
               decoration: BoxDecoration(
-                color: const Color(0xFF0B0F19),
+                color: colors.surface,
                 borderRadius: BorderRadius.circular(30),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.35),
+                    color: colors.shadow,
                     blurRadius: 18,
                     offset: const Offset(0, 4),
                   ),
@@ -367,19 +371,19 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   // Traffic dots indicator
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      CircleAvatar(radius: 3.5, backgroundColor: Color(0xFFEF4444)),
-                      SizedBox(width: 4),
-                      CircleAvatar(radius: 3.5, backgroundColor: Color(0xFFF59E0B)),
-                      SizedBox(width: 4),
-                      CircleAvatar(radius: 3.5, backgroundColor: Color(0xFF10B981)),
+                    children: [
+                      CircleAvatar(radius: 3.5, backgroundColor: colors.error),
+                      const SizedBox(width: 4),
+                      CircleAvatar(radius: 3.5, backgroundColor: colors.warning),
+                      const SizedBox(width: 4),
+                      CircleAvatar(radius: 3.5, backgroundColor: colors.success),
                     ],
                   ),
                   const SizedBox(height: 16),
                   // Logo mark
-                  const Icon(Icons.bolt_rounded, color: Color(0xFF10B981), size: 24),
+                  Icon(Icons.bolt_rounded, color: colors.primary, size: 24),
                   const SizedBox(height: 16),
-                  const Divider(color: Color(0xFF1E293B), height: 1, indent: 12, endIndent: 12),
+                  Divider(color: colors.divider, height: 1, indent: 12, endIndent: 12),
                   const SizedBox(height: 12),
                   Expanded(
                     child: ListView.builder(
@@ -396,13 +400,13 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                               duration: const Duration(milliseconds: 200),
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: isSel ? const Color(0xFF10B981) : Colors.transparent,
+                                color: isSel ? colors.primary : Colors.transparent,
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Icon(
                                 isSel ? item.activeIcon : item.icon,
                                 size: 20,
-                                color: isSel ? Colors.black : const Color(0xFF94A3B8),
+                                color: isSel ? colors.onPrimary : colors.foregroundSecondary,
                               ),
                             ),
                           ),
@@ -410,12 +414,12 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                       },
                     ),
                   ),
-                  const Divider(color: Color(0xFF1E293B), height: 1, indent: 12, endIndent: 12),
+                  Divider(color: colors.divider, height: 1, indent: 12, endIndent: 12),
                   const SizedBox(height: 12),
-                  const CircleAvatar(
+                  CircleAvatar(
                     radius: 16,
-                    backgroundColor: Color(0xFF1E293B),
-                    child: Text('R', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                    backgroundColor: colors.surfaceSecondary,
+                    child: Text('R', style: TextStyle(color: colors.foreground, fontWeight: FontWeight.bold, fontSize: 13)),
                   ),
                   const SizedBox(height: 14),
                 ],
@@ -456,6 +460,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     required int selectedIndex,
   }) {
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
+    final colors = context.colors;
     final isDark = theme.brightness == Brightness.dark;
     final prefs = locator<ChatyPreferencesController>();
     final dataStore = locator<MockDataStore>();
@@ -471,7 +476,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       key: scaffoldKey,
       backgroundColor: theme.backgroundColor,
       drawer: Drawer(
-        backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFF1E293B),
+        backgroundColor: colors.surfaceSecondary,
         child: SafeArea(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -494,8 +499,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                         children: [
                           Text(
                             displayName,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: colors.foreground,
                               fontWeight: FontWeight.w800,
                               fontSize: 16,
                             ),
@@ -503,7 +508,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                           Text(
                             '@${user.username.isNotEmpty ? user.username : 'chaty'}',
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.65),
+                              color: colors.foregroundSecondary,
                               fontSize: 12,
                             ),
                           ),
@@ -513,7 +518,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   ],
                 ),
               ),
-              const Divider(color: Color(0xFF334155), height: 1),
+              Divider(color: colors.divider, height: 1),
               Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
@@ -527,12 +532,12 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                       selectedTileColor: theme.accentColor.withValues(alpha: 0.16),
                       leading: Icon(
                         isSel ? item.activeIcon : item.icon,
-                        color: isSel ? theme.accentColor : const Color(0xFF94A3B8),
+                        color: isSel ? theme.accentColor : colors.foregroundSecondary,
                       ),
                       title: Text(
                         item.label,
                         style: TextStyle(
-                          color: isSel ? Colors.white : const Color(0xFFE2E8F0),
+                          color: isSel ? colors.foreground : colors.foregroundSecondary,
                           fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
                         ),
                       ),
@@ -559,7 +564,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 color: theme.surfaceColor,
                 border: Border(
                   bottom: BorderSide(
-                    color: isDark ? const Color(0xFF27272A) : const Color(0xFFE4E4E7),
+                    color: colors.border,
                     width: 0.8,
                   ),
                 ),
@@ -593,6 +598,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       ),
     );
   }
+
 
   Widget _buildRailShell({
     required dynamic theme,
@@ -764,31 +770,29 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
     final barBg = switch (styleName) {
       'Floating Dynamic Island' =>
-        isDark ? const Color(0xFF0F172A) : const Color(0xFF1E293B),
-      'Segmented Glass Dock' => surface.withValues(alpha: isDark ? 0.85 : 0.92),
-      _ => surface,
+        colors.surfaceElevated,
+      'Segmented Glass Dock' => colors.surface.withValues(alpha: isDark ? 0.85 : 0.92),
+      _ => colors.surface,
     };
 
     final border = switch (styleName) {
       'Segmented Glass Dock' => Border.all(
-        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        color: colors.border,
         width: 1.2,
       ),
       'Floating Pill' || 'Active Pill Chip' || 'Floating Dynamic Island' => Border.all(
-        color: isDark
-            ? const Color(0xFF334155).withValues(alpha: 0.6)
-            : const Color(0xFFE2E8F0),
+        color: colors.borderSubtle,
         width: 0.8,
       ),
       'Top Indicator Line' || 'Bottom Indicator Dot' || 'Curved Notch Teardrop' || 'Classic Label Bar' || 'Soft Square Tile' =>
         Border(
           top: BorderSide(
-            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+            color: colors.borderSubtle,
             width: 1.0,
           ),
         ),
       _ => Border.all(
-        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        color: colors.borderSubtle,
         width: 0.8,
       ),
     };
@@ -815,9 +819,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 boxShadow: hasShadow
                     ? [
                         BoxShadow(
-                          color: Colors.black.withValues(
-                            alpha: isDark ? 0.35 : 0.08,
-                          ),
+                          color: colors.shadow,
                           blurRadius: 18,
                           offset: const Offset(0, 5),
                         ),
@@ -860,7 +862,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     required bool isDark,
     required VoidCallback onTap,
   }) {
-    final unselectedFg = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final unselectedFg = context.colors.foregroundSecondary;
 
     return Expanded(
       child: Tooltip(
@@ -990,7 +992,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   child: Icon(
                     isSelected ? item.activeIcon : item.icon,
                     size: 20,
-                    color: isSelected ? Colors.white : unselectedFg,
+                    color: isSelected ? context.colors.onPrimary : unselectedFg,
                   ),
                 ),
               ),
@@ -1003,7 +1005,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     duration: const Duration(milliseconds: 220),
                     curve: Curves.easeOutCubic,
                     width: isSelected ? 28 : 0,
-                    height: isSelected ? 5 : 0,
+                    height: 5,
                     decoration: BoxDecoration(
                       color: isSelected ? accent : Colors.transparent,
                       borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
@@ -1035,7 +1037,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFF22C55E) : Colors.transparent,
+                  color: isSelected ? context.colors.primary : Colors.transparent,
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: Row(
@@ -1044,16 +1046,16 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     Icon(
                       isSelected ? item.activeIcon : item.icon,
                       size: 19,
-                      color: isSelected ? Colors.black : const Color(0xFF94A3B8),
+                      color: isSelected ? context.colors.onPrimary : unselectedFg,
                     ),
                     if (isSelected) ...[
                       const SizedBox(width: 5),
                       Text(
                         item.label,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w800,
-                          color: Colors.black,
+                          color: context.colors.onPrimary,
                         ),
                       ),
                     ],
@@ -1084,7 +1086,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                       child: Icon(
                         item.activeIcon,
                         size: 24,
-                        color: Colors.white,
+                        color: context.colors.onPrimary,
                       ),
                     )
                   : Column(
@@ -1142,6 +1144,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               // 10. CLASSIC LABEL BAR (Standard native tabs)
               'Classic Label Bar' => Column(
                 mainAxisAlignment: MainAxisAlignment.center,
+
                 children: [
                   Icon(
                     isSelected ? item.activeIcon : item.icon,
@@ -1288,11 +1291,10 @@ class _PerspectiveDrawerScaffoldState extends State<_PerspectiveDrawerScaffold>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = widget.theme.brightness == Brightness.dark;
-    final bgDark = const Color(0xFF18181B);
+    final colors = context.colors;
 
     return Scaffold(
-      backgroundColor: bgDark,
+      backgroundColor: colors.surfaceElevated,
       body: AnimatedBuilder(
         animation: _anim,
         builder: (context, _) {
@@ -1311,10 +1313,10 @@ class _PerspectiveDrawerScaffoldState extends State<_PerspectiveDrawerScaffold>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Side Menu',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: colors.foreground,
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
                           letterSpacing: -0.5,
@@ -1335,16 +1337,16 @@ class _PerspectiveDrawerScaffoldState extends State<_PerspectiveDrawerScaffold>
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 selected: isSel,
-                                selectedTileColor: Colors.white.withValues(alpha: 0.1),
+                                selectedTileColor: colors.primary.withValues(alpha: 0.15),
                                 leading: Icon(
                                   isSel ? item.activeIcon : item.icon,
-                                  color: isSel ? Colors.white : Colors.white70,
+                                  color: isSel ? colors.primary : colors.foregroundSecondary,
                                   size: 20,
                                 ),
                                 title: Text(
                                   item.label,
                                   style: TextStyle(
-                                    color: isSel ? Colors.white : Colors.white70,
+                                    color: isSel ? colors.primary : colors.foregroundSecondary,
                                     fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
                                     fontSize: 14,
                                   ),
@@ -1385,11 +1387,11 @@ class _PerspectiveDrawerScaffoldState extends State<_PerspectiveDrawerScaffold>
                             width: 38,
                             height: 38,
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                              color: colors.surface,
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.15),
+                                  color: colors.shadow,
                                   blurRadius: 10,
                                   offset: const Offset(0, 3),
                                 ),
@@ -1398,7 +1400,7 @@ class _PerspectiveDrawerScaffoldState extends State<_PerspectiveDrawerScaffold>
                             child: Icon(
                               val > 0.5 ? Icons.close_rounded : Icons.menu_rounded,
                               size: 20,
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              color: colors.foreground,
                             ),
                           ),
                         ),
@@ -1414,3 +1416,4 @@ class _PerspectiveDrawerScaffoldState extends State<_PerspectiveDrawerScaffold>
     );
   }
 }
+

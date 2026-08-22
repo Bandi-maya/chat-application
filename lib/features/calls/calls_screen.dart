@@ -21,8 +21,7 @@ class CallsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final calls = dataStore.calls;
-    final themeData = Theme.of(context);
-    final isDark = themeData.brightness == Brightness.dark;
+    final colors = context.colors;
 
     return ChatyScaffold(
       safeAreaTop: true,
@@ -43,7 +42,7 @@ class CallsScreen extends StatelessWidget {
                   Text(
                     'Calls',
                     style: ChatyTypography.headline(
-                      themeData.colorScheme.onSurface,
+                      colors.foreground,
                     ),
                   ),
                   Container(
@@ -52,7 +51,7 @@ class CallsScreen extends StatelessWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: themeData.colorScheme.primary.withValues(
+                      color: colors.primary.withValues(
                         alpha: 0.12,
                       ),
                       borderRadius: BorderRadius.circular(ChatyRadius.full),
@@ -63,7 +62,7 @@ class CallsScreen extends StatelessWidget {
                         Icon(
                           Icons.lock_rounded,
                           size: 13,
-                          color: themeData.colorScheme.primary,
+                          color: colors.primary,
                         ),
                         const SizedBox(width: 4),
                         Text(
@@ -71,7 +70,7 @@ class CallsScreen extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w600,
-                            color: themeData.colorScheme.primary,
+                            color: colors.primary,
                           ),
                         ),
                       ],
@@ -93,7 +92,7 @@ class CallsScreen extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(ChatySpacing.lg),
                         decoration: BoxDecoration(
-                          color: themeData.colorScheme.primary.withValues(
+                          color: colors.primary.withValues(
                             alpha: 0.08,
                           ),
                           shape: BoxShape.circle,
@@ -101,14 +100,14 @@ class CallsScreen extends StatelessWidget {
                         child: Icon(
                           Icons.phone_callback_rounded,
                           size: 48,
-                          color: themeData.colorScheme.primary,
+                          color: colors.primary,
                         ),
                       ),
                       const SizedBox(height: ChatySpacing.base),
                       Text(
                         'No recent calls',
                         style: ChatyTypography.title(
-                          themeData.colorScheme.onSurface,
+                          colors.foreground,
                         ),
                       ),
                       const SizedBox(height: ChatySpacing.xs),
@@ -116,9 +115,7 @@ class CallsScreen extends StatelessWidget {
                         'Voice and video calls with your contacts will appear here with peer-to-peer security.',
                         textAlign: TextAlign.center,
                         style: ChatyTypography.caption(
-                          themeData.colorScheme.onSurface.withValues(
-                            alpha: 0.6,
-                          ),
+                          colors.foregroundSecondary,
                         ),
                       ),
                     ],
@@ -158,8 +155,8 @@ class CallsScreen extends StatelessWidget {
                               caller?.displayName ?? 'Secure Caller',
                               style: TextStyle(
                                 color: isMissed
-                                    ? const Color(0xFFEF4444)
-                                    : themeData.colorScheme.onSurface,
+                                    ? colors.error
+                                    : colors.foreground,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 15,
                                 letterSpacing: -0.2,
@@ -175,17 +172,14 @@ class CallsScreen extends StatelessWidget {
                                       : Icons.call_missed_rounded,
                                   size: 14,
                                   color: isMissed
-                                      ? const Color(0xFFEF4444)
-                                      : themeData.colorScheme.onSurface
-                                            .withValues(alpha: 0.55),
+                                      ? colors.error
+                                      : colors.foregroundSecondary,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
                                   '${_formatCallTime(call.timestamp)} • ${call.durationSeconds > 0 ? '${call.durationSeconds}s' : 'Missed'}',
                                   style: ChatyTypography.caption(
-                                    themeData.colorScheme.onSurface.withValues(
-                                      alpha: 0.6,
-                                    ),
+                                    colors.foregroundSecondary,
                                   ),
                                 ),
                               ],
@@ -196,11 +190,8 @@ class CallsScreen extends StatelessWidget {
                                   : Icons.call_rounded,
                               size: 38,
                               iconSize: 20,
-                              backgroundColor:
-                                  isDark
-                                      ? const Color(0xFF27272A)
-                                      : const Color(0xFFF4F4F5),
-                              color: themeData.colorScheme.primary,
+                              backgroundColor: colors.surfaceSecondary,
+                              color: colors.primary,
                               onPressed: () {
                                 Navigator.of(context).push(
                                   MaterialPageRoute(

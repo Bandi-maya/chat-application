@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/user_profile.dart';
-import '../design_system/components/chaty_kit.dart';
+import '../design_system/design_system.dart';
 
 /// Thin adapter over [ChatyAvatarCore] (the kit's canonical avatar) so all
 /// legacy call sites get the flat premium-iOS paint automatically.
@@ -21,28 +21,29 @@ class AppAvatar extends StatelessWidget {
     this.presence = PresenceState.offline,
   });
 
-  Color _parseColor(String? hex) {
-    if (hex == null || hex.isEmpty) return const Color(0xFF6366F1);
+  Color _parseColor(BuildContext context, String? hex) {
+    if (hex == null || hex.isEmpty) return context.colors.primary;
     try {
       final clean = hex.replaceAll('#', '').replaceAll('0x', '');
       return Color(
         int.parse(clean.length == 6 ? 'FF$clean' : clean, radix: 16),
       );
     } catch (_) {
-      return const Color(0xFF6366F1);
+      return context.colors.primary;
     }
   }
 
-  Color _getPresenceColor() {
+  Color _getPresenceColor(BuildContext context) {
+    final colors = context.colors;
     switch (presence) {
       case PresenceState.online:
-        return const Color(0xFF10B981);
+        return colors.success;
       case PresenceState.away:
-        return const Color(0xFFF59E0B);
+        return colors.warning;
       case PresenceState.typing:
-        return const Color(0xFF6366F1);
+        return colors.primary;
       case PresenceState.offline:
-        return const Color(0xFF94A3B8);
+        return colors.foregroundTertiary;
     }
   }
 
@@ -54,7 +55,7 @@ class AppAvatar extends StatelessWidget {
       children: [
         ChatyAvatarCore(
           initials: initials,
-          color: _parseColor(colorHex),
+          color: _parseColor(context, colorHex),
           size: size,
         ),
         if (showOnlineBadge)
@@ -64,7 +65,7 @@ class AppAvatar extends StatelessWidget {
             child: ChatyOnlineDot(
               active: true,
               avatarSize: size,
-              color: _getPresenceColor(),
+              color: _getPresenceColor(context),
               ringColor: ringColor,
             ),
           ),

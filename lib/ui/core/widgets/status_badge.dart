@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../domain/models/chat_task.dart';
+import '../design_system/design_system.dart';
 
 class StatusBadge extends StatelessWidget {
   final TaskStatus status;
@@ -9,39 +10,40 @@ class StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     Color bg;
     Color fg;
     String label;
 
     switch (status) {
       case TaskStatus.inbox:
-        bg = Colors.blueGrey.withValues(alpha: 0.15);
-        fg = Colors.blueGrey.shade300;
+        bg = colors.foregroundSecondary.withValues(alpha: 0.15);
+        fg = colors.foregroundSecondary;
         label = 'Inbox';
         break;
       case TaskStatus.assigned:
-        bg = Colors.blue.withValues(alpha: 0.15);
-        fg = Colors.blue.shade300;
+        bg = colors.info.withValues(alpha: 0.15);
+        fg = colors.info;
         label = 'Assigned';
         break;
       case TaskStatus.inProgress:
-        bg = const Color(0xFFF59E0B).withValues(alpha: 0.15);
-        fg = const Color(0xFFFBBF24);
+        bg = colors.warning.withValues(alpha: 0.15);
+        fg = colors.warning;
         label = 'In Progress';
         break;
       case TaskStatus.blocked:
-        bg = const Color(0xFFEF4444).withValues(alpha: 0.15);
-        fg = const Color(0xFFF87171);
+        bg = colors.error.withValues(alpha: 0.15);
+        fg = colors.error;
         label = 'Blocked';
         break;
       case TaskStatus.completed:
-        bg = const Color(0xFF10B981).withValues(alpha: 0.15);
-        fg = const Color(0xFF34D399);
+        bg = colors.success.withValues(alpha: 0.15);
+        fg = colors.success;
         label = 'Done';
         break;
       case TaskStatus.archived:
-        bg = Colors.grey.withValues(alpha: 0.15);
-        fg = Colors.grey.shade400;
+        bg = colors.foregroundTertiary.withValues(alpha: 0.15);
+        fg = colors.foregroundTertiary;
         label = 'Archived';
         break;
     }
@@ -68,24 +70,25 @@ class PriorityBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     Color col;
     String text;
 
     switch (priority) {
       case TaskPriority.low:
-        col = Colors.blueGrey;
+        col = colors.foregroundSecondary;
         text = 'Low';
         break;
       case TaskPriority.medium:
-        col = Colors.amber;
+        col = colors.info;
         text = 'Med';
         break;
       case TaskPriority.high:
-        col = Colors.orange;
+        col = colors.warning;
         text = 'High';
         break;
       case TaskPriority.urgent:
-        col = Colors.redAccent;
+        col = colors.error;
         text = 'Urgent';
         break;
     }

@@ -6,6 +6,7 @@ import '../../../data/services/local_lock_service.dart';
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/settings_primitives.dart';
+import '../../../ui/core/design_system/design_system.dart';
 
 /// System Permissions & Hardware screen.
 ///
@@ -131,7 +132,7 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
         await permission.request();
       }
     } catch (_) {
-      _snack('Could not update this permission.', color: Colors.redAccent);
+      _snack('Could not update this permission.', color: context.colors.error);
     } finally {
       await _refreshOne(permission);
     }
@@ -162,7 +163,7 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
       title: 'Chaty test notification',
       body: 'This is a sample notification from Chaty.',
       icon: Icons.notifications_active_rounded,
-      color: Colors.indigoAccent,
+      color: context.colors.primary,
     );
     _snack('Test notification sent.');
   }
@@ -173,7 +174,7 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
       if (!serviceEnabled) {
         _snack(
           'Location services are turned off on this device.',
-          color: Colors.redAccent,
+          color: context.colors.error,
         );
         return;
       }
@@ -183,7 +184,7 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
       }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        _snack('Location permission was denied.', color: Colors.redAccent);
+        _snack('Location permission was denied.', color: context.colors.error);
         return;
       }
       final position = await Geolocator.getCurrentPosition();
@@ -191,11 +192,11 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.location_on_rounded, color: Colors.redAccent),
-              SizedBox(width: 8),
-              Expanded(child: Text('Current GPS location')),
+              Icon(Icons.location_on_rounded, color: context.colors.error),
+              const SizedBox(width: 8),
+              const Expanded(child: Text('Current GPS location')),
             ],
           ),
           content: Column(
@@ -213,7 +214,7 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
               const SizedBox(height: 6),
               Text(
                 'Accuracy: ${position.accuracy.toStringAsFixed(0)} m',
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                style: TextStyle(fontSize: 12, color: context.colors.foregroundSecondary),
               ),
             ],
           ),
@@ -226,7 +227,7 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
         ),
       );
     } catch (error) {
-      _snack('Could not read location: $error', color: Colors.redAccent);
+      _snack('Could not read location: $error', color: context.colors.error);
     } finally {
       await _refreshOne(Permission.locationWhenInUse);
     }
@@ -236,7 +237,7 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
     if (!_biometricsAvailable) {
       _snack(
         'No biometrics are enrolled on this device.',
-        color: Colors.redAccent,
+        color: context.colors.error,
       );
       return;
     }
@@ -247,7 +248,7 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
       ok
           ? 'Biometric verification succeeded.'
           : 'Biometric verification failed or cancelled.',
-      color: ok ? Colors.green : Colors.redAccent,
+      color: ok ? context.colors.success : context.colors.error,
     );
   }
 
@@ -266,14 +267,15 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
           .length;
       _snack(
         '$grantedCount of ${results.length} permissions granted.',
-        color: grantedCount == results.length ? Colors.green : null,
+        color: grantedCount == results.length ? context.colors.success : null,
       );
     } catch (_) {
-      _snack('Could not request permissions.', color: Colors.redAccent);
+      _snack('Could not request permissions.', color: context.colors.error);
     } finally {
       await _refreshAll();
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -357,7 +359,7 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
           children: [
             _permissionSwitch(
               icon: Icons.notifications_active_rounded,
-              color: Colors.indigoAccent,
+              color: context.colors.primary,
               title: 'Notification Permission',
               subtitle:
                   'Allow Chaty to display alerts and heads-up notifications',
@@ -366,7 +368,7 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
             ),
             ChatySettingsTile(
               icon: Icons.send_rounded,
-              iconColor: Colors.cyanAccent,
+              iconColor: context.colors.info,
               title: 'Send a test notification',
               subtitle: 'Display a sample Chaty notification now',
               onTap: _sendTestNotification,
@@ -382,7 +384,7 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
           children: [
             _permissionSwitch(
               icon: Icons.perm_media_rounded,
-              color: Colors.lightBlueAccent,
+              color: context.colors.info,
               title: 'Media & Photo Library',
               subtitle: 'Access the gallery to send photos and video',
               permission: Permission.photos,
@@ -399,7 +401,7 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
           children: [
             _permissionSwitch(
               icon: Icons.location_on_rounded,
-              color: Colors.redAccent,
+              color: context.colors.warning,
               title: 'Location Permission',
               subtitle: 'Access device GPS to share your location in chats',
               permission: Permission.locationWhenInUse,
@@ -407,7 +409,7 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
             ),
             ChatySettingsTile(
               icon: Icons.my_location_rounded,
-              iconColor: Colors.amberAccent,
+              iconColor: context.colors.warning,
               title: 'Fetch current location',
               subtitle: 'Read your real GPS coordinates now',
               onTap: _fetchLocation,
@@ -423,7 +425,7 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
           children: [
             _permissionSwitch(
               icon: Icons.camera_alt_rounded,
-              color: Colors.purpleAccent,
+              color: context.colors.primary,
               title: 'Camera',
               subtitle: 'Take photos, record stories and start video calls',
               permission: Permission.camera,
@@ -431,7 +433,7 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
             ),
             _permissionSwitch(
               icon: Icons.mic_rounded,
-              color: Colors.deepOrangeAccent,
+              color: context.colors.error,
               title: 'Microphone',
               subtitle: 'Record voice messages and voice calls',
               permission: Permission.microphone,
@@ -439,7 +441,7 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
             ),
             _permissionSwitch(
               icon: Icons.contacts_rounded,
-              color: Colors.greenAccent,
+              color: context.colors.success,
               title: 'Contacts',
               subtitle: 'Discover which of your contacts are on Chaty',
               permission: Permission.contacts,
@@ -447,7 +449,7 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
             ),
             ChatySettingsTile(
               icon: Icons.fingerprint_rounded,
-              iconColor: Colors.tealAccent,
+              iconColor: context.colors.primary,
               title: 'Biometrics & Fingerprint',
               subtitle: _biometricsAvailable
                   ? 'Tap to test biometric unlock'
@@ -455,7 +457,7 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
               badgeText: _loading
                   ? null
                   : (_biometricsAvailable ? 'Available' : 'Unavailable'),
-              badgeColor: _biometricsAvailable ? Colors.green : Colors.grey,
+              badgeColor: _biometricsAvailable ? context.colors.success : context.colors.disabled,
               onTap: _testBiometrics,
             ),
           ],
@@ -467,7 +469,7 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
           children: [
             ChatySettingsTile(
               icon: Icons.done_all_rounded,
-              iconColor: Colors.greenAccent,
+              iconColor: context.colors.success,
               title: 'Request all permissions',
               subtitle:
                   'Prompt for notifications, media, location, camera, mic & contacts',
@@ -475,7 +477,7 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
             ),
             ChatySettingsTile(
               icon: Icons.settings_rounded,
-              iconColor: Colors.blueGrey,
+              iconColor: context.colors.foregroundSecondary,
               title: 'Open system settings',
               subtitle: 'Manage every Chaty permission directly in the OS',
               onTap: () {
@@ -510,8 +512,8 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
 
   Widget _buildStatusChip(String label, bool? granted, IconData icon) {
     final Color color = granted == null
-        ? Colors.blueGrey
-        : (granted ? Colors.green : Colors.red);
+        ? context.colors.foregroundSecondary
+        : (granted ? context.colors.success : context.colors.error);
     final IconData trailingIcon = granted == null
         ? Icons.hourglass_bottom_rounded
         : (granted ? Icons.check : Icons.close);
@@ -542,3 +544,4 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
     );
   }
 }
+

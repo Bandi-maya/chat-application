@@ -200,7 +200,7 @@ class ChatyColors {
   Color get border =>
       isDark ? const Color(0xFF27272A) : const Color(0xFFE4E4E7);
   Color get borderSubtle =>
-      isDark ? const Color(0xFF1F2937) : const Color(0xFFF1F5F9);
+      isDark ? const Color(0xFF18181B) : const Color(0xFFF4F4F5);
   Color get divider =>
       isDark ? const Color(0xFF27272A) : const Color(0xFFE5E7EB);
   Color get success => theme.successColor;

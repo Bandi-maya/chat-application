@@ -594,18 +594,17 @@ class _OptionPreview extends StatelessWidget {
   }
 
   Widget _bottomBarPreview(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primary = scheme.primary;
+    final colors = context.colors;
+    final primary = colors.primary;
 
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: switch (value) {
-          'Floating Dynamic Island' => const Color(0xFF0B0F19),
-          'Segmented Glass Dock' => scheme.surface.withValues(alpha: 0.85),
-          _ => scheme.surface,
+          'Floating Dynamic Island' => colors.surfaceElevated,
+          'Segmented Glass Dock' => colors.surface.withValues(alpha: 0.85),
+          _ => colors.surface,
         },
         borderRadius: BorderRadius.circular(
           switch (value) {
@@ -617,13 +616,11 @@ class _OptionPreview extends StatelessWidget {
           },
         ),
         border: Border.all(
-          color: value == 'Floating Dynamic Island'
-              ? const Color(0xFF1E293B)
-              : scheme.outlineVariant.withValues(alpha: 0.6),
+          color: colors.borderSubtle,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.06),
+            color: colors.shadow,
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -638,19 +635,19 @@ class _OptionPreview extends StatelessWidget {
           Icon(
             Icons.update_rounded,
             size: 20,
-            color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+            color: colors.foregroundSecondary,
           ),
           // Inactive Tab 3
           Icon(
             Icons.checklist_rounded,
             size: 20,
-            color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+            color: colors.foregroundSecondary,
           ),
           // Inactive Tab 4
           Icon(
             Icons.call_rounded,
             size: 20,
-            color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+            color: colors.foregroundSecondary,
           ),
         ],
       ),
@@ -658,6 +655,7 @@ class _OptionPreview extends StatelessWidget {
   }
 
   Widget _buildSampleActiveTab(BuildContext context, Color accent, String style) {
+    final colors = context.colors;
     switch (style) {
       case 'Active Pill Chip':
         return Container(
@@ -697,10 +695,10 @@ class _OptionPreview extends StatelessWidget {
               ),
             ],
           ),
-          child: const Icon(
+          child: Icon(
             Icons.chat_bubble_rounded,
             size: 18,
-            color: Colors.white,
+            color: colors.onPrimary,
           ),
         );
       case 'Top Indicator Line':
@@ -757,10 +755,10 @@ class _OptionPreview extends StatelessWidget {
                 ),
               ],
             ),
-            child: const Icon(
+            child: Icon(
               Icons.chat_bubble_rounded,
               size: 20,
-              color: Colors.white,
+              color: colors.onPrimary,
             ),
           ),
         );

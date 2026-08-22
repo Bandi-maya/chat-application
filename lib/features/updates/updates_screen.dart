@@ -84,8 +84,6 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
               }
             }
 
-            final isDark = themeData.brightness == Brightness.dark;
-
             return Container(
               padding: EdgeInsets.only(
                 left: ChatySpacing.lg,
@@ -94,13 +92,13 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                 bottom: MediaQuery.of(sheetContext).viewInsets.bottom + ChatySpacing.lg,
               ),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF18181B) : Colors.white,
+                color: sheetContext.colors.surface,
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(ChatyRadius.sheet),
                 ),
                 border: Border(
                   top: BorderSide(
-                    color: isDark ? const Color(0xFF27272A) : const Color(0xFFE4E4E7),
+                    color: sheetContext.colors.borderSubtle,
                     width: 1.0,
                   ),
                 ),
@@ -257,7 +255,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                         ChatyIconButton(
                           icon: Icons.delete_outline_rounded,
                           tooltip: 'Delete status',
-                          color: const Color(0xFFEF4444),
+                          color: context.colors.error,
                           onPressed: () async {
                             await _statusService.deleteStatus(status);
                             if (dialogContext.mounted) {
@@ -385,8 +383,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final themeData = Theme.of(context);
-    final isDark = themeData.brightness == Brightness.dark;
+    final colors = context.colors;
 
     return ChatyScaffold(
       safeAreaTop: true,
@@ -404,7 +401,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
               child: Text(
                 'Updates',
                 style: ChatyTypography.headline(
-                  themeData.colorScheme.onSurface,
+                  colors.foreground,
                 ),
               ),
             ),
@@ -432,24 +429,23 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                           child: Container(
                             padding: const EdgeInsets.all(2),
                             decoration: BoxDecoration(
-                              color: themeData.colorScheme.primary,
+                              color: colors.primary,
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: isDark
-                                    ? const Color(0xFF18181B)
-                                    : Colors.white,
+                                color: colors.surface,
                                 width: 2,
                               ),
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.add_rounded,
-                              color: Colors.white,
+                              color: colors.onPrimary,
                               size: 13,
                             ),
                           ),
                         ),
                       ],
                     ),
+
                     const SizedBox(width: ChatySpacing.base),
                     Expanded(
                       child: Column(
@@ -462,16 +458,14 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                                       .home.myNameOverride
                                 : 'My Status',
                             style: ChatyTypography.title(
-                              themeData.colorScheme.onSurface,
+                              colors.foreground,
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             'Share photo, video, audio or thought',
                             style: ChatyTypography.caption(
-                              themeData.colorScheme.onSurface.withValues(
-                                alpha: 0.6,
-                              ),
+                              colors.foregroundSecondary,
                             ),
                           ),
                         ],
@@ -479,9 +473,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                     ),
                     Icon(
                       Icons.chevron_right_rounded,
-                      color: themeData.colorScheme.onSurface.withValues(
-                        alpha: 0.35,
-                      ),
+                      color: colors.foregroundTertiary,
                     ),
                   ],
                 ),
@@ -501,7 +493,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                 style: TextStyle(
                   fontSize: 11.5,
                   fontWeight: FontWeight.w700,
-                  color: themeData.colorScheme.primary,
+                  color: colors.primary,
                   letterSpacing: 0.8,
                 ),
               ),
@@ -532,17 +524,13 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                           Icon(
                             Icons.auto_awesome_rounded,
                             size: 40,
-                            color: themeData.colorScheme.onSurface.withValues(
-                              alpha: 0.3,
-                            ),
+                            color: colors.foregroundTertiary,
                           ),
                           const SizedBox(height: ChatySpacing.sm),
                           Text(
                             'No recent updates',
                             style: ChatyTypography.caption(
-                              themeData.colorScheme.onSurface.withValues(
-                                alpha: 0.55,
-                              ),
+                              colors.foregroundSecondary,
                             ),
                           ),
                         ],
@@ -576,7 +564,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: themeData.colorScheme.primary,
+                                    color: colors.primary,
                                     width: 2.0,
                                   ),
                                 ),
@@ -597,7 +585,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                                     ? 'My Status'
                                     : user?.displayName ?? 'Contact',
                                 style: ChatyTypography.title(
-                                  themeData.colorScheme.onSurface,
+                                  colors.foreground,
                                 ),
                               ),
                               subtitle: Text(
@@ -607,17 +595,13 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: ChatyTypography.caption(
-                                  themeData.colorScheme.onSurface.withValues(
-                                    alpha: 0.6,
-                                  ),
+                                  colors.foregroundSecondary,
                                 ),
                               ),
                               trailing: Text(
                                 _relativeTime(status.createdAt),
                                 style: ChatyTypography.caption(
-                                  themeData.colorScheme.onSurface.withValues(
-                                    alpha: 0.45,
-                                  ),
+                                  colors.foregroundTertiary,
                                 ),
                               ),
                               onTap: () => _openStatus(status),
@@ -653,11 +637,10 @@ class _ComposerAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final colors = context.colors;
 
     return Material(
-      color: isDark ? const Color(0xFF27272A) : const Color(0xFFF4F4F5),
+      color: colors.surfaceSecondary,
       borderRadius: BorderRadius.circular(ChatyRadius.md),
       child: InkWell(
         onTap: onTap,
@@ -674,14 +657,14 @@ class _ComposerAction extends StatelessWidget {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               else
-                Icon(icon, size: 20, color: theme.colorScheme.primary),
+                Icon(icon, size: 20, color: colors.primary),
               const SizedBox(height: 4),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.onSurface,
+                  color: colors.foreground,
                 ),
               ),
             ],
@@ -691,4 +674,5 @@ class _ComposerAction extends StatelessWidget {
     );
   }
 }
+
 

@@ -149,26 +149,26 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
                       child: Container(
                         padding: EdgeInsets.all(conv.bubblePadding),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary,
+                          color: context.colors.primary,
                           borderRadius: BorderRadius.circular(
                             conv.bubbleRadius,
                           ),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
                               'Outgoing reply!',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: context.colors.onPrimary,
                                 fontSize: 13,
                               ),
                             ),
-                            SizedBox(width: 6),
+                            const SizedBox(width: 6),
                             Icon(
                               Icons.done_all_rounded,
                               size: 14,
-                              color: Colors.cyanAccent,
+                              color: context.colors.onPrimary,
                             ),
                           ],
                         ),
@@ -237,7 +237,7 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
           children: [
             ChatySwitchTile(
               icon: Icons.dock_rounded,
-              iconColor: Colors.tealAccent,
+              iconColor: context.colors.primary,
               title: 'Enable Quick Contact Sidebar',
               subtitle:
                   'Show quick contact switcher panel inside active conversations',
@@ -287,7 +287,7 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
           children: [
             ChatySwitchTile(
               icon: Icons.touch_app_rounded,
-              iconColor: Colors.amberAccent,
+              iconColor: context.colors.accent,
               title: 'iOS-Style Context Popup Menu',
               subtitle:
                   'Use modern iOS-style floating menu on message long-press',
@@ -333,7 +333,7 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
             if (conv.wallpaperType == 'Image') ...[
               ChatySettingsTile(
                 icon: Icons.image_rounded,
-                iconColor: Colors.pinkAccent,
+                iconColor: context.colors.primary,
                 title: 'Choose background image',
                 subtitle: conv.wallpaperPath.isEmpty
                     ? 'No image selected yet'
@@ -343,7 +343,7 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
               if (conv.wallpaperPath.isNotEmpty)
                 ChatySettingsTile(
                   icon: Icons.delete_sweep_rounded,
-                  iconColor: Colors.redAccent,
+                  iconColor: context.colors.error,
                   title: 'Remove custom image',
                   subtitle: 'Fall back to the themed gradient background',
                   onTap: () {

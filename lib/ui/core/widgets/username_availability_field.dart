@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../../data/services/backend_service.dart';
 import '../validators/input_validators.dart';
+import '../theme/app_theme.dart';
 
 class UsernameAvailabilityField extends StatefulWidget {
   final TextEditingController controller;
@@ -168,12 +169,11 @@ class _UsernameAvailabilityFieldState extends State<UsernameAvailabilityField> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final statusColor = _available == true
-        ? Colors.green
+        ? context.colors.success
         : _available == false
-        ? scheme.error
-        : scheme.onSurfaceVariant;
+        ? context.colors.error
+        : context.colors.foregroundSecondary;
     final statusText = _checking
         ? 'Checking availability…'
         : _available == true
@@ -209,12 +209,12 @@ class _UsernameAvailabilityFieldState extends State<UsernameAvailabilityField> {
                             ),
                           )
                         : _available == true
-                        ? const Icon(
+                        ? Icon(
                             Icons.check_circle_rounded,
-                            color: Colors.green,
+                            color: context.colors.success,
                           )
                         : _available == false
-                        ? Icon(Icons.cancel_rounded, color: scheme.error)
+                        ? Icon(Icons.cancel_rounded, color: context.colors.error)
                         : null,
                   ),
         ),

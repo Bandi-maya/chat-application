@@ -28,7 +28,7 @@ class GroupInfoScreen extends StatelessWidget {
         .whereType<dynamic>()
         .toList();
 
-    final themeData = Theme.of(context);
+    final colors = context.colors;
 
     return ChatyScaffold(
       appBar: ChatyAppBar(
@@ -69,14 +69,14 @@ class GroupInfoScreen extends StatelessWidget {
                       conv.title,
                       textAlign: TextAlign.center,
                       style: ChatyTypography.headline(
-                        themeData.colorScheme.onSurface,
+                        colors.foreground,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '${conv.participantIds.length} Members • End-to-End Encrypted',
                       style: ChatyTypography.caption(
-                        themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+                        colors.foregroundSecondary,
                       ),
                     ),
                   ],
@@ -90,14 +90,14 @@ class GroupInfoScreen extends StatelessWidget {
               title: 'Group Security & Settings',
               children: [
                 ChatyListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.timer_outlined,
-                    color: Color(0xFFF59E0B),
+                    color: colors.warning,
                   ),
                   title: Text(
                     'Disappearing Messages',
                     style: TextStyle(
-                      color: themeData.colorScheme.onSurface,
+                      color: colors.foreground,
                       fontWeight: FontWeight.w600,
                       fontSize: 15,
                     ),
@@ -105,26 +105,24 @@ class GroupInfoScreen extends StatelessWidget {
                   subtitle: Text(
                     '7 days active',
                     style: ChatyTypography.caption(
-                      themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+                      colors.foregroundSecondary,
                     ),
                   ),
                   trailing: Icon(
                     Icons.chevron_right_rounded,
-                    color: themeData.colorScheme.onSurface.withValues(
-                      alpha: 0.35,
-                    ),
+                    color: colors.foregroundSecondary,
                   ),
                   onTap: () {},
                 ),
                 ChatyListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.verified_user_outlined,
-                    color: Color(0xFF10B981),
+                    color: colors.success,
                   ),
                   title: Text(
                     'Encryption Verification',
                     style: TextStyle(
-                      color: themeData.colorScheme.onSurface,
+                      color: colors.foreground,
                       fontWeight: FontWeight.w600,
                       fontSize: 15,
                     ),
@@ -132,14 +130,12 @@ class GroupInfoScreen extends StatelessWidget {
                   subtitle: Text(
                     'Group prekeys authenticated',
                     style: ChatyTypography.caption(
-                      themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+                      colors.foregroundSecondary,
                     ),
                   ),
                   trailing: Icon(
                     Icons.chevron_right_rounded,
-                    color: themeData.colorScheme.onSurface.withValues(
-                      alpha: 0.35,
-                    ),
+                    color: colors.foregroundSecondary,
                   ),
                   onTap: () {},
                 ),
@@ -154,21 +150,21 @@ class GroupInfoScreen extends StatelessWidget {
                   leading: Container(
                     padding: const EdgeInsets.all(ChatySpacing.sm),
                     decoration: BoxDecoration(
-                      color: themeData.colorScheme.primary.withValues(
+                      color: colors.primary.withValues(
                         alpha: 0.12,
                       ),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       Icons.person_add_rounded,
-                      color: themeData.colorScheme.primary,
+                      color: colors.primary,
                       size: 18,
                     ),
                   ),
                   title: Text(
                     'Add Member',
                     style: TextStyle(
-                      color: themeData.colorScheme.primary,
+                      color: colors.primary,
                       fontWeight: FontWeight.w600,
                       fontSize: 15,
                     ),
@@ -176,7 +172,7 @@ class GroupInfoScreen extends StatelessWidget {
                   subtitle: Text(
                     'Invite via username or direct prekey share',
                     style: ChatyTypography.caption(
-                      themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+                      colors.foregroundSecondary,
                     ),
                   ),
                   onTap: () {
@@ -204,7 +200,7 @@ class GroupInfoScreen extends StatelessWidget {
                             Text(
                               isMe ? '${p.displayName} (You)' : p.displayName,
                               style: TextStyle(
-                                color: themeData.colorScheme.onSurface,
+                                color: colors.foreground,
                                 fontSize: 14.5,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -217,8 +213,7 @@ class GroupInfoScreen extends StatelessWidget {
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: themeData.colorScheme.primary
-                                      .withValues(alpha: 0.12),
+                                  color: colors.primary.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(
                                     ChatyRadius.full,
                                   ),
@@ -226,7 +221,7 @@ class GroupInfoScreen extends StatelessWidget {
                                 child: Text(
                                   'Admin',
                                   style: TextStyle(
-                                    color: themeData.colorScheme.primary,
+                                    color: colors.primary,
                                     fontSize: 10.5,
                                     fontWeight: FontWeight.w700,
                                   ),
@@ -238,9 +233,7 @@ class GroupInfoScreen extends StatelessWidget {
                         subtitle: Text(
                           '@${p.username}',
                           style: ChatyTypography.caption(
-                            themeData.colorScheme.onSurface.withValues(
-                              alpha: 0.6,
-                            ),
+                            colors.foregroundSecondary,
                           ),
                         ),
                       );
@@ -254,14 +247,14 @@ class GroupInfoScreen extends StatelessWidget {
             ChatyGroupedSection(
               children: [
                 ChatyListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.exit_to_app_rounded,
-                    color: Color(0xFFEF4444),
+                    color: colors.error,
                   ),
-                  title: const Text(
+                  title: Text(
                     'Leave Group',
                     style: TextStyle(
-                      color: Color(0xFFEF4444),
+                      color: colors.error,
                       fontWeight: FontWeight.w600,
                       fontSize: 15,
                     ),

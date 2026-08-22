@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../tokens/app_tokens.dart';
+import '../../theme/app_theme.dart';
 
 /// ---------------------------------------------------------------------------
 /// CHATY SCAFFOLD (Standardized background & safe-area handling)
@@ -73,15 +74,10 @@ class _ChatyBackButtonState extends State<ChatyBackButton> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final fg = widget.color ?? theme.colorScheme.onSurface;
-    final bg =
-        widget.backgroundColor ??
-        (isDark
-            ? const Color(0xFF1E293B).withValues(alpha: 0.8)
-            : const Color(0xFFF1F5F9));
-    final border = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final colors = context.colors;
+    final fg = widget.color ?? colors.foreground;
+    final bg = widget.backgroundColor ?? colors.surfaceSecondary;
+    final border = colors.border;
 
     return AnimatedScale(
       scale: _isPressed ? ChatyMotion.activeIconScale : 1.0,
@@ -366,13 +362,10 @@ class _ChatySecondaryButtonState extends State<ChatySecondaryButton> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final colors = context.colors;
     final isEnabled = widget.onPressed != null;
-    final border =
-        widget.borderColor ??
-        (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0));
-    final fg = widget.textColor ?? theme.colorScheme.onSurface;
+    final border = widget.borderColor ?? colors.border;
+    final fg = widget.textColor ?? colors.foreground;
 
     return AnimatedScale(
       scale: _isPressed && isEnabled ? ChatyMotion.activeScale : 1.0,
@@ -461,8 +454,8 @@ class _ChatyIconButtonState extends State<ChatyIconButton> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final iconColor = widget.color ?? theme.colorScheme.onSurface;
+    final colors = context.colors;
+    final iconColor = widget.color ?? colors.foreground;
 
     Widget button = Material(
       color: Colors.transparent,
@@ -536,13 +529,9 @@ class ChatyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final bg =
-        backgroundColor ?? (isDark ? const Color(0xFF18181B) : Colors.white);
-    final border =
-        borderColor ??
-        (isDark ? const Color(0xFF27272A) : const Color(0xFFE4E4E7));
+    final colors = context.colors;
+    final bg = backgroundColor ?? colors.surface;
+    final border = borderColor ?? colors.border;
 
     Widget card = Container(
       margin: margin,
@@ -588,10 +577,9 @@ class ChatyGroupedSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final border = isDark ? const Color(0xFF27272A) : const Color(0xFFE4E4E7);
-    final bg = isDark ? const Color(0xFF18181B) : Colors.white;
+    final colors = context.colors;
+    final border = colors.border;
+    final bg = colors.surface;
 
     return Padding(
       padding: margin,
@@ -610,7 +598,7 @@ class ChatyGroupedSection extends StatelessWidget {
                   fontSize: 11.5,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 1.0,
-                  color: theme.colorScheme.primary,
+                  color: colors.primary,
                 ),
               ),
             ),
@@ -650,7 +638,7 @@ class ChatyGroupedSection extends StatelessWidget {
               child: Text(
                 description!,
                 style: ChatyTypography.caption(
-                  theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  colors.foregroundSecondary,
                 ),
               ),
             ),
@@ -773,10 +761,9 @@ class ChatyInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final fill = isDark ? const Color(0xFF18181B) : const Color(0xFFF4F4F5);
-    final border = isDark ? const Color(0xFF27272A) : const Color(0xFFE4E4E7);
+    final colors = context.colors;
+    final fill = colors.inputFill;
+    final border = colors.inputBorder;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -785,7 +772,7 @@ class ChatyInput extends StatelessWidget {
           Text(
             label!,
             style: TextStyle(
-              color: theme.colorScheme.onSurface,
+              color: colors.foreground,
               fontSize: 13.5,
               fontWeight: FontWeight.w600,
               letterSpacing: -0.1,
@@ -805,14 +792,14 @@ class ChatyInput extends StatelessWidget {
           autofocus: autofocus,
           maxLines: maxLines,
           style: TextStyle(
-            color: theme.colorScheme.onSurface,
+            color: colors.foreground,
             fontSize: 15,
             fontWeight: FontWeight.w500,
           ),
           decoration: InputDecoration(
             hintText: hintText,
             hintStyle: TextStyle(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
+              color: colors.foregroundSecondary,
               fontSize: 14.5,
               fontWeight: FontWeight.w400,
             ),
@@ -835,14 +822,14 @@ class ChatyInput extends StatelessWidget {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(ChatyRadius.lg),
               borderSide: BorderSide(
-                color: theme.colorScheme.primary,
+                color: colors.primary,
                 width: 1.6,
               ),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(ChatyRadius.lg),
               borderSide: BorderSide(
-                color: theme.colorScheme.error,
+                color: colors.error,
                 width: 1.2,
               ),
             ),

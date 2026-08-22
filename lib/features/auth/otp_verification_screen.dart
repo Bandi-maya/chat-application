@@ -171,9 +171,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                           decoration: InputDecoration(
                             counterText: '',
                             filled: true,
-                            fillColor: isDark
-                                ? const Color(0xFF1E293B)
-                                : const Color(0xFFF3F4F6),
+                            fillColor: context.colors.inputFill,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),

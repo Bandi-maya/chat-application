@@ -89,9 +89,7 @@ class AuthTextField extends StatelessWidget {
               fontWeight: FontWeight.normal,
             ),
             filled: true,
-            fillColor: isDark
-                ? const Color(0xFF1E293B).withValues(alpha: 0.8)
-                : const Color(0xFFF3F4F6),
+            fillColor: context.colors.inputFill,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 18,
               vertical: 16,
@@ -101,18 +99,14 @@ class AuthTextField extends StatelessWidget {
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
-                color: isDark
-                    ? const Color(0xFF334155)
-                    : const Color(0xFFE5E7EB),
+                color: context.colors.border,
                 width: 1.0,
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
-                color: isDark
-                    ? const Color(0xFF334155)
-                    : const Color(0xFFE5E7EB),
+                color: context.colors.border,
                 width: 1.0,
               ),
             ),
@@ -215,9 +209,7 @@ class AuthSecondaryButton extends StatelessWidget {
         style: OutlinedButton.styleFrom(
           foregroundColor: theme.primaryTextColor,
           side: BorderSide(
-            color: theme.brightness == Brightness.dark
-                ? const Color(0xFF334155)
-                : const Color(0xFFE2E8F0),
+            color: context.colors.border,
             width: 1.5,
           ),
           shape: RoundedRectangleBorder(
@@ -246,9 +238,8 @@ class AuthOrDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dividerColor = theme.brightness == Brightness.dark
-        ? const Color(0xFF334155)
-        : const Color(0xFFE2E8F0);
+    final dividerColor = context.colors.divider;
+
 
     return Row(
       children: [
@@ -296,7 +287,7 @@ class AuthSocialRow extends StatelessWidget {
     // Show sleek authentic sign-in bottom sheet
     showModalBottomSheet(
       context: context,
-      backgroundColor: isDark ? const Color(0xFF18181B) : Colors.white,
+      backgroundColor: context.colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
@@ -310,9 +301,7 @@ class AuthSocialRow extends StatelessWidget {
                 width: 38,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF3F3F46)
-                      : const Color(0xFFCBD5E1),
+                  color: context.colors.border,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -324,9 +313,7 @@ class AuthSocialRow extends StatelessWidget {
                     height: 36,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isDark
-                          ? const Color(0xFF27272A)
-                          : const Color(0xFFF1F5F9),
+                      color: context.colors.surfaceSecondary,
                     ),
                     child: Icon(
                       provLower == 'google'
@@ -382,7 +369,7 @@ class AuthSocialRow extends StatelessWidget {
                         content: Text(
                           'Signed in successfully as $displayName! 🎉',
                         ),
-                        backgroundColor: const Color(0xFF10B981),
+                        backgroundColor: context.colors.success,
                       ),
                     );
 
@@ -406,14 +393,10 @@ class AuthSocialRow extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF27272A)
-                        : const Color(0xFFF8FAFC),
+                    color: context.colors.surfaceSecondary,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isDark
-                          ? const Color(0xFF3F3F46)
-                          : const Color(0xFFE2E8F0),
+                      color: context.colors.border,
                     ),
                   ),
                   child: Row(
@@ -484,7 +467,7 @@ class AuthSocialRow extends StatelessWidget {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text('Connected with $provider!'),
-                          backgroundColor: const Color(0xFF10B981),
+                          backgroundColor: context.colors.success,
                         ),
                       );
 
@@ -529,11 +512,8 @@ class AuthSocialRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = theme.brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC);
-    final borderColor = isDark
-        ? const Color(0xFF334155)
-        : const Color(0xFFE2E8F0);
+    final cardBg = context.colors.surfaceSecondary;
+    final borderColor = context.colors.border;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -541,7 +521,7 @@ class AuthSocialRow extends StatelessWidget {
         _buildSocialBtn(
           context,
           icon: Icons.facebook,
-          iconColor: const Color(0xFF1877F2),
+          iconColor: context.colors.primary,
           name: 'Facebook',
           cardBg: cardBg,
           borderColor: borderColor,
@@ -549,7 +529,7 @@ class AuthSocialRow extends StatelessWidget {
         const SizedBox(width: 18),
         _buildSocialBtn(
           context,
-          customWidget: _buildGoogleLogo(),
+          customWidget: _buildGoogleLogo(context),
           name: 'Google',
           cardBg: cardBg,
           borderColor: borderColor,
@@ -558,7 +538,7 @@ class AuthSocialRow extends StatelessWidget {
         _buildSocialBtn(
           context,
           icon: Icons.apple,
-          iconColor: isDark ? Colors.white : Colors.black,
+          iconColor: context.colors.foreground,
           name: 'Apple',
           cardBg: cardBg,
           borderColor: borderColor,
@@ -593,16 +573,16 @@ class AuthSocialRow extends StatelessWidget {
     );
   }
 
-  Widget _buildGoogleLogo() {
+  Widget _buildGoogleLogo(BuildContext context) {
     return Container(
       width: 22,
       height: 22,
       decoration: const BoxDecoration(shape: BoxShape.circle),
-      child: const Center(
+      child: Center(
         child: Text(
           'G',
           style: TextStyle(
-            color: Color(0xFFEA4335),
+            color: context.colors.primary,
             fontSize: 20,
             fontWeight: FontWeight.w900,
             fontFamily: 'Roboto',
@@ -653,15 +633,14 @@ class AuthIllustration extends StatelessWidget {
       width: double.infinity,
       margin: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
-        color: theme.brightness == Brightness.dark
-            ? const Color(0xFF1E293B).withValues(alpha: 0.6)
-            : const Color(0xFFF1F5F9).withValues(alpha: 0.9),
+        color: context.colors.surfaceSecondary.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: theme.accentColor.withValues(alpha: 0.15),
           width: 1.5,
         ),
       ),
+
       child: Stack(
         alignment: Alignment.center,
         children: [

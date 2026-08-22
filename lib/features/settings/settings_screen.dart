@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../ui/core/design_system/design_system.dart';
 import '../../ui/core/design_system/settings_primitives.dart';
-import '../../ui/core/design_system/components/app_components.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
-import '../../../ui/core/theme/theme_controller.dart';
 import '../../data/repositories/mock_data_store.dart';
 import '../../data/services/notification_service.dart';
 import 'settings_search_delegate.dart';
@@ -188,12 +187,12 @@ class SettingsScreen extends StatelessWidget {
     final user = dataStore.currentUser;
     final nameCtrl = TextEditingController(text: user.displayName);
     final aboutCtrl = TextEditingController(text: user.about);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colors = context.colors;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: isDark ? const Color(0xFF18181B) : Colors.white,
+      backgroundColor: colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -208,9 +207,13 @@ class SettingsScreen extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Edit Profile Details',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: colors.foreground,
+              ),
             ),
             const SizedBox(height: 16),
             TextField(
@@ -242,10 +245,8 @@ class SettingsScreen extends StatelessWidget {
                   Navigator.pop(ctx);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isDark
-                      ? Colors.white
-                      : const Color(0xFF09090B),
-                  foregroundColor: isDark ? Colors.black : Colors.white,
+                  backgroundColor: colors.primary,
+                  foregroundColor: colors.onPrimary,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
@@ -263,11 +264,11 @@ class SettingsScreen extends StatelessWidget {
   }
 
   void _showResetOptions(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colors = context.colors;
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: isDark ? const Color(0xFF18181B) : Colors.white,
+      backgroundColor: colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -277,15 +278,19 @@ class SettingsScreen extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Reset & Preferences',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: colors.foreground,
+              ),
             ),
             const SizedBox(height: 12),
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.restore_rounded,
-                color: Colors.blueAccent,
+                color: colors.primary,
               ),
               title: const Text('Reset Theme to Default B&W'),
               onTap: () {
@@ -297,9 +302,9 @@ class SettingsScreen extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.shield_outlined,
-                color: Colors.purpleAccent,
+                color: colors.primary,
               ),
               title: const Text('Reset Privacy Options'),
               onTap: () {
@@ -311,14 +316,14 @@ class SettingsScreen extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.cleaning_services_rounded,
-                color: Colors.redAccent,
+                color: colors.error,
               ),
-              title: const Text(
+              title: Text(
                 'Reset ALL Preferences',
                 style: TextStyle(
-                  color: Colors.redAccent,
+                  color: colors.error,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -371,13 +376,11 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = themeController.globalTheme;
-    final isDark = theme.brightness == Brightness.dark;
+    final colors = context.colors;
     final user = dataStore.currentUser;
 
-    final cardBg = isDark ? const Color(0xFF141416) : Colors.white;
-    final borderCol = isDark
-        ? const Color(0xFF27272A)
-        : const Color(0xFFE4E4E7);
+    final cardBg = colors.surface;
+    final borderCol = colors.border;
 
     return Scaffold(
       backgroundColor: theme.backgroundColor,
@@ -446,9 +449,7 @@ class SettingsScreen extends StatelessWidget {
                   border: Border.all(color: borderCol, width: 1.1),
                   boxShadow: [
                     BoxShadow(
-                      color: isDark
-                          ? Colors.black.withValues(alpha: 0.3)
-                          : const Color(0x08000000),
+                      color: colors.shadow,
                       blurRadius: 18,
                       offset: const Offset(0, 6),
                     ),
@@ -461,13 +462,9 @@ class SettingsScreen extends StatelessWidget {
                       height: 56,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isDark
-                            ? const Color(0xFF27272A)
-                            : const Color(0xFFE2E8F0),
+                        color: colors.surfaceSecondary,
                         border: Border.all(
-                          color: isDark
-                              ? Colors.white.withValues(alpha: 0.15)
-                              : Colors.black.withValues(alpha: 0.1),
+                          color: colors.border,
                           width: 1.5,
                         ),
                       ),
@@ -507,15 +504,13 @@ class SettingsScreen extends StatelessWidget {
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(
-                                    0xFF10B981,
-                                  ).withValues(alpha: 0.15),
+                                  color: colors.success.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'PRO',
                                   style: TextStyle(
-                                    color: Color(0xFF10B981),
+                                    color: colors.success,
                                     fontSize: 10.5,
                                     fontWeight: FontWeight.w900,
                                   ),
@@ -572,7 +567,7 @@ class SettingsScreen extends StatelessWidget {
                 children: [
                   ChatySettingsTile(
                     icon: Icons.shield_outlined,
-                    iconColor: const Color(0xFF38BDF8),
+                    iconColor: colors.info,
                     title: 'Privacy Center',
                     subtitle:
                         'Freeze last seen, anti-delete, read receipts & stealth',
@@ -589,7 +584,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   ChatySettingsTile(
                     icon: Icons.lock_outline_rounded,
-                    iconColor: const Color(0xFF818CF8),
+                    iconColor: colors.primary,
                     title: 'Security Center',
                     subtitle:
                         'Chaty App Lock (Biometric/PIN/Pattern), devices & audit',
@@ -606,7 +601,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   ChatySettingsTile(
                     icon: Icons.vpn_key_outlined,
-                    iconColor: const Color(0xFF34D399),
+                    iconColor: colors.success,
                     title: 'System Permissions & Hardware',
                     subtitle:
                         'Camera, mic, storage, background refresh & battery',
@@ -633,7 +628,7 @@ class SettingsScreen extends StatelessWidget {
                 children: [
                   ChatySettingsTile(
                     icon: Icons.palette_outlined,
-                    iconColor: const Color(0xFFF472B6),
+                    iconColor: colors.accent,
                     title: 'Themes & Color Engine',
                     subtitle:
                         '13+ dark & light presets, custom tokens, font scaling',
@@ -650,7 +645,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   ChatySettingsTile(
                     icon: Icons.auto_awesome_mosaic_outlined,
-                    iconColor: const Color(0xFFA78BFA),
+                    iconColor: colors.primary,
                     title: 'Universal Appearance',
                     subtitle:
                         'App icon changer, custom emojis, typography styles',
@@ -667,7 +662,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   ChatySettingsTile(
                     icon: Icons.touch_app_outlined,
-                    iconColor: const Color(0xFFFBBF24),
+                    iconColor: colors.warning,
                     title: 'Navigation & Touch Effects',
                     subtitle:
                         'Interactive click particles (Stars/Hearts/Bubbles), Sound FX',
@@ -693,7 +688,7 @@ class SettingsScreen extends StatelessWidget {
                 children: [
                   ChatySettingsTile(
                     icon: Icons.space_dashboard_outlined,
-                    iconColor: const Color(0xFF60A5FA),
+                    iconColor: colors.info,
                     title: 'Home Screen UI Layout',
                     subtitle:
                         'Classic, compact, expressive, stories-first styles',
@@ -710,7 +705,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   ChatySettingsTile(
                     icon: Icons.chat_bubble_outline_rounded,
-                    iconColor: const Color(0xFF2DD4BF),
+                    iconColor: colors.success,
                     title: 'Conversation Customization',
                     subtitle:
                         'Bubble shapes, corner radius, tick styles, contact sidebar',
@@ -727,7 +722,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   ChatySettingsTile(
                     icon: Icons.notifications_none_rounded,
-                    iconColor: const Color(0xFFFB923C),
+                    iconColor: colors.warning,
                     title: 'Notification & Sound Studio',
                     subtitle:
                         'Conversation tones, LED colors, heads-up popups, vibration',
@@ -745,7 +740,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   ChatySettingsTile(
                     icon: Icons.smart_toy_outlined,
-                    iconColor: const Color(0xFF4ADE80),
+                    iconColor: colors.success,
                     title: 'Message Automation & Scheduler',
                     subtitle:
                         'Auto-reply bot with keyword rules, message scheduler',
@@ -772,7 +767,7 @@ class SettingsScreen extends StatelessWidget {
                 children: [
                   ChatySettingsTile(
                     icon: Icons.backup_outlined,
-                    iconColor: const Color(0xFF38BDF8),
+                    iconColor: colors.info,
                     title: 'Backup & Export Data',
                     subtitle:
                         'Export encrypted chats JSON, backup verification',
@@ -780,7 +775,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   ChatySettingsTile(
                     icon: Icons.restore_page_outlined,
-                    iconColor: const Color(0xFFF87171),
+                    iconColor: colors.error,
                     title: 'Reset & Diagnostics',
                     subtitle:
                         'Reset privacy settings, themes, or restore factory defaults',
@@ -788,7 +783,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   ChatySettingsTile(
                     icon: Icons.info_outline_rounded,
-                    iconColor: const Color(0xFF94A3B8),
+                    iconColor: colors.foregroundSecondary,
                     title: 'About Chaty',
                     subtitle:
                         'Version 1.0.0 • Pure private messaging architecture',
@@ -827,22 +822,22 @@ class SettingsScreen extends StatelessWidget {
                         (route) => false,
                       );
                     },
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.logout_rounded,
-                      color: Color(0xFFEF4444),
+                      color: colors.error,
                       size: 18,
                     ),
-                    label: const Text(
+                    label: Text(
                       'Log Out of Chaty',
                       style: TextStyle(
-                        color: Color(0xFFEF4444),
+                        color: colors.error,
                         fontWeight: FontWeight.w700,
                         fontSize: 14.5,
                       ),
                     ),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(
-                        color: Color(0xFFEF4444),
+                      side: BorderSide(
+                        color: colors.error,
                         width: 1.2,
                       ),
                       shape: RoundedRectangleBorder(
@@ -875,3 +870,4 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 }
+

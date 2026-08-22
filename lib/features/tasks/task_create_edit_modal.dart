@@ -127,7 +127,7 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                 ? 'Task "$title" created and shared in chat.'
                 : 'Task "$title" updated.',
           ),
-          backgroundColor: const Color(0xFF10B981),
+          backgroundColor: context.colors.success,
         ),
       );
     } catch (error) {
@@ -183,8 +183,7 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
         .whereType<UserProfile>()
         .toList();
 
-    final themeData = Theme.of(context);
-    final isDark = themeData.brightness == Brightness.dark;
+    final colors = context.colors;
 
     return Container(
       padding: EdgeInsets.only(
@@ -194,7 +193,7 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
         bottom: MediaQuery.of(context).viewInsets.bottom + ChatySpacing.lg,
       ),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF18181B) : Colors.white,
+        color: colors.surface,
         borderRadius: const BorderRadius.vertical(
           top: Radius.circular(ChatyRadius.xl),
         ),
@@ -211,9 +210,7 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                   width: 38,
                   height: 4.5,
                   decoration: BoxDecoration(
-                    color: themeData.colorScheme.onSurface.withValues(
-                      alpha: 0.2,
-                    ),
+                    color: colors.foregroundTertiary,
                     borderRadius: BorderRadius.circular(ChatyRadius.full),
                   ),
                 ),
@@ -225,7 +222,7 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                   Text(
                     widget.existingTask != null ? 'Edit Task' : 'New Task',
                     style: ChatyTypography.headline(
-                      themeData.colorScheme.onSurface,
+                      colors.foreground,
                     ),
                   ),
                   ChatyIconButton(
@@ -254,7 +251,7 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
               Text(
                 'Assign To',
                 style: TextStyle(
-                  color: themeData.colorScheme.onSurface,
+                  color: colors.foreground,
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),
@@ -263,7 +260,7 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
               Text(
                 'Select who is responsible for this task:',
                 style: ChatyTypography.caption(
-                  themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+                  colors.foregroundSecondary,
                 ),
               ),
               const SizedBox(height: ChatySpacing.sm),
@@ -282,7 +279,7 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                       ),
                       label: Text(candidate.displayName.split(' ').first),
                       selected: selected,
-                      selectedColor: themeData.colorScheme.primary.withValues(
+                      selectedColor: colors.primary.withValues(
                         alpha: 0.2,
                       ),
                       onSelected: _isSaving
@@ -296,7 +293,7 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                       'Me (${currentUser.displayName.split(' ').first})',
                     ),
                     selected: _selectedAssigneeIds.contains(currentUser.id),
-                    selectedColor: themeData.colorScheme.primary.withValues(
+                    selectedColor: colors.primary.withValues(
                       alpha: 0.2,
                     ),
                     onSelected: _isSaving
@@ -309,7 +306,7 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
               Text(
                 'Priority',
                 style: TextStyle(
-                  color: themeData.colorScheme.onSurface,
+                  color: colors.foreground,
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),
@@ -351,7 +348,7 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                 Text(
                   _errorMessage!,
                   style: TextStyle(
-                    color: themeData.colorScheme.error,
+                    color: colors.error,
                     fontSize: 13,
                   ),
                 ),

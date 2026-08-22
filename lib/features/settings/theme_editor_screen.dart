@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../ui/core/theme/theme_config.dart';
-import '../../../ui/core/theme/theme_presets.dart';
-import '../../../ui/core/theme/theme_controller.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../messages/message_bubble.dart';
 import '../../domain/models/chat_message.dart';
@@ -27,9 +24,9 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
   void _applyAndSave() {
     widget.themeController.updateThemeConfig(_current);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Theme customization saved!'),
-        backgroundColor: Color(0xFF10B981),
+      SnackBar(
+        content: const Text('Theme customization saved!'),
+        backgroundColor: context.colors.success,
       ),
     );
   }
@@ -144,25 +141,25 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
               Container(
                 padding: const EdgeInsets.all(ChatySpacing.md),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEF4444).withValues(alpha: 0.12),
+                  color: context.colors.error.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(ChatyRadius.md),
                   border: Border.all(
-                    color: const Color(0xFFEF4444).withValues(alpha: 0.4),
+                    color: context.colors.error.withValues(alpha: 0.4),
                   ),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
                     Icon(
                       Icons.warning_amber_rounded,
-                      color: Color(0xFFEF4444),
+                      color: context.colors.error,
                       size: 20,
                     ),
-                    SizedBox(width: 10),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         'Warning: The current color combination falls below WCAG contrast guidelines.',
                         style: TextStyle(
-                          color: Color(0xFFFCA5A5),
+                          color: context.colors.error,
                           fontSize: 12.5,
                         ),
                       ),

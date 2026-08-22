@@ -52,8 +52,7 @@ class MessageActionSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     if (useIosStyle) return _IosStyleMenu(this);
     final quickEmojis = <String>['👍', '❤️', '🔥', '🎉', '👀', '🚀'];
-    final themeData = Theme.of(context);
-    final isDark = themeData.brightness == Brightness.dark;
+    final colors = context.colors;
 
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -61,7 +60,7 @@ class MessageActionSheet extends StatelessWidget {
         vertical: ChatySpacing.md,
       ),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF18181B) : Colors.white,
+        color: colors.surface,
         borderRadius: const BorderRadius.vertical(
           top: Radius.circular(ChatyRadius.xl),
         ),
@@ -78,7 +77,7 @@ class MessageActionSheet extends StatelessWidget {
                   width: 38,
                   height: 4.5,
                   decoration: BoxDecoration(
-                    color: themeData.colorScheme.onSurface.withValues(
+                    color: colors.foregroundSecondary.withValues(
                       alpha: 0.2,
                     ),
                     borderRadius: BorderRadius.circular(ChatyRadius.full),
@@ -92,9 +91,7 @@ class MessageActionSheet extends StatelessWidget {
                   horizontal: ChatySpacing.sm,
                 ),
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF27272A)
-                      : const Color(0xFFF4F4F5),
+                  color: colors.surfaceSecondary,
                   borderRadius: BorderRadius.circular(ChatyRadius.full),
                 ),
                 child: Row(
@@ -126,14 +123,12 @@ class MessageActionSheet extends StatelessWidget {
                         width: 38,
                         height: 38,
                         decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(0xFF3F3F46)
-                              : const Color(0xFFE4E4E7),
+                          color: colors.surfaceElevated,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
                           Icons.add_rounded,
-                          color: themeData.colorScheme.onSurface,
+                          color: colors.foreground,
                           size: 22,
                         ),
                       ),
@@ -147,13 +142,13 @@ class MessageActionSheet extends StatelessWidget {
                   ChatyListTile(
                     leading: Icon(
                       Icons.reply_rounded,
-                      color: themeData.colorScheme.primary,
+                      color: colors.primary,
                       size: 22,
                     ),
                     title: Text(
                       'Reply',
                       style: TextStyle(
-                        color: themeData.colorScheme.onSurface,
+                        color: colors.foreground,
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
                       ),
@@ -163,13 +158,13 @@ class MessageActionSheet extends StatelessWidget {
                   ChatyListTile(
                     leading: Icon(
                       Icons.shortcut_rounded,
-                      color: themeData.colorScheme.primary,
+                      color: colors.primary,
                       size: 22,
                     ),
                     title: Text(
                       'Forward',
                       style: TextStyle(
-                        color: themeData.colorScheme.onSurface,
+                        color: colors.foreground,
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
                       ),
@@ -179,13 +174,13 @@ class MessageActionSheet extends StatelessWidget {
                   ChatyListTile(
                     leading: Icon(
                       Icons.task_alt_rounded,
-                      color: themeData.colorScheme.primary,
+                      color: colors.primary,
                       size: 22,
                     ),
                     title: Text(
                       'Create Task from Message',
                       style: TextStyle(
-                        color: themeData.colorScheme.primary,
+                        color: colors.primary,
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
                       ),
@@ -197,15 +192,13 @@ class MessageActionSheet extends StatelessWidget {
                       message.isPinned
                           ? Icons.push_pin_outlined
                           : Icons.push_pin_rounded,
-                      color: themeData.colorScheme.onSurface.withValues(
-                        alpha: 0.8,
-                      ),
+                      color: colors.foregroundSecondary,
                       size: 22,
                     ),
                     title: Text(
                       message.isPinned ? 'Unpin Message' : 'Pin Message',
                       style: TextStyle(
-                        color: themeData.colorScheme.onSurface,
+                        color: colors.foreground,
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
                       ),
@@ -217,13 +210,13 @@ class MessageActionSheet extends StatelessWidget {
                       message.isStarred
                           ? Icons.star_border_rounded
                           : Icons.star_rounded,
-                      color: const Color(0xFFF59E0B),
+                      color: colors.warning,
                       size: 22,
                     ),
                     title: Text(
                       message.isStarred ? 'Unstar Message' : 'Star Message',
                       style: TextStyle(
-                        color: themeData.colorScheme.onSurface,
+                        color: colors.foreground,
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
                       ),
@@ -233,15 +226,13 @@ class MessageActionSheet extends StatelessWidget {
                   ChatyListTile(
                     leading: Icon(
                       Icons.content_copy_rounded,
-                      color: themeData.colorScheme.onSurface.withValues(
-                        alpha: 0.8,
-                      ),
+                      color: colors.foregroundSecondary,
                       size: 20,
                     ),
                     title: Text(
                       'Copy Text',
                       style: TextStyle(
-                        color: themeData.colorScheme.onSurface,
+                        color: colors.foreground,
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
                       ),
@@ -253,15 +244,15 @@ class MessageActionSheet extends StatelessWidget {
               ChatyGroupedSection(
                 children: [
                   ChatyListTile(
-                    leading: const Icon(
+                    leading: Icon(
                       Icons.delete_outline_rounded,
-                      color: Color(0xFFEF4444),
+                      color: colors.error,
                       size: 22,
                     ),
-                    title: const Text(
+                    title: Text(
                       'Delete for me',
                       style: TextStyle(
-                        color: Color(0xFFEF4444),
+                        color: colors.error,
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
                       ),
@@ -270,15 +261,15 @@ class MessageActionSheet extends StatelessWidget {
                   ),
                   if (isMe && onDeleteForEveryone != null)
                     ChatyListTile(
-                      leading: const Icon(
+                      leading: Icon(
                         Icons.delete_forever_rounded,
-                        color: Color(0xFFEF4444),
+                        color: colors.error,
                         size: 22,
                       ),
-                      title: const Text(
+                      title: Text(
                         'Delete for everyone',
                         style: TextStyle(
-                          color: Color(0xFFEF4444),
+                          color: colors.error,
                           fontWeight: FontWeight.w600,
                           fontSize: 15,
                         ),
@@ -288,17 +279,13 @@ class MessageActionSheet extends StatelessWidget {
                   ChatyListTile(
                     leading: Icon(
                       Icons.flag_outlined,
-                      color: themeData.colorScheme.onSurface.withValues(
-                        alpha: 0.6,
-                      ),
+                      color: colors.foregroundSecondary,
                       size: 22,
                     ),
                     title: Text(
                       'Report Message',
                       style: TextStyle(
-                        color: themeData.colorScheme.onSurface.withValues(
-                          alpha: 0.7,
-                        ),
+                        color: colors.foregroundSecondary,
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
                       ),
@@ -324,12 +311,10 @@ class _IosStyleMenu extends StatelessWidget {
 
   const _IosStyleMenu(this.sheet);
 
-  static const Color _surface = Color(0xF01C1C1E);
-  static const Color _destructive = Color(0xFFFF453A);
-
   @override
   Widget build(BuildContext context) {
     final s = sheet;
+    final colors = context.colors;
     const quickEmojis = <String>['👍', '❤️', '🔥', '🎉', '👀', '🚀'];
 
     Widget row({
@@ -339,7 +324,7 @@ class _IosStyleMenu extends StatelessWidget {
       bool destructive = false,
       bool chevron = false,
     }) {
-      final color = destructive ? _destructive : Colors.white;
+      final color = destructive ? colors.error : colors.foreground;
       return InkWell(
         onTap: onTap,
         child: Padding(
@@ -358,7 +343,7 @@ class _IosStyleMenu extends StatelessWidget {
                 Icon(
                   Icons.chevron_right_rounded,
                   size: 17,
-                  color: Colors.white.withValues(alpha: 0.35),
+                  color: colors.foregroundTertiary,
                 ),
             ],
           ),
@@ -367,7 +352,7 @@ class _IosStyleMenu extends StatelessWidget {
     }
 
     Widget hairline() =>
-        Container(height: 0.6, color: Colors.white.withValues(alpha: 0.12));
+        Container(height: 0.6, color: colors.border);
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -375,8 +360,9 @@ class _IosStyleMenu extends StatelessWidget {
         width: 290,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: _surface,
+          color: colors.surface,
           borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: colors.border),
         ),
         child: SingleChildScrollView(
           child: Column(
@@ -404,10 +390,10 @@ class _IosStyleMenu extends StatelessWidget {
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.12),
+                        color: colors.surfaceSecondary,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.add_rounded, color: Colors.white, size: 18),
+                      child: Icon(Icons.add_rounded, color: colors.foreground, size: 18),
                     ),
                   ),
                 ],
@@ -417,15 +403,16 @@ class _IosStyleMenu extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _iconAction(Icons.reply_rounded, 'Reply', sheet.onReply),
-                  _iconAction(Icons.shortcut_rounded, 'Forward', sheet.onForward),
-                  _iconAction(Icons.content_copy_rounded, 'Copy', sheet.onCopy),
+                  _iconAction(Icons.reply_rounded, 'Reply', sheet.onReply, colors),
+                  _iconAction(Icons.shortcut_rounded, 'Forward', sheet.onForward, colors),
+                  _iconAction(Icons.content_copy_rounded, 'Copy', sheet.onCopy, colors),
                   _iconAction(
                     sheet.message.isStarred
                         ? Icons.star_rounded
                         : Icons.star_border_rounded,
                     'Star',
                     sheet.onStar,
+                    colors,
                   ),
                   _iconAction(
                     sheet.message.isPinned
@@ -433,6 +420,7 @@ class _IosStyleMenu extends StatelessWidget {
                         : Icons.push_pin_outlined,
                     'Pin',
                     sheet.onPin,
+                    colors,
                   ),
                 ],
               ),
@@ -471,7 +459,7 @@ class _IosStyleMenu extends StatelessWidget {
     );
   }
 
-  static Widget _iconAction(IconData icon, String label, VoidCallback onTap) {
+  static Widget _iconAction(IconData icon, String label, VoidCallback onTap, AppColors colors) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
@@ -480,12 +468,13 @@ class _IosStyleMenu extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 21, color: Colors.white),
+            Icon(icon, size: 21, color: colors.foreground),
             const SizedBox(height: 4),
-            Text(label, style: const TextStyle(color: Colors.white70, fontSize: 9.5)),
+            Text(label, style: TextStyle(color: colors.foregroundSecondary, fontSize: 9.5)),
           ],
         ),
       ),
     );
   }
 }
+

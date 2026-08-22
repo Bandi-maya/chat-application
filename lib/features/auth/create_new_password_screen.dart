@@ -55,9 +55,9 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Password updated. Sign in with your new password.'),
-          backgroundColor: Color(0xFF10B981),
+        SnackBar(
+          content: const Text('Password updated. Sign in with your new password.'),
+          backgroundColor: context.colors.success,
         ),
       );
       Navigator.of(context).pushAndRemoveUntil(

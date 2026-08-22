@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../data/services/notification_service.dart';
 import '../controllers/preferences_controller.dart';
+import '../theme/app_theme.dart';
 
 class ChatyEventToastOverlay extends StatefulWidget {
   final ChatyNotificationService notificationService;
@@ -133,8 +134,8 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
                           constraints: const BoxConstraints(maxWidth: 430),
                           child: Material(
                             elevation: 10,
-                            color: theme.colorScheme.surface,
-                            shadowColor: Colors.black.withValues(alpha: 0.18),
+                            color: context.colors.surface,
+                            shadowColor: context.colors.shadow,
                             borderRadius: BorderRadius.circular(18),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
@@ -144,8 +145,7 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(18),
                                 border: Border.all(
-                                  color: theme.colorScheme.outlineVariant
-                                      .withValues(alpha: 0.65),
+                                  color: context.colors.borderSubtle,
                                 ),
                               ),
                               child: Row(
@@ -161,7 +161,7 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
                                       backgroundColor: _avatarColor(
                                         notification,
                                       ),
-                                      foregroundColor: Colors.white,
+                                      foregroundColor: context.colors.onPrimary,
                                       child: Text(
                                         notification.avatarInitials!,
                                         style: const TextStyle(

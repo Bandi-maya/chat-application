@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../../../ui/core/theme/theme_controller.dart';
-import '../../../../injection/locator.dart';
 import '../../../../data/services/notification_service.dart';
+import '../../../../injection/locator.dart';
+import '../../../../ui/core/theme/theme_config.dart';
 
 class AuthPermissionsDialog extends StatefulWidget {
   const AuthPermissionsDialog({super.key});
@@ -36,18 +36,18 @@ class _AuthPermissionsDialogState extends State<AuthPermissionsDialog> {
         title: 'Permissions Configured',
         body: 'Camera, Microphone, Media, and Notification permissions active.',
         icon: Icons.verified_rounded,
-        color: Colors.green,
+        color: context.colors.success,
       );
     } catch (_) {}
 
     Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      SnackBar(
         content: Row(
           children: [
-            Icon(Icons.check_circle_rounded, color: Colors.white),
-            SizedBox(width: 12),
-            Expanded(
+            Icon(Icons.check_circle_rounded, color: context.colors.onPrimary),
+            const SizedBox(width: 12),
+            const Expanded(
               child: Text(
                 'All permissions granted! Welcome to Chaty.',
                 style: TextStyle(fontWeight: FontWeight.w600),
@@ -55,8 +55,8 @@ class _AuthPermissionsDialogState extends State<AuthPermissionsDialog> {
             ),
           ],
         ),
-        backgroundColor: Color(0xFF10B981),
-        duration: Duration(seconds: 3),
+        backgroundColor: context.colors.success,
+        duration: const Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -64,17 +64,16 @@ class _AuthPermissionsDialogState extends State<AuthPermissionsDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = locator<ThemeController>().globalTheme;
-    final isDark = theme.brightness == Brightness.dark;
+    final colors = context.colors;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+        color: colors.surfaceElevated,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
+            color: colors.shadow,
             blurRadius: 24,
             offset: const Offset(0, -6),
           ),
@@ -92,9 +91,7 @@ class _AuthPermissionsDialogState extends State<AuthPermissionsDialog> {
                 width: 44,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF334155)
-                      : const Color(0xFFCBD5E1),
+                  color: colors.borderSubtle,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -106,12 +103,12 @@ class _AuthPermissionsDialogState extends State<AuthPermissionsDialog> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: theme.accentColor.withValues(alpha: 0.15),
+                    color: colors.primary.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Icon(
                     Icons.shield_rounded,
-                    color: theme.accentColor,
+                    color: colors.primary,
                     size: 28,
                   ),
                 ),
@@ -123,7 +120,7 @@ class _AuthPermissionsDialogState extends State<AuthPermissionsDialog> {
                       Text(
                         'App Permissions',
                         style: TextStyle(
-                          color: theme.primaryTextColor,
+                          color: colors.foreground,
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
                           letterSpacing: -0.3,
@@ -133,7 +130,7 @@ class _AuthPermissionsDialogState extends State<AuthPermissionsDialog> {
                       Text(
                         'Required for real-time messaging & media',
                         style: TextStyle(
-                          color: theme.secondaryTextColor,
+                          color: colors.foregroundSecondary,
                           fontSize: 13,
                         ),
                       ),
@@ -150,7 +147,7 @@ class _AuthPermissionsDialogState extends State<AuthPermissionsDialog> {
               title: 'Push Notifications',
               subtitle: 'Instant alerts for messages and updates',
               value: _notifications,
-              theme: theme,
+              colors: colors,
               onChanged: (v) => setState(() => _notifications = v),
             ),
             _buildPermissionItem(
@@ -158,7 +155,7 @@ class _AuthPermissionsDialogState extends State<AuthPermissionsDialog> {
               title: 'Camera Access',
               subtitle: 'Take photos and record video messages',
               value: _camera,
-              theme: theme,
+              colors: colors,
               onChanged: (v) => setState(() => _camera = v),
             ),
             _buildPermissionItem(
@@ -166,7 +163,7 @@ class _AuthPermissionsDialogState extends State<AuthPermissionsDialog> {
               title: 'Microphone Access',
               subtitle: 'Voice notes and voice/video calling',
               value: _microphone,
-              theme: theme,
+              colors: colors,
               onChanged: (v) => setState(() => _microphone = v),
             ),
             _buildPermissionItem(
@@ -174,7 +171,7 @@ class _AuthPermissionsDialogState extends State<AuthPermissionsDialog> {
               title: 'Photos & Storage',
               subtitle: 'Send media files and custom wallpapers',
               value: _photosMedia,
-              theme: theme,
+              colors: colors,
               onChanged: (v) => setState(() => _photosMedia = v),
             ),
             _buildPermissionItem(
@@ -182,7 +179,7 @@ class _AuthPermissionsDialogState extends State<AuthPermissionsDialog> {
               title: 'Contacts & Sync',
               subtitle: 'Find friends and start encrypted chats',
               value: _contacts,
-              theme: theme,
+              colors: colors,
               onChanged: (v) => setState(() => _contacts = v),
             ),
 
@@ -203,7 +200,7 @@ class _AuthPermissionsDialogState extends State<AuthPermissionsDialog> {
                     child: Text(
                       'Not Now',
                       style: TextStyle(
-                        color: theme.secondaryTextColor,
+                        color: colors.foregroundSecondary,
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
@@ -216,11 +213,11 @@ class _AuthPermissionsDialogState extends State<AuthPermissionsDialog> {
                   child: ElevatedButton(
                     onPressed: _grantAllPermissions,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.accentColor,
-                      foregroundColor: theme.onAccentColor,
+                      backgroundColor: colors.primary,
+                      foregroundColor: colors.onPrimary,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       elevation: 2,
-                      shadowColor: theme.accentColor.withValues(alpha: 0.4),
+                      shadowColor: colors.shadow,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
@@ -230,7 +227,7 @@ class _AuthPermissionsDialogState extends State<AuthPermissionsDialog> {
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: theme.onAccentColor,
+                        color: colors.onPrimary,
                       ),
                     ),
                   ),
@@ -248,14 +245,14 @@ class _AuthPermissionsDialogState extends State<AuthPermissionsDialog> {
     required String title,
     required String subtitle,
     required bool value,
-    required dynamic theme,
+    required AppColors colors,
     required ValueChanged<bool> onChanged,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
         children: [
-          Icon(icon, color: theme.accentColor, size: 22),
+          Icon(icon, color: colors.primary, size: 22),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -264,7 +261,7 @@ class _AuthPermissionsDialogState extends State<AuthPermissionsDialog> {
                 Text(
                   title,
                   style: TextStyle(
-                    color: theme.primaryTextColor,
+                    color: colors.foreground,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
@@ -272,7 +269,7 @@ class _AuthPermissionsDialogState extends State<AuthPermissionsDialog> {
                 Text(
                   subtitle,
                   style: TextStyle(
-                    color: theme.secondaryTextColor,
+                    color: colors.foregroundSecondary,
                     fontSize: 11.5,
                   ),
                 ),
@@ -281,7 +278,7 @@ class _AuthPermissionsDialogState extends State<AuthPermissionsDialog> {
           ),
           Switch(
             value: value,
-            activeTrackColor: theme.accentColor,
+            activeTrackColor: colors.primary,
             onChanged: onChanged,
           ),
         ],

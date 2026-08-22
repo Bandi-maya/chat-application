@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../domain/models/conversation.dart';
+import '../design_system/design_system.dart';
 
 class SecurityChip extends StatelessWidget {
   final EncryptionStatus status;
@@ -9,6 +10,7 @@ class SecurityChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     Color bg;
     Color fg;
     IconData icon;
@@ -16,20 +18,20 @@ class SecurityChip extends StatelessWidget {
 
     switch (status) {
       case EncryptionStatus.encrypted:
-        bg = const Color(0xFF10B981).withValues(alpha: 0.15);
-        fg = const Color(0xFF34D399);
+        bg = colors.success.withValues(alpha: 0.15);
+        fg = colors.success;
         icon = Icons.lock_rounded;
         label = 'E2EE';
         break;
       case EncryptionStatus.verificationNeeded:
-        bg = const Color(0xFFF59E0B).withValues(alpha: 0.15);
-        fg = const Color(0xFFFBBF24);
+        bg = colors.warning.withValues(alpha: 0.15);
+        fg = colors.warning;
         icon = Icons.shield_outlined;
         label = 'Verify';
         break;
       case EncryptionStatus.demoMode:
-        bg = const Color(0xFF6366F1).withValues(alpha: 0.15);
-        fg = const Color(0xFF818CF8);
+        bg = colors.primary.withValues(alpha: 0.15);
+        fg = colors.primary;
         icon = Icons.info_outline_rounded;
         label = 'Demo Auth';
         break;

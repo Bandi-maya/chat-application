@@ -105,8 +105,8 @@ class _NavigationEffectsPageState extends State<NavigationEffectsPage> {
                     Icon(
                       Icons.animation_rounded,
                       color: fx.enableClickParticles
-                          ? Colors.amberAccent
-                          : Colors.grey,
+                          ? context.colors.accent
+                          : context.colors.foregroundTertiary,
                       size: 24,
                     ),
                   ],
@@ -145,7 +145,7 @@ class _NavigationEffectsPageState extends State<NavigationEffectsPage> {
           children: [
             ChatySwitchTile(
               icon: Icons.auto_awesome_rounded,
-              iconColor: Colors.amberAccent,
+              iconColor: context.colors.accent,
               title: 'Enable Click Particles',
               subtitle: 'Spawn particle splash on screen touch',
               value: fx.enableClickParticles,
@@ -196,7 +196,7 @@ class _NavigationEffectsPageState extends State<NavigationEffectsPage> {
           children: [
             ChatySwitchTile(
               icon: Icons.ac_unit_rounded,
-              iconColor: Colors.lightBlueAccent,
+              iconColor: context.colors.info,
               title: 'Enable Falling Particles',
               subtitle: 'Render drifting ambient background particles',
               value: fx.enableFallingParticles,

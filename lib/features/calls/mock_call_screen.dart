@@ -49,12 +49,13 @@ class _MockCallScreenState extends State<MockCallScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = widget.theme;
+    final colors = context.colors;
     // Real consumers for the 'Calls appearance' GB keys.
     final prefs = locator<ChatyPreferencesController>();
     final callsBackground =
-        prefs.gbColor('ModCallsBackground') ?? const Color(0xFF09090B);
-    final callsText = prefs.gbColor('ModCallsTextColor');
-    final callsIcon = prefs.gbColor('ModCallsIconColors');
+        prefs.gbColor('ModCallsBackground') ?? colors.surfaceElevated;
+    final callsText = prefs.gbColor('ModCallsTextColor') ?? colors.foreground;
+    final callsIcon = prefs.gbColor('ModCallsIconColors') ?? colors.success;
 
     return Scaffold(
       backgroundColor: callsBackground,
@@ -69,23 +70,23 @@ class _MockCallScreenState extends State<MockCallScreen> {
                 vertical: 6,
               ),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
+                color: colors.foreground.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(ChatyRadius.full),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                border: Border.all(color: colors.borderSubtle),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
                     Icons.lock_rounded,
-                    color: callsIcon ?? const Color(0xFF10B981),
+                    color: callsIcon,
                     size: 14,
                   ),
                   const SizedBox(width: 6),
                   Text(
                     'Direct E2E Encrypted Call',
                     style: TextStyle(
-                      color: callsText ?? Colors.white,
+                      color: callsText,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -99,7 +100,7 @@ class _MockCallScreenState extends State<MockCallScreen> {
             Text(
               widget.title,
               style: TextStyle(
-                color: callsText ?? Colors.white,
+                color: callsText,
                 fontSize: 24,
                 fontWeight: FontWeight.w700,
               ),
@@ -108,7 +109,7 @@ class _MockCallScreenState extends State<MockCallScreen> {
             Text(
               _formatDuration(_secondsElapsed),
               style: TextStyle(
-                color: (callsText ?? Colors.white).withValues(alpha: 0.65),
+                color: callsText.withValues(alpha: 0.65),
                 fontSize: 15,
                 fontWeight: FontWeight.w500,
               ),
@@ -126,19 +127,19 @@ class _MockCallScreenState extends State<MockCallScreen> {
                 height: 280,
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF18181B),
+                  color: colors.surfaceSecondary,
                   borderRadius: BorderRadius.circular(ChatyRadius.xl),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.12),
+                    color: colors.border,
                   ),
                 ),
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.videocam_rounded,
                       size: 64,
-                      color: Colors.white24,
+                      color: colors.foregroundSecondary.withValues(alpha: 0.24),
                     ),
                     Positioned(
                       bottom: 12,
@@ -149,13 +150,13 @@ class _MockCallScreenState extends State<MockCallScreen> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.65),
+                          color: colors.surface.withValues(alpha: 0.65),
                           borderRadius: BorderRadius.circular(ChatyRadius.sm),
                         ),
                         child: Text(
                           widget.title,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: colors.foreground,
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                           ),
@@ -179,8 +180,8 @@ class _MockCallScreenState extends State<MockCallScreen> {
                     widget.title.isNotEmpty
                         ? widget.title.substring(0, 2).toUpperCase()
                         : 'CALL',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: colors.foreground,
                       fontSize: 32,
                       fontWeight: FontWeight.w700,
                     ),
@@ -197,12 +198,12 @@ class _MockCallScreenState extends State<MockCallScreen> {
                 vertical: ChatySpacing.lg,
               ),
               decoration: BoxDecoration(
-                color: const Color(0xFF18181B),
+                color: colors.surface,
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(ChatyRadius.xl),
                 ),
                 border: Border(
-                  top: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+                  top: BorderSide(color: colors.borderSubtle),
                 ),
               ),
               child: Row(
@@ -212,6 +213,7 @@ class _MockCallScreenState extends State<MockCallScreen> {
                     icon: _isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
                     isActive: _isMuted,
                     onTap: () => setState(() => _isMuted = !_isMuted),
+                    colors: colors,
                   ),
                   _buildCallBtn(
                     icon: _isVideoOn
@@ -219,6 +221,7 @@ class _MockCallScreenState extends State<MockCallScreen> {
                         : Icons.videocam_off_rounded,
                     isActive: _isVideoOn,
                     onTap: () => setState(() => _isVideoOn = !_isVideoOn),
+                    colors: colors,
                   ),
                   _buildCallBtn(
                     icon: _isSpeakerOn
@@ -226,19 +229,20 @@ class _MockCallScreenState extends State<MockCallScreen> {
                         : Icons.volume_down_rounded,
                     isActive: _isSpeakerOn,
                     onTap: () => setState(() => _isSpeakerOn = !_isSpeakerOn),
+                    colors: colors,
                   ),
                   // End Call
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Container(
                       padding: const EdgeInsets.all(ChatySpacing.md),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFEF4444),
+                      decoration: BoxDecoration(
+                        color: colors.error,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.call_end_rounded,
-                        color: Colors.white,
+                        color: colors.onError,
                         size: 26,
                       ),
                     ),
@@ -253,14 +257,15 @@ class _MockCallScreenState extends State<MockCallScreen> {
   }
 
   /// Real consumer: `ModCallsIconColors` tints the in-call control icons.
-  Color get _callsIconColor =>
+  Color _callsIconColor(AppColors colors) =>
       locator<ChatyPreferencesController>().gbColor('ModCallsIconColors') ??
-      Colors.white;
+      colors.foreground;
 
   Widget _buildCallBtn({
     required IconData icon,
     required bool isActive,
     required VoidCallback onTap,
+    required AppColors colors,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -268,13 +273,14 @@ class _MockCallScreenState extends State<MockCallScreen> {
         padding: const EdgeInsets.all(ChatySpacing.md),
         decoration: BoxDecoration(
           color: isActive
-              ? Colors.white.withValues(alpha: 0.22)
-              : Colors.white.withValues(alpha: 0.08),
+              ? colors.foreground.withValues(alpha: 0.22)
+              : colors.foreground.withValues(alpha: 0.08),
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: _callsIconColor, size: 22),
+        child: Icon(icon, color: _callsIconColor(colors), size: 22),
       ),
     );
   }
 }
+
 

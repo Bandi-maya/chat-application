@@ -23,8 +23,7 @@ class AttachmentSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final themeData = Theme.of(context);
-    final isDark = themeData.brightness == Brightness.dark;
+    final colors = context.colors;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(
@@ -34,7 +33,7 @@ class AttachmentSheet extends StatelessWidget {
         ChatySpacing.xl,
       ),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF18181B) : Colors.white,
+        color: colors.surface,
         borderRadius: const BorderRadius.vertical(
           top: Radius.circular(ChatyRadius.xl),
         ),
@@ -48,7 +47,7 @@ class AttachmentSheet extends StatelessWidget {
               width: 38,
               height: 4.5,
               decoration: BoxDecoration(
-                color: themeData.colorScheme.onSurface.withValues(alpha: 0.2),
+                color: colors.foregroundSecondary.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(ChatyRadius.full),
               ),
             ),
@@ -60,7 +59,7 @@ class AttachmentSheet extends StatelessWidget {
                   context: context,
                   icon: Icons.photo_library_rounded,
                   label: 'Gallery',
-                  color: const Color(0xFF8B5CF6),
+                  color: colors.accent,
                   onTap: () =>
                       _closeAnd(context, () => onMediaRequested('image')),
                 ),
@@ -68,7 +67,7 @@ class AttachmentSheet extends StatelessWidget {
                   context: context,
                   icon: Icons.videocam_rounded,
                   label: 'Video',
-                  color: const Color(0xFFEC4899),
+                  color: colors.accent,
                   onTap: () =>
                       _closeAnd(context, () => onMediaRequested('video')),
                 ),
@@ -76,7 +75,7 @@ class AttachmentSheet extends StatelessWidget {
                   context: context,
                   icon: Icons.insert_drive_file_rounded,
                   label: 'Document',
-                  color: const Color(0xFF3B82F6),
+                  color: colors.primary,
                   onTap: () =>
                       _closeAnd(context, () => onMediaRequested('document')),
                 ),
@@ -84,7 +83,7 @@ class AttachmentSheet extends StatelessWidget {
                   context: context,
                   icon: Icons.headphones_rounded,
                   label: 'Audio',
-                  color: const Color(0xFFF59E0B),
+                  color: colors.warning,
                   onTap: () =>
                       _closeAnd(context, () => onMediaRequested('audio')),
                 ),
@@ -98,28 +97,28 @@ class AttachmentSheet extends StatelessWidget {
                   context: context,
                   icon: Icons.location_on_rounded,
                   label: 'Location',
-                  color: const Color(0xFF10B981),
+                  color: colors.success,
                   onTap: () => _closeAnd(context, onLocationRequested),
                 ),
                 _option(
                   context: context,
                   icon: Icons.person_rounded,
                   label: 'Contact',
-                  color: const Color(0xFF06B6D4),
+                  color: colors.info,
                   onTap: () => _closeAnd(context, onContactRequested),
                 ),
                 _option(
                   context: context,
                   icon: Icons.poll_rounded,
                   label: 'Poll',
-                  color: const Color(0xFF6366F1),
+                  color: colors.primary,
                   onTap: () => _closeAnd(context, onPollRequested),
                 ),
                 _option(
                   context: context,
                   icon: Icons.task_alt_rounded,
                   label: 'Task',
-                  color: const Color(0xFFEF4444),
+                  color: colors.error,
                   onTap: () => _closeAnd(context, onTaskOption),
                 ),
               ],
@@ -129,7 +128,7 @@ class AttachmentSheet extends StatelessWidget {
               'Files and attachments are end-to-end encrypted before storage.',
               textAlign: TextAlign.center,
               style: ChatyTypography.caption(
-                themeData.colorScheme.onSurface.withValues(alpha: 0.5),
+                colors.foregroundSecondary,
               ),
             ),
           ],
@@ -145,7 +144,7 @@ class AttachmentSheet extends StatelessWidget {
     required Color color,
     required VoidCallback onTap,
   }) {
-    final themeData = Theme.of(context);
+    final colors = context.colors;
     return InkWell(
       borderRadius: BorderRadius.circular(ChatyRadius.md),
       onTap: onTap,
@@ -168,7 +167,7 @@ class AttachmentSheet extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: themeData.colorScheme.onSurface,
+                color: colors.foreground,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),

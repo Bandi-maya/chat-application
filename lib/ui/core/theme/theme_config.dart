@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'semantic_colors.dart';
+import 'chat_theme_tokens.dart';
 
 enum UILayoutMode { classic, compact, expressive, focus, tabletDesktop }
 
@@ -242,10 +244,92 @@ class ThemeConfig {
   }
 
   ThemeData toThemeData() {
+    final bool isDark = brightness == Brightness.dark;
+
+    final appColors = AppColors(
+      brightness: brightness,
+      primary: accentColor,
+      onPrimary: onAccentColor,
+      secondary: accentColor.withValues(alpha: 0.8),
+      onSecondary: onAccentColor,
+      accent: accentColor,
+      onAccent: onAccentColor,
+      background: backgroundColor,
+      onBackground: primaryTextColor,
+      surface: surfaceColor,
+      onSurface: primaryTextColor,
+      surfaceSecondary: cardColor,
+      onSurfaceSecondary: secondaryTextColor,
+      surfaceElevated: cardColor,
+      onSurfaceElevated: primaryTextColor,
+      foreground: primaryTextColor,
+      foregroundSecondary: secondaryTextColor,
+      foregroundTertiary: secondaryTextColor.withValues(alpha: 0.65),
+      border: isDark ? const Color(0xFF27272A) : const Color(0xFFE4E4E7),
+      borderSubtle: isDark ? const Color(0xFF18181B) : const Color(0xFFF4F4F5),
+      divider: isDark ? const Color(0xFF27272A) : const Color(0xFFE5E7EB),
+      input: surfaceColor,
+      inputBorder: isDark ? const Color(0xFF27272A) : const Color(0xFFE4E4E7),
+      inputFill: isDark ? const Color(0xFF18181B) : const Color(0xFFF4F4F5),
+      disabled: isDark ? const Color(0xFF27272A) : const Color(0xFFE4E4E7),
+      disabledForeground: isDark ? const Color(0xFF52525B) : const Color(0xFFA1A1AA),
+      selected: accentColor,
+      onSelected: onAccentColor,
+      hover: accentColor.withValues(alpha: 0.08),
+      pressed: accentColor.withValues(alpha: 0.16),
+      success: successColor,
+      onSuccess: Colors.white,
+      warning: const Color(0xFFF59E0B),
+      onWarning: Colors.black,
+      error: dangerColor,
+      onError: Colors.white,
+      info: linkColor,
+      onInfo: Colors.white,
+      link: linkColor,
+      icon: primaryTextColor,
+      iconSecondary: secondaryTextColor,
+      shadow: isDark ? const Color(0x66000000) : const Color(0x0F000000),
+    );
+
+    final chatColors = ChatColors(
+      incomingBubble: incomingBubbleColor,
+      incomingText: incomingTextColor,
+      outgoingBubble: outgoingBubbleColor,
+      outgoingText: outgoingTextColor,
+      replySurface: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+      replyBorder: accentColor,
+      composerSurface: surfaceColor,
+      composerBorder: isDark ? const Color(0xFF27272A) : const Color(0xFFE4E4E7),
+      messageMetadata: secondaryTextColor.withValues(alpha: 0.7),
+      deliveryTick: secondaryTextColor.withValues(alpha: 0.8),
+      readTick: tickStyle == 'Neon'
+          ? const Color(0xFF39FF14)
+          : (tickStyle == 'iOS Style'
+              ? const Color(0xFF34C759)
+              : (tickStyle == 'Minimal' ? primaryTextColor : const Color(0xFF38BDF8))),
+      reactionSurface: cardColor,
+      reactionBorder: accentColor.withValues(alpha: 0.25),
+      reactionCount: primaryTextColor,
+      mentionBackground: accentColor.withValues(alpha: 0.18),
+      selectionBackground: accentColor.withValues(alpha: 0.22),
+      chatWallpaperBackground: backgroundColor,
+      voiceNoteWaveform: accentColor.withValues(alpha: 0.6),
+      voiceNoteProgress: accentColor,
+      voiceNoteButton: accentColor,
+      systemMessageBackground: surfaceColor.withValues(alpha: 0.8),
+      systemMessageText: secondaryTextColor,
+      taskCardSurface: cardColor,
+      taskCardBorder: accentColor.withValues(alpha: 0.3),
+    );
+
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
       scaffoldBackgroundColor: backgroundColor,
+      extensions: <ThemeExtension<dynamic>>[
+        appColors,
+        chatColors,
+      ],
       colorScheme: ColorScheme(
         brightness: brightness,
         primary: accentColor,

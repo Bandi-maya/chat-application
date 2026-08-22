@@ -125,11 +125,13 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: colors.surfaceElevated,
       appBar: AppBar(
-        backgroundColor: Colors.black.withValues(alpha: 0.7),
-        foregroundColor: Colors.white,
+        backgroundColor: colors.surfaceElevated.withValues(alpha: 0.85),
+        foregroundColor: colors.foreground,
         elevation: 0,
         leading: const ChatyBackButton(),
         title: Column(
@@ -139,15 +141,15 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               widget.title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
-                color: Colors.white,
+                color: colors.foreground,
                 fontWeight: FontWeight.w600,
               ),
             ),
             Text(
               widget.size,
-              style: const TextStyle(fontSize: 11.5, color: Colors.white60),
+              style: TextStyle(fontSize: 11.5, color: colors.foregroundSecondary),
             ),
           ],
         ),
@@ -155,13 +157,13 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           ChatyIconButton(
             tooltip: 'Open with app',
             icon: Icons.open_in_new_rounded,
-            color: Colors.white,
+            color: colors.foreground,
             onPressed: _signedUrl == null ? null : _openExternally,
           ),
           ChatyIconButton(
             tooltip: 'Share file link',
             icon: Icons.share_rounded,
-            color: Colors.white,
+            color: colors.foreground,
             onPressed: _signedUrl == null ? null : _share,
           ),
           const SizedBox(width: ChatySpacing.xs),
@@ -169,9 +171,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       ),
       body: Center(
         child: _loading
-            ? const CircularProgressIndicator(
+            ? CircularProgressIndicator(
                 strokeWidth: 2.2,
-                color: Colors.white,
+                color: colors.primary,
               )
             : _error != null
             ? Padding(
@@ -179,15 +181,15 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 child: Text(
                   _error!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white70, fontSize: 14),
+                  style: TextStyle(color: colors.foregroundSecondary, fontSize: 14),
                 ),
               )
-            : _buildContent(),
+            : _buildContent(colors),
       ),
     );
   }
 
-  Widget _buildContent() {
+  Widget _buildContent(AppColors colors) {
     final url = _signedUrl!;
     if (widget.type == 'image') {
       return InteractiveViewer(
@@ -198,15 +200,16 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           fit: BoxFit.contain,
           loadingBuilder: (context, child, progress) => progress == null
               ? child
-              : const Center(
+              : Center(
                   child: CircularProgressIndicator(
                     strokeWidth: 2.2,
-                    color: Colors.white,
+                    color: colors.primary,
                   ),
                 ),
           errorBuilder: (_, __, ___) => _fallbackCard(
             Icons.broken_image_outlined,
             'Unable to display this image.',
+            colors: colors,
           ),
         ),
       );
@@ -218,6 +221,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           Icons.videocam_off_outlined,
           'Unable to initialize this video.',
           action: _openExternally,
+          colors: colors,
         );
       }
       return SafeArea(
@@ -243,12 +247,12 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                             child: Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.5),
+                                color: colors.surface.withValues(alpha: 0.7),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(
+                              child: Icon(
                                 Icons.play_arrow_rounded,
-                                color: Colors.white,
+                                color: colors.foreground,
                                 size: 54,
                               ),
                             ),
@@ -269,17 +273,17 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                     icon: controller.value.isPlaying
                         ? Icons.pause_rounded
                         : Icons.play_arrow_rounded,
-                    color: Colors.white,
+                    color: colors.foreground,
                   ),
                   const SizedBox(width: ChatySpacing.sm),
                   Expanded(
                     child: VideoProgressIndicator(
                       controller,
                       allowScrubbing: true,
-                      colors: const VideoProgressColors(
-                        playedColor: Colors.white,
-                        bufferedColor: Colors.white30,
-                        backgroundColor: Colors.white12,
+                      colors: VideoProgressColors(
+                        playedColor: colors.primary,
+                        bufferedColor: colors.primary.withValues(alpha: 0.3),
+                        backgroundColor: colors.borderSubtle,
                       ),
                     ),
                   ),
@@ -300,21 +304,27 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       icon,
       'This private ${widget.type} is ready to open securely.',
       action: _openExternally,
+      colors: colors,
     );
   }
 
-  Widget _fallbackCard(IconData icon, String text, {VoidCallback? action}) {
+  Widget _fallbackCard(
+    IconData icon,
+    String text, {
+    VoidCallback? action,
+    required AppColors colors,
+  }) {
     return Padding(
       padding: const EdgeInsets.all(ChatySpacing.xl),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 76, color: Colors.white70),
+          Icon(icon, size: 76, color: colors.foregroundSecondary),
           const SizedBox(height: ChatySpacing.lg),
           Text(
             text,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white70, fontSize: 14.5),
+            style: TextStyle(color: colors.foregroundSecondary, fontSize: 14.5),
           ),
           if (action != null) ...[
             const SizedBox(height: ChatySpacing.lg),
@@ -329,5 +339,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       ),
     );
   }
+}
+
 }
 

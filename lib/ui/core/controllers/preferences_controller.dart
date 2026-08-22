@@ -281,6 +281,33 @@ class ChatyPreferencesController extends ChangeNotifier {
         ...Map<String, Object?>.from(gb),
       };
     }
+    // One-time heal: the header/list visibility keys (PicProf, NameProf, …)
+    // were exposed as Feature-Center toggles BEFORE they had consumers, so
+    // devices can carry stored `false` values that hide the contact name /
+    // avatar / call buttons / presence line even though the intended default
+    // is visible. Clear them once so they return to unset=visible. The
+    // marker persists inside this user's blob, so deliberate later choices
+    // are never touched again.
+    const visibilityHealMarker = 'chaty_visibility_heal_v1';
+    if (_gbFeatures[visibilityHealMarker] != true) {
+      const visibilityKeys = <String>[
+        'PicProf',
+        'NameProf',
+        'Conv_call_btn',
+        'statuschat',
+        'onlinechat',
+        'onlineDotchat',
+      ];
+      var healedAny = false;
+      for (final key in visibilityKeys) {
+        if (_gbFeatures.containsKey(key)) {
+          _gbFeatures.remove(key);
+          healedAny = true;
+        }
+      }
+      _gbFeatures[visibilityHealMarker] = true;
+      if (healedAny) _persist();
+    }
     final favorites = data[PreferenceKeys.favorites];
     if (favorites is List) {
       _starredFavorites

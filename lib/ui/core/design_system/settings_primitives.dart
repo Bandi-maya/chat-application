@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'tokens/app_tokens.dart';
 import 'components/app_components.dart';
 import 'components/chaty_kit.dart';
+import '../theme/app_theme.dart';
 
 /// Comprehensive Chaty Settings UI Primitives & Design System Tokens
 
@@ -700,13 +701,13 @@ class ChatyDangerTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChatySettingsTile(
       icon: Icons.delete_outline_rounded,
-      iconColor: Colors.redAccent,
+      iconColor: context.colors.error,
       title: title,
       subtitle: subtitle,
       onTap: onTap,
-      trailing: const Icon(
+      trailing: Icon(
         Icons.arrow_forward_ios_rounded,
-        color: Colors.redAccent,
+        color: context.colors.error,
         size: 16,
       ),
     );
