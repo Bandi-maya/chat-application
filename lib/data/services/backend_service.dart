@@ -14,6 +14,7 @@ import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/realtime/realtime_event_bus.dart';
 import '../../ui/core/validators/input_validators.dart';
+import 'mls_e2ee_service.dart';
 
 class AuthSession {
   final String userId;
@@ -108,6 +109,9 @@ class ChatyBackendService extends ChangeNotifier {
   Future<void> _handleSession(Session? session) async {
     if (session == null) {
       await _removeRealtimeChannel();
+      if (locator.isRegistered<MlsE2eeService>()) {
+        await locator<MlsE2eeService>().close();
+      }
       _currentUser = null;
       _currentSession = null;
       _usersById.clear();
@@ -145,6 +149,9 @@ class ChatyBackendService extends ChangeNotifier {
     _isHydrating = true;
     try {
       await _loadCurrentProfile();
+      if (locator.isRegistered<MlsE2eeService>()) {
+        await locator<MlsE2eeService>().initializeForCurrentSession();
+      }
       await Future.wait<void>(<Future<void>>[
         _loadConversations(),
         _loadTasks(),
@@ -296,13 +303,69 @@ class ChatyBackendService extends ChangeNotifier {
       },
     );
     final rows = _asRows(raw);
-    final messages =
-        rows
-            .where((row) => row['is_hidden'] != true)
-            .map(_messageFromRow)
-            .toList()
-          ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    final hydratedRows = <Map<String, dynamic>>[];
+    for (final row in rows) {
+      if (row['is_hidden'] == true) continue;
+      hydratedRows.add(await _hydrateEncryptedMessageRow(conversationId, row));
+    }
+    final messages = hydratedRows.map(_messageFromRow).toList()
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
     _messagesByChatId[conversationId] = messages;
+
+    final conversation = _conversationsById[conversationId];
+    if (conversation != null && messages.isNotEmpty) {
+      final latest = messages.last;
+      _conversationsById[conversationId] = conversation.copyWith(
+        lastMessageText: latest.text,
+        lastMessageTime: latest.createdAt,
+        lastMessageSenderId: latest.senderId,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> _hydrateEncryptedMessageRow(
+    String conversationId,
+    Map<String, dynamic> source,
+  ) async {
+    final row = Map<String, dynamic>.from(source);
+    if (row['encryption_protocol'] != MlsE2eeService.protocolSuite) return row;
+    if (row['deleted_at'] != null) return row;
+
+    final ciphertext = row['encrypted_payload']?.toString() ?? '';
+    if (ciphertext.isEmpty || !locator.isRegistered<MlsE2eeService>()) {
+      return _decryptionFailureRow(row);
+    }
+    try {
+      final decrypted = await locator<MlsE2eeService>().decryptPayload(
+        conversationId: conversationId,
+        ciphertext: ciphertext,
+      );
+      final decryptedMetadata = _stringDynamicMap(decrypted['metadata']);
+      final serverMetadata = _stringDynamicMap(row['metadata']);
+      row['body'] = decrypted['text']?.toString() ?? '';
+      row['type'] = decrypted['type']?.toString() ?? 'text';
+      row['metadata'] = <String, dynamic>{
+        ...decryptedMetadata,
+        ...serverMetadata,
+      };
+      return row;
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Chaty MLS decrypt failed for ${row['id']}: $error\n$stackTrace',
+      );
+      return _decryptionFailureRow(row);
+    }
+  }
+
+  Map<String, dynamic> _decryptionFailureRow(Map<String, dynamic> source) {
+    final row = Map<String, dynamic>.from(source);
+    row['type'] = 'system';
+    row['body'] = 'Unable to decrypt this message';
+    row['metadata'] = <String, dynamic>{
+      ..._stringDynamicMap(row['metadata']),
+      'decryption_failed': true,
+    };
+    return row;
   }
 
   Future<void> _refreshLoadedMessageTimelines() async {
@@ -725,6 +788,9 @@ class ChatyBackendService extends ChangeNotifier {
     if (me == null) throw Exception('Authentication required.');
     if (!_conversationsById.containsKey(conversationId))
       throw Exception('Conversation not found.');
+    if (!locator.isRegistered<MlsE2eeService>()) {
+      throw StateError('Encrypted message transport is unavailable.');
+    }
 
     final clientMessageId = _uuid.v4();
     final metadata = <String, dynamic>{
@@ -745,14 +811,27 @@ class ChatyBackendService extends ChangeNotifier {
         },
     };
 
+    final encrypted = await locator<MlsE2eeService>().encryptPayload(
+      conversationId: conversationId,
+      payload: <String, dynamic>{
+        'type': _messageTypeToDatabase(type),
+        'text': text.trim(),
+        'metadata': metadata,
+      },
+    );
+    final deviceId = locator<MlsE2eeService>().currentDeviceId;
+    if (deviceId == null) {
+      throw StateError('Encrypted device identity is unavailable.');
+    }
     final raw = await _client.rpc(
-      'send_message',
+      'send_mls_message_v1',
       params: <String, dynamic>{
         'p_conversation_id': conversationId,
         'p_client_message_id': clientMessageId,
-        'p_body': text.trim(),
-        'p_type': _messageTypeToDatabase(type),
-        'p_metadata': metadata,
+        'p_sender_device_id': deviceId,
+        'p_group_id': encrypted.groupId,
+        'p_epoch': encrypted.epoch,
+        'p_ciphertext': encrypted.ciphertext,
       },
     );
     final messageId = raw?.toString() ?? '';
@@ -1105,6 +1184,9 @@ class ChatyBackendService extends ChangeNotifier {
     try {
       await setPresence(PresenceState.offline);
     } catch (_) {}
+    if (locator.isRegistered<MlsE2eeService>()) {
+      await locator<MlsE2eeService>().close();
+    }
     await _client.auth.signOut();
     await _handleSession(null);
   }
