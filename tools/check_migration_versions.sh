@@ -2,8 +2,15 @@
 set -euo pipefail
 
 migration_dir="supabase/migrations"
+manifest="supabase/MIGRATION_MANIFEST.sha256"
+expected_count=45
+
 if [[ ! -d "$migration_dir" ]]; then
   echo "FAIL: $migration_dir does not exist." >&2
+  exit 1
+fi
+if [[ ! -f "$manifest" ]]; then
+  echo "FAIL: canonical migration checksum manifest is missing: $manifest" >&2
   exit 1
 fi
 
@@ -31,14 +38,22 @@ for path in "$migration_dir"/*.sql; do
   fi
 done
 
-if (( count == 0 )); then
-  echo "FAIL: no SQL migrations found in $migration_dir." >&2
-  exit 1
+if (( count != expected_count )); then
+  echo "FAIL: expected $expected_count canonical production migrations, found $count." >&2
+  failed=1
+fi
+
+manifest_count="$(grep -Ec '^[0-9a-f]{64}  supabase/migrations/[0-9]{14}_[a-z0-9_]+\.sql$' "$manifest" || true)"
+if [[ "$manifest_count" -ne "$expected_count" ]]; then
+  echo "FAIL: checksum manifest must contain exactly $expected_count canonical entries; found $manifest_count." >&2
+  failed=1
 fi
 
 if (( failed != 0 )); then
-  echo "Migration version preflight failed. Run the history reconciliation workflow before release." >&2
+  echo "Migration version preflight failed. Reconcile against the production ledger before release." >&2
   exit 1
 fi
 
-echo "Migration version preflight passed for $count migration files."
+sha256sum --check --strict "$manifest"
+
+echo "Canonical migration preflight passed for $count migration files with production-derived SHA-256 checksums."
