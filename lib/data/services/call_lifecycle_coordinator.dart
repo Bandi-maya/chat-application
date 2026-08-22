@@ -31,6 +31,20 @@ class CallLifecycleCoordinator with WidgetsBindingObserver {
 
   bool get isStarted => _started && !_disposed;
 
+  @visibleForTesting
+  static bool needsReconnectDeadline(CallSessionState state) =>
+      state == CallSessionState.reconnecting;
+
+  @visibleForTesting
+  static bool isTerminalState(CallSessionState state) {
+    return state == CallSessionState.ended ||
+        state == CallSessionState.declined ||
+        state == CallSessionState.failed ||
+        state == CallSessionState.missed ||
+        state == CallSessionState.busy ||
+        state == CallSessionState.idle;
+  }
+
   void start() {
     if (_started || _disposed) return;
     _started = true;
@@ -42,7 +56,7 @@ class CallLifecycleCoordinator with WidgetsBindingObserver {
   void _handleCallStateChanged() {
     if (_disposed) return;
     final session = _callService.currentSession;
-    if (session?.state == CallSessionState.reconnecting) {
+    if (session != null && needsReconnectDeadline(session.state)) {
       _ensureReconnectDeadline();
       return;
     }
@@ -55,9 +69,9 @@ class CallLifecycleCoordinator with WidgetsBindingObserver {
       _reconnectTimer = null;
       if (_disposed) return;
       final session = _callService.currentSession;
-      if (session?.state != CallSessionState.reconnecting) return;
+      if (session == null || !needsReconnectDeadline(session.state)) return;
       debugPrint(
-        'Chaty call reconnect grace period expired for ${session?.callId}.',
+        'Chaty call reconnect grace period expired for ${session.callId}.',
       );
       unawaited(_callService.endCall(reason: 'reconnect_timeout'));
     });
@@ -84,21 +98,12 @@ class CallLifecycleCoordinator with WidgetsBindingObserver {
 
     _cancelReconnectDeadline();
     final session = _callService.currentSession;
-    if (session == null || _isTerminal(session.state)) return;
+    if (session == null || isTerminalState(session.state)) return;
 
     // There is no UI/process left to own camera, microphone or the peer
     // connection. Persist the terminal call state instead of leaving a
     // ringing/connected row stranded on the server.
     unawaited(_callService.endCall(reason: 'app_detached'));
-  }
-
-  bool _isTerminal(CallSessionState state) {
-    return state == CallSessionState.ended ||
-        state == CallSessionState.declined ||
-        state == CallSessionState.failed ||
-        state == CallSessionState.missed ||
-        state == CallSessionState.busy ||
-        state == CallSessionState.idle;
   }
 
   void dispose() {
