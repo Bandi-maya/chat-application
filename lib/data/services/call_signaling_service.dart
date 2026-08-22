@@ -1,73 +1,124 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
+
 import '../../domain/models/call_state.dart';
 import '../../domain/models/other_models.dart';
 import '../repositories/mock_data_store.dart';
 import 'backend_service.dart';
 
-/// Realtime Call Signaling & Session Service for Chaty.
+/// Production call-session controller.
 ///
-/// Features:
-/// - Explicit typed call state machine (`CallSessionState`)
-/// - Direct peer-to-peer signaling via Supabase Realtime broadcast channels (`chaty_calls_v1_{userId}`)
-/// - Media device routing (speaker, earpiece, bluetooth)
-/// - Timeout handling for missed calls
-/// - Call history persistence into backend data store
+/// Supabase Postgres + RLS is the signaling source of truth. WebRTC is the
+/// media source of truth. A session is never marked connected merely because
+/// an invite/answer signal was exchanged: only RTCPeerConnection reaching the
+/// connected state starts the call timer and exposes a connected UI state.
 class CallSignalingService extends ChangeNotifier {
   final SupabaseClient _client;
   final MockDataStore dataStore;
   final ChatyBackendService backend;
+  final Uuid _uuid = const Uuid();
 
   ChatyCallSession? _currentSession;
+  String? _conversationId;
   Timer? _ringTimeoutTimer;
   Timer? _durationTimer;
   int _callDurationSeconds = 0;
 
-  RealtimeChannel? _signalingChannel;
+  RTCPeerConnection? _peerConnection;
+  MediaStream? _localStream;
+  MediaStream? _remoteStream;
+  final List<RTCIceCandidate> _queuedRemoteCandidates = <RTCIceCandidate>[];
+  bool _remoteDescriptionReady = false;
+
+  RealtimeChannel? _sessionChannel;
+  RealtimeChannel? _candidateChannel;
+  StreamSubscription<AuthState>? _authSubscription;
+  bool _initialized = false;
+  Future<void>? _initializeFuture;
 
   CallSignalingService({
     SupabaseClient? client,
     required this.dataStore,
     required this.backend,
-  }) : _client = client ?? Supabase.instance.client;
+  }) : _client = client ?? Supabase.instance.client {
+    unawaited(initialize());
+  }
 
   ChatyCallSession? get currentSession => _currentSession;
   int get callDurationSeconds => _callDurationSeconds;
+  MediaStream? get localStream => _localStream;
+  MediaStream? get remoteStream => _remoteStream;
+  bool get hasLocalMedia => _localStream != null;
+  bool get hasRemoteMedia => _remoteStream != null;
+
   bool get isInActiveCall =>
       _currentSession != null &&
       (_currentSession!.state == CallSessionState.connecting ||
           _currentSession!.state == CallSessionState.connected ||
           _currentSession!.state == CallSessionState.reconnecting);
 
-  /// Starts an isolated deterministic mock call session strictly for QA / UI testing.
-  /// This preview session is completely client-side and does not send signals to real users.
-  void startMockCallForQA({
-    String remoteDisplayName = 'Alex Rivera (QA Participant)',
-    String remoteAvatarInitials = 'AR',
+  Future<void> initialize() {
+    if (_initialized) return Future<void>.value();
+    return _initializeFuture ??= _initialize();
+  }
+
+  Future<void> _initialize() async {
+    _authSubscription ??= _client.auth.onAuthStateChange.listen((state) {
+      if (state.session == null) {
+        unawaited(_resetForSignedOutSession());
+      } else {
+        unawaited(_subscribeDatabaseSignaling());
+        unawaited(_hydrateLatestIncomingCall());
+      }
+    });
+
+    if (_client.auth.currentSession != null) {
+      await _subscribeDatabaseSignaling();
+      await _hydrateLatestIncomingCall();
+    }
+    _initialized = true;
+  }
+
+  /// Debug-only isolated media preview. It never contacts another user and is
+  /// deliberately impossible in release builds.
+  Future<void> startMockCallForQA({
+    String remoteDisplayName = 'QA participant',
+    String remoteAvatarInitials = 'QA',
     String remoteAvatarColorHex = '0xFF6366F1',
     bool isVideo = true,
-  }) {
-    if (!kDebugMode) return; // Isolated to debug / development only
-    _durationTimer?.cancel();
+  }) async {
+    if (!kDebugMode) {
+      throw StateError('Call preview is unavailable in release builds.');
+    }
+    await _disposeMediaTransport();
     _currentSession = ChatyCallSession(
-      callId: 'qa_mock_call_${DateTime.now().millisecondsSinceEpoch}',
-      remoteUserId: 'qa_mock_user_1',
+      callId: 'qa_${_uuid.v4()}',
+      remoteUserId: 'qa_local_preview',
       remoteDisplayName: remoteDisplayName,
       remoteAvatarInitials: remoteAvatarInitials,
       remoteAvatarColorHex: remoteAvatarColorHex,
       isVideo: isVideo,
       isOutgoing: false,
-      state: CallSessionState.connected,
+      state: CallSessionState.connecting,
       startedAt: DateTime.now(),
-      connectedAt: DateTime.now(),
       audioRoute: isVideo ? AudioRouteType.speaker : AudioRouteType.earpiece,
     );
-    _startDurationTimer();
     notifyListeners();
+    try {
+      await _openLocalMedia(isVideo: isVideo);
+    } catch (error) {
+      _currentSession = _currentSession?.copyWith(state: CallSessionState.failed);
+      notifyListeners();
+      rethrow;
+    }
   }
 
-  /// Outgoing call initiator
+  /// Starts a real outgoing WebRTC call. The direct conversation and call row
+  /// are authorized by server-side RPC/RLS before the remote peer is notified.
   Future<void> initiateCall({
     required String remoteUserId,
     required String remoteDisplayName,
@@ -75,11 +126,31 @@ class CallSignalingService extends ChangeNotifier {
     String? remoteAvatarColorHex,
     required bool isVideo,
   }) async {
+    await initialize();
     final myId = _client.auth.currentUser?.id;
-    if (myId == null) return;
+    if (myId == null) throw StateError('Authentication required.');
+    if (remoteUserId.isEmpty || remoteUserId == myId) {
+      throw ArgumentError('A different call participant is required.');
+    }
+    if (_currentSession != null &&
+        _currentSession!.state != CallSessionState.ended &&
+        _currentSession!.state != CallSessionState.declined &&
+        _currentSession!.state != CallSessionState.failed) {
+      throw StateError('Another call is already active.');
+    }
 
-    final callId = 'call_${DateTime.now().millisecondsSinceEpoch}';
+    await _disposeMediaTransport();
+    final conversationRaw = await _client.rpc(
+      'create_direct_conversation',
+      params: <String, dynamic>{'p_other_user_id': remoteUserId},
+    );
+    final conversationId = conversationRaw?.toString() ?? '';
+    if (conversationId.isEmpty) {
+      throw StateError('Unable to establish an authorized conversation.');
+    }
 
+    final callId = _uuid.v4();
+    _conversationId = conversationId;
     _currentSession = ChatyCallSession(
       callId: callId,
       remoteUserId: remoteUserId,
@@ -94,34 +165,60 @@ class CallSignalingService extends ChangeNotifier {
     );
     notifyListeners();
 
-    // Subscribe to signaling channel
-    _subscribeToChannel(myId);
-
-    // Send call invite to remote user channel
-    await _sendSignal(remoteUserId, {
-      'call_id': callId,
-      'from': myId,
-      'from_name': backend.currentUser?.displayName ?? 'Chaty User',
-      'is_video': isVideo,
-      'type': 'invite',
-    });
-
-    _currentSession = _currentSession?.copyWith(
-      state: CallSessionState.ringing,
-    );
-    notifyListeners();
-
-    // Ring timeout: 40 seconds
-    _ringTimeoutTimer?.cancel();
-    _ringTimeoutTimer = Timer(const Duration(seconds: 40), () {
-      if (_currentSession?.state == CallSessionState.ringing ||
-          _currentSession?.state == CallSessionState.initiating) {
-        endCall(reason: 'no_answer');
+    try {
+      await _createMediaTransport(isVideo: isVideo);
+      final offer = await _peerConnection!.createOffer(<String, dynamic>{
+        'offerToReceiveAudio': true,
+        'offerToReceiveVideo': isVideo,
+      });
+      await _peerConnection!.setLocalDescription(offer);
+      final offerSdp = offer.sdp;
+      if (offerSdp == null || offerSdp.isEmpty) {
+        throw StateError('WebRTC did not produce an SDP offer.');
       }
-    });
+
+      await _client.from('call_sessions').insert(<String, dynamic>{
+        'id': callId,
+        'conversation_id': conversationId,
+        'caller_id': myId,
+        'callee_id': remoteUserId,
+        'kind': isVideo ? 'video' : 'audio',
+        'status': 'ringing',
+        'offer_sdp': offerSdp,
+      });
+
+      _currentSession = _currentSession?.copyWith(
+        state: CallSessionState.ringing,
+      );
+      notifyListeners();
+
+      // Temporary compatibility bridge for the existing app-level ringing UI.
+      // It is only a notification hint. Database state + WebRTC remain the
+      // authoritative signaling/media path and this event can never connect a call.
+      unawaited(_sendLegacyInvite(
+        remoteUserId: remoteUserId,
+        callId: callId,
+        isVideo: isVideo,
+      ));
+
+      _ringTimeoutTimer?.cancel();
+      _ringTimeoutTimer = Timer(const Duration(seconds: 40), () {
+        final state = _currentSession?.state;
+        if (state == CallSessionState.ringing ||
+            state == CallSessionState.initiating ||
+            state == CallSessionState.connecting) {
+          unawaited(endCall(reason: 'no_answer'));
+        }
+      });
+    } catch (error) {
+      await _failCurrentCall(error);
+      rethrow;
+    }
   }
 
-  /// Incoming call handler (called when an invite broadcast arrives)
+  /// Compatibility hook used by the existing app-level invite overlay. The
+  /// broadcast does not create a call locally; it only asks the service to
+  /// hydrate the matching server-authorized call row.
   void handleIncomingInvite({
     required String callId,
     required String fromUserId,
@@ -130,162 +227,613 @@ class CallSignalingService extends ChangeNotifier {
     String? fromAvatarColorHex,
     required bool isVideo,
   }) {
-    // If already in a call, respond with busy
-    if (_currentSession != null &&
-        _currentSession!.state != CallSessionState.ended &&
-        _currentSession!.state != CallSessionState.declined) {
-      _sendSignal(fromUserId, {
-        'call_id': callId,
-        'response': 'busy',
-        'type': 'response',
-      });
-      return;
+    unawaited(_hydrateIncomingCall(
+      callId,
+      displayNameHint: fromDisplayName,
+      initialsHint: fromAvatarInitials,
+      colorHint: fromAvatarColorHex,
+    ));
+  }
+
+  /// Accepts an incoming call by building a real peer connection, applying the
+  /// stored SDP offer, creating an answer and persisting it through the guarded
+  /// server RPC. The state remains `connecting` until WebRTC itself connects.
+  Future<void> acceptCall() async {
+    await initialize();
+    var session = _currentSession;
+    if (session == null || session.state != CallSessionState.incoming) {
+      await _hydrateLatestIncomingCall();
+      session = _currentSession;
+    }
+    if (session == null || session.state != CallSessionState.incoming) {
+      throw StateError('No authorized incoming call is available.');
     }
 
-    _currentSession = ChatyCallSession(
-      callId: callId,
-      remoteUserId: fromUserId,
-      remoteDisplayName: fromDisplayName,
-      remoteAvatarInitials: fromAvatarInitials,
-      remoteAvatarColorHex: fromAvatarColorHex,
-      isVideo: isVideo,
-      isOutgoing: false,
-      state: CallSessionState.incoming,
-      startedAt: DateTime.now(),
-      audioRoute: isVideo ? AudioRouteType.speaker : AudioRouteType.earpiece,
-    );
-    notifyListeners();
-
-    final myId = _client.auth.currentUser?.id;
-    if (myId != null) _subscribeToChannel(myId);
-
     _ringTimeoutTimer?.cancel();
-    _ringTimeoutTimer = Timer(const Duration(seconds: 40), () {
-      if (_currentSession?.state == CallSessionState.incoming) {
-        endCall(reason: 'no_answer');
+    try {
+      final row = await _client
+          .from('call_sessions')
+          .select()
+          .eq('id', session.callId)
+          .single();
+      final offerSdp = row['offer_sdp']?.toString() ?? '';
+      if (offerSdp.isEmpty) throw StateError('Incoming call has no SDP offer.');
+      _conversationId = row['conversation_id']?.toString();
+
+      await _createMediaTransport(isVideo: session.isVideo);
+      await _peerConnection!.setRemoteDescription(
+        RTCSessionDescription(offerSdp, 'offer'),
+      );
+      _remoteDescriptionReady = true;
+      await _flushRemoteCandidates();
+
+      final answer = await _peerConnection!.createAnswer(<String, dynamic>{
+        'offerToReceiveAudio': true,
+        'offerToReceiveVideo': session.isVideo,
+      });
+      await _peerConnection!.setLocalDescription(answer);
+      final answerSdp = answer.sdp;
+      if (answerSdp == null || answerSdp.isEmpty) {
+        throw StateError('WebRTC did not produce an SDP answer.');
       }
-    });
+
+      await _client.rpc(
+        'accept_call_session',
+        params: <String, dynamic>{
+          'p_call_id': session.callId,
+          'p_answer_sdp': answerSdp,
+        },
+      );
+      _currentSession = session.copyWith(state: CallSessionState.connecting);
+      notifyListeners();
+    } catch (error) {
+      await _failCurrentCall(error);
+      rethrow;
+    }
   }
 
-  /// Accept incoming call
-  Future<void> acceptCall() async {
-    final session = _currentSession;
-    if (session == null || session.state != CallSessionState.incoming) return;
-
-    _ringTimeoutTimer?.cancel();
-
-    await _sendSignal(session.remoteUserId, {
-      'call_id': session.callId,
-      'response': 'accepted',
-      'type': 'response',
-    });
-
-    _currentSession = session.copyWith(
-      state: CallSessionState.connected,
-      connectedAt: DateTime.now(),
-    );
-    _startDurationTimer();
-    notifyListeners();
-  }
-
-  /// Decline incoming call
   Future<void> declineCall() async {
+    await initialize();
     final session = _currentSession;
     if (session == null || session.state != CallSessionState.incoming) return;
 
     _ringTimeoutTimer?.cancel();
-
-    await _sendSignal(session.remoteUserId, {
-      'call_id': session.callId,
-      'response': 'declined',
-      'type': 'response',
-    });
-
-    _logCallRecord(CallDirection.missed, 0);
-
-    _currentSession = session.copyWith(
-      state: CallSessionState.declined,
-      endedAt: DateTime.now(),
-    );
-    notifyListeners();
+    try {
+      await _client.rpc(
+        'decline_call_session',
+        params: <String, dynamic>{'p_call_id': session.callId},
+      );
+    } finally {
+      _logCallRecord(CallDirection.missed, 0);
+      _currentSession = session.copyWith(
+        state: CallSessionState.declined,
+        endedAt: DateTime.now(),
+      );
+      await _disposeMediaTransport();
+      notifyListeners();
+    }
   }
 
-  /// End ongoing or pending call
   Future<void> endCall({String reason = 'ended'}) async {
     final session = _currentSession;
     if (session == null) return;
 
     _ringTimeoutTimer?.cancel();
     _stopDurationTimer();
-
-    await _sendSignal(session.remoteUserId, {
-      'call_id': session.callId,
-      'response': reason == 'no_answer' ? 'cancelled' : 'ended',
-      'type': 'response',
-    });
-
     final duration = _callDurationSeconds;
-    final direction = session.isOutgoing
-        ? CallDirection.outgoing
-        : (duration > 0 ? CallDirection.incoming : CallDirection.missed);
-    _logCallRecord(direction, duration);
+    try {
+      if (!session.callId.startsWith('qa_')) {
+        await _client.rpc(
+          'end_call_session',
+          params: <String, dynamic>{'p_call_id': session.callId},
+        );
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Chaty call end persistence failed: $error\n$stackTrace');
+    } finally {
+      if (!session.callId.startsWith('qa_')) {
+        final direction = session.isOutgoing
+            ? CallDirection.outgoing
+            : (duration > 0 ? CallDirection.incoming : CallDirection.missed);
+        _logCallRecord(direction, duration);
+      }
+      _currentSession = session.copyWith(
+        state: CallSessionState.ended,
+        endedAt: DateTime.now(),
+      );
+      await _disposeMediaTransport();
+      notifyListeners();
+    }
+  }
 
+  /// Call reactions are intentionally not exposed until there is an authorized
+  /// persisted/private realtime transport for them. A local animation must not
+  /// pretend that the remote participant received a reaction.
+  Future<void> sendCallReaction(String emoji) async {
+    throw UnsupportedError('Call reactions are not available in production yet.');
+  }
+
+  void toggleMute() {
+    final session = _currentSession;
+    final stream = _localStream;
+    if (session == null || stream == null) return;
+    final nextMuted = !session.isMuted;
+    for (final track in stream.getAudioTracks()) {
+      track.enabled = !nextMuted;
+    }
+    _currentSession = session.copyWith(isMuted: nextMuted);
+    notifyListeners();
+  }
+
+  void toggleCamera() {
+    final session = _currentSession;
+    final stream = _localStream;
+    if (session == null || stream == null || !session.isVideo) return;
+    final nextCameraOff = !session.isCameraOff;
+    for (final track in stream.getVideoTracks()) {
+      track.enabled = !nextCameraOff;
+    }
+    _currentSession = session.copyWith(isCameraOff: nextCameraOff);
+    notifyListeners();
+  }
+
+  Future<void> switchCamera() async {
+    final session = _currentSession;
+    final stream = _localStream;
+    if (session == null || stream == null || !session.isVideo) return;
+    final tracks = stream.getVideoTracks();
+    if (tracks.isEmpty) return;
+    final switched = await Helper.switchCamera(tracks.first);
+    if (!switched) return;
     _currentSession = session.copyWith(
-      state: CallSessionState.ended,
+      isFrontCamera: !session.isFrontCamera,
+    );
+    notifyListeners();
+  }
+
+  Future<void> setAudioRoute(AudioRouteType route) async {
+    final session = _currentSession;
+    if (session == null) return;
+    if (route != AudioRouteType.speaker && route != AudioRouteType.earpiece) {
+      throw UnsupportedError('Select Bluetooth/headset through the system audio route.');
+    }
+    await Helper.setSpeakerphoneOn(route == AudioRouteType.speaker);
+    _currentSession = session.copyWith(audioRoute: route);
+    notifyListeners();
+  }
+
+  Future<void> _createMediaTransport({required bool isVideo}) async {
+    await _disposeMediaTransport();
+    final iceServers = await _loadIceServers();
+    final peer = await createPeerConnection(<String, dynamic>{
+      'iceServers': iceServers,
+      'sdpSemantics': 'unified-plan',
+    });
+    _peerConnection = peer;
+
+    peer.onIceCandidate = (candidate) {
+      if (candidate.candidate == null || candidate.candidate!.isEmpty) return;
+      unawaited(_persistLocalCandidate(candidate));
+    };
+    peer.onTrack = (event) {
+      if (event.streams.isNotEmpty) {
+        _remoteStream = event.streams.first;
+        notifyListeners();
+      }
+    };
+    peer.onConnectionState = _handlePeerConnectionState;
+    peer.onIceConnectionState = (state) {
+      if (state == RTCIceConnectionState.RTCIceConnectionStateFailed) {
+        _markTransportFailed('ICE negotiation failed.');
+      }
+    };
+
+    await _openLocalMedia(isVideo: isVideo);
+    final stream = _localStream!;
+    for (final track in stream.getTracks()) {
+      await peer.addTrack(track, stream);
+    }
+    if (isVideo) {
+      await Helper.setSpeakerphoneOn(true);
+    }
+  }
+
+  Future<void> _openLocalMedia({required bool isVideo}) async {
+    if (_localStream != null) return;
+    _localStream = await navigator.mediaDevices.getUserMedia(<String, dynamic>{
+      'audio': true,
+      'video': isVideo
+          ? <String, dynamic>{
+              'facingMode': 'user',
+              'width': <String, dynamic>{'ideal': 1280},
+              'height': <String, dynamic>{'ideal': 720},
+              'frameRate': <String, dynamic>{'ideal': 30},
+            }
+          : false,
+    });
+    notifyListeners();
+  }
+
+  Future<List<Map<String, dynamic>>> _loadIceServers() async {
+    final response = await _client.functions.invoke(
+      'turn-credentials',
+      body: const <String, dynamic>{},
+    );
+    if (response.status != 200) {
+      throw StateError(
+        'Secure call relay is not configured. TURN credentials are required before calls can start.',
+      );
+    }
+    final data = Map<String, dynamic>.from(response.data as Map);
+    final rawServers = data['ice_servers'];
+    if (rawServers is! List || rawServers.isEmpty) {
+      throw StateError('The call relay returned no ICE servers.');
+    }
+    return rawServers
+        .whereType<Map>()
+        .map((server) => Map<String, dynamic>.from(server))
+        .toList(growable: false);
+  }
+
+  Future<void> _subscribeDatabaseSignaling() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return;
+    await _removeDatabaseChannels();
+
+    final sessionChannel = _client.channel('chaty-call-sessions-$userId');
+    sessionChannel.onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'call_sessions',
+      callback: (payload) {
+        final row = Map<String, dynamic>.from(payload.newRecord);
+        if (row.isNotEmpty) unawaited(_handleCallSessionRow(row));
+      },
+    ).subscribe();
+    _sessionChannel = sessionChannel;
+
+    final candidateChannel = _client.channel('chaty-call-candidates-$userId');
+    candidateChannel.onPostgresChanges(
+      event: PostgresChangeEvent.insert,
+      schema: 'public',
+      table: 'call_ice_candidates',
+      callback: (payload) {
+        final row = Map<String, dynamic>.from(payload.newRecord);
+        if (row.isNotEmpty) unawaited(_handleRemoteCandidateRow(row));
+      },
+    ).subscribe();
+    _candidateChannel = candidateChannel;
+  }
+
+  Future<void> _hydrateLatestIncomingCall() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null || isInActiveCall) return;
+    try {
+      final rows = await _client
+          .from('call_sessions')
+          .select()
+          .eq('callee_id', userId)
+          .eq('status', 'ringing')
+          .order('started_at', ascending: false)
+          .limit(1);
+      if (rows is List && rows.isNotEmpty) {
+        await _handleCallSessionRow(Map<String, dynamic>.from(rows.first as Map));
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Chaty incoming-call hydration failed: $error\n$stackTrace');
+    }
+  }
+
+  Future<void> _hydrateIncomingCall(
+    String callId, {
+    String? displayNameHint,
+    String? initialsHint,
+    String? colorHint,
+  }) async {
+    try {
+      final row = await _client
+          .from('call_sessions')
+          .select()
+          .eq('id', callId)
+          .maybeSingle();
+      if (row == null) return;
+      await _handleCallSessionRow(
+        Map<String, dynamic>.from(row),
+        displayNameHint: displayNameHint,
+        initialsHint: initialsHint,
+        colorHint: colorHint,
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Chaty incoming-call lookup failed: $error\n$stackTrace');
+    }
+  }
+
+  Future<void> _handleCallSessionRow(
+    Map<String, dynamic> row, {
+    String? displayNameHint,
+    String? initialsHint,
+    String? colorHint,
+  }) async {
+    final myId = _client.auth.currentUser?.id;
+    final callId = row['id']?.toString() ?? '';
+    final callerId = row['caller_id']?.toString() ?? '';
+    final calleeId = row['callee_id']?.toString() ?? '';
+    final status = row['status']?.toString() ?? '';
+    if (myId == null || callId.isEmpty || (callerId != myId && calleeId != myId)) {
+      return;
+    }
+
+    final active = _currentSession;
+    if (active != null && active.callId != callId && isInActiveCall) return;
+
+    if (status == 'ringing' && calleeId == myId &&
+        (_currentSession == null || _currentSession!.callId != callId)) {
+      final remote = await _resolveParticipantPresentation(
+        callerId,
+        row['conversation_id']?.toString() ?? '',
+      );
+      _conversationId = row['conversation_id']?.toString();
+      _currentSession = ChatyCallSession(
+        callId: callId,
+        remoteUserId: callerId,
+        remoteDisplayName: displayNameHint ?? remote['name'] ?? 'Chaty contact',
+        remoteAvatarInitials: initialsHint ?? remote['initials'],
+        remoteAvatarColorHex: colorHint ?? remote['color'],
+        isVideo: row['kind']?.toString() == 'video',
+        isOutgoing: false,
+        state: CallSessionState.incoming,
+        startedAt: DateTime.tryParse(row['started_at']?.toString() ?? '')?.toLocal() ??
+            DateTime.now(),
+        audioRoute: row['kind']?.toString() == 'video'
+            ? AudioRouteType.speaker
+            : AudioRouteType.earpiece,
+      );
+      notifyListeners();
+      return;
+    }
+
+    if (_currentSession?.callId != callId) return;
+
+    if (status == 'accepted' && _currentSession!.isOutgoing) {
+      final answerSdp = row['answer_sdp']?.toString() ?? '';
+      if (answerSdp.isNotEmpty && !_remoteDescriptionReady && _peerConnection != null) {
+        _ringTimeoutTimer?.cancel();
+        await _peerConnection!.setRemoteDescription(
+          RTCSessionDescription(answerSdp, 'answer'),
+        );
+        _remoteDescriptionReady = true;
+        _currentSession = _currentSession?.copyWith(
+          state: CallSessionState.connecting,
+        );
+        await _flushRemoteCandidates();
+        notifyListeners();
+      }
+      return;
+    }
+
+    if (status == 'declined') {
+      _ringTimeoutTimer?.cancel();
+      _stopDurationTimer();
+      _currentSession = _currentSession?.copyWith(
+        state: CallSessionState.declined,
+        endedAt: DateTime.now(),
+      );
+      await _disposeMediaTransport();
+      notifyListeners();
+      return;
+    }
+
+    if (status == 'ended' || status == 'failed') {
+      _ringTimeoutTimer?.cancel();
+      _stopDurationTimer();
+      _currentSession = _currentSession?.copyWith(
+        state: status == 'failed' ? CallSessionState.failed : CallSessionState.ended,
+        endedAt: DateTime.now(),
+      );
+      await _disposeMediaTransport();
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, String?>> _resolveParticipantPresentation(
+    String userId,
+    String conversationId,
+  ) async {
+    final cached = backend.getUserById(userId);
+    if (cached != null) {
+      return <String, String?>{
+        'name': cached.displayName,
+        'initials': cached.avatarInitials,
+        'color': cached.avatarColorHex,
+      };
+    }
+    if (conversationId.isEmpty) return const <String, String?>{};
+    try {
+      final raw = await _client.rpc(
+        'get_conversation_members',
+        params: <String, dynamic>{'p_conversation_id': conversationId},
+      );
+      if (raw is List) {
+        for (final item in raw.whereType<Map>()) {
+          final row = Map<String, dynamic>.from(item);
+          final id = row['user_id']?.toString() ?? row['id']?.toString() ?? '';
+          if (id != userId) continue;
+          final name = row['display_name']?.toString() ?? row['username']?.toString();
+          final initials = row['avatar_initials']?.toString();
+          return <String, String?>{
+            'name': name,
+            'initials': initials,
+            'color': row['avatar_color_hex']?.toString(),
+          };
+        }
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Chaty call participant lookup failed: $error\n$stackTrace');
+    }
+    return const <String, String?>{};
+  }
+
+  Future<void> _persistLocalCandidate(RTCIceCandidate candidate) async {
+    final session = _currentSession;
+    final myId = _client.auth.currentUser?.id;
+    if (session == null || myId == null || session.callId.startsWith('qa_')) return;
+    try {
+      await _client.from('call_ice_candidates').insert(<String, dynamic>{
+        'call_id': session.callId,
+        'sender_id': myId,
+        'candidate': candidate.candidate,
+        'sdp_mid': candidate.sdpMid,
+        'sdp_mline_index': candidate.sdpMLineIndex,
+      });
+    } catch (error, stackTrace) {
+      debugPrint('Chaty ICE candidate persistence failed: $error\n$stackTrace');
+    }
+  }
+
+  Future<void> _handleRemoteCandidateRow(Map<String, dynamic> row) async {
+    final session = _currentSession;
+    final myId = _client.auth.currentUser?.id;
+    if (session == null || myId == null || _peerConnection == null) return;
+    if (row['call_id']?.toString() != session.callId) return;
+    if (row['sender_id']?.toString() == myId) return;
+
+    final candidateText = row['candidate']?.toString();
+    if (candidateText == null || candidateText.isEmpty) return;
+    final indexRaw = row['sdp_mline_index'];
+    final index = indexRaw is int ? indexRaw : int.tryParse(indexRaw?.toString() ?? '');
+    final candidate = RTCIceCandidate(
+      candidateText,
+      row['sdp_mid']?.toString(),
+      index,
+    );
+    if (!_remoteDescriptionReady) {
+      _queuedRemoteCandidates.add(candidate);
+      return;
+    }
+    await _peerConnection!.addCandidate(candidate);
+  }
+
+  Future<void> _flushRemoteCandidates() async {
+    final peer = _peerConnection;
+    if (peer == null || !_remoteDescriptionReady) return;
+    final pending = List<RTCIceCandidate>.from(_queuedRemoteCandidates);
+    _queuedRemoteCandidates.clear();
+    for (final candidate in pending) {
+      await peer.addCandidate(candidate);
+    }
+  }
+
+  void _handlePeerConnectionState(RTCPeerConnectionState state) {
+    final session = _currentSession;
+    if (session == null) return;
+    switch (state) {
+      case RTCPeerConnectionState.RTCPeerConnectionStateConnected:
+        _ringTimeoutTimer?.cancel();
+        _currentSession = session.copyWith(
+          state: CallSessionState.connected,
+          connectedAt: DateTime.now(),
+        );
+        _startDurationTimer();
+        notifyListeners();
+        break;
+      case RTCPeerConnectionState.RTCPeerConnectionStateDisconnected:
+        if (session.state == CallSessionState.connected) {
+          _currentSession = session.copyWith(
+            state: CallSessionState.reconnecting,
+          );
+          notifyListeners();
+        }
+        break;
+      case RTCPeerConnectionState.RTCPeerConnectionStateFailed:
+        _markTransportFailed('WebRTC peer connection failed.');
+        break;
+      case RTCPeerConnectionState.RTCPeerConnectionStateClosed:
+        _stopDurationTimer();
+        break;
+      default:
+        break;
+    }
+  }
+
+  void _markTransportFailed(String message) {
+    final session = _currentSession;
+    if (session == null || session.state == CallSessionState.failed) return;
+    _ringTimeoutTimer?.cancel();
+    _stopDurationTimer();
+    _currentSession = session.copyWith(
+      state: CallSessionState.failed,
       endedAt: DateTime.now(),
     );
+    debugPrint('Chaty call transport failed: $message');
     notifyListeners();
+    if (!session.callId.startsWith('qa_')) {
+      unawaited(_markServerCallFailed(session.callId));
+    }
+    unawaited(_disposeMediaTransport());
   }
 
-  /// Send in-call quick reaction burst
-  Future<void> sendCallReaction(String emoji) async {
-    final session = _currentSession;
-    if (session == null || session.state != CallSessionState.connected) return;
-
-    await _sendSignal(session.remoteUserId, {
-      'call_id': session.callId,
-      'reaction': emoji,
-      'type': 'reaction',
-    });
+  Future<void> _markServerCallFailed(String callId) async {
+    try {
+      await _client
+          .from('call_sessions')
+          .update(<String, dynamic>{
+            'status': 'failed',
+            'ended_at': DateTime.now().toUtc().toIso8601String(),
+            'ended_by': _client.auth.currentUser?.id,
+          })
+          .eq('id', callId);
+    } catch (error, stackTrace) {
+      debugPrint('Chaty failed-call persistence failed: $error\n$stackTrace');
+    }
   }
 
-  /// Toggle microphone mute
-  void toggleMute() {
-    if (_currentSession == null) return;
-    _currentSession = _currentSession!.copyWith(
-      isMuted: !_currentSession!.isMuted,
-    );
-    notifyListeners();
+  Future<void> _failCurrentCall(Object error) async {
+    debugPrint('Chaty call setup failed: $error');
+    _markTransportFailed(error.toString());
   }
 
-  /// Toggle camera on/off
-  void toggleCamera() {
-    if (_currentSession == null) return;
-    _currentSession = _currentSession!.copyWith(
-      isCameraOff: !_currentSession!.isCameraOff,
-    );
-    notifyListeners();
-  }
-
-  /// Switch front / back camera
-  void switchCamera() {
-    if (_currentSession == null) return;
-    _currentSession = _currentSession!.copyWith(
-      isFrontCamera: !_currentSession!.isFrontCamera,
-    );
-    notifyListeners();
-  }
-
-  /// Set audio output route
-  void setAudioRoute(AudioRouteType route) {
-    if (_currentSession == null) return;
-    _currentSession = _currentSession!.copyWith(audioRoute: route);
-    notifyListeners();
+  Future<void> _sendLegacyInvite({
+    required String remoteUserId,
+    required String callId,
+    required bool isVideo,
+  }) async {
+    final myId = _client.auth.currentUser?.id;
+    if (myId == null) return;
+    final channel = _client.channel('chaty_calls_v1_$remoteUserId');
+    final ready = Completer<void>();
+    try {
+      channel.subscribe((status, error) {
+        if (ready.isCompleted) return;
+        if (status == RealtimeSubscribeStatus.subscribed) {
+          ready.complete();
+        } else if (status == RealtimeSubscribeStatus.channelError ||
+            status == RealtimeSubscribeStatus.timedOut) {
+          ready.completeError(error ?? StateError('channel $status'));
+        }
+      });
+      await ready.future.timeout(const Duration(seconds: 5));
+      await channel.sendBroadcastMessage(
+        event: 'chaty_call_signal',
+        payload: <String, dynamic>{
+          'call_id': callId,
+          'from': myId,
+          'from_name': backend.currentUser?.displayName ?? 'Chaty contact',
+          'is_video': isVideo,
+          'type': 'invite',
+        },
+      );
+    } catch (error, stackTrace) {
+      // Database signaling remains authoritative; the legacy broadcast is only
+      // a temporary ringing-UI compatibility bridge and failure is observable.
+      debugPrint('Chaty legacy ringing hint failed: $error\n$stackTrace');
+    } finally {
+      await _client.removeChannel(channel);
+    }
   }
 
   void _startDurationTimer() {
+    if (_durationTimer != null) return;
     _callDurationSeconds = 0;
-    _durationTimer?.cancel();
     _durationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _callDurationSeconds++;
       notifyListeners();
@@ -300,103 +848,71 @@ class CallSignalingService extends ChangeNotifier {
   void _logCallRecord(CallDirection direction, int durationSec) {
     final session = _currentSession;
     if (session == null) return;
-
     final myId = _client.auth.currentUser?.id ?? '';
-    final record = CallRecord(
-      id: session.callId,
-      callerId: session.isOutgoing ? myId : session.remoteUserId,
-      participantIds: [myId, session.remoteUserId],
-      type: session.isVideo ? CallType.video : CallType.voice,
-      direction: direction,
-      durationSeconds: durationSec,
-      timestamp: session.startedAt,
+    dataStore.addCallRecord(
+      CallRecord(
+        id: session.callId,
+        callerId: session.isOutgoing ? myId : session.remoteUserId,
+        participantIds: <String>[myId, session.remoteUserId],
+        type: session.isVideo ? CallType.video : CallType.voice,
+        direction: direction,
+        durationSeconds: durationSec,
+        timestamp: session.startedAt,
+      ),
     );
-
-    // Save into repository
-    dataStore.addCallRecord(record);
   }
 
-  void _subscribeToChannel(String userId) {
-    if (_signalingChannel != null) return;
-    final channel = _client.channel('chaty_calls_v1_$userId');
-    channel
-        .onBroadcast(
-          event: 'chaty_call_signal',
-          callback: (payload) =>
-              _handleSignalPayload(Map<String, dynamic>.from(payload)),
-        )
-        .subscribe();
-    _signalingChannel = channel;
-  }
+  Future<void> _disposeMediaTransport() async {
+    _remoteDescriptionReady = false;
+    _queuedRemoteCandidates.clear();
+    final local = _localStream;
+    final remote = _remoteStream;
+    final peer = _peerConnection;
+    _localStream = null;
+    _remoteStream = null;
+    _peerConnection = null;
 
-  void _handleSignalPayload(Map<String, dynamic> payload) {
-    final callId = payload['call_id']?.toString() ?? '';
-    final type = payload['type']?.toString() ?? '';
-    final response = payload['response']?.toString() ?? '';
-
-    if (type == 'response' && _currentSession?.callId == callId) {
-      if (response == 'accepted') {
-        _ringTimeoutTimer?.cancel();
-        _currentSession = _currentSession?.copyWith(
-          state: CallSessionState.connected,
-          connectedAt: DateTime.now(),
-        );
-        _startDurationTimer();
-        notifyListeners();
-      } else if (response == 'declined') {
-        _ringTimeoutTimer?.cancel();
-        _currentSession = _currentSession?.copyWith(
-          state: CallSessionState.declined,
-        );
-        notifyListeners();
-      } else if (response == 'busy') {
-        _ringTimeoutTimer?.cancel();
-        _currentSession = _currentSession?.copyWith(
-          state: CallSessionState.busy,
-        );
-        notifyListeners();
-      } else if (response == 'ended' || response == 'cancelled') {
-        endCall(reason: response);
+    if (local != null) {
+      for (final track in local.getTracks()) {
+        await track.stop();
       }
+      await local.dispose();
     }
+    if (remote != null && !identical(remote, local)) {
+      for (final track in remote.getTracks()) {
+        await track.stop();
+      }
+      await remote.dispose();
+    }
+    if (peer != null) await peer.close();
   }
 
-  Future<void> _sendSignal(
-    String toUserId,
-    Map<String, dynamic> payload,
-  ) async {
-    final completer = Completer<void>();
-    final channel = _client.channel('chaty_calls_v1_$toUserId');
-    try {
-      channel.subscribe((status, error) {
-        if (completer.isCompleted) return;
-        if (status == RealtimeSubscribeStatus.subscribed) {
-          completer.complete();
-        } else if (status == RealtimeSubscribeStatus.channelError ||
-            status == RealtimeSubscribeStatus.timedOut) {
-          completer.completeError(error ?? StateError('channel $status'));
-        }
-      });
-      await completer.future.timeout(const Duration(seconds: 5));
-      await channel.sendBroadcastMessage(
-        event: 'chaty_call_signal',
-        payload: payload,
-      );
-    } catch (_) {
-      // Graceful fallback on signal delivery
-    } finally {
-      try {
-        await _client.removeChannel(channel);
-      } catch (_) {}
-    }
+  Future<void> _removeDatabaseChannels() async {
+    final sessions = _sessionChannel;
+    final candidates = _candidateChannel;
+    _sessionChannel = null;
+    _candidateChannel = null;
+    if (sessions != null) await _client.removeChannel(sessions);
+    if (candidates != null) await _client.removeChannel(candidates);
+  }
+
+  Future<void> _resetForSignedOutSession() async {
+    _ringTimeoutTimer?.cancel();
+    _stopDurationTimer();
+    await _disposeMediaTransport();
+    await _removeDatabaseChannels();
+    _currentSession = null;
+    _conversationId = null;
+    notifyListeners();
   }
 
   @override
   void dispose() {
     _ringTimeoutTimer?.cancel();
     _stopDurationTimer();
-    final ch = _signalingChannel;
-    if (ch != null) _client.removeChannel(ch);
+    unawaited(_authSubscription?.cancel());
+    unawaited(_disposeMediaTransport());
+    unawaited(_removeDatabaseChannels());
     super.dispose();
   }
 }
