@@ -117,7 +117,7 @@ class CallSignalingService extends ChangeNotifier {
   }
 
   /// Starts a real outgoing WebRTC call. The direct conversation and call row
-  /// are authorized by server-side RPC/RLS before the remote peer is notified.
+  /// are authorized by server-side RPC/RLS before the remote peer can ring.
   Future<void> initiateCall({
     required String remoteUserId,
     required String remoteDisplayName,
@@ -190,15 +190,6 @@ class CallSignalingService extends ChangeNotifier {
       );
       notifyListeners();
 
-      // Temporary compatibility bridge for the existing app-level ringing UI.
-      // It is only a notification hint. Database state + WebRTC remain the
-      // authoritative signaling/media path and this event can never connect a call.
-      unawaited(_sendLegacyInvite(
-        remoteUserId: remoteUserId,
-        callId: callId,
-        isVideo: isVideo,
-      ));
-
       _ringTimeoutTimer?.cancel();
       _ringTimeoutTimer = Timer(const Duration(seconds: 40), () {
         final state = _currentSession?.state;
@@ -212,25 +203,6 @@ class CallSignalingService extends ChangeNotifier {
       await _failCurrentCall(error);
       rethrow;
     }
-  }
-
-  /// Compatibility hook used by the existing app-level invite overlay. The
-  /// broadcast does not create a call locally; it only asks the service to
-  /// hydrate the matching server-authorized call row.
-  void handleIncomingInvite({
-    required String callId,
-    required String fromUserId,
-    required String fromDisplayName,
-    String? fromAvatarInitials,
-    String? fromAvatarColorHex,
-    required bool isVideo,
-  }) {
-    unawaited(_hydrateIncomingCall(
-      callId,
-      displayNameHint: fromDisplayName,
-      initialsHint: fromAvatarInitials,
-      colorHint: fromAvatarColorHex,
-    ));
   }
 
   /// Accepts an incoming call by building a real peer connection, applying the
@@ -343,9 +315,6 @@ class CallSignalingService extends ChangeNotifier {
     }
   }
 
-  /// Call reactions are intentionally not exposed until there is an authorized
-  /// persisted/private realtime transport for them. A local animation must not
-  /// pretend that the remote participant received a reaction.
   Future<void> sendCallReaction(String emoji) async {
     throw UnsupportedError('Call reactions are not available in production yet.');
   }
@@ -521,49 +490,23 @@ class CallSignalingService extends ChangeNotifier {
     }
   }
 
-  Future<void> _hydrateIncomingCall(
-    String callId, {
-    String? displayNameHint,
-    String? initialsHint,
-    String? colorHint,
-  }) async {
-    try {
-      final row = await _client
-          .from('call_sessions')
-          .select()
-          .eq('id', callId)
-          .maybeSingle();
-      if (row == null) return;
-      await _handleCallSessionRow(
-        Map<String, dynamic>.from(row),
-        displayNameHint: displayNameHint,
-        initialsHint: initialsHint,
-        colorHint: colorHint,
-      );
-    } catch (error, stackTrace) {
-      debugPrint('Chaty incoming-call lookup failed: $error\n$stackTrace');
-    }
-  }
-
-  Future<void> _handleCallSessionRow(
-    Map<String, dynamic> row, {
-    String? displayNameHint,
-    String? initialsHint,
-    String? colorHint,
-  }) async {
+  Future<void> _handleCallSessionRow(Map<String, dynamic> row) async {
     final myId = _client.auth.currentUser?.id;
     final callId = row['id']?.toString() ?? '';
     final callerId = row['caller_id']?.toString() ?? '';
     final calleeId = row['callee_id']?.toString() ?? '';
     final status = row['status']?.toString() ?? '';
-    if (myId == null || callId.isEmpty || (callerId != myId && calleeId != myId)) {
+    if (myId == null ||
+        callId.isEmpty ||
+        (callerId != myId && calleeId != myId)) {
       return;
     }
 
     final active = _currentSession;
     if (active != null && active.callId != callId && isInActiveCall) return;
 
-    if (status == 'ringing' && calleeId == myId &&
+    if (status == 'ringing' &&
+        calleeId == myId &&
         (_currentSession == null || _currentSession!.callId != callId)) {
       final remote = await _resolveParticipantPresentation(
         callerId,
@@ -572,13 +515,14 @@ class CallSignalingService extends ChangeNotifier {
       _currentSession = ChatyCallSession(
         callId: callId,
         remoteUserId: callerId,
-        remoteDisplayName: displayNameHint ?? remote['name'] ?? 'Chaty contact',
-        remoteAvatarInitials: initialsHint ?? remote['initials'],
-        remoteAvatarColorHex: colorHint ?? remote['color'],
+        remoteDisplayName: remote['name'] ?? 'Chaty contact',
+        remoteAvatarInitials: remote['initials'],
+        remoteAvatarColorHex: remote['color'],
         isVideo: row['kind']?.toString() == 'video',
         isOutgoing: false,
         state: CallSessionState.incoming,
-        startedAt: DateTime.tryParse(row['started_at']?.toString() ?? '')?.toLocal() ??
+        startedAt:
+            DateTime.tryParse(row['started_at']?.toString() ?? '')?.toLocal() ??
             DateTime.now(),
         audioRoute: row['kind']?.toString() == 'video'
             ? AudioRouteType.speaker
@@ -592,7 +536,9 @@ class CallSignalingService extends ChangeNotifier {
 
     if (status == 'accepted' && _currentSession!.isOutgoing) {
       final answerSdp = row['answer_sdp']?.toString() ?? '';
-      if (answerSdp.isNotEmpty && !_remoteDescriptionReady && _peerConnection != null) {
+      if (answerSdp.isNotEmpty &&
+          !_remoteDescriptionReady &&
+          _peerConnection != null) {
         _ringTimeoutTimer?.cancel();
         await _peerConnection!.setRemoteDescription(
           RTCSessionDescription(answerSdp, 'answer'),
@@ -623,7 +569,9 @@ class CallSignalingService extends ChangeNotifier {
       _ringTimeoutTimer?.cancel();
       _stopDurationTimer();
       _currentSession = _currentSession?.copyWith(
-        state: status == 'failed' ? CallSessionState.failed : CallSessionState.ended,
+        state: status == 'failed'
+            ? CallSessionState.failed
+            : CallSessionState.ended,
         endedAt: DateTime.now(),
       );
       await _disposeMediaTransport();
@@ -652,9 +600,11 @@ class CallSignalingService extends ChangeNotifier {
       if (raw is List) {
         for (final item in raw.whereType<Map>()) {
           final row = Map<String, dynamic>.from(item);
-          final id = row['user_id']?.toString() ?? row['id']?.toString() ?? '';
+          final id =
+              row['user_id']?.toString() ?? row['id']?.toString() ?? '';
           if (id != userId) continue;
-          final name = row['display_name']?.toString() ?? row['username']?.toString();
+          final name =
+              row['display_name']?.toString() ?? row['username']?.toString();
           final initials = row['avatar_initials']?.toString();
           return <String, String?>{
             'name': name,
@@ -672,7 +622,11 @@ class CallSignalingService extends ChangeNotifier {
   Future<void> _persistLocalCandidate(RTCIceCandidate candidate) async {
     final session = _currentSession;
     final myId = _client.auth.currentUser?.id;
-    if (session == null || myId == null || session.callId.startsWith('qa_')) return;
+    if (session == null ||
+        myId == null ||
+        session.callId.startsWith('qa_')) {
+      return;
+    }
     try {
       await _client.from('call_ice_candidates').insert(<String, dynamic>{
         'call_id': session.callId,
@@ -696,7 +650,9 @@ class CallSignalingService extends ChangeNotifier {
     final candidateText = row['candidate']?.toString();
     if (candidateText == null || candidateText.isEmpty) return;
     final indexRaw = row['sdp_mline_index'];
-    final index = indexRaw is int ? indexRaw : int.tryParse(indexRaw?.toString() ?? '');
+    final index = indexRaw is int
+        ? indexRaw
+        : int.tryParse(indexRaw?.toString() ?? '');
     final candidate = RTCIceCandidate(
       candidateText,
       row['sdp_mid']?.toString(),
@@ -786,43 +742,6 @@ class CallSignalingService extends ChangeNotifier {
   Future<void> _failCurrentCall(Object error) async {
     debugPrint('Chaty call setup failed: $error');
     _markTransportFailed(error.toString());
-  }
-
-  Future<void> _sendLegacyInvite({
-    required String remoteUserId,
-    required String callId,
-    required bool isVideo,
-  }) async {
-    final myId = _client.auth.currentUser?.id;
-    if (myId == null) return;
-    final channel = _client.channel('chaty_calls_v1_$remoteUserId');
-    final ready = Completer<void>();
-    try {
-      channel.subscribe((status, error) {
-        if (ready.isCompleted) return;
-        if (status == RealtimeSubscribeStatus.subscribed) {
-          ready.complete();
-        } else if (status == RealtimeSubscribeStatus.channelError ||
-            status == RealtimeSubscribeStatus.timedOut) {
-          ready.completeError(error ?? StateError('channel $status'));
-        }
-      });
-      await ready.future.timeout(const Duration(seconds: 5));
-      await channel.sendBroadcastMessage(
-        event: 'chaty_call_signal',
-        payload: <String, dynamic>{
-          'call_id': callId,
-          'from': myId,
-          'from_name': backend.currentUser?.displayName ?? 'Chaty contact',
-          'is_video': isVideo,
-          'type': 'invite',
-        },
-      );
-    } catch (error, stackTrace) {
-      debugPrint('Chaty legacy ringing hint failed: $error\n$stackTrace');
-    } finally {
-      await _client.removeChannel(channel);
-    }
   }
 
   void _startDurationTimer() {
