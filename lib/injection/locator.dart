@@ -4,6 +4,7 @@ import 'package:chat/data/repositories/mock_data_store.dart';
 import 'package:chat/data/services/backend_service.dart';
 import 'package:chat/data/services/contact_relationship_service.dart';
 import 'package:chat/data/services/local_lock_service.dart';
+import 'package:chat/data/services/mls_e2ee_service.dart';
 import 'package:chat/data/services/rich_chat_realtime_service.dart';
 import 'package:chat/ui/core/controllers/app_icon_controller.dart';
 import 'package:chat/ui/core/controllers/preferences_controller.dart';
@@ -23,6 +24,7 @@ void setupLocator() {
   if (locator.isRegistered<ThemeController>()) return;
 
   locator.registerLazySingleton<ThemeController>(() => ThemeController());
+  locator.registerLazySingleton<MlsE2eeService>(() => MlsE2eeService());
   locator.registerLazySingleton<ChatyBackendService>(
     () => ChatyBackendService(),
   );
