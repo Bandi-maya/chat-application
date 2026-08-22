@@ -3,7 +3,7 @@ set -euo pipefail
 
 migration_dir="supabase/migrations"
 manifest="supabase/MIGRATION_MANIFEST.sha256"
-expected_count=45
+expected_count=47
 
 if [[ ! -d "$migration_dir" ]]; then
   echo "FAIL: $migration_dir does not exist." >&2
