@@ -5,7 +5,6 @@ import 'package:chat/data/services/backend_service.dart';
 import 'package:chat/data/services/contact_relationship_service.dart';
 import 'package:chat/data/services/local_lock_service.dart';
 import 'package:chat/data/services/rich_chat_realtime_service.dart';
-import 'package:chat/data/services/production_rich_chat_realtime_service.dart';
 import 'package:chat/ui/core/controllers/app_icon_controller.dart';
 import 'package:chat/ui/core/controllers/preferences_controller.dart';
 import 'package:chat/ui/core/controllers/appearance_variant_controller.dart';
@@ -59,7 +58,7 @@ void setupLocator() {
     () => ContactRelationshipService(),
   );
   locator.registerLazySingleton<RichChatRealtimeService>(
-    () => ProductionRichChatRealtimeService(
+    () => RichChatRealtimeService(
       preferencesController: locator<ChatyPreferencesController>(),
       notificationService: locator<ChatyNotificationService>(),
       backendService: locator<ChatyBackendService>(),
