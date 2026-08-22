@@ -23,7 +23,6 @@ class CallSignalingService extends ChangeNotifier {
   final Uuid _uuid = const Uuid();
 
   ChatyCallSession? _currentSession;
-  String? _conversationId;
   Timer? _ringTimeoutTimer;
   Timer? _durationTimer;
   int _callDurationSeconds = 0;
@@ -150,7 +149,6 @@ class CallSignalingService extends ChangeNotifier {
     }
 
     final callId = _uuid.v4();
-    _conversationId = conversationId;
     _currentSession = ChatyCallSession(
       callId: callId,
       remoteUserId: remoteUserId,
@@ -258,7 +256,6 @@ class CallSignalingService extends ChangeNotifier {
           .single();
       final offerSdp = row['offer_sdp']?.toString() ?? '';
       if (offerSdp.isEmpty) throw StateError('Incoming call has no SDP offer.');
-      _conversationId = row['conversation_id']?.toString();
 
       await _createMediaTransport(isVideo: session.isVideo);
       await _peerConnection!.setRemoteDescription(
@@ -516,8 +513,8 @@ class CallSignalingService extends ChangeNotifier {
           .eq('status', 'ringing')
           .order('started_at', ascending: false)
           .limit(1);
-      if (rows is List && rows.isNotEmpty) {
-        await _handleCallSessionRow(Map<String, dynamic>.from(rows.first as Map));
+      if (rows.isNotEmpty) {
+        await _handleCallSessionRow(Map<String, dynamic>.from(rows.first));
       }
     } catch (error, stackTrace) {
       debugPrint('Chaty incoming-call hydration failed: $error\n$stackTrace');
@@ -572,7 +569,6 @@ class CallSignalingService extends ChangeNotifier {
         callerId,
         row['conversation_id']?.toString() ?? '',
       );
-      _conversationId = row['conversation_id']?.toString();
       _currentSession = ChatyCallSession(
         callId: callId,
         remoteUserId: callerId,
@@ -823,8 +819,6 @@ class CallSignalingService extends ChangeNotifier {
         },
       );
     } catch (error, stackTrace) {
-      // Database signaling remains authoritative; the legacy broadcast is only
-      // a temporary ringing-UI compatibility bridge and failure is observable.
       debugPrint('Chaty legacy ringing hint failed: $error\n$stackTrace');
     } finally {
       await _client.removeChannel(channel);
@@ -902,7 +896,6 @@ class CallSignalingService extends ChangeNotifier {
     await _disposeMediaTransport();
     await _removeDatabaseChannels();
     _currentSession = null;
-    _conversationId = null;
     notifyListeners();
   }
 
