@@ -345,11 +345,8 @@ class HomePreferences {
 
 /// Conversation Screen Customization Model
 class ConversationPreferences {
-  final String
-  bubbleShape; // 'Rounded', 'Compact', 'Classic', 'Tail', 'Tail-less', 'Squircle', 'Minimal', 'Card'
-  final double bubbleRadius;
-  final String
-  tickStyle; // 'Default', 'Double Check', 'iOS Style', 'Minimal', 'Neon'
+  final String bubbleStyle; // 48 discrete styles (e.g. 'Stock', 'RC iOS 11', '3D', etc.)
+  final String tickStyle; // 16 discrete styles (e.g. 'RC iOS 11', 'Sticker', 'Green Tick', etc.)
   final bool enableQuickContactSidebar;
   final String sidebarPosition; // 'Left', 'Right'
   final double sidebarOpacity;
@@ -363,9 +360,8 @@ class ConversationPreferences {
   final bool enableAnimatedEmojis;
 
   const ConversationPreferences({
-    this.bubbleShape = 'Rounded',
-    this.bubbleRadius = 16.0,
-    this.tickStyle = 'Default',
+    this.bubbleStyle = 'Stock',
+    this.tickStyle = 'RC iOS 11',
     this.enableQuickContactSidebar = false,
     this.sidebarPosition = 'Right',
     this.sidebarOpacity = 0.9,
@@ -377,9 +373,13 @@ class ConversationPreferences {
     this.enableAnimatedEmojis = true,
   });
 
+  // Backward compatibility alias for bubbleShape
+  String get bubbleShape => bubbleStyle;
+  double get bubbleRadius => 16.0;
+
   ConversationPreferences copyWith({
+    String? bubbleStyle,
     String? bubbleShape,
-    double? bubbleRadius,
     String? tickStyle,
     bool? enableQuickContactSidebar,
     String? sidebarPosition,
@@ -392,8 +392,7 @@ class ConversationPreferences {
     bool? enableAnimatedEmojis,
   }) {
     return ConversationPreferences(
-      bubbleShape: bubbleShape ?? this.bubbleShape,
-      bubbleRadius: bubbleRadius ?? this.bubbleRadius,
+      bubbleStyle: bubbleStyle ?? bubbleShape ?? this.bubbleStyle,
       tickStyle: tickStyle ?? this.tickStyle,
       enableQuickContactSidebar:
           enableQuickContactSidebar ?? this.enableQuickContactSidebar,
@@ -410,8 +409,7 @@ class ConversationPreferences {
   }
 
   Map<String, dynamic> toMap() => {
-    'bubbleShape': bubbleShape,
-    'bubbleRadius': bubbleRadius,
+    'bubbleStyle': bubbleStyle,
     'tickStyle': tickStyle,
     'enableQuickContactSidebar': enableQuickContactSidebar,
     'sidebarPosition': sidebarPosition,
@@ -426,9 +424,8 @@ class ConversationPreferences {
 
   factory ConversationPreferences.fromMap(Map<String, dynamic> map) =>
       ConversationPreferences(
-        bubbleShape: map['bubbleShape'] ?? 'Rounded',
-        bubbleRadius: (map['bubbleRadius'] as num?)?.toDouble() ?? 16.0,
-        tickStyle: map['tickStyle'] ?? 'Default',
+        bubbleStyle: map['bubbleStyle'] ?? map['bubbleShape'] ?? 'Stock',
+        tickStyle: map['tickStyle'] ?? 'RC iOS 11',
         enableQuickContactSidebar: map['enableQuickContactSidebar'] ?? false,
         sidebarPosition: map['sidebarPosition'] ?? 'Right',
         sidebarOpacity: (map['sidebarOpacity'] as num?)?.toDouble() ?? 0.9,

@@ -131,6 +131,9 @@ class _AnimatedEmojiViewState extends State<AnimatedEmojiView>
       );
     }
 
-    return body;
+    // Isolate the emoji's continuous repaints from the rest of the chat
+    // tree: without this boundary every animation frame repaints upward
+    // through the message row and the list.
+    return RepaintBoundary(child: body);
   }
 }

@@ -7,6 +7,13 @@ import 'package:path_provider/path_provider.dart';
 import '../../../ui/core/design_system/settings_primitives.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/theme/app_theme.dart';
+import '../../../ui/core/bubbles/bubble_style_id.dart';
+import '../../../ui/core/bubbles/bubble_style_registry.dart';
+import '../../../ui/core/bubbles/bubble_painter.dart';
+import '../../../ui/core/bubbles/bubble_style_preview.dart';
+import '../../../ui/core/ticks/delivery_icon_style.dart';
+import '../../../ui/core/ticks/delivery_status_icon.dart';
+import '../../../domain/models/chat_message.dart';
 
 class ConversationSettingsPage extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
@@ -55,25 +62,6 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
     }
   }
 
-  static const List<String> _bubbleShapes = [
-    'Rounded',
-    'Compact',
-    'Classic',
-    'Tail',
-    'Tail-less',
-    'Squircle',
-    'Minimal',
-    'Card',
-  ];
-
-  static const List<String> _tickStyles = [
-    'Default',
-    'Double Check',
-    'iOS Style',
-    'Minimal',
-    'Neon',
-  ];
-
   static const List<String> _reactionEmojis = [
     '❤️',
     '👍',
@@ -93,9 +81,185 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
 
   static const List<double> _playbackSpeeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
+  void _showBubbleStylePicker(BuildContext context, String currentStyle) {
+    final activeId = BubbleStyleIdExtension.fromString(currentStyle);
+    final theme = Theme.of(context);
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.75,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (_, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                color: theme.cardColor,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 10, bottom: 8),
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Bubble Styles (${BubbleStyleId.values.length})',
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurface,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: ListView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                      itemCount: BubbleStyleId.values.length,
+                      itemBuilder: (_, idx) {
+                        final styleId = BubbleStyleId.values[idx];
+                        final isSelected = styleId == activeId;
+                        return BubbleStylePreviewTile(
+                          styleId: styleId,
+                          label: styleId.displayName,
+                          isSelected: isSelected,
+                          accentColor: theme.colorScheme.primary,
+                          onTap: () {
+                            widget.preferencesController.updateConversation(
+                              widget.preferencesController.conversation.copyWith(
+                                bubbleStyle: styleId.displayName,
+                              ),
+                              logTitle: 'Bubble Style',
+                            );
+                            Navigator.of(ctx).pop();
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showTickStylePicker(BuildContext context, String currentTick) {
+    final activeStyle = DeliveryIconStyleExtension.fromString(currentTick);
+    final theme = Theme.of(context);
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.65,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          builder: (_, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                color: theme.cardColor,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 10, bottom: 8),
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Delivery Tick Styles (${DeliveryIconStyle.values.length})',
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurface,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: ListView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                      itemCount: DeliveryIconStyle.values.length,
+                      itemBuilder: (_, idx) {
+                        final tickStyle = DeliveryIconStyle.values[idx];
+                        final isSelected = tickStyle == activeStyle;
+                        return DeliveryStatusPreviewTile(
+                          style: tickStyle,
+                          isSelected: isSelected,
+                          onTap: () {
+                            widget.preferencesController.updateConversation(
+                              widget.preferencesController.conversation.copyWith(
+                                tickStyle: tickStyle.displayName,
+                              ),
+                              logTitle: 'Tick Style',
+                            );
+                            Navigator.of(ctx).pop();
+                          },
+                          primaryTextColor: theme.colorScheme.onSurface,
+                          accentColor: theme.colorScheme.primary,
+                          unreadColor: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                          readColor: theme.colorScheme.primary,
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final conv = widget.preferencesController.conversation;
+    final activeBubbleId = BubbleStyleIdExtension.fromString(conv.bubbleStyle);
+    final activeTickStyle = DeliveryIconStyleExtension.fromString(conv.tickStyle);
 
     return ChatySettingsPage(
       title: 'Conversation Screen Settings',
@@ -108,71 +272,84 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Shape: ${conv.bubbleShape} • Radius: ${conv.bubbleRadius.toInt()}px • Ticks: ${conv.tickStyle} • Wallpaper: ${conv.wallpaperType}',
+                'Bubble: ${conv.bubbleStyle} • Ticks: ${conv.tickStyle} • Wallpaper: ${conv.wallpaperType}',
                 style: TextStyle(
                   fontSize: 12,
                   color: Theme.of(context).textTheme.bodySmall?.color,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).cardColor,
+                  color: context.colors.surface,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Theme.of(
-                      context,
-                    ).dividerColor.withValues(alpha: 0.2),
-                  ),
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Incoming Bubble Preview
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(
-                            conv.bubbleRadius,
+                        margin: BubbleStyleRegistry.getGeometry(activeBubbleId).bubbleMargin,
+                        child: CustomPaint(
+                          painter: BubblePainter(
+                            styleId: activeBubbleId,
+                            isMe: false,
+                            fillColor: context.colors.surfaceSecondary,
+                            strokeColor: context.colors.primary.withValues(alpha: 0.4),
+                            accentColor: context.colors.primary,
                           ),
-                        ),
-                        child: const Text(
-                          'Incoming message sample with active styling.',
-                          style: TextStyle(fontSize: 13),
+                          child: Padding(
+                            padding: BubbleStyleRegistry.getGeometry(activeBubbleId).contentPadding,
+                            child: Text(
+                              'Incoming message preview',
+                              style: TextStyle(
+                                color: context.colors.onSurface,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(height: 8),
+                    // Outgoing Bubble Preview with Selected Tick Style
                     Align(
                       alignment: Alignment.centerRight,
                       child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: context.colors.primary,
-                          borderRadius: BorderRadius.circular(
-                            conv.bubbleRadius,
+                        margin: BubbleStyleRegistry.getGeometry(activeBubbleId).bubbleMargin,
+                        child: CustomPaint(
+                          painter: BubblePainter(
+                            styleId: activeBubbleId,
+                            isMe: true,
+                            fillColor: context.colors.primary,
+                            strokeColor: context.colors.primary.withValues(alpha: 0.4),
+                            accentColor: context.colors.primary,
                           ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Outgoing reply!',
-                              style: TextStyle(
-                                color: context.colors.onPrimary,
-                                fontSize: 13,
-                              ),
+                          child: Padding(
+                            padding: BubbleStyleRegistry.getGeometry(activeBubbleId).contentPadding,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Outgoing reply!',
+                                  style: TextStyle(
+                                    color: context.colors.onPrimary,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                DeliveryStatusIcon(
+                                  style: activeTickStyle,
+                                  state: DeliveryState.read,
+                                  unreadColor: context.colors.onPrimary.withValues(alpha: 0.7),
+                                  readColor: Colors.white,
+                                  size: 16,
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 6),
-                            Icon(
-                              Icons.done_all_rounded,
-                              size: 14,
-                              color: context.colors.onPrimary,
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
@@ -183,50 +360,25 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
           ),
         ),
 
-        // Bubbles and Ticks Section
+        // Discrete Bubbles and Ticks Section
         ChatySettingsSection(
           title: 'Bubbles & Ticks',
           description:
-              'Customize chat bubble geometry, colors, padding, and tick markers.',
+              'Choose from 48 discrete bubble contours and 16 custom vector delivery ticks.',
           children: [
-            ChatyChoiceTile<String>(
-              title: 'Bubble Shape Geometry',
-              options: _bubbleShapes,
-              selectedOption: conv.bubbleShape,
-              optionLabel: (s) => s,
-              onSelected: (shape) {
-                widget.preferencesController.updateConversation(
-                  conv.copyWith(bubbleShape: shape),
-                  logTitle: 'Bubble Shape',
-                );
-              },
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline_rounded),
+              title: const Text('Bubble Style'),
+              subtitle: Text(conv.bubbleStyle),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => _showBubbleStylePicker(context, conv.bubbleStyle),
             ),
-            ChatySliderTile(
-              icon: Icons.rounded_corner_rounded,
-              title: 'Bubble Corner Radius',
-              value: conv.bubbleRadius,
-              min: 4.0,
-              max: 24.0,
-              divisions: 20,
-              valueFormatter: (v) => '${v.toInt()}px',
-              onChanged: (v) {
-                widget.preferencesController.updateConversation(
-                  conv.copyWith(bubbleRadius: v),
-                  logTitle: 'Bubble Radius',
-                );
-              },
-            ),
-            ChatyChoiceTile<String>(
-              title: 'Delivery Tick Style',
-              options: _tickStyles,
-              selectedOption: conv.tickStyle,
-              optionLabel: (s) => s,
-              onSelected: (tick) {
-                widget.preferencesController.updateConversation(
-                  conv.copyWith(tickStyle: tick),
-                  logTitle: 'Tick Style',
-                );
-              },
+            ListTile(
+              leading: const Icon(Icons.done_all_rounded),
+              title: const Text('Delivery Tick Style'),
+              subtitle: Text(conv.tickStyle),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => _showTickStylePicker(context, conv.tickStyle),
             ),
           ],
         ),

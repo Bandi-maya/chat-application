@@ -1,11 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../data/repositories/mock_data_store.dart';
 import '../../data/services/notification_service.dart';
+import '../../data/services/profile_media_service.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../../ui/core/design_system/settings_primitives.dart';
-import '../../ui/core/widgets/app_avatar.dart';
 import '../settings/notifications/notification_settings_page.dart';
 import '../settings/privacy/privacy_center_screen.dart';
 import '../settings/settings_root_screen.dart';
@@ -46,21 +47,18 @@ class ProfileScreen extends StatelessWidget {
             _ProfileHeader(
               initials: user.avatarInitials,
               colorHex: user.avatarColorHex,
+              avatarUrl: user.avatarUrl,
+              bannerUrl: user.bannerUrl,
               displayName: displayName,
               username: user.username,
               about: user.about,
               onEdit: () => showChatyProfileEditor(context, dataStore),
+              onEditBanner: () => _editBanner(context),
             ),
             const SizedBox(height: 8),
             ChatySettingsSection(
               title: 'Account',
               children: [
-                if (user.phone.isNotEmpty)
-                  ChatySettingsTile(
-                    icon: Icons.call_outlined,
-                    title: 'Phone',
-                    subtitle: user.phone,
-                  ),
                 ChatySettingsTile(
                   icon: Icons.alternate_email_rounded,
                   title: 'Username',
@@ -131,6 +129,53 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  /// Camera/Gallery → upload → persist. Real storage upload; failures show
+  /// the real error and nothing is changed.
+  Future<void> _editBanner(BuildContext context) async {
+    final source = await showModalBottomSheet<ProfileMediaSource>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_rounded),
+              title: const Text('Take photo'),
+              onTap: () =>
+                  Navigator.pop(sheetContext, ProfileMediaSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_rounded),
+              title: const Text('Choose from gallery'),
+              onTap: () =>
+                  Navigator.pop(sheetContext, ProfileMediaSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !context.mounted) return;
+    try {
+      final url = await ProfileMediaService().uploadBanner(
+        source: source,
+        context: context,
+      );
+      await dataStore.updateUser(dataStore.currentUser.copyWith(bannerUrl: url));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(const SnackBar(content: Text('Banner updated.')));
+      }
+    } catch (error) {
+      final message = error.toString();
+      if (message.contains('cancelled') || !context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update banner: $message')),
+      );
+    }
+  }
+
   void _pushSettings(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -150,10 +195,13 @@ class ProfileScreen extends StatelessWidget {
 class _ProfileHeader extends StatelessWidget {
   final String initials;
   final String colorHex;
+  final String? avatarUrl;
+  final String? bannerUrl;
   final String displayName;
   final String username;
   final String about;
   final VoidCallback onEdit;
+  final VoidCallback onEditBanner;
 
   const _ProfileHeader({
     required this.initials,
@@ -162,6 +210,9 @@ class _ProfileHeader extends StatelessWidget {
     required this.username,
     required this.about,
     required this.onEdit,
+    required this.onEditBanner,
+    this.avatarUrl,
+    this.bannerUrl,
   });
 
   @override
@@ -170,8 +221,82 @@ class _ProfileHeader extends StatelessWidget {
     return Center(
       child: Column(
         children: [
-          const SizedBox(height: 16),
-          AppAvatar(initials: initials, colorHex: colorHex, size: 96),
+          // Banner with an overlapping avatar (original Chaty hierarchy).
+          Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.bottomCenter,
+            children: [
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                height: 180,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  color: colors.surfaceElevated,
+                  border: Border.all(color: colors.borderSubtle),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(19),
+                  child: (bannerUrl ?? '').isNotEmpty
+                      ? (bannerUrl!.startsWith('http://') ||
+                              bannerUrl!.startsWith('https://')
+                          ? Image.network(
+                              bannerUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _BannerFallback(
+                                colors: colors,
+                              ),
+                            )
+                          : Image.file(
+                              File(bannerUrl!.replaceFirst('file://', '')),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _BannerFallback(
+                                colors: colors,
+                              ),
+                            ))
+                      : _BannerFallback(colors: colors),
+                ),
+              ),
+              Positioned(
+                right: 28,
+                top: 24,
+                child: InkWell(
+                  onTap: onEditBanner,
+                  borderRadius: BorderRadius.circular(999),
+                  child: Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: colors.surface.withValues(alpha: 0.85),
+                      border: Border.all(color: colors.borderSubtle),
+                    ),
+                    child: Icon(
+                      Icons.wallpaper_rounded,
+                      size: 17,
+                      color: colors.foreground,
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: -44,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: colors.background,
+                  ),
+                  child: ChatyNetworkAvatar(
+                    initials: initials,
+                    colorHex: colorHex,
+                    url: avatarUrl,
+                    size: 92,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 52),
           const SizedBox(height: 14),
           Text(
             displayName,
@@ -283,6 +408,34 @@ class _Chevron extends StatelessWidget {
       Icons.chevron_right_rounded,
       size: 20,
       color: context.colors.foregroundTertiary,
+    );
+  }
+}
+
+
+/// Token-driven placeholder shown when no banner has been uploaded yet.
+class _BannerFallback extends StatelessWidget {
+  final AppColors colors;
+
+  const _BannerFallback({required this.colors});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [colors.primary.withValues(alpha: 0.18), colors.surfaceSecondary],
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          Icons.wallpaper_rounded,
+          size: 30,
+          color: colors.foregroundTertiary,
+        ),
+      ),
     );
   }
 }

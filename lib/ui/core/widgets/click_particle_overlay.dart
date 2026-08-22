@@ -72,6 +72,9 @@ class _ClickParticleOverlayState extends State<ClickParticleOverlay>
   void _spawnParticles(Offset globalPos) {
     final fx = widget.preferencesController.effects;
     if (!fx.enableClickParticles) return;
+    // Decorative burst motion is suppressed when the platform requests
+    // reduced motion, even if the effect itself is enabled.
+    if (MediaQuery.disableAnimationsOf(context)) return;
 
     final symbol = fx.clickParticleSymbol;
     final speedMultiplier = fx.clickParticleSpeed;
@@ -119,11 +122,13 @@ class _ClickParticlePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     for (final p in particles) {
+      final calculatedSize = (16.0 * p.scale).toDouble();
+      final fontSize = calculatedSize > 0.0 ? calculatedSize : 1.0;
       final textPainter = TextPainter(
         text: TextSpan(
           text: p.symbol,
           style: TextStyle(
-            fontSize: 16 * p.scale,
+            fontSize: fontSize,
             color: Colors.white.withValues(alpha: p.opacity),
           ),
         ),
@@ -136,5 +141,5 @@ class _ClickParticlePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _ClickParticlePainter oldDelegate) => true;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

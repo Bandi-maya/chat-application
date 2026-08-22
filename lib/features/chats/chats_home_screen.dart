@@ -3,8 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../domain/models/preferences.dart';
-import '../../../ui/core/theme/app_theme.dart';
+import '../../domain/models/preferences.dart';
+import '../../ui/core/formatting/chat_formatters.dart';
+import '../../ui/core/theme/app_theme.dart';
 import '../../data/repositories/mock_data_store.dart';
 import '../../data/services/notification_service.dart';
 import '../../data/services/contact_relationship_service.dart';
@@ -17,9 +18,11 @@ import '../../ui/core/design_system/components/chaty_kit.dart';
 import '../../ui/core/design_system/components/app_components.dart';
 import '../../core/emoji/widgets/animated_emoji_text.dart';
 import '../../data/services/protected_resource_gate.dart';
+import '../../ui/core/ticks/delivery_status_icon.dart';
 import '../../data/services/local_lock_service.dart';
 import '../notifications/notification_permission_sheet.dart';
 import '../search/global_search_screen.dart';
+import '../camera/effects/widgets/effect_picker_sheet.dart';
 import 'chat_detail_screen.dart';
 import 'linked_devices_qr_screen.dart';
 import '../profile/profile_screen.dart';
@@ -259,34 +262,12 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     _clearSelection();
   }
 
-  String _formatMessageTime(DateTime value) {
-    final now = DateTime.now();
-    final local = value.toLocal();
-    if (now.year == local.year &&
-        now.month == local.month &&
-        now.day == local.day) {
-      return '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
-    }
-    final yesterday = now.subtract(const Duration(days: 1));
-    if (yesterday.year == local.year &&
-        yesterday.month == local.month &&
-        yesterday.day == local.day)
-      return 'Yesterday';
-    return '${local.day}/${local.month}';
-  }
+  String _formatMessageTime(DateTime value) =>
+      formatConversationTimestamp(value);
 
   String _formatLastSeen(String userId) {
     if (_realtime.isOnline(userId)) return 'online';
-    final value = _realtime.lastSeenFor(userId);
-    if (value == null) return '';
-    final local = value.toLocal();
-    final now = DateTime.now();
-    if (now.year == local.year &&
-        now.month == local.month &&
-        now.day == local.day) {
-      return 'last seen ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
-    }
-    return 'last seen ${local.day}/${local.month}';
+    return formatLastSeen(_realtime.lastSeenFor(userId));
   }
 
   void _openGlobalSearch(ThemeConfig theme) {
@@ -477,7 +458,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                       : _standardAppBar(theme, homePrefs),
                   // P4: iOS collapsing LARGE title. Shrinks away as the list
                   // scrolls; the compact bar title fades in to replace it.
-                  if (!_isSelectionMode)
+                  if (!_isSelectionMode && widget.pageTitle != null)
                     Align(
                       alignment: Alignment.centerLeft,
                       child: SizedBox(
@@ -491,12 +472,13 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                               child: GestureDetector(
                                 behavior: HitTestBehavior.opaque,
                                 onTap: () {
-                                  if (widget.preferencesController.security.entryByAppTitle) {
+                                  if (widget.preferencesController.security.hideLockedChats &&
+                                      widget.preferencesController.security.entryByAppTitle) {
                                     _openLockedChatsVault();
                                   }
                                 },
                                 child: Text(
-                                  widget.pageTitle ?? 'Chaty',
+                                  widget.pageTitle!,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
@@ -917,9 +899,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
           ),
           if (homePrefs.showCameraIcon)
             IconButton(
-              tooltip: 'Camera',
+              tooltip: 'Camera Effects',
               color: theme.primaryTextColor,
-              onPressed: () => _openGlobalSearch(theme),
+              onPressed: () => EffectPickerSheet.show(context),
               icon: const Icon(Icons.camera_alt_outlined),
             ),
           IconButton(
@@ -1206,152 +1188,173 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+                    child: Builder(
+                      builder: (context) {
+                        final lastMine =
+                            conversation.lastMessageSenderId ==
+                                    widget.dataStore.currentUser.id
+                                ? widget.dataStore
+                                      .getMessages(conversation.id)
+                                      .lastOrNull
+                                : null;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Row(
-                                children: [
-                                  if (locked) ...[
-                                    Icon(
-                                      Icons.lock_rounded,
-                                      size: 14,
-                                      color: theme.accentColor,
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      if (locked) ...[
+                                        Icon(
+                                          Icons.lock_rounded,
+                                          size: 14,
+                                          color: theme.accentColor,
+                                        ),
+                                        const SizedBox(width: 4),
+                                      ],
+                                      Flexible(
+                                        child: Text(
+                                          conversation.title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: theme.primaryTextColor,
+                                            // WA-iOS row metrics: 16pt name.
+                                            fontSize:
+                                                16 * density * theme.fontScale,
+                                            fontWeight: conversation.unreadCount > 0
+                                                ? FontWeight.w800
+                                                : FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                ChatyTimeLabel(
+                                  text: _formatMessageTime(
+                                    conversation.lastMessageTime,
+                                  ),
+                                  highlight: conversation.unreadCount > 0,
+                                  color: theme.secondaryTextColor,
+                                  highlightColor: theme.accentColor,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                if (lastMine != null) ...[
+                                  DeliveryStatusIcon(
+                                    style: theme.deliveryTickStyle,
+                                    state: lastMine.deliveryState,
+                                    unreadColor: theme.secondaryTextColor,
+                                    readColor: theme.accentColor,
+                                    size: 13,
+                                  ),
+                                  const SizedBox(width: 4),
+                                ],
+                                Expanded(
+                                  child: AnimatedEmojiText(
+                                    text:
+                                        activity?.isTyping == true ||
+                                            activity?.isRecording == true
+                                        ? presence
+                                        : conversation.lastMessageText.isEmpty
+                                        ? presence
+                                        : conversation.lastMessageText,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    enableExpressiveSizing: false,
+                                    style: TextStyle(
+                                      color:
+                                          activity?.isTyping == true ||
+                                              activity?.isRecording == true
+                                          ? theme.successColor
+                                          : conversation.unreadCount > 0
+                                          ? theme.primaryTextColor
+                                          : theme.secondaryTextColor,
+                                      // WA-iOS: 13.5pt gray preview.
+                                      fontSize: 13.5 * density * theme.fontScale,
+                                      fontWeight:
+                                          activity?.isTyping == true ||
+                                              activity?.isRecording == true
+                                          ? FontWeight.w700
+                                          : FontWeight.w400,
                                     ),
-                                    const SizedBox(width: 4),
-                                  ],
-                                  Flexible(
+                                  ),
+                                ),
+                                if (presence.isNotEmpty &&
+                                    conversation.lastMessageText.isNotEmpty &&
+                                    activity?.isTyping != true &&
+                                    activity?.isRecording != true) ...[
+                                  const SizedBox(width: 8),
+                                  ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 105,
+                                    ),
                                     child: Text(
-                                      conversation.title,
+                                      presence,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
-                                        color: theme.primaryTextColor,
-                                        // WA-iOS row metrics: 16pt name.
-                                        fontSize:
-                                            16 * density * theme.fontScale,
-                                        fontWeight: conversation.unreadCount > 0
-                                            ? FontWeight.w800
-                                            : FontWeight.w600,
+                                        // Real consumers: online / last-seen
+                                        // text colors for chat rows.
+                                        color: online
+                                            ? widget.preferencesController.gbColor(
+                                                    'ModOnlineColor',
+                                                  ) ??
+                                                  theme.successColor
+                                            : widget.preferencesController.gbColor(
+                                                    'ModlastseenColor',
+                                                  ) ??
+                                                  theme.secondaryTextColor,
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ),
                                 ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            ChatyTimeLabel(
-                              text: _formatMessageTime(
-                                conversation.lastMessageTime,
-                              ),
-                              highlight: conversation.unreadCount > 0,
-                              color: theme.secondaryTextColor,
-                              highlightColor: theme.accentColor,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: AnimatedEmojiText(
-                                text:
-                                    activity?.isTyping == true ||
-                                        activity?.isRecording == true
-                                    ? presence
-                                    : conversation.lastMessageText.isEmpty
-                                    ? presence
-                                    : conversation.lastMessageText,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                enableExpressiveSizing: false,
-                                style: TextStyle(
-                                  color:
-                                      activity?.isTyping == true ||
-                                          activity?.isRecording == true
-                                      ? theme.successColor
-                                      : conversation.unreadCount > 0
-                                      ? theme.primaryTextColor
-                                      : theme.secondaryTextColor,
-                                  // WA-iOS: 13.5pt gray preview.
-                                  fontSize: 13.5 * density * theme.fontScale,
-                                  fontWeight:
-                                      activity?.isTyping == true ||
-                                          activity?.isRecording == true
-                                      ? FontWeight.w700
-                                      : FontWeight.w400,
-                                ),
-                              ),
-                            ),
-                            if (presence.isNotEmpty &&
-                                conversation.lastMessageText.isNotEmpty &&
-                                activity?.isTyping != true &&
-                                activity?.isRecording != true) ...[
-                              const SizedBox(width: 8),
-                              ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  maxWidth: 105,
-                                ),
-                                child: Text(
-                                  presence,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    // Real consumers: online / last-seen
-                                    // text colors for chat rows.
-                                    color: online
-                                        ? widget.preferencesController.gbColor(
-                                                'ModOnlineColor',
-                                              ) ??
-                                              theme.successColor
-                                        : widget.preferencesController.gbColor(
-                                                'ModlastseenColor',
-                                              ) ??
-                                              theme.secondaryTextColor,
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.w600,
+                                if (conversation.isMuted) ...[
+                                  const SizedBox(width: 6),
+                                  Icon(
+                                    Icons.volume_off_rounded,
+                                    size: 14,
+                                    color: theme.secondaryTextColor,
                                   ),
-                                ),
-                              ),
-                            ],
-                            if (conversation.isMuted) ...[
-                              const SizedBox(width: 6),
-                              Icon(
-                                Icons.volume_off_rounded,
-                                size: 14,
-                                color: theme.secondaryTextColor,
-                              ),
-                            ],
-                            if (conversation.isPinned) ...[
-                              const SizedBox(width: 6),
-                              Icon(
-                                Icons.push_pin_rounded,
-                                size: 14,
-                                color: theme.secondaryTextColor,
-                              ),
-                            ],
-                            if (conversation.unreadCount > 0) ...[
-                              const SizedBox(width: 7),
-                              // Real consumer: unread badge color keys.
-                              ChatyCountBadge(
-                                count: conversation.unreadCount,
-                                color:
-                                    widget.preferencesController.gbColor(
-                                      'HomeCounterBK',
-                                    ) ??
-                                    theme.accentColor,
-                                textColor:
-                                    widget.preferencesController.gbColor(
-                                      'HomeCounterText',
-                                    ) ??
-                                    theme.onAccentColor,
-                              ),
-                            ],
+                                ],
+                                if (conversation.isPinned) ...[
+                                  const SizedBox(width: 6),
+                                  Icon(
+                                    Icons.push_pin_rounded,
+                                    size: 14,
+                                    color: theme.secondaryTextColor,
+                                  ),
+                                ],
+                                if (conversation.unreadCount > 0) ...[
+                                  const SizedBox(width: 7),
+                                  // Real consumer: unread badge color keys.
+                                  ChatyCountBadge(
+                                    count: conversation.unreadCount,
+                                    color:
+                                        widget.preferencesController.gbColor(
+                                          'HomeCounterBK',
+                                        ) ??
+                                        theme.accentColor,
+                                    textColor:
+                                        widget.preferencesController.gbColor(
+                                          'HomeCounterText',
+                                        ) ??
+                                        theme.onAccentColor,
+                                  ),
+                                ],
+                              ],
+                            ),
                           ],
-                        ),
-                      ],
+                        );
+                      },
                     ),
                   ),
                 ],

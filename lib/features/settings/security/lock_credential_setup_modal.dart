@@ -4,9 +4,10 @@ import 'package:flutter/services.dart';
 import '../../../data/services/local_lock_service.dart';
 import 'pattern_lock_pad.dart';
 
-enum PatternSetupStep {
-  create,
-  confirm,
+enum StepState {
+  enterCurrent,
+  enterNew,
+  confirmNew,
 }
 
 class LockCredentialSetupModal extends StatefulWidget {
@@ -47,17 +48,21 @@ class LockCredentialSetupModal extends StatefulWidget {
 }
 
 class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
-  final TextEditingController _primaryController = TextEditingController();
-  final TextEditingController _confirmController = TextEditingController();
-  
-  // Pattern setup explicit states
-  PatternSetupStep _patternStep = PatternSetupStep.create;
-  String? _firstPatternDrawn;
-  String? _confirmPatternDrawn;
-  final GlobalKey<PatternLockPadState> _padKey = GlobalKey<PatternLockPadState>();
+  final TextEditingController _textController = TextEditingController();
+  final List<TextEditingController> _pinControllers = [];
+  final List<FocusNode> _pinFocusNodes = [];
 
+  StepState _currentStep = StepState.enterNew;
+  bool _hasExistingSecret = false;
+  String _newSecret = '';
   String _error = '';
   bool _busy = false;
+
+  // Pattern states
+  String? _firstPatternDrawn;
+  String? _confirmPatternDrawn;
+  final GlobalKey<PatternLockPadState> _padKey =
+      GlobalKey<PatternLockPadState>();
 
   bool get _isPin => widget.method == 'PIN';
   bool get _isPattern => widget.method == 'Pattern';
@@ -66,37 +71,144 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
   bool get _isDeviceCredential => widget.method == 'Device Credential';
 
   @override
+  void initState() {
+    super.initState();
+    _initPinControllers();
+    _checkExistingSecret();
+  }
+
+  void _initPinControllers() {
+    for (var i = 0; i < widget.pinLength; i++) {
+      _pinControllers.add(TextEditingController());
+      _pinFocusNodes.add(FocusNode());
+    }
+  }
+
+  Future<void> _checkExistingSecret() async {
+    final hasCred = await widget.lockService.hasCredential(widget.method);
+    if (!mounted) return;
+    setState(() {
+      _hasExistingSecret = hasCred;
+      if (hasCred) {
+        _currentStep = StepState.enterCurrent;
+      } else {
+        _currentStep = StepState.enterNew;
+      }
+    });
+  }
+
+  @override
   void dispose() {
-    _primaryController.dispose();
-    _confirmController.dispose();
+    _textController.dispose();
+    for (final c in _pinControllers) {
+      c.dispose();
+    }
+    for (final f in _pinFocusNodes) {
+      f.dispose();
+    }
     super.dispose();
   }
 
-  Future<void> _saveTextCredential() async {
-    final primary = _primaryController.text.trim();
-    final confirmation = _confirmController.text.trim();
+  String _getEnteredPin() {
+    return _pinControllers.map((c) => c.text).join();
+  }
+
+  void _clearPinInputs() {
+    for (final c in _pinControllers) {
+      c.clear();
+    }
+    if (_pinFocusNodes.isNotEmpty) {
+      _pinFocusNodes.first.requestFocus();
+    }
+  }
+
+  Future<void> _handleContinue() async {
+    setState(() => _error = '');
 
     if (_isPin) {
-      if (!RegExp(r'^\d+$').hasMatch(primary) ||
-          primary.length != widget.pinLength) {
-        setState(() => _error = 'Enter exactly ${widget.pinLength} digits.');
+      final pin = _getEnteredPin();
+      if (pin.length != widget.pinLength) {
+        setState(() => _error = 'Enter all ${widget.pinLength} digits.');
         return;
       }
-      // Check for extremely weak PINs (all same digits or simple ascending/descending)
-      if (RegExp(r'^(\d)\1+$').hasMatch(primary)) {
-        setState(() => _error = 'Weak PIN. Avoid repeating digits like 0000 or 1111.');
+
+      if (_currentStep == StepState.enterCurrent) {
+        setState(() => _busy = true);
+        final isValid = await widget.lockService.verifyCredential('PIN', pin);
+        if (!mounted) return;
+        setState(() => _busy = false);
+        if (isValid) {
+          _clearPinInputs();
+          setState(() {
+            _currentStep = StepState.enterNew;
+            _error = '';
+          });
+        } else {
+          setState(() => _error = 'Current PIN is incorrect.');
+          _clearPinInputs();
+        }
+      } else if (_currentStep == StepState.enterNew) {
+        if (RegExp(r'^(\d)\1+$').hasMatch(pin)) {
+          setState(() => _error = 'Weak PIN. Avoid repeating digits like 0000.');
+          return;
+        }
+        _newSecret = pin;
+        _clearPinInputs();
+        setState(() {
+          _currentStep = StepState.confirmNew;
+          _error = '';
+        });
+      } else if (_currentStep == StepState.confirmNew) {
+        if (pin != _newSecret) {
+          setState(() => _error = 'PINs do not match. Try entering again.');
+          _clearPinInputs();
+          return;
+        }
+        await _saveFinalCredential(pin);
+      }
+    } else if (_isPassword) {
+      final pass = _textController.text.trim();
+      if (pass.isEmpty) {
+        setState(() => _error = 'Please enter a password.');
         return;
       }
-    } else if (_isPassword && primary.length < 6) {
-      setState(() => _error = 'Password must contain at least 6 characters.');
-      return;
-    }
 
-    if (primary != confirmation) {
-      setState(() => _error = 'PINs/Passwords don\'t match. Confirm again.');
-      return;
+      if (_currentStep == StepState.enterCurrent) {
+        setState(() => _busy = true);
+        final isValid = await widget.lockService.verifyCredential('Password', pass);
+        if (!mounted) return;
+        setState(() => _busy = false);
+        if (isValid) {
+          _textController.clear();
+          setState(() {
+            _currentStep = StepState.enterNew;
+            _error = '';
+          });
+        } else {
+          setState(() => _error = 'Current password is incorrect.');
+        }
+      } else if (_currentStep == StepState.enterNew) {
+        if (pass.length < 6) {
+          setState(() => _error = 'Password must contain at least 6 characters.');
+          return;
+        }
+        _newSecret = pass;
+        _textController.clear();
+        setState(() {
+          _currentStep = StepState.confirmNew;
+          _error = '';
+        });
+      } else if (_currentStep == StepState.confirmNew) {
+        if (pass != _newSecret) {
+          setState(() => _error = 'Passwords do not match. Try again.');
+          return;
+        }
+        await _saveFinalCredential(pass);
+      }
     }
+  }
 
+  Future<void> _saveFinalCredential(String secret) async {
     setState(() {
       _busy = true;
       _error = '';
@@ -104,28 +216,23 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
     try {
       await widget.lockService.setCredential(
         widget.method,
-        primary,
+        secret,
         pinLength: _isPin ? widget.pinLength : null,
       );
       if (mounted) Navigator.of(context).pop(true);
-    } catch (error) {
+    } catch (e) {
       if (mounted) {
         setState(() {
           _busy = false;
-          _error = error.toString().replaceFirst('Invalid argument(s): ', '');
+          _error = e.toString().replaceFirst('Invalid argument(s): ', '');
         });
       }
     }
   }
 
-  // --- Pattern strict 2-step handling ---
-
+  // --- Pattern Flow ---
   void _onPatternComplete(String pattern) {
-    final nodes = pattern
-        .split('-')
-        .where((value) => value.isNotEmpty)
-        .toList(growable: false);
-
+    final nodes = pattern.split('-').where((v) => v.isNotEmpty).toList();
     if (nodes.length < 4) {
       setState(() => _error = 'Connect at least 4 dots.');
       return;
@@ -133,7 +240,9 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
 
     setState(() {
       _error = '';
-      if (_patternStep == PatternSetupStep.create) {
+      if (_currentStep == StepState.enterCurrent) {
+        _firstPatternDrawn = pattern;
+      } else if (_currentStep == StepState.enterNew) {
         _firstPatternDrawn = pattern;
       } else {
         _confirmPatternDrawn = pattern;
@@ -141,64 +250,59 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
     });
   }
 
-  void _continuePatternStep() {
+  Future<void> _handlePatternContinue() async {
     if (_firstPatternDrawn == null) {
       setState(() => _error = 'Draw your pattern first.');
       return;
     }
-    setState(() {
-      _patternStep = PatternSetupStep.confirm;
-      _confirmPatternDrawn = null;
-      _error = '';
-    });
-    _padKey.currentState?.reset();
-  }
 
-  Future<void> _confirmAndSavePattern() async {
-    if (_confirmPatternDrawn == null) {
-      setState(() => _error = 'Draw the confirmation pattern.');
-      return;
-    }
-
-    if (_firstPatternDrawn != _confirmPatternDrawn) {
-      setState(() {
-        _confirmPatternDrawn = null;
-        _error = 'Patterns don\'t match. Draw the confirmation pattern again.';
-      });
-      _padKey.currentState?.reset();
-      return;
-    }
-
-    setState(() {
-      _busy = true;
-      _error = '';
-    });
-
-    try {
-      await widget.lockService.setCredential('Pattern', _firstPatternDrawn!);
-      if (mounted) Navigator.of(context).pop(true);
-    } catch (error) {
-      if (mounted) {
+    if (_currentStep == StepState.enterCurrent) {
+      setState(() => _busy = true);
+      final isValid =
+          await widget.lockService.verifyCredential('Pattern', _firstPatternDrawn!);
+      if (!mounted) return;
+      setState(() => _busy = false);
+      if (isValid) {
+        _padKey.currentState?.reset();
         setState(() {
-          _busy = false;
-          _error = error.toString().replaceFirst('Invalid argument(s): ', '');
+          _firstPatternDrawn = null;
+          _currentStep = StepState.enterNew;
+          _error = '';
+        });
+      } else {
+        _padKey.currentState?.reset();
+        setState(() {
+          _firstPatternDrawn = null;
+          _error = 'Current pattern is incorrect.';
         });
       }
+    } else if (_currentStep == StepState.enterNew) {
+      _newSecret = _firstPatternDrawn!;
+      _padKey.currentState?.reset();
+      setState(() {
+        _firstPatternDrawn = null;
+        _confirmPatternDrawn = null;
+        _currentStep = StepState.confirmNew;
+        _error = '';
+      });
+    } else if (_currentStep == StepState.confirmNew) {
+      if (_confirmPatternDrawn == null) {
+        setState(() => _error = 'Draw the confirmation pattern.');
+        return;
+      }
+      if (_confirmPatternDrawn != _newSecret) {
+        _padKey.currentState?.reset();
+        setState(() {
+          _confirmPatternDrawn = null;
+          _error = 'Patterns do not match. Draw again to confirm.';
+        });
+        return;
+      }
+      await _saveFinalCredential(_newSecret);
     }
   }
 
-  void _startPatternOver() {
-    setState(() {
-      _patternStep = PatternSetupStep.create;
-      _firstPatternDrawn = null;
-      _confirmPatternDrawn = null;
-      _error = '';
-    });
-    _padKey.currentState?.reset();
-  }
-
-  // --- Native Biometrics / Device Credential ---
-
+  // --- Biometric / Device lock verification ---
   Future<void> _verifyNativeMethod() async {
     if (_busy) return;
     setState(() {
@@ -219,10 +323,92 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
       setState(() {
         _busy = false;
         _error = _isBiometric
-            ? 'Biometric verification was cancelled, unavailable, or no biometric is enrolled.'
+            ? 'Biometric verification was cancelled or unavailable.'
             : 'Device credential verification was cancelled or unavailable.';
       });
     }
+  }
+
+  String _getStepTitle() {
+    switch (_currentStep) {
+      case StepState.enterCurrent:
+        return 'Enter Current ${widget.method}';
+      case StepState.enterNew:
+        return _hasExistingSecret
+            ? 'Enter New ${widget.method}'
+            : 'Create ${widget.method}';
+      case StepState.confirmNew:
+        return 'Confirm New ${widget.method}';
+    }
+  }
+
+  String _getStepSubtitle() {
+    switch (_currentStep) {
+      case StepState.enterCurrent:
+        return 'Please authenticate with your existing ${widget.method} to continue.';
+      case StepState.enterNew:
+        if (_isPin) return 'Choose a ${widget.pinLength}-digit PIN code.';
+        if (_isPattern) return 'Draw an unlock pattern connecting at least 4 dots.';
+        if (_isPassword) return 'Enter a password (min 6 characters).';
+        return 'Choose your credential.';
+      case StepState.confirmNew:
+        return 'Re-enter the same ${widget.method} to ensure accuracy.';
+    }
+  }
+
+  Widget _buildOtpPinBoxes(ThemeData theme) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(widget.pinLength, (index) {
+        return Container(
+          width: 48,
+          height: 56,
+          margin: const EdgeInsets.symmetric(horizontal: 5),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _pinFocusNodes[index].hasFocus
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.outline.withValues(alpha: 0.3),
+              width: _pinFocusNodes[index].hasFocus ? 2 : 1,
+            ),
+          ),
+          child: TextField(
+            controller: _pinControllers[index],
+            focusNode: _pinFocusNodes[index],
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            obscureText: true,
+            maxLength: 1,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onSurface,
+            ),
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+            ],
+            decoration: const InputDecoration(
+              counterText: '',
+              border: InputBorder.none,
+            ),
+            onChanged: (val) {
+              if (val.isNotEmpty) {
+                if (index < widget.pinLength - 1) {
+                  _pinFocusNodes[index + 1].requestFocus();
+                } else {
+                  _pinFocusNodes[index].unfocus();
+                  _handleContinue();
+                }
+              } else if (val.isEmpty && index > 0) {
+                _pinFocusNodes[index - 1].requestFocus();
+              }
+            },
+          ),
+        );
+      }),
+    );
   }
 
   @override
@@ -250,12 +436,12 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
                     _isPattern
                         ? Icons.pattern_rounded
                         : _isBiometric
-                        ? Icons.fingerprint_rounded
-                        : _isDeviceCredential
-                        ? Icons.phonelink_lock_rounded
-                        : _isPassword
-                        ? Icons.password_rounded
-                        : Icons.pin_rounded,
+                            ? Icons.fingerprint_rounded
+                            : _isDeviceCredential
+                                ? Icons.phonelink_lock_rounded
+                                : _isPassword
+                                    ? Icons.password_rounded
+                                    : Icons.pin_rounded,
                     color: theme.colorScheme.primary,
                   ),
                 ),
@@ -265,22 +451,14 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Set up ${widget.method}',
+                        _getStepTitle(),
                         style: theme.textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        _isPattern
-                            ? (_patternStep == PatternSetupStep.create
-                                ? 'Step 1: Draw your unlock pattern (min 4 dots).'
-                                : 'Step 2: Draw the same pattern again to confirm.')
-                            : _isBiometric
-                            ? 'Chaty uses the biometric enrolled on this device.'
-                            : _isDeviceCredential
-                            ? 'Use the device PIN, pattern, password, or biometric managed by the OS.'
-                            : 'Create a local credential stored securely on this device.',
+                        _getStepSubtitle(),
                         style: theme.textTheme.bodySmall,
                       ),
                     ],
@@ -312,10 +490,10 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
                     clearOnFinish: false,
                     onPatternComplete: _onPatternComplete,
                     onPatternReset: () {
-                      if (_patternStep == PatternSetupStep.create) {
-                        _firstPatternDrawn = null;
-                      } else {
+                      if (_currentStep == StepState.confirmNew) {
                         _confirmPatternDrawn = null;
+                      } else {
+                        _firstPatternDrawn = null;
                       }
                     },
                     hideTrace: false,
@@ -324,52 +502,35 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
                 ),
               ),
               const SizedBox(height: 16),
-              if (_patternStep == PatternSetupStep.create) ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _busy ? null : () => _padKey.currentState?.reset(),
-                        child: const Text('Clear'),
-                      ),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _busy ? null : () => _padKey.currentState?.reset(),
+                      child: const Text('Clear'),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: (_firstPatternDrawn != null && !_busy)
-                            ? _continuePatternStep
-                            : null,
-                        child: const Text('Continue / OK'),
-                      ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: ((_currentStep == StepState.confirmNew
+                                  ? _confirmPatternDrawn != null
+                                  : _firstPatternDrawn != null) &&
+                              !_busy)
+                          ? _handlePatternContinue
+                          : null,
+                      child: _busy
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(_currentStep == StepState.confirmNew
+                              ? 'Confirm & Save'
+                              : 'Continue'),
                     ),
-                  ],
-                ),
-              ] else ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _busy ? null : _startPatternOver,
-                        child: const Text('Start over'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: (_confirmPatternDrawn != null && !_busy)
-                            ? _confirmAndSavePattern
-                            : null,
-                        child: _busy
-                            ? const SizedBox.square(
-                                dimension: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Text('Confirm Pattern'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
             ] else if (_isBiometric || _isDeviceCredential) ...[
               const SizedBox(height: 8),
               Icon(
@@ -396,67 +557,58 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
                   _busy
                       ? 'Verifying…'
                       : (_isBiometric
-                            ? 'Verify biometric'
-                            : 'Verify device lock'),
+                          ? 'Verify biometric'
+                          : 'Verify device lock'),
                 ),
               ),
-            ] else ...[
-              TextField(
-                controller: _primaryController,
-                enabled: !_busy,
-                obscureText: _isPassword,
-                keyboardType: _isPin
-                    ? TextInputType.number
-                    : TextInputType.visiblePassword,
-                maxLength: _isPin ? widget.pinLength : null,
-                inputFormatters: _isPin
-                    ? <TextInputFormatter>[
-                        FilteringTextInputFormatter.digitsOnly,
-                      ]
-                    : null,
-                autofillHints: const <String>[],
-                decoration: InputDecoration(
-                  labelText: _isPin
-                      ? 'Enter ${widget.pinLength}-digit PIN'
-                      : 'Enter Password',
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _confirmController,
-                enabled: !_busy,
-                obscureText: true,
-                keyboardType: _isPin
-                    ? TextInputType.number
-                    : TextInputType.visiblePassword,
-                maxLength: _isPin ? widget.pinLength : null,
-                inputFormatters: _isPin
-                    ? <TextInputFormatter>[
-                        FilteringTextInputFormatter.digitsOnly,
-                      ]
-                    : null,
-                autofillHints: const <String>[],
-                onSubmitted: (_) => _saveTextCredential(),
-                decoration: InputDecoration(
-                  labelText: _isPin ? 'Confirm PIN' : 'Confirm Password',
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 8),
+            ] else if (_isPin) ...[
+              const SizedBox(height: 10),
+              _buildOtpPinBoxes(theme),
+              const SizedBox(height: 24),
               FilledButton(
-                onPressed: _busy ? null : _saveTextCredential,
+                onPressed: _busy ? null : _handleContinue,
                 child: _busy
                     ? const SizedBox.square(
                         dimension: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Save credential'),
+                    : Text(_currentStep == StepState.confirmNew
+                        ? 'Confirm PIN'
+                        : 'Continue'),
+              ),
+            ] else ...[
+              TextField(
+                controller: _textController,
+                enabled: !_busy,
+                obscureText: true,
+                keyboardType: TextInputType.visiblePassword,
+                autofillHints: const <String>[],
+                onSubmitted: (_) => _handleContinue(),
+                decoration: InputDecoration(
+                  labelText: _currentStep == StepState.enterCurrent
+                      ? 'Current Password'
+                      : _currentStep == StepState.enterNew
+                          ? 'New Password'
+                          : 'Confirm Password',
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: _busy ? null : _handleContinue,
+                child: _busy
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(_currentStep == StepState.confirmNew
+                        ? 'Save Password'
+                        : 'Continue'),
               ),
             ],
             const SizedBox(height: 14),
             Text(
-              'Credentials are encrypted with salted PBKDF2 hashes in hardware-backed secure storage and never sent to cloud servers.',
+              'Credentials are encrypted with salted PBKDF2 hashes in hardware-backed secure storage.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,

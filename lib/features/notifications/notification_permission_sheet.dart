@@ -43,30 +43,27 @@ class _NotificationPermissionSheetState extends State<NotificationPermissionShee
     final manager = locator<NotificationChannelManager>();
     await manager.markEducationShown();
 
+    final nav = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     final status = await Permission.notification.request();
 
     if (mounted) {
       setState(() => _requesting = false);
-      Navigator.of(context).pop();
+      nav.pop();
       widget.onCompleted?.call();
 
       if (status.isPermanentlyDenied) {
-        // Offer quick navigation to settings if permanently denied
-        _showSettingsPrompt(context);
+        messenger.showSnackBar(
+          SnackBar(
+            content: const Text('Notifications are disabled in system settings.'),
+            action: SnackBarAction(
+              label: 'Settings',
+              onPressed: () => openAppSettings(),
+            ),
+          ),
+        );
       }
     }
-  }
-
-  void _showSettingsPrompt(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Notifications are disabled in system settings.'),
-        action: SnackBarAction(
-          label: 'Settings',
-          onPressed: () => openAppSettings(),
-        ),
-      ),
-    );
   }
 
   @override

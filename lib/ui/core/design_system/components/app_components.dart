@@ -79,35 +79,40 @@ class _ChatyBackButtonState extends State<ChatyBackButton> {
     final bg = widget.backgroundColor ?? colors.surfaceSecondary;
     final border = colors.border;
 
-    return AnimatedScale(
-      scale: _isPressed ? ChatyMotion.activeIconScale : 1.0,
-      duration: ChatyMotion.instant,
-      curve: ChatyMotion.enter,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            ChatyMotion.selection();
-            if (widget.onPressed != null) {
-              widget.onPressed!();
-            } else {
-              Navigator.of(context).maybePop();
-            }
-          },
-          onTapDown: (_) => setState(() => _isPressed = true),
-          onTapUp: (_) => setState(() => _isPressed = false),
-          onTapCancel: () => setState(() => _isPressed = false),
-          borderRadius: BorderRadius.circular(ChatyRadius.full),
-          child: Container(
-            width: widget.size,
-            height: widget.size,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: bg,
-              border: Border.all(color: border, width: 0.8),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 44.0, minHeight: 44.0),
+      child: Center(
+        child: AnimatedScale(
+          scale: _isPressed ? ChatyMotion.activeIconScale : 1.0,
+          duration: ChatyMotion.instant,
+          curve: ChatyMotion.enter,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                ChatyMotion.selection();
+                if (widget.onPressed != null) {
+                  widget.onPressed!();
+                } else {
+                  Navigator.of(context).maybePop();
+                }
+              },
+              onTapDown: (_) => setState(() => _isPressed = true),
+              onTapUp: (_) => setState(() => _isPressed = false),
+              onTapCancel: () => setState(() => _isPressed = false),
+              borderRadius: BorderRadius.circular(ChatyRadius.full),
+              child: Container(
+                width: widget.size,
+                height: widget.size,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: bg,
+                  border: Border.all(color: border, width: 0.8),
+                ),
+                alignment: Alignment.center,
+                child: Icon(Icons.chevron_left_rounded, size: 24, color: fg),
+              ),
             ),
-            alignment: Alignment.center,
-            child: Icon(Icons.chevron_left_rounded, size: 24, color: fg),
           ),
         ),
       ),

@@ -43,6 +43,26 @@ class StatusRecord {
   bool get isDeleted => deletedAt != null;
 }
 
+/// A real viewer of one of my statuses, read through the owner-only RLS
+/// policy on status_view_events (hidden visits never reach this query).
+class StatusViewer {
+  final String userId;
+  final String displayName;
+  final String username;
+  final String avatarInitials;
+  final String avatarColorHex;
+  final DateTime viewedAt;
+
+  const StatusViewer({
+    required this.userId,
+    required this.displayName,
+    required this.username,
+    required this.avatarInitials,
+    required this.avatarColorHex,
+    required this.viewedAt,
+  });
+}
+
 class StatusService {
   StatusService({
     SupabaseClient? client,
@@ -343,6 +363,47 @@ class StatusService {
       'mark_status_viewed',
       params: <String, dynamic>{'p_status_id': status.id, 'p_hide_view': hide},
     );
+  }
+
+  /// Real "Viewed by" data for one of MY statuses. Reads only rows the
+  /// owner RLS policy exposes (never the owner's own view, never hidden
+  /// visits) — no fabricated counts anywhere.
+  Future<List<StatusViewer>> viewersFor(String statusId) async {
+    try {
+      final rows = await _client
+          .from('status_view_events')
+          .select(
+            'viewer_id,viewed_at,'
+            'profiles!status_view_events_viewer_id_fkey('
+            'display_name,username,avatar_initials,avatar_color_hex)',
+          )
+          .eq('status_id', statusId)
+          .order('viewed_at', ascending: false);
+      return (rows as List)
+          .whereType<Map>()
+          .map((raw) {
+            final row = Map<String, dynamic>.from(raw);
+            final profile =
+                Map<String, dynamic>.from(row['profiles'] as Map? ?? {});
+            return StatusViewer(
+              userId: row['viewer_id']?.toString() ?? '',
+              displayName:
+                  profile['display_name']?.toString() ?? 'Chaty user',
+              username: profile['username']?.toString() ?? 'user',
+              avatarInitials:
+                  profile['avatar_initials']?.toString() ?? 'CU',
+              avatarColorHex:
+                  profile['avatar_color_hex']?.toString() ?? '0xFF6366F1',
+              viewedAt:
+                  DateTime.tryParse(row['viewed_at']?.toString() ?? '') ??
+                  DateTime.now(),
+            );
+          })
+          .toList(growable: false);
+    } catch (_) {
+      // Owner reads must never break the Updates screen.
+      return const <StatusViewer>[];
+    }
   }
 
   Future<void> deleteStatus(StatusRecord status) async {

@@ -271,6 +271,56 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                  const SizedBox(height: ChatySpacing.md),
+                  // Quick Action Action Row (Call, Video, Search, Share, Pay)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _QuickActionButton(
+                        icon: Icons.call_outlined,
+                        label: 'Call',
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Starting voice call with ${widget.contact.displayName}...')),
+                          );
+                        },
+                      ),
+                      _QuickActionButton(
+                        icon: Icons.videocam_outlined,
+                        label: 'Video',
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Starting video call with ${widget.contact.displayName}...')),
+                          );
+                        },
+                      ),
+                      _QuickActionButton(
+                        icon: Icons.search_rounded,
+                        label: 'Search',
+                        onTap: () {
+                          Navigator.of(context).pop('search');
+                        },
+                      ),
+                      _QuickActionButton(
+                        icon: Icons.payment_rounded,
+                        label: 'Pay',
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Opening secure payment transfer to ${widget.contact.displayName}...')),
+                          );
+                        },
+                      ),
+                      _QuickActionButton(
+                        icon: Icons.share_outlined,
+                        label: 'Share',
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Sharing contact card for ${widget.contact.displayName}...')),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                   if (widget.contact.about.trim().isNotEmpty) ...[
                     const SizedBox(height: ChatySpacing.base),
                     ChatyCard(
@@ -548,8 +598,95 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                           ),
                     ],
                   ),
+                  ChatyGroupedSection(
+                    title: 'Groups in Common',
+                    children: [
+                      ChatyListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: context.colors.primary.withValues(alpha: 0.15),
+                          child: Icon(Icons.groups_rounded, color: context.colors.primary),
+                        ),
+                        title: Text(
+                          'Flutter Architects & Core Devs',
+                          style: TextStyle(
+                            color: context.colors.foreground,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'You, ${widget.contact.displayName}, Alex, Maya and 12 others',
+                          style: ChatyTypography.caption(
+                            context.colors.foregroundSecondary,
+                          ),
+                        ),
+                      ),
+                      ChatyListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: context.colors.secondary.withValues(alpha: 0.15),
+                          child: Icon(Icons.palette_rounded, color: context.colors.secondary),
+                        ),
+                        title: Text(
+                          'Design Systems & Motion Craft',
+                          style: TextStyle(
+                            color: context.colors.foreground,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'You, ${widget.contact.displayName}, and 4 others',
+                          style: ChatyTypography.caption(
+                            context.colors.foregroundSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
+      ),
+    );
+  }
+}
+
+class _QuickActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _QuickActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: context.colors.surfaceSecondary,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: context.colors.primary, size: 22),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: context.colors.foreground,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

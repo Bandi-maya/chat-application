@@ -156,65 +156,108 @@ class ChatyBackendService extends ChangeNotifier {
     final user = _client.auth.currentUser;
     if (user == null) return;
 
-    final row = await _client
-        .from('profiles')
-        .select()
-        .eq('id', user.id)
-        .single();
-    final profile = _profileFromRow(
-      Map<String, dynamic>.from(row),
-      email: user.email ?? '',
-      phone: user.phone ?? '',
-    );
-    _currentUser = profile;
-    _usersById[profile.id] = profile;
+    try {
+      final row = await _client
+          .from('profiles')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
+      if (row != null) {
+        final profile = _profileFromRow(
+          Map<String, dynamic>.from(row),
+          email: user.email ?? '',
+          phone: user.phone ?? '',
+        );
+        _currentUser = profile;
+        _usersById[profile.id] = profile;
+      } else {
+        // Fallback user profile if row is not populated yet
+        final fallback = UserProfile(
+          id: user.id,
+          displayName: user.userMetadata?['display_name']?.toString() ??
+              user.email?.split('@').first ??
+              'Chaty User',
+          username: user.userMetadata?['username']?.toString() ?? 'user',
+          avatarInitials: _initials(user.email ?? 'CU'),
+          avatarColorHex: '0xFF6366F1',
+          about: '',
+          presence: PresenceState.online,
+          lastSeenAt: DateTime.now(),
+          isVerified: false,
+          email: user.email ?? '',
+          phone: user.phone ?? '',
+          safetyNumber: '',
+        );
+        _currentUser = fallback;
+        _usersById[fallback.id] = fallback;
+      }
+    } catch (_) {
+      final fallback = UserProfile(
+        id: user.id,
+        displayName: user.userMetadata?['display_name']?.toString() ??
+            user.email?.split('@').first ??
+            'Chaty User',
+        username: user.userMetadata?['username']?.toString() ?? 'user',
+        avatarInitials: _initials(user.email ?? 'CU'),
+        avatarColorHex: '0xFF6366F1',
+        about: '',
+        presence: PresenceState.online,
+        lastSeenAt: DateTime.now(),
+        isVerified: false,
+        email: user.email ?? '',
+        phone: user.phone ?? '',
+        safetyNumber: '',
+      );
+      _currentUser = fallback;
+      _usersById[fallback.id] = fallback;
+    }
 
     // Announce this session through setPresence so Freeze Last Seen and the
-    // last-seen/online audience settings are honored here too — a raw write
-    // from this path used to re-broadcast "online" and advance the timestamp
-    // on every startup/profile refresh, defeating both settings.
+    // last-seen/online audience settings are honored here too
     unawaited(setPresence(PresenceState.online));
   }
 
   Future<void> _loadConversations() async {
-    final raw = await _client.rpc('get_my_conversations');
-    final rows = _asRows(raw);
-    final next = <String, Conversation>{};
+    try {
+      final raw = await _client.rpc('get_my_conversations');
+      final rows = _asRows(raw);
+      final next = <String, Conversation>{};
 
-    for (final row in rows) {
-      final id = row['conversation_id']?.toString() ?? '';
-      if (id.isEmpty) continue;
-      final participantIds = _stringList(row['participant_ids']);
-      final adminIds = _stringList(row['admin_ids']);
+      for (final row in rows) {
+        final id = row['conversation_id']?.toString() ?? '';
+        if (id.isEmpty) continue;
+        final participantIds = _stringList(row['participant_ids']);
+        final adminIds = _stringList(row['admin_ids']);
 
-      final conversation = Conversation(
-        id: id,
-        type: row['kind'] == 'group'
-            ? ConversationType.group
-            : ConversationType.direct,
-        title: row['title']?.toString() ?? 'Conversation',
-        participantIds: participantIds,
-        adminIds: adminIds,
-        avatarInitials: row['avatar_initials']?.toString(),
-        avatarColorHex: row['avatar_color_hex']?.toString(),
-        lastMessageText: row['last_message']?.toString() ?? '',
-        lastMessageTime: _date(row['last_message_at']) ?? DateTime.now(),
-        lastMessageSenderId: row['last_message_sender_id']?.toString() ?? '',
-        unreadCount: _integer(row['unread_count']),
-        isPinned: row['is_pinned'] == true,
-        isArchived: row['is_archived'] == true,
-        isMuted: row['is_muted'] == true,
-        draftText: row['draft_text']?.toString() ?? '',
-        encryptionStatus: EncryptionStatus.verificationNeeded,
-      );
-      next[id] = conversation;
-    }
+        final conversation = Conversation(
+          id: id,
+          type: row['kind'] == 'group'
+              ? ConversationType.group
+              : ConversationType.direct,
+          title: row['title']?.toString() ?? 'Conversation',
+          participantIds: participantIds,
+          adminIds: adminIds,
+          avatarInitials: row['avatar_initials']?.toString(),
+          avatarColorHex: row['avatar_color_hex']?.toString(),
+          lastMessageText: row['last_message']?.toString() ?? '',
+          lastMessageTime: _date(row['last_message_at']) ?? DateTime.now(),
+          lastMessageSenderId: row['last_message_sender_id']?.toString() ?? '',
+          unreadCount: _integer(row['unread_count']),
+          isPinned: row['is_pinned'] == true,
+          isArchived: row['is_archived'] == true,
+          isMuted: row['is_muted'] == true,
+          draftText: row['draft_text']?.toString() ?? '',
+          encryptionStatus: EncryptionStatus.verificationNeeded,
+        );
+        next[id] = conversation;
+      }
 
-    _conversationsById
-      ..clear()
-      ..addAll(next);
+      _conversationsById
+        ..clear()
+        ..addAll(next);
 
-    await Future.wait<void>(next.keys.map(_loadConversationMembers));
+      await Future.wait<void>(next.keys.map(_loadConversationMembers));
+    } catch (_) {}
   }
 
   Future<void> _loadConversationMembers(String conversationId) async {

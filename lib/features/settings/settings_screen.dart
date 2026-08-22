@@ -7,7 +7,7 @@ import '../../data/services/notification_service.dart';
 import 'settings_search_delegate.dart';
 import 'privacy/privacy_center_screen.dart';
 import 'security/security_center_screen.dart';
-import 'themes/theme_editor_screen.dart';
+import 'theme_editor_screen.dart';
 import 'appearance/universal_appearance_screen.dart';
 import 'home/home_screen_settings_page.dart';
 import 'conversation/conversation_settings_page.dart';
@@ -84,7 +84,7 @@ class SettingsScreen extends StatelessWidget {
         category: 'Themes',
         description: '13+ dark & light theme presets and token editor',
         icon: Icons.palette_rounded,
-        destination: ChatyThemeEditorScreen(themeController: themeController),
+        destination: ThemeEditorScreen(themeController: themeController),
       ),
       SettingsSearchResult(
         title: 'Home UI Style',
@@ -627,7 +627,7 @@ class SettingsScreen extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => ChatyThemeEditorScreen(
+                          builder: (_) => ThemeEditorScreen(
                             themeController: themeController,
                           ),
                         ),

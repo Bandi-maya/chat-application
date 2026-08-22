@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../../data/repositories/mock_data_store.dart';
 import '../../data/services/backend_service.dart';
 import '../../injection/locator.dart';
+import '../../ui/core/design_system/design_system.dart';
 import '../../ui/core/validators/input_validators.dart';
 import '../../ui/core/widgets/username_availability_field.dart';
 import '../../data/services/profile_media_service.dart';
@@ -24,7 +27,6 @@ Future<void> showChatyProfileEditor(
   final displayNameController = TextEditingController(text: user.displayName);
   final usernameController = TextEditingController(text: user.username);
   final aboutController = TextEditingController(text: user.about);
-  final phoneController = TextEditingController(text: user.phone);
   var saving = false;
   bool? usernameAvailable = true;
 
@@ -53,12 +55,10 @@ Future<void> showChatyProfileEditor(
           setSheetState(() => saving = true);
           final displayName = displayNameController.text.trim();
           final about = aboutController.text.trim();
-          final phone = phoneController.text.trim();
           final updated = user.copyWith(
             displayName: displayName,
             username: normalized,
             about: about,
-            phone: phone,
             avatarInitials: chatyInitialsFor(displayName),
           );
           try {
@@ -115,15 +115,12 @@ Future<void> showChatyProfileEditor(
                     style: Theme.of(sheetContext).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 18),
-                  TextFormField(
+                  ChatyInput(
                     controller: displayNameController,
                     enabled: !saving,
                     textInputAction: TextInputAction.next,
                     validator: ChatyValidators.validateDisplayName,
-                    decoration: const InputDecoration(
-                      labelText: 'Display name',
-                      border: OutlineInputBorder(),
-                    ),
+                    label: 'Display name',
                   ),
                   const SizedBox(height: 12),
                   UsernameAvailabilityField(
@@ -140,49 +137,21 @@ Future<void> showChatyProfileEditor(
                     ),
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
-                    controller: phoneController,
-                    enabled: !saving,
-                    keyboardType: TextInputType.phone,
-                    textInputAction: TextInputAction.next,
-                    validator: (value) =>
-                        value == null || value.trim().isEmpty
-                        ? null
-                        : ChatyValidators.validatePhone(value),
-                    decoration: const InputDecoration(
-                      labelText: 'Phone',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
+                  ChatyInput(
                     controller: aboutController,
                     enabled: !saving,
-                    minLines: 2,
                     maxLines: 4,
-                    maxLength: 256,
                     validator: ChatyValidators.validateBio,
-                    decoration: const InputDecoration(
-                      labelText: 'About',
-                      border: OutlineInputBorder(),
-                    ),
+                    label: 'About',
                   ),
                   const SizedBox(height: 14),
                   SizedBox(
                     width: double.infinity,
-                    height: 50,
-                    child: FilledButton.icon(
+                    child: ChatyPrimaryButton(
+                      text: saving ? 'Saving…' : 'Save profile',
+                      icon: Icons.check_rounded,
+                      isLoading: saving,
                       onPressed: saving ? null : save,
-                      icon: saving
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Icon(Icons.check_rounded),
-                      label: Text(saving ? 'Saving…' : 'Save profile'),
                     ),
                   ),
                 ],
@@ -197,7 +166,6 @@ Future<void> showChatyProfileEditor(
   displayNameController.dispose();
   usernameController.dispose();
   aboutController.dispose();
-  phoneController.dispose();
 }
 
 /// Confirm and perform logout. Same dialog copy and same
@@ -275,7 +243,10 @@ class _ProfilePhotoRowState extends State<_ProfilePhotoRow> {
   Future<void> _upload(ProfileMediaSource source) async {
     setState(() => _busy = true);
     try {
-      final url = await ProfileMediaService().uploadAvatar(source: source);
+      final url = await ProfileMediaService().uploadAvatar(
+        source: source,
+        context: context,
+      );
       await widget.dataStore.updateUser(
         widget.user.copyWith(avatarUrl: url),
       );
@@ -307,7 +278,12 @@ class _ProfilePhotoRowState extends State<_ProfilePhotoRow> {
               radius: 34,
               backgroundColor: colors.surfaceContainerHighest,
               backgroundImage: (widget.user.avatarUrl ?? '').isNotEmpty
-                  ? NetworkImage(widget.user.avatarUrl!)
+                  ? (widget.user.avatarUrl!.startsWith('http://') ||
+                          widget.user.avatarUrl!.startsWith('https://')
+                      ? NetworkImage(widget.user.avatarUrl!)
+                      : FileImage(
+                          File(widget.user.avatarUrl!.replaceFirst('file://', '')),
+                        ) as ImageProvider)
                   : null,
               child: (widget.user.avatarUrl ?? '').isNotEmpty
                   ? null

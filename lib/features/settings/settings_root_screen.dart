@@ -23,7 +23,7 @@ import 'permissions/system_permissions_screen.dart';
 import 'privacy/privacy_center_screen.dart';
 import 'security/security_center_screen.dart';
 import 'settings_search_delegate.dart';
-import 'themes/theme_editor_screen.dart';
+import 'theme_editor_screen.dart';
 
 class SettingsRootScreen extends StatelessWidget {
   final ChatyPreferencesController preferencesController;
@@ -139,7 +139,7 @@ class SettingsRootScreen extends StatelessWidget {
         category: 'Appearance & Personalization',
         description: 'Dark, light and custom theme presets',
         icon: Icons.palette_rounded,
-        destination: ChatyThemeEditorScreen(themeController: themeController),
+        destination: ThemeEditorScreen(themeController: themeController),
         keywords: const [
           'amoled',
           'dark mode',
@@ -354,7 +354,7 @@ class SettingsRootScreen extends StatelessWidget {
                 onTap: () => _push(
                   context,
                   () =>
-                      ChatyThemeEditorScreen(themeController: themeController),
+                      ThemeEditorScreen(themeController: themeController),
                   listenToPreferences: false,
                 ),
               ),

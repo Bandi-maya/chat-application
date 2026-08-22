@@ -10,6 +10,7 @@ import 'package:chat/ui/core/controllers/preferences_controller.dart';
 import 'package:chat/ui/core/design_system/settings_primitives.dart';
 import 'package:chat/ui/core/gb/gb_theme_overrides.dart';
 import 'package:chat/ui/core/theme/theme_presets.dart';
+import 'package:chat/ui/core/ticks/delivery_status_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -60,7 +61,7 @@ void main() {
       expect(prefs.privacy.freezeLastSeen, isFalse);
       expect(prefs.security.isAppLockEnabled, isFalse);
       expect(prefs.home.homeStyle, 'Chaty Default');
-      expect(prefs.conversation.bubbleShape, 'Rounded');
+      expect(prefs.conversation.bubbleShape, 'Stock');
       expect(prefs.automation.enableAutoReply, isFalse);
       expect(prefs.effects.enableClickParticles, isFalse);
     });
@@ -281,7 +282,7 @@ void main() {
         );
 
         expect(find.byType(AnimatedEmojiText), findsOneWidget);
-        expect(find.byIcon(Icons.done_all_rounded), findsOneWidget);
+        expect(find.byType(DeliveryStatusIcon), findsOneWidget);
       },
     );
 

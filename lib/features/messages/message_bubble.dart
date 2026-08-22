@@ -13,6 +13,10 @@ import '../../data/services/chat_media_service.dart';
 import '../../domain/models/chat_message.dart';
 import '../../ui/core/theme/theme_config.dart';
 import '../../ui/core/widgets/app_avatar.dart';
+import '../../ui/core/bubbles/bubble_painter.dart';
+import '../../ui/core/bubbles/bubble_style_registry.dart';
+import '../../ui/core/ticks/delivery_status_icon.dart';
+import 'emoji_only.dart';
 
 class MessageBubble extends StatelessWidget {
   final ChatMessage message;
@@ -62,88 +66,22 @@ class MessageBubble extends StatelessWidget {
     this.onViewOnceOpen,
   });
 
-  BorderRadius _bubbleRadius() {
-    final r = Radius.circular(theme.bubbleRadius);
-    switch (theme.bubbleStyle) {
-      case AppBubbleStyle.rounded:
-        return BorderRadius.only(
-          topLeft: r,
-          topRight: r,
-          bottomLeft: isMe ? r : const Radius.circular(3),
-          bottomRight: isMe ? const Radius.circular(3) : r,
-        );
-      case AppBubbleStyle.softSquare:
-        return BorderRadius.circular(7);
-      case AppBubbleStyle.pill:
-        return BorderRadius.circular(24);
-      case AppBubbleStyle.sharpTail:
-        return BorderRadius.only(
-          topLeft: r,
-          topRight: r,
-          bottomLeft: isMe ? r : Radius.zero,
-          bottomRight: isMe ? Radius.zero : r,
-        );
-    }
-  }
-
-  // Read-state tint for the delivery ticks, driven by the Conversation
-  // "Delivery Tick Style" setting (surfaced via theme.tickStyle).
   Color _tickReadColor() {
-    switch (theme.tickStyle) {
-      case 'Neon':
-        return const Color(0xFF39FF14);
-      case 'iOS Style':
-        return const Color(0xFF34C759);
-      case 'Minimal':
-        return Colors.white;
-      case 'Double Check':
-      case 'Default':
-      default:
-        return const Color(0xFF38BDF8);
-    }
+    return theme.accentColor;
   }
 
-  Widget _deliveryIcon() {
-    final style = theme.tickStyle;
-    // Minimal uses a single check for every positive state and no colored read
-    // accent; Double Check promotes even the "sent" state to a double tick.
-    final minimal = style == 'Minimal';
-    final alwaysDouble = style == 'Double Check';
-    switch (message.deliveryState) {
-      case DeliveryState.queued:
-      case DeliveryState.sending:
-        return const Icon(
-          Icons.access_time_rounded,
-          size: 12,
-          color: Colors.white70,
-        );
-      case DeliveryState.sent:
-        return Icon(
-          minimal || !alwaysDouble
-              ? Icons.done_rounded
-              : Icons.done_all_rounded,
-          size: 13,
-          color: Colors.white70,
-        );
-      case DeliveryState.delivered:
-        return Icon(
-          minimal ? Icons.done_rounded : Icons.done_all_rounded,
-          size: 14,
-          color: Colors.white70,
-        );
-      case DeliveryState.read:
-        return Icon(
-          minimal ? Icons.done_rounded : Icons.done_all_rounded,
-          size: 14,
-          color: minimal ? Colors.white : _tickReadColor(),
-        );
-      case DeliveryState.failed:
-        return const Icon(
-          Icons.error_outline_rounded,
-          size: 12,
-          color: Colors.redAccent,
-        );
-    }
+  Widget _deliveryIcon({bool onLightSurface = false}) {
+    final style = theme.deliveryTickStyle;
+    return DeliveryStatusIcon(
+      style: style,
+      state: message.deliveryState,
+      // On outgoing colored surfaces the ticks are light; on incoming light
+      // surfaces they must use the secondary text color to stay visible.
+      unreadColor:
+          onLightSurface ? theme.secondaryTextColor : Colors.white70,
+      readColor: _tickReadColor(),
+      size: 15,
+    );
   }
 
   String _formatTime(DateTime dt) {
@@ -214,12 +152,81 @@ class MessageBubble extends StatelessWidget {
       );
     }
 
+    // Emoji-only messages render without the standard bubble fill so the
+    // glyphs stay visually free; classification is memoized per text.
+    final isTextOnly = message.attachment == null &&
+        !message.isDeletedForEveryone &&
+        (message.replyToMessageId == null) &&
+        message.type == MessageType.text &&
+        message.text.isNotEmpty;
+    final emojiInfo =
+        isTextOnly ? classifyEmojiOnly(message.text) : const EmojiOnlyInfo(false, 0);
+
     final bubbleBg = isMe
         ? theme.outgoingBubbleColor
         : theme.incomingBubbleColor;
     final textColor = isMe ? theme.outgoingTextColor : theme.incomingTextColor;
 
-    return Padding(
+    if (emojiInfo.isEmojiOnly) {
+      return RepaintBoundary(
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            vertical: 3 * theme.density,
+            horizontal: 12,
+          ),
+          child: Column(
+            crossAxisAlignment: isMe
+                ? CrossAxisAlignment.end
+                : CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              enableAnimatedEmojis
+                  ? AnimatedEmojiText(
+                      text: message.text,
+                      style: TextStyle(
+                        fontSize: emojiInfo.fontSize(14 * theme.fontScale),
+                        height: 1.25,
+                      ),
+                    )
+                  : Text(
+                      message.text,
+                      style: TextStyle(
+                        fontSize: emojiInfo.fontSize(14 * theme.fontScale),
+                        height: 1.25,
+                      ),
+                    ),
+              const SizedBox(height: 3),
+              // Compact metadata surface so time/ticks stay readable over
+              // any wallpaper without re-bubbling the emoji itself.
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: bubbleBg.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _formatTime(message.createdAt),
+                      style: TextStyle(
+                        color: textColor.withValues(alpha: 0.75),
+                        fontSize: 10 * theme.fontScale,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    _deliveryIcon(onLightSurface: !isMe),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RepaintBoundary(
+      child: Padding(
       padding: EdgeInsets.symmetric(
         vertical: 3 * theme.density,
         horizontal: 12,
@@ -258,35 +265,31 @@ class MessageBubble extends StatelessWidget {
                           MediaQuery.sizeOf(context).width *
                           theme.bubbleMaxWidthFactor,
                     ),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 8 * theme.density,
-                    ),
-                    decoration: BoxDecoration(
-                      color: bubbleBg,
-                      borderRadius: _bubbleRadius(),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.06),
-                          blurRadius: 3,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (!isMe && senderName != null) ...[
-                          Text(
-                            senderName!,
-                            style: TextStyle(
-                              color: theme.accentColor,
-                              fontSize: 11.5 * theme.fontScale,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                        ],
+                    margin: BubbleStyleRegistry.getGeometry(theme.bubbleStyle).bubbleMargin,
+                    child: CustomPaint(
+                      painter: BubblePainter(
+                        styleId: theme.bubbleStyle,
+                        isMe: isMe,
+                        fillColor: bubbleBg,
+                        strokeColor: theme.accentColor.withValues(alpha: 0.4),
+                        accentColor: theme.accentColor,
+                      ),
+                      child: Padding(
+                        padding: BubbleStyleRegistry.getGeometry(theme.bubbleStyle).contentPadding,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (!isMe && senderName != null) ...[
+                              Text(
+                                senderName!,
+                                style: TextStyle(
+                                  color: theme.accentColor,
+                                  fontSize: 11.5 * theme.fontScale,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                            ],
                         if (message.isDeletedForEveryone && showDeletedContent)
                           Container(
                             margin: const EdgeInsets.only(bottom: 7),
@@ -564,14 +567,16 @@ class MessageBubble extends StatelessWidget {
                             ),
                             if (isMe) ...[
                               const SizedBox(width: 4),
-                              _deliveryIcon(),
+                              _deliveryIcon(onLightSurface: false),
                             ],
                           ],
                         ),
                       ],
                     ),
                   ),
-                  if (message.reactions.isNotEmpty)
+                ),
+              ),
+              if (message.reactions.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 2, left: 4, right: 4),
                       child: Wrap(
@@ -599,6 +604,7 @@ class MessageBubble extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }

@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'package:chat/data/services/local_lock_service.dart';
-import 'package:chat/domain/models/preferences.dart';
 import 'package:chat/ui/core/controllers/preferences_controller.dart';
 import 'package:chat/features/settings/security/pattern_lock_pad.dart';
 
@@ -129,6 +128,7 @@ void main() {
 
       expect(find.byType(PatternLockPad), findsOneWidget);
       expect(find.bySemanticsLabel('Pattern lock grid 3 by 3'), findsOneWidget);
+      expect(completedPattern, isNull);
     });
   });
 }

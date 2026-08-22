@@ -8,7 +8,7 @@ import '../../ui/core/controllers/appearance_variant_controller.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/gb/gb_theme_overrides.dart';
 import '../calls/calls_screen.dart';
-import '../profile/profile_screen.dart';
+import '../settings/settings_root_screen.dart';
 import '../tasks/tasks_screen.dart';
 import '../updates/updates_screen.dart';
 import 'chats_home_screen.dart';
@@ -26,11 +26,31 @@ class MainNavigationShell extends StatefulWidget {
 class _MainNavigationShellState extends State<MainNavigationShell> {
   int _currentIndex = 0;
   DateTime? _lastExitAttempt;
+  late final PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: _currentIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   void _selectRootDestination(int next) {
     if (next == _currentIndex) return;
     HapticFeedback.selectionClick();
     setState(() => _currentIndex = next);
+    if (_pageController.hasClients && _pageController.page?.round() != next) {
+      _pageController.animateToPage(
+        next,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+      );
+    }
   }
 
   Future<void> _handleRootBack() async {
@@ -113,12 +133,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             icon: Icons.call_outlined,
             activeIcon: Icons.call_rounded,
           ),
-          // Profile is now the root destination; Settings lives one level
-          // deeper (Profile → Settings) and keeps every existing entry.
           const _NavDestinationItem(
-            label: 'Profile',
-            icon: Icons.person_outline_rounded,
-            activeIcon: Icons.person_rounded,
+            label: 'Settings',
+            icon: Icons.settings_outlined,
+            activeIcon: Icons.settings_rounded,
           ),
         ];
 
@@ -149,7 +167,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           ),
           TasksScreen(theme: theme, dataStore: dataStore),
           CallsScreen(theme: theme, dataStore: dataStore),
-          ProfileScreen(
+          SettingsRootScreen(
             preferencesController: preferencesController,
             themeController: themeController,
             dataStore: dataStore,
@@ -203,8 +221,13 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               if (navMode == AppNavigationMode.floatingIslandRail) {
                 return _buildFloatingIslandRailShell(
                   theme: theme,
-                  content: IndexedStack(
-                    index: effectiveIndex,
+                  content: PageView(
+                    controller: _pageController,
+                    onPageChanged: (idx) {
+                      if (_currentIndex != idx) {
+                        setState(() => _currentIndex = idx);
+                      }
+                    },
                     children: screens,
                   ),
                   navItems: navItems,
@@ -238,28 +261,18 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   navMode == AppNavigationMode.compactRail ||
                   (navMode != AppNavigationMode.gestureTabs &&
                       (layoutMode == UILayoutMode.tabletDesktop || autoRail));
-              Widget content = IndexedStack(
-                index: effectiveIndex,
+              Widget content = PageView(
+                controller: _pageController,
+                physics: navMode == AppNavigationMode.gestureTabs
+                    ? const BouncingScrollPhysics()
+                    : const PageScrollPhysics(),
+                onPageChanged: (idx) {
+                  if (_currentIndex != idx) {
+                    setState(() => _currentIndex = idx);
+                  }
+                },
                 children: screens,
               );
-              if (navMode == AppNavigationMode.gestureTabs) {
-                content = GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onHorizontalDragEnd: (details) {
-                    final velocity = details.primaryVelocity ?? 0;
-                    if (velocity <= -220) {
-                      _selectRootDestination(
-                        (effectiveIndex + 1).clamp(0, screens.length - 1),
-                      );
-                    } else if (velocity >= 220) {
-                      _selectRootDestination(
-                        (effectiveIndex - 1).clamp(0, screens.length - 1),
-                      );
-                    }
-                  },
-                  child: content,
-                );
-              }
               if (useRail) {
                 return _buildRailShell(
                   theme: theme,

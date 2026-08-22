@@ -9,6 +9,8 @@ import '../../../ui/core/theme/app_theme.dart';
 import '../../chats/locked_chats_screen.dart';
 import 'app_lock_overlay.dart';
 import 'lock_credential_setup_modal.dart';
+import 'lock_method_selector_sheet.dart';
+import 'security_flow_plan.dart';
 
 class SecurityCenterScreen extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
@@ -20,14 +22,6 @@ class SecurityCenterScreen extends StatefulWidget {
 }
 
 class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
-  static const List<String> _lockMethods = <String>[
-    'Biometric',
-    'Device Credential',
-    'PIN',
-    'Pattern',
-    'Password',
-  ];
-
   static const List<String> _autoLockOptions = <String>[
     'Immediately',
     '15s',
@@ -58,59 +52,169 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
     });
   }
 
-  Future<bool> _hasConfiguredMethod(String method) async {
-    if (method == 'Biometric' || method == 'Device Credential') return false;
-    return _lockService.hasCredential(method);
-  }
+  // ---------------------------------------------------------------------------
+  // Credential lifecycle. Every intent runs the SAME planned pipeline:
+  // verify current → choose type → set+confirm new → OS preflight → apply.
+  // Nothing is persisted until every step passes (see SecurityFlowPlan).
+  // ---------------------------------------------------------------------------
 
-  Future<bool> _configureMethod(String method, {int? pinLength}) async {
-    final configured = await LockCredentialSetupModal.show(
+  static LockMethodType _methodTypeOf(String stored) =>
+      switch (stored) {
+        'PIN' => LockMethodType.pin,
+        'Pattern' => LockMethodType.pattern,
+        'Password' => LockMethodType.password,
+        'Biometric' => LockMethodType.biometric,
+        'Device Credential' => LockMethodType.deviceCredential,
+        _ => LockMethodType.pin,
+      };
+
+  static String _storageKeyOf(LockMethodType type) => switch (type) {
+    LockMethodType.pin => 'PIN',
+    LockMethodType.pattern => 'Pattern',
+    LockMethodType.password => 'Password',
+    LockMethodType.biometric => 'Biometric',
+    LockMethodType.deviceCredential => 'Device Credential',
+  };
+
+  Future<bool> _verifyCurrent(LockMethodType method) async {
+    if (!SecurityFlowPlan.hasVerifiableSecret(method)) {
+      // OS-based method: a live authentication is the proof.
+      final ok = method == LockMethodType.biometric
+          ? await _lockService.authenticateBiometric(
+              reason: 'Confirm it is you to continue',
+            )
+          : await _lockService.authenticateDeviceCredential(
+              reason: 'Confirm it is you to continue',
+            );
+      if (!ok && mounted) _toast('Authentication failed or was cancelled.');
+      return ok;
+    }
+    final unlocked = await AppLockOverlayModal.show(
       context,
-      method: method,
-      pinLength: pinLength ?? _pinLength,
+      preferencesController: widget.preferencesController,
       lockService: _lockService,
+      title: 'Confirm it\'s you',
+      reason: 'Verify your current lock to continue',
     );
-    if (configured) await _loadCapabilities();
-    return configured;
+    if (unlocked != true) {
+      if (mounted) _toast('Verification cancelled.');
+      return false;
+    }
+    return true;
   }
 
-  Future<void> _setAppLockEnabled(bool enabled) async {
+  /// Executes one security intent end-to-end. Returns true when applied.
+  Future<bool> _runFlow({
+    required SecurityIntent intent,
+    LockMethodType? target,
+    int? setupPinLength,
+  }) async {
     final security = widget.preferencesController.security;
-    if (!enabled) {
-      widget.preferencesController.updateSecurity(
-        security.copyWith(isAppLockEnabled: false),
-        logTitle: 'Disable App Lock',
-      );
-      return;
-    }
-
-    final alreadyConfigured = await _hasConfiguredMethod(security.lockMethod);
-    if (!alreadyConfigured) {
-      final configured = await _configureMethod(security.lockMethod);
-      if (!configured || !mounted) return;
-    }
-
-    widget.preferencesController.updateSecurity(
-      widget.preferencesController.security.copyWith(isAppLockEnabled: true),
-      logTitle: 'Enable App Lock',
+    final current = _methodTypeOf(security.lockMethod);
+    var chosen = target ?? current;
+    var secretConfigured = await _lockService.hasCredential(
+      _storageKeyOf(current),
     );
+    // True once this flow has proven knowledge of the current secret.
+    var verifiedInFlow = false;
+
+    for (final step in SecurityFlowPlan.plan(
+      intent: intent,
+      currentMethod: current,
+      currentSecretConfigured: secretConfigured,
+      targetMethod: chosen,
+    )) {
+      if (!mounted) return false;
+      switch (step) {
+        case SecurityFlowStep.verifyCurrent:
+          final ok = await _verifyCurrent(current);
+          if (!ok) return false;
+          verifiedInFlow = true;
+
+        case SecurityFlowStep.chooseMethod:
+          final picked = await LockMethodSelectorSheet.show(
+            context,
+            lockService: _lockService,
+            currentMethod: chosen,
+          );
+          if (picked == null || !mounted) return false;
+          chosen = picked;
+          secretConfigured = await _lockService.hasCredential(
+            _storageKeyOf(chosen),
+          );
+
+        case SecurityFlowStep.setupNew:
+          // Keeping the type you already have (and just verified) does not
+          // require typing a brand-new secret — matching platform behavior.
+          if (verifiedInFlow && secretConfigured && chosen == current) {
+            break;
+          }
+          final configured = await LockCredentialSetupModal.show(
+            context,
+            method: _storageKeyOf(chosen),
+            pinLength: setupPinLength ?? _pinLength,
+            lockService: _lockService,
+          );
+          if (!configured || !mounted) return false;
+          await _loadCapabilities();
+
+        case SecurityFlowStep.preflightOsAuth:
+          final ok = chosen == LockMethodType.biometric
+              ? await _lockService.authenticateBiometric(
+                  reason: 'Confirm biometric unlock works for Chaty',
+                )
+              : await _lockService.authenticateDeviceCredential(
+                  reason: 'Confirm your device lock works for Chaty',
+                );
+          if (!ok) {
+            if (mounted) {
+              _toast(
+                chosen == LockMethodType.biometric
+                    ? 'Biometric unavailable or not confirmed — pick another '
+                        'lock type so you cannot be locked out.'
+                    : 'Device lock not confirmed — set a device screen lock '
+                        'first or pick another lock type.',
+              );
+            }
+            return false;
+          }
+
+        case SecurityFlowStep.apply:
+          final latest = widget.preferencesController.security;
+          switch (intent) {
+            case SecurityIntent.enableLock:
+              widget.preferencesController.updateSecurity(
+                latest.copyWith(
+                  lockMethod: _storageKeyOf(chosen),
+                  isAppLockEnabled: true,
+                ),
+                logTitle: 'Enable Chaty Lock (${_storageKeyOf(chosen)})',
+              );
+            case SecurityIntent.changeMethod:
+              widget.preferencesController.updateSecurity(
+                latest.copyWith(lockMethod: _storageKeyOf(chosen)),
+                logTitle: 'Lock Method',
+              );
+            case SecurityIntent.changeCredential:
+              // Secret already persisted by the setup modal; nothing else to
+              // change preference-side.
+              break;
+            case SecurityIntent.disableLock:
+              widget.preferencesController.updateSecurity(
+                latest.copyWith(isAppLockEnabled: false),
+                logTitle: 'Disable App Lock',
+              );
+          }
+      }
+    }
+    if (mounted) setState(() {});
+    return true;
   }
 
-  Future<void> _changeMethod(String method) async {
-    final configured = await _configureMethod(method);
-    if (!configured || !mounted) return;
-    widget.preferencesController.updateSecurity(
-      widget.preferencesController.security.copyWith(lockMethod: method),
-      logTitle: 'Lock Method',
-    );
-  }
-
-  Future<void> _changePinLength(String value) async {
-    final length = value == '6 digits' ? 6 : 4;
-    if (length == _pinLength && await _lockService.hasCredential('PIN')) return;
-    final configured = await _configureMethod('PIN', pinLength: length);
-    if (!configured || !mounted) return;
-    setState(() => _pinLength = length);
+  void _toast(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showSafetyNumberDialog() {
@@ -156,6 +260,58 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(),
             child: const Text('Verified'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<String?> _showSecretPhraseSetupDialog() async {
+    final controller = TextEditingController();
+    final colors = context.colors;
+    return await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.key_rounded, color: colors.accent),
+            const SizedBox(width: 8),
+            const Text('Set Secret Search Word'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Enter a secret word, phrase, or emoji. Typing this in the search bar will reveal your hidden locked chats.',
+              style: TextStyle(fontSize: 13, color: colors.foregroundSecondary),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Secret Word or Emoji',
+                hintText: 'e.g. sesame, vault, 🔒',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final text = controller.text.trim();
+              if (text.isNotEmpty) {
+                Navigator.of(ctx).pop(text);
+              }
+            },
+            child: const Text('Save Word'),
           ),
         ],
       ),
@@ -208,15 +364,27 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
                   ? 'App lock active (${security.lockMethod})'
                   : 'Protect the application with biometrics, PIN, pattern, password, or device lock',
               value: security.isAppLockEnabled,
-              onChanged: _setAppLockEnabled,
+              onChanged: (value) => _runFlow(
+                intent: value
+                    ? SecurityIntent.enableLock
+                    : SecurityIntent.disableLock,
+              ),
             ),
             if (security.isAppLockEnabled) ...[
-              ChatyChoiceTile<String>(
-                title: 'Lock Method',
-                options: _lockMethods,
-                selectedOption: security.lockMethod,
-                optionLabel: (value) => value,
-                onSelected: _changeMethod,
+              ChatySettingsTile(
+                icon: Icons.style_rounded,
+                title: 'Lock type',
+                subtitle:
+                    '${security.lockMethod} • tap to verify and change type',
+                trailing: Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: colors.foregroundTertiary,
+                ),
+                onTap: () => _runFlow(
+                  intent: SecurityIntent.changeMethod,
+                  target: null,
+                ),
               ),
               if (security.lockMethod == 'Biometric')
                 ChatySettingsTile(
@@ -229,7 +397,17 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
                   badgeColor: _biometricAvailable
                       ? colors.success
                       : colors.warning,
-                  onTap: () => _configureMethod('Biometric'),
+                  onTap: () async {
+                    final ok = await _lockService.authenticateBiometric(
+                      reason: 'Test biometric unlock for Chaty',
+                    );
+                    if (!mounted) return;
+                    _toast(
+                      ok
+                          ? 'Biometric unlock works.'
+                          : 'Biometric failed or was cancelled.',
+                    );
+                  },
                 ),
               if (security.lockMethod == 'Device Credential')
                 ChatySettingsTile(
@@ -237,7 +415,17 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
                   title: 'Device screen lock',
                   subtitle:
                       'Use the PIN, pattern, password, or biometric managed by Android/iOS',
-                  onTap: () => _configureMethod('Device Credential'),
+                  onTap: () async {
+                    final ok = await _lockService.authenticateDeviceCredential(
+                      reason: 'Test your device screen lock for Chaty',
+                    );
+                    if (!mounted) return;
+                    _toast(
+                      ok
+                          ? 'Device lock works.'
+                          : 'Device authentication failed or was cancelled.',
+                    );
+                  },
                 ),
               if (security.lockMethod == 'PIN') ...[
                 ChatyChoiceTile<String>(
@@ -245,14 +433,22 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
                   options: const <String>['4 digits', '6 digits'],
                   selectedOption: _pinLength == 6 ? '6 digits' : '4 digits',
                   optionLabel: (value) => value,
-                  onSelected: _changePinLength,
+                  onSelected: (value) => _runFlow(
+                intent: SecurityIntent.changeCredential,
+                target: LockMethodType.pin,
+                setupPinLength: value == '6 digits' ? 6 : 4,
+              ),
                 ),
                 ChatySettingsTile(
                   icon: Icons.pin_rounded,
                   title: 'Change PIN Code',
                   subtitle:
                       '$_pinLength-digit PIN stored securely on this device',
-                  onTap: () => _configureMethod('PIN', pinLength: _pinLength),
+                  onTap: () => _runFlow(
+                    intent: SecurityIntent.changeCredential,
+                    target: LockMethodType.pin,
+                    setupPinLength: _pinLength,
+                  ),
                 ),
               ],
               if (security.lockMethod == 'Password')
@@ -261,14 +457,20 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
                   title: 'Change Lock Password',
                   subtitle:
                       'Password is hashed and stored in secure device storage',
-                  onTap: () => _configureMethod('Password'),
+                  onTap: () => _runFlow(
+                    intent: SecurityIntent.changeCredential,
+                    target: LockMethodType.password,
+                  ),
                 ),
               if (security.lockMethod == 'Pattern') ...[
                 ChatySettingsTile(
                   icon: Icons.pattern_rounded,
                   title: 'Change Unlock Pattern',
                   subtitle: 'Draw and confirm a 3×3 gesture pattern',
-                  onTap: () => _configureMethod('Pattern'),
+                  onTap: () => _runFlow(
+                    intent: SecurityIntent.changeCredential,
+                    target: LockMethodType.pattern,
+                  ),
                 ),
                 ChatySwitchTile(
                   title: 'Make Pattern Invisible',
@@ -372,11 +574,22 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
               title: 'Secret Code Search Discovery',
               subtitle: 'Reveal hidden locked chats only when typing your secret word or emoji in search',
               value: security.entryBySecretPhrase,
-              onChanged: (value) =>
+              onChanged: (value) async {
+                if (value) {
+                  final phrase = await _showSecretPhraseSetupDialog();
+                  if (phrase == null || phrase.isEmpty || !mounted) return;
+                  await _lockService.setSecretPhrase(phrase);
                   widget.preferencesController.updateSecurity(
-                    security.copyWith(entryBySecretPhrase: value),
+                    security.copyWith(entryBySecretPhrase: true),
                     logTitle: 'Secret search phrase entry',
-                  ),
+                  );
+                } else {
+                  widget.preferencesController.updateSecurity(
+                    security.copyWith(entryBySecretPhrase: false),
+                    logTitle: 'Secret search phrase disabled',
+                  );
+                }
+              },
             ),
             ChatySwitchTile(
               icon: Icons.screenshot_rounded,
@@ -394,13 +607,10 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
               title: 'Lock Authentication Method',
               subtitle:
                   'Uses ${security.lockMethod}. Chat Lock protects specific chats even if full App Lock is off.',
-              onTap: () async {
-                final configured = await _hasConfiguredMethod(
-                  security.lockMethod,
-                );
-                if (!configured && mounted)
-                  await _configureMethod(security.lockMethod);
-              },
+              onTap: () => _runFlow(
+                intent: SecurityIntent.changeCredential,
+                target: _methodTypeOf(security.lockMethod),
+              ),
             ),
           ],
         ),

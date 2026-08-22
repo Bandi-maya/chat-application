@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../ui/core/theme/app_theme.dart';
+import '../../ui/core/formatting/chat_formatters.dart';
+import '../../ui/core/theme/app_theme.dart';
 import '../../data/repositories/mock_data_store.dart';
 import '../../data/services/contact_relationship_service.dart';
 import '../../data/services/rich_chat_realtime_service.dart';
@@ -78,6 +79,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Timer? _voiceTimer;
   bool _typingPublished = false;
   bool _loadingMessages = true;
+  /// False until the list has laid out once and been positioned at its
+  /// initial offset. The list renders fully laid-out but transparent until
+  /// then, so the user never sees an off-screen frame or a visible jump.
+  bool _initialPositionApplied = false;
   String? _loadError;
   ChatMessage? _replyTarget;
   bool _showQuickReplyOverlay = false;
@@ -131,12 +136,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   Future<void> _loadConversation() async {
+    // Keep _loadingMessages=true until cached/remote messages are actually
+    // available — clearing it here used to show a false “No messages yet”
+    // empty state while the first query was still in flight.
     if (mounted) {
-      setState(() {
-        _loadingMessages = false;
-        _loadError = null;
-      });
-      _scrollToBottom(animate: false);
+      setState(() => _loadError = null);
     }
     try {
       await widget.dataStore.ensureConversationLoaded(widget.conversationId);
@@ -196,17 +200,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   String _lastSeen(String userId) {
     if (_realtime.isOnline(userId)) return 'online';
-    final seen = _realtime.lastSeenFor(userId);
-    if (seen == null) return 'last seen hidden';
-    final local = seen.toLocal();
-    final now = DateTime.now();
-    final hh = local.hour.toString().padLeft(2, '0');
-    final mm = local.minute.toString().padLeft(2, '0');
-    if (now.year == local.year &&
-        now.month == local.month &&
-        now.day == local.day)
-      return 'last seen today at $hh:$mm';
-    return 'last seen ${local.day}/${local.month}/${local.year} at $hh:$mm';
+    return formatLastSeen(_realtime.lastSeenFor(userId)).isEmpty
+        ? 'last seen hidden'
+        : formatLastSeen(_realtime.lastSeenFor(userId));
   }
 
   void _handleComposerChanged(String value) {
@@ -385,16 +381,19 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   void _scrollToBottom({bool animate = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollCtrl.hasClients) {
-        if (animate) {
-          _scrollCtrl.animateTo(
-            _scrollCtrl.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-          );
-        } else {
-          _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
-        }
+      if (!mounted || !_scrollCtrl.hasClients) return;
+      if (animate) {
+        _scrollCtrl.animateTo(
+          _scrollCtrl.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+        return;
+      }
+      _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+      if (!_initialPositionApplied) {
+        // First meaningful frame is now correct; reveal the list.
+        setState(() => _initialPositionApplied = true);
       }
     });
   }
@@ -1685,6 +1684,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         ),
       );
     }
+    if (_loadingMessages) {
+      // Deterministic loading state: skeleton until the first query lands —
+      // never a fake “No messages yet”.
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    }
     if (messages.isEmpty)
       return ChatyEmptyState(
         icon: Icons.chat_bubble_outline_rounded,
@@ -1698,61 +1702,64 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final retainViewOnce =
         widget.preferencesController.privacy.antiViewOnce ||
         widget.preferencesController.gbBool('anti_vw_once');
-    return ListView.builder(
-      controller: _scrollCtrl,
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: messages.length,
-      itemBuilder: (context, index) {
-        final message = messages[index];
-        final isMine = message.senderId == widget.dataStore.currentUser.id;
-        final bubble = MessageBubble(
-          message: message,
-          isMe: isMine,
-          theme: theme,
-          showDeletedContent: showDeleted,
-          retainViewOnce: retainViewOnce,
-          viewOnceOpened: _openedViewOnceIds.contains(message.id),
-          onViewOnceOpen: () => _openViewOnceMedia(message, theme),
-          senderName: conversation.type == ConversationType.group && !isMine
-              ? _senderName(message.senderId)
-              : null,
-          onLongPress: () => _onMessageLongPress(message),
-          onReactionTap: (emoji) => widget.dataStore.toggleReaction(
-            conversation.id,
-            message.id,
-            emoji,
-          ),
-          onDoubleTap: () => widget.dataStore.toggleReaction(
-            conversation.id,
-            message.id,
-            widget.preferencesController.conversation.doubleTapReactionEmoji,
-          ),
-          voicePlaybackSpeed:
-              widget.preferencesController.conversation.voicePlaybackSpeed,
-          onTaskTap: message.linkedTaskId == null
-              ? null
-              : () => _openCreateTaskModal(sourceMessageId: message.id),
-          onMediaTap: message.attachment == null
-              ? null
-              : () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => MediaViewerScreen(
-                      title: message.attachment!.name,
-                      type: message.attachment!.type,
-                      size: message.attachment!.size,
-                      storagePath: message.attachment!.url,
-                      theme: theme,
+    return Opacity(
+      opacity: _initialPositionApplied ? 1 : 0,
+      child: ListView.builder(
+        controller: _scrollCtrl,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        itemCount: messages.length,
+        itemBuilder: (context, index) {
+          final message = messages[index];
+          final isMine = message.senderId == widget.dataStore.currentUser.id;
+          final bubble = MessageBubble(
+            message: message,
+            isMe: isMine,
+            theme: theme,
+            showDeletedContent: showDeleted,
+            retainViewOnce: retainViewOnce,
+            viewOnceOpened: _openedViewOnceIds.contains(message.id),
+            onViewOnceOpen: () => _openViewOnceMedia(message, theme),
+            senderName: conversation.type == ConversationType.group && !isMine
+                ? _senderName(message.senderId)
+                : null,
+            onLongPress: () => _onMessageLongPress(message),
+            onReactionTap: (emoji) => widget.dataStore.toggleReaction(
+              conversation.id,
+              message.id,
+              emoji,
+            ),
+            onDoubleTap: () => widget.dataStore.toggleReaction(
+              conversation.id,
+              message.id,
+              widget.preferencesController.conversation.doubleTapReactionEmoji,
+            ),
+            voicePlaybackSpeed:
+                widget.preferencesController.conversation.voicePlaybackSpeed,
+            onTaskTap: message.linkedTaskId == null
+                ? null
+                : () => _openCreateTaskModal(sourceMessageId: message.id),
+            onMediaTap: message.attachment == null
+                ? null
+                : () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => MediaViewerScreen(
+                        title: message.attachment!.name,
+                        type: message.attachment!.type,
+                        size: message.attachment!.size,
+                        storagePath: message.attachment!.url,
+                        theme: theme,
+                      ),
                     ),
                   ),
-                ),
-        );
-        if (!ChatAttachmentActions.isPollMessage(message)) return bubble;
-        return GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: () => _attachments.openPoll(context, message.id),
-          child: bubble,
-        );
-      },
+          );
+          if (!ChatAttachmentActions.isPollMessage(message)) return bubble;
+          return GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => _attachments.openPoll(context, message.id),
+            child: bubble,
+          );
+        },
+      ),
     );
   }
 }
@@ -1950,25 +1957,23 @@ class _ComposerState extends State<_Composer>
               Expanded(child: _LevelMeter(levels: _levels, theme: theme))
             else
               const Spacer(),
-            if (widget.recordLocked) ...[
-              const SizedBox(width: 10),
-              _ComposerCircleButton(
-                theme: theme,
-                tooltip: 'Send voice note',
-                icon: Icons.send_rounded,
-                fillColor: theme.accentColor,
-                iconColor: theme.onAccentColor,
-                busy: widget.voiceBusy,
-                onTap: widget.voiceBusy ? null : widget.onVoiceSend,
-              ),
-            ],
+            const SizedBox(width: 10),
+            _ComposerCircleButton(
+              theme: theme,
+              tooltip: 'Send voice note',
+              icon: Icons.send_rounded,
+              fillColor: theme.accentColor,
+              iconColor: theme.onAccentColor,
+              busy: widget.voiceBusy,
+              onTap: widget.voiceBusy ? null : widget.onVoiceSend,
+            ),
           ],
         ),
         const SizedBox(height: 5),
         Text(
           widget.recordLocked
-              ? 'Recording locked • tap send when ready'
-              : 'Slide left to cancel • slide up to lock',
+              ? 'Recording locked • tap send or delete'
+              : 'Tap send to finish • slide left to cancel',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(color: theme.secondaryTextColor, fontSize: 11),

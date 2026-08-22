@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../domain/models/other_models.dart';
 import '../../data/repositories/mock_data_store.dart';
@@ -44,34 +45,85 @@ class CallsScreen extends StatelessWidget {
                     'Calls',
                     style: ChatyTypography.headline(colors.foreground),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: ChatySpacing.sm,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colors.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(ChatyRadius.full),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.lock_rounded,
-                          size: 13,
-                          color: colors.primary,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Encrypted',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w600,
-                            color: colors.primary,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (kDebugMode)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(ChatyRadius.full),
+                            onTap: () {
+                              final callService = locator<CallSignalingService>();
+                              callService.startMockCallForQA(isVideo: true);
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => OngoingCallScreen(theme: theme),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: ChatySpacing.sm,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: colors.warning.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(ChatyRadius.full),
+                                border: Border.all(color: colors.warning.withValues(alpha: 0.4)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.bug_report_rounded,
+                                    size: 13,
+                                    color: colors.warning,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'QA Call Preview',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: colors.warning,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
-                      ],
-                    ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: ChatySpacing.sm,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colors.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(ChatyRadius.full),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.lock_rounded,
+                              size: 13,
+                              color: colors.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Encrypted',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: colors.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

@@ -57,8 +57,8 @@ class NotificationChannelManager extends ChangeNotifier {
   static const String _educationShownKey = 'chaty_notif_education_shown';
   static const String _badgeCountKey = 'chaty_unread_badge_count';
 
-  final ChatyPreferencesController _preferences;
-  final MockDataStore _dataStore;
+  final ChatyPreferencesController preferences;
+  final MockDataStore dataStore;
 
   int _badgeCount = 0;
   bool _educationShown = false;
@@ -66,12 +66,11 @@ class NotificationChannelManager extends ChangeNotifier {
       StreamController<NotificationPayload>.broadcast();
 
   NotificationChannelManager({
-    required ChatyPreferencesController preferences,
-    required MockDataStore dataStore,
-  }) : _preferences = preferences,
-       _dataStore = dataStore {
-    _dataStore.addListener(syncUnreadBadgeCount);
-    _preferences.addListener(syncUnreadBadgeCount);
+    required this.preferences,
+    required this.dataStore,
+  }) {
+    dataStore.addListener(syncUnreadBadgeCount);
+    preferences.addListener(syncUnreadBadgeCount);
   }
 
   int get badgeCount => _badgeCount;
@@ -95,14 +94,14 @@ class NotificationChannelManager extends ChangeNotifier {
 
   /// Calculates real unread message count and updates launcher badge.
   Future<void> syncUnreadBadgeCount() async {
-    if (!_preferences.notification.enableGlobalNotifications) {
+    if (!preferences.notification.enableGlobalNotifications) {
       _badgeCount = 0;
       notifyListeners();
       return;
     }
 
     int totalUnread = 0;
-    for (final convo in _dataStore.conversations) {
+    for (final convo in dataStore.conversations) {
       if (!convo.isMuted) {
         totalUnread += convo.unreadCount;
       }
@@ -128,7 +127,7 @@ class NotificationChannelManager extends ChangeNotifier {
     required String content,
     bool isCall = false,
   }) {
-    if (!_preferences.notification.showMessagePreview) {
+    if (!preferences.notification.showMessagePreview) {
       return isCall ? 'Incoming call' : 'New message';
     }
     return content;
@@ -144,8 +143,8 @@ class NotificationChannelManager extends ChangeNotifier {
 
   @override
   void dispose() {
-    _dataStore.removeListener(syncUnreadBadgeCount);
-    _preferences.removeListener(syncUnreadBadgeCount);
+    dataStore.removeListener(syncUnreadBadgeCount);
+    preferences.removeListener(syncUnreadBadgeCount);
     _deepLinkController.close();
     super.dispose();
   }

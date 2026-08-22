@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../injection/locator.dart';
-import '../../../ui/core/controllers/preferences_controller.dart';
+import '../../injection/locator.dart';
+import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/design_system/design_system.dart';
 
 class MockCallScreen extends StatefulWidget {

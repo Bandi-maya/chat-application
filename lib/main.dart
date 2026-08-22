@@ -17,8 +17,8 @@ import 'package:chat/data/services/push_token_service.dart';
 import 'package:chat/data/services/notification_channel_manager.dart';
 import 'package:chat/domain/models/user_profile.dart';
 import 'package:chat/features/auth/create_new_password_screen.dart';
-import 'package:chat/features/auth/splash_screen.dart';
 import 'package:chat/features/auth/welcome_screen.dart';
+import 'package:chat/features/chats/main_navigation_shell.dart';
 import 'package:chat/features/calls/ongoing_call_screen.dart';
 import 'package:chat/features/settings/security/app_lock_overlay.dart';
 import 'package:chat/features/settings/security/security_center_screen.dart';
@@ -501,7 +501,9 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
               ],
             );
           },
-          home: const SplashScreen(),
+          home: _backend.isAuthenticated
+              ? const MainNavigationShell()
+              : const WelcomeScreen(),
         );
       },
     );

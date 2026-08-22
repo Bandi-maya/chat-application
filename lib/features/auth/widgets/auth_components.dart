@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../../../ui/core/design_system/design_system.dart';
-import '../../../../injection/locator.dart';
-import '../../../../data/services/backend_service.dart';
-import '../../../../data/repositories/mock_data_store.dart';
-import '../../../../ui/core/persistence/preferences_storage.dart';
+import '../../../ui/core/design_system/design_system.dart';
+import '../../../injection/locator.dart';
+import '../../../data/services/backend_service.dart';
+import '../../../data/repositories/mock_data_store.dart';
+import '../../../ui/core/persistence/preferences_storage.dart';
 import '../../chats/main_navigation_shell.dart';
 
 /// Circular back button as shown on top-left of each screen in the design.

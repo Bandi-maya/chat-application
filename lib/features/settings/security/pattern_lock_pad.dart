@@ -52,7 +52,7 @@ class PatternLockPadState extends State<PatternLockPad> {
 
   int? _hitTest(Offset localPosition, Size size) {
     final centers = _centers(size);
-    final radius = math.min(size.width, size.height) / 7.5;
+    final radius = math.min(size.width, size.height) / 7.0;
     for (var index = 0; index < centers.length; index++) {
       if ((centers[index] - localPosition).distance <= radius) return index;
     }
@@ -73,9 +73,8 @@ class PatternLockPadState extends State<PatternLockPad> {
     if (_selected.isNotEmpty) {
       widget.onPatternComplete(_selected.join('-'));
     }
-    setState(() => _pointer = null);
-    if (widget.clearOnFinish) {
-      // Small visual delay before clearing if required
+    if (mounted) {
+      setState(() => _pointer = null);
     }
   }
 
@@ -83,7 +82,7 @@ class PatternLockPadState extends State<PatternLockPad> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final color = theme.colorScheme.primary;
-    final muted = theme.colorScheme.onSurface.withValues(alpha: 0.25);
+    final muted = theme.colorScheme.onSurface.withValues(alpha: 0.35);
 
     return Semantics(
       label: 'Pattern lock grid 3 by 3',
@@ -149,39 +148,63 @@ class _PatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final centers = _centers(size);
-    final linePaint = Paint()
-      ..color = activeColor
-      ..strokeWidth = 4.5
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..style = PaintingStyle.stroke;
 
+    // Draw lines connecting selected dots if trace is NOT hidden
     if (!hideTrace && selected.isNotEmpty) {
+      final linePaint = Paint()
+        ..color = activeColor.withValues(alpha: 0.85)
+        ..strokeWidth = 5.0
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke;
+
       final path = Path()
         ..moveTo(centers[selected.first].dx, centers[selected.first].dy);
       for (final index in selected.skip(1)) {
         path.lineTo(centers[index].dx, centers[index].dy);
       }
-      if (pointer != null) path.lineTo(pointer!.dx, pointer!.dy);
+      if (pointer != null) {
+        path.lineTo(pointer!.dx, pointer!.dy);
+      }
       canvas.drawPath(path, linePaint);
     }
 
+    // Draw all 9 nodes
     for (var index = 0; index < centers.length; index++) {
       final isSelected = selected.contains(index);
-      final outer = Paint()
-        ..color = isSelected
-            ? activeColor.withValues(alpha: 0.22)
-            : inactiveColor.withValues(alpha: 0.16)
-        ..style = PaintingStyle.fill;
-      final border = Paint()
-        ..color = isSelected ? activeColor : inactiveColor
-        ..strokeWidth = isSelected ? 3 : 1.8
-        ..style = PaintingStyle.stroke;
 
-      canvas.drawCircle(centers[index], isSelected ? 20 : 16, outer);
-      canvas.drawCircle(centers[index], isSelected ? 20 : 16, border);
       if (isSelected) {
-        canvas.drawCircle(centers[index], 7, Paint()..color = activeColor);
+        // Outer halo when selected
+        if (!hideTrace) {
+          final outerHalo = Paint()
+            ..color = activeColor.withValues(alpha: 0.25)
+            ..style = PaintingStyle.fill;
+          canvas.drawCircle(centers[index], 24, outerHalo);
+
+          final outerBorder = Paint()
+            ..color = activeColor
+            ..strokeWidth = 2.5
+            ..style = PaintingStyle.stroke;
+          canvas.drawCircle(centers[index], 24, outerBorder);
+        }
+
+        // Inner solid dot
+        final centerDot = Paint()
+          ..color = (!hideTrace) ? activeColor : inactiveColor
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(centers[index], (!hideTrace) ? 8 : 6, centerDot);
+      } else {
+        // Inactive unselected dot
+        final inactiveDot = Paint()
+          ..color = inactiveColor
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(centers[index], 6, inactiveDot);
+
+        final inactiveRing = Paint()
+          ..color = inactiveColor.withValues(alpha: 0.15)
+          ..strokeWidth = 1.5
+          ..style = PaintingStyle.stroke;
+        canvas.drawCircle(centers[index], 16, inactiveRing);
       }
     }
   }

@@ -1,7 +1,16 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../messages/message_bubble.dart';
 import '../../domain/models/chat_message.dart';
+import '../../ui/core/bubbles/bubble_style_id.dart';
+import '../../ui/core/bubbles/bubble_style_preview.dart';
+import '../../ui/core/ticks/delivery_icon_style.dart';
+import '../../ui/core/ticks/delivery_status_icon.dart';
+import '../../ui/core/theme/chaty_theme_manager.dart';
+import '../../ui/core/theme/image_theme_generator.dart';
 
 class ThemeEditorScreen extends StatefulWidget {
   final ThemeController themeController;
@@ -31,6 +40,233 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
     );
   }
 
+  Future<void> _exportTheme() async {
+    try {
+      final file = await ChatyThemeManager.saveThemeToFile(_current);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Theme exported to ${file.path.split('/').last}'),
+          backgroundColor: context.colors.success,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Export failed: $e')),
+      );
+    }
+  }
+
+  Future<void> _importTheme() async {
+    try {
+      final result = await FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+      if (result == null || result.path == null) return;
+      final file = File(result.path!);
+      final content = await file.readAsString();
+      final theme = ChatyThemeManager.validateAndImportTheme(content);
+      setState(() => _current = theme);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Imported "${theme.name}" successfully!'),
+          backgroundColor: context.colors.success,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Import failed: $e')),
+      );
+    }
+  }
+
+  Future<void> _generateFromImage() async {
+    try {
+      final result = await FilePicker.pickFile(type: FileType.image);
+      if (result == null || result.path == null) return;
+      final file = File(result.path!);
+      final isDark = _current.brightness == Brightness.dark;
+      final generated = await ImageThemeGenerator.generateFromImageFile(file, isDark: isDark);
+      setState(() => _current = generated);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Palette extracted from image!'),
+          backgroundColor: context.colors.success,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not generate theme from image: $e')),
+      );
+    }
+  }
+
+  void _showBubblePicker() {
+    final theme = Theme.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.75,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (_, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                color: theme.cardColor,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 10, bottom: 8),
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Bubble Styles (${BubbleStyleId.values.length})',
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurface,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: ListView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                      itemCount: BubbleStyleId.values.length,
+                      itemBuilder: (_, idx) {
+                        final styleId = BubbleStyleId.values[idx];
+                        final isSelected = styleId == _current.bubbleStyle;
+                        return BubbleStylePreviewTile(
+                          styleId: styleId,
+                          label: styleId.displayName,
+                          isSelected: isSelected,
+                          accentColor: _current.accentColor,
+                          onTap: () {
+                            setState(() => _current = _current.copyWith(bubbleStyle: styleId));
+                            Navigator.of(ctx).pop();
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showTickPicker() {
+    final theme = Theme.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.65,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          builder: (_, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                color: theme.cardColor,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 10, bottom: 8),
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Delivery Tick Styles (${DeliveryIconStyle.values.length})',
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurface,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: ListView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                      itemCount: DeliveryIconStyle.values.length,
+                      itemBuilder: (_, idx) {
+                        final tickStyle = DeliveryIconStyle.values[idx];
+                        final isSelected = tickStyle == _current.deliveryTickStyle;
+                        return DeliveryStatusPreviewTile(
+                          style: tickStyle,
+                          isSelected: isSelected,
+                          onTap: () {
+                            setState(() => _current = _current.copyWith(deliveryTickStyle: tickStyle));
+                            Navigator.of(ctx).pop();
+                          },
+                          primaryTextColor: _current.primaryTextColor,
+                          accentColor: _current.accentColor,
+                          unreadColor: _current.secondaryTextColor,
+                          readColor: _current.accentColor,
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _navModeChip(String label, AppNavigationMode mode) {
     final isSel = _current.navigationMode == mode;
     final themeData = Theme.of(context);
@@ -54,124 +290,83 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = _current;
     final themeData = Theme.of(context);
 
     return ChatyScaffold(
       appBar: ChatyAppBar(
-        title: 'Theme & Appearance Editor',
+        title: 'Theme & Design Studio',
         leading: const ChatyBackButton(),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: ChatySpacing.sm),
-            child: ChatyPrimaryButton(
-              text: 'Save',
-              width: 72,
-              height: 34,
-              onPressed: _applyAndSave,
-            ),
+          IconButton(
+            icon: const Icon(Icons.palette_outlined),
+            tooltip: 'Extract from photo',
+            onPressed: _generateFromImage,
+          ),
+          IconButton(
+            icon: const Icon(Icons.file_download_outlined),
+            tooltip: 'Import Theme JSON',
+            onPressed: _importTheme,
+          ),
+          IconButton(
+            icon: const Icon(Icons.file_upload_outlined),
+            tooltip: 'Export Theme JSON',
+            onPressed: _exportTheme,
+          ),
+          IconButton(
+            icon: const Icon(Icons.check_rounded),
+            tooltip: 'Save Theme',
+            onPressed: _applyAndSave,
           ),
         ],
       ),
       body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(
           horizontal: ChatySpacing.base,
           vertical: ChatySpacing.md,
         ),
+        physics: const BouncingScrollPhysics(),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Live Interactive Chat Preview Box
-            ChatyGroupedSection(
-              title: 'Live Preview',
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: ChatySpacing.md,
-                    horizontal: ChatySpacing.xs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.backgroundColor,
-                    borderRadius: BorderRadius.circular(ChatyRadius.md),
-                  ),
-                  child: Column(
-                    children: [
-                      MessageBubble(
-                        message: ChatMessage(
-                          id: 'prev_1',
-                          conversationId: 'prev',
-                          senderId: 'other',
-                          text:
-                              'Hey Alex! How does this custom bubble palette look?',
-                          createdAt: DateTime.now().subtract(
-                            const Duration(minutes: 5),
-                          ),
-                        ),
-                        isMe: false,
-                        theme: theme,
-                        senderName: 'Dr. Elena Rostova',
-                        onLongPress: () {},
-                      ),
-                      MessageBubble(
-                        message: ChatMessage(
-                          id: 'prev_2',
-                          conversationId: 'prev',
-                          senderId: 'me',
-                          text:
-                              'It looks crisp and accessible! Full contrast guaranteed.',
-                          createdAt: DateTime.now().subtract(
-                            const Duration(minutes: 4),
-                          ),
-                          deliveryState: DeliveryState.read,
-                        ),
-                        isMe: true,
-                        theme: theme,
-                        onLongPress: () {},
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-
-            // Contrast Warning Card (Accessibility check)
-            if (theme.hasContrastIssue) ...[
-              const SizedBox(height: ChatySpacing.md),
-              Container(
-                padding: const EdgeInsets.all(ChatySpacing.md),
-                decoration: BoxDecoration(
-                  color: context.colors.error.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(ChatyRadius.md),
-                  border: Border.all(
-                    color: context.colors.error.withValues(alpha: 0.4),
-                  ),
-                ),
-                child: Row(
+            // Preview message bubble live
+            Padding(
+              padding: const EdgeInsets.only(bottom: ChatySpacing.md),
+              child: ChatyCard(
+                child: Column(
                   children: [
-                    Icon(
-                      Icons.warning_amber_rounded,
-                      color: context.colors.error,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Warning: The current color combination falls below WCAG contrast guidelines.',
-                        style: TextStyle(
-                          color: context.colors.error,
-                          fontSize: 12.5,
-                        ),
+                    MessageBubble(
+                      message: ChatMessage(
+                        id: 'prev_1',
+                        conversationId: 'c1',
+                        senderId: 'contact_1',
+                        text: 'Live theme & geometry preview',
+                        createdAt: DateTime.now().subtract(const Duration(minutes: 2)),
+                        deliveryState: DeliveryState.read,
                       ),
+                      isMe: false,
+                      theme: _current,
+                      onLongPress: () {},
+                    ),
+                    const SizedBox(height: 8),
+                    MessageBubble(
+                      message: ChatMessage(
+                        id: 'prev_2',
+                        conversationId: 'c1',
+                        senderId: 'user_me',
+                        text: 'Looks state-of-the-art!',
+                        createdAt: DateTime.now(),
+                        deliveryState: DeliveryState.read,
+                      ),
+                      isMe: true,
+                      theme: _current,
+                      onLongPress: () {},
                     ),
                   ],
                 ),
               ),
-            ],
+            ),
 
-            const SizedBox(height: ChatySpacing.lg),
-
-            // Preset Selector
+            // Presets
             ChatyGroupedSection(
               title: 'Theme Presets',
               children: [
@@ -190,15 +385,6 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
                             selected: isSel,
                             selectedColor: p.accentColor.withValues(alpha: 0.2),
                             backgroundColor: themeData.colorScheme.surface,
-                            labelStyle: TextStyle(
-                              color: isSel
-                                  ? p.accentColor
-                                  : themeData.colorScheme.onSurface,
-                              fontWeight: isSel
-                                  ? FontWeight.w600
-                                  : FontWeight.normal,
-                              fontSize: 13,
-                            ),
                             onSelected: (val) {
                               if (val) setState(() => _current = p);
                             },
@@ -213,53 +399,32 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
 
             const SizedBox(height: ChatySpacing.lg),
 
-            // UI Layout Presets
+            // Discrete Bubble and Tick Pickers
             ChatyGroupedSection(
-              title: 'UI Layout Preset',
+              title: 'Bubble & Tick Styles',
               children: [
-                Padding(
-                  padding: const EdgeInsets.all(ChatySpacing.md),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: UILayoutMode.values.map((mode) {
-                      final isSel = _current.layoutMode == mode;
-                      return ChoiceChip(
-                        label: Text(mode.name.toUpperCase()),
-                        selected: isSel,
-                        selectedColor: theme.accentColor.withValues(alpha: 0.2),
-                        onSelected: (val) {
-                          if (val) {
-                            setState(() {
-                              _current = _current.copyWith(layoutMode: mode);
-                              if (mode == UILayoutMode.compact) {
-                                _current = _current.copyWith(
-                                  density: 0.85,
-                                  fontScale: 0.9,
-                                );
-                              } else if (mode == UILayoutMode.expressive) {
-                                _current = _current.copyWith(
-                                  density: 1.15,
-                                  cornerRadius: 20,
-                                );
-                              }
-                            });
-                          }
-                        },
-                      );
-                    }).toList(),
-                  ),
+                ChatyListTile(
+                  leading: const Icon(Icons.chat_bubble_outline_rounded),
+                  title: const Text('Bubble Style Geometry'),
+                  subtitle: Text(_current.bubbleStyle.name),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: _showBubblePicker,
+                ),
+                ChatyListTile(
+                  leading: const Icon(Icons.done_all_rounded),
+                  title: const Text('Delivery Tick Style'),
+                  subtitle: Text(_current.deliveryTickStyle.name),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: _showTickPicker,
                 ),
               ],
             ),
 
             const SizedBox(height: ChatySpacing.lg),
 
-            // Navigation Shell Architecture (5 Archetypes)
+            // Navigation Architecture
             ChatyGroupedSection(
               title: 'Navigation Layout Architecture',
-              description:
-                  'Switch between the 5 distinct mobile navigation archetypes',
               children: [
                 Padding(
                   padding: const EdgeInsets.all(ChatySpacing.md),
@@ -267,171 +432,13 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      _navModeChip(
-                        'Bottom Nav Bar',
-                        AppNavigationMode.bottomNav,
-                      ),
-                      _navModeChip(
-                        'Top WhatsApp Bar',
-                        AppNavigationMode.topWhatsAppBar,
-                      ),
-                      _navModeChip(
-                        'Floating Island Rail',
-                        AppNavigationMode.floatingIslandRail,
-                      ),
-                      _navModeChip(
-                        '3D Perspective Drawer',
-                        AppNavigationMode.perspective3DDrawer,
-                      ),
-                      _navModeChip(
-                        'Modern Side Menu',
-                        AppNavigationMode.modernSideMenu,
-                      ),
-                      _navModeChip(
-                        'Gesture Tabs',
-                        AppNavigationMode.gestureTabs,
-                      ),
+                      _navModeChip('Bottom Nav Bar', AppNavigationMode.bottomNav),
+                      _navModeChip('Top WhatsApp Bar', AppNavigationMode.topWhatsAppBar),
+                      _navModeChip('Floating Island Rail', AppNavigationMode.floatingIslandRail),
+                      _navModeChip('3D Perspective Drawer', AppNavigationMode.perspective3DDrawer),
+                      _navModeChip('Modern Side Menu', AppNavigationMode.modernSideMenu),
+                      _navModeChip('Gesture Tabs', AppNavigationMode.gestureTabs),
                     ],
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: ChatySpacing.lg),
-
-            // Bubble Geometry & Style
-            ChatyGroupedSection(
-              title: 'Bubble Shape & Geometry',
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(ChatySpacing.md),
-                  child: Wrap(
-                    spacing: 8,
-                    children: AppBubbleStyle.values.map((s) {
-                      final isSel = _current.bubbleStyle == s;
-                      return ChoiceChip(
-                        label: Text(s.name),
-                        selected: isSel,
-                        selectedColor: theme.accentColor.withValues(alpha: 0.2),
-                        onSelected: (val) {
-                          if (val) {
-                            setState(
-                              () =>
-                                  _current = _current.copyWith(bubbleStyle: s),
-                            );
-                          }
-                        },
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: ChatySpacing.lg),
-
-            // Sliders (Corner radius, Font scaling, Density)
-            ChatyGroupedSection(
-              title: 'Geometry & Typography Sliders',
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(ChatySpacing.md),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Corner Radius (${_current.cornerRadius.toInt()}px)',
-                        style: TextStyle(
-                          color: themeData.colorScheme.onSurface,
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Slider(
-                        value: _current.cornerRadius,
-                        min: 4,
-                        max: 28,
-                        divisions: 12,
-                        activeColor: theme.accentColor,
-                        onChanged: (v) => setState(
-                          () => _current = _current.copyWith(cornerRadius: v),
-                        ),
-                      ),
-                      const SizedBox(height: ChatySpacing.sm),
-                      Text(
-                        'Font Scale (${_current.fontScale.toStringAsFixed(2)}x)',
-                        style: TextStyle(
-                          color: themeData.colorScheme.onSurface,
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Slider(
-                        value: _current.fontScale,
-                        min: 0.85,
-                        max: 1.3,
-                        divisions: 9,
-                        activeColor: theme.accentColor,
-                        onChanged: (v) => setState(
-                          () => _current = _current.copyWith(fontScale: v),
-                        ),
-                      ),
-                      const SizedBox(height: ChatySpacing.sm),
-                      Text(
-                        'Message Density (${_current.density.toStringAsFixed(2)}x)',
-                        style: TextStyle(
-                          color: themeData.colorScheme.onSurface,
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Slider(
-                        value: _current.density,
-                        min: 0.7,
-                        max: 1.4,
-                        divisions: 7,
-                        activeColor: theme.accentColor,
-                        onChanged: (v) => setState(
-                          () => _current = _current.copyWith(density: v),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: ChatySpacing.lg),
-
-            // Navigation Modes
-            ChatyGroupedSection(
-              title: 'Navigation Pattern',
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(ChatySpacing.md),
-                  child: SegmentedButton<AppNavigationMode>(
-                    segments: const [
-                      ButtonSegment(
-                        value: AppNavigationMode.bottomNav,
-                        label: Text('Bottom Nav'),
-                      ),
-                      ButtonSegment(
-                        value: AppNavigationMode.compactRail,
-                        label: Text('Rail'),
-                      ),
-                      ButtonSegment(
-                        value: AppNavigationMode.gestureTabs,
-                        label: Text('Tabs'),
-                      ),
-                    ],
-                    selected: {_current.navigationMode},
-                    onSelectionChanged: (val) {
-                      setState(
-                        () => _current = _current.copyWith(
-                          navigationMode: val.first,
-                        ),
-                      );
-                    },
                   ),
                 ),
               ],

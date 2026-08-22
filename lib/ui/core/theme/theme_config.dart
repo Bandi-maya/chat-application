@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'semantic_colors.dart';
 import 'chat_theme_tokens.dart';
+import '../bubbles/bubble_style_id.dart';
+import '../ticks/delivery_icon_style.dart';
 
 enum UILayoutMode { classic, compact, expressive, focus, tabletDesktop }
 
@@ -13,8 +15,6 @@ enum AppNavigationMode {
   gestureTabs,
   compactRail,
 }
-
-enum AppBubbleStyle { rounded, softSquare, pill, sharpTail }
 
 class ThemeConfig {
   final String id;
@@ -38,12 +38,10 @@ class ThemeConfig {
   final double fontScale; // 0.85 to 1.3
   final AppNavigationMode navigationMode;
   final UILayoutMode layoutMode;
-  final AppBubbleStyle bubbleStyle;
-  final String
-  tickStyle; // 'Default', 'Double Check', 'iOS Style', 'Minimal', 'Neon'
-  final double bubbleRadius; // corner radius applied to chat bubbles only
-  final String
-  wallpaperId; // 'none', 'subtle_dots', 'geometric', 'gradient_mesh', 'constellation'
+  final BubbleStyleId bubbleStyle;
+  final DeliveryIconStyle deliveryTickStyle;
+  final String tickStyle; // preserved as string alias
+  final String wallpaperId; // 'none', 'subtle_dots', 'geometric', 'gradient_mesh', 'constellation'
   final double animationLevel; // 0.0 to 1.0
   final bool highContrast;
 
@@ -69,9 +67,9 @@ class ThemeConfig {
     this.fontScale = 1.0,
     this.navigationMode = AppNavigationMode.bottomNav,
     this.layoutMode = UILayoutMode.classic,
-    this.bubbleStyle = AppBubbleStyle.rounded,
-    this.tickStyle = 'Default',
-    this.bubbleRadius = 16.0,
+    this.bubbleStyle = BubbleStyleId.stock,
+    this.deliveryTickStyle = DeliveryIconStyle.rcIos11,
+    this.tickStyle = 'RC iOS 11',
     this.wallpaperId = 'subtle_dots',
     this.animationLevel = 1.0,
     this.highContrast = false,
@@ -108,12 +106,12 @@ class ThemeConfig {
     double? cornerRadius,
     double? density,
     double? fontScale,
-      bool? highContrast,
+    bool? highContrast,
     AppNavigationMode? navigationMode,
     UILayoutMode? layoutMode,
-    AppBubbleStyle? bubbleStyle,
+    BubbleStyleId? bubbleStyle,
+    DeliveryIconStyle? deliveryTickStyle,
     String? tickStyle,
-    double? bubbleRadius,
     String? wallpaperId,
     double? animationLevel,
   }) {
@@ -136,16 +134,17 @@ class ThemeConfig {
       successColor: successColor ?? this.successColor,
       cornerRadius: cornerRadius ?? this.cornerRadius,
       density: density ?? this.density,
-      fontScale: fontScale ?? this.fontScale,
+      fontScale: fontScale != null && fontScale > 0.0 && fontScale.isFinite
+          ? fontScale.clamp(0.5, 2.0)
+          : this.fontScale,
       highContrast: highContrast ?? this.highContrast,
       navigationMode: navigationMode ?? this.navigationMode,
       layoutMode: layoutMode ?? this.layoutMode,
       bubbleStyle: bubbleStyle ?? this.bubbleStyle,
+      deliveryTickStyle: deliveryTickStyle ?? this.deliveryTickStyle,
       tickStyle: tickStyle ?? this.tickStyle,
-      bubbleRadius: bubbleRadius ?? this.bubbleRadius,
       wallpaperId: wallpaperId ?? this.wallpaperId,
       animationLevel: animationLevel ?? this.animationLevel,
-      
     );
   }
 
@@ -163,6 +162,18 @@ class ThemeConfig {
       primaryTextColor,
       backgroundColor,
     );
+    // Secondary text (timestamps, subtitles, hints) on the canvas — this pair
+    // was previously unguarded, so custom themes could render invisible
+    // metadata text.
+    final double secondaryTextRatio = calculateContrastRatio(
+      secondaryTextColor,
+      backgroundColor,
+    );
+    // Primary text on elevated surfaces (app bars, cards, sheets).
+    final double textOnSurfaceRatio = calculateContrastRatio(
+      primaryTextColor,
+      surfaceColor,
+    );
     final double outgoingBubbleRatio = calculateContrastRatio(
       outgoingTextColor,
       outgoingBubbleColor,
@@ -172,6 +183,8 @@ class ThemeConfig {
       incomingBubbleColor,
     );
     return textRatio < 4.5 ||
+        secondaryTextRatio < 3.0 ||
+        textOnSurfaceRatio < 3.5 ||
         outgoingBubbleRatio < 3.5 ||
         incomingBubbleRatio < 3.5;
   }
@@ -559,13 +572,16 @@ class ThemeConfig {
     'navigationMode': navigationMode.name,
     'layoutMode': layoutMode.name,
     'bubbleStyle': bubbleStyle.name,
+    'deliveryTickStyle': deliveryTickStyle.name,
     'tickStyle': tickStyle,
-    'bubbleRadius': bubbleRadius,
     'wallpaperId': wallpaperId,
-    'animationLevel': animationLevel
+    'animationLevel': animationLevel,
   };
 
   factory ThemeConfig.fromMap(Map<String, dynamic> map) {
+    final bubbleStyleRaw = map['bubbleStyle'] as String?;
+    final tickStyleRaw = map['deliveryTickStyle'] as String? ?? map['tickStyle'] as String?;
+
     return ThemeConfig(
       id: map['id'] is String && (map['id'] as String).isNotEmpty
           ? map['id'] as String
@@ -609,7 +625,7 @@ class ThemeConfig {
       successColor: _color(map['successColor'], const Color(0xFF22C55E)),
       cornerRadius: _double(map['cornerRadius'], 16.0),
       density: _double(map['density'], 1.0),
-      fontScale: _double(map['fontScale'], 1.0),
+      fontScale: _double(map['fontScale'], 1.0).clamp(0.5, 2.0),
       highContrast: map['highContrast'] == true,
       navigationMode: _enumByName(
         AppNavigationMode.values,
@@ -621,16 +637,9 @@ class ThemeConfig {
         map['layoutMode'],
         UILayoutMode.classic,
       ),
-      bubbleStyle: _enumByName(
-        AppBubbleStyle.values,
-        map['bubbleStyle'],
-        AppBubbleStyle.rounded,
-      ),
-      tickStyle:
-          map['tickStyle'] is String && (map['tickStyle'] as String).isNotEmpty
-          ? map['tickStyle'] as String
-          : 'Default',
-      bubbleRadius: _double(map['bubbleRadius'], 16.0),
+      bubbleStyle: BubbleStyleIdExtension.fromString(bubbleStyleRaw),
+      deliveryTickStyle: DeliveryIconStyleExtension.fromString(tickStyleRaw),
+      tickStyle: tickStyleRaw ?? 'RC iOS 11',
       wallpaperId: map['wallpaperId'] is String
           ? map['wallpaperId'] as String
           : 'subtle_dots',

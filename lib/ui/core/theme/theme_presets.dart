@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'theme_config.dart';
+import '../bubbles/bubble_style_id.dart';
+import '../ticks/delivery_icon_style.dart';
 
 class ThemePresets {
   static const ThemeConfig monochromeDark = ThemeConfig(
@@ -450,8 +452,8 @@ class ThemePresets {
     cornerRadius: 14.0,
     density: 1.0,
     fontScale: 1.0,
-    bubbleStyle: AppBubbleStyle.rounded,
-    bubbleRadius: 18.0,
+    bubbleStyle: BubbleStyleId.rcIos11,
+    deliveryTickStyle: DeliveryIconStyle.rcIos11,
     wallpaperId: 'none',
   );
 
@@ -477,8 +479,8 @@ class ThemePresets {
     cornerRadius: 14.0,
     density: 1.0,
     fontScale: 1.0,
-    bubbleStyle: AppBubbleStyle.rounded,
-    bubbleRadius: 18.0,
+    bubbleStyle: BubbleStyleId.rcIos11,
+    deliveryTickStyle: DeliveryIconStyle.rcIos11,
     wallpaperId: 'none',
   );
 

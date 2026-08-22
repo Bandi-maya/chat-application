@@ -48,8 +48,25 @@ class _FallingParticlesOverlayState extends State<FallingParticlesOverlay>
     super.initState();
     _controller =
         AnimationController(vsync: this, duration: const Duration(seconds: 10))
-          ..addListener(_updateParticles)
-          ..repeat();
+          ..addListener(_updateParticles);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncMotion();
+  }
+
+  /// Honors the platform "reduce motion" setting: the effect stays
+  /// available but stops its infinite loop, rendering a static scatter
+  /// instead of continuously falling particles.
+  void _syncMotion() {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    if (reduceMotion) {
+      if (_controller.isAnimating) _controller.stop();
+    } else if (!_controller.isAnimating) {
+      _controller.repeat();
+    }
   }
 
   @override
@@ -144,11 +161,12 @@ class _FallingPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     for (final item in items) {
+      final fontSize = item.size > 0 ? item.size : 14.0;
       final textPainter = TextPainter(
         text: TextSpan(
           text: item.symbol,
           style: TextStyle(
-            fontSize: item.size,
+            fontSize: fontSize,
             color: Colors.white.withValues(alpha: item.opacity),
           ),
         ),

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../data/repositories/mock_data_store.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/design_system/design_system.dart';
-import '../../features/chats/main_navigation_shell.dart';
+import '../chats/main_navigation_shell.dart';
 import '../../injection/locator.dart';
 
 class ProfileSetupScreen extends StatefulWidget {

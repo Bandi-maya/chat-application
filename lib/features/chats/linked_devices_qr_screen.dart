@@ -9,7 +9,7 @@ import '../../data/services/contact_relationship_service.dart';
 import '../../domain/models/other_models.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/design_system/design_system.dart';
-import '../chats/chat_detail_screen.dart';
+import 'chat_detail_screen.dart';
 
 class LinkedDevicesQrScreen extends StatefulWidget {
   final MockDataStore dataStore;

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../controllers/preferences_controller.dart';
 import '../theme/theme_config.dart';
+import '../bubbles/bubble_style_id.dart';
+import '../ticks/delivery_icon_style.dart';
 
 class GbThemeOverrides {
   const GbThemeOverrides._();
@@ -39,28 +41,24 @@ class GbThemeOverrides {
     ]);
     final outgoingBubble = firstColor(<String>['ModChatRightBubble']);
     final incomingBubble = firstColor(<String>['ModChatLeftBubble']);
-    final outgoingText = firstColor(<String>[
-      'ModChatBubbleText',
-      'date_right_color',
-    ]);
-    final incomingText = firstColor(<String>[
-      'ModChatBubbleTextLeft',
-      'date_left_color',
-    ]);
-    final link = firstColor(<String>['ModChatBubbleHyperlinks']);
+    final outgoingText = firstColor(<String>['ModChatBubbleRightColor']);
+    final incomingText = firstColor(<String>['ModChatBubbleLeftColor']);
+    final link = firstColor(<String>['ModChatLinkColor']);
+    final fontScaleRaw = prefs.gbDouble('font_scale');
+    final fontScale = (fontScaleRaw > 0.0 && fontScaleRaw.isFinite)
+        ? fontScaleRaw.clamp(0.5, 2.0)
+        : null;
 
-    final textSize = prefs.gbDouble('text_size_pick', fallback: 15);
-    final fontScale = (base.fontScale * (textSize / 15))
-        .clamp(0.78, 1.6)
-        .toDouble();
     // Resolve the bubble geometry from the GB catalog key first (legacy/mod
     // themes), then fall back to the structured Conversation "bubble shape"
     // picker, and finally the base theme. Previously only the GB key was read,
     // so the structured picker was write-only.
     final bubbleStyle =
         _bubbleStyle(prefs.gbString('bubble_style', fallback: '')) ??
-        _bubbleStyle(prefs.conversation.bubbleShape) ??
+        _bubbleStyle(prefs.conversation.bubbleStyle) ??
         base.bubbleStyle;
+
+    final deliveryTickStyle = DeliveryIconStyleExtension.fromString(prefs.conversation.tickStyle);
 
     final candidate = base.copyWith(
       accentColor: accent,
@@ -82,51 +80,78 @@ class GbThemeOverrides {
       linkColor: link,
       fontScale: fontScale,
       bubbleStyle: bubbleStyle,
+      deliveryTickStyle: deliveryTickStyle,
       tickStyle: prefs.conversation.tickStyle,
-      bubbleRadius: prefs.conversation.bubbleRadius,
     );
 
     // Never accept a custom override that makes core text unreadable. If a
     // user picks an unsafe color combination, keep the selected theme's text
     // token for that surface while preserving the other valid overrides.
-    return candidate.hasContrastIssue
-        ? candidate.copyWith(
-            primaryTextColor: _ensureContrast(
-              candidate.primaryTextColor,
-              candidate.backgroundColor,
-              base.primaryTextColor,
-            ),
-            outgoingTextColor: _ensureContrast(
-              candidate.outgoingTextColor,
-              candidate.outgoingBubbleColor,
-              base.outgoingTextColor,
-            ),
-            incomingTextColor: _ensureContrast(
-              candidate.incomingTextColor,
-              candidate.incomingBubbleColor,
-              base.incomingTextColor,
-            ),
-          )
-        : candidate;
+    if (!candidate.hasContrastIssue) return candidate;
+
+    var repaired = candidate.copyWith(
+      // Primary text must read on BOTH the canvas and elevated surfaces
+      // (app bars, cards), so repair against whichever is currently worse.
+      primaryTextColor: _ensureContrastWorst(
+        candidate.primaryTextColor,
+        <Color>[candidate.backgroundColor, candidate.surfaceColor],
+        base.primaryTextColor,
+      ),
+      secondaryTextColor: _ensureContrast(
+        candidate.secondaryTextColor,
+        candidate.backgroundColor,
+        base.secondaryTextColor,
+      ),
+      outgoingTextColor: _ensureContrast(
+        candidate.outgoingTextColor,
+        candidate.outgoingBubbleColor,
+        base.outgoingTextColor,
+      ),
+      incomingTextColor: _ensureContrast(
+        candidate.incomingTextColor,
+        candidate.incomingBubbleColor,
+        base.incomingTextColor,
+      ),
+    );
+
+    // Some custom themes pick a surface that is tonally opposite to the
+    // canvas (e.g. near-black app bar under a near-white background). No
+    // single text token can then read on both, so pull the SURFACE toward
+    // the canvas until one does. This is the only case where we touch a
+    // user-chosen surface color.
+    final surfaces = <Color>[repaired.backgroundColor, repaired.surfaceColor];
+    if (_ensureContrastWorst(
+          repaired.primaryTextColor,
+          surfaces,
+          base.primaryTextColor,
+        ) !=
+        repaired.primaryTextColor) {
+      var surface = repaired.surfaceColor;
+      for (var i = 0; i < 4; i++) {
+        surface = Color.alphaBlend(
+          repaired.backgroundColor.withValues(alpha: 0.45),
+          surface,
+        );
+        final attempt = repaired.copyWith(surfaceColor: surface);
+        if (ThemeConfig.calculateContrastRatio(
+              attempt.primaryTextColor,
+              surface,
+            ) >=
+            3.5) {
+          repaired = attempt;
+          break;
+        }
+      }
+      if (repaired.surfaceColor != surface) {
+        repaired = repaired.copyWith(surfaceColor: surface);
+      }
+    }
+    return repaired;
   }
 
-  static AppBubbleStyle? _bubbleStyle(String raw) {
-    final value = raw.toLowerCase();
-    if (value.isEmpty) return null;
-    if (value.contains('pill')) return AppBubbleStyle.pill;
-    if (value.contains('compact') ||
-        value.contains('square') ||
-        value.contains('card') ||
-        value.contains('minimal')) {
-      return AppBubbleStyle.softSquare;
-    }
-    if (value.contains('tail-less') || value.contains('tailless'))
-      return AppBubbleStyle.rounded;
-    if (value.contains('tail') || value.contains('classic'))
-      return AppBubbleStyle.sharpTail;
-    if (value.contains('round') || value.contains('squircle'))
-      return AppBubbleStyle.rounded;
-    return null;
+  static BubbleStyleId? _bubbleStyle(String raw) {
+    if (raw.isEmpty) return null;
+    return BubbleStyleIdExtension.fromString(raw);
   }
 
   static Color _ensureContrast(
@@ -139,5 +164,23 @@ class GbThemeOverrides {
     if (ThemeConfig.calculateContrastRatio(fallback, background) >= 3.5)
       return fallback;
     return background.computeLuminance() > 0.45 ? Colors.black : Colors.white;
+  }
+
+  static Color _ensureContrastWorst(
+    Color foreground,
+    List<Color> backgrounds,
+    Color fallback,
+  ) {
+    var minCandidate = double.infinity;
+    var minFallback = double.infinity;
+    for (final bg in backgrounds) {
+      final cRatio = ThemeConfig.calculateContrastRatio(foreground, bg);
+      final fRatio = ThemeConfig.calculateContrastRatio(fallback, bg);
+      if (cRatio < minCandidate) minCandidate = cRatio;
+      if (fRatio < minFallback) minFallback = fRatio;
+    }
+    if (minCandidate >= 3.5) return foreground;
+    if (minFallback >= 3.5) return fallback;
+    return backgrounds.first.computeLuminance() > 0.45 ? Colors.black : Colors.white;
   }
 }

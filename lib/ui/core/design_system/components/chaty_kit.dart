@@ -1,4 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import '../tokens/app_tokens.dart';
+import '../../theme/theme_extensions.dart';
 
 /// ---------------------------------------------------------------------------
 /// SHARED DIALOGS / SHEETS / FEEDBACK — replaces the per-screen copies.
@@ -609,16 +612,26 @@ class ChatyNetworkAvatar extends StatelessWidget {
       );
     }
     final parsed = _parseColor(colorHex, fallback: const Color(0xFF6366F1));
+    final cleanUrl = url!;
+    final isLocalFile = !cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://');
+
     return ClipOval(
       child: SizedBox(
         width: size,
         height: size,
-        child: Image.network(
-          url!,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) =>
-              ChatyAvatarCore(initials: initials, color: parsed, size: size),
-        ),
+        child: isLocalFile
+            ? Image.file(
+                File(cleanUrl.replaceFirst('file://', '')),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    ChatyAvatarCore(initials: initials, color: parsed, size: size),
+              )
+            : Image.network(
+                cleanUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    ChatyAvatarCore(initials: initials, color: parsed, size: size),
+              ),
       ),
     );
   }
@@ -629,5 +642,234 @@ class ChatyNetworkAvatar extends StatelessWidget {
     final value = int.tryParse(normalized, radix: 16);
     if (value == null) return fallback;
     return normalized.length <= 6 ? Color(0xFF000000 | value) : Color(value);
+  }
+}
+
+/// ---------------------------------------------------------------------------
+/// CHATY SEARCH FIELD
+/// Compact, quiet search input. Surface-only treatment (no borders), balanced
+/// leading icon, trailing clear affordance that only appears when there is
+/// text to clear.
+/// ---------------------------------------------------------------------------
+class ChatySearchField extends StatefulWidget {
+  final TextEditingController controller;
+  final FocusNode? focusNode;
+  final String hint;
+  final ValueChanged<String>? onChanged;
+  final Color? fillColor;
+  final Color? textColor;
+  final Color? hintColor;
+  final double fontScale;
+
+  const ChatySearchField({
+    super.key,
+    required this.controller,
+    this.focusNode,
+    this.hint = 'Search',
+    this.onChanged,
+    this.fillColor,
+    this.textColor,
+    this.hintColor,
+    this.fontScale = 1.0,
+  });
+
+  @override
+  State<ChatySearchField> createState() => _ChatySearchFieldState();
+}
+
+class _ChatySearchFieldState extends State<ChatySearchField> {
+  FocusNode? _internalFocus;
+  FocusNode? _attachedTo;
+  bool _focused = false;
+
+  FocusNode get _effective =>
+      widget.focusNode ?? (_internalFocus ??= FocusNode());
+
+  void _attach(FocusNode node) {
+    _attachedTo?.removeListener(_handleFocusChanged);
+    _attachedTo = node..addListener(_handleFocusChanged);
+    final has = node.hasFocus;
+    if (has != _focused && mounted) setState(() => _focused = has);
+  }
+
+  void _handleFocusChanged() {
+    final has = _attachedTo?.hasFocus ?? false;
+    if (has != _focused && mounted) setState(() => _focused = has);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _attach(_effective);
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant ChatySearchField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusNode != widget.focusNode) _attach(_effective);
+  }
+
+  @override
+  void dispose() {
+    _attachedTo?.removeListener(_handleFocusChanged);
+    _internalFocus?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final height = 44.0;
+    return AnimatedContainer(
+      duration: ChatyMotion.fast,
+      curve: ChatyMotion.enter,
+      height: height,
+      decoration: BoxDecoration(
+        color: widget.fillColor ?? colors.surfaceSecondary,
+        borderRadius: ChatyRadius.roundedFull,
+        border: Border.all(
+          color: _focused ? colors.primary : Colors.transparent,
+          width: 1.2,
+        ),
+      ),
+      child: TextField(
+        controller: widget.controller,
+        focusNode: _effective,
+        onChanged: widget.onChanged,
+        style: TextStyle(
+          color: widget.textColor ?? colors.foreground,
+          fontSize: 14 * widget.fontScale,
+        ),
+        onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: widget.hint,
+          hintStyle: TextStyle(
+            color: widget.hintColor ?? colors.foregroundSecondary,
+            fontSize: 13.5 * widget.fontScale,
+          ),
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            size: ChatyIconSize.sm,
+            color: widget.hintColor ?? colors.foregroundSecondary,
+          ),
+          suffixIcon: widget.controller.text.isEmpty
+              ? null
+              : IconButton(
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () {
+                    widget.controller.clear();
+                    widget.onChanged?.call('');
+                    if (mounted) setState(() {});
+                  },
+                  icon: Icon(
+                    Icons.close_rounded,
+                    size: ChatyIconSize.sm,
+                    color: colors.foregroundSecondary,
+                  ),
+                ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: ChatySpacing.md,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// ---------------------------------------------------------------------------
+/// CHATY SEGMENTED CONTROL
+/// Pill-track segmented control with an animated selection pill. Selection is
+/// obvious but restrained; motion respects the platform reduce-motion flag.
+/// ---------------------------------------------------------------------------
+class ChatySegmentedControl<T> extends StatelessWidget {
+  final List<T> options;
+  final T selected;
+  final String Function(T) label;
+  final ValueChanged<T> onSelected;
+
+  const ChatySegmentedControl({
+    super.key,
+    required this.options,
+    required this.selected,
+    required this.label,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final index = options.indexOf(selected);
+    return Container(
+      height: 36,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: colors.surfaceSecondary,
+        borderRadius: ChatyRadius.roundedFull,
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final segmentWidth =
+              (constraints.maxWidth - 6) / (options.isEmpty ? 1 : options.length);
+          return Stack(
+            children: [
+              if (index >= 0)
+                AnimatedAlign(
+                  duration: reduceMotion
+                      ? Duration.zero
+                      : ChatyMotion.standard,
+                  curve: ChatyMotion.enter,
+                  alignment: Alignment(
+                    -1 + 2 * ((index + 0.5) / options.length),
+                    0,
+                  ),
+                  child: Container(
+                    width: segmentWidth,
+                    decoration: BoxDecoration(
+                      color: colors.surface,
+                      borderRadius: ChatyRadius.roundedFull,
+                    ),
+                  ),
+                ),
+              Row(
+                children: [
+                  for (final option in options)
+                    Expanded(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {
+                          if (option == selected) return;
+                          ChatyMotion.selection();
+                          onSelected(option);
+                        },
+                        child: Center(
+                          child: Text(
+                            label(option),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: option == selected
+                                  ? colors.foreground
+                                  : colors.foregroundSecondary,
+                              fontSize: 13,
+                              fontWeight: option == selected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 }

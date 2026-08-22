@@ -1,10 +1,12 @@
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:uuid/uuid.dart';
+
+import '../../features/profile/image_editor_cropper_dialog.dart';
 
 /// Source of the media: device camera or the system gallery.
 enum ProfileMediaSource { camera, gallery }
@@ -32,19 +34,27 @@ class ProfileMediaService {
 
   Future<String> uploadAvatar({
     required ProfileMediaSource source,
+    BuildContext? context,
   }) => _pickCompressUpload(
     source: source,
     folder: 'avatars',
     square: 512,
     quality: 88,
+    isAvatar: true,
+    context: context,
   );
 
-  Future<String> uploadBanner({required ProfileMediaSource source}) =>
+  Future<String> uploadBanner({
+    required ProfileMediaSource source,
+    BuildContext? context,
+  }) =>
       _pickCompressUpload(
         source: source,
         folder: 'banners',
         square: 1280,
         quality: 85,
+        isAvatar: false,
+        context: context,
       );
 
   Future<String> _pickCompressUpload({
@@ -52,6 +62,8 @@ class ProfileMediaService {
     required String folder,
     required int square,
     required int quality,
+    required bool isAvatar,
+    BuildContext? context,
   }) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null || userId.isEmpty) {
@@ -62,16 +74,31 @@ class ProfileMediaService {
       source: source == ProfileMediaSource.camera
           ? ImageSource.camera
           : ImageSource.gallery,
-      maxWidth: square.toDouble() * 1.5,
-      maxHeight: square.toDouble() * 1.5,
-      imageQuality: 92,
+      maxWidth: square.toDouble() * 1.8,
+      maxHeight: square.toDouble() * 1.8,
+      imageQuality: 95,
     );
     if (picked == null) throw const _CancelledException();
-    final original = File(picked.path);
-    if (!await original.exists()) {
+    var workingFile = File(picked.path);
+    if (!await workingFile.exists()) {
       throw Exception('The selected image is no longer accessible.');
     }
-    final size = await original.length();
+
+    // Interactive Crop & Edit Dialog in temp storage
+    if (context != null && context.mounted) {
+      final cropped = await ImageEditorCropperDialog.open(
+        context,
+        imageFile: workingFile,
+        isAvatar: isAvatar,
+        title: isAvatar ? 'Crop Avatar Photo' : 'Crop Profile Banner',
+      );
+      if (cropped == null) {
+        throw const _CancelledException();
+      }
+      workingFile = cropped;
+    }
+
+    final size = await workingFile.length();
     if (size > maxBytesBeforeCompress) {
       throw Exception('Image is too large (max 6 MB before compression).');
     }
@@ -79,11 +106,11 @@ class ProfileMediaService {
     // Normalize to JPEG at the target size so avatars/banners stay small and
     // consistent regardless of the source format.
     final compressedPath =
-        '${original.parent.path}/'
+        '${workingFile.parent.path}/'
         'chaty_${folder}_'
         '${DateTime.now().millisecondsSinceEpoch}.jpg';
     final compressed = await FlutterImageCompress.compressAndGetFile(
-      original.path,
+      workingFile.path,
       compressedPath,
       format: CompressFormat.jpeg,
       quality: quality,
@@ -91,7 +118,7 @@ class ProfileMediaService {
       minHeight: square,
       keepExif: false,
     );
-    final file = compressed != null ? File(compressed.path) : original;
+    final file = compressed != null ? File(compressed.path) : workingFile;
     if (!await file.exists()) {
       throw Exception('Image processing failed. Try a different picture.');
     }
@@ -116,7 +143,9 @@ class ProfileMediaService {
       rethrow;
     } finally {
       try {
-        await original.delete();
+        if (await workingFile.exists()) {
+          await workingFile.delete();
+        }
         if (compressed != null && await File(compressed.path).exists()) {
           await File(compressed.path).delete();
         }

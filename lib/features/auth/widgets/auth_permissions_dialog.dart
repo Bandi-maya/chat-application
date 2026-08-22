@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../../../data/services/notification_service.dart';
-import '../../../../injection/locator.dart';
-import '../../../../ui/core/theme/app_theme.dart';
+import '../../../data/services/notification_service.dart';
+import '../../../injection/locator.dart';
+import '../../../ui/core/theme/app_theme.dart';
 
 class AuthPermissionsDialog extends StatefulWidget {
   const AuthPermissionsDialog({super.key});

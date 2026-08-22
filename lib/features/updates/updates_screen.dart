@@ -264,18 +264,45 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                           ),
                         ),
                       ),
-                      if (status.userId == widget.dataStore.currentUser.id)
+                      if (status.userId == widget.dataStore.currentUser.id) ...[
+                        // Real viewer list from status_view_events (owner RLS).
+                        ChatyIconButton(
+                          icon: Icons.remove_red_eye_outlined,
+                          tooltip: 'Viewed by',
+                          color: context.colors.accent,
+                          onPressed: () {
+                            showModalBottomSheet<void>(
+                              context: dialogContext,
+                              showDragHandle: true,
+                              builder: (_) => _StatusViewersSheet(
+                                statusId: status.id,
+                                statusService: _statusService,
+                              ),
+                            );
+                          },
+                        ),
                         ChatyIconButton(
                           icon: Icons.delete_outline_rounded,
                           tooltip: 'Delete status',
                           color: context.colors.error,
                           onPressed: () async {
-                            await _statusService.deleteStatus(status);
-                            if (dialogContext.mounted) {
-                              Navigator.of(dialogContext).pop();
+                            final confirmed = await ChatyConfirmDialog.show(
+                              dialogContext,
+                              title: 'Delete this update?',
+                              message:
+                                  'This update will be deleted for everyone and removed from your status.',
+                              confirmLabel: 'Delete',
+                              destructive: true,
+                            );
+                            if (confirmed == true) {
+                              await _statusService.deleteStatus(status);
+                              if (dialogContext.mounted) {
+                                Navigator.of(dialogContext).pop();
+                              }
                             }
                           },
                         ),
+                      ],
                     ],
                   ),
                 ),
@@ -683,6 +710,140 @@ class _ComposerAction extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Real "Viewed by" list for one of my statuses. Data comes exclusively
+/// from the owner-exposed rows of status_view_events — counts are never
+/// fabricated and hidden visits are filtered server-side by RLS.
+class _StatusViewersSheet extends StatefulWidget {
+  final String statusId;
+  final StatusService statusService;
+
+  const _StatusViewersSheet({
+    required this.statusId,
+    required this.statusService,
+  });
+
+  @override
+  State<_StatusViewersSheet> createState() => _StatusViewersSheetState();
+}
+
+class _StatusViewersSheetState extends State<_StatusViewersSheet> {
+  late final Future<List<StatusViewer>> _viewers;
+
+  @override
+  void initState() {
+    super.initState();
+    _viewers = widget.statusService.viewersFor(widget.statusId);
+  }
+
+  String _relativeTime(DateTime value) {
+    final diff = DateTime.now().difference(value);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.6,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(
+                'Viewed by',
+                style: TextStyle(
+                  color: colors.foreground,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            Flexible(
+              child: FutureBuilder<List<StatusViewer>>(
+                future: _viewers,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    );
+                  }
+                  final viewers = snapshot.data ?? const <StatusViewer>[];
+                  if (viewers.isEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                      child: Text(
+                        'No views yet.',
+                        style: TextStyle(
+                          color: colors.foregroundSecondary,
+                          fontSize: 13.5,
+                        ),
+                      ),
+                    );
+                  }
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.only(bottom: 16),
+                    itemCount: viewers.length,
+                    separatorBuilder: (_, _) =>
+                        Divider(color: colors.divider, height: 1, indent: 66),
+                    itemBuilder: (context, index) {
+                      final viewer = viewers[index];
+                      return ListTile(
+                        leading: AppAvatar(
+                          initials: viewer.avatarInitials,
+                          colorHex: viewer.avatarColorHex,
+                          size: 40,
+                        ),
+                        title: Text(
+                          viewer.displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: colors.foreground,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14.5,
+                          ),
+                        ),
+                        subtitle: Text(
+                          '@${viewer.username}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: colors.foregroundSecondary,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                        trailing: Text(
+                          _relativeTime(viewer.viewedAt),
+                          style: TextStyle(
+                            color: colors.foregroundTertiary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );

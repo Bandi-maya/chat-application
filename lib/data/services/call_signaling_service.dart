@@ -16,8 +16,8 @@ import 'backend_service.dart';
 /// - Call history persistence into backend data store
 class CallSignalingService extends ChangeNotifier {
   final SupabaseClient _client;
-  final MockDataStore _dataStore;
-  final ChatyBackendService _backend;
+  final MockDataStore dataStore;
+  final ChatyBackendService backend;
 
   ChatyCallSession? _currentSession;
   Timer? _ringTimeoutTimer;
@@ -28,11 +28,9 @@ class CallSignalingService extends ChangeNotifier {
 
   CallSignalingService({
     SupabaseClient? client,
-    required MockDataStore dataStore,
-    required ChatyBackendService backend,
-  }) : _client = client ?? Supabase.instance.client,
-       _dataStore = dataStore,
-       _backend = backend;
+    required this.dataStore,
+    required this.backend,
+  }) : _client = client ?? Supabase.instance.client;
 
   ChatyCallSession? get currentSession => _currentSession;
   int get callDurationSeconds => _callDurationSeconds;
@@ -41,6 +39,33 @@ class CallSignalingService extends ChangeNotifier {
       (_currentSession!.state == CallSessionState.connecting ||
           _currentSession!.state == CallSessionState.connected ||
           _currentSession!.state == CallSessionState.reconnecting);
+
+  /// Starts an isolated deterministic mock call session strictly for QA / UI testing.
+  /// This preview session is completely client-side and does not send signals to real users.
+  void startMockCallForQA({
+    String remoteDisplayName = 'Alex Rivera (QA Participant)',
+    String remoteAvatarInitials = 'AR',
+    String remoteAvatarColorHex = '0xFF6366F1',
+    bool isVideo = true,
+  }) {
+    if (!kDebugMode) return; // Isolated to debug / development only
+    _durationTimer?.cancel();
+    _currentSession = ChatyCallSession(
+      callId: 'qa_mock_call_${DateTime.now().millisecondsSinceEpoch}',
+      remoteUserId: 'qa_mock_user_1',
+      remoteDisplayName: remoteDisplayName,
+      remoteAvatarInitials: remoteAvatarInitials,
+      remoteAvatarColorHex: remoteAvatarColorHex,
+      isVideo: isVideo,
+      isOutgoing: false,
+      state: CallSessionState.connected,
+      startedAt: DateTime.now(),
+      connectedAt: DateTime.now(),
+      audioRoute: isVideo ? AudioRouteType.speaker : AudioRouteType.earpiece,
+    );
+    _startDurationTimer();
+    notifyListeners();
+  }
 
   /// Outgoing call initiator
   Future<void> initiateCall({
@@ -76,7 +101,7 @@ class CallSignalingService extends ChangeNotifier {
     await _sendSignal(remoteUserId, {
       'call_id': callId,
       'from': myId,
-      'from_name': _backend.currentUser?.displayName ?? 'Chaty User',
+      'from_name': backend.currentUser?.displayName ?? 'Chaty User',
       'is_video': isVideo,
       'type': 'invite',
     });
@@ -101,33 +126,28 @@ class CallSignalingService extends ChangeNotifier {
     required String callId,
     required String fromUserId,
     required String fromDisplayName,
-    String? avatarInitials,
-    String? avatarColorHex,
+    String? fromAvatarInitials,
+    String? fromAvatarColorHex,
     required bool isVideo,
   }) {
     // If already in a call, respond with busy
     if (_currentSession != null &&
         _currentSession!.state != CallSessionState.ended &&
         _currentSession!.state != CallSessionState.declined) {
-      unawaited(
-        _sendSignal(fromUserId, {
-          'call_id': callId,
-          'response': 'busy',
-          'type': 'response',
-        }),
-      );
+      _sendSignal(fromUserId, {
+        'call_id': callId,
+        'response': 'busy',
+        'type': 'response',
+      });
       return;
     }
-
-    final myId = _client.auth.currentUser?.id;
-    if (myId != null) _subscribeToChannel(myId);
 
     _currentSession = ChatyCallSession(
       callId: callId,
       remoteUserId: fromUserId,
       remoteDisplayName: fromDisplayName,
-      remoteAvatarInitials: avatarInitials,
-      remoteAvatarColorHex: avatarColorHex,
+      remoteAvatarInitials: fromAvatarInitials,
+      remoteAvatarColorHex: fromAvatarColorHex,
       isVideo: isVideo,
       isOutgoing: false,
       state: CallSessionState.incoming,
@@ -136,27 +156,23 @@ class CallSignalingService extends ChangeNotifier {
     );
     notifyListeners();
 
+    final myId = _client.auth.currentUser?.id;
+    if (myId != null) _subscribeToChannel(myId);
+
     _ringTimeoutTimer?.cancel();
     _ringTimeoutTimer = Timer(const Duration(seconds: 40), () {
-      if (_currentSession?.callId == callId &&
-          _currentSession?.state == CallSessionState.incoming) {
-        _logCallRecord(CallDirection.missed, 0);
-        _currentSession = _currentSession?.copyWith(
-          state: CallSessionState.missed,
-        );
-        notifyListeners();
+      if (_currentSession?.state == CallSessionState.incoming) {
+        endCall(reason: 'no_answer');
       }
     });
   }
 
-  /// Recipient accepts incoming call
+  /// Accept incoming call
   Future<void> acceptCall() async {
     final session = _currentSession;
-    if (session == null) return;
+    if (session == null || session.state != CallSessionState.incoming) return;
 
     _ringTimeoutTimer?.cancel();
-    _currentSession = session.copyWith(state: CallSessionState.connecting);
-    notifyListeners();
 
     await _sendSignal(session.remoteUserId, {
       'call_id': session.callId,
@@ -164,8 +180,7 @@ class CallSignalingService extends ChangeNotifier {
       'type': 'response',
     });
 
-    // Move to connected
-    _currentSession = _currentSession?.copyWith(
+    _currentSession = session.copyWith(
       state: CallSessionState.connected,
       connectedAt: DateTime.now(),
     );
@@ -173,19 +188,21 @@ class CallSignalingService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Recipient declines incoming call
+  /// Decline incoming call
   Future<void> declineCall() async {
     final session = _currentSession;
-    if (session == null) return;
+    if (session == null || session.state != CallSessionState.incoming) return;
 
     _ringTimeoutTimer?.cancel();
+
     await _sendSignal(session.remoteUserId, {
       'call_id': session.callId,
       'response': 'declined',
       'type': 'response',
     });
 
-    _logCallRecord(CallDirection.incoming, 0);
+    _logCallRecord(CallDirection.missed, 0);
+
     _currentSession = session.copyWith(
       state: CallSessionState.declined,
       endedAt: DateTime.now(),
@@ -296,7 +313,7 @@ class CallSignalingService extends ChangeNotifier {
     );
 
     // Save into repository
-    _dataStore.addCallRecord(record);
+    dataStore.addCallRecord(record);
   }
 
   void _subscribeToChannel(String userId) {
