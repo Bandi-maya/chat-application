@@ -59,57 +59,61 @@ void main() {
     test('Treats standard text as non-command', () {
       final regular = ChatCommandParser.parse('Hello /task inside sentence');
       expect(regular.isCommand, isFalse);
-      expect(regular.type, ChatCommandType.none);
+      expect(regular.type, ChatCommandType.unknown);
     });
   });
 
   group('Production Security Contract Tests', () {
     test('Conversations never claim E2EE by default', () {
+      final conversation = Conversation(
+        id: 'conversation-id',
+        type: ConversationType.direct,
+        title: 'Secure chat',
+        participantIds: const <String>['a', 'b'],
+        lastMessageText: '',
+        lastMessageTime: DateTime.utc(2026),
+        lastMessageSenderId: 'a',
+      );
+
       expect(
-        const Conversation(
-          id: 'conversation',
-          type: ConversationType.direct,
-          title: 'Conversation',
-          participantIds: <String>['me', 'peer'],
-          adminIds: <String>['me'],
-          lastMessageText: '',
-          lastMessageTime: null,
-          lastMessageSenderId: '',
-          encryptionStatus: EncryptionStatus.verificationNeeded,
-        ).encryptionStatus,
+        conversation.encryptionStatus,
         EncryptionStatus.verificationNeeded,
       );
     });
 
     test('Profiles do not fabricate cryptographic safety numbers', () {
       final profile = UserProfile(
-        id: 'user',
+        id: 'user-id',
         displayName: 'User',
-        username: 'user',
+        username: 'user_name',
         avatarInitials: 'US',
-        avatarColorHex: '0xFF000000',
+        avatarColorHex: '0xFF6366F1',
         about: '',
-        presence: PresenceState.offline,
-        lastSeenAt: DateTime.fromMillisecondsSinceEpoch(0),
-        isVerified: false,
-        email: 'user@example.com',
-        phone: '',
-        safetyNumber: '',
+        lastSeenAt: DateTime.utc(2026),
       );
+
       expect(profile.safetyNumber, isEmpty);
     });
 
     test('Realtime event bus publishes typed events', () async {
       final bus = RealtimeEventBus();
-      final future = bus.events.first;
-      bus.emit(
-        const RealtimeEvent(
+      final events = <RealtimeEvent>[];
+      final subscription = bus.events.listen(events.add);
+
+      bus.publish(
+        RealtimeEvent(
           type: RealtimeEventType.messageCreated,
-          entityId: 'message',
+          conversationId: 'conversation-id',
+          userId: 'user-id',
+          payload: const <String, dynamic>{'text': 'Hello world!'},
         ),
       );
-      expect((await future).type, RealtimeEventType.messageCreated);
-      await bus.dispose();
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(events, hasLength(1));
+      expect(events.single.type, RealtimeEventType.messageCreated);
+      expect(events.single.conversationId, 'conversation-id');
+      await subscription.cancel();
     });
   });
 }
