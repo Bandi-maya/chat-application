@@ -1,0 +1,69 @@
+name: Supabase Migration Reconciliation
+
+on:
+  push:
+    branches:
+      - production-hardening-2026-08-22
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch-production-history:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_REF: dntnxeanubswyswahdnj
+      SUPABASE_YES: 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Verify reconciliation credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${SUPABASE_ACCESS_TOKEN:-}" || { echo 'SUPABASE_ACCESS_TOKEN is required'; exit 1; }
+          test -n "${SUPABASE_DB_PASSWORD:-}" || { echo 'SUPABASE_DB_PASSWORD is required'; exit 1; }
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.111.0
+
+      - name: Initialize local Supabase config
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f supabase/config.toml ]; then
+            supabase init
+          fi
+          supabase --version
+
+      - name: Link production project read-only for history fetch
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase link --project-ref "$SUPABASE_PROJECT_REF"
+
+      - name: Fetch canonical migration history
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reconciliation
+          cp -a supabase/migrations reconciliation/repository-migrations-before-fetch
+          supabase migration fetch
+          supabase migration list | tee reconciliation/migration-list.txt
+          find supabase/migrations -maxdepth 1 -type f -name '*.sql' -printf '%f\n' | sort > reconciliation/fetched-filenames.txt
+          tar -czf reconciliation/canonical-migration-history.tgz supabase/migrations
+
+      - name: Upload canonical history
+        uses: actions/upload-artifact@v4
+        with:
+          name: Supabase-Canonical-Migration-History
+          path: reconciliation/
+          if-no-files-found: error
+          retention-days: 7
