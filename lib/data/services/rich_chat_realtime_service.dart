@@ -21,6 +21,15 @@ class ContactActivityState {
   });
 }
 
+/// Source-compatibility event for the legacy chat-detail caller only.
+/// Production call state is no longer transported through this service.
+class CallResponseEvent {
+  final String callId;
+  final String response;
+
+  const CallResponseEvent({required this.callId, required this.response});
+}
+
 class RichChatRealtimeService extends ChangeNotifier {
   RichChatRealtimeService({
     required ChatyPreferencesController preferencesController,
@@ -67,6 +76,23 @@ class RichChatRealtimeService extends ChangeNotifier {
   String? get _currentUserId => _client.auth.currentUser?.id;
 
   bool get isConnected => _channel != null;
+
+  /// Deprecated source-compatibility surface. It intentionally emits nothing:
+  /// call acceptance/decline is observed from CallSignalingService's
+  /// RLS-protected call_sessions subscription instead of broadcast events.
+  Stream<CallResponseEvent> get callResponses =>
+      const Stream<CallResponseEvent>.empty();
+
+  /// Deprecated source-compatibility surface. No network event is emitted.
+  /// The chat screen's CallSignalingService invocation is the sole call start.
+  Future<void> placeCall({
+    required String calleeId,
+    required String callId,
+    required bool isVideo,
+  }) async {}
+
+  /// Deprecated source-compatibility surface. No network event is emitted.
+  Future<void> cancelCall(String callId) async {}
 
   PresenceState presenceFor(String userId) =>
       _presenceByUserId[userId] ?? PresenceState.offline;
