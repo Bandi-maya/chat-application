@@ -13,6 +13,7 @@ import 'package:chat/data/services/message_automation_service.dart';
 import 'package:chat/data/services/push_token_service.dart';
 import 'package:chat/data/services/notification_channel_manager.dart';
 import 'package:chat/data/services/call_signaling_service.dart';
+import 'package:chat/data/services/call_lifecycle_coordinator.dart';
 import 'package:chat/features/camera/effects/effect_engine.dart';
 
 final GetIt locator = GetIt.instance;
@@ -49,6 +50,14 @@ void setupLocator() {
       backend: locator<ChatyBackendService>(),
     ),
   );
+  locator.registerLazySingleton<CallLifecycleCoordinator>(
+    () => CallLifecycleCoordinator(
+      callService: locator<CallSignalingService>(),
+    )..start(),
+  );
+  // Lifecycle policy must be active even before a call screen is opened so
+  // incoming/reconnecting calls cannot become stranded server sessions.
+  locator<CallLifecycleCoordinator>();
   locator.registerLazySingleton<EffectEngine>(
     () => EffectEngine(),
   );
