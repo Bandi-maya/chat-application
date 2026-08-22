@@ -141,12 +141,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   String _friendlyError(Object error) {
     final value = error.toString().replaceFirst('Exception: ', '');
-    if (value.contains('already registered'))
+    if (value.contains('already registered')) {
       return 'An account already exists for this email. Sign in instead.';
-    if (value.contains('already taken'))
+    }
+    if (value.contains('already taken')) {
       return 'That username was just taken. Choose one of the available suggestions.';
-    if (value.contains('rate limit'))
+    }
+    if (value.contains('rate limit')) {
       return 'Too many attempts. Wait a moment and try again.';
+    }
     return value;
   }
 
@@ -261,10 +264,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       validator: (value) {
                         final password = value ?? '';
-                        if (password.isEmpty)
+                        if (password.isEmpty) {
                           return 'Please enter your password';
-                        if (password.length < 8)
+                        }
+                        if (password.length < 8) {
                           return 'Password must be at least 8 characters';
+                        }
                         if (!RegExp(r'[A-Z]').hasMatch(password) ||
                             !RegExp(r'[a-z]').hasMatch(password) ||
                             !RegExp(r'[0-9]').hasMatch(password)) {
@@ -292,10 +297,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       isLoading: _isLoading,
                       theme: theme,
                     ),
-                    const SizedBox(height: 20),
-                    AuthOrDivider(theme: theme),
-                    const SizedBox(height: 20),
-                    AuthSocialRow(theme: theme),
                     const SizedBox(height: 28),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
