@@ -4,25 +4,25 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../domain/models/call_state.dart';
+import 'call_foreground_service.dart';
 import 'call_signaling_service.dart';
 
 /// Owns process/lifecycle policy around the WebRTC call controller.
 ///
 /// Signaling and media remain the responsibility of [CallSignalingService].
-/// This coordinator only decides what to do when the transport temporarily
-/// disconnects or the Flutter process is being detached.
-///
-/// A paused/hidden app does NOT end an active call here. Reliable long-running
-/// Android background calls require the dedicated foreground-service phase;
-/// until that is installed we keep the WebRTC transport alive and fail closed
-/// only when Flutter is actually detached.
+/// This coordinator decides how long reconnecting transports may survive,
+/// synchronizes Android foreground execution with the authoritative call
+/// state, and terminates stranded server/media state when Flutter detaches.
 class CallLifecycleCoordinator with WidgetsBindingObserver {
   CallLifecycleCoordinator({
     required CallSignalingService callService,
+    required ChatyCallForegroundService foregroundService,
     this.reconnectGracePeriod = const Duration(seconds: 15),
-  }) : _callService = callService;
+  }) : _callService = callService,
+       _foregroundService = foregroundService;
 
   final CallSignalingService _callService;
+  final ChatyCallForegroundService _foregroundService;
   final Duration reconnectGracePeriod;
 
   Timer? _reconnectTimer;
@@ -50,12 +50,15 @@ class CallLifecycleCoordinator with WidgetsBindingObserver {
     _started = true;
     WidgetsBinding.instance.addObserver(this);
     _callService.addListener(_handleCallStateChanged);
+    unawaited(_foregroundService.initialize());
     _handleCallStateChanged();
   }
 
   void _handleCallStateChanged() {
     if (_disposed) return;
     final session = _callService.currentSession;
+    unawaited(_foregroundService.sync(session));
+
     if (session != null && needsReconnectDeadline(session.state)) {
       _ensureReconnectDeadline();
       return;
@@ -98,12 +101,17 @@ class CallLifecycleCoordinator with WidgetsBindingObserver {
 
     _cancelReconnectDeadline();
     final session = _callService.currentSession;
-    if (session == null || isTerminalState(session.state)) return;
+    if (session == null || isTerminalState(session.state)) {
+      unawaited(_foregroundService.stop());
+      return;
+    }
 
-    // There is no UI/process left to own camera, microphone or the peer
-    // connection. Persist the terminal call state instead of leaving a
-    // ringing/connected row stranded on the server.
+    // There is no UI/main isolate left to own the WebRTC peer connection.
+    // Persist the terminal call state instead of leaving a ringing/connected
+    // row stranded. The foreground service is configured stopWithTask=true,
+    // so task removal cannot masquerade as a surviving call.
     unawaited(_callService.endCall(reason: 'app_detached'));
+    unawaited(_foregroundService.stop());
   }
 
   void dispose() {
@@ -114,6 +122,7 @@ class CallLifecycleCoordinator with WidgetsBindingObserver {
       WidgetsBinding.instance.removeObserver(this);
       _callService.removeListener(_handleCallStateChanged);
     }
+    unawaited(_foregroundService.stop());
     _started = false;
   }
 }
