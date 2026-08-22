@@ -19,6 +19,7 @@ class ChatMediaService {
        _preferences = preferences ?? locator<ChatyPreferencesController>();
 
   static const String bucket = 'chat-media';
+  static const int storageLimitMb = 50;
   final SupabaseClient _client;
   final ChatyPreferencesController _preferences;
   final Uuid _uuid = const Uuid();
@@ -122,7 +123,7 @@ class ChatMediaService {
     if (size > maxBytes) {
       final limitMb = (maxBytes / (1024 * 1024)).round();
       throw Exception(
-        'This $type exceeds your configured $limitMb MB media limit.',
+        'This $type exceeds the $limitMb MB storage limit.',
       );
     }
 
@@ -155,9 +156,16 @@ class ChatMediaService {
 
   int _maxBytes(String type) {
     final configured = type == 'audio'
-        ? _preferences.gbDouble('abo_saleh_audio_limit_check', fallback: 50)
-        : _preferences.gbDouble('Up_size_limit', fallback: 100);
-    return configured.clamp(1, 2048).round() * 1024 * 1024;
+        ? _preferences.gbDouble(
+            'abo_saleh_audio_limit_check',
+            fallback: storageLimitMb.toDouble(),
+          )
+        : _preferences.gbDouble(
+            'Up_size_limit',
+            fallback: storageLimitMb.toDouble(),
+          );
+    final effectiveMb = configured.clamp(1, storageLimitMb).round();
+    return effectiveMb * 1024 * 1024;
   }
 
   Future<String> createSignedUrl(
