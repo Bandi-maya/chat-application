@@ -58,6 +58,10 @@ class ChatyBackendService extends ChangeNotifier {
 
   RealtimeChannel? _realtimeChannel;
   Timer? _reconcileTimer;
+  final Set<String> _pendingMessageConversationIds = <String>{};
+  final Set<String> _pendingMemberConversationIds = <String>{};
+  bool _pendingConversationListRefresh = false;
+  bool _pendingTaskRefresh = false;
   bool _isInitialized = false;
   bool _isHydrating = false;
 
@@ -171,7 +175,6 @@ class ChatyBackendService extends ChangeNotifier {
         _currentUser = profile;
         _usersById[profile.id] = profile;
       } else {
-        // Fallback user profile if row is not populated yet
         final fallback = UserProfile(
           id: user.id,
           displayName: user.userMetadata?['display_name']?.toString() ??
@@ -212,12 +215,10 @@ class ChatyBackendService extends ChangeNotifier {
       _usersById[fallback.id] = fallback;
     }
 
-    // Announce this session through setPresence so Freeze Last Seen and the
-    // last-seen/online audience settings are honored here too
     unawaited(setPresence(PresenceState.online));
   }
 
-  Future<void> _loadConversations() async {
+  Future<void> _loadConversations({bool loadMembers = true}) async {
     try {
       final raw = await _client.rpc('get_my_conversations');
       final rows = _asRows(raw);
@@ -255,9 +256,15 @@ class ChatyBackendService extends ChangeNotifier {
       _conversationsById
         ..clear()
         ..addAll(next);
+      _messagesByChatId.removeWhere((id, _) => !next.containsKey(id));
 
-      await Future.wait<void>(next.keys.map(_loadConversationMembers));
-    } catch (_) {}
+      if (loadMembers) {
+        await Future.wait<void>(next.keys.map(_loadConversationMembers));
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Chaty conversation load failed: $error\n$stackTrace');
+      rethrow;
+    }
   }
 
   Future<void> _loadConversationMembers(String conversationId) async {
@@ -328,52 +335,170 @@ class ChatyBackendService extends ChangeNotifier {
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'messages',
-          callback: (_) => _scheduleReconciliation(),
+          callback: (payload) {
+            final row = payload.eventType == PostgresChangeEvent.delete
+                ? payload.oldRecord
+                : payload.newRecord;
+            _scheduleMessageReconciliation(Map<String, dynamic>.from(row));
+          },
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'conversation_members',
-          callback: (_) => _scheduleReconciliation(),
+          callback: (payload) {
+            final row = payload.eventType == PostgresChangeEvent.delete
+                ? payload.oldRecord
+                : payload.newRecord;
+            _scheduleMembershipReconciliation(Map<String, dynamic>.from(row));
+          },
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'message_reactions',
-          callback: (_) => _scheduleReconciliation(),
+          callback: (payload) {
+            final row = payload.eventType == PostgresChangeEvent.delete
+                ? payload.oldRecord
+                : payload.newRecord;
+            _scheduleMessageRelatedReconciliation(
+              Map<String, dynamic>.from(row),
+            );
+          },
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'message_receipts',
-          callback: (_) => _scheduleReconciliation(),
+          callback: (payload) {
+            final row = payload.eventType == PostgresChangeEvent.delete
+                ? payload.oldRecord
+                : payload.newRecord;
+            _scheduleMessageRelatedReconciliation(
+              Map<String, dynamic>.from(row),
+            );
+          },
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'tasks',
-          callback: (_) => _scheduleReconciliation(),
+          callback: (_) => _scheduleTaskReconciliation(),
         )
         .subscribe();
     _realtimeChannel = channel;
   }
 
-  void _scheduleReconciliation() {
+  void _scheduleMessageReconciliation(Map<String, dynamic> row) {
+    final conversationId = row['conversation_id']?.toString() ??
+        _conversationIdForLoadedMessage(row['id']?.toString() ?? '');
+    if (conversationId != null && conversationId.isNotEmpty) {
+      _pendingMessageConversationIds.add(conversationId);
+    }
+    _pendingConversationListRefresh = true;
+    _armRealtimeReconciliation();
+  }
+
+  void _scheduleMembershipReconciliation(Map<String, dynamic> row) {
+    final conversationId = row['conversation_id']?.toString() ?? '';
+    if (conversationId.isNotEmpty) {
+      _pendingMemberConversationIds.add(conversationId);
+      if (_messagesByChatId.containsKey(conversationId)) {
+        _pendingMessageConversationIds.add(conversationId);
+      }
+    }
+    _pendingConversationListRefresh = true;
+    _armRealtimeReconciliation();
+  }
+
+  void _scheduleMessageRelatedReconciliation(Map<String, dynamic> row) {
+    final messageId = row['message_id']?.toString() ?? '';
+    final conversationId = _conversationIdForLoadedMessage(messageId);
+    if (conversationId != null) {
+      _pendingMessageConversationIds.add(conversationId);
+      _armRealtimeReconciliation();
+    }
+  }
+
+  void _scheduleTaskReconciliation() {
+    _pendingTaskRefresh = true;
+    _armRealtimeReconciliation();
+  }
+
+  String? _conversationIdForLoadedMessage(String messageId) {
+    if (messageId.isEmpty) return null;
+    for (final entry in _messagesByChatId.entries) {
+      if (entry.value.any((message) => message.id == messageId)) {
+        return entry.key;
+      }
+    }
+    return null;
+  }
+
+  void _armRealtimeReconciliation() {
     _reconcileTimer?.cancel();
-    _reconcileTimer = Timer(const Duration(milliseconds: 120), () async {
+    _reconcileTimer = Timer(
+      const Duration(milliseconds: 120),
+      _flushRealtimeReconciliation,
+    );
+  }
+
+  Future<void> _flushRealtimeReconciliation() async {
+    final refreshConversationList = _pendingConversationListRefresh;
+    final refreshTasks = _pendingTaskRefresh;
+    final messageConversationIds = Set<String>.from(
+      _pendingMessageConversationIds,
+    );
+    final memberConversationIds = Set<String>.from(
+      _pendingMemberConversationIds,
+    );
+
+    _pendingConversationListRefresh = false;
+    _pendingTaskRefresh = false;
+    _pendingMessageConversationIds.clear();
+    _pendingMemberConversationIds.clear();
+
+    try {
+      if (refreshConversationList) {
+        await _loadConversations(loadMembers: false);
+      }
+      if (refreshTasks) {
+        await _loadTasks();
+      }
+      for (final conversationId in memberConversationIds) {
+        if (_conversationsById.containsKey(conversationId)) {
+          await _loadConversationMembers(conversationId);
+        }
+      }
+      for (final conversationId in messageConversationIds) {
+        if (_conversationsById.containsKey(conversationId) &&
+            _messagesByChatId.containsKey(conversationId)) {
+          await _loadMessages(conversationId);
+        }
+      }
+      notifyListeners();
+      eventBus.publish(
+        RealtimeEvent(type: RealtimeEventType.conversationUpdated),
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Chaty targeted realtime reconciliation failed: $error\n$stackTrace');
       try {
         await _hydrateAuthenticatedState();
-        eventBus.publish(
-          RealtimeEvent(type: RealtimeEventType.conversationUpdated),
+      } catch (fallbackError, fallbackStack) {
+        debugPrint(
+          'Chaty fallback realtime hydration failed: '
+          '$fallbackError\n$fallbackStack',
         );
-      } catch (error, stackTrace) {
-        debugPrint('Chaty realtime reconciliation failed: $error\n$stackTrace');
       }
-    });
+    }
   }
 
   Future<void> _removeRealtimeChannel() async {
     _reconcileTimer?.cancel();
+    _pendingConversationListRefresh = false;
+    _pendingTaskRefresh = false;
+    _pendingMessageConversationIds.clear();
+    _pendingMemberConversationIds.clear();
     final channel = _realtimeChannel;
     _realtimeChannel = null;
     if (channel != null) {
@@ -608,8 +733,6 @@ class ChatyBackendService extends ChangeNotifier {
         'reply_to_preview_text': replyToPreviewText,
       if (replyToSenderName != null) 'reply_to_sender_name': replyToSenderName,
       if (linkedTaskId != null) 'linked_task_id': linkedTaskId,
-      // Arbitrary caller extras (view_once / forwarded flags) persist to the
-      // server metadata JSON so recipients observe them via realtime sync.
       ...?extraMetadata,
       if (attachment != null)
         'attachment': <String, dynamic>{
@@ -635,7 +758,7 @@ class ChatyBackendService extends ChangeNotifier {
     final messageId = raw?.toString() ?? '';
     await Future.wait<void>(<Future<void>>[
       _loadMessages(conversationId),
-      _loadConversations(),
+      _loadConversations(loadMembers: false),
     ]);
     notifyListeners();
 
@@ -702,7 +825,7 @@ class ChatyBackendService extends ChangeNotifier {
     );
     await Future.wait<void>(<Future<void>>[
       _loadMessages(conversationId),
-      _loadConversations(),
+      _loadConversations(loadMembers: false),
     ]);
     notifyListeners();
   }
@@ -713,13 +836,10 @@ class ChatyBackendService extends ChangeNotifier {
         'mark_conversation_read',
         params: <String, dynamic>{'p_conversation_id': conversationId},
       );
-      await _loadConversations();
+      await _loadConversations(loadMembers: false);
       if (_messagesByChatId.containsKey(conversationId))
         await _loadMessages(conversationId);
     } else {
-      // Read receipts suppressed (privacy toggle off, ghost mode, or blue-ticks-
-      // after-reply not yet satisfied). Clear the local unread badge without
-      // broadcasting a read receipt to the sender.
       final current = _conversationsById[conversationId];
       if (current != null && current.unreadCount != 0) {
         _conversationsById[conversationId] = current.copyWith(unreadCount: 0);
@@ -728,10 +848,6 @@ class ChatyBackendService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Whether opening [conversationId] should broadcast a read receipt to the
-  /// sender. Honors the Read Receipts privacy toggle, Ghost Mode, and the
-  /// "send blue ticks only after I reply" option. Defaults to sending when the
-  /// preferences controller is not yet registered (fail-open to legacy behavior).
   bool _shouldSendReadReceipts(String conversationId) {
     if (!locator.isRegistered<ChatyPreferencesController>()) return true;
     final prefs = locator<ChatyPreferencesController>();
@@ -744,7 +860,7 @@ class ChatyBackendService extends ChangeNotifier {
           msgs != null &&
           msgs.isNotEmpty &&
           !msgs.any((m) => m.senderId == myId)) {
-        return false; // no outgoing message in this thread yet
+        return false;
       }
     }
     return true;
@@ -801,7 +917,7 @@ class ChatyBackendService extends ChangeNotifier {
         'p_value': value,
       },
     );
-    await _loadConversations();
+    await _loadConversations(loadMembers: false);
     notifyListeners();
   }
 
@@ -877,7 +993,7 @@ class ChatyBackendService extends ChangeNotifier {
     final id = raw?.toString() ?? '';
     await Future.wait<void>(<Future<void>>[
       _loadTasks(),
-      _loadConversations(),
+      _loadConversations(loadMembers: false),
       if (_messagesByChatId.containsKey(sourceConversationId))
         _loadMessages(sourceConversationId),
     ]);
@@ -885,9 +1001,6 @@ class ChatyBackendService extends ChangeNotifier {
     return _tasks.firstWhere((task) => task.id == id);
   }
 
-  /// Authoritative stage transition: persists first (RPC), then reloads the
-  /// authoritative task list. Throws on failure so callers can surface a
-  /// real error — the UI must never show a move that did not persist.
   Future<void> updateTaskStatus(String taskId, TaskStatus status) {
     return _updateTaskStatusAsync(taskId, status);
   }
@@ -901,7 +1014,6 @@ class ChatyBackendService extends ChangeNotifier {
       },
     );
     await _loadTasks();
-    await _refreshLoadedMessageTimelines();
     notifyListeners();
   }
 
@@ -911,9 +1023,6 @@ class ChatyBackendService extends ChangeNotifier {
       throw Exception('You can only update the signed-in profile.');
     }
     final privacy = _currentPrivacy();
-    // Profile edits must honor the presence privacy gates exactly like
-    // setPresence: publish the downgraded presence and only advance the
-    // last-seen timestamp when it is not frozen.
     final update = <String, dynamic>{
       'username': ChatyValidators.normalizeUsername(updated.username),
       'display_name': updated.displayName.trim(),
@@ -921,8 +1030,6 @@ class ChatyBackendService extends ChangeNotifier {
       'phone': updated.phone.trim(),
       'avatar_initials': updated.avatarInitials,
       'avatar_color_hex': updated.avatarColorHex,
-      // Media URLs are owned by ProfileMediaService uploads; write them back
-      // verbatim so every device converges on the same object.
       if (updated.avatarUrl != null) 'avatar_url': updated.avatarUrl,
       if (updated.bannerUrl != null) 'banner_url': updated.bannerUrl,
       'presence': _presenceToDatabase(
@@ -946,24 +1053,17 @@ class ChatyBackendService extends ChangeNotifier {
         _effectivePublishedPresence(presence, privacy),
       ),
     };
-    // "Freeze Last Seen" means the timestamp contacts read must stop moving, so
-    // we only advance last_seen_at when the user has NOT frozen it.
     if (privacy == null || !privacy.freezeLastSeen) {
       update['last_seen_at'] = DateTime.now().toUtc().toIso8601String();
     }
     await _client.from('profiles').update(update).eq('id', authUser.id);
   }
 
-  /// Current privacy preferences, or null when the controller is not yet
-  /// registered (fail-open to legacy behavior during early startup).
   PrivacyPreferences? _currentPrivacy() {
     if (!locator.isRegistered<ChatyPreferencesController>()) return null;
     return locator<ChatyPreferencesController>().privacy;
   }
 
-  /// When the user hides their online status from everyone (last-seen audience
-  /// "Nobody" with online mirroring it), we must not broadcast an "online"
-  /// presence at all — downgrade it to offline before publishing.
   PresenceState _effectivePublishedPresence(
     PresenceState presence,
     PrivacyPreferences? privacy,
@@ -973,8 +1073,7 @@ class ChatyBackendService extends ChangeNotifier {
         privacy.hideLastSeenAudience == 'Nobody' &&
         privacy.hideOnlineAudience == 'Same as Last Seen';
     if (onlineHiddenFromAll &&
-        (presence == PresenceState.online ||
-            presence == PresenceState.typing)) {
+        (presence == PresenceState.online || presence == PresenceState.typing)) {
       return PresenceState.offline;
     }
     return presence;
@@ -1256,10 +1355,6 @@ class ChatyBackendService extends ChangeNotifier {
     }
   }
 
-  /// Bijective status mapping. The previous reader folded 'assigned' and
-  /// 'blocked' into inbox, which snapped In Review / Testing tasks back to
-  /// Todo on every reload — the reported kanban bug.
-  /// Public for workflow regression tests.
   static TaskStatus taskStatusFromDatabase(String? value) {
     switch (value) {
       case 'assigned':
@@ -1279,12 +1374,6 @@ class ChatyBackendService extends ChangeNotifier {
     }
   }
 
-  /// Public for workflow regression tests. Bijective inverse of
-  /// [taskStatusFromDatabase]. The DB check constraint
-  /// permits exactly inbox/assigned/in_progress/blocked/completed/archived
-  /// ('cancelled' is the stored archived state). The previous writer mapped
-  /// assigned→'todo' and blocked→'in_progress', colliding stages and raising
-  /// Postgres 23514 for Todo writes.
   static String taskStatusToDatabase(TaskStatus value) {
     switch (value) {
       case TaskStatus.inProgress:
