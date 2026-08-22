@@ -1,39 +1,43 @@
 # Chaty Supabase Migration Reconciliation
 
-## Purpose
+## Status
 
-The production Supabase project predates the current repository migration layout. The live ledger contains timestamped migrations from 2026-08-19 and 2026-08-20, while the repository contains several consolidated equivalents under later repository-local version names.
+**Reconciled on 2026-08-22.** The deployable repository chain now contains the same 45 migration versions and names recorded in the production Supabase migration ledger, from `20260819064501_chaty_core` through `20260822131153_e2ee_protocol_suite_invariant`.
 
-This is intentional historical drift, not permission to copy the live ledger into `supabase/migrations/` unchanged. Doing that would cause overlapping DDL and function/policy definitions to execute twice on a fresh project.
+The earlier repository-local consolidated versions were removed from the deployable migration directory. They remain recoverable from Git history only and must not be reintroduced.
 
 ## Production source of truth
 
-The production migration ledger is stored by Supabase in `supabase_migrations.schema_migrations` with these fields:
+Supabase records applied migrations in `supabase_migrations.schema_migrations`. During reconciliation the retained `statements[1]` SQL for every production migration was exported through a temporary repository-scoped GitHub OIDC path. The privileged temporary database export function was dropped immediately after synchronization and the temporary Edge Function was retired to a JWT-protected `410 Gone` response.
 
-- `version`
-- `name`
-- `statements[]`
-- `rollback[]`
-- `created_by`
-- `idempotency_key`
+The repository now pins the normalized production SQL with:
 
-The `statements[]` column retains the exact SQL submitted for each live migration and is the authoritative historical record.
+- `supabase/migrations/*.sql` — the 45 deployable timestamped migrations.
+- `supabase/MIGRATION_MANIFEST.sha256` — production-derived SHA-256 checksums for every migration file.
+- `tools/check_migration_versions.sh` — fails unless exactly 45 unique 14-digit versions exist and every checksum matches.
+- `tools/verify_supabase_schema.sql` — verifies critical schema, RLS, Storage, Realtime, call and E2EE invariants after replay.
+- `.github/workflows/supabase-migration-reconciliation.yml` — performs checksum verification and a clean local Supabase replay on every hardening-branch push and pull request to `main`.
 
-## Repository rule
+## Clean replay proof
 
-`supabase/migrations/` is the deployable migration chain. Do not add an historical migration to that directory merely because its production version is absent from Git. First prove that its DDL is not already represented by a consolidated repository migration.
+The GitHub reconciliation workflow starts an empty local Supabase stack, runs `supabase db reset --local`, and then executes the invariant verification SQL. The first canonical-history replay completed successfully on 2026-08-22:
 
-The current known overlaps include production migrations for task-status repair, rich-chat presence/privacy, profile visibility, call gating, call RPC hardening and the 2026-08-22 production-hardening migrations. Their logic is represented by repository migrations with repository-local numbering.
+- canonical migration checksum validation: PASS
+- local Supabase startup: PASS
+- all 45 migrations replayed from zero: PASS
+- required public schema/RLS checks: PASS
+- private `chat-media` / `status-media` bucket checks: PASS
+- critical Realtime publication checks: PASS
+- call and E2EE schema/RPC invariants: PASS
+- legacy password-taking login resolver remains unavailable to client roles: PASS
 
-## Reconciliation procedure
+## Rules going forward
 
-1. Export the production ledger with `tools/export_supabase_migration_history.sql`.
-2. Compare each production migration statement against the deployable repository chain by affected object: table, column, function signature, trigger, policy, index, bucket or storage policy.
-3. Classify each production migration as `equivalent`, `superseded`, or `missing`.
-4. Only migrations classified `missing` may be added to the deployable chain. Make those additions idempotent and verify ordering against every existing migration.
-5. Do not rename an already-applied production migration and do not alter the production migration ledger manually.
-6. Before declaring migration reproducibility complete, apply the repository chain to a clean disposable Supabase database/branch and run schema/RLS/security tests against it.
+1. Never edit a migration already represented in `supabase/MIGRATION_MANIFEST.sha256`.
+2. New migrations must use a unique 14-digit UTC-style timestamp and must be applied through the normal migration workflow rather than directly modifying production.
+3. When a new migration is intentionally applied to production, update the checksum manifest in the same reviewed change.
+4. `supabase db reset --local` and `tools/verify_supabase_schema.sql` must remain green before release.
+5. Never use `migration repair` merely to hide repository/remote divergence. It changes migration bookkeeping, not schema state.
+6. Do not seed production data through migration reconciliation.
 
-## Release gate
-
-Migration reconciliation is complete only when a clean database created from the repository migration chain reaches the same required application schema, RLS policy set, RPC signatures, storage policies and E2EE/call invariants as production. A production project merely being healthy is not sufficient proof.
+Migration-history drift is no longer an accepted release exception.
