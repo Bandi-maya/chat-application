@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../injection/locator.dart';
 import '../../ui/core/theme/app_theme.dart';
+import '../../ui/core/validators/input_validators.dart';
 import 'login_screen.dart';
 import 'widgets/auth_components.dart';
 
@@ -104,7 +105,7 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Create a new unique password.',
+                      'Use at least 12 characters with uppercase, lowercase, a number, and a symbol.',
                       style: TextStyle(
                         color: theme.secondaryTextColor,
                         fontSize: 14,
@@ -113,7 +114,7 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
                     const SizedBox(height: 36),
                     AuthTextField(
                       label: 'Password',
-                      hintText: 'Enter password',
+                      hintText: 'Enter a strong password',
                       controller: _passwordController,
                       obscureText: _obscurePassword,
                       theme: theme,
@@ -131,18 +132,7 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
                           () => _obscurePassword = !_obscurePassword,
                         ),
                       ),
-                      validator: (value) {
-                        final password = value ?? '';
-                        if (password.length < 8) {
-                          return 'Password must be at least 8 characters';
-                        }
-                        if (!RegExp(r'[A-Z]').hasMatch(password) ||
-                            !RegExp(r'[a-z]').hasMatch(password) ||
-                            !RegExp(r'[0-9]').hasMatch(password)) {
-                          return 'Use upper/lowercase letters and a number';
-                        }
-                        return null;
-                      },
+                      validator: ChatyValidators.validatePassword,
                     ),
                     const SizedBox(height: 20),
                     AuthTextField(
@@ -165,9 +155,15 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
                         onPressed: () =>
                             setState(() => _obscureConfirm = !_obscureConfirm),
                       ),
-                      validator: (value) => value == null || value.isEmpty
-                          ? 'Please confirm your password'
-                          : null,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please confirm your password';
+                        }
+                        if (value != _passwordController.text) {
+                          return 'Passwords do not match';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 24),
                     if (_errorMessage != null)
