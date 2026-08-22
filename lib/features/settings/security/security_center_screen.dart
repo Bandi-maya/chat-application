@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../../data/repositories/mock_data_store.dart';
 import '../../../data/services/local_lock_service.dart';
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/settings_primitives.dart';
 import '../../../ui/core/theme/app_theme.dart';
+import '../../chats/locked_chats_screen.dart';
 import 'app_lock_overlay.dart';
 import 'lock_credential_setup_modal.dart';
 
@@ -332,28 +334,66 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
           ],
         ),
         ChatySettingsSection(
-          title: 'Chat Lock',
+          title: 'Chat Lock & Hidden Chats',
           description:
-              'Locked conversations require the same verified local authentication before their messages open.',
+              'Locked and hidden conversations require verified local authentication. Hidden chats do not appear in normal chat lists or searches.',
           children: [
             ChatySettingsTile(
-              icon: Icons.chat_bubble_outline_rounded,
+              icon: Icons.lock_outline_rounded,
               iconColor: colors.accent,
-              title: 'Locked Chats',
+              title: 'Open Locked & Hidden Chats',
               subtitle: lockedChats == 0
-                  ? 'No chats locked • Long-press a chat and use the lock action'
-                  : '$lockedChats chat${lockedChats == 1 ? '' : 's'} currently protected',
+                  ? 'No chats protected • Tap to manage vault'
+                  : '$lockedChats conversation${lockedChats == 1 ? '' : 's'} in secure vault',
               badgeText: '$lockedChats',
               badgeColor: lockedChats > 0
                   ? colors.accent
                   : colors.foregroundSecondary,
-              onTap: null,
+              onTap: () => LockedChatsScreen.open(
+                context,
+                dataStore: locator<MockDataStore>(),
+                preferencesController: widget.preferencesController,
+                themeController: locator<ThemeController>(),
+              ),
+            ),
+            ChatySwitchTile(
+              icon: Icons.touch_app_rounded,
+              title: 'Unlock via Chaty Title Tap',
+              subtitle: 'Tap the main screen Chaty header to authenticate and open locked chats',
+              value: security.entryByAppTitle,
+              onChanged: (value) =>
+                  widget.preferencesController.updateSecurity(
+                    security.copyWith(entryByAppTitle: value),
+                    logTitle: 'Title tap vault entry',
+                  ),
+            ),
+            ChatySwitchTile(
+              icon: Icons.key_rounded,
+              title: 'Secret Code Search Discovery',
+              subtitle: 'Reveal hidden locked chats only when typing your secret word or emoji in search',
+              value: security.entryBySecretPhrase,
+              onChanged: (value) =>
+                  widget.preferencesController.updateSecurity(
+                    security.copyWith(entryBySecretPhrase: value),
+                    logTitle: 'Secret search phrase entry',
+                  ),
+            ),
+            ChatySwitchTile(
+              icon: Icons.screenshot_rounded,
+              title: 'Protect Screen & App Previews',
+              subtitle: 'Blank out app thumbnail in multi-tasking view and block screenshots on supported devices',
+              value: security.protectFromScreenshots,
+              onChanged: (value) =>
+                  widget.preferencesController.updateSecurity(
+                    security.copyWith(protectFromScreenshots: value),
+                    logTitle: 'Screen & preview security',
+                  ),
             ),
             ChatySettingsTile(
               icon: Icons.verified_user_outlined,
-              title: 'Chat Lock Authentication',
+              title: 'Lock Authentication Method',
               subtitle:
-                  'Uses ${security.lockMethod}. Chat Lock works even when full App Lock is disabled.',
+                  'Uses ${security.lockMethod}. Chat Lock protects specific chats even if full App Lock is off.',
               onTap: () async {
                 final configured = await _hasConfiguredMethod(
                   security.lockMethod,

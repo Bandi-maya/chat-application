@@ -581,7 +581,9 @@ class RichChatRealtimeService extends ChangeNotifier {
     if (_backend.getUserById(userId) == null) return; // not a known contact
     final name = row['display_name']?.toString() ?? '';
     final about = row['about']?.toString() ?? row['bio']?.toString() ?? '';
-    final fingerprint = '$name|$about';
+    final avatar = row['avatar_url']?.toString() ?? '';
+    final banner = row['banner_url']?.toString() ?? '';
+    final fingerprint = '$name|$about|$avatar|$banner';
     final previous = _profileFingerprints[userId];
     _profileFingerprints[userId] = fingerprint;
     if (previous == null || previous == fingerprint) return;

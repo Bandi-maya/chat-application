@@ -114,6 +114,26 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
   Widget build(BuildContext context) {
     final notification = _visible;
     final theme = Theme.of(context);
+    // Toast appearance is fully setting-driven and dimension-adaptive: the
+    // row hugs its content (no fixed width), height follows the avatar size,
+    // padding scales with accessibility text scale, and the max width never
+    // exceeds the screen.
+    final prefs = widget.preferencesController;
+    final avatarSize = prefs
+        .gbDouble('toast_avatar_size', fallback: 40)
+        .clamp(24.0, 56.0);
+    final cornerRadius = prefs
+        .gbDouble('toast_corner_radius', fallback: 18)
+        .clamp(4.0, 32.0);
+    final elevation = prefs.gbDouble('toast_elevation', fallback: 10)
+        .clamp(0.0, 24.0);
+    final backgroundOverride = prefs.gbColor('event_toast_bg');
+    final horizontalPad =
+        (12 * MediaQuery.textScalerOf(context).scale(1.0)).clamp(10.0, 20.0);
+    final maxWidth = (MediaQuery.sizeOf(context).width * 0.9).clamp(
+      260.0,
+      430.0,
+    );
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -138,19 +158,22 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
                     : Padding(
                         padding: _padding(context),
                         child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 430),
+                          constraints: BoxConstraints(maxWidth: maxWidth),
                           child: Material(
-                            elevation: 10,
-                            color: context.colors.surface,
+                            elevation: elevation,
+                            color:
+                                backgroundOverride ?? context.colors.surface,
                             shadowColor: context.colors.shadow,
-                            borderRadius: BorderRadius.circular(18),
+                            borderRadius: BorderRadius.circular(cornerRadius),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
+                              padding: EdgeInsets.symmetric(
+                                horizontal: horizontalPad,
                                 vertical: 11,
                               ),
                               decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(18),
+                                borderRadius: BorderRadius.circular(
+                                  cornerRadius,
+                                ),
                                 border: Border.all(
                                   color: context.colors.borderSubtle,
                                 ),
@@ -164,7 +187,7 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
                                           .showSenderAvatar &&
                                       notification.avatarInitials != null) ...[
                                     CircleAvatar(
-                                      radius: 20,
+                                      radius: avatarSize / 2,
                                       backgroundColor: _avatarColor(
                                         notification,
                                       ),
@@ -179,8 +202,8 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
                                     ),
                                   ] else
                                     Container(
-                                      width: 40,
-                                      height: 40,
+                                      width: avatarSize,
+                                      height: avatarSize,
                                       decoration: BoxDecoration(
                                         color: notification.color.withValues(
                                           alpha: 0.14,

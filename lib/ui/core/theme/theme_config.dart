@@ -108,6 +108,7 @@ class ThemeConfig {
     double? cornerRadius,
     double? density,
     double? fontScale,
+      bool? highContrast,
     AppNavigationMode? navigationMode,
     UILayoutMode? layoutMode,
     AppBubbleStyle? bubbleStyle,
@@ -115,7 +116,6 @@ class ThemeConfig {
     double? bubbleRadius,
     String? wallpaperId,
     double? animationLevel,
-    bool? highContrast,
   }) {
     return ThemeConfig(
       id: id ?? this.id,
@@ -137,6 +137,7 @@ class ThemeConfig {
       cornerRadius: cornerRadius ?? this.cornerRadius,
       density: density ?? this.density,
       fontScale: fontScale ?? this.fontScale,
+      highContrast: highContrast ?? this.highContrast,
       navigationMode: navigationMode ?? this.navigationMode,
       layoutMode: layoutMode ?? this.layoutMode,
       bubbleStyle: bubbleStyle ?? this.bubbleStyle,
@@ -144,7 +145,7 @@ class ThemeConfig {
       bubbleRadius: bubbleRadius ?? this.bubbleRadius,
       wallpaperId: wallpaperId ?? this.wallpaperId,
       animationLevel: animationLevel ?? this.animationLevel,
-      highContrast: highContrast ?? this.highContrast,
+      
     );
   }
 
@@ -554,14 +555,14 @@ class ThemeConfig {
     'cornerRadius': cornerRadius,
     'density': density,
     'fontScale': fontScale,
+        'highContrast': highContrast,
     'navigationMode': navigationMode.name,
     'layoutMode': layoutMode.name,
     'bubbleStyle': bubbleStyle.name,
     'tickStyle': tickStyle,
     'bubbleRadius': bubbleRadius,
     'wallpaperId': wallpaperId,
-    'animationLevel': animationLevel,
-    'highContrast': highContrast,
+    'animationLevel': animationLevel
   };
 
   factory ThemeConfig.fromMap(Map<String, dynamic> map) {
@@ -609,6 +610,7 @@ class ThemeConfig {
       cornerRadius: _double(map['cornerRadius'], 16.0),
       density: _double(map['density'], 1.0),
       fontScale: _double(map['fontScale'], 1.0),
+      highContrast: map['highContrast'] == true,
       navigationMode: _enumByName(
         AppNavigationMode.values,
         map['navigationMode'],
@@ -633,7 +635,6 @@ class ThemeConfig {
           ? map['wallpaperId'] as String
           : 'subtle_dots',
       animationLevel: _double(map['animationLevel'], 1.0).clamp(0.0, 1.0),
-      highContrast: map['highContrast'] == true,
     );
   }
 

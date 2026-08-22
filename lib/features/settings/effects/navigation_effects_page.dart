@@ -13,16 +13,6 @@ class NavigationEffectsPage extends StatefulWidget {
 }
 
 class _NavigationEffectsPageState extends State<NavigationEffectsPage> {
-  static const List<String> _pageTransitions = [
-    'Fade Through',
-    'Fade',
-    'Slide',
-    'Grow',
-    'Scale',
-    'Shared Axis',
-    'Cupertino',
-    'None',
-  ];
 
   static const List<String> _clickSymbols = ['✨', '❤️', '🔥', '⚡', '⭐', '🌸'];
 
@@ -50,7 +40,7 @@ class _NavigationEffectsPageState extends State<NavigationEffectsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Transition: ${fx.pageTransitionStyle} • Click Particles: ${fx.enableClickParticles ? "${fx.clickParticleSymbol} Active" : "Off"} • Falling: ${fx.enableFallingParticles ? "${fx.fallingParticleObject} Active" : "Off"}',
+                'Click Particles: ${fx.enableClickParticles ? "${fx.clickParticleSymbol} Active" : "Off"} • Falling: ${fx.enableFallingParticles ? "${fx.fallingParticleObject} Active" : "Off"}',
                 style: TextStyle(
                   fontSize: 12,
                   color: Theme.of(context).textTheme.bodySmall?.color,
@@ -91,7 +81,9 @@ class _NavigationEffectsPageState extends State<NavigationEffectsPage> {
                               ),
                             ),
                             Text(
-                              'Transition: ${fx.pageTransitionStyle}',
+                              fx.enableClickParticles
+                                  ? 'Particles spawn on user interaction'
+                                  : 'Tap anywhere to spawn particle effects',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Theme.of(
@@ -115,27 +107,6 @@ class _NavigationEffectsPageState extends State<NavigationEffectsPage> {
               ),
             ],
           ),
-        ),
-
-        // Page Transitions
-        ChatySettingsSection(
-          title: 'Page Transitions',
-          description:
-              'Custom route animation style applied across Chaty navigation.',
-          children: [
-            ChatyChoiceTile<String>(
-              title: 'Route Transition Style',
-              options: _pageTransitions,
-              selectedOption: fx.pageTransitionStyle,
-              optionLabel: (s) => s,
-              onSelected: (style) {
-                widget.preferencesController.updateEffects(
-                  fx.copyWith(pageTransitionStyle: style),
-                  logTitle: 'Page Transition',
-                );
-              },
-            ),
-          ],
         ),
 
         // Interactive Click Particles

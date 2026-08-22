@@ -438,7 +438,7 @@ class MockDataStore extends ChangeNotifier {
     );
   }
 
-  void updateTaskStatus(String taskId, TaskStatus status) =>
+  Future<void> updateTaskStatus(String taskId, TaskStatus status) =>
       _backend.updateTaskStatus(taskId, status);
 
   void addStory(String content) => _backend.addStory(content);

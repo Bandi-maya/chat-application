@@ -14,6 +14,11 @@ class UserProfile {
   final String phone;
   final String safetyNumber;
 
+  /// Remote photo/banner URLs (public profile-media objects); null when the
+  /// user has not uploaded media yet.
+  final String? avatarUrl;
+  final String? bannerUrl;
+
   const UserProfile({
     required this.id,
     required this.displayName,
@@ -28,6 +33,8 @@ class UserProfile {
     this.phone = '',
     // Populated only when real device-to-device verification exists.
     this.safetyNumber = '',
+    this.avatarUrl,
+    this.bannerUrl,
   });
 
   UserProfile copyWith({
@@ -43,6 +50,8 @@ class UserProfile {
     String? email,
     String? phone,
     String? safetyNumber,
+    String? avatarUrl,
+    String? bannerUrl,
   }) {
     return UserProfile(
       id: id ?? this.id,
@@ -57,6 +66,8 @@ class UserProfile {
       email: email ?? this.email,
       phone: phone ?? this.phone,
       safetyNumber: safetyNumber ?? this.safetyNumber,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      bannerUrl: bannerUrl ?? this.bannerUrl,
     );
   }
 }

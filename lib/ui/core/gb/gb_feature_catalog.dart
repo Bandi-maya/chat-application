@@ -28,23 +28,21 @@ class GbFeatureCatalog {
 
   static const Map<String, String> _categoryKeys = <String, String>{
     'Navigation & touch effects':
-        'key_pager_animation,key_chats_listanimation,key_chat_animation,tap_effect_enabled,tap_emoji,fall_effect_enabled,fall_emoji',
+        'tap_effect_enabled,tap_emoji,fall_effect_enabled,fall_emoji',
     'Chat list rows':
         'ModConTextColor,ModContactNameColor,HomeCounterBK,HomeCounterText,ModOnlineColor,ModlastseenColor,key_mas_hide_archive_home,onlinechat,onlineDotchat,onlineDotchatColor',
     'Presence & activity alerts':
         'abu_saleh_toast_online,abu_saleh_toast_online_bc,abu_saleh_toast_online_tc,abu_saleh_toast_status,abu_saleh_toast_status_bc,abu_saleh_toast_status_tc,abu_saleh_toast_profile,abu_saleh_toast_profile_bc,abu_saleh_toast_profile_tc,abu_saleh_toast_typing,abu_saleh_toast_typing_bc,abu_saleh_toast_typing_tc',
     'Home header':
-        'ui_home_styleV3,home_stories_key,home_stories_style,enable_grp_separationV2,my_name,yo_multi_account_menu,yo_want_ghostmode,yo_want_toolbar_cam,yo_want_airplanemode,ModConColor,tabindicator',
+        'ui_home_styleV3,home_stories_key,home_stories_style,enable_grp_separationV2,my_name,yo_want_ghostmode,yo_want_toolbar_cam,yo_want_airplanemode,ModConColor,tabindicator',
     'Privacy':
-        'yoHideSeen,anti_vw_once,yoDisableFwd,yoCallsPrivacy,Saleh_HidePrivacy,Saleh_HideCUpdates,abu_saleh_channels,yoHideStatViewV2,yoAntiRevokeStatus,AntiRevokeStatusNotif,disappearing_message_key,yoAntiRevoke,AntiRevokeMsgNotif,yoBlueOnReply',
+        'yoHideSeen,anti_vw_once,yoDisableFwd,yoCallsPrivacy,Saleh_HidePrivacy,yoHideStatViewV2,yoAntiRevokeStatus,AntiRevokeStatusNotif,yoAntiRevoke,AntiRevokeMsgNotif,yoBlueOnReply',
     'Status & stories':
         'home_stories_key,home_stories_style,abu9aleh_status_audio',
     'Chat bubbles & ticks':
         'tick_style,bubble_style,text_size_pick,ConvoBack,ModChatRightBubble,ModChatBubbleText,date_right_color,ModChatLeftBubble,ModChatBubbleTextLeft,date_left_color',
-    'Conversation behavior': 'inconvo_trans_option',
     'Universal behavior':
-        'inconvo_trans_option,trans_def_to,Pop_Heds,always_online,Img_highres_seek',
-    'Conversation colors': 'ModChatBubbleHyperlinks',
+        'Pop_Heds,always_online,Img_highres_seek',
     'Calls appearance':
         'ModCallsBackground,ModCallsTextColor,ModCallsIconColors',
     'Conversation header':
@@ -74,13 +72,6 @@ class GbFeatureCatalog {
       'Compact',
       'Minimal',
     ],
-    'key_status_ui': <String>[
-      'Classic',
-      'Instagram',
-      'Cards',
-      'Minimal',
-      'Compact',
-    ],
     'tick_style': <String>['Default', 'Double check', 'iOS', 'Minimal', 'Neon'],
     'bubble_style': <String>[
       'Rounded',
@@ -102,63 +93,9 @@ class GbFeatureCatalog {
       'German',
       'Arabic',
     ],
-    'inconvo_trans_option': <String>[
-      'Off',
-      'Inline',
-      'Action menu',
-      'Auto-detect',
-    ],
-    'trans_def_to': <String>[
-      'System',
-      'English',
-      'Hindi',
-      'Telugu',
-      'Tamil',
-      'Spanish',
-      'French',
-      'German',
-      'Arabic',
-    ],
     'abu_saleh_quickcontact': <String>['Off', 'Left', 'Right', 'Floating'],
-    'key_pager_animation': <String>[
-      'None',
-      'Fade',
-      'Slide',
-      'Scale',
-      'Shared axis',
-      'Flip',
-    ],
-    'key_chats_listanimation': <String>[
-      'None',
-      'Fade',
-      'Slide',
-      'Scale',
-      'Stagger',
-    ],
-    'key_chat_animation': <String>[
-      'None',
-      'Fade',
-      'Slide',
-      'Scale',
-      'Shared axis',
-    ],
-    'font': <String>[
-      'System',
-      'Compact',
-      'Rounded',
-      'Serif',
-      'Mono',
-      'Display',
-    ],
     'MasOption': <String>['Default', 'Compact', 'Expanded', 'Bottom sheet'],
-    'tenor_giphy': <String>['Tenor', 'Giphy', 'Both', 'Off'],
     'yoCallsPrivacy': <String>[
-      'Everyone',
-      'My contacts',
-      'My contacts except',
-      'Nobody',
-    ],
-    'yoCustomPrivList': <String>[
       'Everyone',
       'My contacts',
       'My contacts except',
@@ -173,14 +110,6 @@ class GbFeatureCatalog {
       'Bubbles',
       'Sparks',
     ],
-    'quickText': <String>['Compact', 'Normal', 'Large'],
-    'key_updown_iconcolor': <String>['Theme', 'Accent', 'White', 'Black'],
-    'cat_img': <String>['Default', 'Compact', 'Expanded'],
-    'yohide_mediashow': <String>['Manage hidden media'],
-    'stat_cat': <String>['Everyone', 'Contacts', 'Selected contacts', 'Nobody'],
-    'cat_pc': <String>['Everyone', 'Contacts', 'Selected contacts', 'Nobody'],
-    'cat_pg': <String>['Everyone', 'Contacts', 'Selected contacts', 'Nobody'],
-    'cat_pb': <String>['Everyone', 'Contacts', 'Selected contacts', 'Nobody'],
   };
 
   static const Map<String, String> _descriptions = <String, String>{
@@ -192,48 +121,21 @@ class GbFeatureCatalog {
         'Keep a locally visible copy when a sender deletes a message.',
     'yoAntiRevokeStatus':
         'Keep a locally visible copy of a status after its owner deletes it until expiry.',
-    'disappearing_message_key':
-        'Retain disappearing messages locally when enabled.',
     'yoHideStatViewV2': 'Do not publish status-view receipts.',
     'yoBlueOnReply': 'Send read receipts only after you reply.',
     'always_online':
         'Keep presence online while Chaty maintains an active connection.',
-    'fwd_lim_incr': 'Allow forwarding to more conversations per operation.',
-    'enable_fivminstatus':
-        'Allow longer video status uploads up to five minutes.',
     'abu9aleh_status_audio': 'Allow audio status uploads.',
-    'status_wantsendconfirmation':
-        'Ask for confirmation before publishing a status.',
-    'stkr_wantsendconfirmation':
-        'Ask for confirmation before sending a sticker.',
     'Audio_ears': 'Use proximity/earpiece behavior for voice-note playback.',
     'Audio_sensor':
         'Enable proximity sensor handling during voice-note playback.',
-    'abu_saleh_play_voice_note': 'Use the enhanced voice-note player.',
     'Img_highres_seek': 'Set preferred image quality for uploads.',
-    'abu_saleh_image_quality': 'Select image upload quality.',
     'Up_size_limit': 'Configure maximum video/file upload size.',
     'abo_saleh_audio_limit_check': 'Configure maximum audio upload size.',
     'Img_share_limit': 'Configure maximum images selectable in one send.',
     'key_more_docs_send': 'Allow selecting more documents per send.',
-    'key_send_hidden_msg':
-        'Allow sending messages from hidden chats without exposing them in the main list.',
-    'key_edit_hidden_msg': 'Allow editing messages in hidden chats.',
-    'key_notsend_msg':
-        'Pause outgoing messages while stealth/airplane mode is active.',
-    'key_notreceive_msg':
-        'Pause realtime incoming message reconciliation while local airplane mode is active.',
-    'key_noreceive_img':
-        'Pause automatic media retrieval while local airplane mode is active.',
-    'abu_saleh_unreaded_chat':
-        'Keep selected chats marked unread until manually cleared.',
-    'multiChats': 'Enable multi-select actions on chats.',
     'Pop_Heds': 'Enable heads-up / floating message alerts.',
-    'disable_bcounter': 'Hide unread badge counters.',
-    'disable_audioheads': 'Disable floating audio heads.',
-    'disable_chatswipeV2': 'Disable swipe actions on chat rows.',
     'home_stories_key': 'Show stories/status strip on home.',
-    'key_carousel_view': 'Render statuses in carousel mode.',
     'onlinechat': 'Show online state in chat list rows.',
     'onlineDotchat': 'Show an online dot on chat avatars.',
     'abu_saleh_toast_online': 'Alert when a contact comes online (toast).',
@@ -253,23 +155,12 @@ class GbFeatureCatalog {
     'statuschat': 'Show the presence/status line under the header name.',
     'ModChatGStatusB': 'Presence pill background color in the header.',
     'ModChatGStatusT': 'Presence pill text color in the header.',
-    'elapsed_time': 'Show elapsed time since last activity.',
-    'arch_chats_top': 'Place archived chats at the top.',
     'key_mas_hide_archive_home': 'Hide archived-chat shortcut on home.',
-    'key_hide_unsaved_num': 'Hide unsaved-number entries where applicable.',
     'yo_want_ghostmode': 'Enable the stealth privacy bundle.',
     'yo_want_airplanemode':
         'Pause Chaty network/realtime actions without disabling the phone network.',
-    'yo_want_nightmode': 'Show the light/dark quick toggle.',
     'yo_want_toolbar_cam': 'Show the camera shortcut.',
-    'yo_multi_account_menu': 'Show multi-account switcher.',
-    'disable_hiddenchat_access': 'Hide the hidden-chat entry point.',
     'enable_grp_separationV2': 'Separate direct chats and groups.',
-    'pic_inside': 'Show avatars alongside chat bubbles.',
-    'chat_contactpicV2': 'Show contact avatars on incoming messages.',
-    'chat_mypicV2': 'Show your avatar on outgoing messages.',
-    'enable_statuspage_extras': 'Enable status-page extended actions.',
-    'key_with_thumb': 'Show status media thumbnails.',
   };
 
   static final List<GbFeatureDefinition> all = () {
@@ -308,8 +199,6 @@ class GbFeatureCatalog {
     if (_choiceOptions.containsKey(key) ||
         <String>{
           'yoCallsPrivacy',
-          'yoCustomPrivList',
-          'key_status_ui',
           'animation_drawable',
           'animation_drawableshatssss',
           'yo_nicons',
@@ -325,9 +214,7 @@ class GbFeatureCatalog {
       'clear_logs',
       'mas_key_cleanlog_blocklist',
       'load_customfont',
-      'key_edit_hidden_msg',
       'key_reply_mention',
-      'yohide_mediashow',
     }.contains(key))
       return GbFeatureKind.action;
     final k = key.toLowerCase();
@@ -380,7 +267,6 @@ class GbFeatureCatalog {
       'yoAntiRevokeStatus',
       'AntiRevokeMsgNotif',
       'AntiRevokeStatusNotif',
-      'disappearing_message_key',
       'key_chat_editview',
       'abusaleh_media',
       'yo_hideinfo',

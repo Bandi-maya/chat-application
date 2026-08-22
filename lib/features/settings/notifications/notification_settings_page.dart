@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-
-import '../../../data/services/notification_service.dart';
-import '../../../ui/core/controllers/preferences_controller.dart';
-import '../../../ui/core/design_system/settings_primitives.dart';
-import '../../../ui/core/design_system/design_system.dart';
+import 'package:chat/data/repositories/mock_data_store.dart';
+import 'package:chat/data/services/notification_service.dart';
+import 'package:chat/injection/locator.dart';
+import 'package:chat/ui/core/controllers/preferences_controller.dart';
+import 'package:chat/ui/core/design_system/settings_primitives.dart';
+import 'package:chat/ui/core/design_system/design_system.dart';
+import 'package:chat/ui/core/design_system/color_picker.dart';
 
 class NotificationSettingsPage extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
@@ -269,6 +271,92 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                     logTitle: 'Event Toast Position',
                   ),
             ),
+              ChatySliderTile(
+                icon: Icons.person_rounded,
+                title: 'Toast avatar size',
+                subtitle: 'Scales the profile picture and toast height',
+                value: widget.preferencesController.gbDouble(
+                  'toast_avatar_size',
+                  fallback: 40,
+                ),
+                min: 24,
+                max: 56,
+                divisions: 8,
+                valueFormatter: (v) => '${v.round()} px',
+                onChanged: (v) => setState(
+                  () => widget.preferencesController.updateGbFeature(
+                    'toast_avatar_size',
+                    v.round(),
+                    logTitle: 'Toast Avatar Size',
+                  ),
+                ),
+              ),
+              ChatySliderTile(
+                icon: Icons.rounded_corner_rounded,
+                title: 'Corner radius',
+                value: widget.preferencesController.gbDouble(
+                  'toast_corner_radius',
+                  fallback: 18,
+                ),
+                min: 4,
+                max: 32,
+                divisions: 7,
+                valueFormatter: (v) => '${v.round()} px',
+                onChanged: (v) =>
+                    widget.preferencesController.updateGbFeature(
+                      'toast_corner_radius',
+                      v.round(),
+                      logTitle: 'Toast Corner Radius',
+                    ),
+              ),
+              ChatySliderTile(
+                icon: Icons.layers_rounded,
+                title: 'Elevation',
+                value: widget.preferencesController.gbDouble(
+                  'toast_elevation',
+                  fallback: 10,
+                ),
+                min: 0,
+                max: 24,
+                divisions: 8,
+                valueFormatter: (v) => v.round().toString(),
+                onChanged: (v) =>
+                    widget.preferencesController.updateGbFeature(
+                      'toast_elevation',
+                      v.round(),
+                      logTitle: 'Toast Elevation',
+                    ),
+              ),
+              ChatySettingsTile(
+                icon: Icons.format_color_fill_rounded,
+                title: 'Background color',
+                subtitle:
+                    _bgColor == null ? 'Theme surface' : 'Custom color set',
+                trailing: Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _bgColor ?? context.colors.surface,
+                    border: Border.all(color: context.colors.border),
+                  ),
+                ),
+                onTap: () async {
+                  final picked = await ChatyColorPickerModal.show(
+                    context,
+                    title: 'Toast background',
+                    currentColor: _bgColor ?? context.colors.surface,
+                    backgroundContextColor: context.colors.background,
+                  );
+                  if (!mounted) return;
+                  widget.preferencesController.updateGbFeature(
+                    'event_toast_bg',
+                    picked?.toARGB32() ?? 0,
+                    logTitle: 'Toast Background',
+                  );
+                  setState(() {});
+                },
+              ),
             ChatyChoiceTile<int>(
               title: 'Toast duration',
               options: _toastDurations,
@@ -281,9 +369,43 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                     logTitle: 'Event Toast Duration',
                   ),
             ),
+            ChatySettingsTile(
+              icon: Icons.play_circle_rounded,
+              iconColor: context.colors.primary,
+              title: 'Test toast',
+              subtitle:
+                  'Render this toast now with your current style settings',
+              trailing: Icon(
+                Icons.play_arrow_rounded,
+                color: context.colors.primary,
+              ),
+              onTap: _fireTestToast,
+            ),
           ],
         ),
       ],
     );
   }
+
+  /// The configured custom background, or null when the theme surface is
+  /// used. Drives both the swatch preview and the picker's initial value.
+  Color? get _bgColor => widget.preferencesController.gbColor('event_toast_bg');
+
+  /// Renders the REAL configured toast through the REAL overlay using this
+  /// account's own profile data — a local preview only; nothing is pushed
+  /// to anyone. It intentionally respects every active setting (master
+  /// switch, position, duration, avatar size, radius, elevation, colors).
+  void _fireTestToast() {
+    final me = locator<MockDataStore>().currentUser;
+    widget.notificationService.triggerEventNotification(
+      title: '${me.displayName} is online',
+      body: 'Preview — your toast style, rendered locally',
+      icon: Icons.wifi_tethering_rounded,
+      color: context.colors.primary,
+      userId: me.id,
+      avatarInitials: me.avatarInitials,
+      avatarColorHex: me.avatarColorHex,
+    );
+  }
+
 }

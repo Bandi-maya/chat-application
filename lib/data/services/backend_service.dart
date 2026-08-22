@@ -842,8 +842,11 @@ class ChatyBackendService extends ChangeNotifier {
     return _tasks.firstWhere((task) => task.id == id);
   }
 
-  void updateTaskStatus(String taskId, TaskStatus status) {
-    unawaited(_updateTaskStatusAsync(taskId, status));
+  /// Authoritative stage transition: persists first (RPC), then reloads the
+  /// authoritative task list. Throws on failure so callers can surface a
+  /// real error — the UI must never show a move that did not persist.
+  Future<void> updateTaskStatus(String taskId, TaskStatus status) {
+    return _updateTaskStatusAsync(taskId, status);
   }
 
   Future<void> _updateTaskStatusAsync(String taskId, TaskStatus status) async {
@@ -851,7 +854,7 @@ class ChatyBackendService extends ChangeNotifier {
       'update_task_status',
       params: <String, dynamic>{
         'p_task_id': taskId,
-        'p_status': _taskStatusToDatabase(status),
+        'p_status': taskStatusToDatabase(status),
       },
     );
     await _loadTasks();
@@ -875,6 +878,10 @@ class ChatyBackendService extends ChangeNotifier {
       'phone': updated.phone.trim(),
       'avatar_initials': updated.avatarInitials,
       'avatar_color_hex': updated.avatarColorHex,
+      // Media URLs are owned by ProfileMediaService uploads; write them back
+      // verbatim so every device converges on the same object.
+      if (updated.avatarUrl != null) 'avatar_url': updated.avatarUrl,
+      if (updated.bannerUrl != null) 'banner_url': updated.bannerUrl,
       'presence': _presenceToDatabase(
         _effectivePublishedPresence(updated.presence, privacy),
       ),
@@ -982,6 +989,8 @@ class ChatyBackendService extends ChangeNotifier {
       email: email,
       phone: phone.isNotEmpty ? phone : (row['phone']?.toString() ?? ''),
       safetyNumber: '',
+      avatarUrl: row['avatar_url']?.toString(),
+      bannerUrl: row['banner_url']?.toString(),
     );
   }
 
@@ -1054,7 +1063,7 @@ class ChatyBackendService extends ChangeNotifier {
       description: row['description']?.toString() ?? '',
       creatorId: row['creator_id']?.toString() ?? '',
       assigneeIds: _stringList(row['assignee_ids']),
-      status: _taskStatusFromDatabase(row['status']?.toString()),
+      status: taskStatusFromDatabase(row['status']?.toString()),
       priority: _taskPriorityFromDatabase(row['priority']?.toString()),
       dueAt: _date(row['due_at']) ?? createdAt.add(const Duration(days: 3)),
       labels: _stringList(row['labels']),
@@ -1204,20 +1213,36 @@ class ChatyBackendService extends ChangeNotifier {
     }
   }
 
-  static TaskStatus _taskStatusFromDatabase(String? value) {
+  /// Bijective status mapping. The previous reader folded 'assigned' and
+  /// 'blocked' into inbox, which snapped In Review / Testing tasks back to
+  /// Todo on every reload — the reported kanban bug.
+  /// Public for workflow regression tests.
+  static TaskStatus taskStatusFromDatabase(String? value) {
     switch (value) {
+      case 'assigned':
+        return TaskStatus.assigned;
       case 'in_progress':
         return TaskStatus.inProgress;
+      case 'blocked':
+        return TaskStatus.blocked;
       case 'completed':
         return TaskStatus.completed;
       case 'cancelled':
+      case 'archived':
         return TaskStatus.archived;
+      case 'inbox':
       default:
         return TaskStatus.inbox;
     }
   }
 
-  static String _taskStatusToDatabase(TaskStatus value) {
+  /// Public for workflow regression tests. Bijective inverse of
+  /// [taskStatusFromDatabase]. The DB check constraint
+  /// permits exactly inbox/assigned/in_progress/blocked/completed/archived
+  /// ('cancelled' is the stored archived state). The previous writer mapped
+  /// assigned→'todo' and blocked→'in_progress', colliding stages and raising
+  /// Postgres 23514 for Todo writes.
+  static String taskStatusToDatabase(TaskStatus value) {
     switch (value) {
       case TaskStatus.inProgress:
         return 'in_progress';
@@ -1226,11 +1251,11 @@ class ChatyBackendService extends ChangeNotifier {
       case TaskStatus.archived:
         return 'cancelled';
       case TaskStatus.blocked:
-        return 'in_progress';
+        return 'blocked';
       case TaskStatus.assigned:
-        return 'todo';
+        return 'assigned';
       case TaskStatus.inbox:
-        return 'todo';
+        return 'inbox';
     }
   }
 }

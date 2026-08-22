@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/models/chat_task.dart';
+import '../../domain/models/task_workflow.dart';
 import '../../data/repositories/mock_data_store.dart';
 import '../../ui/core/widgets/status_badge.dart';
 import '../../ui/core/widgets/app_avatar.dart';
@@ -27,32 +28,12 @@ class _TasksScreenState extends State<TasksScreen>
   late final TabController _tabCtrl;
   String _selectedPriorityFilter = 'All';
 
-  // P4 Kanban workflow — the five user-facing stages. Enum values reuse the
-  // existing server mapping; only labels and order are ours.
-  static const List<TaskStatus> _workflow = <TaskStatus>[
-    TaskStatus.inbox,
-    TaskStatus.inProgress,
-    TaskStatus.assigned,
-    TaskStatus.blocked,
-    TaskStatus.completed,
-  ];
+  // P4 Kanban workflow — stage order, labels and legal transitions live in
+  // the typed [TaskWorkflow] model; the chevron AND drag & drop both go
+  // through the same validated transition below.
+  static const List<TaskStatus> _workflow = TaskWorkflow.stages;
 
-  static String _stageLabel(TaskStatus status) {
-    switch (status) {
-      case TaskStatus.inbox:
-        return 'Todo';
-      case TaskStatus.inProgress:
-        return 'In Process';
-      case TaskStatus.assigned:
-        return 'In Review';
-      case TaskStatus.blocked:
-        return 'Testing';
-      case TaskStatus.completed:
-        return 'Done';
-      case TaskStatus.archived:
-        return 'Archived';
-    }
-  }
+  static String _stageLabel(TaskStatus status) => TaskWorkflow.label(status);
 
   // --- Task history ("task tree"): every stage transition is recorded
   // per task and viewable from the card's history button.
@@ -187,24 +168,43 @@ class _TasksScreenState extends State<TasksScreen>
     );
   }
 
-  void _moveTask(ChatTask task, TaskStatus target) {
-    if (task.status == target) return;
-    final from = task.status;
-    widget.dataStore.updateTaskStatus(task.id, target);
-    unawaited(_recordMove(task, from, target));
+  /// The SINGLE transition use-case. Both the card chevrons and the kanban
+  /// drag & drop funnel through here:
+  /// workflow validation → backend persistence → authoritative reload.
+  /// The UI only moves a task after the RPC succeeds; failures surface the
+  /// real error and the board stays on the persisted state (no fake moves).
+  Future<void> _moveTask(ChatTask task, TaskStatus target) async {
+    final Transition? move;
+    try {
+      move = TaskWorkflow.validate(task.status, target);
+    } on TaskTransitionError catch (error) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(error.reason)));
+      return;
+    }
+    if (move == null) return;
+    try {
+      await widget.dataStore.updateTaskStatus(task.id, target);
+      await _recordMove(task, move.from, move.to);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              'Could not move "${task.title}" to '
+              '${TaskWorkflow.label(target)}: $error',
+            ),
+          ),
+        );
+    }
   }
 
-  TaskStatus? _previous(TaskStatus status) {
-    final index = _workflow.indexOf(status);
-    if (index <= 0) return null;
-    return _workflow[index - 1];
-  }
+  TaskStatus? _previous(TaskStatus status) => TaskWorkflow.previous(status);
 
-  TaskStatus? _next(TaskStatus status) {
-    final index = _workflow.indexOf(status);
-    if (index < 0 || index >= _workflow.length - 1) return null;
-    return _workflow[index + 1];
-  }
+  TaskStatus? _next(TaskStatus status) => TaskWorkflow.next(status);
 
   @override
   Widget build(BuildContext context) {
@@ -526,8 +526,10 @@ class _TasksScreenState extends State<TasksScreen>
                       .where((task) => task.status == status)
                       .toList(growable: false);
                   return DragTarget<ChatTask>(
+                    // Same workflow validation as the chevron: same-stage
+                    // drops are silent no-ops, off-board moves reject.
                     onWillAcceptWithDetails: (details) =>
-                        details.data.status != status,
+                        TaskWorkflow.canMove(details.data.status, status),
                     onAcceptWithDetails: (details) =>
                         _moveTask(details.data, status),
                     builder: (context, candidates, rejected) {

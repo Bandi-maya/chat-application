@@ -579,3 +579,55 @@ class _ChatySwipeActionsState extends State<ChatySwipeActions>
     );
   }
 }
+
+
+/// Avatar that renders the user's uploaded photo when available and falls
+/// back to the flat [ChatyAvatarCore] initials otherwise. Used everywhere a
+/// real profile photo can appear (home header, chat header preview, profile).
+class ChatyNetworkAvatar extends StatelessWidget {
+  final String initials;
+  final String? colorHex;
+  final String? url;
+  final double size;
+
+  const ChatyNetworkAvatar({
+    super.key,
+    required this.initials,
+    this.colorHex,
+    this.url,
+    required this.size,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasPhoto = url != null && url!.isNotEmpty;
+    if (!hasPhoto) {
+      return ChatyAvatarCore(
+        initials: initials,
+        color: _parseColor(colorHex, fallback: const Color(0xFF6366F1)),
+        size: size,
+      );
+    }
+    final parsed = _parseColor(colorHex, fallback: const Color(0xFF6366F1));
+    return ClipOval(
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: Image.network(
+          url!,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) =>
+              ChatyAvatarCore(initials: initials, color: parsed, size: size),
+        ),
+      ),
+    );
+  }
+
+  static Color _parseColor(String? hex, {required Color fallback}) {
+    if (hex == null || hex.isEmpty) return fallback;
+    final normalized = hex.replaceFirst('0x', '').replaceFirst('#', '');
+    final value = int.tryParse(normalized, radix: 16);
+    if (value == null) return fallback;
+    return normalized.length <= 6 ? Color(0xFF000000 | value) : Color(value);
+  }
+}

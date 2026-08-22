@@ -5,6 +5,7 @@ import '../../data/services/backend_service.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/validators/input_validators.dart';
 import '../../ui/core/widgets/username_availability_field.dart';
+import '../../data/services/profile_media_service.dart';
 
 /// Shared profile actions used by BOTH the Profile root screen and the
 /// Settings screen, so there is exactly one profile editor and one logout
@@ -102,6 +103,8 @@ Future<void> showChatyProfileEditor(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _ProfilePhotoRow(user: user, dataStore: dataStore),
+                  const SizedBox(height: 14),
                   const Text(
                     'Edit profile',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
@@ -249,4 +252,118 @@ String chatyInitialsFor(String displayName) {
         .toUpperCase();
   }
   return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+}
+
+
+/// Camera/Gallery chooser + immediate upload for the profile photo. The
+/// upload persists through the normal profile-update path so every device
+/// converges on the same URL; cancelling text edits never rolls media back
+/// (matching mainstream messaging behavior).
+class _ProfilePhotoRow extends StatefulWidget {
+  final dynamic user;
+  final MockDataStore dataStore;
+
+  const _ProfilePhotoRow({required this.user, required this.dataStore});
+
+  @override
+  State<_ProfilePhotoRow> createState() => _ProfilePhotoRowState();
+}
+
+class _ProfilePhotoRowState extends State<_ProfilePhotoRow> {
+  bool _busy = false;
+
+  Future<void> _upload(ProfileMediaSource source) async {
+    setState(() => _busy = true);
+    try {
+      final url = await ProfileMediaService().uploadAvatar(source: source);
+      await widget.dataStore.updateUser(
+        widget.user.copyWith(avatarUrl: url),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Profile photo updated.')));
+    } catch (error) {
+      final message = error.toString();
+      if (message.contains('cancelled')) return;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update photo: $message')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            CircleAvatar(
+              radius: 34,
+              backgroundColor: colors.surfaceContainerHighest,
+              backgroundImage: (widget.user.avatarUrl ?? '').isNotEmpty
+                  ? NetworkImage(widget.user.avatarUrl!)
+                  : null,
+              child: (widget.user.avatarUrl ?? '').isNotEmpty
+                  ? null
+                  : Text(
+                      chatyInitialsFor(widget.user.displayName),
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+            ),
+            Positioned(
+              right: -2,
+              bottom: -2,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: colors.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.photo_camera_rounded,
+                  size: 13,
+                  color: colors.onPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              TextButton.icon(
+                onPressed: _busy
+                    ? null
+                    : () => _upload(ProfileMediaSource.camera),
+                icon: const Icon(Icons.photo_camera_rounded, size: 18),
+                label: const Text('Camera'),
+              ),
+              TextButton.icon(
+                onPressed: _busy
+                    ? null
+                    : () => _upload(ProfileMediaSource.gallery),
+                icon: const Icon(Icons.photo_rounded, size: 18),
+                label: const Text('Gallery'),
+              ),
+              if (_busy)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }

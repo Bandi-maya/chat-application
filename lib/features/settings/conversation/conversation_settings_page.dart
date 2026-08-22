@@ -132,7 +132,7 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Container(
-                        padding: EdgeInsets.all(conv.bubblePadding),
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
                           color: Theme.of(context).colorScheme.surface,
                           borderRadius: BorderRadius.circular(
@@ -149,7 +149,7 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: Container(
-                        padding: EdgeInsets.all(conv.bubblePadding),
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
                           color: context.colors.primary,
                           borderRadius: BorderRadius.circular(

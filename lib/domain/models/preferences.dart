@@ -10,18 +10,14 @@ class PrivacyPreferences {
   final bool readReceipts;
   final bool typingIndicators;
   final bool recordingIndicators;
-  final bool linkPreviews;
   final String
   whoCanCallMe; // 'Everyone', 'My Contacts', 'My Contacts Except...', 'Nobody'
   final List<String>
   whoCanCallMeExceptions; // user IDs excluded when 'My Contacts Except...'
   final bool hidePrivacyOption;
-  final bool hideUpdateOption;
-  final bool disableChannels;
   final bool hideViewStatus;
   final bool antiDeleteStatus;
   final bool statusRevocationAlert;
-  final bool antiDisappearingMessages;
   final bool showEditedMessage;
   final bool antiDeleteMessages;
   final bool messageRevokeAlert;
@@ -37,16 +33,12 @@ class PrivacyPreferences {
     this.readReceipts = true,
     this.typingIndicators = true,
     this.recordingIndicators = true,
-    this.linkPreviews = true,
     this.whoCanCallMe = 'Everyone',
     this.whoCanCallMeExceptions = const <String>[],
     this.hidePrivacyOption = false,
-    this.hideUpdateOption = false,
-    this.disableChannels = false,
     this.hideViewStatus = false,
     this.antiDeleteStatus = true,
     this.statusRevocationAlert = true,
-    this.antiDisappearingMessages = true,
     this.showEditedMessage = true,
     this.antiDeleteMessages = true,
     this.messageRevokeAlert = true,
@@ -63,16 +55,12 @@ class PrivacyPreferences {
     bool? readReceipts,
     bool? typingIndicators,
     bool? recordingIndicators,
-    bool? linkPreviews,
     String? whoCanCallMe,
     List<String>? whoCanCallMeExceptions,
     bool? hidePrivacyOption,
-    bool? hideUpdateOption,
-    bool? disableChannels,
     bool? hideViewStatus,
     bool? antiDeleteStatus,
     bool? statusRevocationAlert,
-    bool? antiDisappearingMessages,
     bool? showEditedMessage,
     bool? antiDeleteMessages,
     bool? messageRevokeAlert,
@@ -89,19 +77,14 @@ class PrivacyPreferences {
       readReceipts: readReceipts ?? this.readReceipts,
       typingIndicators: typingIndicators ?? this.typingIndicators,
       recordingIndicators: recordingIndicators ?? this.recordingIndicators,
-      linkPreviews: linkPreviews ?? this.linkPreviews,
       whoCanCallMe: whoCanCallMe ?? this.whoCanCallMe,
       whoCanCallMeExceptions:
           whoCanCallMeExceptions ?? this.whoCanCallMeExceptions,
       hidePrivacyOption: hidePrivacyOption ?? this.hidePrivacyOption,
-      hideUpdateOption: hideUpdateOption ?? this.hideUpdateOption,
-      disableChannels: disableChannels ?? this.disableChannels,
       hideViewStatus: hideViewStatus ?? this.hideViewStatus,
       antiDeleteStatus: antiDeleteStatus ?? this.antiDeleteStatus,
       statusRevocationAlert:
           statusRevocationAlert ?? this.statusRevocationAlert,
-      antiDisappearingMessages:
-          antiDisappearingMessages ?? this.antiDisappearingMessages,
       showEditedMessage: showEditedMessage ?? this.showEditedMessage,
       antiDeleteMessages: antiDeleteMessages ?? this.antiDeleteMessages,
       messageRevokeAlert: messageRevokeAlert ?? this.messageRevokeAlert,
@@ -120,16 +103,12 @@ class PrivacyPreferences {
     'readReceipts': readReceipts,
     'typingIndicators': typingIndicators,
     'recordingIndicators': recordingIndicators,
-    'linkPreviews': linkPreviews,
     'whoCanCallMe': whoCanCallMe,
     'whoCanCallMeExceptions': whoCanCallMeExceptions,
     'hidePrivacyOption': hidePrivacyOption,
-    'hideUpdateOption': hideUpdateOption,
-    'disableChannels': disableChannels,
     'hideViewStatus': hideViewStatus,
     'antiDeleteStatus': antiDeleteStatus,
     'statusRevocationAlert': statusRevocationAlert,
-    'antiDisappearingMessages': antiDisappearingMessages,
     'showEditedMessage': showEditedMessage,
     'antiDeleteMessages': antiDeleteMessages,
     'messageRevokeAlert': messageRevokeAlert,
@@ -147,7 +126,6 @@ class PrivacyPreferences {
         readReceipts: map['readReceipts'] ?? true,
         typingIndicators: map['typingIndicators'] ?? true,
         recordingIndicators: map['recordingIndicators'] ?? true,
-        linkPreviews: map['linkPreviews'] ?? true,
         whoCanCallMe: map['whoCanCallMe'] ?? 'Everyone',
         whoCanCallMeExceptions:
             (map['whoCanCallMeExceptions'] as List<dynamic>? ??
@@ -155,12 +133,9 @@ class PrivacyPreferences {
                 .map((item) => item.toString())
                 .toList(growable: false),
         hidePrivacyOption: map['hidePrivacyOption'] ?? false,
-        hideUpdateOption: map['hideUpdateOption'] ?? false,
-        disableChannels: map['disableChannels'] ?? false,
         hideViewStatus: map['hideViewStatus'] ?? false,
         antiDeleteStatus: map['antiDeleteStatus'] ?? true,
         statusRevocationAlert: map['statusRevocationAlert'] ?? true,
-        antiDisappearingMessages: map['antiDisappearingMessages'] ?? true,
         showEditedMessage: map['showEditedMessage'] ?? true,
         antiDeleteMessages: map['antiDeleteMessages'] ?? true,
         messageRevokeAlert: map['messageRevokeAlert'] ?? true,
@@ -186,6 +161,11 @@ class SecurityPreferences {
   autoLockTimeout; // 'Immediately', '15s', '30s', '1m', '5m', '15m'
   final bool hideLockNotificationContent;
   final List<String> lockedConversationIds;
+  final List<String> hiddenConversationIds;
+  final bool hideLockedChats;
+  final bool entryByAppTitle;
+  final bool entryBySecretPhrase;
+  final bool protectFromScreenshots;
 
   const SecurityPreferences({
     this.isAppLockEnabled = false,
@@ -195,6 +175,11 @@ class SecurityPreferences {
     this.autoLockTimeout = '1m',
     this.hideLockNotificationContent = true,
     this.lockedConversationIds = const [],
+    this.hiddenConversationIds = const [],
+    this.hideLockedChats = false,
+    this.entryByAppTitle = true,
+    this.entryBySecretPhrase = false,
+    this.protectFromScreenshots = false,
   });
 
   SecurityPreferences copyWith({
@@ -205,6 +190,11 @@ class SecurityPreferences {
     String? autoLockTimeout,
     bool? hideLockNotificationContent,
     List<String>? lockedConversationIds,
+    List<String>? hiddenConversationIds,
+    bool? hideLockedChats,
+    bool? entryByAppTitle,
+    bool? entryBySecretPhrase,
+    bool? protectFromScreenshots,
   }) {
     return SecurityPreferences(
       isAppLockEnabled: isAppLockEnabled ?? this.isAppLockEnabled,
@@ -217,6 +207,13 @@ class SecurityPreferences {
           hideLockNotificationContent ?? this.hideLockNotificationContent,
       lockedConversationIds:
           lockedConversationIds ?? this.lockedConversationIds,
+      hiddenConversationIds:
+          hiddenConversationIds ?? this.hiddenConversationIds,
+      hideLockedChats: hideLockedChats ?? this.hideLockedChats,
+      entryByAppTitle: entryByAppTitle ?? this.entryByAppTitle,
+      entryBySecretPhrase: entryBySecretPhrase ?? this.entryBySecretPhrase,
+      protectFromScreenshots:
+          protectFromScreenshots ?? this.protectFromScreenshots,
     );
   }
 
@@ -228,6 +225,11 @@ class SecurityPreferences {
     'autoLockTimeout': autoLockTimeout,
     'hideLockNotificationContent': hideLockNotificationContent,
     'lockedConversationIds': lockedConversationIds,
+    'hiddenConversationIds': hiddenConversationIds,
+    'hideLockedChats': hideLockedChats,
+    'entryByAppTitle': entryByAppTitle,
+    'entryBySecretPhrase': entryBySecretPhrase,
+    'protectFromScreenshots': protectFromScreenshots,
   };
 
   factory SecurityPreferences.fromMap(Map<String, dynamic> map) =>
@@ -245,6 +247,16 @@ class SecurityPreferences {
                 ?.map((e) => e.toString())
                 .toList() ??
             const [],
+        hiddenConversationIds:
+            (map['hiddenConversationIds'] as List?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            const [],
+        hideLockedChats: map['hideLockedChats'] as bool? ?? false,
+        entryByAppTitle: map['entryByAppTitle'] as bool? ?? true,
+        entryBySecretPhrase: map['entryBySecretPhrase'] as bool? ?? false,
+        protectFromScreenshots:
+            map['protectFromScreenshots'] as bool? ?? false,
       );
 }
 
@@ -257,17 +269,11 @@ class HomePreferences {
   storiesStyle; // 'Circular', 'Squircle', 'Card', 'Minimal', 'Compact'
   final bool separateChatsAndGroups;
   final String myNameOverride;
-  final bool disableStatusUnderName;
-  final bool hideHomeProfilePic;
   final String avatarShape; // 'circle', 'squircle', 'roundedSquare'
   final bool ghostMode;
   final bool airplaneModeSimulator;
   final bool showSearchBar;
   final bool showCameraIcon;
-  final bool showAddAccount;
-  final int headerBackgroundColorHex;
-  final int headerTextColorHex;
-  final double headerHeight;
 
   const HomePreferences({
     this.homeStyle = 'Chaty Default',
@@ -275,17 +281,11 @@ class HomePreferences {
     this.storiesStyle = 'Circular',
     this.separateChatsAndGroups = false,
     this.myNameOverride = 'Alex Rivera',
-    this.disableStatusUnderName = false,
-    this.hideHomeProfilePic = false,
     this.avatarShape = 'circle',
     this.ghostMode = false,
     this.airplaneModeSimulator = false,
     this.showSearchBar = true,
     this.showCameraIcon = false,
-    this.showAddAccount = false,
-    this.headerBackgroundColorHex = 0x00000000,
-    this.headerTextColorHex = 0x00000000,
-    this.headerHeight = 56.0,
   });
 
   HomePreferences copyWith({
@@ -294,17 +294,11 @@ class HomePreferences {
     String? storiesStyle,
     bool? separateChatsAndGroups,
     String? myNameOverride,
-    bool? disableStatusUnderName,
-    bool? hideHomeProfilePic,
     String? avatarShape,
     bool? ghostMode,
     bool? airplaneModeSimulator,
     bool? showSearchBar,
     bool? showCameraIcon,
-    bool? showAddAccount,
-    int? headerBackgroundColorHex,
-    int? headerTextColorHex,
-    double? headerHeight,
   }) {
     return HomePreferences(
       homeStyle: homeStyle ?? this.homeStyle,
@@ -313,20 +307,12 @@ class HomePreferences {
       separateChatsAndGroups:
           separateChatsAndGroups ?? this.separateChatsAndGroups,
       myNameOverride: myNameOverride ?? this.myNameOverride,
-      disableStatusUnderName:
-          disableStatusUnderName ?? this.disableStatusUnderName,
-      hideHomeProfilePic: hideHomeProfilePic ?? this.hideHomeProfilePic,
       avatarShape: avatarShape ?? this.avatarShape,
       ghostMode: ghostMode ?? this.ghostMode,
       airplaneModeSimulator:
           airplaneModeSimulator ?? this.airplaneModeSimulator,
       showSearchBar: showSearchBar ?? this.showSearchBar,
       showCameraIcon: showCameraIcon ?? this.showCameraIcon,
-      showAddAccount: showAddAccount ?? this.showAddAccount,
-      headerBackgroundColorHex:
-          headerBackgroundColorHex ?? this.headerBackgroundColorHex,
-      headerTextColorHex: headerTextColorHex ?? this.headerTextColorHex,
-      headerHeight: headerHeight ?? this.headerHeight,
     );
   }
 
@@ -336,17 +322,11 @@ class HomePreferences {
     'storiesStyle': storiesStyle,
     'separateChatsAndGroups': separateChatsAndGroups,
     'myNameOverride': myNameOverride,
-    'disableStatusUnderName': disableStatusUnderName,
-    'hideHomeProfilePic': hideHomeProfilePic,
     'avatarShape': avatarShape,
     'ghostMode': ghostMode,
     'airplaneModeSimulator': airplaneModeSimulator,
     'showSearchBar': showSearchBar,
     'showCameraIcon': showCameraIcon,
-    'showAddAccount': showAddAccount,
-    'headerBackgroundColorHex': headerBackgroundColorHex,
-    'headerTextColorHex': headerTextColorHex,
-    'headerHeight': headerHeight,
   };
 
   factory HomePreferences.fromMap(Map<String, dynamic> map) => HomePreferences(
@@ -355,17 +335,11 @@ class HomePreferences {
     storiesStyle: map['storiesStyle'] ?? 'Circular',
     separateChatsAndGroups: map['separateChatsAndGroups'] ?? false,
     myNameOverride: map['myNameOverride'] ?? 'Alex Rivera',
-    disableStatusUnderName: map['disableStatusUnderName'] ?? false,
-    hideHomeProfilePic: map['hideHomeProfilePic'] ?? false,
     avatarShape: map['avatarShape'] ?? 'circle',
     ghostMode: map['ghostMode'] ?? false,
     airplaneModeSimulator: map['airplaneModeSimulator'] ?? false,
     showSearchBar: map['showSearchBar'] ?? true,
     showCameraIcon: map['showCameraIcon'] ?? false,
-    showAddAccount: map['showAddAccount'] ?? false,
-    headerBackgroundColorHex: map['headerBackgroundColorHex'] ?? 0x00000000,
-    headerTextColorHex: map['headerTextColorHex'] ?? 0x00000000,
-    headerHeight: (map['headerHeight'] as num?)?.toDouble() ?? 56.0,
   );
 }
 
@@ -374,22 +348,16 @@ class ConversationPreferences {
   final String
   bubbleShape; // 'Rounded', 'Compact', 'Classic', 'Tail', 'Tail-less', 'Squircle', 'Minimal', 'Card'
   final double bubbleRadius;
-  final double bubblePadding;
   final String
   tickStyle; // 'Default', 'Double Check', 'iOS Style', 'Minimal', 'Neon'
-  final int customIncomingBubbleHex;
-  final int customOutgoingBubbleHex;
   final bool enableQuickContactSidebar;
   final String sidebarPosition; // 'Left', 'Right'
   final double sidebarOpacity;
   final bool iosStylePopupMenu;
   final String doubleTapReactionEmoji;
-  final bool enableTranslation;
-  final String targetLanguage;
   final String
   wallpaperType; // 'Solid', 'Gradient', 'Pattern', 'Image', 'ProfileBlur'
   final double voicePlaybackSpeed;
-  final String waveformStyle;
   final String
   wallpaperPath; // '' = none; local copy of a user-picked background image
   final bool enableAnimatedEmojis;
@@ -397,20 +365,14 @@ class ConversationPreferences {
   const ConversationPreferences({
     this.bubbleShape = 'Rounded',
     this.bubbleRadius = 16.0,
-    this.bubblePadding = 12.0,
     this.tickStyle = 'Default',
-    this.customIncomingBubbleHex = 0,
-    this.customOutgoingBubbleHex = 0,
     this.enableQuickContactSidebar = false,
     this.sidebarPosition = 'Right',
     this.sidebarOpacity = 0.9,
     this.iosStylePopupMenu = true,
     this.doubleTapReactionEmoji = '❤️',
-    this.enableTranslation = true,
-    this.targetLanguage = 'English',
     this.wallpaperType = 'Pattern',
     this.voicePlaybackSpeed = 1.0,
-    this.waveformStyle = 'Bars',
     this.wallpaperPath = '',
     this.enableAnimatedEmojis = true,
   });
@@ -418,32 +380,21 @@ class ConversationPreferences {
   ConversationPreferences copyWith({
     String? bubbleShape,
     double? bubbleRadius,
-    double? bubblePadding,
     String? tickStyle,
-    int? customIncomingBubbleHex,
-    int? customOutgoingBubbleHex,
     bool? enableQuickContactSidebar,
     String? sidebarPosition,
     double? sidebarOpacity,
     bool? iosStylePopupMenu,
     String? doubleTapReactionEmoji,
-    bool? enableTranslation,
-    String? targetLanguage,
     String? wallpaperType,
     double? voicePlaybackSpeed,
-    String? waveformStyle,
     String? wallpaperPath,
     bool? enableAnimatedEmojis,
   }) {
     return ConversationPreferences(
       bubbleShape: bubbleShape ?? this.bubbleShape,
       bubbleRadius: bubbleRadius ?? this.bubbleRadius,
-      bubblePadding: bubblePadding ?? this.bubblePadding,
       tickStyle: tickStyle ?? this.tickStyle,
-      customIncomingBubbleHex:
-          customIncomingBubbleHex ?? this.customIncomingBubbleHex,
-      customOutgoingBubbleHex:
-          customOutgoingBubbleHex ?? this.customOutgoingBubbleHex,
       enableQuickContactSidebar:
           enableQuickContactSidebar ?? this.enableQuickContactSidebar,
       sidebarPosition: sidebarPosition ?? this.sidebarPosition,
@@ -451,11 +402,8 @@ class ConversationPreferences {
       iosStylePopupMenu: iosStylePopupMenu ?? this.iosStylePopupMenu,
       doubleTapReactionEmoji:
           doubleTapReactionEmoji ?? this.doubleTapReactionEmoji,
-      enableTranslation: enableTranslation ?? this.enableTranslation,
-      targetLanguage: targetLanguage ?? this.targetLanguage,
       wallpaperType: wallpaperType ?? this.wallpaperType,
       voicePlaybackSpeed: voicePlaybackSpeed ?? this.voicePlaybackSpeed,
-      waveformStyle: waveformStyle ?? this.waveformStyle,
       wallpaperPath: wallpaperPath ?? this.wallpaperPath,
       enableAnimatedEmojis: enableAnimatedEmojis ?? this.enableAnimatedEmojis,
     );
@@ -464,20 +412,14 @@ class ConversationPreferences {
   Map<String, dynamic> toMap() => {
     'bubbleShape': bubbleShape,
     'bubbleRadius': bubbleRadius,
-    'bubblePadding': bubblePadding,
     'tickStyle': tickStyle,
-    'customIncomingBubbleHex': customIncomingBubbleHex,
-    'customOutgoingBubbleHex': customOutgoingBubbleHex,
     'enableQuickContactSidebar': enableQuickContactSidebar,
     'sidebarPosition': sidebarPosition,
     'sidebarOpacity': sidebarOpacity,
     'iosStylePopupMenu': iosStylePopupMenu,
     'doubleTapReactionEmoji': doubleTapReactionEmoji,
-    'enableTranslation': enableTranslation,
-    'targetLanguage': targetLanguage,
     'wallpaperType': wallpaperType,
     'voicePlaybackSpeed': voicePlaybackSpeed,
-    'waveformStyle': waveformStyle,
     'wallpaperPath': wallpaperPath,
     'enableAnimatedEmojis': enableAnimatedEmojis,
   };
@@ -486,21 +428,15 @@ class ConversationPreferences {
       ConversationPreferences(
         bubbleShape: map['bubbleShape'] ?? 'Rounded',
         bubbleRadius: (map['bubbleRadius'] as num?)?.toDouble() ?? 16.0,
-        bubblePadding: (map['bubblePadding'] as num?)?.toDouble() ?? 12.0,
         tickStyle: map['tickStyle'] ?? 'Default',
-        customIncomingBubbleHex: map['customIncomingBubbleHex'] ?? 0,
-        customOutgoingBubbleHex: map['customOutgoingBubbleHex'] ?? 0,
         enableQuickContactSidebar: map['enableQuickContactSidebar'] ?? false,
         sidebarPosition: map['sidebarPosition'] ?? 'Right',
         sidebarOpacity: (map['sidebarOpacity'] as num?)?.toDouble() ?? 0.9,
         iosStylePopupMenu: map['iosStylePopupMenu'] ?? true,
         doubleTapReactionEmoji: map['doubleTapReactionEmoji'] ?? '❤️',
-        enableTranslation: map['enableTranslation'] ?? true,
-        targetLanguage: map['targetLanguage'] ?? 'English',
         wallpaperType: map['wallpaperType'] ?? 'Pattern',
         voicePlaybackSpeed:
             (map['voicePlaybackSpeed'] as num?)?.toDouble() ?? 1.0,
-        waveformStyle: map['waveformStyle'] ?? 'Bars',
         wallpaperPath: map['wallpaperPath'] as String? ?? '',
         enableAnimatedEmojis: map['enableAnimatedEmojis'] ?? true,
       );
@@ -692,7 +628,6 @@ class MessageAutomationPreferences {
   final List<AutoReplyRule> autoReplyRules;
   final List<ScheduledMessageEntry> scheduledMessages;
   final List<QuickReplyTemplate> quickReplies;
-  final List<String> blockedUserIds;
 
   const MessageAutomationPreferences({
     this.enableAutoReply = false,
@@ -718,7 +653,6 @@ class MessageAutomationPreferences {
         content: 'On my way! Be there in 5 minutes.',
       ),
     ],
-    this.blockedUserIds = const [],
   });
 
   MessageAutomationPreferences copyWith({
@@ -726,14 +660,12 @@ class MessageAutomationPreferences {
     List<AutoReplyRule>? autoReplyRules,
     List<ScheduledMessageEntry>? scheduledMessages,
     List<QuickReplyTemplate>? quickReplies,
-    List<String>? blockedUserIds,
   }) {
     return MessageAutomationPreferences(
       enableAutoReply: enableAutoReply ?? this.enableAutoReply,
       autoReplyRules: autoReplyRules ?? this.autoReplyRules,
       scheduledMessages: scheduledMessages ?? this.scheduledMessages,
       quickReplies: quickReplies ?? this.quickReplies,
-      blockedUserIds: blockedUserIds ?? this.blockedUserIds,
     );
   }
 
@@ -742,7 +674,6 @@ class MessageAutomationPreferences {
     'autoReplyRules': autoReplyRules.map((r) => r.toMap()).toList(),
     'scheduledMessages': scheduledMessages.map((s) => s.toMap()).toList(),
     'quickReplies': quickReplies.map((q) => q.toMap()).toList(),
-    'blockedUserIds': blockedUserIds,
   };
 
   factory MessageAutomationPreferences.fromMap(Map<String, dynamic> map) =>
@@ -763,18 +694,11 @@ class MessageAutomationPreferences {
                 ?.map((q) => QuickReplyTemplate.fromMap(q))
                 .toList() ??
             [],
-        blockedUserIds:
-            (map['blockedUserIds'] as List?)
-                ?.map((b) => b.toString())
-                .toList() ??
-            [],
       );
 }
 
 /// Navigation Effects & Particle Config Model
-class NavigationEffectPreferences {
-  final String
-  pageTransitionStyle; // 'Fade', 'Slide', 'Grow', 'Scale', 'Shared Axis', 'Fade Through', 'Cupertino', 'None'
+class NavigationEffectPreferences { // 'Fade', 'Slide', 'Grow', 'Scale', 'Shared Axis', 'Fade Through', 'Cupertino', 'None'
   final bool enableClickParticles;
   final String clickParticleSymbol; // '✨', '❤️', '🔥', '⚡', '⭐', '🌸'
   final double clickParticleSpeed;
@@ -784,7 +708,6 @@ class NavigationEffectPreferences {
   final String fallingParticleScope; // 'Home only', 'Chat only', 'Both'
 
   const NavigationEffectPreferences({
-    this.pageTransitionStyle = 'Fade Through',
     this.enableClickParticles = false,
     this.clickParticleSymbol = '✨',
     this.clickParticleSpeed = 1.0,
@@ -794,7 +717,6 @@ class NavigationEffectPreferences {
   });
 
   NavigationEffectPreferences copyWith({
-    String? pageTransitionStyle,
     bool? enableClickParticles,
     String? clickParticleSymbol,
     double? clickParticleSpeed,
@@ -803,7 +725,6 @@ class NavigationEffectPreferences {
     String? fallingParticleScope,
   }) {
     return NavigationEffectPreferences(
-      pageTransitionStyle: pageTransitionStyle ?? this.pageTransitionStyle,
       enableClickParticles: enableClickParticles ?? this.enableClickParticles,
       clickParticleSymbol: clickParticleSymbol ?? this.clickParticleSymbol,
       clickParticleSpeed: clickParticleSpeed ?? this.clickParticleSpeed,
@@ -816,7 +737,6 @@ class NavigationEffectPreferences {
   }
 
   Map<String, dynamic> toMap() => {
-    'pageTransitionStyle': pageTransitionStyle,
     'enableClickParticles': enableClickParticles,
     'clickParticleSymbol': clickParticleSymbol,
     'clickParticleSpeed': clickParticleSpeed,
@@ -827,7 +747,6 @@ class NavigationEffectPreferences {
 
   factory NavigationEffectPreferences.fromMap(Map<String, dynamic> map) =>
       NavigationEffectPreferences(
-        pageTransitionStyle: map['pageTransitionStyle'] ?? 'Fade Through',
         enableClickParticles: map['enableClickParticles'] ?? false,
         clickParticleSymbol: map['clickParticleSymbol'] ?? '✨',
         clickParticleSpeed:

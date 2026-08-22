@@ -9,6 +9,7 @@ import 'package:chat/data/services/backend_service.dart';
 import 'package:chat/data/services/notification_service.dart';
 import 'package:chat/data/services/contact_relationship_service.dart';
 import 'package:chat/data/services/local_lock_service.dart';
+import 'package:chat/data/services/protected_resource_gate.dart';
 import 'package:chat/data/services/message_automation_service.dart';
 import 'package:chat/data/services/rich_chat_realtime_service.dart';
 import 'package:chat/data/services/status_service.dart';
@@ -357,6 +358,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
       _backgroundedAt ??= DateTime.now();
+      ProtectedResourceGate.invalidateAllSessions();
     } else if (state == AppLifecycleState.resumed) {
       // Once the user leaves and returns, a deliberately configured App Lock
       // behaves normally according to the selected timeout.

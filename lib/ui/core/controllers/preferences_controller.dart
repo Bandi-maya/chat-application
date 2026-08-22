@@ -421,14 +421,6 @@ class ChatyPreferencesController extends ChangeNotifier {
       _privacy = _privacy.copyWith(hidePrivacyOption: flag);
       return;
     }
-    if (key == 'Saleh_HideCUpdates') {
-      _privacy = _privacy.copyWith(hideUpdateOption: flag);
-      return;
-    }
-    if (key == 'abu_saleh_channels') {
-      _privacy = _privacy.copyWith(disableChannels: flag);
-      return;
-    }
     if (key == 'yoHideStatViewV2') {
       _privacy = _privacy.copyWith(hideViewStatus: flag);
       return;
@@ -439,10 +431,6 @@ class ChatyPreferencesController extends ChangeNotifier {
     }
     if (key == 'AntiRevokeStatusNotif') {
       _privacy = _privacy.copyWith(statusRevocationAlert: flag);
-      return;
-    }
-    if (key == 'disappearing_message_key') {
-      _privacy = _privacy.copyWith(antiDisappearingMessages: flag);
       return;
     }
     if (key == 'key_chat_editview') {
@@ -498,10 +486,6 @@ class ChatyPreferencesController extends ChangeNotifier {
       _home = _home.copyWith(showCameraIcon: flag);
       return;
     }
-    if (key == 'yo_multi_account_menu') {
-      _home = _home.copyWith(showAddAccount: flag);
-      return;
-    }
     if (key == 'ui_home_styleV3') {
       _home = _home.copyWith(homeStyle: text);
       return;
@@ -519,18 +503,6 @@ class ChatyPreferencesController extends ChangeNotifier {
         enableQuickContactSidebar: text != 'Off',
         sidebarPosition: text == 'Left' ? 'Left' : 'Right',
       );
-      return;
-    }
-    if (key == 'inconvo_trans_option') {
-      _conversation = _conversation.copyWith(enableTranslation: text != 'Off');
-      return;
-    }
-    if (key == 'trans_def_to') {
-      _conversation = _conversation.copyWith(targetLanguage: text);
-      return;
-    }
-    if (key == 'key_pager_animation') {
-      _effects = _effects.copyWith(pageTransitionStyle: text);
       return;
     }
     if (key == 'tap_effect_enabled') {
@@ -696,6 +668,12 @@ class ChatyPreferencesController extends ChangeNotifier {
   bool isConversationLocked(String conversationId) =>
       _security.lockedConversationIds.contains(conversationId);
 
+  bool isConversationHidden(String conversationId) =>
+      _security.hiddenConversationIds.contains(conversationId);
+
+  bool isConversationProtected(String conversationId) =>
+      isConversationLocked(conversationId) || isConversationHidden(conversationId);
+
   void toggleLockConversation(String conversationId, {bool? lock}) {
     final list = List<String>.from(_security.lockedConversationIds);
     final shouldLock = lock ?? !list.contains(conversationId);
@@ -707,6 +685,40 @@ class ChatyPreferencesController extends ChangeNotifier {
     updateSecurity(
       _security.copyWith(lockedConversationIds: list),
       logTitle: shouldLock ? 'Lock Chat' : 'Unlock Chat',
+    );
+  }
+
+  void toggleHideConversation(String conversationId, {bool? hide}) {
+    final list = List<String>.from(_security.hiddenConversationIds);
+    final lockedList = List<String>.from(_security.lockedConversationIds);
+    final shouldHide = hide ?? !list.contains(conversationId);
+    if (shouldHide) {
+      if (!list.contains(conversationId)) list.add(conversationId);
+      // Hiding a chat also marks it locked
+      if (!lockedList.contains(conversationId)) lockedList.add(conversationId);
+    } else {
+      list.remove(conversationId);
+    }
+    updateSecurity(
+      _security.copyWith(
+        hiddenConversationIds: list,
+        lockedConversationIds: lockedList,
+      ),
+      logTitle: shouldHide ? 'Hide Locked Chat' : 'Unhide Chat',
+    );
+  }
+
+  void unlockConversationCompletely(String conversationId) {
+    final hiddenList = List<String>.from(_security.hiddenConversationIds)
+      ..remove(conversationId);
+    final lockedList = List<String>.from(_security.lockedConversationIds)
+      ..remove(conversationId);
+    updateSecurity(
+      _security.copyWith(
+        hiddenConversationIds: hiddenList,
+        lockedConversationIds: lockedList,
+      ),
+      logTitle: 'Unlock Chat Permanently',
     );
   }
 

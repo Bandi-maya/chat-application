@@ -69,9 +69,7 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: home.headerBackgroundColorHex != 0
-                      ? Color(home.headerBackgroundColorHex)
-                      : colors.surface,
+                  color: colors.surface,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: colors.borderSubtle),
                 ),
@@ -94,9 +92,7 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                                 : 'Alex Rivera',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: home.headerTextColorHex != 0
-                                  ? Color(home.headerTextColorHex)
-                                  : colors.foreground,
+                              color: colors.foreground,
                             ),
                           ),
                         ),

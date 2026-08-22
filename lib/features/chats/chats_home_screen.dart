@@ -16,11 +16,14 @@ import '../../ui/core/design_system/settings_primitives.dart';
 import '../../ui/core/design_system/components/chaty_kit.dart';
 import '../../ui/core/design_system/components/app_components.dart';
 import '../../core/emoji/widgets/animated_emoji_text.dart';
+import '../../data/services/protected_resource_gate.dart';
+import '../../data/services/local_lock_service.dart';
 import '../notifications/notification_permission_sheet.dart';
 import '../search/global_search_screen.dart';
-import '../settings/security/app_lock_overlay.dart';
 import 'chat_detail_screen.dart';
 import 'linked_devices_qr_screen.dart';
+import '../profile/profile_screen.dart';
+import 'locked_chats_screen.dart';
 import 'new_chat_screen.dart';
 
 class ChatsHomeScreen extends StatefulWidget {
@@ -90,6 +93,21 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     super.dispose();
   }
 
+  /// Opens the Profile destination from the header avatar (nested push, so
+  /// it correctly receives the global chevron).
+  void _openProfileFromHeader() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ProfileScreen(
+          preferencesController: widget.preferencesController,
+          themeController: widget.themeController,
+          dataStore: widget.dataStore,
+          notificationService: widget.notificationService,
+        ),
+      ),
+    );
+  }
+
   void _toggleSearch() {
     setState(() {
       _isSearchOpen = !_isSearchOpen;
@@ -132,19 +150,39 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     );
   }
 
-  void _handleConversationTap(Conversation conversation) {
+  void _openLockedChatsVault() {
+    LockedChatsScreen.open(
+      context,
+      dataStore: widget.dataStore,
+      preferencesController: widget.preferencesController,
+      themeController: widget.themeController,
+    );
+  }
+
+  Future<void> _checkSecretSearchPhrase(String query) async {
+    if (query.isEmpty) return;
+    final lockService = locator<LocalLockService>();
+    final isMatch = await lockService.verifySecretPhrase(query);
+    if (isMatch && mounted) {
+      _searchCtrl.clear();
+      setState(() => _isSearchOpen = false);
+      _openLockedChatsVault();
+    }
+  }
+
+  void _handleConversationTap(Conversation conversation) async {
     if (_isSelectionMode) {
       _toggleSelection(conversation.id);
       return;
     }
-    if (widget.preferencesController.isConversationLocked(conversation.id)) {
-      AppLockOverlayModal.show(
-        context,
-        preferencesController: widget.preferencesController,
-      ).then((unlocked) {
-        if (unlocked == true && mounted) _openChat(conversation);
-      });
-    } else {
+    final authorized = await ProtectedResourceGate.authorizeConversation(
+      context,
+      conversationId: conversation.id,
+      preferencesController: widget.preferencesController,
+      title: conversation.title,
+      reason: 'Authenticate to open ${conversation.title}',
+    );
+    if (authorized && mounted) {
       _openChat(conversation);
     }
   }
@@ -354,6 +392,10 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               if (widget.forcedType != null &&
                   conversation.type != widget.forcedType)
                 return false;
+              // Privacy rule: Exclude hidden locked chats from regular list
+              if (widget.preferencesController.isConversationHidden(conversation.id)) {
+                return false;
+              }
               if (query.isNotEmpty &&
                   !conversation.title.toLowerCase().contains(query) &&
                   !conversation.lastMessageText.toLowerCase().contains(query))
@@ -446,16 +488,24 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                             padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
                             child: Align(
                               alignment: Alignment.centerLeft,
-                              child: Text(
-                                widget.pageTitle ?? 'Chaty',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: theme.primaryTextColor,
-                                  fontSize: 32 * theme.fontScale,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.5,
-                                  height: 1.0,
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () {
+                                  if (widget.preferencesController.security.entryByAppTitle) {
+                                    _openLockedChatsVault();
+                                  }
+                                },
+                                child: Text(
+                                  widget.pageTitle ?? 'Chaty',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: theme.primaryTextColor,
+                                    fontSize: 32 * theme.fontScale,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.5,
+                                    height: 1.0,
+                                  ),
                                 ),
                               ),
                             ),
@@ -472,7 +522,10 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                               child: TextField(
                                 controller: _searchCtrl,
                                 focusNode: _searchFocus,
-                                onChanged: (_) => setState(() {}),
+                                onChanged: (val) {
+                                  setState(() {});
+                                  _checkSecretSearchPhrase(val);
+                                },
                                 style: TextStyle(color: theme.primaryTextColor),
                                 decoration: InputDecoration(
                                   hintText:
@@ -848,7 +901,10 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         children: [
           Expanded(
             child: Text(
-              widget.pageTitle ?? 'Chaty',
+              widget.pageTitle ??
+                  (widget.dataStore.currentUser.displayName.isNotEmpty
+                      ? widget.dataStore.currentUser.displayName
+                      : 'Chaty'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -879,6 +935,21 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               onPressed: _toggleSearch,
               icon: Icon(
                 _isSearchOpen ? Icons.close_rounded : Icons.search_rounded,
+              ),
+            ),
+          // Small profile avatar → Profile (real photo when uploaded).
+          if (widget.forcedType == null)
+            Padding(
+              padding: const EdgeInsets.only(right: 2),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: _openProfileFromHeader,
+                child: ChatyNetworkAvatar(
+                  initials: widget.dataStore.currentUser.avatarInitials,
+                  colorHex: widget.dataStore.currentUser.avatarColorHex,
+                  url: widget.dataStore.currentUser.avatarUrl,
+                  size: 34,
+                ),
               ),
             ),
           IconButton(

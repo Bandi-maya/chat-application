@@ -8,7 +8,10 @@ import '../../domain/models/user_profile.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/design_system/design_system.dart';
+import '../../data/services/local_lock_service.dart';
+import '../../injection/locator.dart';
 import '../chats/chat_detail_screen.dart';
+import '../chats/locked_chats_screen.dart';
 
 class GlobalSearchScreen extends StatefulWidget {
   final ThemeConfig theme;
@@ -55,9 +58,30 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
     _debounce?.cancel();
     final query = _searchController.text.trim();
     final lower = query.toLowerCase();
+
+    // Check secret search phrase for revealing locked vault
+    if (query.isNotEmpty) {
+      final lockService = locator<LocalLockService>();
+      lockService.verifySecretPhrase(query).then((isMatch) {
+        if (isMatch && mounted) {
+          _searchController.clear();
+          LockedChatsScreen.open(
+            context,
+            dataStore: widget.dataStore,
+            preferencesController: widget.preferencesController,
+            themeController: widget.themeController,
+          );
+        }
+      });
+    }
+
     final conversations = query.isEmpty
         ? <Conversation>[]
         : widget.dataStore.conversations.where((conversation) {
+            // Privacy rule: Exclude hidden locked chats from global search
+            if (widget.preferencesController.isConversationHidden(conversation.id)) {
+              return false;
+            }
             return conversation.title.toLowerCase().contains(lower) ||
                 conversation.lastMessageText.toLowerCase().contains(lower);
           }).toList();

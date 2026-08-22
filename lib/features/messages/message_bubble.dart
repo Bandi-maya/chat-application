@@ -32,6 +32,10 @@ class MessageBubble extends StatelessWidget {
   /// the edited timestamp.
   final bool showEditedLabel;
 
+  /// Real consumer of `conversation.enableAnimatedEmojis`: when off, message
+  /// text renders as plain static text instead of animated emoji widgets.
+  final bool enableAnimatedEmojis;
+
   /// View-once support: whether the local user already opened this media and
   /// whether the sender's Anti-View-Once preference retains it after opening.
   final bool retainViewOnce;
@@ -52,6 +56,7 @@ class MessageBubble extends StatelessWidget {
     this.voicePlaybackSpeed = 1.0,
     this.showDeletedContent = false,
     this.showEditedLabel = true,
+    this.enableAnimatedEmojis = true,
     this.retainViewOnce = false,
     this.viewOnceOpened = false,
     this.onViewOnceOpen,
@@ -502,20 +507,29 @@ class MessageBubble extends StatelessWidget {
                             message.type != MessageType.location &&
                             message.type != MessageType.contact &&
                             message.text.isNotEmpty)
-                          AnimatedEmojiText(
-                            text: message.text,
-                            style: TextStyle(
-                              color: textColor,
-                              fontSize: 14 * theme.fontScale,
-                              height: 1.35,
-                            ),
-                          ),
+                          enableAnimatedEmojis
+                              ? AnimatedEmojiText(
+                                  text: message.text,
+                                  style: TextStyle(
+                                    color: textColor,
+                                    fontSize: 14 * theme.fontScale,
+                                    height: 1.35,
+                                  ),
+                                )
+                              : Text(
+                                  message.text,
+                                  style: TextStyle(
+                                    color: textColor,
+                                    fontSize: 14 * theme.fontScale,
+                                    height: 1.35,
+                                  ),
+                                ),
                         const SizedBox(height: 4),
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            if (message.editedAt != null) ...[
+                            if (message.editedAt != null && showEditedLabel) ...[
                               Text(
                                 'edited',
                                 style: TextStyle(

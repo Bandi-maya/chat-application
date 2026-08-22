@@ -62,7 +62,7 @@ void main() {
       expect(prefs.home.homeStyle, 'Chaty Default');
       expect(prefs.conversation.bubbleShape, 'Rounded');
       expect(prefs.automation.enableAutoReply, isFalse);
-      expect(prefs.effects.pageTransitionStyle, 'Fade Through');
+      expect(prefs.effects.enableClickParticles, isFalse);
     });
 
     test('Updating preferences persists in controller state', () {
@@ -138,6 +138,11 @@ void main() {
           makePatternInvisible: true,
           hideLockNotificationContent: true,
           lockedConversationIds: ['conv_1', 'conv_2'],
+          hiddenConversationIds: ['conv_2'],
+          hideLockedChats: true,
+          entryByAppTitle: true,
+          entryBySecretPhrase: true,
+          protectFromScreenshots: true,
         );
         final map = original.toMap();
 
@@ -149,6 +154,7 @@ void main() {
           'patternCode',
           'recoveryQuestion',
           'recoveryAnswer',
+          'secretPhrase',
         ]) {
           expect(
             map.containsKey(secretField),
@@ -167,6 +173,14 @@ void main() {
           restored.lockedConversationIds,
           containsAll(['conv_1', 'conv_2']),
         );
+        expect(
+          restored.hiddenConversationIds,
+          containsAll(['conv_2']),
+        );
+        expect(restored.hideLockedChats, isTrue);
+        expect(restored.entryByAppTitle, isTrue);
+        expect(restored.entryBySecretPhrase, isTrue);
+        expect(restored.protectFromScreenshots, isTrue);
       },
     );
   });

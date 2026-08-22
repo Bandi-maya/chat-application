@@ -1,7 +1,9 @@
 # Chaty — Settings Wiring Matrix
 
 **Audit date:** 2026-08-22 · **Scope:** every visible settings control → state field/key → feature consumer.
-**Method:** scripted extraction of all typed model fields (multi-line-safe), GB Feature Center catalog keys (79), ThemeConfig fields (27) and appearance-controller fields; whitespace-tolerant reference matching across `lib/`; manual classification of edge rows.
+**Method:** scripted extraction of all typed model fields (multi-line-safe), GB Feature Center catalog keys, ThemeConfig fields (27) and appearance-controller fields; whitespace-tolerant reference matching across `lib/`; manual classification of edge rows.
+
+**UPDATE (same day, after fixes):** every ⚠️ row below has since been resolved — either WIRED (`showEditedMessage`, `enableAnimatedEmojis`) or PRUNED from control + alias + model together (translation pair, channels, disappearing, hide-updates, add-account, `pageTransitionStyle`, bubble padding/hex/waveform/header metrics, `blockedUserIds`). Two audit corrections surfaced during the work: `scheduledMessages` is ✅ server-executed (`schedule_message` RPC + `scheduled_messages` table; the local list is a display mirror) and ThemeConfig `linkColor` is ✅ (feeds the semantic `link`/`info` scheme colors; GB `ModChatBubbleHyperlinks` remains as a working hidden customization). ThemeConfig `highContrast` is 🖼 preset metadata for the selectable High Contrast theme.
 
 **Legend**
 
@@ -129,8 +131,8 @@ Entry/exit animation (40 options → `chaty_page_transitions.dart`), text scale 
 
 \* `notify_recording_started` works but is NOT in the catalog list below.
 
-## 11 · Orphaned working keys (consumed in code but NOT listed in the center)
-`ModCallsBackground/Text/IconColors`, `event_toast_position`, `event_toast_duration_seconds`, `notify_recording_started`, all four `abu_saleh_toast_*_bc/_tc` tints. These behave correctly but have no visible control after the P3 prune — either re-list them or accept hidden-only configuration.
+## 11 · Working keys controlled outside the GB center (verified, no action needed)
+`event_toast_position`, `event_toast_duration_seconds`, `notify_recording_started` → controlled from **Notifications settings**; `ModCallsBackground/TextColor/IconColors` and all `abu_saleh_toast_*_bc/_tc` tints → listed in the GB center's Calls-appearance / Presence-alerts categories. Nothing is orphaned.
 
 ---
 
@@ -147,9 +149,11 @@ Entry/exit animation (40 options → `chaty_page_transitions.dart`), text scale 
 | Effects | 6 | – | 1 | – |
 | Theme tokens | 25 | – | – | 2 |
 
-**Highest-value fixes (all honest, no fake-wiring):**
-1. `showEditedMessage` → gate the existing "edited" chip in `message_bubble` (one-line consumer).
-2. Delete or implement `pageTransitionStyle` (duplicate of the wired entry/exit system).
-3. `scheduledMessages` → add a dispatcher to `message_automation_service`'s existing 30 s timer, or remove the sheet.
-4. Re-list the orphaned working keys (§11) so visible controls exist for working features.
-5. Prune the ~34 dead catalog keys + 12 dead model fields (incl. `linkPreviews`, translation pair) in the next cleanup pass.
+**Highest-value fixes — ALL IMPLEMENTED 2026-08-22:**
+1. ✅ `showEditedMessage` → gates the "edited" chip (`MessageBubble.showEditedLabel`, wired from chat_detail; GB `key_chat_editview` now fully functional).
+2. ✅ ✅ `pageTransitionStyle` REMOVED end-to-end (field + GB key/alias + Effects-page control); route transitions remain served by the wired Appearance entry/exit system.
+3. ✅ `scheduledMessages` — audit corrected: already server-executed; no dispatcher needed.
+4. ✅ Orphan scan corrected — no re-listing needed (see §11).
+5. ✅ Pruned: 11 dead keys from the GB center (+39 leftover description/option/default entries, 2 empty categories), 7 controller aliases, and 17 dead model fields across Privacy/Home/Conversation/Automation/NavigationEffects. Kept after correction: `linkColor`+`highContrast` (both live). Bonus wire: `enableAnimatedEmojis` now switches bubble text between AnimatedEmojiText and plain Text.
+
+Zero residual references to any removed symbol repo-wide (scripted check); all touched files brace-balanced and CRLF-pure. Run `flutter analyze` locally to confirm compilation.

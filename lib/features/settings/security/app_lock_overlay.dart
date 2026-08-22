@@ -32,7 +32,7 @@ class AppLockOverlayModal extends StatefulWidget {
     return showGeneralDialog<bool>(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black.withValues(alpha: 0.55),
+      barrierColor: Colors.black.withValues(alpha: 0.75),
       transitionDuration: const Duration(milliseconds: 180),
       pageBuilder: (ctx, animation, secondaryAnimation) => AppLockOverlayModal(
         preferencesController: preferencesController,
@@ -70,6 +70,7 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
   bool _hasConfiguredCredential = true;
   bool _nativePromptStarted = false;
   int _pinLength = 4;
+  int _cooldownSeconds = 0;
 
   LocalLockService get _lockService =>
       widget.lockService ?? locator<LocalLockService>();
@@ -93,6 +94,7 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
     final method = widget.preferencesController.security.lockMethod;
     final pinLength = await _lockService.getPinLength();
     final biometric = await _lockService.canUseBiometrics();
+    final cooldown = await _lockService.getRemainingCooldownSeconds();
     var hasCredential = true;
     if (method == 'PIN' || method == 'Pattern' || method == 'Password') {
       hasCredential = await _lockService.hasCredential(method);
@@ -102,6 +104,10 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
       _pinLength = pinLength;
       _biometricAvailable = biometric;
       _hasConfiguredCredential = hasCredential;
+      _cooldownSeconds = cooldown;
+      if (cooldown > 0) {
+        _errorMessage = 'Too many failed attempts. Try again in $cooldown seconds.';
+      }
     });
   }
 
@@ -142,26 +148,46 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
 
   Future<void> _verifySecret(String method, String value) async {
     if (_busy) return;
+
+    final cooldown = await _lockService.getRemainingCooldownSeconds();
+    if (cooldown > 0) {
+      setState(() {
+        _cooldownSeconds = cooldown;
+        _errorMessage = 'Too many failed attempts. Try again in $cooldown seconds.';
+        _enteredPin = '';
+        _passwordController.clear();
+      });
+      return;
+    }
+
     setState(() {
       _busy = true;
       _errorMessage = '';
     });
+
     final valid = await _lockService.verifyCredential(method, value);
     if (!mounted) return;
     if (valid) {
       _completeUnlock();
       return;
     }
+
+    final newCooldown = await _lockService.getRemainingCooldownSeconds();
     setState(() {
       _busy = false;
       _enteredPin = '';
       _passwordController.clear();
-      _errorMessage = 'Incorrect ${method.toLowerCase()}. Try again.';
+      _cooldownSeconds = newCooldown;
+      if (newCooldown > 0) {
+        _errorMessage = 'Too many failed attempts. Try again in $newCooldown seconds.';
+      } else {
+        _errorMessage = 'Incorrect ${method.toLowerCase()}. Try again.';
+      }
     });
   }
 
   Future<void> _verifyPinDigit(String digit) async {
-    if (_busy || _enteredPin.length >= _pinLength) return;
+    if (_busy || _enteredPin.length >= _pinLength || _cooldownSeconds > 0) return;
     final next = '$_enteredPin$digit';
     setState(() {
       _enteredPin = next;
@@ -219,7 +245,9 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                 final digit = '${index + 1}';
                 return _NumberKey(
                   label: digit,
-                  onTap: _busy ? null : () => _verifyPinDigit(digit),
+                  onTap: (_busy || _cooldownSeconds > 0)
+                      ? null
+                      : () => _verifyPinDigit(digit),
                 );
               }),
               IconButton(
@@ -231,7 +259,9 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
               ),
               _NumberKey(
                 label: '0',
-                onTap: _busy ? null : () => _verifyPinDigit('0'),
+                onTap: (_busy || _cooldownSeconds > 0)
+                    ? null
+                    : () => _verifyPinDigit('0'),
               ),
               IconButton(
                 tooltip: 'Delete digit',
@@ -365,7 +395,7 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                     ] else if (method == 'Password') ...[
                       TextField(
                         controller: _passwordController,
-                        enabled: !_busy,
+                        enabled: !_busy && _cooldownSeconds == 0,
                         obscureText: true,
                         autofocus: true,
                         onSubmitted: (value) =>
@@ -377,7 +407,7 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                       ),
                       const SizedBox(height: 14),
                       FilledButton(
-                        onPressed: _busy
+                        onPressed: (_busy || _cooldownSeconds > 0)
                             ? null
                             : () => _verifySecret(
                                 'Password',
