@@ -4,7 +4,6 @@ import '../../../data/services/notification_service.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/settings_primitives.dart';
 import '../../../ui/core/design_system/design_system.dart';
-import '../../../ui/core/theme/app_theme.dart';
 
 class NotificationSettingsPage extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
@@ -60,7 +59,8 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
 
     return ChatySettingsPage(
       title: 'Toast & Event Notifications',
-      subtitle: 'Manage live toasts, contact activity alerts and preview styles',
+      subtitle:
+          'Manage live toasts, contact activity alerts and preview styles',
       children: [
         // Live Toast Preview
         ChatySettingsSection(
@@ -76,9 +76,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                     decoration: BoxDecoration(
                       color: colors.surfaceSecondary,
                       borderRadius: BorderRadius.circular(ChatyRadius.lg),
-                      border: Border.all(
-                        color: colors.borderSubtle,
-                      ),
+                      border: Border.all(color: colors.borderSubtle),
                     ),
                     child: Row(
                       children: [
@@ -100,9 +98,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                             children: [
                               Text(
                                 'Elena is online',
-                                style: ChatyTypography.title(
-                                  colors.foreground,
-                                ),
+                                style: ChatyTypography.title(colors.foreground),
                               ),
                               const SizedBox(height: 2),
                               Text(

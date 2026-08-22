@@ -213,24 +213,40 @@ class AppColors extends ThemeExtension<AppColors> {
       accent: Color.lerp(accent, other.accent, t) ?? accent,
       onAccent: Color.lerp(onAccent, other.onAccent, t) ?? onAccent,
       background: Color.lerp(background, other.background, t) ?? background,
-      onBackground: Color.lerp(onBackground, other.onBackground, t) ?? onBackground,
+      onBackground:
+          Color.lerp(onBackground, other.onBackground, t) ?? onBackground,
       surface: Color.lerp(surface, other.surface, t) ?? surface,
       onSurface: Color.lerp(onSurface, other.onSurface, t) ?? onSurface,
-      surfaceSecondary: Color.lerp(surfaceSecondary, other.surfaceSecondary, t) ?? surfaceSecondary,
-      onSurfaceSecondary: Color.lerp(onSurfaceSecondary, other.onSurfaceSecondary, t) ?? onSurfaceSecondary,
-      surfaceElevated: Color.lerp(surfaceElevated, other.surfaceElevated, t) ?? surfaceElevated,
-      onSurfaceElevated: Color.lerp(onSurfaceElevated, other.onSurfaceElevated, t) ?? onSurfaceElevated,
+      surfaceSecondary:
+          Color.lerp(surfaceSecondary, other.surfaceSecondary, t) ??
+          surfaceSecondary,
+      onSurfaceSecondary:
+          Color.lerp(onSurfaceSecondary, other.onSurfaceSecondary, t) ??
+          onSurfaceSecondary,
+      surfaceElevated:
+          Color.lerp(surfaceElevated, other.surfaceElevated, t) ??
+          surfaceElevated,
+      onSurfaceElevated:
+          Color.lerp(onSurfaceElevated, other.onSurfaceElevated, t) ??
+          onSurfaceElevated,
       foreground: Color.lerp(foreground, other.foreground, t) ?? foreground,
-      foregroundSecondary: Color.lerp(foregroundSecondary, other.foregroundSecondary, t) ?? foregroundSecondary,
-      foregroundTertiary: Color.lerp(foregroundTertiary, other.foregroundTertiary, t) ?? foregroundTertiary,
+      foregroundSecondary:
+          Color.lerp(foregroundSecondary, other.foregroundSecondary, t) ??
+          foregroundSecondary,
+      foregroundTertiary:
+          Color.lerp(foregroundTertiary, other.foregroundTertiary, t) ??
+          foregroundTertiary,
       border: Color.lerp(border, other.border, t) ?? border,
-      borderSubtle: Color.lerp(borderSubtle, other.borderSubtle, t) ?? borderSubtle,
+      borderSubtle:
+          Color.lerp(borderSubtle, other.borderSubtle, t) ?? borderSubtle,
       divider: Color.lerp(divider, other.divider, t) ?? divider,
       input: Color.lerp(input, other.input, t) ?? input,
       inputBorder: Color.lerp(inputBorder, other.inputBorder, t) ?? inputBorder,
       inputFill: Color.lerp(inputFill, other.inputFill, t) ?? inputFill,
       disabled: Color.lerp(disabled, other.disabled, t) ?? disabled,
-      disabledForeground: Color.lerp(disabledForeground, other.disabledForeground, t) ?? disabledForeground,
+      disabledForeground:
+          Color.lerp(disabledForeground, other.disabledForeground, t) ??
+          disabledForeground,
       selected: Color.lerp(selected, other.selected, t) ?? selected,
       onSelected: Color.lerp(onSelected, other.onSelected, t) ?? onSelected,
       hover: Color.lerp(hover, other.hover, t) ?? hover,
@@ -245,7 +261,8 @@ class AppColors extends ThemeExtension<AppColors> {
       onInfo: Color.lerp(onInfo, other.onInfo, t) ?? onInfo,
       link: Color.lerp(link, other.link, t) ?? link,
       icon: Color.lerp(icon, other.icon, t) ?? icon,
-      iconSecondary: Color.lerp(iconSecondary, other.iconSecondary, t) ?? iconSecondary,
+      iconSecondary:
+          Color.lerp(iconSecondary, other.iconSecondary, t) ?? iconSecondary,
       shadow: Color.lerp(shadow, other.shadow, t) ?? shadow,
     );
   }

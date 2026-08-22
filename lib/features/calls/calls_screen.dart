@@ -3,8 +3,9 @@ import '../../domain/models/other_models.dart';
 import '../../data/repositories/mock_data_store.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/design_system/design_system.dart';
-import '../../ui/core/theme/theme_config.dart';
-import 'mock_call_screen.dart';
+import '../../injection/locator.dart';
+import '../../data/services/call_signaling_service.dart';
+import 'ongoing_call_screen.dart';
 
 class CallsScreen extends StatelessWidget {
   final ThemeConfig theme;
@@ -41,9 +42,7 @@ class CallsScreen extends StatelessWidget {
                 children: [
                   Text(
                     'Calls',
-                    style: ChatyTypography.headline(
-                      colors.foreground,
-                    ),
+                    style: ChatyTypography.headline(colors.foreground),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -51,9 +50,7 @@ class CallsScreen extends StatelessWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: colors.primary.withValues(
-                        alpha: 0.12,
-                      ),
+                      color: colors.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(ChatyRadius.full),
                     ),
                     child: Row(
@@ -92,9 +89,7 @@ class CallsScreen extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(ChatySpacing.lg),
                         decoration: BoxDecoration(
-                          color: colors.primary.withValues(
-                            alpha: 0.08,
-                          ),
+                          color: colors.primary.withValues(alpha: 0.08),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -106,9 +101,7 @@ class CallsScreen extends StatelessWidget {
                       const SizedBox(height: ChatySpacing.base),
                       Text(
                         'No recent calls',
-                        style: ChatyTypography.title(
-                          colors.foreground,
-                        ),
+                        style: ChatyTypography.title(colors.foreground),
                       ),
                       const SizedBox(height: ChatySpacing.xs),
                       Text(
@@ -193,24 +186,36 @@ class CallsScreen extends StatelessWidget {
                               backgroundColor: colors.surfaceSecondary,
                               color: colors.primary,
                               onPressed: () {
+                                final callService = locator<CallSignalingService>();
+                                callService.initiateCall(
+                                  remoteUserId: call.callerId,
+                                  remoteDisplayName: caller?.displayName ?? 'Contact',
+                                  remoteAvatarInitials: caller?.avatarInitials,
+                                  remoteAvatarColorHex: caller?.avatarColorHex,
+                                  isVideo: isVideo,
+                                );
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
-                                    builder: (context) => MockCallScreen(
+                                    builder: (context) => OngoingCallScreen(
                                       theme: theme,
-                                      title: caller?.displayName ?? 'Contact',
-                                      isVideo: isVideo,
                                     ),
                                   ),
                                 );
                               },
                             ),
                             onTap: () {
+                              final callService = locator<CallSignalingService>();
+                              callService.initiateCall(
+                                remoteUserId: call.callerId,
+                                remoteDisplayName: caller?.displayName ?? 'Contact',
+                                remoteAvatarInitials: caller?.avatarInitials,
+                                remoteAvatarColorHex: caller?.avatarColorHex,
+                                isVideo: isVideo,
+                              );
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (context) => MockCallScreen(
+                                  builder: (context) => OngoingCallScreen(
                                     theme: theme,
-                                    title: caller?.displayName ?? 'Contact',
-                                    isVideo: isVideo,
                                   ),
                                 ),
                               );

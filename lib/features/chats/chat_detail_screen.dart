@@ -4,8 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../ui/core/theme/theme_config.dart';
-import '../../../ui/core/theme/theme_controller.dart';
+import '../../../ui/core/theme/app_theme.dart';
 import '../../data/repositories/mock_data_store.dart';
 import '../../data/services/contact_relationship_service.dart';
 import '../../data/services/rich_chat_realtime_service.dart';
@@ -21,9 +20,11 @@ import '../../ui/core/design_system/settings_primitives.dart';
 import '../../ui/core/design_system/components/chaty_kit.dart';
 import '../../ui/core/design_system/components/app_components.dart';
 import '../../ui/core/gb/gb_theme_overrides.dart';
+import '../../core/emoji/widgets/animated_emoji_text.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/widgets/chat_wallpaper.dart';
-import '../calls/mock_call_screen.dart';
+import '../../data/services/call_signaling_service.dart';
+import '../calls/ongoing_call_screen.dart';
 import '../messages/attachment_sheet.dart';
 import '../messages/chat_attachment_actions.dart';
 import '../messages/emoji_picker_modal.dart';
@@ -459,78 +460,78 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         widget.preferencesController.conversation.iosStylePopupMenu;
 
     Widget buildActions(BuildContext sheetContext) => MessageActionSheet(
-        message: message,
-        isMe: isMine,
-        theme: theme,
-        useIosStyle: iosStyle,
-        onForward: () {
-          Navigator.of(sheetContext).pop();
-          _openForwardSheet(message);
-        },
-        onReact: (emoji) {
-          widget.dataStore.toggleReaction(
-            widget.conversationId,
-            message.id,
-            emoji,
-          );
-          Navigator.of(sheetContext).pop();
-        },
-        onReply: () {
-          Navigator.of(sheetContext).pop();
-          setState(() => _replyTarget = message);
-        },
-        onPin: () {
-          widget.dataStore.togglePinMessage(widget.conversationId, message.id);
-          Navigator.of(sheetContext).pop();
-        },
-        onStar: () {
-          widget.dataStore.toggleStarMessage(widget.conversationId, message.id);
-          Navigator.of(sheetContext).pop();
-        },
-        onCopy: () async {
-          Navigator.of(sheetContext).pop();
-          await Clipboard.setData(ClipboardData(text: message.text));
-          if (mounted)
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('Message copied')));
-        },
-        onDeleteForMe: () {
-          widget.dataStore.deleteMessage(
-            widget.conversationId,
-            message.id,
-            forEveryone: false,
-          );
-          Navigator.of(sheetContext).pop();
-        },
-        onDeleteForEveryone: isMine
-            ? () {
-                widget.dataStore.deleteMessage(
-                  widget.conversationId,
-                  message.id,
-                  forEveryone: true,
-                );
-                Navigator.of(sheetContext).pop();
-              }
-            : null,
-        onReport: () {
-          Navigator.of(sheetContext).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Use Contact info → Block to stop unwanted messages.',
-              ),
+      message: message,
+      isMe: isMine,
+      theme: theme,
+      useIosStyle: iosStyle,
+      onForward: () {
+        Navigator.of(sheetContext).pop();
+        _openForwardSheet(message);
+      },
+      onReact: (emoji) {
+        widget.dataStore.toggleReaction(
+          widget.conversationId,
+          message.id,
+          emoji,
+        );
+        Navigator.of(sheetContext).pop();
+      },
+      onReply: () {
+        Navigator.of(sheetContext).pop();
+        setState(() => _replyTarget = message);
+      },
+      onPin: () {
+        widget.dataStore.togglePinMessage(widget.conversationId, message.id);
+        Navigator.of(sheetContext).pop();
+      },
+      onStar: () {
+        widget.dataStore.toggleStarMessage(widget.conversationId, message.id);
+        Navigator.of(sheetContext).pop();
+      },
+      onCopy: () async {
+        Navigator.of(sheetContext).pop();
+        await Clipboard.setData(ClipboardData(text: message.text));
+        if (mounted)
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Message copied')));
+      },
+      onDeleteForMe: () {
+        widget.dataStore.deleteMessage(
+          widget.conversationId,
+          message.id,
+          forEveryone: false,
+        );
+        Navigator.of(sheetContext).pop();
+      },
+      onDeleteForEveryone: isMine
+          ? () {
+              widget.dataStore.deleteMessage(
+                widget.conversationId,
+                message.id,
+                forEveryone: true,
+              );
+              Navigator.of(sheetContext).pop();
+            }
+          : null,
+      onReport: () {
+        Navigator.of(sheetContext).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Use Contact info → Block to stop unwanted messages.',
             ),
-          );
-        },
-        onCreateTask: () {
-          Navigator.of(sheetContext).pop();
-          _openCreateTaskModal(
-            initialTitle: message.text,
-            sourceMessageId: message.id,
-          );
-        },
-      );
+          ),
+        );
+      },
+      onCreateTask: () {
+        Navigator.of(sheetContext).pop();
+        _openCreateTaskModal(
+          initialTitle: message.text,
+          sourceMessageId: message.id,
+        );
+      },
+    );
 
     if (iosStyle) {
       showDialog<void>(
@@ -728,26 +729,28 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       if (event.callId != callId || !mounted) return;
       if (event.response == 'accepted') {
         answered = true;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Call connected.')),
-        );
       } else if (event.response == 'declined' || event.response == 'busy') {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              event.response == 'busy' ? 'Line busy.' : 'Call declined.',
-            ),
-          ),
-        );
+        if (mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
       }
     });
+
+    final callService = locator<CallSignalingService>();
+    unawaited(
+      callService.initiateCall(
+        remoteUserId: contact.id,
+        remoteDisplayName: conversation.title,
+        remoteAvatarInitials: contact.avatarInitials,
+        remoteAvatarColorHex: contact.avatarColorHex,
+        isVideo: isVideo,
+      ),
+    );
+
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => MockCallScreen(
+        builder: (_) => OngoingCallScreen(
           theme: _theme,
-          title: conversation.title,
-          isVideo: isVideo,
         ),
       ),
     );
@@ -887,32 +890,33 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           child: Row(
             children: [
               if (showHeaderAvatar)
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  AppAvatar(
-                    initials:
-                        conversation.avatarInitials ??
-                        conversation.title.characters
-                            .take(2)
-                            .toString()
-                            .toUpperCase(),
-                    colorHex: conversation.avatarColorHex ?? '0xFF6366F1',
-                    size: 38,
-                  ),
-                  if (conversation.type == ConversationType.direct && isOnline)
-                    Positioned(
-                      right: -1,
-                      bottom: -1,
-                      child: ChatyOnlineDot(
-                        active: true,
-                        avatarSize: 38,
-                        color: theme.successColor,
-                        ringColor: theme.surfaceColor,
-                      ),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    AppAvatar(
+                      initials:
+                          conversation.avatarInitials ??
+                          conversation.title.characters
+                              .take(2)
+                              .toString()
+                              .toUpperCase(),
+                      colorHex: conversation.avatarColorHex ?? '0xFF6366F1',
+                      size: 38,
                     ),
-                ],
-              ),
+                    if (conversation.type == ConversationType.direct &&
+                        isOnline)
+                      Positioned(
+                        right: -1,
+                        bottom: -1,
+                        child: ChatyOnlineDot(
+                          active: true,
+                          avatarSize: 38,
+                          color: theme.successColor,
+                          ringColor: theme.surfaceColor,
+                        ),
+                      ),
+                  ],
+                ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -950,10 +954,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: presenceTextColor ??
+                            color:
+                                presenceTextColor ??
                                 (remoteTyping || remoteRecording || isOnline
-                                ? theme.successColor
-                                : theme.secondaryTextColor),
+                                    ? theme.successColor
+                                    : theme.secondaryTextColor),
                             fontSize: 10.5 * theme.fontScale,
                             fontWeight: FontWeight.w500,
                           ),
@@ -967,38 +972,35 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         ),
         actions: [
           if (showHeaderCalls)
-          IconButton(
-            icon: Icon(
-              Icons.call_rounded,
-              color: _connectionStatus.callsAllowed
-                  ? null
-                  : theme.secondaryTextColor,
+            IconButton(
+              icon: Icon(
+                Icons.call_rounded,
+                color: _connectionStatus.callsAllowed
+                    ? null
+                    : theme.secondaryTextColor,
+              ),
+              tooltip: _connectionStatus.callsAllowed
+                  ? 'Voice call'
+                  : 'Voice call • contact acceptance required',
+              onPressed: () => _startCall(false),
             ),
-            tooltip: _connectionStatus.callsAllowed
-                ? 'Voice call'
-                : 'Voice call • contact acceptance required',
-            onPressed: () => _startCall(false),
-          ),
           if (showHeaderCalls)
-          IconButton(
-            icon: Icon(
-              Icons.video_camera_front_rounded,
-              color: _connectionStatus.callsAllowed
-                  ? null
-                  : theme.secondaryTextColor,
+            IconButton(
+              icon: Icon(
+                Icons.video_camera_front_rounded,
+                color: _connectionStatus.callsAllowed
+                    ? null
+                    : theme.secondaryTextColor,
+              ),
+              tooltip: _connectionStatus.callsAllowed
+                  ? 'Video call'
+                  : 'Video call • contact acceptance required',
+              onPressed: () => _startCall(true),
             ),
-            tooltip: _connectionStatus.callsAllowed
-                ? 'Video call'
-                : 'Video call • contact acceptance required',
-            onPressed: () => _startCall(true),
-          ),
           // Chat overflow menu: wallpaper, mute, clear, block and more.
           IconButton(
             tooltip: 'Chat options',
-            icon: Icon(
-              Icons.more_vert_rounded,
-              color: theme.primaryTextColor,
-            ),
+            icon: Icon(Icons.more_vert_rounded, color: theme.primaryTextColor),
             onPressed: () => _openChatMenu(conversation, otherUser),
           ),
         ],
@@ -1010,12 +1012,19 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             if (!_realtime.isConnected)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 4,
+                  horizontal: 12,
+                ),
                 color: context.colors.warning.withValues(alpha: 0.15),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.wifi_off_rounded, size: 14, color: context.colors.warning),
+                    Icon(
+                      Icons.wifi_off_rounded,
+                      size: 14,
+                      color: context.colors.warning,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       'No internet connection • Working offline with cached media',
@@ -1036,14 +1045,19 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   children: [
                     ChatWallpaper(
                       theme: theme,
-                      wallpaperType:
-                          widget.preferencesController.conversation.wallpaperType,
+                      wallpaperType: widget
+                          .preferencesController
+                          .conversation
+                          .wallpaperType,
                       // Per-chat override wins over the theme pattern.
                       patternId: _chatWallpaperOverride ?? theme.wallpaperId,
-                      profileColorHex: conversation.avatarColorHex ??
+                      profileColorHex:
+                          conversation.avatarColorHex ??
                           otherUser?.avatarColorHex,
-                      imagePath:
-                          widget.preferencesController.conversation.wallpaperPath,
+                      imagePath: widget
+                          .preferencesController
+                          .conversation
+                          .wallpaperPath,
                     ),
                     _messagesBody(theme, conversation, messages, showDeleted),
                     // Floating scroll-to-bottom arrow with unseen count —
@@ -1055,13 +1069,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       child: IgnorePointer(
                         ignoring: _isNearBottom || messages.isEmpty,
                         child: AnimatedScale(
-                          scale:
-                              _isNearBottom || messages.isEmpty ? 0.4 : 1.0,
+                          scale: _isNearBottom || messages.isEmpty ? 0.4 : 1.0,
                           duration: const Duration(milliseconds: 160),
                           curve: Curves.easeOutBack,
                           child: AnimatedOpacity(
-                            opacity:
-                                _isNearBottom || messages.isEmpty ? 0.0 : 1.0,
+                            opacity: _isNearBottom || messages.isEmpty
+                                ? 0.0
+                                : 1.0,
                             duration: const Duration(milliseconds: 140),
                             child: Material(
                               color: Colors.transparent,
@@ -1193,14 +1207,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          Text(
-                            _replyTarget!.text,
+                          AnimatedEmojiText(
+                            text: _replyTarget!.text,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: theme.secondaryTextColor,
                               fontSize: 11.5,
                             ),
+                            enableExpressiveSizing: false,
                           ),
                         ],
                       ),
@@ -1229,6 +1244,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               onVoiceHoldEnd: _handleVoiceRelease,
               onVoiceCancel: _cancelVoice,
               onVoiceSend: _finishVoice,
+              amplitudeProvider: _voice.currentLevel,
             ),
           ],
         ),
@@ -1340,9 +1356,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           ),
           decoration: BoxDecoration(
             color: theme.surfaceColor,
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(18),
-            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1417,14 +1431,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         extraMetadata: <String, dynamic>{'forwarded': labelAllowed},
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Forwarded to ${target.title}.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Forwarded to ${target.title}.')));
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not forward: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not forward: $error')));
     }
   }
 
@@ -1432,120 +1446,66 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   // Chat overflow menu (3-dots in the header): everything below is REAL.
   // ---------------------------------------------------------------------------
   void _openChatMenu(Conversation conversation, UserProfile? otherUser) {
-    final theme = _theme;
     final isDirect =
         conversation.type == ConversationType.direct && otherUser != null;
-
-    Widget row({
-      required IconData icon,
-      required String label,
-      required VoidCallback onTap,
-      bool destructive = false,
-    }) {
-      final color = destructive ? theme.dangerColor : theme.primaryTextColor;
-      return ListTile(
-        leading: Icon(icon, size: 21, color: destructive ? theme.dangerColor : theme.accentColor),
-        title: Text(label, style: TextStyle(color: color, fontSize: 14.5)),
-        onTap: onTap,
-      );
-    }
-
-    BuildContext sheetCtx = context;
-
-    Future<void> closeAnd(VoidCallback action) async {
-      Navigator.of(sheetCtx).pop();
-      action();
-    }
-
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        sheetCtx = sheetContext;
-        return SafeArea(
-          child: Container(
-            decoration: BoxDecoration(
-              color: theme.surfaceColor,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(18),
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 14),
-                Text(
-                  conversation.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: theme.primaryTextColor,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
+    ChatyMenuSheet.show(
+      context,
+      title: conversation.title,
+      items: [
+        ChatyMenuItem(
+          icon: isDirect
+              ? Icons.person_outline_rounded
+              : Icons.groups_2_rounded,
+          label: isDirect ? 'View contact info' : 'View group info',
+          onTap: () {
+            if (isDirect) {
+              _openContactInfo(conversation, otherUser);
+            } else {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => GroupInfoScreen(
+                    theme: _theme,
+                    dataStore: widget.dataStore,
+                    conversationId: widget.conversationId,
                   ),
                 ),
-                const SizedBox(height: 6),
-                row(
-                  icon: isDirect
-                      ? Icons.person_outline_rounded
-                      : Icons.groups_2_rounded,
-                  label: isDirect ? 'View contact info' : 'View group info',
-                  onTap: () => closeAnd(() {
-                    if (isDirect && otherUser != null) {
-                      _openContactInfo(conversation, otherUser);
-                    } else if (!isDirect) {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => GroupInfoScreen(
-                            theme: theme,
-                            dataStore: widget.dataStore,
-                            conversationId: widget.conversationId,
-                          ),
-                        ),
-                      );
-                    }
-                  }),
-                ),
-                row(
-                  icon: Icons.wallpaper_rounded,
-                  label: 'Chat wallpaper',
-                  onTap: () {
-                    Navigator.of(sheetCtx).pop();
-                    _openWallpaperPicker();
-                  },
-                ),
-                row(
-                  icon: conversation.isMuted
-                      ? Icons.notifications_active_rounded
-                      : Icons.notifications_off_rounded,
-                  label: conversation.isMuted ? 'Unmute notifications' : 'Mute notifications',
-                  onTap: () => closeAnd(() =>
-                      widget.dataStore.toggleMuteConversation(conversation.id)),
-                ),
-                row(
-                  icon: Icons.emoji_emotions_outlined,
-                  label: 'Clear recent emojis',
-                  onTap: () => closeAnd(_clearRecentEmojis),
-                ),
-                row(
-                  icon: Icons.delete_sweep_rounded,
-                  label: 'Clear conversation',
-                  destructive: true,
-                  onTap: () => closeAnd(_clearConversation),
-                ),
-                if (isDirect && otherUser != null)
-                  row(
-                    icon: Icons.block_rounded,
-                    label: 'Block ${otherUser.displayName.split(' ').first}',
-                    destructive: true,
-                    onTap: () => closeAnd(() => _blockContact(otherUser)),
-                  ),
-                const SizedBox(height: 10),
-              ],
-            ),
+              );
+            }
+          },
+        ),
+        ChatyMenuItem(
+          icon: Icons.wallpaper_rounded,
+          label: 'Chat wallpaper',
+          onTap: _openWallpaperPicker,
+        ),
+        ChatyMenuItem(
+          icon: conversation.isMuted
+              ? Icons.notifications_active_rounded
+              : Icons.notifications_off_rounded,
+          label: conversation.isMuted
+              ? 'Unmute notifications'
+              : 'Mute notifications',
+          onTap: () => widget.dataStore.toggleMuteConversation(conversation.id),
+        ),
+        ChatyMenuItem(
+          icon: Icons.emoji_emotions_outlined,
+          label: 'Clear recent emojis',
+          onTap: _clearRecentEmojis,
+        ),
+        ChatyMenuItem(
+          icon: Icons.delete_sweep_rounded,
+          label: 'Clear conversation',
+          destructive: true,
+          onTap: _clearConversation,
+        ),
+        if (isDirect)
+          ChatyMenuItem(
+            icon: Icons.block_rounded,
+            label: 'Block ${otherUser.displayName.split(' ').first}',
+            destructive: true,
+            onTap: () => _blockContact(otherUser),
           ),
-        );
-      },
+      ],
     );
   }
 
@@ -1726,11 +1686,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       );
     }
     if (messages.isEmpty)
-      return Center(
-        child: Text(
-          'No messages yet',
-          style: TextStyle(color: theme.secondaryTextColor),
-        ),
+      return ChatyEmptyState(
+        icon: Icons.chat_bubble_outline_rounded,
+        title: 'No messages yet',
+        message: 'Say hi to start the conversation.',
+        iconColor: theme.secondaryTextColor,
+        titleColor: theme.primaryTextColor,
+        messageColor: theme.secondaryTextColor,
       );
     // Anti View-Once resolve chain: explicit privacy pref OR GB toggle.
     final retainViewOnce =
@@ -1795,7 +1757,21 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 }
 
-class _Composer extends StatelessWidget {
+/// Premium message composer + voice recorder.
+///
+/// Presentation only: every callback is owned by the screen and the capture
+/// pipeline is untouched. While recording, the level meter renders REAL
+/// microphone amplitude samples (dBFS from the `record` plugin, polled at
+/// ~90ms) — never synthetic bars. With no amplitude provider the meter is
+/// simply omitted rather than faked.
+/// Premium message composer + voice recorder.
+///
+/// Presentation only: every callback is owned by the screen and the capture
+/// pipeline is untouched. While recording, the level meter renders REAL
+/// microphone amplitude samples (dBFS from the `record` plugin, polled at
+/// ~90ms) — never synthetic bars. With no amplitude provider the meter is
+/// simply omitted rather than faked.
+class _Composer extends StatefulWidget {
   final ThemeConfig theme;
   final TextEditingController controller;
   final VoidCallback onAttach;
@@ -1812,6 +1788,7 @@ class _Composer extends StatelessWidget {
   final VoidCallback onVoiceHoldEnd;
   final VoidCallback onVoiceCancel;
   final VoidCallback onVoiceSend;
+  final Future<double> Function()? amplitudeProvider;
 
   const _Composer({
     required this.theme,
@@ -1830,176 +1807,388 @@ class _Composer extends StatelessWidget {
     required this.onVoiceHoldEnd,
     required this.onVoiceCancel,
     required this.onVoiceSend,
+    this.amplitudeProvider,
   });
 
-  String _time() {
-    final min = (voiceSeconds ~/ 60).toString().padLeft(2, '0');
-    final sec = (voiceSeconds % 60).toString().padLeft(2, '0');
+  @override
+  State<_Composer> createState() => _ComposerState();
+}
+
+class _ComposerState extends State<_Composer>
+    with SingleTickerProviderStateMixin {
+  /// Level-meter resolution. Bars scroll left as new samples arrive.
+  static const int _barCount = 30;
+  static const double _dbFloor = -60;
+  final List<double> _levels = List<double>.filled(_barCount, 0.0);
+  Timer? _levelTimer;
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.recording) {
+      _pulse.repeat(reverse: true);
+      _startLevelPolling();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _Composer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.recording == oldWidget.recording) return;
+    if (widget.recording) {
+      _pulse.repeat(reverse: true);
+      _startLevelPolling();
+    } else {
+      _pulse.stop();
+      _stopLevelPolling();
+    }
+  }
+
+  @override
+  void dispose() {
+    _stopLevelPolling();
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  void _startLevelPolling() {
+    _levels.fillRange(0, _barCount, 0.0);
+    _levelTimer?.cancel();
+    _levelTimer = Timer.periodic(const Duration(milliseconds: 90), (_) async {
+      final provider = widget.amplitudeProvider;
+      if (provider == null || !mounted) return;
+      final db = await provider();
+      // dBFS → 0..1 with a small floor so silence still shows a stub.
+      final normalized = ((db - _dbFloor) / -_dbFloor).clamp(0.0, 1.0);
+      if (!mounted) return;
+      setState(() {
+        _levels.removeAt(0);
+        _levels.add(normalized < 0.06 ? 0.06 : normalized);
+      });
+    });
+  }
+
+  void _stopLevelPolling() {
+    _levelTimer?.cancel();
+    _levelTimer = null;
+  }
+
+  String get _time {
+    final min = (widget.voiceSeconds ~/ 60).toString().padLeft(2, '0');
+    final sec = (widget.voiceSeconds % 60).toString().padLeft(2, '0');
     return '$min:$sec';
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = widget.theme;
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
     return Container(
-      padding: const EdgeInsets.fromLTRB(4, 7, 7, 7),
+      padding: const EdgeInsets.fromLTRB(6, 8, 8, 8),
       decoration: BoxDecoration(
         color: theme.surfaceColor,
         border: Border(top: BorderSide(color: theme.cardColor)),
       ),
       child: SafeArea(
         top: false,
-        child: recording
-            ? Row(
-                children: [
-                  IconButton(
-                    tooltip: 'Cancel recording',
-                    onPressed: voiceBusy ? null : onVoiceCancel,
-                    icon: Icon(
-                      Icons.delete_outline_rounded,
-                      color: theme.dangerColor,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: theme.dangerColor,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _time(),
-                    style: TextStyle(
-                      color: theme.primaryTextColor,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      recordLocked
-                          ? 'Recording locked • tap send when ready'
-                          : 'Slide left to cancel • slide up to lock',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: theme.secondaryTextColor,
-                        fontSize: 11.5,
-                      ),
-                    ),
-                  ),
-                  if (recordLocked)
-                    IconButton.filled(
-                      tooltip: 'Send voice note',
-                      style: IconButton.styleFrom(
-                        backgroundColor: theme.accentColor,
-                        foregroundColor: theme.onAccentColor,
-                      ),
-                      onPressed: voiceBusy ? null : onVoiceSend,
-                      icon: voiceBusy
-                          ? SizedBox(
-                              width: 17,
-                              height: 17,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: theme.onAccentColor,
-                              ),
-                            )
-                          : const Icon(Icons.send_rounded, size: 19),
-                    ),
-                ],
-              )
-            : Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  IconButton(
-                    tooltip: 'Attach',
-                    color: theme.accentColor,
-                    onPressed: onAttach,
-                    icon: const Icon(Icons.add_circle_outline_rounded),
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: controller,
-                      minLines: 1,
-                      maxLines: 5,
-                      onChanged: onChanged,
-                      style: TextStyle(
-                        color: theme.primaryTextColor,
-                        fontSize: 14 * theme.fontScale,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Message…  /task or #reply',
-                        hintStyle: TextStyle(color: theme.secondaryTextColor),
-                        filled: true,
-                        fillColor: theme.cardColor,
-                        prefixIcon: IconButton(
-                          tooltip: 'Emoji',
-                          onPressed: onEmoji,
-                          icon: Icon(
-                            Icons.emoji_emotions_outlined,
-                            color: theme.secondaryTextColor,
-                          ),
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(22),
-                          borderSide: BorderSide.none,
-                        ),
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 11,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: controller,
-                    builder: (context, value, _) {
-                      final hasText = value.text.trim().isNotEmpty;
-                      if (hasText) {
-                        return IconButton.filled(
-                          tooltip: 'Send',
-                          style: IconButton.styleFrom(
-                            backgroundColor: theme.accentColor,
-                            foregroundColor: theme.onAccentColor,
-                          ),
-                          onPressed: onSend,
-                          icon: const Icon(Icons.send_rounded, size: 19),
-                        );
-                      }
-                      return Semantics(
-                        button: true,
-                        label:
-                            'Voice note. Tap to start locked recording, or hold to record and slide.',
-                        child: GestureDetector(
-                          onTap: onVoiceTap,
-                          onLongPressStart: (_) => onVoiceHoldStart(),
-                          onLongPressMoveUpdate: onVoiceMove,
-                          onLongPressEnd: (_) => onVoiceHoldEnd(),
-                          child: Container(
-                            width: 46,
-                            height: 46,
-                            decoration: BoxDecoration(
-                              color: theme.accentColor,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.mic_rounded,
-                              size: 20,
-                              color: theme.onAccentColor,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
+        child: widget.recording
+            ? _buildRecordingBar(theme, reduceMotion)
+            : _buildInputRow(theme),
       ),
     );
+  }
+
+  // --- Recording ------------------------------------------------------------
+
+  Widget _buildRecordingBar(ThemeConfig theme, bool reduceMotion) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            _ComposerCircleButton(
+              theme: theme,
+              tooltip: 'Cancel recording',
+              icon: Icons.delete_outline_rounded,
+              iconColor: theme.dangerColor,
+              onTap: widget.voiceBusy ? null : widget.onVoiceCancel,
+            ),
+            const SizedBox(width: 10),
+            FadeTransition(
+              opacity: reduceMotion
+                  ? const AlwaysStoppedAnimation<double>(1)
+                  : Tween<double>(begin: 1, end: 0.35).animate(_pulse),
+              child: Container(
+                width: 9,
+                height: 9,
+                decoration: BoxDecoration(
+                  color: theme.dangerColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              _time,
+              style: TextStyle(
+                color: theme.primaryTextColor,
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+            if (widget.recordLocked) ...[
+              const SizedBox(width: 6),
+              Icon(Icons.lock_rounded, size: 13, color: theme.successColor),
+            ],
+            const SizedBox(width: 12),
+            if (widget.amplitudeProvider != null)
+              Expanded(child: _LevelMeter(levels: _levels, theme: theme))
+            else
+              const Spacer(),
+            if (widget.recordLocked) ...[
+              const SizedBox(width: 10),
+              _ComposerCircleButton(
+                theme: theme,
+                tooltip: 'Send voice note',
+                icon: Icons.send_rounded,
+                fillColor: theme.accentColor,
+                iconColor: theme.onAccentColor,
+                busy: widget.voiceBusy,
+                onTap: widget.voiceBusy ? null : widget.onVoiceSend,
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 5),
+        Text(
+          widget.recordLocked
+              ? 'Recording locked • tap send when ready'
+              : 'Slide left to cancel • slide up to lock',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(color: theme.secondaryTextColor, fontSize: 11),
+        ),
+      ],
+    );
+  }
+
+  // --- Text input -----------------------------------------------------------
+
+  Widget _buildInputRow(ThemeConfig theme) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        _ComposerCircleButton(
+          theme: theme,
+          tooltip: 'Attach',
+          icon: Icons.add_circle_outline_rounded,
+          iconColor: theme.accentColor,
+          onTap: widget.onAttach,
+        ),
+        Expanded(
+          child: TextField(
+            controller: widget.controller,
+            minLines: 1,
+            maxLines: 5,
+            onChanged: widget.onChanged,
+            style: TextStyle(
+              color: theme.primaryTextColor,
+              fontSize: 14 * theme.fontScale,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Message…  /task or #reply',
+              hintStyle: TextStyle(color: theme.secondaryTextColor),
+              filled: true,
+              fillColor: theme.cardColor,
+              prefixIcon: IconButton(
+                tooltip: 'Emoji',
+                onPressed: widget.onEmoji,
+                icon: Icon(
+                  Icons.emoji_emotions_outlined,
+                  color: theme.secondaryTextColor,
+                ),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(22),
+                borderSide: BorderSide.none,
+              ),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 11,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: widget.controller,
+          builder: (context, value, _) {
+            final hasText = value.text.trim().isNotEmpty;
+            if (hasText) {
+              return _ComposerCircleButton(
+                theme: theme,
+                tooltip: 'Send',
+                icon: Icons.send_rounded,
+                fillColor: theme.accentColor,
+                iconColor: theme.onAccentColor,
+                onTap: widget.onSend,
+              );
+            }
+            return _ComposerCircleButton(
+              theme: theme,
+              size: 46,
+              icon: Icons.mic_rounded,
+              fillColor: theme.accentColor,
+              iconColor: theme.onAccentColor,
+              semanticsLabel:
+                  'Voice note. Tap to start locked recording, or hold to record and slide.',
+              onTap: widget.onVoiceTap,
+              onLongPressStart: (_) => widget.onVoiceHoldStart(),
+              onLongPressMoveUpdate: widget.onVoiceMove,
+              onLongPressEnd: (_) => widget.onVoiceHoldEnd(),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+/// Real-amplitude level meter: one rounded bar per sample, newest on the
+/// right. Heights animate at the poll cadence so transitions stay
+/// interruptible.
+class _LevelMeter extends StatelessWidget {
+  final List<double> levels;
+  final ThemeConfig theme;
+
+  const _LevelMeter({required this.levels, required this.theme});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 26,
+      child: Row(
+        children: [
+          for (final level in levels)
+            Expanded(
+              child: Center(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 90),
+                  curve: Curves.easeOut,
+                  width: 3,
+                  height: 4 + 20 * level,
+                  decoration: BoxDecoration(
+                    color: theme.accentColor.withValues(
+                      alpha: 0.45 + 0.55 * level,
+                    ),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Uniform circular action used across the composer: one geometry (44/46dp),
+/// optional accent fill, busy spinner, subtle press-scale feedback and an
+/// optional hold-to-record gesture set. All colors come from the theme.
+class _ComposerCircleButton extends StatefulWidget {
+  final ThemeConfig theme;
+  final String? tooltip;
+  final IconData? icon;
+  final Color? iconColor;
+  final Color? fillColor;
+  final VoidCallback? onTap;
+  final GestureLongPressStartCallback? onLongPressStart;
+  final GestureLongPressMoveUpdateCallback? onLongPressMoveUpdate;
+  final GestureLongPressEndCallback? onLongPressEnd;
+  final String? semanticsLabel;
+  final bool busy;
+  final double size;
+
+  const _ComposerCircleButton({
+    required this.theme,
+    this.tooltip,
+    this.icon,
+    this.iconColor,
+    this.fillColor,
+    this.onTap,
+    this.onLongPressStart,
+    this.onLongPressMoveUpdate,
+    this.onLongPressEnd,
+    this.semanticsLabel,
+    this.busy = false,
+    this.size = 44,
+  });
+
+  @override
+  State<_ComposerCircleButton> createState() => _ComposerCircleButtonState();
+}
+
+class _ComposerCircleButtonState extends State<_ComposerCircleButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.onTap != null || widget.onLongPressStart != null;
+    final content = Container(
+      width: widget.size,
+      height: widget.size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: widget.fillColor ?? Colors.transparent,
+      ),
+      child: widget.busy
+          ? Padding(
+              padding: const EdgeInsets.all(12),
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: widget.iconColor,
+              ),
+            )
+          : Icon(widget.icon, size: 21, color: widget.iconColor),
+    );
+
+    Widget button = GestureDetector(
+      onTap: widget.onTap,
+      onLongPressStart: widget.onLongPressStart,
+      onLongPressMoveUpdate: widget.onLongPressMoveUpdate,
+      onLongPressEnd: widget.onLongPressEnd,
+      behavior: HitTestBehavior.opaque,
+      onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
+      onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
+      onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
+      child: AnimatedScale(
+        scale: _pressed ? 0.94 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 120),
+          opacity: !enabled ? 0.45 : (_pressed ? 0.85 : 1.0),
+          child: content,
+        ),
+      ),
+    );
+
+    if (widget.semanticsLabel != null) {
+      button = Semantics(
+        button: true,
+        label: widget.semanticsLabel!,
+        child: button,
+      );
+    }
+    if (widget.tooltip != null) {
+      button = Tooltip(message: widget.tooltip!, child: button);
+    }
+    return button;
   }
 }

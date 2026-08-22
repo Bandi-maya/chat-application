@@ -12,11 +12,13 @@ import 'package:chat/data/services/local_lock_service.dart';
 import 'package:chat/data/services/message_automation_service.dart';
 import 'package:chat/data/services/rich_chat_realtime_service.dart';
 import 'package:chat/data/services/status_service.dart';
+import 'package:chat/data/services/push_token_service.dart';
+import 'package:chat/data/services/notification_channel_manager.dart';
 import 'package:chat/domain/models/user_profile.dart';
 import 'package:chat/features/auth/create_new_password_screen.dart';
 import 'package:chat/features/auth/splash_screen.dart';
 import 'package:chat/features/auth/welcome_screen.dart';
-import 'package:chat/features/calls/mock_call_screen.dart';
+import 'package:chat/features/calls/ongoing_call_screen.dart';
 import 'package:chat/features/settings/security/app_lock_overlay.dart';
 import 'package:chat/features/settings/security/security_center_screen.dart';
 import 'package:chat/injection/locator.dart';
@@ -56,6 +58,8 @@ Future<void> main() async {
   // theme flash on launch and the user's chosen theme survives restarts.
   await locator<ThemeController>().init();
   await locator<AppIconController>().initialize();
+  await locator<NotificationChannelManager>().initialize();
+  await locator<PushTokenService>().initialize();
   runApp(const ChatyApp());
 }
 
@@ -431,11 +435,21 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
                     .clamp(0.8, 1.6),
               ),
             );
+            final shouldShowLock =
+                _backend.isAuthenticated &&
+                _preferencesController.security.isAppLockEnabled &&
+                _appLockRequired;
             final appContent = MediaQuery(
               data: scaled,
               child: ChatyEventToastOverlay(
                 notificationService: _notificationService,
                 preferencesController: _preferencesController,
+                // Real consumer of "Hide Notification Content when Locked":
+                // toasts render UNDER the lock barrier, which is translucent
+                // (α .55), so preview text would be readable while locked.
+                concealWhileLocked:
+                    shouldShowLock &&
+                    _preferencesController.security.hideLockNotificationContent,
                 child: ClickParticleOverlay(
                   preferencesController: _preferencesController,
                   child: FallingParticlesOverlay(
@@ -446,10 +460,6 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
                 ),
               ),
             );
-            final shouldShowLock =
-                _backend.isAuthenticated &&
-                _preferencesController.security.isAppLockEnabled &&
-                _appLockRequired;
             // Real consumer of the Who-Can-Call-Me gate: the realtime
             // service only surfaces invites that PASSED the privacy gate,
             // so anything shown here is a call the user is allowed to
@@ -470,16 +480,13 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
                       _richRealtime.respondToIncomingCall(true);
                       _rootNavigatorKey.currentState?.push(
                         MaterialPageRoute(
-                          builder: (_) => MockCallScreen(
+                          builder: (_) => OngoingCallScreen(
                             theme: currentTheme,
-                            title: incomingCall.displayName,
-                            isVideo: incomingCall.isVideo,
                           ),
                         ),
                       );
                     },
-                    onDecline: () =>
-                        _richRealtime.respondToIncomingCall(false),
+                    onDecline: () => _richRealtime.respondToIncomingCall(false),
                   ),
                 if (shouldShowLock)
                   AppLockOverlayModal(
@@ -541,7 +548,12 @@ class _IncomingCallOverlay extends StatelessWidget {
               Row(
                 children: [
                   AppAvatar(
-                    initials: call.avatarInitials ?? call.displayName.characters.take(2).toString().toUpperCase(),
+                    initials:
+                        call.avatarInitials ??
+                        call.displayName.characters
+                            .take(2)
+                            .toString()
+                            .toUpperCase(),
                     colorHex: call.avatarColorHex ?? '0xFF6366F1',
                     size: 44,
                   ),
@@ -574,9 +586,7 @@ class _IncomingCallOverlay extends StatelessWidget {
                     ),
                   ),
                   Icon(
-                    call.isVideo
-                        ? Icons.videocam_rounded
-                        : Icons.call_rounded,
+                    call.isVideo ? Icons.videocam_rounded : Icons.call_rounded,
                     color: theme.accentColor,
                   ),
                 ],

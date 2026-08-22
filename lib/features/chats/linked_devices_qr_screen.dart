@@ -8,7 +8,6 @@ import '../../data/repositories/mock_data_store.dart';
 import '../../data/services/contact_relationship_service.dart';
 import '../../domain/models/other_models.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
-import '../../ui/core/theme/theme_controller.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../chats/chat_detail_screen.dart';
 
@@ -98,24 +97,13 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen>
 
   Future<void> _revoke(LinkedDevice device) async {
     if (device.isCurrentDevice) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Log out ${device.deviceName}?'),
-        content: const Text(
+    final confirmed = await ChatyConfirmDialog.show(
+      context,
+      title: 'Log out ${device.deviceName}?',
+      message:
           'This device will be marked revoked and removed from your active device list.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Log out'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Log out',
+      destructive: true,
     );
     if (confirmed != true) return;
     try {
@@ -271,7 +259,9 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen>
                         subtitle: Text(
                           '${device.platform}${device.location.isEmpty ? '' : ' • ${device.location}'}\n${_lastActive(device)}',
                           style: ChatyTypography.caption(
-                            themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+                            themeData.colorScheme.onSurface.withValues(
+                              alpha: 0.6,
+                            ),
                           ),
                         ),
                         trailing: device.isCurrentDevice
@@ -354,9 +344,7 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen>
             const SizedBox(height: 2),
             Text(
               '@${widget.dataStore.currentUser.username}',
-              style: ChatyTypography.caption(
-                colors.foregroundSecondary,
-              ),
+              style: ChatyTypography.caption(colors.foregroundSecondary),
             ),
             const SizedBox(height: ChatySpacing.md),
             ConstrainedBox(
@@ -497,4 +485,3 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen>
     );
   }
 }
-

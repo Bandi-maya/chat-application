@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
-import '../../../ui/core/theme/theme_config.dart';
 import '../../ui/core/design_system/design_system.dart';
 
 class MockCallScreen extends StatefulWidget {
@@ -77,11 +76,7 @@ class _MockCallScreenState extends State<MockCallScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.lock_rounded,
-                    color: callsIcon,
-                    size: 14,
-                  ),
+                  Icon(Icons.lock_rounded, color: callsIcon, size: 14),
                   const SizedBox(width: 6),
                   Text(
                     'Direct E2E Encrypted Call',
@@ -94,8 +89,7 @@ class _MockCallScreenState extends State<MockCallScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: ChatySpacing.xl),
-
+            const SizedBox(height: ChatySpacing.md),
             // Caller Info
             Text(
               widget.title,
@@ -112,84 +106,37 @@ class _MockCallScreenState extends State<MockCallScreen> {
                 color: callsText.withValues(alpha: 0.65),
                 fontSize: 15,
                 fontWeight: FontWeight.w500,
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
 
             const Spacer(),
 
-            // Video Preview or Avatar
-            if (_isVideoOn)
-              Container(
-                margin: const EdgeInsets.symmetric(
-                  horizontal: ChatySpacing.lg,
-                  vertical: ChatySpacing.base,
-                ),
-                height: 280,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: colors.surfaceSecondary,
-                  borderRadius: BorderRadius.circular(ChatyRadius.xl),
-                  border: Border.all(
-                    color: colors.border,
-                  ),
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Icon(
-                      Icons.videocam_rounded,
-                      size: 64,
-                      color: colors.foregroundSecondary.withValues(alpha: 0.24),
-                    ),
-                    Positioned(
-                      bottom: 12,
-                      left: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colors.surface.withValues(alpha: 0.65),
-                          borderRadius: BorderRadius.circular(ChatyRadius.sm),
-                        ),
-                        child: Text(
-                          widget.title,
-                          style: TextStyle(
-                            color: colors.foreground,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
+            // Primary content: remote video fills the stage; audio-only falls
+            // back to the avatar monogram. Local preview is a small PiP.
+            Expanded(
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: _isVideoOn
+                        ? _RemoteVideoStage(colors: colors, title: widget.title)
+                        : Center(
+                            child: _AvatarMonogram(
+                              title: widget.title,
+                              theme: theme,
+                              colors: colors,
+                            ),
                           ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              Container(
-                width: 110,
-                height: 110,
-                decoration: BoxDecoration(
-                  color: theme.accentColor.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: theme.accentColor, width: 2),
-                ),
-                child: Center(
-                  child: Text(
-                    widget.title.isNotEmpty
-                        ? widget.title.substring(0, 2).toUpperCase()
-                        : 'CALL',
-                    style: TextStyle(
-                      color: colors.foreground,
-                      fontSize: 32,
-                      fontWeight: FontWeight.w700,
-                    ),
                   ),
-                ),
+                  if (_isVideoOn)
+                    Positioned(
+                      top: ChatySpacing.sm,
+                      right: ChatySpacing.md,
+                      child: _LocalPip(colors: colors),
+                    ),
+                ],
               ),
-
-            const Spacer(),
+            ),
 
             // Call Controls Toolbar
             Container(
@@ -202,51 +149,38 @@ class _MockCallScreenState extends State<MockCallScreen> {
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(ChatyRadius.xl),
                 ),
-                border: Border(
-                  top: BorderSide(color: colors.borderSubtle),
-                ),
+                border: Border(top: BorderSide(color: colors.borderSubtle)),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildCallBtn(
+                  _CallControl(
                     icon: _isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
-                    isActive: _isMuted,
+                    isOff: _isMuted,
                     onTap: () => setState(() => _isMuted = !_isMuted),
                     colors: colors,
+                    callsIcon: callsIcon,
                   ),
-                  _buildCallBtn(
+                  _CallControl(
                     icon: _isVideoOn
                         ? Icons.videocam_rounded
                         : Icons.videocam_off_rounded,
-                    isActive: _isVideoOn,
+                    isOff: !_isVideoOn,
                     onTap: () => setState(() => _isVideoOn = !_isVideoOn),
                     colors: colors,
+                    callsIcon: callsIcon,
                   ),
-                  _buildCallBtn(
+                  _CallControl(
                     icon: _isSpeakerOn
                         ? Icons.volume_up_rounded
                         : Icons.volume_down_rounded,
-                    isActive: _isSpeakerOn,
+                    isOff: !_isSpeakerOn,
                     onTap: () => setState(() => _isSpeakerOn = !_isSpeakerOn),
                     colors: colors,
+                    callsIcon: callsIcon,
                   ),
-                  // End Call
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      padding: const EdgeInsets.all(ChatySpacing.md),
-                      decoration: BoxDecoration(
-                        color: colors.error,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.call_end_rounded,
-                        color: colors.onError,
-                        size: 26,
-                      ),
-                    ),
-                  ),
+                  // End call — always destructive.
+                  _EndCallControl(onTap: () => Navigator.pop(context)),
                 ],
               ),
             ),
@@ -255,32 +189,237 @@ class _MockCallScreenState extends State<MockCallScreen> {
       ),
     );
   }
+}
 
-  /// Real consumer: `ModCallsIconColors` tints the in-call control icons.
-  Color _callsIconColor(AppColors colors) =>
-      locator<ChatyPreferencesController>().gbColor('ModCallsIconColors') ??
-      colors.foreground;
+/// Full-stage remote video surface. The call engine renders real frames into
+/// the app's existing transport; this placeholder keeps the stage geometry
+/// stable when no frame surface is attached.
+class _RemoteVideoStage extends StatelessWidget {
+  final AppColors colors;
+  final String title;
 
-  Widget _buildCallBtn({
-    required IconData icon,
-    required bool isActive,
-    required VoidCallback onTap,
-    required AppColors colors,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(ChatySpacing.md),
-        decoration: BoxDecoration(
-          color: isActive
-              ? colors.foreground.withValues(alpha: 0.22)
-              : colors.foreground.withValues(alpha: 0.08),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, color: _callsIconColor(colors), size: 22),
+  const _RemoteVideoStage({required this.colors, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: ChatySpacing.md),
+      decoration: BoxDecoration(
+        color: colors.surfaceSecondary,
+        borderRadius: BorderRadius.circular(ChatyRadius.xl),
+        border: Border.all(color: colors.border),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Icon(
+            Icons.videocam_rounded,
+            size: 64,
+            color: colors.foregroundSecondary.withValues(alpha: 0.24),
+          ),
+          Positioned(
+            bottom: 12,
+            left: 12,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: colors.surface.withValues(alpha: 0.65),
+                borderRadius: BorderRadius.circular(ChatyRadius.sm),
+              ),
+              child: Text(
+                title,
+                style: TextStyle(
+                  color: colors.foreground,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
+/// Audio-only fallback: avatar monogram with the accent ring.
+class _AvatarMonogram extends StatelessWidget {
+  final String title;
+  final ThemeConfig theme;
+  final AppColors colors;
 
+  const _AvatarMonogram({
+    required this.title,
+    required this.theme,
+    required this.colors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 110,
+      height: 110,
+      decoration: BoxDecoration(
+        color: theme.accentColor.withValues(alpha: 0.15),
+        shape: BoxShape.circle,
+        border: Border.all(color: theme.accentColor, width: 2),
+      ),
+      child: Center(
+        child: Text(
+          title.isNotEmpty ? title.substring(0, 2).toUpperCase() : 'CALL',
+          style: TextStyle(
+            color: colors.foreground,
+            fontSize: 32,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Small self-view thumbnail (secondary surface, top-right).
+class _LocalPip extends StatelessWidget {
+  final AppColors colors;
+
+  const _LocalPip({required this.colors});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 92,
+      height: 124,
+      decoration: BoxDecoration(
+        color: colors.surfaceElevated,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.borderSubtle),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow,
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.person_rounded,
+            size: 30,
+            color: colors.foregroundSecondary.withValues(alpha: 0.6),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'You',
+            style: TextStyle(
+              color: colors.foregroundSecondary,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Uniform 54dp circular call control. "Off" states (muted, camera off,
+/// speaker off) tint toward error so the state reads at a glance; "on"
+/// states use the calls icon color on a subtle fill.
+class _CallControl extends StatefulWidget {
+  final IconData icon;
+  final bool isOff;
+  final VoidCallback onTap;
+  final AppColors colors;
+  final Color callsIcon;
+
+  const _CallControl({
+    required this.icon,
+    required this.isOff,
+    required this.onTap,
+    required this.colors,
+    required this.callsIcon,
+  });
+
+  @override
+  State<_CallControl> createState() => _CallControlState();
+}
+
+class _CallControlState extends State<_CallControl> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = widget.colors;
+    return GestureDetector(
+      onTap: widget.onTap,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTapUp: (_) => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.93 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+        child: Container(
+          width: 54,
+          height: 54,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: widget.isOff
+                ? colors.error.withValues(alpha: 0.16)
+                : colors.foreground.withValues(alpha: 0.08),
+            border: Border.all(
+              color: widget.isOff
+                  ? colors.error.withValues(alpha: 0.35)
+                  : Colors.transparent,
+            ),
+          ),
+          child: Icon(
+            widget.icon,
+            color: widget.isOff ? colors.error : widget.callsIcon,
+            size: 22,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// End-call control: larger, always destructive, same press-scale language.
+class _EndCallControl extends StatefulWidget {
+  final VoidCallback onTap;
+  const _EndCallControl({required this.onTap});
+
+  @override
+  State<_EndCallControl> createState() => _EndCallControlState();
+}
+
+class _EndCallControlState extends State<_EndCallControl> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return GestureDetector(
+      onTap: widget.onTap,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTapUp: (_) => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.93 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+        child: Container(
+          width: 62,
+          height: 62,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: colors.error,
+          ),
+          child: Icon(Icons.call_end_rounded, color: colors.onError, size: 27),
+        ),
+      ),
+    );
+  }
+}

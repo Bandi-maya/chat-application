@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../ui/core/theme/theme_config.dart';
 import '../../data/repositories/mock_data_store.dart';
 import '../../data/services/status_service.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
@@ -89,7 +88,9 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                 left: ChatySpacing.lg,
                 right: ChatySpacing.lg,
                 top: ChatySpacing.md,
-                bottom: MediaQuery.of(sheetContext).viewInsets.bottom + ChatySpacing.lg,
+                bottom:
+                    MediaQuery.of(sheetContext).viewInsets.bottom +
+                    ChatySpacing.lg,
               ),
               decoration: BoxDecoration(
                 color: sheetContext.colors.surface,
@@ -114,7 +115,9 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                         width: 36,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: themeData.colorScheme.onSurface.withValues(alpha: 0.2),
+                          color: themeData.colorScheme.onSurface.withValues(
+                            alpha: 0.2,
+                          ),
                           borderRadius: BorderRadius.circular(ChatyRadius.full),
                         ),
                       ),
@@ -122,7 +125,9 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                     const SizedBox(height: ChatySpacing.base),
                     Text(
                       'New Update',
-                      style: ChatyTypography.headline(themeData.colorScheme.onSurface),
+                      style: ChatyTypography.headline(
+                        themeData.colorScheme.onSurface,
+                      ),
                     ),
                     const SizedBox(height: ChatySpacing.xs),
                     Text(
@@ -145,7 +150,9 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                             icon: Icons.image_rounded,
                             label: 'Photo',
                             busy: busyType == 'image',
-                            onTap: busyType == null ? () => publishMedia('image') : null,
+                            onTap: busyType == null
+                                ? () => publishMedia('image')
+                                : null,
                           ),
                         ),
                         const SizedBox(width: ChatySpacing.sm),
@@ -154,7 +161,9 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                             icon: Icons.videocam_rounded,
                             label: 'Video',
                             busy: busyType == 'video',
-                            onTap: busyType == null ? () => publishMedia('video') : null,
+                            onTap: busyType == null
+                                ? () => publishMedia('video')
+                                : null,
                           ),
                         ),
                         const SizedBox(width: ChatySpacing.sm),
@@ -163,7 +172,9 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                             icon: Icons.graphic_eq_rounded,
                             label: 'Audio',
                             busy: busyType == 'audio',
-                            onTap: busyType == null ? () => publishMedia('audio') : null,
+                            onTap: busyType == null
+                                ? () => publishMedia('audio')
+                                : null,
                           ),
                         ),
                         const SizedBox(width: ChatySpacing.sm),
@@ -172,7 +183,9 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                             icon: Icons.description_rounded,
                             label: 'File',
                             busy: busyType == 'document',
-                            onTap: busyType == null ? () => publishMedia('document') : null,
+                            onTap: busyType == null
+                                ? () => publishMedia('document')
+                                : null,
                           ),
                         ),
                       ],
@@ -400,9 +413,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
               ),
               child: Text(
                 'Updates',
-                style: ChatyTypography.headline(
-                  colors.foreground,
-                ),
+                style: ChatyTypography.headline(colors.foreground),
               ),
             ),
           ),
@@ -417,10 +428,8 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                     Stack(
                       children: [
                         AppAvatar(
-                          initials:
-                              widget.dataStore.currentUser.avatarInitials,
-                          colorHex:
-                              widget.dataStore.currentUser.avatarColorHex,
+                          initials: widget.dataStore.currentUser.avatarInitials,
+                          colorHex: widget.dataStore.currentUser.avatarColorHex,
                           size: 48,
                         ),
                         Positioned(
@@ -452,14 +461,17 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            widget.preferencesController.home.myNameOverride
+                            widget
+                                    .preferencesController
+                                    .home
+                                    .myNameOverride
                                     .isNotEmpty
-                                ? widget.preferencesController
-                                      .home.myNameOverride
+                                ? widget
+                                      .preferencesController
+                                      .home
+                                      .myNameOverride
                                 : 'My Status',
-                            style: ChatyTypography.title(
-                              colors.foreground,
-                            ),
+                            style: ChatyTypography.title(colors.foreground),
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -570,11 +582,15 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                                 ),
                                 child: AppAvatar(
                                   initials: isMine
-                                      ? widget.dataStore.currentUser
+                                      ? widget
+                                            .dataStore
+                                            .currentUser
                                             .avatarInitials
                                       : user?.avatarInitials ?? 'U',
                                   colorHex: isMine
-                                      ? widget.dataStore.currentUser
+                                      ? widget
+                                            .dataStore
+                                            .currentUser
                                             .avatarColorHex
                                       : user?.avatarColorHex ?? '0xFF6366F1',
                                   size: 40,
@@ -584,9 +600,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                                 isMine
                                     ? 'My Status'
                                     : user?.displayName ?? 'Contact',
-                                style: ChatyTypography.title(
-                                  colors.foreground,
-                                ),
+                                style: ChatyTypography.title(colors.foreground),
                               ),
                               subtitle: Text(
                                 status.text.isNotEmpty
@@ -674,5 +688,3 @@ class _ComposerAction extends StatelessWidget {
     );
   }
 }
-
-

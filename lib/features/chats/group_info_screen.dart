@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../ui/core/theme/theme_config.dart';
 import '../../data/repositories/mock_data_store.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/design_system/design_system.dart';
@@ -68,9 +67,7 @@ class GroupInfoScreen extends StatelessWidget {
                     Text(
                       conv.title,
                       textAlign: TextAlign.center,
-                      style: ChatyTypography.headline(
-                        colors.foreground,
-                      ),
+                      style: ChatyTypography.headline(colors.foreground),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -90,10 +87,7 @@ class GroupInfoScreen extends StatelessWidget {
               title: 'Group Security & Settings',
               children: [
                 ChatyListTile(
-                  leading: Icon(
-                    Icons.timer_outlined,
-                    color: colors.warning,
-                  ),
+                  leading: Icon(Icons.timer_outlined, color: colors.warning),
                   title: Text(
                     'Disappearing Messages',
                     style: TextStyle(
@@ -104,9 +98,7 @@ class GroupInfoScreen extends StatelessWidget {
                   ),
                   subtitle: Text(
                     '7 days active',
-                    style: ChatyTypography.caption(
-                      colors.foregroundSecondary,
-                    ),
+                    style: ChatyTypography.caption(colors.foregroundSecondary),
                   ),
                   trailing: Icon(
                     Icons.chevron_right_rounded,
@@ -129,9 +121,7 @@ class GroupInfoScreen extends StatelessWidget {
                   ),
                   subtitle: Text(
                     'Group prekeys authenticated',
-                    style: ChatyTypography.caption(
-                      colors.foregroundSecondary,
-                    ),
+                    style: ChatyTypography.caption(colors.foregroundSecondary),
                   ),
                   trailing: Icon(
                     Icons.chevron_right_rounded,
@@ -150,9 +140,7 @@ class GroupInfoScreen extends StatelessWidget {
                   leading: Container(
                     padding: const EdgeInsets.all(ChatySpacing.sm),
                     decoration: BoxDecoration(
-                      color: colors.primary.withValues(
-                        alpha: 0.12,
-                      ),
+                      color: colors.primary.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -171,9 +159,7 @@ class GroupInfoScreen extends StatelessWidget {
                   ),
                   subtitle: Text(
                     'Invite via username or direct prekey share',
-                    style: ChatyTypography.caption(
-                      colors.foregroundSecondary,
-                    ),
+                    style: ChatyTypography.caption(colors.foregroundSecondary),
                   ),
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -247,10 +233,7 @@ class GroupInfoScreen extends StatelessWidget {
             ChatyGroupedSection(
               children: [
                 ChatyListTile(
-                  leading: Icon(
-                    Icons.exit_to_app_rounded,
-                    color: colors.error,
-                  ),
+                  leading: Icon(Icons.exit_to_app_rounded, color: colors.error),
                   title: Text(
                     'Leave Group',
                     style: TextStyle(

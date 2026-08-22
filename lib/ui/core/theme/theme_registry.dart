@@ -18,9 +18,11 @@ class ThemeRegistry {
       ThemePresets.getSystemDefaultTheme(platformBrightness);
 
   /// Register/Lookup theme by brightness.
-  static List<ThemeConfig> getDarkThemes() =>
-      allThemes.where((t) => t.brightness == Brightness.dark).toList(growable: false);
+  static List<ThemeConfig> getDarkThemes() => allThemes
+      .where((t) => t.brightness == Brightness.dark)
+      .toList(growable: false);
 
-  static List<ThemeConfig> getLightThemes() =>
-      allThemes.where((t) => t.brightness == Brightness.light).toList(growable: false);
+  static List<ThemeConfig> getLightThemes() => allThemes
+      .where((t) => t.brightness == Brightness.light)
+      .toList(growable: false);
 }

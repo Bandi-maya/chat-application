@@ -235,10 +235,7 @@ class _ProPricingScreenState extends State<ProPricingScreen> {
                     ),
                     const SizedBox(height: ChatySpacing.md),
 
-                    _buildCheckItem(
-                      colors,
-                      'Smart AI messaging assistance',
-                    ),
+                    _buildCheckItem(colors, 'Smart AI messaging assistance'),
                     _buildCheckItem(
                       colors,
                       'Access to Chaty Pro Theme Library',
@@ -275,11 +272,7 @@ class _ProPricingScreenState extends State<ProPricingScreen> {
               shape: BoxShape.circle,
               color: colors.success.withValues(alpha: 0.15),
             ),
-            child: Icon(
-              Icons.check_rounded,
-              size: 14,
-              color: colors.success,
-            ),
+            child: Icon(Icons.check_rounded, size: 14, color: colors.success),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -297,4 +290,3 @@ class _ProPricingScreenState extends State<ProPricingScreen> {
     );
   }
 }
-

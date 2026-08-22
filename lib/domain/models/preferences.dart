@@ -390,7 +390,9 @@ class ConversationPreferences {
   wallpaperType; // 'Solid', 'Gradient', 'Pattern', 'Image', 'ProfileBlur'
   final double voicePlaybackSpeed;
   final String waveformStyle;
-  final String wallpaperPath; // '' = none; local copy of a user-picked background image
+  final String
+  wallpaperPath; // '' = none; local copy of a user-picked background image
+  final bool enableAnimatedEmojis;
 
   const ConversationPreferences({
     this.bubbleShape = 'Rounded',
@@ -410,6 +412,7 @@ class ConversationPreferences {
     this.voicePlaybackSpeed = 1.0,
     this.waveformStyle = 'Bars',
     this.wallpaperPath = '',
+    this.enableAnimatedEmojis = true,
   });
 
   ConversationPreferences copyWith({
@@ -430,6 +433,7 @@ class ConversationPreferences {
     double? voicePlaybackSpeed,
     String? waveformStyle,
     String? wallpaperPath,
+    bool? enableAnimatedEmojis,
   }) {
     return ConversationPreferences(
       bubbleShape: bubbleShape ?? this.bubbleShape,
@@ -453,6 +457,7 @@ class ConversationPreferences {
       voicePlaybackSpeed: voicePlaybackSpeed ?? this.voicePlaybackSpeed,
       waveformStyle: waveformStyle ?? this.waveformStyle,
       wallpaperPath: wallpaperPath ?? this.wallpaperPath,
+      enableAnimatedEmojis: enableAnimatedEmojis ?? this.enableAnimatedEmojis,
     );
   }
 
@@ -474,6 +479,7 @@ class ConversationPreferences {
     'voicePlaybackSpeed': voicePlaybackSpeed,
     'waveformStyle': waveformStyle,
     'wallpaperPath': wallpaperPath,
+    'enableAnimatedEmojis': enableAnimatedEmojis,
   };
 
   factory ConversationPreferences.fromMap(Map<String, dynamic> map) =>
@@ -496,6 +502,7 @@ class ConversationPreferences {
             (map['voicePlaybackSpeed'] as num?)?.toDouble() ?? 1.0,
         waveformStyle: map['waveformStyle'] ?? 'Bars',
         wallpaperPath: map['wallpaperPath'] as String? ?? '',
+        enableAnimatedEmojis: map['enableAnimatedEmojis'] ?? true,
       );
 }
 

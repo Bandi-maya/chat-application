@@ -73,9 +73,7 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                       ? Color(home.headerBackgroundColorHex)
                       : colors.surface,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: colors.borderSubtle,
-                  ),
+                  border: Border.all(color: colors.borderSubtle),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -119,10 +117,7 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               gradient: LinearGradient(
-                                colors: [
-                                  colors.accent,
-                                  colors.primary,
-                                ],
+                                colors: [colors.accent, colors.primary],
                               ),
                             ),
                             child: ChatyAvatar(
@@ -138,10 +133,7 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               gradient: LinearGradient(
-                                colors: [
-                                  colors.primary,
-                                  colors.info,
-                                ],
+                                colors: [colors.primary, colors.info],
                               ),
                             ),
                             child: ChatyAvatar(
@@ -157,10 +149,7 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               gradient: LinearGradient(
-                                colors: [
-                                  colors.warning,
-                                  colors.accent,
-                                ],
+                                colors: [colors.warning, colors.accent],
                               ),
                             ),
                             child: ChatyAvatar(
@@ -249,7 +238,8 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                   children: [
                     ChatyChoiceTile<AppNavigationMode>(
                       title: 'Navigation Layout Architecture',
-                      subtitle: 'Switch between the 5 primary navigation layouts (Top Bar, Island Rail, 3D Drawer, Side Menu, Bottom Bar)',
+                      subtitle:
+                          'Switch between the 5 primary navigation layouts (Top Bar, Island Rail, 3D Drawer, Side Menu, Bottom Bar)',
                       options: const [
                         AppNavigationMode.bottomNav,
                         AppNavigationMode.topWhatsAppBar,
@@ -261,10 +251,14 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                       selectedOption: currentMode,
                       optionLabel: (mode) => switch (mode) {
                         AppNavigationMode.bottomNav => 'Bottom Nav Bar',
-                        AppNavigationMode.topWhatsAppBar => 'Top WhatsApp Bar (Image 1)',
-                        AppNavigationMode.floatingIslandRail => 'Floating Island Rail (Image 2)',
-                        AppNavigationMode.perspective3DDrawer => '3D Perspective Drawer (Image 3)',
-                        AppNavigationMode.modernSideMenu => 'Modern Side Menu (Image 4 & 5)',
+                        AppNavigationMode.topWhatsAppBar =>
+                          'Top WhatsApp Bar (Image 1)',
+                        AppNavigationMode.floatingIslandRail =>
+                          'Floating Island Rail (Image 2)',
+                        AppNavigationMode.perspective3DDrawer =>
+                          '3D Perspective Drawer (Image 3)',
+                        AppNavigationMode.modernSideMenu =>
+                          'Modern Side Menu (Image 4 & 5)',
                         AppNavigationMode.gestureTabs => 'Gesture Tabs',
                         AppNavigationMode.compactRail => 'Compact Rail',
                       },
@@ -282,7 +276,8 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                 final appearance = locator<AppearanceVariantController>();
                 return ChatyChoiceTile<String>(
                   title: 'Bottom Navigation Bar Style',
-                  subtitle: 'Select from 12 custom animated navigation designs (for Bottom Nav Bar)',
+                  subtitle:
+                      'Select from 12 custom animated navigation designs (for Bottom Nav Bar)',
                   options: AppearanceVariantController.bottomBarStyles,
                   selectedOption: appearance.bottomBarStyle,
                   optionLabel: (s) => s,
@@ -439,5 +434,4 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
       ],
     );
   }
-
 }

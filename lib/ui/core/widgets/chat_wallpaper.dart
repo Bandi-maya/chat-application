@@ -240,9 +240,7 @@ class _WallpaperPatternPainter extends CustomPainter {
 
           final grid = <List<Offset>>[
             for (int cy = 0; cy < rows; cy++)
-              <Offset>[
-                for (int cx = 0; cx < cols; cx++) point(cx, cy),
-              ],
+              <Offset>[for (int cx = 0; cx < cols; cx++) point(cx, cy)],
           ];
           for (int cy = 0; cy < rows; cy++) {
             for (int cx = 0; cx < cols; cx++) {

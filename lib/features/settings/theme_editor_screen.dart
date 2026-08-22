@@ -258,7 +258,8 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
             // Navigation Shell Architecture (5 Archetypes)
             ChatyGroupedSection(
               title: 'Navigation Layout Architecture',
-              description: 'Switch between the 5 distinct mobile navigation archetypes',
+              description:
+                  'Switch between the 5 distinct mobile navigation archetypes',
               children: [
                 Padding(
                   padding: const EdgeInsets.all(ChatySpacing.md),
@@ -266,12 +267,30 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      _navModeChip('Bottom Nav Bar', AppNavigationMode.bottomNav),
-                      _navModeChip('Top WhatsApp Bar', AppNavigationMode.topWhatsAppBar),
-                      _navModeChip('Floating Island Rail', AppNavigationMode.floatingIslandRail),
-                      _navModeChip('3D Perspective Drawer', AppNavigationMode.perspective3DDrawer),
-                      _navModeChip('Modern Side Menu', AppNavigationMode.modernSideMenu),
-                      _navModeChip('Gesture Tabs', AppNavigationMode.gestureTabs),
+                      _navModeChip(
+                        'Bottom Nav Bar',
+                        AppNavigationMode.bottomNav,
+                      ),
+                      _navModeChip(
+                        'Top WhatsApp Bar',
+                        AppNavigationMode.topWhatsAppBar,
+                      ),
+                      _navModeChip(
+                        'Floating Island Rail',
+                        AppNavigationMode.floatingIslandRail,
+                      ),
+                      _navModeChip(
+                        '3D Perspective Drawer',
+                        AppNavigationMode.perspective3DDrawer,
+                      ),
+                      _navModeChip(
+                        'Modern Side Menu',
+                        AppNavigationMode.modernSideMenu,
+                      ),
+                      _navModeChip(
+                        'Gesture Tabs',
+                        AppNavigationMode.gestureTabs,
+                      ),
                     ],
                   ),
                 ),
@@ -425,4 +444,3 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
     );
   }
 }
-

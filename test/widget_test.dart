@@ -1,6 +1,9 @@
+import 'package:chat/core/emoji/emoji_registry.dart';
+import 'package:chat/core/emoji/emoji_parser.dart';
+import 'package:chat/core/emoji/models/parsed_emoji_span.dart';
+import 'package:chat/core/emoji/widgets/animated_emoji_text.dart';
 import 'package:chat/domain/models/chat_message.dart';
 import 'package:chat/domain/models/preferences.dart';
-import 'package:chat/features/messages/emoji_picker_modal.dart';
 import 'package:chat/features/messages/message_bubble.dart';
 import 'package:chat/features/settings/settings_search_delegate.dart';
 import 'package:chat/ui/core/controllers/preferences_controller.dart';
@@ -169,12 +172,69 @@ void main() {
   });
 
   group('Animated Emoji & Expression Engine Tests', () {
-    test('chatyAnimatedEmojiForUnicode detects supported animated emojis', () {
-      expect(chatyAnimatedEmojiForUnicode('❤️'), isNotNull);
-      expect(chatyAnimatedEmojiForUnicode('🔥'), isNotNull);
-      expect(chatyAnimatedEmojiForUnicode('👍'), isNotNull);
-      expect(chatyAnimatedEmojiForUnicode('😂'), isNotNull);
-      expect(chatyAnimatedEmojiForUnicode('random text'), isNull);
+    test(
+      'ChatyEmojiRegistry detects supported animated emojis and normalizes',
+      () {
+        expect(ChatyEmojiRegistry.find('❤️'), isNotNull);
+        expect(ChatyEmojiRegistry.find('🔥'), isNotNull);
+        expect(ChatyEmojiRegistry.find('👍'), isNotNull);
+        expect(ChatyEmojiRegistry.find('😂'), isNotNull);
+        expect(ChatyEmojiRegistry.find('👋'), isNotNull);
+        expect(ChatyEmojiRegistry.find('✨'), isNotNull);
+        expect(ChatyEmojiRegistry.find('non-emoji'), isNull);
+      },
+    );
+
+    test(
+      'ChatyEmojiParser accurately detects emoji-only messages and sizing modes',
+      () {
+        expect(ChatyEmojiParser.emojiOnlyCount('👋'), 1);
+        expect(
+          ChatyEmojiParser.resolveEmojiOnlyDisplayMode('👋'),
+          EmojiDisplayMode.jumboSingle,
+        );
+
+        expect(ChatyEmojiParser.emojiOnlyCount('🔥 ❤️'), 2);
+        expect(
+          ChatyEmojiParser.resolveEmojiOnlyDisplayMode('🔥 ❤️'),
+          EmojiDisplayMode.mediumFew,
+        );
+
+        expect(ChatyEmojiParser.emojiOnlyCount('👍 🎉 👀 🚀'), 4);
+        expect(
+          ChatyEmojiParser.resolveEmojiOnlyDisplayMode('👍 🎉 👀 🚀'),
+          EmojiDisplayMode.mediumMany,
+        );
+
+        expect(ChatyEmojiParser.emojiOnlyCount('Hello 👋'), 0);
+        expect(
+          ChatyEmojiParser.resolveEmojiOnlyDisplayMode('Hello 👋'),
+          isNull,
+        );
+      },
+    );
+
+    test(
+      'ChatyEmojiParser handles Unicode ZWJ and skin tones without corruption',
+      () {
+        final spans = ChatyEmojiParser.parse('Great job 👍🏽 team!');
+        expect(spans.length, 3);
+        expect(spans[0].rawText, 'Great job ');
+        expect(spans[1].isEmoji, isTrue);
+        expect(spans[2].rawText, ' team!');
+      },
+    );
+
+    test('enableAnimatedEmojis preference roundtrips accurately', () {
+      final defaultPrefs = const ConversationPreferences();
+      expect(defaultPrefs.enableAnimatedEmojis, isTrue);
+
+      final toggled = defaultPrefs.copyWith(enableAnimatedEmojis: false);
+      expect(toggled.enableAnimatedEmojis, isFalse);
+
+      final map = toggled.toMap();
+      final restored = ConversationPreferences.fromMap(map);
+      expect(restored.enableAnimatedEmojis, isFalse);
     });
   });
 
@@ -206,7 +266,7 @@ void main() {
           ),
         );
 
-        expect(find.text('Hello from Chaty production test!'), findsOneWidget);
+        expect(find.byType(AnimatedEmojiText), findsOneWidget);
         expect(find.byIcon(Icons.done_all_rounded), findsOneWidget);
       },
     );

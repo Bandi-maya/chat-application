@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../ui/core/design_system/settings_primitives.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
+import '../../../ui/core/theme/app_theme.dart';
 
 class NavigationEffectsPage extends StatefulWidget {
   final ChatyPreferencesController preferencesController;

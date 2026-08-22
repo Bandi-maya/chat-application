@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../ui/core/theme/theme_config.dart';
 import '../../ui/core/design_system/design_system.dart';
 
 class AttachmentSheet extends StatelessWidget {
@@ -127,9 +126,7 @@ class AttachmentSheet extends StatelessWidget {
             Text(
               'Files and attachments are end-to-end encrypted before storage.',
               textAlign: TextAlign.center,
-              style: ChatyTypography.caption(
-                colors.foregroundSecondary,
-              ),
+              style: ChatyTypography.caption(colors.foregroundSecondary),
             ),
           ],
         ),

@@ -272,7 +272,9 @@ class ThemeConfig {
       inputBorder: isDark ? const Color(0xFF27272A) : const Color(0xFFE4E4E7),
       inputFill: isDark ? const Color(0xFF18181B) : const Color(0xFFF4F4F5),
       disabled: isDark ? const Color(0xFF27272A) : const Color(0xFFE4E4E7),
-      disabledForeground: isDark ? const Color(0xFF52525B) : const Color(0xFFA1A1AA),
+      disabledForeground: isDark
+          ? const Color(0xFF52525B)
+          : const Color(0xFFA1A1AA),
       selected: accentColor,
       onSelected: onAccentColor,
       hover: accentColor.withValues(alpha: 0.08),
@@ -299,14 +301,18 @@ class ThemeConfig {
       replySurface: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
       replyBorder: accentColor,
       composerSurface: surfaceColor,
-      composerBorder: isDark ? const Color(0xFF27272A) : const Color(0xFFE4E4E7),
+      composerBorder: isDark
+          ? const Color(0xFF27272A)
+          : const Color(0xFFE4E4E7),
       messageMetadata: secondaryTextColor.withValues(alpha: 0.7),
       deliveryTick: secondaryTextColor.withValues(alpha: 0.8),
       readTick: tickStyle == 'Neon'
           ? const Color(0xFF39FF14)
           : (tickStyle == 'iOS Style'
-              ? const Color(0xFF34C759)
-              : (tickStyle == 'Minimal' ? primaryTextColor : const Color(0xFF38BDF8))),
+                ? const Color(0xFF34C759)
+                : (tickStyle == 'Minimal'
+                      ? primaryTextColor
+                      : const Color(0xFF38BDF8))),
       reactionSurface: cardColor,
       reactionBorder: accentColor.withValues(alpha: 0.25),
       reactionCount: primaryTextColor,
@@ -326,10 +332,7 @@ class ThemeConfig {
       useMaterial3: true,
       brightness: brightness,
       scaffoldBackgroundColor: backgroundColor,
-      extensions: <ThemeExtension<dynamic>>[
-        appColors,
-        chatColors,
-      ],
+      extensions: <ThemeExtension<dynamic>>[appColors, chatColors],
       colorScheme: ColorScheme(
         brightness: brightness,
         primary: accentColor,

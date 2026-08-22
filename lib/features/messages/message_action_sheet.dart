@@ -1,8 +1,8 @@
-import 'package:animated_emoji/animated_emoji.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/emoji/models/parsed_emoji_span.dart';
+import '../../core/emoji/widgets/animated_emoji_view.dart';
 import '../../domain/models/chat_message.dart';
-import '../../ui/core/theme/theme_config.dart';
 import '../../ui/core/design_system/design_system.dart';
 import 'emoji_picker_modal.dart';
 
@@ -20,6 +20,7 @@ class MessageActionSheet extends StatelessWidget {
   final VoidCallback onDeleteForMe;
   final VoidCallback? onDeleteForEveryone;
   final VoidCallback onReport;
+
   /// Real consumer of conversation.iosStylePopupMenu: switches the SAME
   /// actions to a floating iOS-style dark context menu instead of the
   /// bottom sheet.
@@ -77,9 +78,7 @@ class MessageActionSheet extends StatelessWidget {
                   width: 38,
                   height: 4.5,
                   decoration: BoxDecoration(
-                    color: colors.foregroundSecondary.withValues(
-                      alpha: 0.2,
-                    ),
+                    color: colors.foregroundSecondary.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(ChatyRadius.full),
                   ),
                 ),
@@ -98,7 +97,6 @@ class MessageActionSheet extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     ...quickEmojis.map((emoji) {
-                      final animated = chatyAnimatedEmojiForUnicode(emoji);
                       return InkWell(
                         onTap: () => onReact(emoji),
                         borderRadius: BorderRadius.circular(ChatyRadius.full),
@@ -106,12 +104,12 @@ class MessageActionSheet extends StatelessWidget {
                           width: 42,
                           height: 42,
                           child: Center(
-                            child: animated == null
-                                ? Text(
-                                    emoji,
-                                    style: const TextStyle(fontSize: 22),
-                                  )
-                                : AnimatedEmoji(animated, size: 30),
+                            child: AnimatedEmojiView(
+                              unicode: emoji,
+                              size: 28,
+                              interactive: true,
+                              mode: EmojiDisplayMode.reaction,
+                            ),
                           ),
                         ),
                       );
@@ -303,7 +301,6 @@ class MessageActionSheet extends StatelessWidget {
   }
 }
 
-
 /// Floating iOS-style presentation for [MessageActionSheet]: a compact dark
 /// glass card with an emoji strip, an icon action row and grouped list rows.
 class _IosStyleMenu extends StatelessWidget {
@@ -351,8 +348,7 @@ class _IosStyleMenu extends StatelessWidget {
       );
     }
 
-    Widget hairline() =>
-        Container(height: 0.6, color: colors.border);
+    Widget hairline() => Container(height: 0.6, color: colors.border);
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -380,7 +376,14 @@ class _IosStyleMenu extends StatelessWidget {
                       child: SizedBox(
                         width: 38,
                         height: 38,
-                        child: Center(child: Text(emoji, style: const TextStyle(fontSize: 20))),
+                        child: Center(
+                          child: AnimatedEmojiView(
+                            unicode: emoji,
+                            size: 26,
+                            interactive: true,
+                            mode: EmojiDisplayMode.reaction,
+                          ),
+                        ),
                       ),
                     ),
                   InkWell(
@@ -393,7 +396,11 @@ class _IosStyleMenu extends StatelessWidget {
                         color: colors.surfaceSecondary,
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(Icons.add_rounded, color: colors.foreground, size: 18),
+                      child: Icon(
+                        Icons.add_rounded,
+                        color: colors.foreground,
+                        size: 18,
+                      ),
                     ),
                   ),
                 ],
@@ -403,9 +410,24 @@ class _IosStyleMenu extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _iconAction(Icons.reply_rounded, 'Reply', sheet.onReply, colors),
-                  _iconAction(Icons.shortcut_rounded, 'Forward', sheet.onForward, colors),
-                  _iconAction(Icons.content_copy_rounded, 'Copy', sheet.onCopy, colors),
+                  _iconAction(
+                    Icons.reply_rounded,
+                    'Reply',
+                    sheet.onReply,
+                    colors,
+                  ),
+                  _iconAction(
+                    Icons.shortcut_rounded,
+                    'Forward',
+                    sheet.onForward,
+                    colors,
+                  ),
+                  _iconAction(
+                    Icons.content_copy_rounded,
+                    'Copy',
+                    sheet.onCopy,
+                    colors,
+                  ),
                   _iconAction(
                     sheet.message.isStarred
                         ? Icons.star_rounded
@@ -459,7 +481,12 @@ class _IosStyleMenu extends StatelessWidget {
     );
   }
 
-  static Widget _iconAction(IconData icon, String label, VoidCallback onTap, AppColors colors) {
+  static Widget _iconAction(
+    IconData icon,
+    String label,
+    VoidCallback onTap,
+    AppColors colors,
+  ) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
@@ -470,11 +497,16 @@ class _IosStyleMenu extends StatelessWidget {
           children: [
             Icon(icon, size: 21, color: colors.foreground),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: colors.foregroundSecondary, fontSize: 9.5)),
+            Text(
+              label,
+              style: TextStyle(
+                color: colors.foregroundSecondary,
+                fontSize: 9.5,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 }
-

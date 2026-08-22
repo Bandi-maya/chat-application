@@ -1,0 +1,88 @@
+/// Explicit typed states for the WebRTC & Signaling state machine.
+enum CallSessionState {
+  idle,
+  initiating,
+  ringing,
+  incoming,
+  connecting,
+  connected,
+  reconnecting,
+  declined,
+  busy,
+  missed,
+  ended,
+  failed,
+}
+
+/// Available audio routing outputs.
+enum AudioRouteType {
+  earpiece,
+  speaker,
+  wiredHeadset,
+  bluetooth,
+}
+
+/// Information model representing an active or recent call session.
+class ChatyCallSession {
+  final String callId;
+  final String remoteUserId;
+  final String remoteDisplayName;
+  final String? remoteAvatarInitials;
+  final String? remoteAvatarColorHex;
+  final bool isVideo;
+  final bool isOutgoing;
+  final CallSessionState state;
+  final DateTime startedAt;
+  final DateTime? connectedAt;
+  final DateTime? endedAt;
+  final AudioRouteType audioRoute;
+  final bool isMuted;
+  final bool isCameraOff;
+  final bool isFrontCamera;
+
+  const ChatyCallSession({
+    required this.callId,
+    required this.remoteUserId,
+    required this.remoteDisplayName,
+    this.remoteAvatarInitials,
+    this.remoteAvatarColorHex,
+    required this.isVideo,
+    required this.isOutgoing,
+    required this.state,
+    required this.startedAt,
+    this.connectedAt,
+    this.endedAt,
+    this.audioRoute = AudioRouteType.speaker,
+    this.isMuted = false,
+    this.isCameraOff = false,
+    this.isFrontCamera = true,
+  });
+
+  ChatyCallSession copyWith({
+    CallSessionState? state,
+    DateTime? connectedAt,
+    DateTime? endedAt,
+    AudioRouteType? audioRoute,
+    bool? isMuted,
+    bool? isCameraOff,
+    bool? isFrontCamera,
+  }) {
+    return ChatyCallSession(
+      callId: callId,
+      remoteUserId: remoteUserId,
+      remoteDisplayName: remoteDisplayName,
+      remoteAvatarInitials: remoteAvatarInitials,
+      remoteAvatarColorHex: remoteAvatarColorHex,
+      isVideo: isVideo,
+      isOutgoing: isOutgoing,
+      state: state ?? this.state,
+      startedAt: startedAt,
+      connectedAt: connectedAt ?? this.connectedAt,
+      endedAt: endedAt ?? this.endedAt,
+      audioRoute: audioRoute ?? this.audioRoute,
+      isMuted: isMuted ?? this.isMuted,
+      isCameraOff: isCameraOff ?? this.isCameraOff,
+      isFrontCamera: isFrontCamera ?? this.isFrontCamera,
+    );
+  }
+}

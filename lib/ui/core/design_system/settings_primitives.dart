@@ -54,10 +54,7 @@ class ChatySettingsPage extends StatelessWidget {
           ],
         ),
         actions: trailingHeaderWidget != null
-            ? [
-                trailingHeaderWidget!,
-                const SizedBox(width: ChatySpacing.sm),
-              ]
+            ? [trailingHeaderWidget!, const SizedBox(width: ChatySpacing.sm)]
             : null,
       ),
       body: SafeArea(
@@ -75,7 +72,6 @@ class ChatySettingsPage extends StatelessWidget {
     );
   }
 }
-
 
 class ChatySettingsSection extends StatelessWidget {
   final String? title;

@@ -144,7 +144,9 @@ class _ContactPrivacyScreenState extends State<ContactPrivacyScreen> {
                         child: Text(
                           'These controls change what ${widget.contact.displayName} can observe from you. They are cryptographically and server-enforced.',
                           style: TextStyle(
-                            color: theme.colorScheme.onSurface.withValues(alpha: 0.85),
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.85,
+                            ),
                             fontSize: 13.5,
                             height: 1.4,
                           ),
@@ -157,7 +159,10 @@ class _ContactPrivacyScreenState extends State<ContactPrivacyScreen> {
                   const SizedBox(height: ChatySpacing.sm),
                   Text(
                     _error!,
-                    style: TextStyle(color: theme.colorScheme.error, fontSize: 13),
+                    style: TextStyle(
+                      color: theme.colorScheme.error,
+                      fontSize: 13,
+                    ),
                   ),
                 ],
                 const SizedBox(height: ChatySpacing.base),
@@ -242,4 +247,3 @@ class _ContactPrivacyScreenState extends State<ContactPrivacyScreen> {
     );
   }
 }
-

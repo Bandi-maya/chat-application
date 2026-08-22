@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:animated_emoji/animated_emoji.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:just_audio/just_audio.dart';
@@ -8,11 +7,12 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../core/emoji/widgets/animated_emoji_text.dart';
+import '../../core/emoji/widgets/animated_emoji_reaction.dart';
 import '../../data/services/chat_media_service.dart';
 import '../../domain/models/chat_message.dart';
 import '../../ui/core/theme/theme_config.dart';
 import '../../ui/core/widgets/app_avatar.dart';
-import 'emoji_picker_modal.dart';
 
 class MessageBubble extends StatelessWidget {
   final ChatMessage message;
@@ -26,6 +26,12 @@ class MessageBubble extends StatelessWidget {
   final VoidCallback? onDoubleTap;
   final double voicePlaybackSpeed;
   final bool showDeletedContent;
+
+  /// Real consumer of `privacy.showEditedMessage` (GB `key_chat_editview`):
+  /// when off, the "edited" marker is hidden even though the server keeps
+  /// the edited timestamp.
+  final bool showEditedLabel;
+
   /// View-once support: whether the local user already opened this media and
   /// whether the sender's Anti-View-Once preference retains it after opening.
   final bool retainViewOnce;
@@ -45,6 +51,7 @@ class MessageBubble extends StatelessWidget {
     this.onDoubleTap,
     this.voicePlaybackSpeed = 1.0,
     this.showDeletedContent = false,
+    this.showEditedLabel = true,
     this.retainViewOnce = false,
     this.viewOnceOpened = false,
     this.onViewOnceOpen,
@@ -338,14 +345,15 @@ class MessageBubble extends StatelessWidget {
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                Text(
-                                  message.replyToPreviewText ?? '',
+                                AnimatedEmojiText(
+                                  text: message.replyToPreviewText ?? '',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     color: textColor.withValues(alpha: 0.8),
                                     fontSize: 11,
                                   ),
+                                  enableExpressiveSizing: false,
                                 ),
                               ],
                             ),
@@ -494,8 +502,8 @@ class MessageBubble extends StatelessWidget {
                             message.type != MessageType.location &&
                             message.type != MessageType.contact &&
                             message.text.isNotEmpty)
-                          Text(
-                            message.text,
+                          AnimatedEmojiText(
+                            text: message.text,
                             style: TextStyle(
                               color: textColor,
                               fontSize: 14 * theme.fontScale,
@@ -557,49 +565,15 @@ class MessageBubble extends StatelessWidget {
                         runSpacing: 4,
                         children: message.reactions
                             .map((reaction) {
-                              final animated = chatyAnimatedEmojiForUnicode(
-                                reaction.emoji,
-                              );
-                              return InkWell(
+                              return AnimatedEmojiReaction(
+                                emoji: reaction.emoji,
+                                count: reaction.userIds.length,
+                                isSelected: isMe,
+                                backgroundColor: theme.cardColor,
+                                activeBorderColor: theme.accentColor,
+                                textColor: theme.primaryTextColor,
                                 onTap: () =>
                                     onReactionTap?.call(reaction.emoji),
-                                borderRadius: BorderRadius.circular(14),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 7,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: theme.cardColor,
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(
-                                      color: theme.accentColor.withValues(
-                                        alpha: 0.25,
-                                      ),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (animated != null)
-                                        AnimatedEmoji(animated, size: 20)
-                                      else
-                                        Text(
-                                          reaction.emoji,
-                                          style: const TextStyle(fontSize: 15),
-                                        ),
-                                      const SizedBox(width: 3),
-                                      Text(
-                                        '${reaction.userIds.length}',
-                                        style: TextStyle(
-                                          color: theme.primaryTextColor,
-                                          fontSize: 10.5,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
                               );
                             })
                             .toList(growable: false),
@@ -1376,14 +1350,20 @@ class _ViewOnceLockedCard extends StatelessWidget {
               alignment: Alignment.center,
               children: [
                 Icon(
-                  isVideo ? Icons.videocam_off_rounded : Icons.image_not_supported_outlined,
+                  isVideo
+                      ? Icons.videocam_off_rounded
+                      : Icons.image_not_supported_outlined,
                   size: 30,
                   color: accentColor,
                 ),
                 Positioned(
                   right: -4,
                   bottom: -2,
-                  child: Icon(Icons.one_k_rounded, size: 13, color: textColor.withValues(alpha: 0.7)),
+                  child: Icon(
+                    Icons.one_k_rounded,
+                    size: 13,
+                    color: textColor.withValues(alpha: 0.7),
+                  ),
                 ),
               ],
             ),
@@ -1399,7 +1379,10 @@ class _ViewOnceLockedCard extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               'Tap to open • opens only once',
-              style: TextStyle(color: textColor.withValues(alpha: 0.5), fontSize: 9.5),
+              style: TextStyle(
+                color: textColor.withValues(alpha: 0.5),
+                fontSize: 9.5,
+              ),
             ),
           ],
         ),
@@ -1426,11 +1409,18 @@ class _ViewOnceExpiredCard extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.visibility_off_rounded, size: 16, color: textColor.withValues(alpha: 0.55)),
+          Icon(
+            Icons.visibility_off_rounded,
+            size: 16,
+            color: textColor.withValues(alpha: 0.55),
+          ),
           const SizedBox(width: 7),
           Text(
             'Opened • view-once media expired',
-            style: TextStyle(color: textColor.withValues(alpha: 0.6), fontSize: 11),
+            style: TextStyle(
+              color: textColor.withValues(alpha: 0.6),
+              fontSize: 11,
+            ),
           ),
         ],
       ),

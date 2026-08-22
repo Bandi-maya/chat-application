@@ -5,8 +5,7 @@ import '../../../ui/core/controllers/app_icon_controller.dart';
 import '../../../ui/core/controllers/appearance_variant_controller.dart';
 import 'app_icon_settings_screen.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
-import '../../../ui/core/design_system/components/app_components.dart';
-import '../../../ui/core/theme/theme_controller.dart';
+import '../../../ui/core/design_system/design_system.dart';
 import '../theme_editor_screen.dart';
 
 class UniversalAppearanceScreen extends StatelessWidget {
@@ -606,18 +605,16 @@ class _OptionPreview extends StatelessWidget {
           'Segmented Glass Dock' => colors.surface.withValues(alpha: 0.85),
           _ => colors.surface,
         },
-        borderRadius: BorderRadius.circular(
-          switch (value) {
-            'Floating Pill' || 'Floating Dynamic Island' || 'Active Pill Chip' => 28,
-            'Top Indicator Line' || 'Classic Label Bar' => 12,
-            'Circle Accent Pop' => 24,
-            'Soft Square Tile' => 16,
-            _ => 20,
-          },
-        ),
-        border: Border.all(
-          color: colors.borderSubtle,
-        ),
+        borderRadius: BorderRadius.circular(switch (value) {
+          'Floating Pill' ||
+          'Floating Dynamic Island' ||
+          'Active Pill Chip' => 28,
+          'Top Indicator Line' || 'Classic Label Bar' => 12,
+          'Circle Accent Pop' => 24,
+          'Soft Square Tile' => 16,
+          _ => 20,
+        }),
+        border: Border.all(color: colors.borderSubtle),
         boxShadow: [
           BoxShadow(
             color: colors.shadow,
@@ -644,17 +641,17 @@ class _OptionPreview extends StatelessWidget {
             color: colors.foregroundSecondary,
           ),
           // Inactive Tab 4
-          Icon(
-            Icons.call_rounded,
-            size: 20,
-            color: colors.foregroundSecondary,
-          ),
+          Icon(Icons.call_rounded, size: 20, color: colors.foregroundSecondary),
         ],
       ),
     );
   }
 
-  Widget _buildSampleActiveTab(BuildContext context, Color accent, String style) {
+  Widget _buildSampleActiveTab(
+    BuildContext context,
+    Color accent,
+    String style,
+  ) {
     final colors = context.colors;
     switch (style) {
       case 'Active Pill Chip':
@@ -727,10 +724,7 @@ class _OptionPreview extends StatelessWidget {
             Container(
               width: 4.5,
               height: 4.5,
-              decoration: BoxDecoration(
-                color: accent,
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
             ),
           ],
         );

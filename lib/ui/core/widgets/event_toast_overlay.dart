@@ -11,11 +11,18 @@ class ChatyEventToastOverlay extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
   final Widget child;
 
+  /// Real consumer of `security.hideLockNotificationContent`: while the app
+  /// lock gate is showing, the toast body (message detail/preview text) is
+  /// replaced by dots so nothing readable leaks through the translucent
+  /// barrier. Titles stay visible so the user still knows what happened.
+  final bool concealWhileLocked;
+
   const ChatyEventToastOverlay({
     super.key,
     required this.notificationService,
     required this.preferencesController,
     required this.child,
+    this.concealWhileLocked = false,
   });
 
   @override
@@ -215,13 +222,15 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
                                             .showMessagePreview) ...[
                                           const SizedBox(height: 2),
                                           Text(
-                                            notification.body,
+                                            widget.concealWhileLocked
+                                                ? '••••••'
+                                                : notification.body,
                                             maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
                                             style: theme.textTheme.bodySmall
                                                 ?.copyWith(
-                                                  color: notification
-                                                      .textColor ??
+                                                  color:
+                                                      notification.textColor ??
                                                       theme
                                                           .colorScheme
                                                           .onSurfaceVariant,

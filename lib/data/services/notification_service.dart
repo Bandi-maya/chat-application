@@ -6,6 +6,7 @@ class ChatyEventNotification {
   final String body;
   final IconData icon;
   final Color color;
+
   /// Optional custom text tint for title/body (GB toast `_tc` keys).
   final Color? textColor;
   final DateTime timestamp;

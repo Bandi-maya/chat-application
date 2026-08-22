@@ -214,7 +214,10 @@ class _UsernameAvailabilityFieldState extends State<UsernameAvailabilityField> {
                             color: context.colors.success,
                           )
                         : _available == false
-                        ? Icon(Icons.cancel_rounded, color: context.colors.error)
+                        ? Icon(
+                            Icons.cancel_rounded,
+                            color: context.colors.error,
+                          )
                         : null,
                   ),
         ),

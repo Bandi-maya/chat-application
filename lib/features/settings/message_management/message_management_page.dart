@@ -485,7 +485,9 @@ class _MessageManagementPageState extends State<MessageManagementPage> {
                 title: 'Trigger: "${rule.keyword}"',
                 subtitle: 'Reply: ${rule.responseMessage}',
                 badgeText: rule.enabled ? 'ACTIVE' : 'OFF',
-                badgeColor: rule.enabled ? context.colors.success : context.colors.foregroundTertiary,
+                badgeColor: rule.enabled
+                    ? context.colors.success
+                    : context.colors.foregroundTertiary,
                 trailing: IconButton(
                   icon: Icon(
                     Icons.delete_outline_rounded,

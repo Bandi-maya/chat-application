@@ -637,9 +637,7 @@ class ChatyGroupedSection extends StatelessWidget {
               ),
               child: Text(
                 description!,
-                style: ChatyTypography.caption(
-                  colors.foregroundSecondary,
-                ),
+                style: ChatyTypography.caption(colors.foregroundSecondary),
               ),
             ),
           ],
@@ -821,17 +819,11 @@ class ChatyInput extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(ChatyRadius.lg),
-              borderSide: BorderSide(
-                color: colors.primary,
-                width: 1.6,
-              ),
+              borderSide: BorderSide(color: colors.primary, width: 1.6),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(ChatyRadius.lg),
-              borderSide: BorderSide(
-                color: colors.error,
-                width: 1.2,
-              ),
+              borderSide: BorderSide(color: colors.error, width: 1.2),
             ),
           ),
         ),

@@ -4,8 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../domain/models/preferences.dart';
-import '../../../ui/core/theme/theme_config.dart';
-import '../../../ui/core/theme/theme_controller.dart';
+import '../../../ui/core/theme/app_theme.dart';
 import '../../data/repositories/mock_data_store.dart';
 import '../../data/services/notification_service.dart';
 import '../../data/services/contact_relationship_service.dart';
@@ -16,6 +15,8 @@ import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/design_system/settings_primitives.dart';
 import '../../ui/core/design_system/components/chaty_kit.dart';
 import '../../ui/core/design_system/components/app_components.dart';
+import '../../core/emoji/widgets/animated_emoji_text.dart';
+import '../notifications/notification_permission_sheet.dart';
 import '../search/global_search_screen.dart';
 import '../settings/security/app_lock_overlay.dart';
 import 'chat_detail_screen.dart';
@@ -68,7 +69,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     super.initState();
     _realtime = locator<RichChatRealtimeService>();
     _relationships = locator<ContactRelationshipService>();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _trackConversations());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _trackConversations();
+      NotificationPermissionSheet.showIfNeeded(context);
+    });
   }
 
   void _trackConversations() {
@@ -560,8 +565,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       color: storiesStyle == 'Minimal'
-                                          ? theme.secondaryTextColor
-                                                .withValues(alpha: 0.55)
+                                          ? theme.secondaryTextColor.withValues(
+                                              alpha: 0.55,
+                                            )
                                           : theme.secondaryTextColor,
                                       fontSize: storyNameFontSize,
                                     ),
@@ -579,61 +585,59 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                               decoration: BoxDecoration(
                                 color: theme.cardColor,
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: theme.surfaceColor,
-                                ),
+                                border: Border.all(color: theme.surfaceColor),
                               ),
                               child: entry,
                             );
                           },
                         ),
                       ),
-                    if (styleShowFilters) Align(
-                      alignment: Alignment.centerLeft,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.fromLTRB(16, 3, 16, 8),
-                        child: Row(
-                          children: filters
-                              .map((filter) {
-                                final selected = _selectedFilter == filter;
-                                return Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: ChoiceChip(
-                                    label: Text(filter),
-                                    selected: selected,
-                                    selectedColor: theme.accentColor.withValues(
-                                      alpha: 0.18,
+                    if (styleShowFilters)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.fromLTRB(16, 3, 16, 8),
+                          child: Row(
+                            children: filters
+                                .map((filter) {
+                                  final selected = _selectedFilter == filter;
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: ChoiceChip(
+                                      label: Text(filter),
+                                      selected: selected,
+                                      selectedColor: theme.accentColor
+                                          .withValues(alpha: 0.18),
+                                      backgroundColor: theme.cardColor,
+                                      side: BorderSide(
+                                        color: selected
+                                            ? theme.accentColor.withValues(
+                                                alpha: 0.35,
+                                              )
+                                            : theme.surfaceColor,
+                                      ),
+                                      labelStyle: TextStyle(
+                                        color: selected
+                                            ? theme.accentColor
+                                            : theme.secondaryTextColor,
+                                        fontWeight: selected
+                                            ? FontWeight.w700
+                                            : FontWeight.w500,
+                                      ),
+                                      onSelected: (value) {
+                                        if (value)
+                                          setState(
+                                            () => _selectedFilter = filter,
+                                          );
+                                      },
                                     ),
-                                    backgroundColor: theme.cardColor,
-                                    side: BorderSide(
-                                      color: selected
-                                          ? theme.accentColor.withValues(
-                                              alpha: 0.35,
-                                            )
-                                          : theme.surfaceColor,
-                                    ),
-                                    labelStyle: TextStyle(
-                                      color: selected
-                                          ? theme.accentColor
-                                          : theme.secondaryTextColor,
-                                      fontWeight: selected
-                                          ? FontWeight.w700
-                                          : FontWeight.w500,
-                                    ),
-                                    onSelected: (value) {
-                                      if (value)
-                                        setState(
-                                          () => _selectedFilter = filter,
-                                        );
-                                    },
-                                  ),
-                                );
-                              })
-                              .toList(growable: false),
+                                  );
+                                })
+                                .toList(growable: false),
+                          ),
                         ),
                       ),
-                    ),
                   ],
                   Expanded(
                     // P4: drives the large-title collapse from the primary
@@ -777,8 +781,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                     .toList(growable: false),
                 groups: widget.dataStore.conversations
                     .where(
-                      (c) =>
-                          c.type == ConversationType.group && !c.isArchived,
+                      (c) => c.type == ConversationType.group && !c.isArchived,
                     )
                     .toList(growable: false),
                 onOpen: _handleConversationTap,
@@ -1156,7 +1159,8 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                       style: TextStyle(
                                         color: theme.primaryTextColor,
                                         // WA-iOS row metrics: 16pt name.
-                                        fontSize: 16 * density * theme.fontScale,
+                                        fontSize:
+                                            16 * density * theme.fontScale,
                                         fontWeight: conversation.unreadCount > 0
                                             ? FontWeight.w800
                                             : FontWeight.w600,
@@ -1181,8 +1185,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                         Row(
                           children: [
                             Expanded(
-                              child: Text(
-                                activity?.isTyping == true ||
+                              child: AnimatedEmojiText(
+                                text:
+                                    activity?.isTyping == true ||
                                         activity?.isRecording == true
                                     ? presence
                                     : conversation.lastMessageText.isEmpty
@@ -1190,6 +1195,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                     : conversation.lastMessageText,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
+                                enableExpressiveSizing: false,
                                 style: TextStyle(
                                   color:
                                       activity?.isTyping == true ||
@@ -1226,13 +1232,13 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                     // text colors for chat rows.
                                     color: online
                                         ? widget.preferencesController.gbColor(
-                                              'ModOnlineColor',
-                                            ) ??
-                                            theme.successColor
+                                                'ModOnlineColor',
+                                              ) ??
+                                              theme.successColor
                                         : widget.preferencesController.gbColor(
-                                              'ModlastseenColor',
-                                            ) ??
-                                            theme.secondaryTextColor,
+                                                'ModlastseenColor',
+                                              ) ??
+                                              theme.secondaryTextColor,
                                     fontSize: 9.5,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -1488,31 +1494,13 @@ class _ArchivedChatsScreenState extends State<_ArchivedChatsScreen> {
                   title: const Text('Archived'),
                 ),
           body: archived.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.archive_outlined,
-                        size: 56,
-                        color: theme.secondaryTextColor,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No archived chats',
-                        style: TextStyle(
-                          color: theme.primaryTextColor,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Chats you archive will appear here',
-                        style: TextStyle(color: theme.secondaryTextColor),
-                      ),
-                    ],
-                  ),
+              ? ChatyEmptyState(
+                  icon: Icons.archive_outlined,
+                  title: 'No archived chats',
+                  message: 'Chats you archive will appear here',
+                  iconColor: theme.secondaryTextColor,
+                  titleColor: theme.primaryTextColor,
+                  messageColor: theme.secondaryTextColor,
                 )
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(vertical: 8),

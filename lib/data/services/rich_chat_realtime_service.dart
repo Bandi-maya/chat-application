@@ -114,8 +114,7 @@ class RichChatRealtimeService extends ChangeNotifier {
   IncomingCall? get incomingCall => _incomingCall;
 
   /// Caller-side stream of responses to our outgoing invites.
-  Stream<CallResponseEvent> get callResponses =>
-      _callResponseController.stream;
+  Stream<CallResponseEvent> get callResponses => _callResponseController.stream;
 
   bool get isConnected => _channel != null;
 
@@ -243,7 +242,8 @@ class RichChatRealtimeService extends ChangeNotifier {
         title: '${profile?.displayName ?? 'Contact'} is online',
         body: 'Now active in Chaty',
         icon: Icons.online_prediction_rounded,
-        color: _preferences.gbColor('abu_saleh_toast_online_bc') ??
+        color:
+            _preferences.gbColor('abu_saleh_toast_online_bc') ??
             Colors.greenAccent,
         textColor: _preferences.gbColor('abu_saleh_toast_online_tc'),
         userId: userId,
@@ -308,7 +308,8 @@ class RichChatRealtimeService extends ChangeNotifier {
         title: '${profile?.displayName ?? 'Contact'} is typing',
         body: 'Typing in a conversation',
         icon: Icons.keyboard_alt_outlined,
-        color: _preferences.gbColor('abu_saleh_toast_typing_bc') ??
+        color:
+            _preferences.gbColor('abu_saleh_toast_typing_bc') ??
             Colors.blueAccent,
         textColor: _preferences.gbColor('abu_saleh_toast_typing_tc'),
         userId: userId,
@@ -594,7 +595,8 @@ class RichChatRealtimeService extends ChangeNotifier {
           ' updated their profile',
       body: about.isNotEmpty ? about : 'Profile details changed',
       icon: Icons.person_outline_rounded,
-      color: _preferences.gbColor('abu_saleh_toast_profile_bc') ??
+      color:
+          _preferences.gbColor('abu_saleh_toast_profile_bc') ??
           const Color(0xFF6366F1),
       textColor: _preferences.gbColor('abu_saleh_toast_profile_tc'),
       userId: userId,

@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 
 import '../../../ui/core/controllers/app_icon_controller.dart';
 import '../../../ui/core/design_system/settings_primitives.dart';
+import '../../../ui/core/design_system/components/chaty_kit.dart';
 import '../../../ui/core/widgets/app_brand_icon.dart';
 
 class AppIconSettingsScreen extends StatefulWidget {
@@ -48,24 +49,12 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen>
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Use ${variant.title} icon?'),
-        content: const Text(
+    final confirmed = await ChatyConfirmDialog.show(
+      context,
+      title: 'Use ${variant.title} icon?',
+      message:
           'Chaty will switch to this launcher icon. Your saved custom icons stay available.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Apply'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Apply',
     );
     if (confirmed != true || !mounted) return;
 
@@ -76,25 +65,14 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen>
       return;
     }
 
-    final restart = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Launcher icon applied'),
-        content: const Text(
+    final restart = await ChatyConfirmDialog.show(
+      context,
+      title: 'Launcher icon applied',
+      message:
           'Some launchers cache app icons briefly. Restart Chaty if the old icon is still visible.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Continue'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Restart now'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Restart now',
+      cancelLabel: 'Continue',
+      barrierDismissible: false,
     );
     if (restart == true) await SystemNavigator.pop();
   }
@@ -118,24 +96,13 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen>
   }
 
   Future<void> _deleteCustomPreset(CustomIconPreset preset) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete custom icon?'),
-        content: const Text(
+    final confirmed = await ChatyConfirmDialog.show(
+      context,
+      title: 'Delete custom icon?',
+      message:
           'This removes only this saved custom icon. Other custom and built-in icons are not changed.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Delete',
+      destructive: true,
     );
     if (confirmed == true) {
       await widget.appIconController.removeCustomPreset(preset.id);

@@ -7,7 +7,6 @@ import '../../domain/models/chat_message.dart';
 import '../../domain/models/contact_relationship.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/user_profile.dart';
-import '../../ui/core/theme/theme_config.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../messages/media_viewer_screen.dart';
 import 'contact_privacy_screen.dart';
@@ -93,24 +92,13 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
     if (_busy) return;
     final next = !_blocked;
     if (next) {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text('Block ${widget.contact.displayName}?'),
-          content: const Text(
+      final confirmed = await ChatyConfirmDialog.show(
+        context,
+        title: 'Block ${widget.contact.displayName}?',
+        message:
             'You will stop receiving new messages from this person, and they cannot message you until you unblock them.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Block'),
-            ),
-          ],
-        ),
+        confirmLabel: 'Block',
+        destructive: true,
       );
       if (confirmed != true) return;
     }
@@ -200,8 +188,6 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final themeData = Theme.of(context);
-    final isDark = themeData.brightness == Brightness.dark;
     final media = _media;
     final documents = _documents;
     final links = _links;
@@ -303,7 +289,10 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                     Text(
                       _error!,
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: context.colors.error, fontSize: 13),
+                      style: TextStyle(
+                        color: context.colors.error,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                   const SizedBox(height: ChatySpacing.lg),
@@ -472,7 +461,8 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                                         width: 110,
                                         padding: const EdgeInsets.all(8),
                                         decoration: BoxDecoration(
-                                          color: context.colors.surfaceSecondary,
+                                          color:
+                                              context.colors.surfaceSecondary,
                                           borderRadius: BorderRadius.circular(
                                             ChatyRadius.md,
                                           ),
@@ -495,7 +485,8 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                               style: TextStyle(
-                                                color: context.colors.foreground,
+                                                color:
+                                                    context.colors.foreground,
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.w600,
                                               ),
@@ -511,20 +502,19 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                           ),
                         ),
                       if (links.isNotEmpty)
-
                         for (final link in links.take(5))
                           ChatyListTile(
                             leading: Icon(
                               Icons.link_rounded,
                               size: 20,
-                              color: themeData.colorScheme.primary,
+                              color: context.colors.primary,
                             ),
                             title: Text(
                               link,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: themeData.colorScheme.primary,
+                                color: context.colors.primary,
                                 fontSize: 13.5,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -535,7 +525,7 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                           ChatyListTile(
                             leading: Icon(
                               Icons.description_outlined,
-                              color: themeData.colorScheme.primary,
+                              color: context.colors.primary,
                               size: 22,
                             ),
                             title: Text(
@@ -543,7 +533,7 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: themeData.colorScheme.onSurface,
+                                color: context.colors.foreground,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 14,
                               ),
@@ -551,9 +541,7 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                             subtitle: Text(
                               message.attachment!.size,
                               style: ChatyTypography.caption(
-                                themeData.colorScheme.onSurface.withValues(
-                                  alpha: 0.6,
-                                ),
+                                context.colors.foregroundSecondary,
                               ),
                             ),
                             onTap: () => _openMedia(message),
@@ -566,5 +554,3 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
     );
   }
 }
-
-

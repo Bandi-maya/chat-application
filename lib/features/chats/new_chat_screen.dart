@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import '../../data/repositories/mock_data_store.dart';
 import '../../domain/models/user_profile.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
-import '../../ui/core/theme/theme_config.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/design_system/design_system.dart';
 import 'chat_detail_screen.dart';
@@ -147,8 +146,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final themeData = Theme.of(context);
-    final isDark = themeData.brightness == Brightness.dark;
+    final colors = context.colors;
 
     return ChatyScaffold(
       appBar: ChatyAppBar(
@@ -190,10 +188,8 @@ class _NewChatScreenState extends State<NewChatScreen> {
                   'Create',
                   style: TextStyle(
                     color: _selectedGroupMembers.isNotEmpty
-                        ? themeData.colorScheme.primary
-                        : themeData.colorScheme.onSurface.withValues(
-                            alpha: 0.35,
-                          ),
+                        ? colors.primary
+                        : colors.foregroundTertiary,
                     fontWeight: FontWeight.w700,
                     fontSize: 15,
                   ),
@@ -217,7 +213,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
                     hintText: 'Enter group subject...',
                     prefixIcon: Icon(
                       Icons.group_work_rounded,
-                      color: themeData.colorScheme.primary,
+                      color: colors.primary,
                       size: 20,
                     ),
                   ),
@@ -229,9 +225,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
                   hintText: 'Search @username or name...',
                   prefixIcon: Icon(
                     Icons.search_rounded,
-                    color: themeData.colorScheme.onSurface.withValues(
-                      alpha: 0.45,
-                    ),
+                    color: colors.foregroundTertiary,
                     size: 20,
                   ),
                   suffixIcon: _searchCtrl.text.isNotEmpty
@@ -262,36 +256,30 @@ class _NewChatScreenState extends State<NewChatScreen> {
                   leading: Container(
                     padding: const EdgeInsets.all(ChatySpacing.sm),
                     decoration: BoxDecoration(
-                      color: themeData.colorScheme.primary.withValues(
-                        alpha: 0.12,
-                      ),
+                      color: colors.primary.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       Icons.group_add_rounded,
-                      color: themeData.colorScheme.primary,
+                      color: colors.primary,
                       size: 20,
                     ),
                   ),
                   title: Text(
                     'Create New Group',
                     style: TextStyle(
-                      color: themeData.colorScheme.onSurface,
+                      color: colors.foreground,
                       fontWeight: FontWeight.w700,
                       fontSize: 15,
                     ),
                   ),
                   subtitle: Text(
                     'Start an encrypted group with multiple members',
-                    style: ChatyTypography.caption(
-                      themeData.colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
+                    style: ChatyTypography.caption(colors.foregroundSecondary),
                   ),
                   trailing: Icon(
                     Icons.chevron_right_rounded,
-                    color: themeData.colorScheme.onSurface.withValues(
-                      alpha: 0.35,
-                    ),
+                    color: colors.foregroundTertiary,
                   ),
                 ),
               ),
@@ -309,9 +297,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
                           Icon(
                             Icons.person_search_rounded,
                             size: 48,
-                            color: themeData.colorScheme.onSurface.withValues(
-                              alpha: 0.3,
-                            ),
+                            color: colors.foregroundTertiary,
                           ),
                           const SizedBox(height: ChatySpacing.base),
                           Text(
@@ -320,9 +306,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
                                 : 'No matching contacts found.',
                             textAlign: TextAlign.center,
                             style: ChatyTypography.caption(
-                              themeData.colorScheme.onSurface.withValues(
-                                alpha: 0.6,
-                              ),
+                              colors.foregroundSecondary,
                             ),
                           ),
                         ],
@@ -339,7 +323,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
                       height: 1,
                       thickness: 1,
                       indent: 64,
-                      color: context.colors.divider,
+                      color: colors.divider,
                     ),
                     itemBuilder: (context, index) {
                       final user = _results[index];
@@ -357,7 +341,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
                         title: Text(
                           user.displayName,
                           style: TextStyle(
-                            color: themeData.colorScheme.onSurface,
+                            color: colors.foreground,
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                             letterSpacing: -0.2,
@@ -368,15 +352,13 @@ class _NewChatScreenState extends State<NewChatScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: ChatyTypography.caption(
-                            themeData.colorScheme.onSurface.withValues(
-                              alpha: 0.6,
-                            ),
+                            colors.foregroundSecondary,
                           ),
                         ),
                         trailing: _isCreatingGroup
                             ? Checkbox(
                                 value: isSelected,
-                                activeColor: themeData.colorScheme.primary,
+                                activeColor: colors.primary,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(4),
                                 ),
@@ -385,8 +367,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
                             : Icon(
                                 Icons.chevron_right_rounded,
                                 size: 20,
-                                color: themeData.colorScheme.onSurface
-                                    .withValues(alpha: 0.35),
+                                color: colors.foregroundTertiary,
                               ),
                         onTap: _isCreatingGroup
                             ? () => _toggleMember(user.id)
@@ -408,4 +389,3 @@ class _NewChatScreenState extends State<NewChatScreen> {
     });
   }
 }
-

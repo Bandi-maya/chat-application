@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/services/backend_service.dart';
 import '../../injection/locator.dart';
+import '../../ui/core/design_system/components/chaty_kit.dart';
 import '../../ui/core/persistence/preferences_storage.dart';
 import '../../ui/core/theme/theme_controller.dart';
 import '../../ui/core/widgets/username_availability_field.dart';
@@ -97,25 +98,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _showVerificationDialog(ChatyBackendService backend) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Verify your email'),
-        content: const Text(
+    final confirmed = await ChatyConfirmDialog.show(
+      context,
+      title: 'Verify your email',
+      message:
           'Your account was created. Open the newest Chaty verification email and tap Confirm. Android can reopen Chaty through the secure chaty:// callback. Then tap Continue below.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Later'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Continue'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Continue',
+      cancelLabel: 'Later',
+      barrierDismissible: false,
     );
 
     if (!mounted || confirmed != true) return;

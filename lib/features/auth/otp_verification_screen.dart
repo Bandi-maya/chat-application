@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../injection/locator.dart';
-import '../../ui/core/theme/theme_controller.dart';
+import '../../ui/core/theme/app_theme.dart';
 import 'create_new_password_screen.dart';
 import 'widgets/auth_components.dart';
 
@@ -31,21 +31,18 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     for (final controller in _controllers) {
       controller.dispose();
     }
-    for (final focusNode in _focusNodes) {
-      focusNode.dispose();
+    for (final node in _focusNodes) {
+      node.dispose();
     }
     super.dispose();
   }
 
-  String get currentOtp =>
-      _controllers.map((controller) => controller.text).join();
+  String get _otpCode => _controllers.map((c) => c.text.trim()).join();
 
-  Future<void> _handleVerify() async {
-    if (_isLoading) return;
-    if (currentOtp.length != 6) {
-      setState(
-        () => _errorMessage = 'Enter the complete 6-digit verification code.',
-      );
+  Future<void> _verifyOtp() async {
+    final code = _otpCode;
+    if (code.length != 6) {
+      setState(() => _errorMessage = 'Enter all 6 digits of the code.');
       return;
     }
 
@@ -55,65 +52,55 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     });
 
     try {
-      final response = await Supabase.instance.client.auth.verifyOTP(
-        email: widget.email.trim().toLowerCase(),
-        token: currentOtp,
-        type: OtpType.email,
+      final res = await Supabase.instance.client.auth.verifyOTP(
+        email: widget.email,
+        token: code,
+        type: OtpType.recovery,
       );
-      if (response.session == null) {
-        throw const AuthException(
-          'The verification code could not create a session.',
-        );
+
+      if (res.session == null) {
+        throw Exception('Verification failed. Invalid or expired OTP.');
       }
+
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => CreateNewPasswordScreen(email: widget.email),
         ),
       );
-    } on AuthException catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _errorMessage = error.message;
-      });
     } catch (error) {
       if (!mounted) return;
       setState(() {
+        _errorMessage = error.toString().replaceFirst('Exception: ', '');
         _isLoading = false;
-        _errorMessage = error.toString();
       });
     }
   }
 
-  Future<void> _resend() async {
-    if (_isLoading) return;
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  Future<void> _resendCode() async {
     try {
-      await Supabase.instance.client.auth.signInWithOtp(
-        email: widget.email.trim().toLowerCase(),
-        emailRedirectTo: 'chaty://reset-password/',
-        shouldCreateUser: false,
+      await Supabase.instance.client.auth.resetPasswordForEmail(
+        widget.email,
+        redirectTo: 'chaty://reset-callback',
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('A new verification email was sent.')),
+        SnackBar(
+          content: const Text('A new OTP has been sent to your email.'),
+          backgroundColor: context.colors.success,
+        ),
       );
-    } on AuthException catch (error) {
+    } catch (error) {
       if (!mounted) return;
-      setState(() => _errorMessage = error.message);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      setState(() {
+        _errorMessage = error.toString().replaceFirst('Exception: ', '');
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = locator<ThemeController>().globalTheme;
-    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: theme.backgroundColor,
@@ -205,14 +192,14 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                     ),
                   AuthPrimaryButton(
                     text: 'Verify',
-                    onPressed: _handleVerify,
+                    onPressed: _verifyOtp,
                     isLoading: _isLoading,
                     theme: theme,
                   ),
                   const SizedBox(height: 12),
                   Center(
                     child: TextButton(
-                      onPressed: _isLoading ? null : _resend,
+                      onPressed: _isLoading ? null : _resendCode,
                       child: Text(
                         'Resend verification email',
                         style: TextStyle(

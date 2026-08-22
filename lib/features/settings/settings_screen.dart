@@ -288,10 +288,7 @@ class SettingsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             ListTile(
-              leading: Icon(
-                Icons.restore_rounded,
-                color: colors.primary,
-              ),
+              leading: Icon(Icons.restore_rounded, color: colors.primary),
               title: const Text('Reset Theme to Default B&W'),
               onTap: () {
                 themeController.resetToDefaults();
@@ -302,10 +299,7 @@ class SettingsScreen extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: Icon(
-                Icons.shield_outlined,
-                color: colors.primary,
-              ),
+              leading: Icon(Icons.shield_outlined, color: colors.primary),
               title: const Text('Reset Privacy Options'),
               onTap: () {
                 preferencesController.resetPrivacy();
@@ -463,10 +457,7 @@ class SettingsScreen extends StatelessWidget {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: colors.surfaceSecondary,
-                        border: Border.all(
-                          color: colors.border,
-                          width: 1.5,
-                        ),
+                        border: Border.all(color: colors.border, width: 1.5),
                       ),
                       alignment: Alignment.center,
                       child: Text(
@@ -836,10 +827,7 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ),
                     style: OutlinedButton.styleFrom(
-                      side: BorderSide(
-                        color: colors.error,
-                        width: 1.2,
-                      ),
+                      side: BorderSide(color: colors.error, width: 1.2),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
@@ -870,4 +858,3 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 }
-

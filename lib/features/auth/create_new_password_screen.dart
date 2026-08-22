@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../injection/locator.dart';
-import '../../ui/core/theme/theme_controller.dart';
+import '../../ui/core/theme/app_theme.dart';
 import 'login_screen.dart';
 import 'widgets/auth_components.dart';
 
@@ -56,7 +56,9 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Password updated. Sign in with your new password.'),
+          content: const Text(
+            'Password updated. Sign in with your new password.',
+          ),
           backgroundColor: context.colors.success,
         ),
       );

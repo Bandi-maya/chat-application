@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../../ui/core/design_system/settings_primitives.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
+import '../../../ui/core/theme/app_theme.dart';
 
 class ConversationSettingsPage extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
@@ -26,13 +27,13 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
   /// survives cache cleanup, then persists the path for the consumer.
   Future<void> _pickWallpaperImage() async {
     try {
-      final picked = await FilePicker.pickFile(
-        type: FileType.image,
-      );
+      final picked = await FilePicker.pickFile(type: FileType.image);
       final sourcePath = picked?.path;
       if (sourcePath == null || sourcePath.isEmpty) return;
       final docs = await getApplicationDocumentsDirectory();
-      var ext = sourcePath.contains('.') ? sourcePath.split('.').last.toLowerCase() : 'png';
+      var ext = sourcePath.contains('.')
+          ? sourcePath.split('.').last.toLowerCase()
+          : 'png';
       if (!RegExp(r'^[a-z0-9]{2,5}$').hasMatch(ext)) ext = 'png';
       final target = File(
         '${docs.path}/chaty_wallpaper_${DateTime.now().millisecondsSinceEpoch}.$ext',
@@ -53,6 +54,7 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
       );
     }
   }
+
   static const List<String> _bubbleShapes = [
     'Rounded',
     'Compact',
@@ -285,6 +287,20 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
         ChatySettingsSection(
           title: 'Reactions & Interaction Menus',
           children: [
+            ChatySwitchTile(
+              icon: Icons.auto_awesome_rounded,
+              iconColor: context.colors.primary,
+              title: 'Animated Emojis',
+              subtitle:
+                  'Play vector animations for emojis and reactions throughout chats',
+              value: conv.enableAnimatedEmojis,
+              onChanged: (val) {
+                widget.preferencesController.updateConversation(
+                  conv.copyWith(enableAnimatedEmojis: val),
+                  logTitle: 'Animated Emojis',
+                );
+              },
+            ),
             ChatySwitchTile(
               icon: Icons.touch_app_rounded,
               iconColor: context.colors.accent,

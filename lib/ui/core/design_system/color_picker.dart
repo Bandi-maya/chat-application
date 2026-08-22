@@ -190,10 +190,11 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: (hasContrastWarning
-                              ? context.colors.error
-                              : context.colors.success)
-                          .withValues(alpha: 0.15),
+                      color:
+                          (hasContrastWarning
+                                  ? context.colors.error
+                                  : context.colors.success)
+                              .withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -274,7 +275,9 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
                     color: c,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: isSel ? context.colors.primary : context.colors.border,
+                      color: isSel
+                          ? context.colors.primary
+                          : context.colors.border,
                       width: isSel ? 3 : 1.5,
                     ),
                   ),
@@ -328,7 +331,6 @@ class _ChatyColorPickerModalState extends State<ChatyColorPickerModal> {
               ),
             ],
           ),
-
         ],
       ),
     );

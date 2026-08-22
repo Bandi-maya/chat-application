@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../ui/core/theme/theme_config.dart';
 import '../../data/repositories/mock_data_store.dart';
 import '../../domain/models/chat_task.dart';
 import '../../domain/models/conversation.dart';
@@ -221,9 +220,7 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                 children: [
                   Text(
                     widget.existingTask != null ? 'Edit Task' : 'New Task',
-                    style: ChatyTypography.headline(
-                      colors.foreground,
-                    ),
+                    style: ChatyTypography.headline(colors.foreground),
                   ),
                   ChatyIconButton(
                     icon: Icons.close_rounded,
@@ -259,9 +256,7 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
               const SizedBox(height: 4),
               Text(
                 'Select who is responsible for this task:',
-                style: ChatyTypography.caption(
-                  colors.foregroundSecondary,
-                ),
+                style: ChatyTypography.caption(colors.foregroundSecondary),
               ),
               const SizedBox(height: ChatySpacing.sm),
               Wrap(
@@ -269,7 +264,9 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                 runSpacing: ChatySpacing.sm,
                 children: [
                   ...candidateAssignees.map((candidate) {
-                    final selected = _selectedAssigneeIds.contains(candidate.id);
+                    final selected = _selectedAssigneeIds.contains(
+                      candidate.id,
+                    );
                     return FilterChip(
                       avatar: Icon(
                         selected
@@ -279,9 +276,7 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                       ),
                       label: Text(candidate.displayName.split(' ').first),
                       selected: selected,
-                      selectedColor: colors.primary.withValues(
-                        alpha: 0.2,
-                      ),
+                      selectedColor: colors.primary.withValues(alpha: 0.2),
                       onSelected: _isSaving
                           ? null
                           : (value) => _setAssignee(candidate.id, value),
@@ -293,9 +288,7 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                       'Me (${currentUser.displayName.split(' ').first})',
                     ),
                     selected: _selectedAssigneeIds.contains(currentUser.id),
-                    selectedColor: colors.primary.withValues(
-                      alpha: 0.2,
-                    ),
+                    selectedColor: colors.primary.withValues(alpha: 0.2),
                     onSelected: _isSaving
                         ? null
                         : (selected) => _setAssignee(currentUser.id, selected),
@@ -347,10 +340,7 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                 const SizedBox(height: ChatySpacing.sm),
                 Text(
                   _errorMessage!,
-                  style: TextStyle(
-                    color: colors.error,
-                    fontSize: 13,
-                  ),
+                  style: TextStyle(color: colors.error, fontSize: 13),
                 ),
               ],
               const SizedBox(height: ChatySpacing.lg),
@@ -380,4 +370,3 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
     });
   }
 }
-

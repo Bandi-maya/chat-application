@@ -10,6 +10,10 @@ import 'package:chat/ui/core/controllers/preferences_controller.dart';
 import 'package:chat/ui/core/controllers/appearance_variant_controller.dart';
 import 'package:chat/data/services/notification_service.dart';
 import 'package:chat/data/services/message_automation_service.dart';
+import 'package:chat/data/services/push_token_service.dart';
+import 'package:chat/data/services/notification_channel_manager.dart';
+import 'package:chat/data/services/call_signaling_service.dart';
+import 'package:chat/features/camera/effects/effect_engine.dart';
 
 final GetIt locator = GetIt.instance;
 
@@ -29,6 +33,24 @@ void setupLocator() {
   );
   locator.registerLazySingleton<ChatyNotificationService>(
     () => ChatyNotificationService(),
+  );
+  locator.registerLazySingleton<PushTokenService>(
+    () => PushTokenService(),
+  );
+  locator.registerLazySingleton<NotificationChannelManager>(
+    () => NotificationChannelManager(
+      preferences: locator<ChatyPreferencesController>(),
+      dataStore: locator<MockDataStore>(),
+    ),
+  );
+  locator.registerLazySingleton<CallSignalingService>(
+    () => CallSignalingService(
+      dataStore: locator<MockDataStore>(),
+      backend: locator<ChatyBackendService>(),
+    ),
+  );
+  locator.registerLazySingleton<EffectEngine>(
+    () => EffectEngine(),
   );
   locator.registerLazySingleton<AppIconController>(() => AppIconController());
   locator.registerLazySingleton<LocalLockService>(() => LocalLockService());

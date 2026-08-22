@@ -37,9 +37,7 @@ class ChatAttachmentActions {
         child: Container(
           decoration: BoxDecoration(
             color: themeData.scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(18),
-            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -71,9 +69,7 @@ class ChatAttachmentActions {
               ListTile(
                 leading: const Icon(Icons.visibility_off_rounded),
                 title: const Text('View once'),
-                subtitle: const Text(
-                  'Recipient can open it a single time',
-                ),
+                subtitle: const Text('Recipient can open it a single time'),
                 onTap: () => Navigator.pop(sheetContext, true),
               ),
               const SizedBox(height: 8),

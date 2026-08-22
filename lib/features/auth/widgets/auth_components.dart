@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../../ui/core/design_system/design_system.dart';
-import '../../../../ui/core/theme/theme_config.dart';
 import '../../../../injection/locator.dart';
 import '../../../../data/services/backend_service.dart';
 import '../../../../data/repositories/mock_data_store.dart';
@@ -55,8 +54,6 @@ class AuthTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = theme.brightness == Brightness.dark;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -98,17 +95,11 @@ class AuthTextField extends StatelessWidget {
             suffixIcon: suffixIcon,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(
-                color: context.colors.border,
-                width: 1.0,
-              ),
+              borderSide: BorderSide(color: context.colors.border, width: 1.0),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(
-                color: context.colors.border,
-                width: 1.0,
-              ),
+              borderSide: BorderSide(color: context.colors.border, width: 1.0),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
@@ -208,10 +199,7 @@ class AuthSecondaryButton extends StatelessWidget {
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           foregroundColor: theme.primaryTextColor,
-          side: BorderSide(
-            color: context.colors.border,
-            width: 1.5,
-          ),
+          side: BorderSide(color: context.colors.border, width: 1.5),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -240,7 +228,6 @@ class AuthOrDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     final dividerColor = context.colors.divider;
 
-
     return Row(
       children: [
         Expanded(child: Divider(color: dividerColor, thickness: 1)),
@@ -268,7 +255,6 @@ class AuthSocialRow extends StatelessWidget {
   const AuthSocialRow({super.key, required this.theme});
 
   Future<void> _onSocialTap(BuildContext context, String provider) async {
-    final isDark = theme.brightness == Brightness.dark;
     final provLower = provider.toLowerCase();
 
     String email;
@@ -395,9 +381,7 @@ class AuthSocialRow extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: context.colors.surfaceSecondary,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: context.colors.border,
-                    ),
+                    border: Border.all(color: context.colors.border),
                   ),
                   child: Row(
                     children: [

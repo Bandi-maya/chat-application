@@ -84,6 +84,11 @@ class ChatyBackendService extends ChangeNotifier {
   List<LinkedDevice> get currentUserDevices =>
       List<LinkedDevice>.unmodifiable(_linkedDevices);
 
+  void addCall(CallRecord record) {
+    _calls.insert(0, record);
+    notifyListeners();
+  }
+
   Future<void> initialize() async {
     if (_isInitialized) return;
 
@@ -164,15 +169,11 @@ class ChatyBackendService extends ChangeNotifier {
     _currentUser = profile;
     _usersById[profile.id] = profile;
 
-    unawaited(
-      _client
-          .from('profiles')
-          .update(<String, dynamic>{
-            'presence': 'online',
-            'last_seen_at': DateTime.now().toUtc().toIso8601String(),
-          })
-          .eq('id', user.id),
-    );
+    // Announce this session through setPresence so Freeze Last Seen and the
+    // last-seen/online audience settings are honored here too — a raw write
+    // from this path used to re-broadcast "online" and advance the timestamp
+    // on every startup/profile refresh, defeating both settings.
+    unawaited(setPresence(PresenceState.online));
   }
 
   Future<void> _loadConversations() async {
@@ -863,19 +864,25 @@ class ChatyBackendService extends ChangeNotifier {
     if (authUser == null || authUser.id != updated.id) {
       throw Exception('You can only update the signed-in profile.');
     }
-    await _client
-        .from('profiles')
-        .update(<String, dynamic>{
-          'username': ChatyValidators.normalizeUsername(updated.username),
-          'display_name': updated.displayName.trim(),
-          'about': updated.about.trim(),
-          'phone': updated.phone.trim(),
-          'avatar_initials': updated.avatarInitials,
-          'avatar_color_hex': updated.avatarColorHex,
-          'presence': _presenceToDatabase(updated.presence),
-          'last_seen_at': DateTime.now().toUtc().toIso8601String(),
-        })
-        .eq('id', authUser.id);
+    final privacy = _currentPrivacy();
+    // Profile edits must honor the presence privacy gates exactly like
+    // setPresence: publish the downgraded presence and only advance the
+    // last-seen timestamp when it is not frozen.
+    final update = <String, dynamic>{
+      'username': ChatyValidators.normalizeUsername(updated.username),
+      'display_name': updated.displayName.trim(),
+      'about': updated.about.trim(),
+      'phone': updated.phone.trim(),
+      'avatar_initials': updated.avatarInitials,
+      'avatar_color_hex': updated.avatarColorHex,
+      'presence': _presenceToDatabase(
+        _effectivePublishedPresence(updated.presence, privacy),
+      ),
+    };
+    if (privacy == null || !privacy.freezeLastSeen) {
+      update['last_seen_at'] = DateTime.now().toUtc().toIso8601String();
+    }
+    await _client.from('profiles').update(update).eq('id', authUser.id);
     await _loadCurrentProfile();
     notifyListeners();
   }

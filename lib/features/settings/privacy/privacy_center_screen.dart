@@ -90,6 +90,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
       logTitle: 'Who Can Call Me Exceptions',
     );
   }
+
   final GbFeatureBackendService _privacyBackend = GbFeatureBackendService();
   late Future<List<Map<String, dynamic>>> _blockedFuture;
 
@@ -389,7 +390,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
                 subtitle: prefs.whoCanCallMeExceptions.isEmpty
                     ? 'No contacts are excluded from calling you'
                     : '${prefs.whoCanCallMeExceptions.length}'
-                        ' contact(s) may not call you',
+                          ' contact(s) may not call you',
                 onTap: () => _editCallExceptions(),
               ),
             ChatySwitchTile(
@@ -430,7 +431,6 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
             ),
           ],
         ),
-
       ],
     );
   }

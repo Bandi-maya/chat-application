@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../ui/core/theme/theme_controller.dart';
-import '../../../ui/core/theme/theme_config.dart';
 import '../../data/repositories/mock_data_store.dart';
 import '../../data/services/notification_service.dart';
 import '../../domain/models/conversation.dart';
@@ -10,7 +8,7 @@ import '../../ui/core/controllers/appearance_variant_controller.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/gb/gb_theme_overrides.dart';
 import '../calls/calls_screen.dart';
-import '../settings/settings_root_screen.dart';
+import '../profile/profile_screen.dart';
 import '../tasks/tasks_screen.dart';
 import '../updates/updates_screen.dart';
 import 'chats_home_screen.dart';
@@ -115,10 +113,12 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             icon: Icons.call_outlined,
             activeIcon: Icons.call_rounded,
           ),
+          // Profile is now the root destination; Settings lives one level
+          // deeper (Profile → Settings) and keeps every existing entry.
           const _NavDestinationItem(
-            label: 'Settings',
-            icon: Icons.settings_outlined,
-            activeIcon: Icons.settings_rounded,
+            label: 'Profile',
+            icon: Icons.person_outline_rounded,
+            activeIcon: Icons.person_rounded,
           ),
         ];
 
@@ -149,7 +149,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           ),
           TasksScreen(theme: theme, dataStore: dataStore),
           CallsScreen(theme: theme, dataStore: dataStore),
-          SettingsRootScreen(
+          ProfileScreen(
             preferencesController: preferencesController,
             themeController: themeController,
             dataStore: dataStore,
@@ -203,7 +203,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               if (navMode == AppNavigationMode.floatingIslandRail) {
                 return _buildFloatingIslandRailShell(
                   theme: theme,
-                  content: IndexedStack(index: effectiveIndex, children: screens),
+                  content: IndexedStack(
+                    index: effectiveIndex,
+                    children: screens,
+                  ),
                   navItems: navItems,
                   selectedIndex: effectiveIndex,
                 );
@@ -310,7 +313,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   indicatorColor: indicatorColor,
                   indicatorWeight: 3.5,
                   labelColor: colors.onPrimary,
-                  unselectedLabelColor: colors.onPrimary.withValues(alpha: 0.72),
+                  unselectedLabelColor: colors.onPrimary.withValues(
+                    alpha: 0.72,
+                  ),
                   labelStyle: const TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
@@ -344,7 +349,6 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     required int selectedIndex,
   }) {
     final colors = context.colors;
-    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: theme.backgroundColor,
@@ -374,16 +378,27 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     children: [
                       CircleAvatar(radius: 3.5, backgroundColor: colors.error),
                       const SizedBox(width: 4),
-                      CircleAvatar(radius: 3.5, backgroundColor: colors.warning),
+                      CircleAvatar(
+                        radius: 3.5,
+                        backgroundColor: colors.warning,
+                      ),
                       const SizedBox(width: 4),
-                      CircleAvatar(radius: 3.5, backgroundColor: colors.success),
+                      CircleAvatar(
+                        radius: 3.5,
+                        backgroundColor: colors.success,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
                   // Logo mark
                   Icon(Icons.bolt_rounded, color: colors.primary, size: 24),
                   const SizedBox(height: 16),
-                  Divider(color: colors.divider, height: 1, indent: 12, endIndent: 12),
+                  Divider(
+                    color: colors.divider,
+                    height: 1,
+                    indent: 12,
+                    endIndent: 12,
+                  ),
                   const SizedBox(height: 12),
                   Expanded(
                     child: ListView.builder(
@@ -392,7 +407,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                         final item = navItems[i];
                         final isSel = selectedIndex == i;
                         return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 6,
+                            horizontal: 10,
+                          ),
                           child: InkWell(
                             onTap: () => _selectRootDestination(i),
                             borderRadius: BorderRadius.circular(16),
@@ -400,13 +418,17 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                               duration: const Duration(milliseconds: 200),
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: isSel ? colors.primary : Colors.transparent,
+                                color: isSel
+                                    ? colors.primary
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Icon(
                                 isSel ? item.activeIcon : item.icon,
                                 size: 20,
-                                color: isSel ? colors.onPrimary : colors.foregroundSecondary,
+                                color: isSel
+                                    ? colors.onPrimary
+                                    : colors.foregroundSecondary,
                               ),
                             ),
                           ),
@@ -414,12 +436,32 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                       },
                     ),
                   ),
-                  Divider(color: colors.divider, height: 1, indent: 12, endIndent: 12),
+                  Divider(
+                    color: colors.divider,
+                    height: 1,
+                    indent: 12,
+                    endIndent: 12,
+                  ),
                   const SizedBox(height: 12),
-                  CircleAvatar(
-                    radius: 16,
-                    backgroundColor: colors.surfaceSecondary,
-                    child: Text('R', style: TextStyle(color: colors.foreground, fontWeight: FontWeight.bold, fontSize: 13)),
+                  // Real signed-in user identity (was a hardcoded letter).
+                  Builder(
+                    builder: (context) {
+                      final user = locator<MockDataStore>().currentUser;
+                      return CircleAvatar(
+                        radius: 16,
+                        backgroundColor: colors.surfaceSecondary,
+                        child: Text(
+                          user.avatarInitials.isNotEmpty
+                              ? user.avatarInitials
+                              : 'CU',
+                          style: TextStyle(
+                            color: colors.foreground,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 14),
                 ],
@@ -461,7 +503,6 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   }) {
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
     final colors = context.colors;
-    final isDark = theme.brightness == Brightness.dark;
     final prefs = locator<ChatyPreferencesController>();
     final dataStore = locator<MockDataStore>();
     final user = dataStore.currentUser;
@@ -469,8 +510,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     final displayName = prefs.home.myNameOverride.isNotEmpty
         ? prefs.home.myNameOverride
         : user.displayName.isNotEmpty
-            ? user.displayName
-            : 'Chaty User';
+        ? user.displayName
+        : 'Chaty User';
 
     return Scaffold(
       key: scaffoldKey,
@@ -486,7 +527,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 child: Row(
                   children: [
                     AppAvatar(
-                      initials: user.avatarInitials.isNotEmpty ? user.avatarInitials : 'CU',
+                      initials: user.avatarInitials.isNotEmpty
+                          ? user.avatarInitials
+                          : 'CU',
                       colorHex: user.avatarColorHex,
                       size: 48,
                       showOnlineBadge: true,
@@ -521,23 +564,34 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               Divider(color: colors.divider, height: 1),
               Expanded(
                 child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 10,
+                  ),
                   itemCount: navItems.length,
                   itemBuilder: (context, i) {
                     final item = navItems[i];
                     final isSel = selectedIndex == i;
                     return ListTile(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                       selected: isSel,
-                      selectedTileColor: theme.accentColor.withValues(alpha: 0.16),
+                      selectedTileColor: theme.accentColor.withValues(
+                        alpha: 0.16,
+                      ),
                       leading: Icon(
                         isSel ? item.activeIcon : item.icon,
-                        color: isSel ? theme.accentColor : colors.foregroundSecondary,
+                        color: isSel
+                            ? theme.accentColor
+                            : colors.foregroundSecondary,
                       ),
                       title: Text(
                         item.label,
                         style: TextStyle(
-                          color: isSel ? colors.foreground : colors.foregroundSecondary,
+                          color: isSel
+                              ? colors.foreground
+                              : colors.foregroundSecondary,
                           fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
                         ),
                       ),
@@ -563,10 +617,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               decoration: BoxDecoration(
                 color: theme.surfaceColor,
                 border: Border(
-                  bottom: BorderSide(
-                    color: colors.border,
-                    width: 0.8,
-                  ),
+                  bottom: BorderSide(color: colors.border, width: 0.8),
                 ),
               ),
               child: Row(
@@ -598,7 +649,6 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       ),
     );
   }
-
 
   Widget _buildRailShell({
     required dynamic theme,
@@ -699,8 +749,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   }) {
     final styleName = appearance.bottomBarStyle;
     final isDark = theme.brightness == Brightness.dark;
+    final colors = context.colors;
     final accent = theme.accentColor as Color;
-    final surface = theme.surfaceColor as Color;
     final bg = theme.backgroundColor as Color;
 
     // Sizing & layout properties per style
@@ -769,32 +819,25 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     };
 
     final barBg = switch (styleName) {
-      'Floating Dynamic Island' =>
-        colors.surfaceElevated,
-      'Segmented Glass Dock' => colors.surface.withValues(alpha: isDark ? 0.85 : 0.92),
+      'Floating Dynamic Island' => colors.surfaceElevated,
+      'Segmented Glass Dock' => colors.surface.withValues(
+        alpha: isDark ? 0.85 : 0.92,
+      ),
       _ => colors.surface,
     };
 
     final border = switch (styleName) {
-      'Segmented Glass Dock' => Border.all(
-        color: colors.border,
-        width: 1.2,
+      'Segmented Glass Dock' => Border.all(color: colors.border, width: 1.2),
+      'Floating Pill' || 'Active Pill Chip' || 'Floating Dynamic Island' =>
+        Border.all(color: colors.borderSubtle, width: 0.8),
+      'Top Indicator Line' ||
+      'Bottom Indicator Dot' ||
+      'Curved Notch Teardrop' ||
+      'Classic Label Bar' ||
+      'Soft Square Tile' => Border(
+        top: BorderSide(color: colors.borderSubtle, width: 1.0),
       ),
-      'Floating Pill' || 'Active Pill Chip' || 'Floating Dynamic Island' => Border.all(
-        color: colors.borderSubtle,
-        width: 0.8,
-      ),
-      'Top Indicator Line' || 'Bottom Indicator Dot' || 'Curved Notch Teardrop' || 'Classic Label Bar' || 'Soft Square Tile' =>
-        Border(
-          top: BorderSide(
-            color: colors.borderSubtle,
-            width: 1.0,
-          ),
-        ),
-      _ => Border.all(
-        color: colors.borderSubtle,
-        width: 0.8,
-      ),
+      _ => Border.all(color: colors.borderSubtle, width: 0.8),
     };
 
     final hasShadow = sideMargin > 0;
@@ -831,7 +874,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 children: List.generate(navItems.length, (i) {
                   final item = navItems[i];
                   final isSelected = selectedIndex == i;
-                  final isCenter = (navItems.length % 2 == 1) && (i == navItems.length ~/ 2);
+                  final isCenter =
+                      (navItems.length % 2 == 1) && (i == navItems.length ~/ 2);
 
                   return _buildCustomNavItem(
                     item: item,
@@ -889,7 +933,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(30),
                   border: isSelected
-                      ? Border.all(color: accent.withValues(alpha: 0.3), width: 1)
+                      ? Border.all(
+                          color: accent.withValues(alpha: 0.3),
+                          width: 1,
+                        )
                       : null,
                 ),
                 child: Row(
@@ -926,7 +973,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     height: 3.5,
                     decoration: BoxDecoration(
                       color: isSelected ? accent : Colors.transparent,
-                      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(3)),
+                      borderRadius: const BorderRadius.vertical(
+                        bottom: Radius.circular(3),
+                      ),
                     ),
                   ),
                   Icon(
@@ -938,7 +987,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     item.label,
                     style: TextStyle(
                       fontSize: 10,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w500,
                       color: isSelected ? accent : unselectedFg,
                     ),
                   ),
@@ -1008,7 +1059,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     height: 5,
                     decoration: BoxDecoration(
                       color: isSelected ? accent : Colors.transparent,
-                      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
+                      borderRadius: const BorderRadius.vertical(
+                        bottom: Radius.circular(8),
+                      ),
                     ),
                   ),
                   Icon(
@@ -1020,7 +1073,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     item.label,
                     style: TextStyle(
                       fontSize: 10,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w500,
                       color: isSelected ? accent : unselectedFg,
                     ),
                   ),
@@ -1037,7 +1092,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: isSelected ? context.colors.primary : Colors.transparent,
+                  color: isSelected
+                      ? context.colors.primary
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: Row(
@@ -1046,7 +1103,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     Icon(
                       isSelected ? item.activeIcon : item.icon,
                       size: 19,
-                      color: isSelected ? context.colors.onPrimary : unselectedFg,
+                      color: isSelected
+                          ? context.colors.onPrimary
+                          : unselectedFg,
                     ),
                     if (isSelected) ...[
                       const SizedBox(width: 5),
@@ -1064,63 +1123,72 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               ),
 
               // 7. RAISED CENTER ACTION (Image 4 center button)
-              'Raised Center Action' => isCenter
-                  ? Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [accent, accent.withValues(alpha: 0.85)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+              'Raised Center Action' =>
+                isCenter
+                    ? Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [accent, accent.withValues(alpha: 0.85)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: accent.withValues(alpha: 0.4),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: accent.withValues(alpha: 0.4),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
+                        child: Icon(
+                          item.activeIcon,
+                          size: 24,
+                          color: context.colors.onPrimary,
+                        ),
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            isSelected ? item.activeIcon : item.icon,
+                            size: 20,
+                            color: isSelected ? accent : unselectedFg,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            item.label,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: isSelected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              color: isSelected ? accent : unselectedFg,
+                            ),
                           ),
                         ],
                       ),
-                      child: Icon(
-                        item.activeIcon,
-                        size: 24,
-                        color: context.colors.onPrimary,
-                      ),
-                    )
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          isSelected ? item.activeIcon : item.icon,
-                          size: 20,
-                          color: isSelected ? accent : unselectedFg,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          item.label,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                            color: isSelected ? accent : unselectedFg,
-                          ),
-                        ),
-                      ],
-                    ),
 
               // 8. SEGMENTED GLASS DOCK (Frosted look with subtle inner border)
               'Segmented Glass Dock' => AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 curve: Curves.easeOutCubic,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? accent.withValues(alpha: isDark ? 0.25 : 0.15)
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(16),
                   border: isSelected
-                      ? Border.all(color: accent.withValues(alpha: 0.4), width: 1)
+                      ? Border.all(
+                          color: accent.withValues(alpha: 0.4),
+                          width: 1,
+                        )
                       : null,
                 ),
                 child: Icon(
@@ -1156,7 +1224,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     item.label,
                     style: TextStyle(
                       fontSize: 10.5,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w500,
                       color: isSelected ? accent : unselectedFg,
                     ),
                   ),
@@ -1185,7 +1255,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                       item.label,
                       style: TextStyle(
                         fontSize: 9.5,
-                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        fontWeight: isSelected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
                         color: isSelected ? accent : unselectedFg,
                       ),
                     ),
@@ -1196,7 +1268,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               // 12. FLOATING PILL (Default smooth floating capsule)
               _ => AnimatedContainer(
                 duration: const Duration(milliseconds: 220),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? accent.withValues(alpha: isDark ? 0.2 : 0.12)
@@ -1260,7 +1335,8 @@ class _PerspectiveDrawerScaffold extends StatefulWidget {
   });
 
   @override
-  State<_PerspectiveDrawerScaffold> createState() => _PerspectiveDrawerScaffoldState();
+  State<_PerspectiveDrawerScaffold> createState() =>
+      _PerspectiveDrawerScaffoldState();
 }
 
 class _PerspectiveDrawerScaffoldState extends State<_PerspectiveDrawerScaffold>
@@ -1271,7 +1347,10 @@ class _PerspectiveDrawerScaffoldState extends State<_PerspectiveDrawerScaffold>
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 280));
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
     _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic);
   }
 
@@ -1309,7 +1388,10 @@ class _PerspectiveDrawerScaffoldState extends State<_PerspectiveDrawerScaffold>
               SafeArea(
                 child: Container(
                   width: 210,
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 20,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1337,17 +1419,25 @@ class _PerspectiveDrawerScaffoldState extends State<_PerspectiveDrawerScaffold>
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 selected: isSel,
-                                selectedTileColor: colors.primary.withValues(alpha: 0.15),
+                                selectedTileColor: colors.primary.withValues(
+                                  alpha: 0.15,
+                                ),
                                 leading: Icon(
                                   isSel ? item.activeIcon : item.icon,
-                                  color: isSel ? colors.primary : colors.foregroundSecondary,
+                                  color: isSel
+                                      ? colors.primary
+                                      : colors.foregroundSecondary,
                                   size: 20,
                                 ),
                                 title: Text(
                                   item.label,
                                   style: TextStyle(
-                                    color: isSel ? colors.primary : colors.foregroundSecondary,
-                                    fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                                    color: isSel
+                                        ? colors.primary
+                                        : colors.foregroundSecondary,
+                                    fontWeight: isSel
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
                                     fontSize: 14,
                                   ),
                                 ),
@@ -1398,7 +1488,9 @@ class _PerspectiveDrawerScaffoldState extends State<_PerspectiveDrawerScaffold>
                               ],
                             ),
                             child: Icon(
-                              val > 0.5 ? Icons.close_rounded : Icons.menu_rounded,
+                              val > 0.5
+                                  ? Icons.close_rounded
+                                  : Icons.menu_rounded,
                               size: 20,
                               color: colors.foreground,
                             ),
@@ -1416,4 +1508,3 @@ class _PerspectiveDrawerScaffoldState extends State<_PerspectiveDrawerScaffold>
     );
   }
 }
-

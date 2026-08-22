@@ -31,10 +31,7 @@ class ChatyPageTransitionsBuilder extends PageTransitionsBuilder {
   final String entry;
   final String exit;
 
-  const ChatyPageTransitionsBuilder({
-    required this.entry,
-    required this.exit,
-  });
+  const ChatyPageTransitionsBuilder({required this.entry, required this.exit});
 
   @override
   Widget buildTransitions<T>(
@@ -263,15 +260,18 @@ class _TransitionMotion extends StatelessWidget {
     return AnimatedBuilder(
       animation: curved,
       builder: (context, _) {
-        final double presence =
-            (asEntry ? curved.value : 1 - curved.value).clamp(0.0, 1.0);
+        final double presence = (asEntry ? curved.value : 1 - curved.value)
+            .clamp(0.0, 1.0);
         final double absence = 1 - presence;
         Widget result = FractionalTranslation(
           translation: Offset(spec.shift.dx * absence, spec.shift.dy * absence),
           child: child,
         );
         if (spec.scale != 1.0) {
-          result = Transform.scale(scale: 1 + (spec.scale - 1) * absence, child: result);
+          result = Transform.scale(
+            scale: 1 + (spec.scale - 1) * absence,
+            child: result,
+          );
         }
         if (spec.fade) {
           result = Opacity(opacity: presence, child: result);

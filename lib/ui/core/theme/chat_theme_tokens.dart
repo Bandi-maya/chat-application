@@ -107,11 +107,13 @@ class ChatColors extends ThemeExtension<ChatColors> {
       reactionCount: reactionCount ?? this.reactionCount,
       mentionBackground: mentionBackground ?? this.mentionBackground,
       selectionBackground: selectionBackground ?? this.selectionBackground,
-      chatWallpaperBackground: chatWallpaperBackground ?? this.chatWallpaperBackground,
+      chatWallpaperBackground:
+          chatWallpaperBackground ?? this.chatWallpaperBackground,
       voiceNoteWaveform: voiceNoteWaveform ?? this.voiceNoteWaveform,
       voiceNoteProgress: voiceNoteProgress ?? this.voiceNoteProgress,
       voiceNoteButton: voiceNoteButton ?? this.voiceNoteButton,
-      systemMessageBackground: systemMessageBackground ?? this.systemMessageBackground,
+      systemMessageBackground:
+          systemMessageBackground ?? this.systemMessageBackground,
       systemMessageText: systemMessageText ?? this.systemMessageText,
       taskCardSurface: taskCardSurface ?? this.taskCardSurface,
       taskCardBorder: taskCardBorder ?? this.taskCardBorder,
@@ -122,30 +124,72 @@ class ChatColors extends ThemeExtension<ChatColors> {
   ChatColors lerp(ThemeExtension<ChatColors>? other, double t) {
     if (other is! ChatColors) return this;
     return ChatColors(
-      incomingBubble: Color.lerp(incomingBubble, other.incomingBubble, t) ?? incomingBubble,
-      incomingText: Color.lerp(incomingText, other.incomingText, t) ?? incomingText,
-      outgoingBubble: Color.lerp(outgoingBubble, other.outgoingBubble, t) ?? outgoingBubble,
-      outgoingText: Color.lerp(outgoingText, other.outgoingText, t) ?? outgoingText,
-      replySurface: Color.lerp(replySurface, other.replySurface, t) ?? replySurface,
+      incomingBubble:
+          Color.lerp(incomingBubble, other.incomingBubble, t) ?? incomingBubble,
+      incomingText:
+          Color.lerp(incomingText, other.incomingText, t) ?? incomingText,
+      outgoingBubble:
+          Color.lerp(outgoingBubble, other.outgoingBubble, t) ?? outgoingBubble,
+      outgoingText:
+          Color.lerp(outgoingText, other.outgoingText, t) ?? outgoingText,
+      replySurface:
+          Color.lerp(replySurface, other.replySurface, t) ?? replySurface,
       replyBorder: Color.lerp(replyBorder, other.replyBorder, t) ?? replyBorder,
-      composerSurface: Color.lerp(composerSurface, other.composerSurface, t) ?? composerSurface,
-      composerBorder: Color.lerp(composerBorder, other.composerBorder, t) ?? composerBorder,
-      messageMetadata: Color.lerp(messageMetadata, other.messageMetadata, t) ?? messageMetadata,
-      deliveryTick: Color.lerp(deliveryTick, other.deliveryTick, t) ?? deliveryTick,
+      composerSurface:
+          Color.lerp(composerSurface, other.composerSurface, t) ??
+          composerSurface,
+      composerBorder:
+          Color.lerp(composerBorder, other.composerBorder, t) ?? composerBorder,
+      messageMetadata:
+          Color.lerp(messageMetadata, other.messageMetadata, t) ??
+          messageMetadata,
+      deliveryTick:
+          Color.lerp(deliveryTick, other.deliveryTick, t) ?? deliveryTick,
       readTick: Color.lerp(readTick, other.readTick, t) ?? readTick,
-      reactionSurface: Color.lerp(reactionSurface, other.reactionSurface, t) ?? reactionSurface,
-      reactionBorder: Color.lerp(reactionBorder, other.reactionBorder, t) ?? reactionBorder,
-      reactionCount: Color.lerp(reactionCount, other.reactionCount, t) ?? reactionCount,
-      mentionBackground: Color.lerp(mentionBackground, other.mentionBackground, t) ?? mentionBackground,
-      selectionBackground: Color.lerp(selectionBackground, other.selectionBackground, t) ?? selectionBackground,
-      chatWallpaperBackground: Color.lerp(chatWallpaperBackground, other.chatWallpaperBackground, t) ?? chatWallpaperBackground,
-      voiceNoteWaveform: Color.lerp(voiceNoteWaveform, other.voiceNoteWaveform, t) ?? voiceNoteWaveform,
-      voiceNoteProgress: Color.lerp(voiceNoteProgress, other.voiceNoteProgress, t) ?? voiceNoteProgress,
-      voiceNoteButton: Color.lerp(voiceNoteButton, other.voiceNoteButton, t) ?? voiceNoteButton,
-      systemMessageBackground: Color.lerp(systemMessageBackground, other.systemMessageBackground, t) ?? systemMessageBackground,
-      systemMessageText: Color.lerp(systemMessageText, other.systemMessageText, t) ?? systemMessageText,
-      taskCardSurface: Color.lerp(taskCardSurface, other.taskCardSurface, t) ?? taskCardSurface,
-      taskCardBorder: Color.lerp(taskCardBorder, other.taskCardBorder, t) ?? taskCardBorder,
+      reactionSurface:
+          Color.lerp(reactionSurface, other.reactionSurface, t) ??
+          reactionSurface,
+      reactionBorder:
+          Color.lerp(reactionBorder, other.reactionBorder, t) ?? reactionBorder,
+      reactionCount:
+          Color.lerp(reactionCount, other.reactionCount, t) ?? reactionCount,
+      mentionBackground:
+          Color.lerp(mentionBackground, other.mentionBackground, t) ??
+          mentionBackground,
+      selectionBackground:
+          Color.lerp(selectionBackground, other.selectionBackground, t) ??
+          selectionBackground,
+      chatWallpaperBackground:
+          Color.lerp(
+            chatWallpaperBackground,
+            other.chatWallpaperBackground,
+            t,
+          ) ??
+          chatWallpaperBackground,
+      voiceNoteWaveform:
+          Color.lerp(voiceNoteWaveform, other.voiceNoteWaveform, t) ??
+          voiceNoteWaveform,
+      voiceNoteProgress:
+          Color.lerp(voiceNoteProgress, other.voiceNoteProgress, t) ??
+          voiceNoteProgress,
+      voiceNoteButton:
+          Color.lerp(voiceNoteButton, other.voiceNoteButton, t) ??
+          voiceNoteButton,
+      systemMessageBackground:
+          Color.lerp(
+            systemMessageBackground,
+            other.systemMessageBackground,
+            t,
+          ) ??
+          systemMessageBackground,
+      systemMessageText:
+          Color.lerp(systemMessageText, other.systemMessageText, t) ??
+          systemMessageText,
+      taskCardSurface:
+          Color.lerp(taskCardSurface, other.taskCardSurface, t) ??
+          taskCardSurface,
+      taskCardBorder:
+          Color.lerp(taskCardBorder, other.taskCardBorder, t) ?? taskCardBorder,
     );
   }
 }

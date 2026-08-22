@@ -226,6 +226,11 @@ class MockDataStore extends ChangeNotifier {
   void deleteConversation(String conversationId) =>
       unawaited(_backend.deleteConversation(conversationId));
 
+  void addCallRecord(CallRecord record) {
+    _backend.addCall(record);
+    notifyListeners();
+  }
+
   void togglePinConversation(String conversationId) {
     final conversation = conversations
         .where((item) => item.id == conversationId)

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../ui/core/design_system/components/app_components.dart';
+import '../../ui/core/theme/app_theme.dart';
 
 class SettingsSearchResult {
   final String title;
@@ -39,9 +40,7 @@ class SettingsSearchDelegate extends SearchDelegate<SettingsSearchResult?> {
   Widget? buildLeading(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(8.0),
-      child: ChatyBackButton(
-        onPressed: () => close(context, null),
-      ),
+      child: ChatyBackButton(onPressed: () => close(context, null)),
     );
   }
 
@@ -63,15 +62,20 @@ class SettingsSearchDelegate extends SearchDelegate<SettingsSearchResult?> {
           }).toList();
 
     if (matches.isEmpty) {
+      final colors = context.colors;
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.search_off_rounded, size: 48, color: Colors.grey),
+            Icon(
+              Icons.search_off_rounded,
+              size: 48,
+              color: colors.foregroundTertiary,
+            ),
             const SizedBox(height: 12),
             Text(
               'No settings found for "$query"',
-              style: const TextStyle(color: Colors.grey),
+              style: TextStyle(color: colors.foregroundTertiary),
             ),
           ],
         ),

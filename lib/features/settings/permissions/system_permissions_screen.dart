@@ -214,7 +214,10 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
               const SizedBox(height: 6),
               Text(
                 'Accuracy: ${position.accuracy.toStringAsFixed(0)} m',
-                style: TextStyle(fontSize: 12, color: context.colors.foregroundSecondary),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: context.colors.foregroundSecondary,
+                ),
               ),
             ],
           ),
@@ -275,7 +278,6 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
       await _refreshAll();
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -457,7 +459,9 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
               badgeText: _loading
                   ? null
                   : (_biometricsAvailable ? 'Available' : 'Unavailable'),
-              badgeColor: _biometricsAvailable ? context.colors.success : context.colors.disabled,
+              badgeColor: _biometricsAvailable
+                  ? context.colors.success
+                  : context.colors.disabled,
               onTap: _testBiometrics,
             ),
           ],
@@ -544,4 +548,3 @@ class _SystemPermissionsScreenState extends State<SystemPermissionsScreen>
     );
   }
 }
-

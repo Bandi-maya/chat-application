@@ -6,7 +6,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../data/services/chat_media_service.dart';
-import '../../../ui/core/theme/theme_config.dart';
 import '../../ui/core/design_system/design_system.dart';
 
 class MediaViewerScreen extends StatefulWidget {
@@ -149,7 +148,10 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
             ),
             Text(
               widget.size,
-              style: TextStyle(fontSize: 11.5, color: colors.foregroundSecondary),
+              style: TextStyle(
+                fontSize: 11.5,
+                color: colors.foregroundSecondary,
+              ),
             ),
           ],
         ),
@@ -171,17 +173,17 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       ),
       body: Center(
         child: _loading
-            ? CircularProgressIndicator(
-                strokeWidth: 2.2,
-                color: colors.primary,
-              )
+            ? CircularProgressIndicator(strokeWidth: 2.2, color: colors.primary)
             : _error != null
             ? Padding(
                 padding: const EdgeInsets.all(ChatySpacing.lg),
                 child: Text(
                   _error!,
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: colors.foregroundSecondary, fontSize: 14),
+                  style: TextStyle(
+                    color: colors.foregroundSecondary,
+                    fontSize: 14,
+                  ),
                 ),
               )
             : _buildContent(colors),
@@ -340,6 +342,3 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     );
   }
 }
-
-}
-

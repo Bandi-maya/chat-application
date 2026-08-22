@@ -90,9 +90,9 @@ class ChatyEmptyState extends StatelessWidget {
             Icon(
               icon,
               size: 46,
-              color: iconColor ?? theme.colorScheme.onSurface.withValues(
-                alpha: 0.35,
-              ),
+              color:
+                  iconColor ??
+                  theme.colorScheme.onSurface.withValues(alpha: 0.35),
             ),
             const SizedBox(height: 14),
             Text(
@@ -109,7 +109,8 @@ class ChatyEmptyState extends StatelessWidget {
               message,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: messageColor ??
+                color:
+                    messageColor ??
                     theme.colorScheme.onSurface.withValues(alpha: 0.6),
                 fontSize: 13,
                 height: 1.35,
@@ -412,11 +413,7 @@ class ChatyInsetDivider extends StatelessWidget {
   final Color color;
   final double indent;
 
-  const ChatyInsetDivider({
-    super.key,
-    required this.color,
-    this.indent = 66,
-  });
+  const ChatyInsetDivider({super.key, required this.color, this.indent = 66});
 
   @override
   Widget build(BuildContext context) {
@@ -488,6 +485,7 @@ class _ChatySwipeActionsState extends State<ChatySwipeActions>
       final t = Curves.easeOutCubic.transform(_snap.value);
       setState(() => _dragOffset = start + (target - start) * (1 - t));
     }
+
     _snap
       ..reset()
       ..addListener(listener)
@@ -507,14 +505,13 @@ class _ChatySwipeActionsState extends State<ChatySwipeActions>
       onHorizontalDragStart: (_) => _snap.stop(),
       onHorizontalDragUpdate: (details) {
         setState(() {
-          _dragOffset =
-              (_dragOffset - details.delta.dx).clamp(0.0, _maxDrag);
+          _dragOffset = (_dragOffset - details.delta.dx).clamp(0.0, _maxDrag);
         });
       },
       onHorizontalDragEnd: (details) {
         final velocity = -(details.primaryVelocity ?? 0.0);
-        final open = _dragOffset > _maxDrag / 2 ||
-            (velocity > 420 && _dragOffset > 12);
+        final open =
+            _dragOffset > _maxDrag / 2 || (velocity > 420 && _dragOffset > 12);
         _settle(open ? _maxDrag : 0.0);
       },
       child: Stack(
@@ -542,8 +539,7 @@ class _ChatySwipeActionsState extends State<ChatySwipeActions>
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(action.icon,
-                                size: 21, color: Colors.white),
+                            Icon(action.icon, size: 21, color: Colors.white),
                             if (_dragOffset > _maxDrag * 0.72) ...[
                               const SizedBox(height: 4),
                               Text(

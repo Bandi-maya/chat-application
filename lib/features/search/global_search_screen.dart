@@ -6,8 +6,6 @@ import '../../data/repositories/mock_data_store.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/user_profile.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
-import '../../ui/core/theme/theme_config.dart';
-import '../../ui/core/theme/theme_controller.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../chats/chat_detail_screen.dart';
@@ -147,10 +145,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
           child: TextField(
             controller: _searchController,
             autofocus: true,
-            style: TextStyle(
-              color: context.colors.foreground,
-              fontSize: 15,
-            ),
+            style: TextStyle(color: context.colors.foreground, fontSize: 15),
             decoration: InputDecoration(
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: ChatySpacing.base,
@@ -378,4 +373,3 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
     );
   }
 }
-

@@ -23,6 +23,20 @@ class VoiceNoteService {
       ? Duration.zero
       : DateTime.now().difference(_startedAt!);
 
+  /// Live microphone input level in dBFS (roughly -60…0) for the recording
+  /// UI's level meter. Strictly read-only: it never touches the capture
+  /// pipeline. Returns the floor when idle or if the probe fails, so the UI
+  /// can always render something stable.
+  Future<double> currentLevel() async {
+    if (!_recording) return -60;
+    try {
+      final amplitude = await _recorder.getAmplitude();
+      return amplitude.current;
+    } catch (_) {
+      return -60;
+    }
+  }
+
   Future<void> start() async {
     if (_recording) return;
     if (!await _recorder.hasPermission())

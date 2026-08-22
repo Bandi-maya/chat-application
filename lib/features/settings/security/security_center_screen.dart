@@ -344,7 +344,9 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
                   ? 'No chats locked • Long-press a chat and use the lock action'
                   : '$lockedChats chat${lockedChats == 1 ? '' : 's'} currently protected',
               badgeText: '$lockedChats',
-              badgeColor: lockedChats > 0 ? colors.accent : colors.foregroundSecondary,
+              badgeColor: lockedChats > 0
+                  ? colors.accent
+                  : colors.foregroundSecondary,
               onTap: null,
             ),
             ChatySettingsTile(

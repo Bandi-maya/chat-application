@@ -62,6 +62,10 @@ class StatusService {
   // New-status alert state (abu_saleh_toast_status family).
   final Set<String> _statusAlertSeenIds = <String>{};
   bool _statusAlertBaselineDone = false;
+  // Status-VIEWED alert state (notification.notifyStatusViewed consumer).
+  StreamSubscription<List<Map<String, dynamic>>>? _viewEventsSub;
+  final Set<String> _statusViewAlerted = <String>{};
+  bool _statusViewBaselineDone = false;
 
   /// Real consumer for `privacy.statusRevocationAlert` +
   /// `notification.notifyStatusDeleted`.
@@ -74,6 +78,7 @@ class StatusService {
   /// message-revoke alert in RichChatRealtimeService.
   void startRevocationWatch() {
     if (_revocationSub != null) return;
+    _startViewEventsWatch();
     _revocationSub = _client
         .from('status_updates')
         .stream(primaryKey: const <String>['id'])
@@ -109,15 +114,12 @@ class StatusService {
                       ' added a new status',
                   body: text.isEmpty
                       ? 'New status update'
-                      : (text.length > 80
-                            ? '${text.substring(0, 80)}…'
-                            : text),
+                      : (text.length > 80 ? '${text.substring(0, 80)}…' : text),
                   icon: Icons.auto_awesome_rounded,
-                  color: _preferences.gbColor('abu_saleh_toast_status_bc') ??
+                  color:
+                      _preferences.gbColor('abu_saleh_toast_status_bc') ??
                       const Color(0xFF6366F1),
-                  textColor: _preferences.gbColor(
-                    'abu_saleh_toast_status_tc',
-                  ),
+                  textColor: _preferences.gbColor('abu_saleh_toast_status_tc'),
                   userId: rowUserId,
                   avatarInitials: profile?.avatarInitials,
                   avatarColorHex: profile?.avatarColorHex,
@@ -144,8 +146,7 @@ class StatusService {
               );
               locator<ChatyNotificationService>().triggerEventNotification(
                 title: 'Status update removed',
-                body:
-                    '${profile?.displayName ?? 'Someone'} deleted a status.',
+                body: '${profile?.displayName ?? 'Someone'} deleted a status.',
                 icon: Icons.history_toggle_off_rounded,
                 color: const Color(0xFF6366F1),
                 userId: userId,
@@ -159,17 +160,77 @@ class StatusService {
         });
   }
 
+  /// Real consumer for `notification.notifyStatusViewed`.
+  ///
+  /// Watches the status_view_events realtime stream and fires an event
+  /// notification when a CONTACT views one of MY statuses. Rows the viewer
+  /// marked hidden never pass the owner RLS policy, so hidden visits are
+  /// structurally undeliverable here. The first snapshot only establishes a
+  /// dedupe baseline so existing viewers never re-alert on app start.
+  void _startViewEventsWatch() {
+    if (_viewEventsSub != null) return;
+    _viewEventsSub = _client
+        .from('status_view_events')
+        .stream(primaryKey: const <String>['id'])
+        .listen((rows) {
+          final myId = _client.auth.currentUser?.id;
+          if (myId == null || myId.isEmpty) return;
+          final baselineBatch = !_statusViewBaselineDone;
+          for (final raw in rows) {
+            final row = Map<String, dynamic>.from(raw);
+            final ownerId = row['status_owner_id']?.toString() ?? '';
+            if (ownerId != myId) continue;
+            final viewerId = row['viewer_id']?.toString() ?? '';
+            final statusId = row['status_id']?.toString() ?? '';
+            if (viewerId.isEmpty || viewerId == myId) continue;
+            final key = '$statusId:$viewerId';
+            if (_statusViewAlerted.contains(key)) continue;
+            _statusViewAlerted.add(key);
+            // Baseline batch only seeds dedupe state — never alerts, so the
+            // backlog of past viewers is silent on app start.
+            if (baselineBatch) continue;
+            if (!_preferences.notification.enableGlobalNotifications) {
+              continue;
+            }
+            if (!_preferences.notification.notifyStatusViewed) continue;
+            try {
+              final profile = locator<ChatyBackendService>().getUserById(
+                viewerId,
+              );
+              locator<ChatyNotificationService>().triggerEventNotification(
+                title: 'Status viewed',
+                body:
+                    '${profile?.displayName ?? 'Someone'}'
+                    ' viewed your status.',
+                icon: Icons.visibility_rounded,
+                color: const Color(0xFF10B981),
+                userId: viewerId,
+                avatarInitials: profile?.avatarInitials,
+                avatarColorHex: profile?.avatarColorHex,
+              );
+            } catch (_) {
+              // Notification failures must never break the stream listener.
+            }
+          }
+          _statusViewBaselineDone = true;
+        });
+  }
+
   /// Clears baseline/alert tracking (used on account switch).
   void resetRevocationTracking() {
     _revocationSeenAlive.clear();
     _revocationAlerted.clear();
     _statusAlertSeenIds.clear();
     _statusAlertBaselineDone = false;
+    _statusViewAlerted.clear();
+    _statusViewBaselineDone = false;
   }
 
   void stopRevocationWatch() {
     _revocationSub?.cancel();
     _revocationSub = null;
+    _viewEventsSub?.cancel();
+    _viewEventsSub = null;
     resetRevocationTracking();
   }
 

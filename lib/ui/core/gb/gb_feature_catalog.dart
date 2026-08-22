@@ -41,24 +41,20 @@ class GbFeatureCatalog {
         'home_stories_key,home_stories_style,abu9aleh_status_audio',
     'Chat bubbles & ticks':
         'tick_style,bubble_style,text_size_pick,ConvoBack,ModChatRightBubble,ModChatBubbleText,date_right_color,ModChatLeftBubble,ModChatBubbleTextLeft,date_left_color',
-    'Conversation behavior':
-        'inconvo_trans_option',
+    'Conversation behavior': 'inconvo_trans_option',
     'Universal behavior':
         'inconvo_trans_option,trans_def_to,Pop_Heds,always_online,Img_highres_seek',
-    'Conversation colors':
-        'ModChatBubbleHyperlinks',
+    'Conversation colors': 'ModChatBubbleHyperlinks',
     'Calls appearance':
         'ModCallsBackground,ModCallsTextColor,ModCallsIconColors',
     'Conversation header':
         'ModChatColor,PicProf,NameProf,Conv_call_btn,statuschat,ModChatGStatusB,ModChatGStatusT',
-    'Quick contact':
-        'abu_saleh_quickcontact',
+    'Quick contact': 'abu_saleh_quickcontact',
     'Universal colors':
         'ModConPickColor,HomeBarText,ModConBackColor,list_bg_color,ModDarkConPickColor,ModDarkConPickColorNav',
     'Media limits & quality':
         'Up_size_limit,abo_saleh_audio_limit_check,Img_share_limit,key_more_docs_send',
-    'Composer appearance':
-        'BGColor',
+    'Composer appearance': 'BGColor',
   };
 
   static const Map<String, List<String>>
@@ -240,12 +236,9 @@ class GbFeatureCatalog {
     'key_carousel_view': 'Render statuses in carousel mode.',
     'onlinechat': 'Show online state in chat list rows.',
     'onlineDotchat': 'Show an online dot on chat avatars.',
-    'abu_saleh_toast_online':
-        'Alert when a contact comes online (toast).',
-    'abu_saleh_toast_typing':
-        'Alert when a contact starts typing (toast).',
-    'abu_saleh_toast_status':
-        'Alert when a contact publishes a new status.',
+    'abu_saleh_toast_online': 'Alert when a contact comes online (toast).',
+    'abu_saleh_toast_typing': 'Alert when a contact starts typing (toast).',
+    'abu_saleh_toast_status': 'Alert when a contact publishes a new status.',
     'abu_saleh_toast_profile':
         'Alert when a contact updates their profile details.',
     'onlineDotchatColor': 'Custom color for the chat-list online dot.',

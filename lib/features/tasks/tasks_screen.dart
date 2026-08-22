@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../ui/core/theme/theme_config.dart';
 import '../../domain/models/chat_task.dart';
 import '../../data/repositories/mock_data_store.dart';
 import '../../ui/core/widgets/status_badge.dart';
@@ -77,7 +76,11 @@ class _TasksScreenState extends State<TasksScreen>
     }
   }
 
-  Future<void> _recordMove(ChatTask task, TaskStatus from, TaskStatus to) async {
+  Future<void> _recordMove(
+    ChatTask task,
+    TaskStatus from,
+    TaskStatus to,
+  ) async {
     final history = await _loadHistory();
     final entries = history.putIfAbsent(task.id, () => <String>[]);
     final now = DateTime.now();
@@ -120,7 +123,10 @@ class _TasksScreenState extends State<TasksScreen>
                       ListTile(
                         dense: true,
                         leading: const Icon(Icons.history_rounded, size: 18),
-                        title: Text(entry, style: const TextStyle(fontSize: 13)),
+                        title: Text(
+                          entry,
+                          style: const TextStyle(fontSize: 13),
+                        ),
                       ),
                   ],
                 ),
@@ -224,9 +230,7 @@ class _TasksScreenState extends State<TasksScreen>
                 Expanded(
                   child: Text(
                     'Action Items',
-                    style: ChatyTypography.headline(
-                      colors.foreground,
-                    ),
+                    style: ChatyTypography.headline(colors.foreground),
                   ),
                 ),
                 ChatyIconButton(
@@ -278,9 +282,7 @@ class _TasksScreenState extends State<TasksScreen>
                         child: ChoiceChip(
                           label: Text(p),
                           selected: isSelected,
-                          selectedColor: colors.primary.withValues(
-                            alpha: 0.15,
-                          ),
+                          selectedColor: colors.primary.withValues(alpha: 0.15),
                           backgroundColor: colors.surfaceSecondary,
                           labelStyle: TextStyle(
                             color: isSelected
@@ -297,9 +299,7 @@ class _TasksScreenState extends State<TasksScreen>
                             ),
                           ),
                           side: BorderSide(
-                            color: isSelected
-                                ? colors.primary
-                                : colors.border,
+                            color: isSelected ? colors.primary : colors.border,
                           ),
                           onSelected: (value) {
                             if (value) {
@@ -370,7 +370,9 @@ class _TasksScreenState extends State<TasksScreen>
 
         return ChatyCard(
           padding: const EdgeInsets.all(ChatySpacing.base),
-          borderColor: isOverdue ? context.colors.error.withValues(alpha: 0.4) : null,
+          borderColor: isOverdue
+              ? context.colors.error.withValues(alpha: 0.4)
+              : null,
           onTap: () => _openTask(task, theme),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -498,9 +500,19 @@ class _TasksScreenState extends State<TasksScreen>
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        // Responsive: on narrow screens columns take 82% width and scroll
+        // horizontally; on wide screens the width shrinks just enough for
+        // ALL five stages to fit on screen at once (no horizontal scroll).
+        final outerPadding = ChatySpacing.base * 2;
+        final innerMargins = ChatySpacing.md * columns.length;
+        final fitAllWidth =
+            (constraints.maxWidth - outerPadding - innerMargins) /
+            columns.length;
         final columnWidth = constraints.maxWidth < 500
             ? constraints.maxWidth * 0.82
-            : 280.0;
+            : fitAllWidth < 240
+            ? 280.0
+            : fitAllWidth.clamp(240.0, 460.0);
         return SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.all(ChatySpacing.base),
@@ -617,10 +629,7 @@ class _TasksScreenState extends State<TasksScreen>
       decoration: BoxDecoration(
         color: context.colors.surface,
         borderRadius: BorderRadius.circular(ChatyRadius.md),
-        border: Border.all(
-          color: context.colors.border,
-          width: 1.0,
-        ),
+        border: Border.all(color: context.colors.border, width: 1.0),
       ),
       child: Material(
         color: Colors.transparent,
@@ -687,7 +696,6 @@ class _TasksScreenState extends State<TasksScreen>
       ),
     );
 
-
     return Padding(
       padding: const EdgeInsets.only(bottom: ChatySpacing.sm),
       child: LongPressDraggable<ChatTask>(
@@ -705,4 +713,3 @@ class _TasksScreenState extends State<TasksScreen>
     );
   }
 }
-
