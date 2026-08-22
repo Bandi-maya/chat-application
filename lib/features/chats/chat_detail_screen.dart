@@ -714,47 +714,39 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       await _showConnectionGate(contact);
       return;
     }
-    // Real call signaling: announce the invite over the callee's personal
-    // realtime channel; the recipient's Who-Can-Call-Me setting decides
-    // whether their device rings, declines, or reports busy.
-    final callId = 'call_${DateTime.now().microsecondsSinceEpoch}';
-    await _realtime.placeCall(
-      calleeId: contact.id,
-      callId: callId,
-      isVideo: isVideo,
-    );
-    var answered = false;
-    final responseSub = _realtime.callResponses.listen((event) {
-      if (event.callId != callId || !mounted) return;
-      if (event.response == 'accepted') {
-        answered = true;
-      } else if (event.response == 'declined' || event.response == 'busy') {
-        if (mounted && Navigator.of(context).canPop()) {
-          Navigator.of(context).pop();
-        }
-      }
-    });
 
     final callService = locator<CallSignalingService>();
-    unawaited(
-      callService.initiateCall(
+    try {
+      await callService.initiateCall(
         remoteUserId: contact.id,
         remoteDisplayName: conversation.title,
         remoteAvatarInitials: contact.avatarInitials,
         remoteAvatarColorHex: contact.avatarColorHex,
         isVideo: isVideo,
-      ),
-    );
-
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => OngoingCallScreen(
-          theme: _theme,
+      );
+      if (!mounted) {
+        await callService.endCall(reason: 'caller_screen_disposed');
+        return;
+      }
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => OngoingCallScreen(theme: _theme),
         ),
-      ),
-    );
-    await responseSub.cancel();
-    if (!answered) await _realtime.cancelCall(callId);
+      );
+    } catch (error) {
+      if (!mounted) return;
+      final reason = error
+          .toString()
+          .replaceFirst('StateError: ', '')
+          .replaceFirst('Exception: ', '');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Unable to start ${isVideo ? 'video' : 'voice'} call: $reason',
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -1330,8 +1322,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   /// Real consumer for the Disable Forwarded Label setting: the flag is
-  /// resolved at SEND time (`privacy.disableForwardedLabel` OR GB
-  /// 'yoDisableFwd') and baked into the forwarded copy's metadata.
+  /// resolved at SEND time (`privacy.disableForwardedLabel` OR GB toggle) and
+  /// baked into the forwarded copy's metadata.
   Future<void> _openForwardSheet(ChatMessage message) async {
     final theme = _theme;
     final targets = widget.dataStore.conversations
