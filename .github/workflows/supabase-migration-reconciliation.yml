@@ -30,7 +30,22 @@ jobs:
           ref: production-hardening-2026-08-22
           fetch-depth: 0
 
+      - name: Check whether canonical history is already pinned
+        id: canonical
+        shell: bash
+        run: |
+          set +e
+          bash tools/check_migration_versions.sh
+          code=$?
+          set -e
+          if [ "$code" -eq 0 ]; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Request short-lived GitHub OIDC token
+        if: steps.canonical.outputs.ready != 'true'
         id: oidc
         shell: bash
         run: |
@@ -43,6 +58,7 @@ jobs:
           echo "token=$token" >> "$GITHUB_OUTPUT"
 
       - name: Export retained production migration history
+        if: steps.canonical.outputs.ready != 'true'
         shell: bash
         env:
           OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
@@ -84,19 +100,18 @@ jobs:
               path = root / f'{version}_{name}.sql'
               path.write_text(sql.rstrip() + '\n', encoding='utf-8')
 
-          expected_first = '20260819064501'
-          expected_last = '20260822131153'
           ordered = sorted(seen)
-          if ordered[0] != expected_first or ordered[-1] != expected_last:
+          if ordered[0] != '20260819064501' or ordered[-1] != '20260822131153':
               raise SystemExit(f'Unexpected migration bounds: {ordered[0]}..{ordered[-1]}')
           print(f'Wrote {len(seen)} canonical production migration files.')
           PY
 
-      - name: Validate migration filenames
+      - name: Validate canonical migration history
         shell: bash
         run: bash tools/check_migration_versions.sh
 
       - name: Commit canonical migration history
+        if: steps.canonical.outputs.ready != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -110,14 +125,60 @@ jobs:
           git commit -m 'chore: sync canonical Supabase migration history'
           git push origin HEAD:production-hardening-2026-08-22
 
-  pr-reconciliation-status:
-    if: github.event_name == 'pull_request'
+  validate-canonical-history:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Validate repository migration versions
+      - name: Validate versions and production-derived checksums
         shell: bash
         run: bash tools/check_migration_versions.sh
+
+  clean-database-replay:
+    needs: validate-canonical-history
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.111.0
+
+      - name: Initialize local Supabase configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f supabase/config.toml ]; then
+            supabase init
+          fi
+          supabase --version
+
+      - name: Start clean local Supabase stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase start
+
+      - name: Replay all migrations from zero
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase db reset --local
+
+      - name: Verify schema, RLS, storage, realtime and E2EE invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql 'postgresql://postgres:postgres@127.0.0.1:54322/postgres' \
+            --set ON_ERROR_STOP=1 \
+            --file tools/verify_supabase_schema.sql
+
+      - name: Stop local Supabase stack
+        if: always()
+        shell: bash
+        run: supabase stop --no-backup || true
