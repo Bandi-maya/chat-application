@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - production-hardening-2026-08-22
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
