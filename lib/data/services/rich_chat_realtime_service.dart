@@ -5,10 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/user_profile.dart';
-import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import 'backend_service.dart';
-import 'contact_relationship_service.dart';
 import 'notification_service.dart';
 
 class ContactActivityState {
@@ -21,37 +19,6 @@ class ContactActivityState {
     this.isRecording = false,
     required this.updatedAt,
   });
-}
-
-/// An incoming call invite that PASSED the recipient's Who-Can-Call-Me
-/// gate and is currently ringing.
-class IncomingCall {
-  final String callId;
-  final String fromUserId;
-  final bool isVideo;
-  final String displayName;
-  final String? avatarInitials;
-  final String? avatarColorHex;
-  final DateTime receivedAt;
-
-  const IncomingCall({
-    required this.callId,
-    required this.fromUserId,
-    required this.isVideo,
-    required this.displayName,
-    this.avatarInitials,
-    this.avatarColorHex,
-    required this.receivedAt,
-  });
-}
-
-/// Caller-side response to an outgoing call invite.
-class CallResponseEvent {
-  final String callId;
-  // accepted | declined | busy | cancelled
-  final String response;
-
-  const CallResponseEvent({required this.callId, required this.response});
 }
 
 class RichChatRealtimeService extends ChangeNotifier {
@@ -80,13 +47,6 @@ class RichChatRealtimeService extends ChangeNotifier {
   final SupabaseClient _client;
 
   RealtimeChannel? _channel;
-  RealtimeChannel? _callsChannel;
-  IncomingCall? _incomingCall;
-  Timer? _incomingCallTimer;
-  final StreamController<CallResponseEvent> _callResponseController =
-      StreamController<CallResponseEvent>.broadcast();
-  String? _activeOutgoingCallId;
-  String? _activeOutgoingCalleeId;
   StreamSubscription<AuthState>? _authSubscription;
   final Map<String, PresenceState> _presenceByUserId =
       <String, PresenceState>{};
@@ -99,38 +59,25 @@ class RichChatRealtimeService extends ChangeNotifier {
       <String, DeliveryState>{};
   final Map<String, String> _senderByMessageId = <String, String>{};
   final Set<String> _trackedConversationIds = <String>{};
-  // Message IDs we've already surfaced a "revoked" alert for, so a contact
-  // deleting a message never produces duplicate alerts on repeated payloads.
   final Set<String> _revokeAlerted = <String>{};
-  // Profile fingerprints for the profile-change alert (name|about per user).
   final Map<String, String> _profileFingerprints = <String, String>{};
   bool _disposed = false;
   bool _initializing = false;
 
   String? get _currentUserId => _client.auth.currentUser?.id;
 
-  /// Currently ringing incoming call (already passed the Who-Can-Call-Me
-  /// gate), or null. Drives the app-level ringing overlay.
-  IncomingCall? get incomingCall => _incomingCall;
-
-  /// Caller-side stream of responses to our outgoing invites.
-  Stream<CallResponseEvent> get callResponses => _callResponseController.stream;
-
   bool get isConnected => _channel != null;
 
   PresenceState presenceFor(String userId) =>
       _presenceByUserId[userId] ?? PresenceState.offline;
+
   bool isOnline(String userId) {
-    // Reciprocity: when the user hides their own online status, Chaty must not
-    // reveal contacts' online status to them either.
     if (_isMyOnlineHidden) return false;
     final state = presenceFor(userId);
     return state == PresenceState.online || state == PresenceState.typing;
   }
 
   DateTime? lastSeenFor(String userId) {
-    // Reciprocity: hiding your own last seen (frozen, or audience "Nobody")
-    // also hides contacts' last seen from you — the standard messaging rule.
     if (_isMyLastSeenHidden) return null;
     return _lastSeenByUserId[userId];
   }
@@ -235,7 +182,6 @@ class RichChatRealtimeService extends ChangeNotifier {
         previous == PresenceState.offline &&
         next == PresenceState.online &&
         (_preferences.notification.notifyContactOnline ||
-            // Real consumer: presence-alert master toggle.
             _preferences.gbBool('abu_saleh_toast_online'))) {
       final profile = _backend.getUserById(userId);
       _notifications.triggerEventNotification(
@@ -302,7 +248,6 @@ class RichChatRealtimeService extends ChangeNotifier {
         next.isTyping &&
         previous?.isTyping != true &&
         (_preferences.notification.notifyTypingStarted ||
-            // Real consumer: typing-alert master toggle.
             _preferences.gbBool('abu_saleh_toast_typing'))) {
       _notifications.triggerEventNotification(
         title: '${profile?.displayName ?? 'Contact'} is typing',
@@ -377,11 +322,6 @@ class RichChatRealtimeService extends ChangeNotifier {
     }
   }
 
-  /// Surfaces a "message revoked" alert when a contact deletes a message for
-  /// everyone (soft-delete → the row gains a deleted_at). Requires BOTH the
-  /// Message Revoke Alert privacy capability and the Deleted-message
-  /// notification toggle; either being off suppresses the alert. De-duplicated
-  /// per message id so repeated realtime payloads never re-notify.
   void _maybeAlertRevokedMessage(String id, Map<String, dynamic> row) {
     if (id.isEmpty || row['deleted_at'] == null) return;
     final senderId = _senderByMessageId[id] ?? '';
@@ -416,9 +356,6 @@ class RichChatRealtimeService extends ChangeNotifier {
 
   Future<void> setRecording(String conversationId, bool isRecording) async {
     if (_currentUserId == null) return;
-    // Respect the Recording Indicators privacy toggle and Ghost Mode, mirroring
-    // how typing indicators are gated before publishing. Always allow clearing
-    // the state (isRecording == false).
     if (isRecording &&
         (!_preferences.privacy.recordingIndicators ||
             _preferences.home.ghostMode ||
@@ -544,41 +481,12 @@ class RichChatRealtimeService extends ChangeNotifier {
         )
         .subscribe();
     _channel = channel;
-
-    _callsChannel = _subscribeCallSignals(userId);
   }
 
-  /// Personal call-signaling channel: carries broadcast invite/response
-  /// events for Who Can Call Me enforcement and ringing.
-  RealtimeChannel _subscribeCallSignals(String userId) {
-    final callsChannel = _client.channel('chaty_calls_v1_$userId');
-    callsChannel
-        .onBroadcast(
-          event: 'chaty_call_invite',
-          callback: (payload) {
-            unawaited(
-              _handleIncomingInvite(Map<String, dynamic>.from(payload)),
-            );
-          },
-        )
-        .onBroadcast(
-          event: 'chaty_call_response',
-          callback: (payload) {
-            _handleCallResponse(Map<String, dynamic>.from(payload));
-          },
-        )
-        .subscribe();
-    return callsChannel;
-  }
-
-  /// Real consumer for `abu_saleh_toast_profile` (+ `_bc`/`_tc` styling):
-  /// diffs contact profile rows on realtime change and fires an alert when
-  /// the display name or about text actually changed. The first sighting of
-  /// a contact only establishes the baseline — never alerts.
   void _handleProfileChange(Map<String, dynamic> row) {
     final userId = row['id']?.toString() ?? '';
     if (userId.isEmpty || userId == _currentUserId) return;
-    if (_backend.getUserById(userId) == null) return; // not a known contact
+    if (_backend.getUserById(userId) == null) return;
     final name = row['display_name']?.toString() ?? '';
     final about = row['about']?.toString() ?? row['bio']?.toString() ?? '';
     final avatar = row['avatar_url']?.toString() ?? '';
@@ -607,170 +515,6 @@ class RichChatRealtimeService extends ChangeNotifier {
     );
   }
 
-  Future<void> _handleIncomingInvite(Map<String, dynamic> payload) async {
-    final callId = payload['call_id']?.toString() ?? '';
-    final fromUserId = payload['from']?.toString() ?? '';
-    if (callId.isEmpty || fromUserId.isEmpty || fromUserId == _currentUserId) {
-      return;
-    }
-    if (_incomingCall != null) {
-      await _broadcastToUser(fromUserId, <String, dynamic>{
-        'call_id': callId,
-        'response': 'busy',
-      });
-      return;
-    }
-    // THE GATE: Who Can Call Me is enforced at ring time on the recipient,
-    // mirroring how read receipts / recording indicators are enforced here.
-    final allowed = await _callerMayRing(fromUserId);
-    if (!allowed) {
-      await _broadcastToUser(fromUserId, <String, dynamic>{
-        'call_id': callId,
-        'response': 'declined',
-      });
-      return;
-    }
-    final profile = _backend.getUserById(fromUserId);
-    if (_disposed) return;
-    _incomingCall = IncomingCall(
-      callId: callId,
-      fromUserId: fromUserId,
-      isVideo: payload['is_video'] == true,
-      displayName: profile?.displayName ?? 'Incoming call',
-      avatarInitials: profile?.avatarInitials,
-      avatarColorHex: profile?.avatarColorHex,
-      receivedAt: DateTime.now(),
-    );
-    notifyListeners();
-    _incomingCallTimer?.cancel();
-    _incomingCallTimer = Timer(const Duration(seconds: 35), () {
-      // Missed call: silently dismiss the ringing overlay.
-      if (_incomingCall?.callId == callId) _clearIncomingCall();
-    });
-  }
-
-  void _clearIncomingCall() {
-    if (_incomingCall == null) return;
-    _incomingCallTimer?.cancel();
-    _incomingCall = null;
-    if (!_disposed) notifyListeners();
-  }
-
-  Future<bool> _callerMayRing(String callerId) async {
-    switch (_preferences.privacy.whoCanCallMe) {
-      case 'Nobody':
-        return false;
-      case 'My Contacts':
-      case 'My Contacts Except…':
-        try {
-          final status = await locator<ContactRelationshipService>()
-              .connectionStatus(callerId);
-          if (!status.callsAllowed) return false;
-        } catch (_) {
-          // When connectivity fails, fail closed: do not ring.
-          return false;
-        }
-        if (_preferences.privacy.whoCanCallMe == 'My Contacts Except…' &&
-            _preferences.privacy.whoCanCallMeExceptions.contains(callerId)) {
-          return false;
-        }
-        return true;
-      default:
-        return true; // 'Everyone'
-    }
-  }
-
-  void _handleCallResponse(Map<String, dynamic> payload) {
-    final callId = payload['call_id']?.toString() ?? '';
-    final response = payload['response']?.toString() ?? '';
-    if (callId.isEmpty) return;
-    // Caller cancelled while it was still ringing here: dismiss overlay.
-    if (response == 'cancelled' && _incomingCall?.callId == callId) {
-      _clearIncomingCall();
-      return;
-    }
-    if (callId == _activeOutgoingCallId) {
-      _callResponseController.add(
-        CallResponseEvent(callId: callId, response: response),
-      );
-    }
-  }
-
-  /// Called by the ringing overlay UI.
-  void respondToIncomingCall(bool accept) {
-    final call = _incomingCall;
-    if (call == null) return;
-    _clearIncomingCall();
-    unawaited(
-      _broadcastToUser(call.fromUserId, <String, dynamic>{
-        'call_id': call.callId,
-        'response': accept ? 'accepted' : 'declined',
-      }),
-    );
-  }
-
-  /// Caller side: announce a new outgoing call to the callee's channel.
-  Future<void> placeCall({
-    required String calleeId,
-    required String callId,
-    required bool isVideo,
-  }) async {
-    _activeOutgoingCallId = callId;
-    _activeOutgoingCalleeId = calleeId;
-    await _broadcastToUser(calleeId, <String, dynamic>{
-      'call_id': callId,
-      'from': _currentUserId,
-      'is_video': isVideo,
-    });
-  }
-
-  /// Caller side: we hung up before an answer (or after leaving the screen).
-  Future<void> cancelCall(String callId) async {
-    final calleeId = _activeOutgoingCalleeId;
-    _activeOutgoingCallId = null;
-    _activeOutgoingCalleeId = null;
-    if (calleeId == null) return;
-    await _broadcastToUser(calleeId, <String, dynamic>{
-      'call_id': callId,
-      'response': 'cancelled',
-    });
-  }
-
-  /// Joins the RECIPIENT's personal signaling channel just long enough to
-  /// broadcast one event, then leaves it.
-  Future<void> _broadcastToUser(
-    String toUserId,
-    Map<String, dynamic> payload,
-  ) async {
-    final completer = Completer<void>();
-    final channel = _client.channel('chaty_calls_v1_$toUserId');
-    try {
-      channel.subscribe((status, error) {
-        if (completer.isCompleted) return;
-        if (status == RealtimeSubscribeStatus.subscribed) {
-          completer.complete();
-        } else if (status == RealtimeSubscribeStatus.channelError ||
-            status == RealtimeSubscribeStatus.timedOut) {
-          completer.completeError(error ?? StateError('channel $status'));
-        }
-      });
-      await completer.future.timeout(const Duration(seconds: 6));
-      await channel.sendBroadcastMessage(
-        event: payload.containsKey('response')
-            ? 'chaty_call_response'
-            : 'chaty_call_invite',
-        payload: payload,
-      );
-    } catch (_) {
-      // Signaling failures must never crash the app; the caller just sees
-      // no answer.
-    } finally {
-      try {
-        await _client.removeChannel(channel);
-      } catch (_) {}
-    }
-  }
-
   Future<void> _reset() async {
     final channel = _channel;
     _channel = null;
@@ -779,17 +523,6 @@ class RichChatRealtimeService extends ChangeNotifier {
         await _client.removeChannel(channel);
       } catch (_) {}
     }
-    final callsChannel = _callsChannel;
-    _callsChannel = null;
-    if (callsChannel != null) {
-      try {
-        await _client.removeChannel(callsChannel);
-      } catch (_) {}
-    }
-    _incomingCallTimer?.cancel();
-    _incomingCall = null;
-    _activeOutgoingCallId = null;
-    _activeOutgoingCalleeId = null;
     _presenceByUserId.clear();
     _lastSeenByUserId.clear();
     _profileFingerprints.clear();
@@ -807,10 +540,6 @@ class RichChatRealtimeService extends ChangeNotifier {
     unawaited(_authSubscription?.cancel());
     final channel = _channel;
     if (channel != null) unawaited(_client.removeChannel(channel));
-    final callsChannel = _callsChannel;
-    if (callsChannel != null) unawaited(_client.removeChannel(callsChannel));
-    _incomingCallTimer?.cancel();
-    unawaited(_callResponseController.close());
     super.dispose();
   }
 
