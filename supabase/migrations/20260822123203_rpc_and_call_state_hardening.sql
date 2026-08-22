@@ -1,5 +1,4 @@
--- Production hardening: privileged RPC authorization + bounded WebRTC signaling.
--- Applied to the connected production project before being mirrored here.
+-- Harden privileged RPCs and the WebRTC signaling state machine.
 
 DO $$
 BEGIN

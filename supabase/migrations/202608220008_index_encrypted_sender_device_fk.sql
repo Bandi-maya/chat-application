@@ -1,3 +1,0 @@
-CREATE INDEX IF NOT EXISTS messages_sender_device_idx
-  ON public.messages(sender_id, sender_device_id)
-  WHERE sender_device_id IS NOT NULL;
