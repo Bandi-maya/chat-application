@@ -100,6 +100,14 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     _preferencesController = locator<ChatyPreferencesController>();
     _appearanceController = locator<AppearanceVariantController>();
     _backend = locator<ChatyBackendService>();
+    // Supabase restores persisted auth before runApp. Hydrate application data
+    // independently so a profile/query failure never gets misclassified as an
+    // unauthenticated session and never forces a valid user back to Welcome.
+    unawaited(
+      _backend.initialize().catchError((Object error, StackTrace stackTrace) {
+        debugPrint('Chaty backend bootstrap failed: $error\n$stackTrace');
+      }),
+    );
     _lockService = locator<LocalLockService>();
     _notificationService = locator<ChatyNotificationService>();
     _relationshipService = locator<ContactRelationshipService>();
@@ -501,7 +509,10 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
               ],
             );
           },
-          home: _backend.isAuthenticated
+          // Authentication and profile hydration are separate concerns. A
+          // valid persisted Supabase session remains authenticated while
+          // profile/conversation hydration retries in the background.
+          home: Supabase.instance.client.auth.currentSession != null
               ? const MainNavigationShell()
               : const WelcomeScreen(),
         );
