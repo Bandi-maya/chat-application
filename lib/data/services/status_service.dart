@@ -43,8 +43,6 @@ class StatusRecord {
   bool get isDeleted => deletedAt != null;
 }
 
-/// A real viewer of one of my statuses, read through the owner-only RLS
-/// policy on status_view_events (hidden visits never reach this query).
 class StatusViewer {
   final String userId;
   final String displayName;
@@ -71,6 +69,7 @@ class StatusService {
        _preferences = preferences ?? locator<ChatyPreferencesController>();
 
   static const String bucket = 'status-media';
+  static const int storageLimitMb = 50;
 
   final SupabaseClient _client;
   final ChatyPreferencesController _preferences;
@@ -79,23 +78,12 @@ class StatusService {
   StreamSubscription<List<Map<String, dynamic>>>? _revocationSub;
   final Set<String> _revocationSeenAlive = <String>{};
   final Set<String> _revocationAlerted = <String>{};
-  // New-status alert state (abu_saleh_toast_status family).
   final Set<String> _statusAlertSeenIds = <String>{};
   bool _statusAlertBaselineDone = false;
-  // Status-VIEWED alert state (notification.notifyStatusViewed consumer).
   StreamSubscription<List<Map<String, dynamic>>>? _viewEventsSub;
   final Set<String> _statusViewAlerted = <String>{};
   bool _statusViewBaselineDone = false;
 
-  /// Real consumer for `privacy.statusRevocationAlert` +
-  /// `notification.notifyStatusDeleted`.
-  ///
-  /// Watches the RAW status_updates realtime stream app-wide (unfiltered, so
-  /// deletions are observable even without anti-delete retention) and fires
-  /// an event notification the moment a CONTACT's status transitions from
-  /// alive to deleted. The first snapshot only establishes the baseline, so
-  /// already-deleted statuses never alert on app start — same policy as the
-  /// message-revoke alert in RichChatRealtimeService.
   void startRevocationWatch() {
     if (_revocationSub != null) return;
     _startViewEventsWatch();
@@ -115,8 +103,6 @@ class StatusService {
               final unseen = !_statusAlertSeenIds.contains(id);
               _statusAlertSeenIds.add(id);
               _revocationSeenAlive.add(id);
-              // Real consumer for `abu_saleh_toast_status` (+ `_bc`/`_tc`):
-              // a contact publishing a NEW status after our baseline.
               if (baselineBatch || !unseen) continue;
               if (rowUserId.isEmpty || rowUserId == myId) continue;
               if (!_preferences.notification.enableGlobalNotifications) {
@@ -144,13 +130,9 @@ class StatusService {
                   avatarInitials: profile?.avatarInitials,
                   avatarColorHex: profile?.avatarColorHex,
                 );
-              } catch (_) {
-                // Notification failures must never break the stream listener.
-              }
+              } catch (_) {}
               continue;
             }
-            // Deleted row: only alert if we saw it alive first and have not
-            // alerted for it already.
             if (!_revocationSeenAlive.contains(id)) continue;
             if (_revocationAlerted.contains(id)) continue;
             _revocationAlerted.add(id);
@@ -173,20 +155,11 @@ class StatusService {
                 avatarInitials: profile?.avatarInitials,
                 avatarColorHex: profile?.avatarColorHex,
               );
-            } catch (_) {
-              // Notification failures must never break the stream listener.
-            }
+            } catch (_) {}
           }
         });
   }
 
-  /// Real consumer for `notification.notifyStatusViewed`.
-  ///
-  /// Watches the status_view_events realtime stream and fires an event
-  /// notification when a CONTACT views one of MY statuses. Rows the viewer
-  /// marked hidden never pass the owner RLS policy, so hidden visits are
-  /// structurally undeliverable here. The first snapshot only establishes a
-  /// dedupe baseline so existing viewers never re-alert on app start.
   void _startViewEventsWatch() {
     if (_viewEventsSub != null) return;
     _viewEventsSub = _client
@@ -206,12 +179,8 @@ class StatusService {
             final key = '$statusId:$viewerId';
             if (_statusViewAlerted.contains(key)) continue;
             _statusViewAlerted.add(key);
-            // Baseline batch only seeds dedupe state — never alerts, so the
-            // backlog of past viewers is silent on app start.
             if (baselineBatch) continue;
-            if (!_preferences.notification.enableGlobalNotifications) {
-              continue;
-            }
+            if (!_preferences.notification.enableGlobalNotifications) continue;
             if (!_preferences.notification.notifyStatusViewed) continue;
             try {
               final profile = locator<ChatyBackendService>().getUserById(
@@ -228,15 +197,12 @@ class StatusService {
                 avatarInitials: profile?.avatarInitials,
                 avatarColorHex: profile?.avatarColorHex,
               );
-            } catch (_) {
-              // Notification failures must never break the stream listener.
-            }
+            } catch (_) {}
           }
           _statusViewBaselineDone = true;
         });
   }
 
-  /// Clears baseline/alert tracking (used on account switch).
   void resetRevocationTracking() {
     _revocationSeenAlive.clear();
     _revocationAlerted.clear();
@@ -310,12 +276,19 @@ class StatusService {
     final size = await file.length();
     if (size <= 0) throw Exception('The selected file is empty.');
     final configuredMb = mediaType == 'audio'
-        ? _preferences.gbDouble('abo_saleh_audio_limit_check', fallback: 50)
-        : _preferences.gbDouble('Up_size_limit', fallback: 100);
-    final maxBytes = configuredMb.clamp(1, 2048).round() * 1024 * 1024;
+        ? _preferences.gbDouble(
+            'abo_saleh_audio_limit_check',
+            fallback: storageLimitMb.toDouble(),
+          )
+        : _preferences.gbDouble(
+            'Up_size_limit',
+            fallback: storageLimitMb.toDouble(),
+          );
+    final effectiveLimitMb = configuredMb.clamp(1, storageLimitMb).round();
+    final maxBytes = effectiveLimitMb * 1024 * 1024;
     if (size > maxBytes)
       throw Exception(
-        'Selected media exceeds the configured ${configuredMb.round()} MB limit.',
+        'Selected media exceeds the $effectiveLimitMb MB storage limit.',
       );
 
     final user = _client.auth.currentUser;
@@ -365,9 +338,6 @@ class StatusService {
     );
   }
 
-  /// Real "Viewed by" data for one of MY statuses. Reads only rows the
-  /// owner RLS policy exposes (never the owner's own view, never hidden
-  /// visits) — no fabricated counts anywhere.
   Future<List<StatusViewer>> viewersFor(String statusId) async {
     try {
       final rows = await _client
@@ -401,7 +371,6 @@ class StatusService {
           })
           .toList(growable: false);
     } catch (_) {
-      // Owner reads must never break the Updates screen.
       return const <StatusViewer>[];
     }
   }
@@ -414,9 +383,6 @@ class StatusService {
       'delete_status_update',
       params: <String, dynamic>{'p_status_id': status.id},
     );
-    // Media is retained until status expiry so anti-delete viewers can still
-    // access the original signed object. Storage cleanup can safely happen
-    // after the status expiry window.
   }
 
   Future<StatusRecord> _insert({
