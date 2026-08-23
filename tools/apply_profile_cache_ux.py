@@ -128,16 +128,16 @@ path.write_text(text, encoding='utf-8')
 print('Profile media cache UX applied.')
 
 # This is intentionally the final legacy UX patch in the integration chain.
-# Normalize the overlap introduced by older startup/lifecycle patches, then let
-# the canonical frontend master plan become the single owner of that behavior.
-normalize_input = ROOT / 'tools/prepare_frontend_master_input.py'
-if normalize_input.exists():
-    runpy.run_path(str(normalize_input), run_name='__main__')
-
-master_patch = ROOT / 'tools/apply_frontend_master_plan.py'
-if master_patch.exists():
-    runpy.run_path(str(master_patch), run_name='__main__')
-
-restore_exports = ROOT / 'tools/restore_frontend_design_exports.py'
-if restore_exports.exists():
-    runpy.run_path(str(restore_exports), run_name='__main__')
+# Normalize older startup/lifecycle patches, apply the canonical frontend plan,
+# restore barrel exports, then remove namespace collisions introduced by the
+# new preview primitives. Every CI reconciliation therefore analyzes the same
+# final frontend tree.
+for tool in (
+    'prepare_frontend_master_input.py',
+    'apply_frontend_master_plan.py',
+    'restore_frontend_design_exports.py',
+    'apply_frontend_namespace_cleanup.py',
+):
+    script = ROOT / 'tools' / tool
+    if script.exists():
+        runpy.run_path(str(script), run_name='__main__')
