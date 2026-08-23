@@ -38,7 +38,10 @@ if (releaseTaskRequested && !allowCiDebugSigning) {
 }
 
 android {
-    namespace = applicationIdOverride ?: "com.example.chat"
+    // Keep the source namespace aligned with the existing Kotlin package and
+    // manifest-relative component names. Store/package identity is controlled
+    // independently by applicationId below.
+    namespace = "com.example.chat"
     // flutter_secure_storage 11 requires Android API 37 metadata. Raising
     // compileSdk only exposes newer compile-time APIs; minSdk/targetSdk keep
     // their existing Flutter-managed behavior and device compatibility.
