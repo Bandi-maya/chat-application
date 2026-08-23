@@ -133,3 +133,7 @@ print('Profile media cache UX applied.')
 master_patch = ROOT / 'tools/apply_frontend_master_plan.py'
 if master_patch.exists():
     runpy.run_path(str(master_patch), run_name='__main__')
+
+restore_exports = ROOT / 'tools/restore_frontend_design_exports.py'
+if restore_exports.exists():
+    runpy.run_path(str(restore_exports), run_name='__main__')
