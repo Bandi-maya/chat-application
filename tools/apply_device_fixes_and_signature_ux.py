@@ -5,96 +5,73 @@ import re
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def read(path):
+def read(path: str) -> str:
     return (ROOT / path).read_text(encoding='utf-8')
 
 
-def write(path, text):
+def write(path: str, text: str) -> None:
     (ROOT / path).write_text(text, encoding='utf-8')
 
 
-def replace_required(text, old, new, label):
+def replace_required(text: str, old: str, new: str, label: str) -> str:
     if old not in text:
         raise SystemExit(f'missing marker for {label}')
     return text.replace(old, new, 1)
 
-# 1) Android MLS compatibility. openmls 2.x uses std::fs file locking that is
-# unsupported on some Android/F2FS builds. Pin the last lock-free wrapper and
-# serialize all app-facing MLS work through one process-wide gate.
+
+# ---------------------------------------------------------------------------
+# 1. Android MLS compatibility.
+# ---------------------------------------------------------------------------
+# openmls 2.x introduced an advisory <db>.lock file. On the user's Android
+# filesystem std::fs::File::try_lock returns "not supported", preventing every
+# encrypted attachment operation. 1.4.2 predates that wrapper-level file lock
+# while retaining the RFC 9420 engine/API used by Chaty. Keep the existing
+# per-conversation serialization until an Android-safe 2.x lock implementation
+# is available upstream.
 pub = read('pubspec.yaml')
-pub = re.sub(r'  openmls: \^2\.0\.1', '  openmls: 1.4.2', pub)
+pub = re.sub(r'  openmls:\s*\^?2\.0\.1', '  openmls: 1.4.2', pub)
 write('pubspec.yaml', pub)
 
 mls_path = 'lib/data/services/mls_e2ee_service.dart'
 mls = read(mls_path)
-if 'final _ConversationGate _engineGate = _ConversationGate();' not in mls:
-    mls = replace_required(
-        mls,
-        "  final Map<String, _ConversationGate> _conversationGates =\n      <String, _ConversationGate>{};\n",
-        "  final Map<String, _ConversationGate> _conversationGates =\n      <String, _ConversationGate>{};\n  final _ConversationGate _engineGate = _ConversationGate();\n",
-        'MLS global gate field',
-    )
-
-mls = mls.replace(
-    "    return _gate(conversationId).run<MlsConversationState>(\n      () => _ensureConversationReadyLocked(conversationId),\n    );",
-    "    return _engineGate.run<MlsConversationState>(\n      () => _gate(conversationId).run<MlsConversationState>(\n        () => _ensureConversationReadyLocked(conversationId),\n      ),\n    );",
-)
-mls = mls.replace(
-    "    return _gate(conversationId).run<MlsEncryptedPayload>(() async {",
-    "    return _engineGate.run<MlsEncryptedPayload>(() =>\n      _gate(conversationId).run<MlsEncryptedPayload>(() async {",
-    1,
-)
-# close first encrypt wrapper before method end
-needle = "      return MlsEncryptedPayload(\n        groupId: group.groupId,\n        epoch: localEpoch.toInt(),\n        ciphertext: base64Encode(encrypted.ciphertext),\n      );\n    });\n  }"
-if needle in mls:
-    mls = mls.replace(needle, needle.replace("    });\n  }", "    }));\n  });\n  }"), 1)
-
-# Decrypt wrapper
-mls = mls.replace(
-    "    return _gate(conversationId).run<Map<String, dynamic>>(() async {",
-    "    return _engineGate.run<Map<String, dynamic>>(() =>\n      _gate(conversationId).run<Map<String, dynamic>>(() async {",
-    1,
-)
-needle = "      return Map<String, dynamic>.from(envelope['payload'] as Map);\n    });\n  }"
-if needle in mls:
-    mls = mls.replace(needle, "      return Map<String, dynamic>.from(envelope['payload'] as Map);\n    }));\n  });\n  }", 1)
-
-# Exporter wrapper
-mls = mls.replace(
-    "    return _gate(conversationId).run<Uint8List>(() async {",
-    "    return _engineGate.run<Uint8List>(() =>\n      _gate(conversationId).run<Uint8List>(() async {",
-    1,
-)
-needle = "      return _requireEngine().exportSecret(\n        groupIdBytes: base64Decode(group.groupId),\n        label: 'chaty-attachment-v1',\n        context: utf8.encode('$conversationId:$attachmentId'),\n        keyLength: 32,\n      );\n    });\n  }"
-if needle in mls:
-    mls = mls.replace(needle, needle.replace("    });\n  }", "    }));\n  });\n  }"), 1)
-
-# Real device fingerprint for the Security Center.
 if 'Future<String> deviceFingerprint() async' not in mls:
-    insert = """
+    if "package:cryptography/cryptography.dart" not in mls:
+        mls = mls.replace(
+            "import 'package:flutter/foundation.dart';",
+            "import 'package:cryptography/cryptography.dart';\nimport 'package:flutter/foundation.dart';",
+            1,
+        )
+    method = r'''
   Future<String> deviceFingerprint() async {
     await initializeForCurrentSession();
     final key = _requireSignerPublicKey();
     final digest = await Sha256().hash(key);
-    final hex = digest.bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-    return List<String>.generate(
-      (hex.length / 4).ceil(),
-      (index) => hex.substring(index * 4, (index * 4 + 4).clamp(0, hex.length)),
-    ).join(' ');
+    final hex = digest.bytes
+        .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+        .join();
+    final groups = <String>[];
+    for (var offset = 0; offset < hex.length; offset += 4) {
+      groups.add(hex.substring(offset, (offset + 4).clamp(0, hex.length)));
+    }
+    return groups.join(' ');
   }
 
-"""
-    mls = mls.replace('  Future<void> close() async {', insert + '  Future<void> close() async {', 1)
-    if "package:cryptography/cryptography.dart" not in mls:
-        mls = mls.replace("import 'package:flutter/foundation.dart';", "import 'package:cryptography/cryptography.dart';\nimport 'package:flutter/foundation.dart';", 1)
+'''
+    mls = replace_required(
+        mls,
+        '  Future<void> close() async {',
+        method + '  Future<void> close() async {',
+        'MLS close method',
+    )
 write(mls_path, mls)
 
-# 2) Calls: TURN is preferred, not a hard precondition. Use STUN-only direct
-# ICE when the relay function is not configured so testing and permissive
-# networks work immediately. If ICE later fails, UI reports a concise message.
+
+# ---------------------------------------------------------------------------
+# 2. Calls: TURN is preferred, but it must not block direct WebRTC testing.
+# ---------------------------------------------------------------------------
 call_path = 'lib/data/services/call_signaling_service.dart'
 call = read(call_path)
-old = """  Future<List<Map<String, dynamic>>> _loadIceServers() async {
+old_turn = r'''  Future<List<Map<String, dynamic>>> _loadIceServers() async {
     final response = await _client.functions.invoke(
       'turn-credentials',
       body: const <String, dynamic>{},
@@ -114,8 +91,8 @@ old = """  Future<List<Map<String, dynamic>>> _loadIceServers() async {
         .map((server) => Map<String, dynamic>.from(server))
         .toList(growable: false);
   }
-"""
-new = """  Future<List<Map<String, dynamic>>> _loadIceServers() async {
+'''
+new_turn = r'''  Future<List<Map<String, dynamic>>> _loadIceServers() async {
     final directServers = <Map<String, dynamic>>[
       <String, dynamic>{
         'urls': <String>[
@@ -140,27 +117,44 @@ new = """  Future<List<Map<String, dynamic>>> _loadIceServers() async {
       final relays = rawServers
           .whereType<Map>()
           .map((server) => Map<String, dynamic>.from(server))
-          .toList(growable: true);
+          .toList(growable: false);
       return <Map<String, dynamic>>[...directServers, ...relays];
     } catch (error) {
       debugPrint('Chaty TURN lookup failed; using direct ICE/STUN: $error');
       return directServers;
     }
   }
-"""
-call = replace_required(call, old, new, 'TURN fallback')
-call = call.replace("_markTransportFailed('ICE negotiation failed.');", "_markTransportFailed('Call could not connect on this network.');")
+'''
+if old_turn in call:
+    call = call.replace(old_turn, new_turn, 1)
+elif 'stun:stun.cloudflare.com:3478' not in call:
+    raise SystemExit('TURN loader marker not found')
+call = call.replace(
+    "_markTransportFailed('ICE negotiation failed.');",
+    "_markTransportFailed('Call could not connect on this network.');",
+)
 write(call_path, call)
 
-# 3) Security Center: remove simulated/demo claims and use the actual MLS
-# engine fingerprint. Do not leave Biometric selected when the device cannot
-# perform biometric auth; fall back to device credential while keeping lock on.
+
+# ---------------------------------------------------------------------------
+# 3. Security Center: real MLS status/fingerprint + safe biometric fallback.
+# ---------------------------------------------------------------------------
 sec_path = 'lib/features/settings/security/security_center_screen.dart'
 sec = read(sec_path)
 if "import '../../../data/services/mls_e2ee_service.dart';" not in sec:
-    sec = sec.replace("import '../../../data/services/local_lock_service.dart';", "import '../../../data/services/local_lock_service.dart';\nimport '../../../data/services/mls_e2ee_service.dart';", 1)
-sec = sec.replace('  bool _biometricAvailable = false;', '  bool _biometricAvailable = false;\n  String? _deviceFingerprint;')
-old_load = """  Future<void> _loadCapabilities() async {
+    sec = sec.replace(
+        "import '../../../data/services/local_lock_service.dart';",
+        "import '../../../data/services/local_lock_service.dart';\n"
+        "import '../../../data/services/mls_e2ee_service.dart';",
+        1,
+    )
+if 'String? _deviceFingerprint;' not in sec:
+    sec = sec.replace(
+        '  bool _biometricAvailable = false;',
+        '  bool _biometricAvailable = false;\n  String? _deviceFingerprint;',
+        1,
+    )
+old_load = r'''  Future<void> _loadCapabilities() async {
     final pinLength = await _lockService.getPinLength();
     final biometricAvailable = await _lockService.canUseBiometrics();
     if (!mounted) return;
@@ -169,8 +163,8 @@ old_load = """  Future<void> _loadCapabilities() async {
       _biometricAvailable = biometricAvailable;
     });
   }
-"""
-new_load = """  Future<void> _loadCapabilities() async {
+'''
+new_load = r'''  Future<void> _loadCapabilities() async {
     final pinLength = await _lockService.getPinLength();
     final biometricAvailable = await _lockService.canUseBiometrics();
     String? fingerprint;
@@ -193,28 +187,49 @@ new_load = """  Future<void> _loadCapabilities() async {
       _deviceFingerprint = fingerprint;
     });
   }
-"""
-sec = replace_required(sec, old_load, new_load, 'security capability load')
-# Replace static safety number dialog payload/copy.
-sec = sec.replace("'05423 89104 33812 77192\\n44901 88321 00192 44381'", "_deviceFingerprint ?? 'Security keys are initializing…'")
-sec = sec.replace("'Demo Security Model • End-to-end encryption state verified with prekey identity.'", "'This is this device’s MLS identity fingerprint. Compare it with your contact through a trusted channel before marking the device verified.'")
-sec = sec.replace("'All conversations in Chaty utilize local end-to-end encryption simulation.'", "'Chaty messages use RFC 9420 MLS encryption. Device keys stay on this device and conversation membership changes advance the MLS epoch.'")
+'''
+if old_load in sec:
+    sec = sec.replace(old_load, new_load, 1)
+sec = sec.replace(
+    "'05423 89104 33812 77192\\n44901 88321 00192 44381'",
+    "_deviceFingerprint ?? 'Security keys are initializing…'",
+)
+sec = sec.replace(
+    "'Demo Security Model • End-to-end encryption state verified with prekey identity.'",
+    "'This is this device’s MLS identity fingerprint. Compare it through a trusted channel before trusting the device.'",
+)
+sec = sec.replace(
+    "'All conversations in Chaty utilize local end-to-end encryption simulation.'",
+    "'Chaty messages use RFC 9420 MLS encryption. Device keys stay on this device and membership changes advance the MLS epoch.'",
+)
 sec = sec.replace("title: 'Demo Security Model',", "title: 'MLS Device Security',")
-sec = sec.replace("subtitle: 'Double-ratchet session status: Active & Verified',", "subtitle: _deviceFingerprint == null\n                  ? 'Initializing encrypted device identity…'\n                  : 'RFC 9420 MLS device identity is active',")
-sec = sec.replace("subtitle: 'Simulate key fingerprints for security auditing',", "subtitle: 'Compare the real device fingerprint before trusting a device',")
-sec = sec.replace("const Text('Safety Number Verification')", "const Text('Device Fingerprint Verification')")
+sec = sec.replace(
+    "subtitle: 'Double-ratchet session status: Active & Verified',",
+    "subtitle: _deviceFingerprint == null\n"
+    "                  ? 'Initializing encrypted device identity…'\n"
+    "                  : 'RFC 9420 MLS device identity is active',",
+)
+sec = sec.replace(
+    "subtitle: 'Simulate key fingerprints for security auditing',",
+    "subtitle: 'Compare the real device fingerprint before trusting a device',",
+)
+sec = sec.replace(
+    "const Text('Safety Number Verification')",
+    "const Text('Device Fingerprint Verification')",
+)
 write(sec_path, sec)
 
-# 4) Unique default Chaty theme. Keep legacy ids readable for migration but
-# stop using/advertising WhatsApp as the app identity.
+
+# ---------------------------------------------------------------------------
+# 4. Chaty's own default visual identity.
+# ---------------------------------------------------------------------------
 theme_path = 'lib/ui/core/theme/theme_presets.dart'
 theme = read(theme_path)
 if 'static const ThemeConfig chatyAuroraLight' not in theme:
     marker = "  /// WhatsApp iOS (light) — the app's default identity. Authentic palette:"
     if marker not in theme:
         raise SystemExit('theme insertion marker missing')
-    aurora = """  /// Chaty's signature palette: indigo-violet base with cyan highlights.
-  /// The colors are intentionally independent from other messaging brands.
+    aurora = r'''  /// Chaty's signature palette: indigo-violet with cyan highlights.
   static const ThemeConfig chatyAuroraLight = ThemeConfig(
     id: 'chaty_aurora_light',
     name: 'Chaty Aurora',
@@ -236,7 +251,7 @@ if 'static const ThemeConfig chatyAuroraLight' not in theme:
     density: 1.0,
     fontScale: 1.0,
     bubbleStyle: BubbleStyleId.rounded,
-    deliveryTickStyle: DeliveryIconStyle.material,
+    deliveryTickStyle: DeliveryIconStyle.cirCheck,
     wallpaperId: 'none',
   );
 
@@ -261,121 +276,201 @@ if 'static const ThemeConfig chatyAuroraLight' not in theme:
     density: 1.0,
     fontScale: 1.0,
     bubbleStyle: BubbleStyleId.rounded,
-    deliveryTickStyle: DeliveryIconStyle.material,
+    deliveryTickStyle: DeliveryIconStyle.cirCheck,
     wallpaperId: 'none',
   );
 
-"""
-    theme = theme.replace(marker, aurora + "  /// Legacy green light palette retained only for persisted-theme migration.", 1)
-# remove WhatsApp labels from visible preset names/comments and set defaults
-theme = theme.replace("name: 'WhatsApp iOS'", "name: 'Legacy Green Light'")
-theme = theme.replace("name: 'WhatsApp iOS Dark'", "name: 'Legacy Green Dark'")
-theme = theme.replace('    whatsappIosLight,\n    whatsappIosDark,', '    chatyAuroraLight,\n    chatyAuroraDark,\n    whatsappIosLight,\n    whatsappIosDark,')
-theme = theme.replace('return brightness == Brightness.light ? whatsappIosLight : whatsappIosDark;', 'return brightness == Brightness.light ? chatyAuroraLight : chatyAuroraDark;')
+'''
+    theme = theme.replace(marker, aurora + '  /// Legacy green light palette retained for persisted-theme migration.\n', 1)
+if '    chatyAuroraLight,' not in theme:
+    theme = theme.replace(
+        '  static const List<ThemeConfig> all = <ThemeConfig>[\n',
+        '  static const List<ThemeConfig> all = <ThemeConfig>[\n'
+        '    chatyAuroraLight,\n    chatyAuroraDark,\n',
+        1,
+    )
+theme = theme.replace("name: 'WhatsApp iOS',", "name: 'Legacy Green Light',")
+theme = theme.replace("name: 'WhatsApp iOS Dark',", "name: 'Legacy Green Dark',")
+theme = theme.replace(
+    'return brightness == Brightness.light ? whatsappIosLight : whatsappIosDark;',
+    'return brightness == Brightness.light ? chatyAuroraLight : chatyAuroraDark;',
+)
 write(theme_path, theme)
 
-# 5) Rename user-visible WhatsApp labels in lib/ without touching enum/property
-# identifiers required by persistence.
-for path in (ROOT / 'lib').rglob('*.dart'):
-    text = path.read_text(encoding='utf-8')
-    updated = text
-    # Visible/common labels and comments. Identifiers like topWhatsAppBar and
-    # whatsappLb deliberately remain for backwards-compatible persistence.
-    updated = updated.replace("'WhatsApp Style'", "'Chaty Classic'")
-    updated = updated.replace("'WhatsApp iOS'", "'Chaty Classic'")
-    updated = updated.replace("'WhatsApp iOS Dark'", "'Chaty Classic Dark'")
-    updated = updated.replace("'Whatsapp LB'", "'Chaty Soft'")
-    updated = updated.replace('WHATSAPP-STYLE', 'CHATY CLASSIC')
-    updated = updated.replace('WhatsApp-style', 'Chaty classic')
-    updated = updated.replace('WhatsApp iOS', 'Chaty Classic')
-    updated = updated.replace('WhatsApp-iOS', 'Chaty Classic')
-    if updated != text:
-        path.write_text(updated, encoding='utf-8')
 
-# 6) Export signature components.
+# ---------------------------------------------------------------------------
+# 5. Remove third-party brand names from user-visible Chaty copy while keeping
+# persisted enum/setting identifiers unchanged for compatibility.
+# ---------------------------------------------------------------------------
+for dart_path in (ROOT / 'lib').rglob('*.dart'):
+    original = dart_path.read_text(encoding='utf-8')
+    updated = original
+    replacements = {
+        "'WhatsApp Style'": "'Chaty Classic'",
+        "'WhatsApp iOS'": "'Chaty Classic'",
+        "'WhatsApp iOS Dark'": "'Chaty Classic Dark'",
+        "'Whatsapp LB'": "'Chaty Soft'",
+        'WHATSAPP-STYLE': 'CHATY CLASSIC',
+        'WhatsApp-style': 'Chaty classic',
+        'WhatsApp iOS': 'Chaty Classic',
+        'WhatsApp-iOS': 'Chaty Classic',
+    }
+    for old, new in replacements.items():
+        updated = updated.replace(old, new)
+    if updated != original:
+        dart_path.write_text(updated, encoding='utf-8')
+
+
+# ---------------------------------------------------------------------------
+# 6. Export and wire signature components.
+# ---------------------------------------------------------------------------
 design_path = 'lib/ui/core/design_system/design_system.dart'
 design = read(design_path)
 if "export 'components/signature_components.dart';" not in design:
-    design = design.replace("export 'components/chaty_kit.dart';", "export 'components/chaty_kit.dart';\nexport 'components/signature_components.dart';")
+    design = design.replace(
+        "export 'components/chaty_kit.dart';",
+        "export 'components/chaty_kit.dart';\nexport 'components/signature_components.dart';",
+        1,
+    )
 write(design_path, design)
 
-# 7) Wire signature task card and composer treatment into the main chat.
 bubble_path = 'lib/features/messages/message_bubble.dart'
 bubble = read(bubble_path)
-if "../core/design_system/design_system.dart" not in bubble and "design_system/design_system.dart" not in bubble:
-    # determine existing import area conservatively
-    bubble = bubble.replace("import 'package:flutter/material.dart';", "import 'package:flutter/material.dart';\n\nimport '../../ui/core/design_system/design_system.dart';", 1)
-old_task = re.compile(r"                        if \(message\.type == MessageType\.taskCard\)\n                          InkWell\(.*?\n                          \),\n                        // Real consumer", re.S)
-m = old_task.search(bubble)
-if m:
-    replacement = """                        if (message.type == MessageType.taskCard)
+if "../../ui/core/design_system/design_system.dart" not in bubble:
+    bubble = bubble.replace(
+        "import 'package:flutter/material.dart';",
+        "import 'package:flutter/material.dart';\n\n"
+        "import '../../ui/core/design_system/design_system.dart';",
+        1,
+    )
+pattern = re.compile(
+    r"                        if \(message\.type == MessageType\.taskCard\)\n"
+    r"                          InkWell\(.*?\n"
+    r"                          \),\n"
+    r"                        // Real consumer",
+    re.S,
+)
+match = pattern.search(bubble)
+if match:
+    replacement = r'''                        if (message.type == MessageType.taskCard)
                           ChatyTaskCard(
                             title: message.text,
                             status: message.metadata['status']?.toString() ?? 'Open',
                             assignee: message.metadata['assignee_name']?.toString(),
                             onTap: onTaskTap,
                           ),
-                        // Real consumer"""
-    bubble = bubble[:m.start()] + replacement + bubble[m.end():]
+                        // Real consumer'''
+    bubble = bubble[:match.start()] + replacement + bubble[match.end():]
 write(bubble_path, bubble)
 
 chat_path = 'lib/features/chats/chat_detail_screen.dart'
 chat = read(chat_path)
-# Transform composer background and hint into signature mode, without changing
-# the proven send/record behavior.
-chat = chat.replace("hintText: 'Message…  /task or #reply',", "hintText: 'Message…  type / for commands',")
 chat = chat.replace(
-    "        Expanded(\n          child: TextField(",
-    "        Expanded(\n          child: ChatyComposerShell(\n            commandMode: widget.controller.text.trimLeft().startsWith('/'),\n            child: TextField(",
-    1,
+    "hintText: 'Message…  /task or #reply',",
+    "hintText: 'Message…  type / for commands',",
 )
-# close shell immediately after TextField in this specific composer region
-needle = "            ),\n          ),\n        ),\n        const SizedBox(width: 6),\n        ValueListenableBuilder<TextEditingValue>("
-if needle in chat:
-    chat = chat.replace(needle, "            ),\n          ),\n        ),\n        ),\n        const SizedBox(width: 6),\n        ValueListenableBuilder<TextEditingValue>(", 1)
+# Use a subtle Chaty shell without touching recording/send state machinery.
+composer_marker = """        Expanded(
+          child: TextField(
+            controller: widget.controller,"""
+composer_replacement = """        Expanded(
+          child: ChatyComposerShell(
+            commandMode: widget.controller.text.trimLeft().startsWith('/'),
+            child: TextField(
+              controller: widget.controller,"""
+if composer_marker in chat:
+    chat = chat.replace(composer_marker, composer_replacement, 1)
+    close_marker = """            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        ValueListenableBuilder<TextEditingValue>("""
+    if close_marker not in chat:
+        raise SystemExit('composer close marker missing')
+    chat = chat.replace(
+        close_marker,
+        """            ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        ValueListenableBuilder<TextEditingValue>(""",
+        1,
+    )
 write(chat_path, chat)
 
-# 8) Never show raw internal exception paths to users for attachment failures.
+
+# ---------------------------------------------------------------------------
+# 7. Replace raw internal errors with the Chaty Activity Island.
+# ---------------------------------------------------------------------------
 attach_path = 'lib/features/messages/chat_attachment_actions.dart'
 attach = read(attach_path)
-attach = attach.replace("_toast(context, 'Unable to send $type: $error');", "debugPrint('Chaty media send failed: $error');\n      _toast(context, 'Couldn’t send this item. Check the connection and try again.');")
-attach = attach.replace("_toast(context, 'Unable to send voice note: $error');", "debugPrint('Chaty voice send failed: $error');\n      _toast(context, 'Couldn’t send the voice note. Please try again.');")
-attach = attach.replace("_toast(context, 'Unable to share location: $error');", "debugPrint('Chaty location share failed: $error');\n      _toast(context, 'Couldn’t share the location. Check location permission and try again.');")
-attach = attach.replace("_toast(context, 'Unable to share contact: $error');", "debugPrint('Chaty contact share failed: $error');\n      _toast(context, 'Couldn’t share the contact. Please try again.');")
-attach = attach.replace("_toast(context, 'Unable to create poll: $error');", "debugPrint('Chaty poll creation failed: $error');\n      _toast(context, 'Couldn’t create the poll. Please try again.');")
 if "../../ui/core/design_system/design_system.dart" not in attach:
-    attach = attach.replace("import '../../ui/core/controllers/preferences_controller.dart';", "import '../../ui/core/controllers/preferences_controller.dart';\nimport '../../ui/core/design_system/design_system.dart';", 1)
-old_toast = """  static void _toast(BuildContext context, String message) {
+    attach = attach.replace(
+        "import '../../ui/core/controllers/preferences_controller.dart';",
+        "import '../../ui/core/controllers/preferences_controller.dart';\n"
+        "import '../../ui/core/design_system/design_system.dart';",
+        1,
+    )
+replacements = {
+    "_toast(context, 'Unable to send $type: $error');":
+        "debugPrint('Chaty media send failed: $error');\n"
+        "      _toast(context, 'Couldn’t send this item. Check the connection and try again.');",
+    "_toast(context, 'Unable to send voice note: $error');":
+        "debugPrint('Chaty voice send failed: $error');\n"
+        "      _toast(context, 'Couldn’t send the voice note. Please try again.');",
+    "_toast(context, 'Unable to share location: $error');":
+        "debugPrint('Chaty location share failed: $error');\n"
+        "      _toast(context, 'Couldn’t share the location. Check location permission and try again.');",
+    "_toast(context, 'Unable to share contact: $error');":
+        "debugPrint('Chaty contact share failed: $error');\n"
+        "      _toast(context, 'Couldn’t share the contact. Please try again.');",
+    "_toast(context, 'Unable to create poll: $error');":
+        "debugPrint('Chaty poll creation failed: $error');\n"
+        "      _toast(context, 'Couldn’t create the poll. Please try again.');",
+}
+for old, new in replacements.items():
+    attach = attach.replace(old, new)
+old_toast = r'''  static void _toast(BuildContext context, String message) {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
   }
-"""
-new_toast = """  static void _toast(BuildContext context, String message) {
+'''
+new_toast = r'''  static void _toast(BuildContext context, String message) {
     if (!context.mounted) return;
     ChatyActivityIsland.show(
       context,
-      icon: message.toLowerCase().contains('sent') ? Icons.done_rounded : Icons.info_outline_rounded,
+      icon: message.toLowerCase().contains('sent')
+          ? Icons.done_rounded
+          : Icons.info_outline_rounded,
       title: message,
     );
   }
-"""
+'''
 if old_toast in attach:
     attach = attach.replace(old_toast, new_toast, 1)
 write(attach_path, attach)
 
-# 9) Brand the main navigation comments/labels and make overflow/activity
-# styling derive from the new theme automatically.
+
+# ---------------------------------------------------------------------------
+# 8. Brand cleanup in root navigation source comments.
+# ---------------------------------------------------------------------------
 nav_path = 'lib/features/chats/main_navigation_shell.dart'
 nav = read(nav_path)
-nav = nav.replace('// 1. TOP WHATSAPP-STYLE GREEN TAB BAR (Image 1)', '// 1. TOP CHATY CLASSIC TAB BAR')
+nav = nav.replace(
+    '// 1. TOP WHATSAPP-STYLE GREEN TAB BAR (Image 1)',
+    '// 1. TOP CHATY CLASSIC TAB BAR',
+)
 write(nav_path, nav)
 
-# Contract check: no user-visible demo security or hard TURN startup error.
+
+# Hard invariants.
 checks = {
-    sec_path: ['MLS Device Security', 'RFC 9420 MLS device identity is active'],
+    mls_path: ['deviceFingerprint'],
     call_path: ['using direct ICE/STUN fallback', 'stun.cloudflare.com:3478'],
+    sec_path: ['MLS Device Security', 'RFC 9420 MLS device identity is active'],
     theme_path: ['chatyAuroraLight', 'chatyAuroraDark'],
     design_path: ['signature_components.dart'],
     attach_path: ['Couldn’t send this item'],
