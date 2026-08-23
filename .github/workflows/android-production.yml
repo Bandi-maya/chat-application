@@ -58,6 +58,7 @@ jobs:
           python3 tools/apply_unique_ux_round2.py
           python3 tools/apply_offline_first_system_ux.py
           python3 tools/apply_offline_first_phase4_compat.py
+          python3 tools/apply_secure_pending_send_ux.py
           python3 tools/apply_research_ui_ux_round3.py
           python3 tools/apply_call_notification_actions.py
           dart format \
@@ -72,6 +73,7 @@ jobs:
             lib/data/services/encrypted_message_outbox.dart \
             lib/data/services/local_snapshot_cache_service.dart \
             lib/data/services/mls_e2ee_service.dart \
+            lib/data/services/pending_secure_send_store.dart \
             lib/data/services/push_token_service.dart \
             lib/data/services/uploaded_attachment_guard.dart \
             lib/data/services/voice_note_service.dart \
@@ -100,6 +102,7 @@ jobs:
             test/encrypted_attachment_codec_test.dart \
             test/encrypted_message_outbox_test.dart \
             test/offline_first_contract_test.dart \
+            test/pending_secure_send_contract_test.dart \
             test/phase5_feature_contracts_test.dart \
             test/phase6_state_views_test.dart \
             test/root_navigation_policy_test.dart \
