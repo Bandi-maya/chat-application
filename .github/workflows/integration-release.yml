@@ -57,6 +57,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/apply_release_integration.py
+          python3 tools/apply_account_deletion_purge.py
           dart format \
             lib/data/repositories/chaty_data_store.dart \
             lib/data/services/backend_service.dart \
@@ -79,6 +80,7 @@ jobs:
             lib/features/settings/settings_root_screen.dart \
             lib/ui/core/design_system/components/state_views.dart \
             lib/ui/core/design_system/design_system.dart \
+            test/account_deletion_purge_contract_test.dart \
             test/encrypted_attachment_codec_test.dart \
             test/encrypted_message_outbox_test.dart \
             test/phase5_feature_contracts_test.dart \
@@ -116,6 +118,9 @@ jobs:
 
       - name: Test encrypted offline outbox
         run: flutter test test/encrypted_message_outbox_test.dart
+
+      - name: Test account-deletion local purge contract
+        run: flutter test test/account_deletion_purge_contract_test.dart
 
       - name: Test navigation and feature contracts
         run: flutter test test/root_navigation_policy_test.dart test/phase5_feature_contracts_test.dart
