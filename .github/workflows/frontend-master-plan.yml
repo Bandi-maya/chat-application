@@ -70,6 +70,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          cp pubspec.yaml "$RUNNER_TEMP/pubspec.yaml"
+          if [ -f pubspec.lock ]; then cp pubspec.lock "$RUNNER_TEMP/pubspec.lock"; fi
+          # Frontend lanes do not own the production OpenMLS dependency patch.
+          # Pin the bridge only inside this runner so the native probe can run;
+          # the Android integration gate remains authoritative for production.
+          flutter pub add --dev flutter_rust_bridge:2.12.0
           mkdir -p tool
           cat > tool/openmls_ci_probe.dart <<'DART'
           import 'package:openmls/openmls.dart';
@@ -80,6 +86,8 @@ jobs:
           DART
           dart run tool/openmls_ci_probe.dart
           rm -f tool/openmls_ci_probe.dart
+          mv "$RUNNER_TEMP/pubspec.yaml" pubspec.yaml
+          if [ -f "$RUNNER_TEMP/pubspec.lock" ]; then mv "$RUNNER_TEMP/pubspec.lock" pubspec.lock; fi
 
       - name: Frontend contract tests
         run: flutter test test/frontend_master_plan_contract_test.dart
