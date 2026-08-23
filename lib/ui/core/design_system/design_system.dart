@@ -5,6 +5,7 @@ export 'components/signature_components.dart';
 export 'components/call_activity_capsule.dart';
 export 'components/messaging_components.dart';
 export 'components/social_components.dart';
+export 'components/settings_components.dart';
 export 'chaty_motion.dart';
 export 'chaty_haptics.dart';
 export 'chaty_adaptive.dart';
