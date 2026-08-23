@@ -22,3 +22,9 @@ Avoid feature redesign. Phase 8 is the integration/release gate, not a place to 
 4. All Phase 1–7 PRs are green and conflict-reviewed before integration.
 5. `flutter analyze`, full tests, security/replay checks, and release APK build pass on the integrated head.
 6. Final merge to `main` is serialized with expected-head SHA protection and only after the integrated branch is green.
+
+## Current verification notes
+- Production presentation code now uses `ChatyDataStore`; unauthenticated guest fabrication is rejected.
+- The no-production-mocks guard now rejects QA/demo call execution paths instead of permitting them behind `kDebugMode`.
+- A deterministic Phase-8 source patch removes `startMockCallForQA`, QA call IDs, and the Local Media QA UI; the workflow commits that cleanup only after analyzer, full tests, migration checks, no-mock scan, and release APK verification pass.
+- Phase 8 still cannot reach 100% until Phases 1–7 are individually accepted and the integrated head passes the same gates after conflict resolution.
