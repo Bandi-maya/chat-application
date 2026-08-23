@@ -57,6 +57,7 @@ jobs:
           python3 tools/apply_signature_followups.py
           python3 tools/apply_unique_ux_round2.py
           python3 tools/apply_offline_first_system_ux.py
+          python3 tools/apply_offline_first_phase4_compat.py
           dart format \
             lib/main.dart \
             lib/data/repositories/chaty_data_store.dart \
