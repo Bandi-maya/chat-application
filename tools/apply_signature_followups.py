@@ -42,6 +42,85 @@ text = text.replace(
             },""",
     1,
 )
+# Never expose Supabase/native exception strings in the chat UI.
+old_call_error = """    } catch (error) {
+      if (!mounted) return;
+      final reason = error
+          .toString()
+          .replaceFirst('StateError: ', '')
+          .replaceFirst('Exception: ', '');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Unable to start ${isVideo ? 'video' : 'voice'} call: $reason',
+          ),
+        ),
+      );
+    }
+"""
+new_call_error = """    } catch (error, stackTrace) {
+      debugPrint('Chaty call start failed: $error\\n$stackTrace');
+      if (!mounted) return;
+      ChatyActivityIsland.show(
+        context,
+        icon: Icons.call_end_rounded,
+        title: 'Couldn’t start the ${isVideo ? 'video' : 'voice'} call',
+        subtitle: 'Check your connection and try again.',
+      );
+    }
+"""
+if old_call_error in text:
+    text = text.replace(old_call_error, new_call_error, 1)
+# In-chat avatar now uses the same live presence language as home.
+old_header_avatar = """              if (showHeaderAvatar)
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    AppAvatar(
+                      initials:
+                          conversation.avatarInitials ??
+                          conversation.title.characters
+                              .take(2)
+                              .toString()
+                              .toUpperCase(),
+                      colorHex: conversation.avatarColorHex ?? '0xFF6366F1',
+                      size: 38,
+                    ),
+                    if (conversation.type == ConversationType.direct &&
+                        isOnline)
+                      Positioned(
+                        right: -1,
+                        bottom: -1,
+                        child: ChatyOnlineDot(
+                          active: true,
+                          avatarSize: 38,
+                          color: theme.successColor,
+                          ringColor: theme.surfaceColor,
+                        ),
+                      ),
+                  ],
+                ),
+"""
+new_header_avatar = """              if (showHeaderAvatar)
+                ChatyPresenceAvatar(
+                  size: 40,
+                  online: conversation.type == ConversationType.direct && isOnline,
+                  typing: remoteTyping,
+                  recording: remoteRecording,
+                  child: AppAvatar(
+                    initials:
+                        conversation.avatarInitials ??
+                        conversation.title.characters
+                            .take(2)
+                            .toString()
+                            .toUpperCase(),
+                    colorHex: conversation.avatarColorHex ?? '0xFF6366F1',
+                    size: 38,
+                  ),
+                ),
+"""
+if old_header_avatar in text:
+    text = text.replace(old_header_avatar, new_header_avatar, 1)
 write(path, text)
 
 # Runtime device fingerprint cannot be rendered in a const Text.
