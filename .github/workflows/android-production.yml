@@ -139,9 +139,9 @@ jobs:
           SUPABASE_PROJECT_REF: dntnxeanubswyswahdnj
         run: bash tools/check_supabase_auth_security.sh
 
-      - name: Build installable test APK
+      - name: Build installable ARM64 test APK
         run: >-
-          flutter build apk --debug --no-pub
+          flutter build apk --debug --no-pub --target-platform android-arm64
           --dart-define=SUPABASE_URL=https://dntnxeanubswyswahdnj.supabase.co
           --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_gFpVYJctaDkRRgttvnUl-A_TKu81hFF
 
@@ -151,17 +151,17 @@ jobs:
           set -euo pipefail
           APK=build/app/outputs/flutter-apk/app-debug.apk
           test -s "$APK"
-          cp "$APK" Chaty-test.apk
-          unzip -t Chaty-test.apk >/dev/null
-          sha256sum Chaty-test.apk | tee Chaty-test.apk.sha256
-          ls -lh Chaty-test.apk
+          cp "$APK" Chaty-test-arm64.apk
+          unzip -t Chaty-test-arm64.apk >/dev/null
+          sha256sum Chaty-test-arm64.apk | tee Chaty-test-arm64.apk.sha256
+          ls -lh Chaty-test-arm64.apk
 
       - name: Upload test APK
         uses: actions/upload-artifact@v4
         with:
-          name: Chaty-Test-APK
+          name: Chaty-Test-APK-ARM64
           path: |
-            Chaty-test.apk
-            Chaty-test.apk.sha256
+            Chaty-test-arm64.apk
+            Chaty-test-arm64.apk.sha256
           if-no-files-found: error
           retention-days: 14
