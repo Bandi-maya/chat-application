@@ -19,8 +19,6 @@ jobs:
   verify-and-build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    env:
-      CHATY_ALLOW_CI_DEBUG_SIGNING: 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -141,29 +139,29 @@ jobs:
           SUPABASE_PROJECT_REF: dntnxeanubswyswahdnj
         run: bash tools/check_supabase_auth_security.sh
 
-      - name: Build release-mode verification APK
+      - name: Build installable test APK
         run: >-
-          flutter build apk --release --no-pub
+          flutter build apk --debug --no-pub
           --dart-define=SUPABASE_URL=https://dntnxeanubswyswahdnj.supabase.co
           --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_gFpVYJctaDkRRgttvnUl-A_TKu81hFF
 
-      - name: Verify APK archive and hash
+      - name: Verify test APK archive and hash
         shell: bash
         run: |
           set -euo pipefail
-          APK=build/app/outputs/flutter-apk/app-release.apk
+          APK=build/app/outputs/flutter-apk/app-debug.apk
           test -s "$APK"
-          cp "$APK" Chaty-verification.apk
-          unzip -t Chaty-verification.apk >/dev/null
-          sha256sum Chaty-verification.apk | tee Chaty-verification.apk.sha256
-          ls -lh Chaty-verification.apk
+          cp "$APK" Chaty-test.apk
+          unzip -t Chaty-test.apk >/dev/null
+          sha256sum Chaty-test.apk | tee Chaty-test.apk.sha256
+          ls -lh Chaty-test.apk
 
-      - name: Upload verification APK
+      - name: Upload test APK
         uses: actions/upload-artifact@v4
         with:
-          name: Chaty-Verification-APK
+          name: Chaty-Test-APK
           path: |
-            Chaty-verification.apk
-            Chaty-verification.apk.sha256
+            Chaty-test.apk
+            Chaty-test.apk.sha256
           if-no-files-found: error
           retention-days: 14
