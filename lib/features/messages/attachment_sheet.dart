@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../ui/core/design_system/design_system.dart';
 
@@ -23,150 +24,211 @@ class AttachmentSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final actions = <_OrbitAction>[
+      _OrbitAction(
+        Icons.photo_library_rounded,
+        'Gallery',
+        'Photos',
+        colors.accent,
+        () => onMediaRequested('image'),
+      ),
+      _OrbitAction(
+        Icons.videocam_rounded,
+        'Video',
+        'Clips',
+        colors.accent,
+        () => onMediaRequested('video'),
+      ),
+      _OrbitAction(
+        Icons.insert_drive_file_rounded,
+        'Document',
+        'Files',
+        colors.primary,
+        () => onMediaRequested('document'),
+      ),
+      _OrbitAction(
+        Icons.graphic_eq_rounded,
+        'Audio',
+        'Sound',
+        colors.warning,
+        () => onMediaRequested('audio'),
+      ),
+      _OrbitAction(
+        Icons.location_on_rounded,
+        'Location',
+        'Place',
+        colors.success,
+        onLocationRequested,
+      ),
+      _OrbitAction(
+        Icons.person_rounded,
+        'Contact',
+        'Person',
+        colors.info,
+        onContactRequested,
+      ),
+      _OrbitAction(
+        Icons.poll_rounded,
+        'Poll',
+        'Ask',
+        colors.primary,
+        onPollRequested,
+      ),
+      _OrbitAction(
+        Icons.task_alt_rounded,
+        'Task',
+        'Assign',
+        colors.error,
+        onTaskOption,
+      ),
+    ];
 
     return Container(
       padding: const EdgeInsets.fromLTRB(
+        ChatySpacing.base,
+        ChatySpacing.sm,
+        ChatySpacing.base,
         ChatySpacing.lg,
-        ChatySpacing.md,
-        ChatySpacing.lg,
-        ChatySpacing.xl,
       ),
       decoration: BoxDecoration(
         color: colors.surface,
         borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(ChatyRadius.xl),
+          top: Radius.circular(30),
         ),
       ),
       child: SafeArea(
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              width: 38,
-              height: 4.5,
-              decoration: BoxDecoration(
-                color: colors.foregroundSecondary.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(ChatyRadius.full),
+            Center(
+              child: Container(
+                width: 38,
+                height: 4.5,
+                decoration: BoxDecoration(
+                  color: colors.foregroundSecondary.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(ChatyRadius.full),
+                ),
               ),
-            ),
-            const SizedBox(height: ChatySpacing.lg),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _option(
-                  context: context,
-                  icon: Icons.photo_library_rounded,
-                  label: 'Gallery',
-                  color: colors.accent,
-                  onTap: () =>
-                      _closeAnd(context, () => onMediaRequested('image')),
-                ),
-                _option(
-                  context: context,
-                  icon: Icons.videocam_rounded,
-                  label: 'Video',
-                  color: colors.accent,
-                  onTap: () =>
-                      _closeAnd(context, () => onMediaRequested('video')),
-                ),
-                _option(
-                  context: context,
-                  icon: Icons.insert_drive_file_rounded,
-                  label: 'Document',
-                  color: colors.primary,
-                  onTap: () =>
-                      _closeAnd(context, () => onMediaRequested('document')),
-                ),
-                _option(
-                  context: context,
-                  icon: Icons.headphones_rounded,
-                  label: 'Audio',
-                  color: colors.warning,
-                  onTap: () =>
-                      _closeAnd(context, () => onMediaRequested('audio')),
-                ),
-              ],
             ),
             const SizedBox(height: ChatySpacing.base),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _option(
-                  context: context,
-                  icon: Icons.location_on_rounded,
-                  label: 'Location',
-                  color: colors.success,
-                  onTap: () => _closeAnd(context, onLocationRequested),
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: colors.primary.withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    Icons.auto_awesome_rounded,
+                    color: colors.primary,
+                    size: 21,
+                  ),
                 ),
-                _option(
-                  context: context,
-                  icon: Icons.person_rounded,
-                  label: 'Contact',
-                  color: colors.info,
-                  onTap: () => _closeAnd(context, onContactRequested),
+                const SizedBox(width: 11),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Send something',
+                        style: TextStyle(
+                          color: colors.foreground,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Pick an action — Chaty secures media before upload.',
+                        style: ChatyTypography.caption(
+                          colors.foregroundSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                _option(
-                  context: context,
-                  icon: Icons.poll_rounded,
-                  label: 'Poll',
-                  color: colors.primary,
-                  onTap: () => _closeAnd(context, onPollRequested),
-                ),
-                _option(
-                  context: context,
-                  icon: Icons.task_alt_rounded,
-                  label: 'Task',
-                  color: colors.error,
-                  onTap: () => _closeAnd(context, onTaskOption),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colors.success.withValues(alpha: .10),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.lock_rounded,
+                        size: 13,
+                        color: colors.success,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Secure',
+                        style: TextStyle(
+                          color: colors.success,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: ChatySpacing.lg),
-            Text(
-              'Files and attachments are end-to-end encrypted before storage.',
-              textAlign: TextAlign.center,
-              style: ChatyTypography.caption(colors.foregroundSecondary),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final itemWidth = constraints.maxWidth >= 420
+                    ? (constraints.maxWidth - 30) / 4
+                    : (constraints.maxWidth - 20) / 3;
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 12,
+                  children: actions
+                      .map(
+                        (action) => SizedBox(
+                          width: itemWidth,
+                          child: _OrbitTile(
+                            action: action,
+                            onTap: () => _closeAnd(context, action.onTap),
+                          ),
+                        ),
+                      )
+                      .toList(growable: false),
+                );
+              },
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _option({
-    required BuildContext context,
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    final colors = context.colors;
-    return InkWell(
-      borderRadius: BorderRadius.circular(ChatyRadius.md),
-      onTap: onTap,
-      child: SizedBox(
-        width: 72,
-        child: Column(
-          children: [
+            const SizedBox(height: ChatySpacing.base),
             Container(
-              width: 52,
-              height: 52,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(ChatyRadius.md),
+                color: colors.surfaceSecondary,
+                borderRadius: BorderRadius.circular(16),
               ),
-              child: Icon(icon, color: color, size: 24),
-            ),
-            const SizedBox(height: ChatySpacing.xs),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: colors.foreground,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.shield_outlined,
+                    size: 17,
+                    color: colors.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Attachments are encrypted before they leave this device.',
+                      style: ChatyTypography.caption(
+                        colors.foregroundSecondary,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -176,7 +238,91 @@ class AttachmentSheet extends StatelessWidget {
   }
 
   void _closeAnd(BuildContext context, VoidCallback action) {
+    HapticFeedback.selectionClick();
     Navigator.of(context).pop();
     WidgetsBinding.instance.addPostFrameCallback((_) => action());
+  }
+}
+
+class _OrbitAction {
+  const _OrbitAction(
+    this.icon,
+    this.label,
+    this.hint,
+    this.color,
+    this.onTap,
+  );
+
+  final IconData icon;
+  final String label;
+  final String hint;
+  final Color color;
+  final VoidCallback onTap;
+}
+
+class _OrbitTile extends StatelessWidget {
+  const _OrbitTile({required this.action, required this.onTap});
+
+  final _OrbitAction action;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          decoration: BoxDecoration(
+            color: Color.alphaBlend(
+              action.color.withValues(alpha: .055),
+              colors.surfaceSecondary,
+            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: action.color.withValues(alpha: .16),
+            ),
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: action.color.withValues(alpha: .13),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(action.icon, color: action.color, size: 23),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                action.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: colors.foreground,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                action.hint,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: colors.foregroundSecondary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
