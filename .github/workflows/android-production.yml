@@ -58,10 +58,13 @@ jobs:
           python3 tools/apply_unique_ux_round2.py
           python3 tools/apply_offline_first_system_ux.py
           python3 tools/apply_offline_first_phase4_compat.py
+          python3 tools/apply_research_ui_ux_round3.py
+          python3 tools/apply_call_notification_actions.py
           dart format \
             lib/main.dart \
             lib/data/repositories/chaty_data_store.dart \
             lib/data/services/backend_service.dart \
+            lib/data/services/call_foreground_service.dart \
             lib/data/services/call_history_service.dart \
             lib/data/services/call_signaling_service.dart \
             lib/data/services/chat_media_service.dart \
@@ -86,6 +89,8 @@ jobs:
             lib/features/search/global_search_screen.dart \
             lib/features/settings/security/security_center_screen.dart \
             lib/features/settings/settings_root_screen.dart \
+            lib/features/updates/updates_screen.dart \
+            lib/ui/core/design_system/components/call_activity_capsule.dart \
             lib/ui/core/design_system/components/signature_components.dart \
             lib/ui/core/design_system/components/state_views.dart \
             lib/ui/core/design_system/design_system.dart \
