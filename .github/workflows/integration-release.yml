@@ -39,7 +39,9 @@ jobs:
           cache: true
 
       - name: Fetch isolated phase heads
-        if: github.event_name == 'push' && github.ref == 'refs/heads/integration/phases-1-8' && github.actor != 'github-actions[bot]'
+        if: >-
+          (github.event_name == 'push' && github.ref == 'refs/heads/integration/phases-1-8' && github.actor != 'github-actions[bot]') ||
+          (github.event_name == 'pull_request' && github.head_ref == 'integration/phases-1-8')
         shell: bash
         run: |
           set -euo pipefail
@@ -52,7 +54,9 @@ jobs:
             '+refs/heads/phase-7-platform-security:refs/remotes/origin/phase-7-platform-security'
 
       - name: Apply verified phase integration
-        if: github.event_name == 'push' && github.ref == 'refs/heads/integration/phases-1-8' && github.actor != 'github-actions[bot]'
+        if: >-
+          (github.event_name == 'push' && github.ref == 'refs/heads/integration/phases-1-8' && github.actor != 'github-actions[bot]') ||
+          (github.event_name == 'pull_request' && github.head_ref == 'integration/phases-1-8')
         shell: bash
         run: |
           set -euo pipefail
