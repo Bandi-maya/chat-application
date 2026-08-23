@@ -42,6 +42,9 @@ jobs:
           github.actor != 'github-actions[bot]'
         run: python3 tools/apply_frontend_master_plan.py
 
+      - name: Normalize shared frontend namespaces
+        run: python3 tools/apply_frontend_namespace_cleanup.py
+
       - name: Format frontend implementation
         run: >-
           dart format
