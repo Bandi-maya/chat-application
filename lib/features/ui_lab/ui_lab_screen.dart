@@ -1,7 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../ui/core/design_system/design_system.dart';
+import '../../ui/core/design_system/component_state.dart';
+import '../../ui/core/design_system/components/messaging_components.dart';
+import '../../ui/core/design_system/components/settings_components.dart';
+import '../../ui/core/design_system/components/signature_components.dart';
+import '../../ui/core/design_system/components/social_components.dart';
 import 'ui_lab_models.dart';
 import 'ui_lab_repository.dart';
 
@@ -100,7 +104,10 @@ class _UiLabScreenState extends State<UiLabScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(item.title, style: Theme.of(context).textTheme.titleLarge),
+                    Text(
+                      item.title,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
                     const SizedBox(height: 12),
                     ChatyActionDock(
                       actions: [
@@ -212,7 +219,7 @@ class _UiLabScreenState extends State<UiLabScreen> {
     final state = switch (_scenario) {
       UiLabScenario.offline => ChatyComponentState.offline,
       UiLabScenario.uploading => ChatyComponentState.uploading,
-      UiLabScenario.error || UiLabScenario.failed => ChatyComponentState.failed,
+      UiLabScenario.error || UiLabScenario.failed => ChatyComponentState.error,
       UiLabScenario.locked => ChatyComponentState.locked,
       _ => ChatyComponentState.ready,
     };
