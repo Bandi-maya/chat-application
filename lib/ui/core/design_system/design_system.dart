@@ -3,6 +3,7 @@ export 'components/app_components.dart';
 export 'components/chaty_kit.dart';
 export 'components/signature_components.dart';
 export 'components/call_activity_capsule.dart';
+export 'components/global_activity_host.dart';
 export 'components/messaging_components.dart';
 export 'components/media_draft_tray.dart';
 export 'components/social_components.dart';
