@@ -44,12 +44,12 @@ jobs:
         run: |
           set -euo pipefail
           git fetch origin \
-            phase-2-encrypted-attachments \
-            phase-3-calls-transport \
-            phase-4-realtime-offline \
-            phase-5-feature-correctness \
-            phase-6-ui-ux-consistency \
-            phase-7-platform-security
+            '+refs/heads/phase-2-encrypted-attachments:refs/remotes/origin/phase-2-encrypted-attachments' \
+            '+refs/heads/phase-3-calls-transport:refs/remotes/origin/phase-3-calls-transport' \
+            '+refs/heads/phase-4-realtime-offline:refs/remotes/origin/phase-4-realtime-offline' \
+            '+refs/heads/phase-5-feature-correctness:refs/remotes/origin/phase-5-feature-correctness' \
+            '+refs/heads/phase-6-ui-ux-consistency:refs/remotes/origin/phase-6-ui-ux-consistency' \
+            '+refs/heads/phase-7-platform-security:refs/remotes/origin/phase-7-platform-security'
 
       - name: Apply verified phase integration
         if: github.event_name == 'push' && github.ref == 'refs/heads/integration/phases-1-8' && github.actor != 'github-actions[bot]'
@@ -138,12 +138,12 @@ jobs:
       - name: Reject production mocks/placeholders
         run: bash tools/check_no_production_mocks.sh
 
-      - name: Hosted Auth security gate when management credential is available
+      - name: Harden and verify hosted Auth when management credential is available
         if: ${{ secrets.SUPABASE_ACCESS_TOKEN != '' }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: dntnxeanubswyswahdnj
-        run: bash tools/check_supabase_auth_security.sh
+        run: bash tools/harden_supabase_auth.sh
 
       - name: Build release-mode verification APK
         run: >-
@@ -183,9 +183,6 @@ jobs:
       CHATY_ANDROID_STORE_PASSWORD: ${{ secrets.CHATY_ANDROID_STORE_PASSWORD }}
       CHATY_ANDROID_KEY_ALIAS: ${{ secrets.CHATY_ANDROID_KEY_ALIAS }}
       CHATY_ANDROID_KEY_PASSWORD: ${{ secrets.CHATY_ANDROID_KEY_PASSWORD }}
-      CHATY_TURN_URL: ${{ secrets.CHATY_TURN_URL }}
-      CHATY_TURN_USERNAME: ${{ secrets.CHATY_TURN_USERNAME }}
-      CHATY_TURN_CREDENTIAL: ${{ secrets.CHATY_TURN_CREDENTIAL }}
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_PROJECT_REF: dntnxeanubswyswahdnj
     steps:
@@ -211,9 +208,6 @@ jobs:
           test -n "$CHATY_ANDROID_STORE_PASSWORD"
           test -n "$CHATY_ANDROID_KEY_ALIAS"
           test -n "$CHATY_ANDROID_KEY_PASSWORD"
-          test -n "$CHATY_TURN_URL"
-          test -n "$CHATY_TURN_USERNAME"
-          test -n "$CHATY_TURN_CREDENTIAL"
           test -n "$SUPABASE_ACCESS_TOKEN"
           KEYSTORE="$RUNNER_TEMP/chaty-production.jks"
           printf '%s' "$CHATY_ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
@@ -225,16 +219,14 @@ jobs:
       - run: flutter test
       - run: bash tools/check_migration_versions.sh
       - run: bash tools/check_no_production_mocks.sh
-      - run: bash tools/check_supabase_auth_security.sh
+      - name: Harden and verify hosted Auth
+        run: bash tools/harden_supabase_auth.sh
 
       - name: Build signed production APK
         run: >-
           flutter build apk --release --no-pub
           --dart-define=SUPABASE_URL=${SUPABASE_URL}
           --dart-define=SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}
-          --dart-define=CHATY_TURN_URL=${CHATY_TURN_URL}
-          --dart-define=CHATY_TURN_USERNAME=${CHATY_TURN_USERNAME}
-          --dart-define=CHATY_TURN_CREDENTIAL=${CHATY_TURN_CREDENTIAL}
 
       - name: Verify production APK signature and hash
         shell: bash
