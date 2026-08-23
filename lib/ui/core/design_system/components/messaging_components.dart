@@ -40,7 +40,8 @@ class ChatyConversationTile extends StatelessWidget {
     final hasUnread = unreadCount > 0;
     return Semantics(
       button: true,
-      label: '$title. $preview. $timeLabel${hasUnread ? '. $unreadCount unread' : ''}',
+      label:
+          '$title. $preview. $timeLabel${hasUnread ? '. $unreadCount unread' : ''}',
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress == null
@@ -260,7 +261,10 @@ class ChatyReplyPreview extends StatelessWidget {
               label: 'Cancel reply',
               child: IconButton(
                 tooltip: 'Cancel reply',
-                constraints: const BoxConstraints.tightFor(width: 42, height: 42),
+                constraints: const BoxConstraints.tightFor(
+                  width: 42,
+                  height: 42,
+                ),
                 onPressed: onDismiss,
                 icon: const Icon(Icons.close_rounded, size: 19),
               ),
@@ -292,7 +296,10 @@ class ChatyMessageMeta extends StatelessWidget {
         if (edited)
           Text(
             'edited · ',
-            style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10.5),
+            style: TextStyle(
+              color: scheme.onSurfaceVariant,
+              fontSize: 10.5,
+            ),
           ),
         Text(
           timeLabel,
@@ -357,7 +364,10 @@ class ChatyPinnedRail extends StatelessWidget {
                       label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: scheme.onSurface, fontSize: 12.5),
+                      style: TextStyle(
+                        color: scheme.onSurface,
+                        fontSize: 12.5,
+                      ),
                     ),
                   ],
                 ),
@@ -411,7 +421,9 @@ class ChatyPollCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .65)),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: .65),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -575,8 +587,7 @@ class ChatyFileCard extends StatelessWidget {
     return switch (state) {
       ChatyComponentState.uploading => '$sizeLabel · uploading',
       ChatyComponentState.offline => '$sizeLabel · queued offline',
-      ChatyComponentState.error || ChatyComponentState.failed =>
-        '$sizeLabel · tap to retry',
+      ChatyComponentState.error => '$sizeLabel · tap to retry',
       ChatyComponentState.locked => '$sizeLabel · protected',
       _ => sizeLabel,
     };
@@ -586,8 +597,7 @@ class ChatyFileCard extends StatelessWidget {
     return switch (state) {
       ChatyComponentState.uploading => Icons.cloud_upload_rounded,
       ChatyComponentState.offline => Icons.schedule_send_rounded,
-      ChatyComponentState.error || ChatyComponentState.failed =>
-        Icons.refresh_rounded,
+      ChatyComponentState.error => Icons.refresh_rounded,
       ChatyComponentState.locked => Icons.lock_rounded,
       _ => Icons.open_in_new_rounded,
     };
@@ -633,7 +643,8 @@ class ChatyLocationCard extends StatelessWidget {
             children: [
               SizedBox(
                 height: 118,
-                child: preview ??
+                child:
+                    preview ??
                     DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
@@ -898,11 +909,13 @@ class _DeliveryGlyph extends StatelessWidget {
       ChatyDeliveryState.queued =>
         (Icons.schedule_send_rounded, scheme.onSurfaceVariant),
       ChatyDeliveryState.sending => (Icons.sync_rounded, scheme.primary),
-      ChatyDeliveryState.sent => (Icons.check_rounded, scheme.onSurfaceVariant),
+      ChatyDeliveryState.sent =>
+        (Icons.check_rounded, scheme.onSurfaceVariant),
       ChatyDeliveryState.delivered =>
         (Icons.done_all_rounded, scheme.onSurfaceVariant),
       ChatyDeliveryState.read => (Icons.done_all_rounded, scheme.primary),
-      ChatyDeliveryState.failed => (Icons.error_outline_rounded, scheme.error),
+      ChatyDeliveryState.failed =>
+        (Icons.error_outline_rounded, scheme.error),
     };
     return Icon(icon, size: 15, color: color);
   }
