@@ -127,16 +127,15 @@ for needle in (
 path.write_text(text, encoding='utf-8')
 print('Profile media cache UX applied.')
 
-# This is intentionally the final legacy UX patch in the integration chain.
-# Normalize older startup/lifecycle patches, apply the canonical frontend plan,
-# restore barrel exports, then remove namespace collisions introduced by the
-# new preview primitives. Every CI reconciliation therefore analyzes the same
-# final frontend tree.
+# Canonical integration order: legacy/device compatibility first, then the
+# frontend architecture, namespace reconciliation, and production P4-P7
+# component wiring. Every authoritative CI run analyzes this final tree.
 for tool in (
     'prepare_frontend_master_input.py',
     'apply_frontend_master_plan.py',
     'restore_frontend_design_exports.py',
     'apply_frontend_namespace_cleanup.py',
+    'apply_frontend_p4_p7.py',
 ):
     script = ROOT / 'tools' / tool
     if script.exists():
