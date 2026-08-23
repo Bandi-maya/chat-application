@@ -62,12 +62,22 @@ jobs:
           python3 tools/apply_research_ui_ux_round3.py
           python3 tools/apply_call_notification_actions.py
           python3 tools/apply_profile_cache_ux.py
+          python3 tools/prepare_frontend_master_input.py
+          python3 tools/apply_frontend_master_plan.py
+          python3 tools/restore_frontend_design_exports.py
+          python3 tools/apply_frontend_namespace_cleanup.py
+          python3 tools/prepare_frontend_p4_p7_input.py
+          python3 tools/apply_frontend_p4_p7.py
+          python3 tools/post_frontend_p4_imports.py
+          python3 tools/apply_frontend_p8_p10.py
+          python3 tools/apply_frontend_p11_p14.py
           dart format \
             lib/main.dart \
             lib/data/repositories/chaty_data_store.dart \
             lib/data/services/backend_service.dart \
             lib/data/services/call_foreground_service.dart \
             lib/data/services/call_history_service.dart \
+            lib/data/services/call_lifecycle_coordinator.dart \
             lib/data/services/call_signaling_service.dart \
             lib/data/services/chat_media_service.dart \
             lib/data/services/encrypted_attachment_codec.dart \
@@ -80,6 +90,7 @@ jobs:
             lib/data/services/voice_note_service.dart \
             lib/domain/models/chat_message.dart \
             lib/features/chats/chat_detail_screen.dart \
+            lib/features/chats/chats_home_screen.dart \
             lib/features/chats/contact_info_screen.dart \
             lib/features/chats/main_navigation_shell.dart \
             lib/features/chats/root_navigation_policy.dart \
@@ -94,8 +105,18 @@ jobs:
             lib/features/settings/security/security_center_screen.dart \
             lib/features/settings/settings_root_screen.dart \
             lib/features/updates/updates_screen.dart \
+            lib/features/ui_lab/ui_lab_models.dart \
+            lib/features/ui_lab/ui_lab_repository.dart \
+            lib/features/ui_lab/ui_lab_screen.dart \
+            lib/ui/core/design_system/chaty_adaptive.dart \
+            lib/ui/core/design_system/chaty_haptics.dart \
+            lib/ui/core/design_system/chaty_motion.dart \
+            lib/ui/core/design_system/component_state.dart \
             lib/ui/core/design_system/components/call_activity_capsule.dart \
+            lib/ui/core/design_system/components/messaging_components.dart \
+            lib/ui/core/design_system/components/settings_components.dart \
             lib/ui/core/design_system/components/signature_components.dart \
+            lib/ui/core/design_system/components/social_components.dart \
             lib/ui/core/design_system/components/state_views.dart \
             lib/ui/core/design_system/design_system.dart \
             lib/ui/core/theme/theme_controller.dart \
@@ -104,6 +125,8 @@ jobs:
             test/account_deletion_purge_contract_test.dart \
             test/encrypted_attachment_codec_test.dart \
             test/encrypted_message_outbox_test.dart \
+            test/frontend_master_contract_test.dart \
+            test/frontend_master_plan_contract_test.dart \
             test/offline_first_contract_test.dart \
             test/pending_secure_send_contract_test.dart \
             test/phase5_feature_contracts_test.dart \
