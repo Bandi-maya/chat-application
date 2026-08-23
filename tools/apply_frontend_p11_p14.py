@@ -24,29 +24,33 @@ text = text.replace('.clamp(0.8, 1.6)', '.clamp(0.8, 2.0)')
 write(path, text)
 
 # Add practical adaptive helpers used by phone/tablet/foldable surfaces.
+# IMPORTANT: this script is executed repeatedly by CI reconciliation. Keep each
+# helper independently idempotent so previously promoted lane code cannot gain
+# duplicate class members on the next integration run.
 path = 'lib/ui/core/design_system/chaty_adaptive.dart'
 text = read(path)
-if 'static bool usesTwoPane' not in text:
-    text = text.replace(
-        '''  static bool prefersRail(BuildContext context) {
-    final value = of(context);
-    return value == ChatyWindowClass.expanded ||
-        value == ChatyWindowClass.large;
-  }
-''',
-        '''  static bool prefersRail(BuildContext context) {
-    final value = of(context);
-    return value == ChatyWindowClass.expanded ||
-        value == ChatyWindowClass.large;
-  }
 
+if 'static bool usesTwoPane' not in text:
+    marker = '''  static bool prefersRail(BuildContext context) {
+    final value = of(context);
+    return value == ChatyWindowClass.expanded ||
+        value == ChatyWindowClass.large;
+  }
+'''
+    replacement = marker + '''
   static bool usesTwoPane(BuildContext context) {
     final value = of(context);
     return value == ChatyWindowClass.expanded ||
         value == ChatyWindowClass.large;
   }
+'''
+    if marker not in text:
+        raise SystemExit('P11-P14 adaptive marker missing: prefersRail')
+    text = text.replace(marker, replacement, 1)
 
-  static EdgeInsets pageInsets(BuildContext context) {
+if 'static EdgeInsets pageInsets' not in text:
+    marker = '  static double contentMaxWidth(BuildContext context) {'
+    helper = '''  static EdgeInsets pageInsets(BuildContext context) {
     return switch (of(context)) {
       ChatyWindowClass.compact => const EdgeInsets.symmetric(horizontal: 12),
       ChatyWindowClass.medium => const EdgeInsets.symmetric(horizontal: 20),
@@ -55,7 +59,14 @@ if 'static bool usesTwoPane' not in text:
     };
   }
 
-  static double conversationListWidth(BuildContext context) {
+'''
+    if marker not in text:
+        raise SystemExit('P11-P14 adaptive marker missing: contentMaxWidth')
+    text = text.replace(marker, helper + marker, 1)
+
+if 'static double conversationListWidth' not in text:
+    marker = '  static EdgeInsets pageInsets(BuildContext context) {'
+    helper = '''  static double conversationListWidth(BuildContext context) {
     return switch (of(context)) {
       ChatyWindowClass.compact => double.infinity,
       ChatyWindowClass.medium => double.infinity,
@@ -63,9 +74,12 @@ if 'static bool usesTwoPane' not in text:
       ChatyWindowClass.large => 400,
     };
   }
-''',
-        1,
-    )
+
+'''
+    if marker not in text:
+        raise SystemExit('P11-P14 adaptive marker missing: pageInsets')
+    text = text.replace(marker, helper + marker, 1)
+
 write(path, text)
 
 # Motion helper already respects MediaQuery.disableAnimations. Make its public
