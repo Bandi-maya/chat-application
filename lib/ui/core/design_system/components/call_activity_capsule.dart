@@ -6,6 +6,12 @@ import 'package:flutter/material.dart';
 /// active. Android's foreground notification remains the system-level surface;
 /// this is the in-app counterpart so users never have to navigate back to the
 /// call screen just to toggle audio route or hang up.
+///
+/// IMPORTANT: this widget is intentionally independent from [Tooltip]. Global
+/// activity surfaces can be hosted at, or temporarily outside, a Navigator
+/// overlay while routes are changing. RawTooltip requires an Overlay and used
+/// to crash the app in that state. Accessibility is provided through Semantics
+/// and minimum 48dp targets instead.
 class ChatyCallActivityCapsule extends StatelessWidget {
   const ChatyCallActivityCapsule({
     super.key,
@@ -59,88 +65,130 @@ class ChatyCallActivityCapsule extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(
-                    child: InkWell(
-                      onTap: onOpen,
-                      borderRadius: const BorderRadius.horizontal(
-                        left: Radius.circular(24),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(13, 9, 8, 9),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 39,
-                              height: 39,
-                              decoration: BoxDecoration(
-                                color: scheme.primary.withValues(alpha: .14),
-                                borderRadius: BorderRadius.circular(14),
+                    child: Semantics(
+                      button: true,
+                      label: 'Return to call with $contactName. $status',
+                      child: InkWell(
+                        onTap: onOpen,
+                        borderRadius: const BorderRadius.horizontal(
+                          left: Radius.circular(24),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(13, 9, 8, 9),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: scheme.primary.withValues(alpha: .14),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Icon(
+                                  isVideo
+                                      ? Icons.videocam_rounded
+                                      : Icons.call_rounded,
+                                  color: scheme.primary,
+                                  size: 20,
+                                ),
                               ),
-                              child: Icon(
-                                isVideo
-                                    ? Icons.videocam_rounded
-                                    : Icons.call_rounded,
-                                color: scheme.primary,
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    contactName,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: scheme.onSurface,
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 13.5,
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      contactName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: scheme.onSurface,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 13.5,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 1),
-                                  Text(
-                                    status,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: scheme.onSurfaceVariant,
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w600,
+                                    const SizedBox(height: 1),
+                                    Text(
+                                      status,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: scheme.onSurfaceVariant,
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                  IconButton(
-                    tooltip: isSpeaker ? 'Use earpiece' : 'Use speaker',
+                  _OverlaySafeCallAction(
+                    semanticsLabel: isSpeaker
+                        ? 'Use earpiece'
+                        : 'Use speaker',
+                    icon: isSpeaker
+                        ? Icons.volume_up_rounded
+                        : Icons.hearing_rounded,
+                    foregroundColor: scheme.onSurface,
                     onPressed: onToggleSpeaker,
-                    icon: Icon(
-                      isSpeaker
-                          ? Icons.volume_up_rounded
-                          : Icons.hearing_rounded,
-                    ),
                   ),
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
-                    child: IconButton.filled(
-                      tooltip: 'Hang up',
-                      style: IconButton.styleFrom(
-                        backgroundColor: scheme.error,
-                        foregroundColor: scheme.onError,
-                      ),
+                    child: _OverlaySafeCallAction(
+                      semanticsLabel: 'Hang up',
+                      icon: Icons.call_end_rounded,
+                      foregroundColor: scheme.onError,
+                      backgroundColor: scheme.error,
                       onPressed: onHangUp,
-                      icon: const Icon(Icons.call_end_rounded),
                     ),
                   ),
                 ],
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OverlaySafeCallAction extends StatelessWidget {
+  const _OverlaySafeCallAction({
+    required this.semanticsLabel,
+    required this.icon,
+    required this.foregroundColor,
+    required this.onPressed,
+    this.backgroundColor,
+  });
+
+  final String semanticsLabel;
+  final IconData icon;
+  final Color foregroundColor;
+  final Color? backgroundColor;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: semanticsLabel,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints.tightFor(width: 48, height: 48),
+        child: Material(
+          color: backgroundColor ?? Colors.transparent,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onPressed,
+            child: Center(
+              child: Icon(icon, color: foregroundColor, size: 22),
             ),
           ),
         ),
