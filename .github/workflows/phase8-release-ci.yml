@@ -95,6 +95,8 @@ jobs:
       CHATY_TURN_URL: ${{ secrets.CHATY_TURN_URL }}
       CHATY_TURN_USERNAME: ${{ secrets.CHATY_TURN_USERNAME }}
       CHATY_TURN_CREDENTIAL: ${{ secrets.CHATY_TURN_CREDENTIAL }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: dntnxeanubswyswahdnj
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-java@v5
@@ -121,12 +123,16 @@ jobs:
           test -n "$CHATY_TURN_URL"
           test -n "$CHATY_TURN_USERNAME"
           test -n "$CHATY_TURN_CREDENTIAL"
+          test -n "$SUPABASE_ACCESS_TOKEN"
           KEYSTORE="$RUNNER_TEMP/chaty-production.jks"
           printf '%s' "$CHATY_ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
           test -s "$KEYSTORE"
           echo "CHATY_ANDROID_KEYSTORE_PATH=$KEYSTORE" >> "$GITHUB_ENV"
 
       - run: flutter pub get
+      - name: Hosted Supabase Auth security preflight
+        run: bash tools/check_supabase_auth_security.sh
+      - run: bash tools/check_migration_versions.sh
       - run: bash tools/check_no_production_mocks.sh
       - name: Build signed production APK
         run: >-
@@ -143,7 +149,9 @@ jobs:
           APK=build/app/outputs/flutter-apk/app-release.apk
           test -s "$APK"
           unzip -t "$APK" >/dev/null
-          jarsigner -verify -verbose -certs "$APK" >/dev/null
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$APKSIGNER"
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
           sha256sum "$APK" | tee Chaty-production.apk.sha256
           cp "$APK" Chaty-production.apk
       - uses: actions/upload-artifact@v4
