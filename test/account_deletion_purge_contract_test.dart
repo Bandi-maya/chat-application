@@ -9,8 +9,8 @@ void main() {
     final profile = File('lib/features/profile/profile_actions.dart').readAsStringSync();
 
     expect(mls, contains('purgeLocalIdentityForUser'));
-    expect(mls, contains("'$prefix.db_key.v1'"));
-    expect(mls, contains("'$basePath-wal'"));
+    expect(mls, contains(r"'$prefix.db_key.v1'"));
+    expect(mls, contains(r"'$basePath-wal'"));
     expect(media, contains('purgeLocalTemporaryFiles'));
     expect(profile, contains('EncryptedMessageOutbox().clear(deletingUserId)'));
     expect(profile, contains('purgeLocalIdentityForUser(deletingUserId)'));
