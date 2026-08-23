@@ -24,12 +24,17 @@ def replace_required(text: str, old: str, new: str, label: str) -> str:
 # ---------------------------------------------------------------------------
 # openmls 2.x introduced an advisory <db>.lock file. On the user's Android
 # filesystem std::fs::File::try_lock returns "not supported", preventing every
-# encrypted attachment operation. 1.4.2 predates that wrapper-level file lock
-# while retaining the RFC 9420 engine/API used by Chaty. Keep the existing
-# per-conversation serialization until an Android-safe 2.x lock implementation
-# is available upstream.
+# encrypted attachment operation. 1.4.2 predates that wrapper-level file lock.
+# Its generated bindings were built with flutter_rust_bridge 2.12.0, therefore
+# pin both halves so native codegen/runtime versions stay identical.
 pub = read('pubspec.yaml')
 pub = re.sub(r'  openmls:\s*\^?2\.0\.1', '  openmls: 1.4.2', pub)
+if '  flutter_rust_bridge: 2.12.0' not in pub:
+    pub = pub.replace(
+        '  openmls: 1.4.2\n',
+        '  openmls: 1.4.2\n  flutter_rust_bridge: 2.12.0\n',
+        1,
+    )
 write('pubspec.yaml', pub)
 
 mls_path = 'lib/data/services/mls_e2ee_service.dart'
@@ -369,7 +374,6 @@ chat = chat.replace(
     "hintText: 'Message…  /task or #reply',",
     "hintText: 'Message…  type / for commands',",
 )
-# Use a subtle Chaty shell without touching recording/send state machinery.
 composer_marker = """        Expanded(
           child: TextField(
             controller: widget.controller,"""
@@ -466,7 +470,6 @@ nav = nav.replace(
 write(nav_path, nav)
 
 
-# Hard invariants.
 checks = {
     mls_path: ['deviceFingerprint'],
     call_path: ['using direct ICE/STUN fallback', 'stun.cloudflare.com:3478'],
