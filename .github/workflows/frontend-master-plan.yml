@@ -3,6 +3,8 @@ name: Chaty Frontend Master Plan
 on:
   push:
     branches: [integration/phases-1-8]
+  pull_request:
+    branches: [integration/phases-1-8]
   workflow_dispatch:
 
 permissions:
@@ -33,8 +35,11 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Apply frontend master plan
-        if: github.actor != 'github-actions[bot]'
+      - name: Apply canonical frontend plan on integration branch
+        if: >-
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/integration/phases-1-8' &&
+          github.actor != 'github-actions[bot]'
         run: python3 tools/apply_frontend_master_plan.py
 
       - name: Format frontend implementation
@@ -43,16 +48,15 @@ jobs:
           lib/main.dart
           lib/features/chats/main_navigation_shell.dart
           lib/features/chats/chats_home_screen.dart
+          lib/features/messages/attachment_sheet.dart
           lib/features/settings/settings_root_screen.dart
+          lib/features/updates/updates_screen.dart
           lib/features/ui_lab
           lib/ui/core/design_system/chaty_motion.dart
           lib/ui/core/design_system/chaty_haptics.dart
           lib/ui/core/design_system/chaty_adaptive.dart
           lib/ui/core/design_system/component_state.dart
-          lib/ui/core/design_system/components/call_activity_capsule.dart
-          lib/ui/core/design_system/components/messaging_components.dart
-          lib/ui/core/design_system/components/social_components.dart
-          lib/ui/core/design_system/components/settings_components.dart
+          lib/ui/core/design_system/components
           lib/ui/core/design_system/design_system.dart
           test/frontend_master_plan_contract_test.dart
 
@@ -90,7 +94,10 @@ jobs:
         run: bash tools/check_no_production_mocks.sh
 
       - name: Commit verified frontend source
-        if: github.actor != 'github-actions[bot]'
+        if: >-
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/integration/phases-1-8' &&
+          github.actor != 'github-actions[bot]'
         shell: bash
         run: |
           set -euo pipefail
