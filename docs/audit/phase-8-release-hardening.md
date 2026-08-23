@@ -27,4 +27,5 @@ Avoid feature redesign. Phase 8 is the integration/release gate, not a place to 
 - Production presentation code now uses `ChatyDataStore`; unauthenticated guest fabrication is rejected.
 - The no-production-mocks guard now rejects QA/demo call execution paths instead of permitting them behind `kDebugMode`.
 - A deterministic Phase-8 source patch removes `startMockCallForQA`, QA call IDs, and the Local Media QA UI; the workflow commits that cleanup only after analyzer, full tests, migration checks, no-mock scan, and release APK verification pass.
+- The trusted-facade base runner now applies that QA cleanup before executing the strict no-mock guard, removing the previous intermediate-state ordering failure.
 - Phase 8 still cannot reach 100% until Phases 1–7 are individually accepted and the integrated head passes the same gates after conflict resolution.
