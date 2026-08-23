@@ -127,15 +127,16 @@ for needle in (
 path.write_text(text, encoding='utf-8')
 print('Profile media cache UX applied.')
 
-# Canonical integration order: legacy/device compatibility first, then the
-# frontend architecture, namespace reconciliation, and production P4-P7
-# component wiring. Every authoritative CI run analyzes this final tree.
+# Canonical frontend execution order. Legacy/device compatibility runs before
+# the original design foundation. Each grouped frontend phase then layers on
+# top of the verified tree so CI analyzes one deterministic result.
 for tool in (
     'prepare_frontend_master_input.py',
     'apply_frontend_master_plan.py',
     'restore_frontend_design_exports.py',
     'apply_frontend_namespace_cleanup.py',
     'apply_frontend_p4_p7.py',
+    'apply_frontend_p8_p10.py',
 ):
     script = ROOT / 'tools' / tool
     if script.exists():
