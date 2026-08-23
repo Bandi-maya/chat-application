@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
+import runpy
 
 ROOT = Path(__file__).resolve().parents[1]
 path = ROOT / 'lib/features/profile/profile_screen.dart'
@@ -125,3 +126,10 @@ for needle in (
 
 path.write_text(text, encoding='utf-8')
 print('Profile media cache UX applied.')
+
+# This is intentionally the final legacy UX patch in the integration chain.
+# Apply the canonical frontend master plan afterwards so older compatibility
+# scripts cannot overwrite the stable lifecycle/component architecture.
+master_patch = ROOT / 'tools/apply_frontend_master_plan.py'
+if master_patch.exists():
+    runpy.run_path(str(master_patch), run_name='__main__')
