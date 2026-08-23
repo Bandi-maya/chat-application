@@ -56,7 +56,9 @@ jobs:
           python3 tools/apply_device_fixes_and_signature_ux.py
           python3 tools/apply_signature_followups.py
           python3 tools/apply_unique_ux_round2.py
+          python3 tools/apply_offline_first_system_ux.py
           dart format \
+            lib/main.dart \
             lib/data/repositories/chaty_data_store.dart \
             lib/data/services/backend_service.dart \
             lib/data/services/call_history_service.dart \
@@ -64,7 +66,9 @@ jobs:
             lib/data/services/chat_media_service.dart \
             lib/data/services/encrypted_attachment_codec.dart \
             lib/data/services/encrypted_message_outbox.dart \
+            lib/data/services/local_snapshot_cache_service.dart \
             lib/data/services/mls_e2ee_service.dart \
+            lib/data/services/push_token_service.dart \
             lib/data/services/uploaded_attachment_guard.dart \
             lib/data/services/voice_note_service.dart \
             lib/domain/models/chat_message.dart \
@@ -89,6 +93,7 @@ jobs:
             test/account_deletion_purge_contract_test.dart \
             test/encrypted_attachment_codec_test.dart \
             test/encrypted_message_outbox_test.dart \
+            test/offline_first_contract_test.dart \
             test/phase5_feature_contracts_test.dart \
             test/phase6_state_views_test.dart \
             test/root_navigation_policy_test.dart \
