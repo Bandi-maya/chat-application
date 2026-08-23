@@ -128,8 +128,12 @@ path.write_text(text, encoding='utf-8')
 print('Profile media cache UX applied.')
 
 # This is intentionally the final legacy UX patch in the integration chain.
-# Apply the canonical frontend master plan afterwards so older compatibility
-# scripts cannot overwrite the stable lifecycle/component architecture.
+# Normalize the overlap introduced by older startup/lifecycle patches, then let
+# the canonical frontend master plan become the single owner of that behavior.
+normalize_input = ROOT / 'tools/prepare_frontend_master_input.py'
+if normalize_input.exists():
+    runpy.run_path(str(normalize_input), run_name='__main__')
+
 master_patch = ROOT / 'tools/apply_frontend_master_plan.py'
 if master_patch.exists():
     runpy.run_path(str(master_patch), run_name='__main__')
