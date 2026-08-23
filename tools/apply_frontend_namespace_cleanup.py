@@ -36,15 +36,19 @@ text = text.replace('abstract final class ChatyMotion {',
                     'abstract final class ChatyMotionSpec {')
 write(path, text)
 
-for path in [
+for relative_path in [
     'lib/ui/core/design_system/components/messaging_components.dart',
     'lib/ui/core/design_system/components/social_components.dart',
+    'lib/ui/core/design_system/components/global_activity_host.dart',
     'lib/features/ui_lab/ui_lab_screen.dart',
 ]:
-    text = read(path)
-    if "chaty_motion.dart" in text:
+    candidate = ROOT / relative_path
+    if not candidate.exists():
+        continue
+    text = candidate.read_text(encoding='utf-8')
+    if 'chaty_motion.dart' in text:
         text = text.replace('ChatyMotion.', 'ChatyMotionSpec.')
-    write(path, text)
+    candidate.write_text(text, encoding='utf-8')
 
 # Clean the imports added by the master pass when the production home screen
 # already has the same components through its design-system barrel.
