@@ -53,7 +53,6 @@ class CallsScreen extends StatelessWidget {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     final calls = dataStore.calls;
@@ -73,17 +72,13 @@ class CallsScreen extends StatelessWidget {
                 ChatySpacing.sm,
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Calls',
-                    style: ChatyTypography.headline(colors.foreground),
-                  ),
-                ],
-                          ),
-                        ),
-                      ),
+                  Expanded(
+                    child: Text(
+                      'Calls',
+                      style: ChatyTypography.headline(colors.foreground),
                     ),
+                  ),
                 ],
               ),
             ),
@@ -110,10 +105,9 @@ class CallsScreen extends StatelessWidget {
               sliver: SliverToBoxAdapter(
                 child: ChatyGroupedSection(
                   children: [
-                    for (int i = 0; i < calls.length; i++) ...[
+                    for (final call in calls)
                       Builder(
                         builder: (context) {
-                          final call = calls[i];
                           final currentUserId = dataStore.currentUser.id;
                           final remoteUserId = call.participantIds.firstWhere(
                             (id) => id.isNotEmpty && id != currentUserId,
@@ -122,6 +116,18 @@ class CallsScreen extends StatelessWidget {
                           final contact = dataStore.getUserById(remoteUserId);
                           final isMissed = call.direction == CallDirection.missed;
                           final isVideo = call.type == CallType.video;
+                          final canCall = remoteUserId.isNotEmpty &&
+                              remoteUserId != currentUserId;
+
+                          Future<void> redial() => _startCall(
+                            context,
+                            remoteUserId: remoteUserId,
+                            remoteDisplayName:
+                                contact?.displayName ?? 'Chaty contact',
+                            remoteAvatarInitials: contact?.avatarInitials,
+                            remoteAvatarColorHex: contact?.avatarColorHex,
+                            isVideo: isVideo,
+                          );
 
                           return ChatyListTile(
                             contentPadding: const EdgeInsets.symmetric(
@@ -136,7 +142,9 @@ class CallsScreen extends StatelessWidget {
                             title: Text(
                               contact?.displayName ?? 'Chaty contact',
                               style: TextStyle(
-                                color: isMissed ? colors.error : colors.foreground,
+                                color: isMissed
+                                    ? colors.error
+                                    : colors.foreground,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 15,
                                 letterSpacing: -0.2,
@@ -177,33 +185,12 @@ class CallsScreen extends StatelessWidget {
                               iconSize: 20,
                               backgroundColor: colors.surfaceSecondary,
                               color: colors.primary,
-                              onPressed: remoteUserId == currentUserId
-                                  ? null
-                                  : () => _startCall(
-                                        context,
-                                        remoteUserId: remoteUserId,
-                                        remoteDisplayName:
-                                            contact?.displayName ?? 'Chaty contact',
-                                        remoteAvatarInitials: contact?.avatarInitials,
-                                        remoteAvatarColorHex: contact?.avatarColorHex,
-                                        isVideo: isVideo,
-                                      ),
+                              onPressed: canCall ? () => redial() : null,
                             ),
-                            onTap: remoteUserId == currentUserId
-                                ? null
-                                : () => _startCall(
-                                      context,
-                                      remoteUserId: remoteUserId,
-                                      remoteDisplayName:
-                                          contact?.displayName ?? 'Chaty contact',
-                                      remoteAvatarInitials: contact?.avatarInitials,
-                                      remoteAvatarColorHex: contact?.avatarColorHex,
-                                      isVideo: isVideo,
-                                    ),
+                            onTap: canCall ? () => redial() : null,
                           );
                         },
                       ),
-                    ],
                   ],
                 ),
               ),
