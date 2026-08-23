@@ -137,6 +137,7 @@ for tool in (
     'apply_frontend_namespace_cleanup.py',
     'prepare_frontend_p4_p7_input.py',
     'apply_frontend_p4_p7.py',
+    'post_frontend_p4_imports.py',
     'apply_frontend_p8_p10.py',
     'apply_frontend_p11_p14.py',
 ):
