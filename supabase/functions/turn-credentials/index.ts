@@ -17,18 +17,8 @@ Deno.serve(async (request: Request) => {
   const authorization = request.headers.get("Authorization") ?? "";
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-  const turnSecret = Deno.env.get("TURN_SHARED_SECRET") ?? "";
-  const turnUrls = (Deno.env.get("TURN_URLS") ?? "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-  const stunUrls = (Deno.env.get("STUN_URLS") ?? "stun:stun.l.google.com:19302")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-
-  if (!supabaseUrl || !anonKey || !turnSecret || turnUrls.length === 0) {
-    return new Response(JSON.stringify({ error: "turn_not_configured" }), {
+  if (!supabaseUrl || !anonKey) {
+    return new Response(JSON.stringify({ error: "server_not_configured" }), {
       status: 503,
       headers: jsonHeaders,
     });
@@ -45,6 +35,29 @@ Deno.serve(async (request: Request) => {
       status: 401,
       headers: jsonHeaders,
     });
+  }
+
+  const stunUrls = (Deno.env.get("STUN_URLS") ??
+    "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302,stun:stun.cloudflare.com:3478")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const turnSecret = Deno.env.get("TURN_SHARED_SECRET") ?? "";
+  const turnUrls = (Deno.env.get("TURN_URLS") ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  // Direct STUN is a valid ICE configuration. A production relay is added
+  // automatically once TURN_URLS and TURN_SHARED_SECRET are configured.
+  if (!turnSecret || turnUrls.length === 0) {
+    return new Response(
+      JSON.stringify({
+        relay_configured: false,
+        ice_servers: [{ urls: stunUrls }],
+      }),
+      { status: 200, headers: jsonHeaders },
+    );
   }
 
   const lifetimeSeconds = 3600;
@@ -67,6 +80,7 @@ Deno.serve(async (request: Request) => {
 
   return new Response(
     JSON.stringify({
+      relay_configured: true,
       expires_at: expiresAt,
       ice_servers: [
         { urls: stunUrls },
