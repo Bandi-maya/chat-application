@@ -128,8 +128,8 @@ path.write_text(text, encoding='utf-8')
 print('Profile media cache UX applied.')
 
 # Canonical frontend execution order. Legacy/device compatibility runs before
-# the original design foundation. Each grouped frontend phase then layers on
-# top of the verified tree so CI analyzes one deterministic result.
+# the design foundation. Grouped implementation phases then layer onto one
+# deterministic final tree that analyzer/tests/build all verify.
 for tool in (
     'prepare_frontend_master_input.py',
     'apply_frontend_master_plan.py',
@@ -137,6 +137,7 @@ for tool in (
     'apply_frontend_namespace_cleanup.py',
     'apply_frontend_p4_p7.py',
     'apply_frontend_p8_p10.py',
+    'apply_frontend_p11_p14.py',
 ):
     script = ROOT / 'tools' / tool
     if script.exists():
