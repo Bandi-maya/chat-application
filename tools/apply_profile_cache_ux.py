@@ -9,6 +9,14 @@ if "../../ui/core/widgets/cached_remote_image.dart" not in text:
     text = text.replace(
         "import '../../ui/core/design_system/settings_primitives.dart';",
         "import '../../ui/core/design_system/settings_primitives.dart';\n"
+        "import '../../ui/core/widgets/app_avatar.dart';\n"
+        "import '../../ui/core/widgets/cached_remote_image.dart';",
+        1,
+    )
+elif "../../ui/core/widgets/app_avatar.dart" not in text:
+    text = text.replace(
+        "import '../../ui/core/widgets/cached_remote_image.dart';",
+        "import '../../ui/core/widgets/app_avatar.dart';\n"
         "import '../../ui/core/widgets/cached_remote_image.dart';",
         1,
     )
@@ -41,7 +49,6 @@ new_avatar = '''                  child: _CachedProfileAvatar(
                   ),'''
 text = text.replace(old_avatar, new_avatar, 1)
 
-# Upload failures are concise; the previous cached image remains untouched.
 old_error = '''      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not update banner: $message')),
       );'''
@@ -108,7 +115,11 @@ if 'class _CachedProfileAvatar extends StatelessWidget' not in text:
         raise SystemExit('profile avatar insertion marker missing')
     text = text.replace(marker, widget + marker, 1)
 
-for needle in ('ChatyCachedRemoteImage(', 'class _CachedProfileAvatar'):
+for needle in (
+    "import '../../ui/core/widgets/app_avatar.dart';",
+    'ChatyCachedRemoteImage(',
+    'class _CachedProfileAvatar',
+):
     if needle not in text:
         raise SystemExit(f'profile-cache invariant missing: {needle}')
 
