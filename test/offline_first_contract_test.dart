@@ -31,8 +31,9 @@ void main() {
 
   test('push registration no longer impersonates an FCM token', () {
     final push = File('lib/data/services/push_token_service.dart').readAsStringSync();
-    expect(push, contains('device_\${platformName}_\${_uuid.v4()}'));
+    expect(push, isNot(contains('device_\${platformName}_\${_uuid.v4()}')));
     expect(push, isNot(contains("token = 'fcm_")));
+    expect(push, contains('registerPlatformToken'));
     expect(push, contains('hasRealPushTransport'));
   });
 
