@@ -135,6 +135,7 @@ for tool in (
     'apply_frontend_master_plan.py',
     'restore_frontend_design_exports.py',
     'apply_frontend_namespace_cleanup.py',
+    'prepare_frontend_p4_p7_input.py',
     'apply_frontend_p4_p7.py',
     'apply_frontend_p8_p10.py',
     'apply_frontend_p11_p14.py',
