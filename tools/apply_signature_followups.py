@@ -11,7 +11,7 @@ def read(path):
 def write(path, text):
     (ROOT / path).write_text(text, encoding='utf-8')
 
-# Chat composer needs the signature component import.
+# Chat composer: signature shell import + discoverable command palette.
 path = 'lib/features/chats/chat_detail_screen.dart'
 text = read(path)
 if "../../ui/core/design_system/components/signature_components.dart" not in text:
@@ -21,12 +21,30 @@ if "../../ui/core/design_system/components/signature_components.dart" not in tex
         "import '../../ui/core/design_system/components/signature_components.dart';",
         1,
     )
-# Source-comment brand cleanup that does not touch persisted identifiers.
 text = text.replace('matching WhatsApp semantics', 'matching Chaty view-once semantics')
 text = text.replace('WhatsApp/Telegram/Instagram scroll logic', 'Chaty scroll and unread-position logic')
+text = text.replace(
+    '            onChanged: widget.onChanged,',
+    """            onChanged: (value) {
+              widget.onChanged(value);
+              if (value.trim() == '/') {
+                Future<void>.microtask(() async {
+                  final command = await ChatyCommandPalette.show(context);
+                  if (!mounted || command == null) return;
+                  widget.controller
+                    ..text = '$command '
+                    ..selection = TextSelection.collapsed(
+                      offset: command.length + 1,
+                    );
+                  widget.onChanged(widget.controller.text);
+                });
+              }
+            },""",
+    1,
+)
 write(path, text)
 
-# Real fingerprint is runtime data, so the Text cannot be const.
+# Runtime device fingerprint cannot be rendered in a const Text.
 path = 'lib/features/settings/security/security_center_screen.dart'
 text = read(path)
 text = text.replace(
@@ -35,8 +53,7 @@ text = text.replace(
 )
 write(path, text)
 
-# Existing installations may have the old green preset persisted. Migrate only
-# the former default ids; explicit non-default custom themes remain untouched.
+# Existing installations migrate only the former default green presets.
 path = 'lib/ui/core/theme/theme_controller.dart'
 text = read(path)
 marker = """    _layoutMode = _globalTheme.layoutMode;
@@ -59,7 +76,7 @@ if 'legacyDefaultIds' not in text:
     text = text.replace(marker, replacement, 1)
 write(path, text)
 
-# Replace the search bar with the signature universal search component.
+# Universal smart search.
 path = 'lib/features/search/global_search_screen.dart'
 text = read(path)
 old = """        titleWidget: Container(
@@ -101,7 +118,7 @@ if old in text:
     text = text.replace(old, new, 1)
 write(path, text)
 
-# Reaction bar: use the signature component in the message action surface.
+# Signature reaction bar.
 path = 'lib/features/messages/message_action_sheet.dart'
 text = read(path)
 start = """              Container(
@@ -144,11 +161,10 @@ if start in text:
               ),
               const SizedBox(height: ChatySpacing.base),"""
     text = text[:s] + replacement + text[e:]
-# remove now-unused normal quickEmojis declaration (iOS menu has its own const)
 text = text.replace("    final quickEmojis = <String>['👍', '❤️', '🔥', '🎉', '👀', '🚀'];\n", '')
 write(path, text)
 
-# View-once choice gets the brand glass-sheet surface.
+# View-once confirmation uses Chaty's glass-sheet surface.
 path = 'lib/features/messages/chat_attachment_actions.dart'
 text = read(path)
 text = text.replace(
@@ -156,13 +172,128 @@ text = text.replace(
     "final result = await ChatyGlassSheet.show<bool>(\n      context,\n      child: SafeArea(",
     1,
 )
-# ChatyGlassSheet has no builder scope; rename the old builder context to context
-# only inside the view-once block by using Navigator.of(context).
 segment_start = text.find('Future<bool> _confirmViewOnce')
 segment_end = text.find('  Future<void> shareMedia', segment_start)
 if segment_start >= 0 and segment_end > segment_start:
     segment = text[segment_start:segment_end].replace('sheetContext', 'context')
     text = text[:segment_start] + segment + text[segment_end:]
+write(path, text)
+
+# Home: presence avatar + Quick Peek and contextual action dock.
+path = 'lib/features/chats/chats_home_screen.dart'
+text = read(path)
+if "../../ui/core/design_system/components/signature_components.dart" not in text:
+    text = text.replace(
+        "import '../../ui/core/design_system/components/app_components.dart';",
+        "import '../../ui/core/design_system/components/app_components.dart';\n"
+        "import '../../ui/core/design_system/components/signature_components.dart';",
+        1,
+    )
+old_long = """  void _handleConversationLongPress(Conversation conversation) {
+    HapticFeedback.mediumImpact();
+    _toggleSelection(conversation.id);
+  }
+"""
+new_long = """  void _handleConversationLongPress(Conversation conversation) {
+    HapticFeedback.mediumImpact();
+    final locked = widget.preferencesController.isConversationLocked(
+      conversation.id,
+    );
+    ChatyQuickPeek.show(
+      context,
+      title: conversation.title,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            conversation.lastMessageText.isEmpty
+                ? 'No message preview available.'
+                : conversation.lastMessageText,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 16),
+          Center(
+            child: ChatyActionDock(
+              actions: [
+                ChatyDockAction(
+                  icon: conversation.isPinned
+                      ? Icons.push_pin_rounded
+                      : Icons.push_pin_outlined,
+                  label: conversation.isPinned ? 'Unpin' : 'Pin',
+                  onPressed: () {
+                    widget.dataStore.togglePinConversation(conversation.id);
+                    Navigator.of(context).pop();
+                  },
+                ),
+                ChatyDockAction(
+                  icon: conversation.isMuted
+                      ? Icons.volume_up_rounded
+                      : Icons.volume_off_rounded,
+                  label: conversation.isMuted ? 'Unmute' : 'Mute',
+                  onPressed: () {
+                    widget.dataStore.toggleMuteConversation(conversation.id);
+                    Navigator.of(context).pop();
+                  },
+                ),
+                ChatyDockAction(
+                  icon: Icons.archive_outlined,
+                  label: 'Archive',
+                  onPressed: () {
+                    widget.dataStore.toggleArchiveConversation(conversation.id);
+                    Navigator.of(context).pop();
+                  },
+                ),
+                ChatyDockAction(
+                  icon: locked ? Icons.lock_open_rounded : Icons.lock_rounded,
+                  label: locked ? 'Unlock' : 'Lock',
+                  onPressed: () {
+                    widget.preferencesController.toggleLockConversation(
+                      conversation.id,
+                      lock: !locked,
+                    );
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _handleConversationTap(conversation);
+            },
+            child: const Text('Open conversation'),
+          ),
+        ],
+      ),
+    );
+  }
+"""
+if old_long in text:
+    text = text.replace(old_long, new_long, 1)
+old_avatar = """                child: ChatyNetworkAvatar(
+                  initials: widget.dataStore.currentUser.avatarInitials,
+                  colorHex: widget.dataStore.currentUser.avatarColorHex,
+                  url: widget.dataStore.currentUser.avatarUrl,
+                  size: 34,
+                ),"""
+new_avatar = """                child: ChatyPresenceAvatar(
+                  size: 36,
+                  online: true,
+                  child: ChatyNetworkAvatar(
+                    initials: widget.dataStore.currentUser.avatarInitials,
+                    colorHex: widget.dataStore.currentUser.avatarColorHex,
+                    url: widget.dataStore.currentUser.avatarUrl,
+                    size: 34,
+                  ),
+                ),"""
+if old_avatar in text:
+    text = text.replace(old_avatar, new_avatar, 1)
+text = text.replace('WA-iOS presence dot sits bottom-right.', 'Chaty presence dot sits bottom-right.')
+text = text.replace('WA-iOS row metrics: 16pt name.', 'Chaty row metrics: 16pt name.')
 write(path, text)
 
 print('Chaty signature follow-up wiring applied.')
