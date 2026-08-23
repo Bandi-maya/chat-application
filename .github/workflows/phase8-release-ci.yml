@@ -28,6 +28,7 @@ jobs:
       - run: flutter analyze --no-fatal-infos
       - run: flutter test
       - run: bash tools/check_migration_versions.sh
+      - run: bash tools/check_no_production_mocks.sh
       - run: >-
           flutter build apk --release --no-pub
           --dart-define=SUPABASE_URL=https://dntnxeanubswyswahdnj.supabase.co
