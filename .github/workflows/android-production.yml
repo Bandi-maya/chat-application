@@ -55,6 +55,7 @@ jobs:
           python3 tools/apply_account_deletion_purge.py
           python3 tools/apply_device_fixes_and_signature_ux.py
           python3 tools/apply_signature_followups.py
+          python3 tools/apply_unique_ux_round2.py
           dart format \
             lib/data/repositories/chaty_data_store.dart \
             lib/data/services/backend_service.dart \
@@ -71,6 +72,7 @@ jobs:
             lib/features/chats/contact_info_screen.dart \
             lib/features/chats/main_navigation_shell.dart \
             lib/features/chats/root_navigation_policy.dart \
+            lib/features/messages/attachment_sheet.dart \
             lib/features/messages/chat_attachment_actions.dart \
             lib/features/messages/media_viewer_screen.dart \
             lib/features/messages/message_action_sheet.dart \
