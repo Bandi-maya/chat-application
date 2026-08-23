@@ -53,10 +53,12 @@ jobs:
             '+refs/heads/phase-7-platform-security:refs/remotes/origin/phase-7-platform-security'
           python3 tools/apply_release_integration.py
           python3 tools/apply_account_deletion_purge.py
+          python3 tools/apply_device_fixes_and_signature_ux.py
           dart format \
             lib/data/repositories/chaty_data_store.dart \
             lib/data/services/backend_service.dart \
             lib/data/services/call_history_service.dart \
+            lib/data/services/call_signaling_service.dart \
             lib/data/services/chat_media_service.dart \
             lib/data/services/encrypted_attachment_codec.dart \
             lib/data/services/encrypted_message_outbox.dart \
@@ -72,9 +74,12 @@ jobs:
             lib/features/messages/media_viewer_screen.dart \
             lib/features/messages/message_bubble.dart \
             lib/features/profile/profile_actions.dart \
+            lib/features/settings/security/security_center_screen.dart \
             lib/features/settings/settings_root_screen.dart \
+            lib/ui/core/design_system/components/signature_components.dart \
             lib/ui/core/design_system/components/state_views.dart \
             lib/ui/core/design_system/design_system.dart \
+            lib/ui/core/theme/theme_presets.dart \
             test/account_deletion_purge_contract_test.dart \
             test/encrypted_attachment_codec_test.dart \
             test/encrypted_message_outbox_test.dart \
