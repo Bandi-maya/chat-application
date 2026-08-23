@@ -1,4 +1,4 @@
-name: Chaty Android Production
+name: Chaty Android Verification
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
       - main
       - production-supabase
       - production-hardening-2026-08-22
+      - integration/phases-1-8
   pull_request:
     branches:
       - main
@@ -17,7 +18,12 @@ permissions:
 jobs:
   verify-and-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
+    env:
+      # This workflow proves release-mode compilation only. The final signed
+      # production APK is built exclusively by integration-release.yml with a
+      # persistent private keystore and a non-example application id.
+      CHATY_ALLOW_CI_DEBUG_SIGNING: 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -49,36 +55,36 @@ jobs:
       - name: Test
         run: flutter test
 
-      - name: Hosted Auth release preflight
+      - name: Hosted Auth security preflight on main
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: dntnxeanubswyswahdnj
         run: bash tools/check_supabase_auth_security.sh
 
-      - name: Build release APK
+      - name: Build release-mode verification APK
         run: >-
           flutter build apk --release --no-pub
           --dart-define=SUPABASE_URL=https://dntnxeanubswyswahdnj.supabase.co
           --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_gFpVYJctaDkRRgttvnUl-A_TKu81hFF
 
-      - name: Verify APK
+      - name: Verify APK archive and hash
         shell: bash
         run: |
           set -euo pipefail
           APK=build/app/outputs/flutter-apk/app-release.apk
           test -s "$APK"
-          cp "$APK" Chaty-production.apk
-          unzip -t Chaty-production.apk >/dev/null
-          sha256sum Chaty-production.apk | tee Chaty-production.apk.sha256
-          ls -lh Chaty-production.apk
+          cp "$APK" Chaty-verification.apk
+          unzip -t Chaty-verification.apk >/dev/null
+          sha256sum Chaty-verification.apk | tee Chaty-verification.apk.sha256
+          ls -lh Chaty-verification.apk
 
-      - name: Upload APK
+      - name: Upload verification APK
         uses: actions/upload-artifact@v4
         with:
-          name: Chaty-Production-APK
+          name: Chaty-Verification-APK
           path: |
-            Chaty-production.apk
-            Chaty-production.apk.sha256
+            Chaty-verification.apk
+            Chaty-verification.apk.sha256
           if-no-files-found: error
           retention-days: 14
