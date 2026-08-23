@@ -1,0 +1,40 @@
+name: Phase 8 Release Gate
+
+on:
+  push:
+    branches: [phase-8-release-hardening]
+  pull_request:
+    branches: [production-hardening-2026-08-22]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos
+      - run: flutter test
+      - run: bash tools/check_migration_versions.sh
+      - run: >-
+          flutter build apk --release --no-pub
+          --dart-define=SUPABASE_URL=https://dntnxeanubswyswahdnj.supabase.co
+          --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_gFpVYJctaDkRRgttvnUl-A_TKu81hFF
+      - shell: bash
+        run: |
+          set -euo pipefail
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          test -s "$APK"
+          sha256sum "$APK"
