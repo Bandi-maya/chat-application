@@ -46,7 +46,9 @@ class ChatySettingsSection extends StatelessWidget {
             decoration: BoxDecoration(
               color: scheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: scheme.outlineVariant.withValues(alpha: .55)),
+              border: Border.all(
+                color: scheme.outlineVariant.withValues(alpha: .55),
+              ),
             ),
             child: Column(children: _withDividers(context)),
           ),
@@ -56,7 +58,9 @@ class ChatySettingsSection extends StatelessWidget {
   }
 
   List<Widget> _withDividers(BuildContext context) {
-    final divider = Theme.of(context).colorScheme.outlineVariant.withValues(alpha: .45);
+    final divider = Theme.of(
+      context,
+    ).colorScheme.outlineVariant.withValues(alpha: .45);
     final result = <Widget>[];
     for (var i = 0; i < children.length; i++) {
       result.add(children[i]);
@@ -120,7 +124,7 @@ class ChatySettingTile extends StatelessWidget {
                       style: TextStyle(
                         color: destructive ? scheme.error : scheme.onSurface,
                         fontSize: 14,
-                        fontWeight: FontWeight.w750,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     if (subtitle != null) ...[
