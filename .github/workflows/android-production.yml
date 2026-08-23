@@ -61,6 +61,7 @@ jobs:
           python3 tools/apply_secure_pending_send_ux.py
           python3 tools/apply_research_ui_ux_round3.py
           python3 tools/apply_call_notification_actions.py
+          python3 tools/apply_profile_cache_ux.py
           dart format \
             lib/main.dart \
             lib/data/repositories/chaty_data_store.dart \
@@ -88,6 +89,7 @@ jobs:
             lib/features/messages/message_action_sheet.dart \
             lib/features/messages/message_bubble.dart \
             lib/features/profile/profile_actions.dart \
+            lib/features/profile/profile_screen.dart \
             lib/features/search/global_search_screen.dart \
             lib/features/settings/security/security_center_screen.dart \
             lib/features/settings/settings_root_screen.dart \
@@ -98,6 +100,7 @@ jobs:
             lib/ui/core/design_system/design_system.dart \
             lib/ui/core/theme/theme_controller.dart \
             lib/ui/core/theme/theme_presets.dart \
+            lib/ui/core/widgets/cached_remote_image.dart \
             test/account_deletion_purge_contract_test.dart \
             test/encrypted_attachment_codec_test.dart \
             test/encrypted_message_outbox_test.dart \
