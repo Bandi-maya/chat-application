@@ -18,15 +18,25 @@ void main() {
     expect(chat, contains('_loadingMessages = cachedMessages.isEmpty'));
     expect(chat, contains('_scrollToBottom(animate: false)'));
     expect(chat, contains('Waiting for secure chat setup'));
-    expect(chat, isNot(contains("SnackBar(content: Text('Unable to send voice note: \$error'))")));
+    expect(
+      chat,
+      isNot(contains("SnackBar(content: Text('Unable to send voice note: \$error'))")),
+    );
   });
 
   test('startup does not wait for noncritical housekeeping', () {
     final main = File('lib/main.dart').readAsStringSync();
-    expect(main, contains('runApp(const ChatyApp());'));
-    expect(main, contains('unawaited(locator<AppIconController>().initialize())'));
-    expect(main, contains('late final Listenable _rootListenable'));
-    expect(main, contains('listenable: _rootListenable'));
+    final runAppIndex = main.indexOf('runApp(const ChatyApp());');
+    final deferredIndex = main.indexOf('unawaited(_initializeDeferredPlatformServices());');
+
+    expect(runAppIndex, greaterThanOrEqualTo(0));
+    expect(deferredIndex, greaterThan(runAppIndex));
+    expect(main, contains('Future<void> _initializeDeferredPlatformServices() async'));
+    expect(main, contains('await locator<AppIconController>().initialize();'));
+    expect(main, contains('await locator<NotificationChannelManager>().initialize();'));
+    expect(main, contains('await locator<PushTokenService>().initialize();'));
+    expect(main, contains('late final Listenable _rootSignals'));
+    expect(main, contains('listenable: _rootSignals'));
   });
 
   test('push registration no longer impersonates an FCM token', () {
