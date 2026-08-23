@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../data/repositories/chaty_data_store.dart';
@@ -54,23 +53,6 @@ class CallsScreen extends StatelessWidget {
     }
   }
 
-  Future<void> _openDebugPreview(BuildContext context) async {
-    if (!kDebugMode) return;
-    final callService = locator<CallSignalingService>();
-    try {
-      await callService.startMockCallForQA(isVideo: true);
-      if (!context.mounted) return;
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => OngoingCallScreen(theme: theme),
-        ),
-      );
-    } catch (error) {
-      if (context.mounted) {
-        ChatyToast.show(context, error.toString(), background: context.colors.error);
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -97,40 +79,7 @@ class CallsScreen extends StatelessWidget {
                     'Calls',
                     style: ChatyTypography.headline(colors.foreground),
                   ),
-                  if (kDebugMode)
-                    Semantics(
-                      button: true,
-                      label: 'Open local call media preview',
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(ChatyRadius.full),
-                        onTap: () => _openDebugPreview(context),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: ChatySpacing.sm,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colors.warning.withValues(alpha: 0.14),
-                            borderRadius: BorderRadius.circular(ChatyRadius.full),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.bug_report_rounded,
-                                size: 14,
-                                color: colors.warning,
-                              ),
-                              const SizedBox(width: 5),
-                              Text(
-                                'Local media QA',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: colors.warning,
-                                ),
-                              ),
-                            ],
+                ],
                           ),
                         ),
                       ),
@@ -150,8 +99,6 @@ class CallsScreen extends StatelessWidget {
                 iconColor: colors.primary,
                 titleColor: colors.foreground,
                 messageColor: colors.foregroundSecondary,
-                actionLabel: kDebugMode ? 'Open local media QA' : null,
-                onAction: kDebugMode ? () => _openDebugPreview(context) : null,
               ),
             )
           else

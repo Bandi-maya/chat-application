@@ -82,40 +82,6 @@ class CallSignalingService extends ChangeNotifier {
     _initialized = true;
   }
 
-  /// Debug-only isolated media preview. It never contacts another user and is
-  /// deliberately impossible in release builds.
-  Future<void> startMockCallForQA({
-    String remoteDisplayName = 'QA participant',
-    String remoteAvatarInitials = 'QA',
-    String remoteAvatarColorHex = '0xFF6366F1',
-    bool isVideo = true,
-  }) async {
-    if (!kDebugMode) {
-      throw StateError('Call preview is unavailable in release builds.');
-    }
-    await _disposeMediaTransport();
-    _currentSession = ChatyCallSession(
-      callId: 'qa_${_uuid.v4()}',
-      remoteUserId: 'qa_local_preview',
-      remoteDisplayName: remoteDisplayName,
-      remoteAvatarInitials: remoteAvatarInitials,
-      remoteAvatarColorHex: remoteAvatarColorHex,
-      isVideo: isVideo,
-      isOutgoing: false,
-      state: CallSessionState.connecting,
-      startedAt: DateTime.now(),
-      audioRoute: isVideo ? AudioRouteType.speaker : AudioRouteType.earpiece,
-    );
-    notifyListeners();
-    try {
-      await _openLocalMedia(isVideo: isVideo);
-    } catch (error) {
-      _currentSession = _currentSession?.copyWith(state: CallSessionState.failed);
-      notifyListeners();
-      rethrow;
-    }
-  }
-
   /// Starts a real outgoing WebRTC call. The direct conversation and call row
   /// are authorized by server-side RPC/RLS before the remote peer can ring.
   Future<void> initiateCall({
@@ -291,21 +257,17 @@ class CallSignalingService extends ChangeNotifier {
     _stopDurationTimer();
     final duration = _callDurationSeconds;
     try {
-      if (!session.callId.startsWith('qa_')) {
-        await _client.rpc(
-          'end_call_session',
-          params: <String, dynamic>{'p_call_id': session.callId},
-        );
-      }
+      await _client.rpc(
+        'end_call_session',
+        params: <String, dynamic>{'p_call_id': session.callId},
+      );
     } catch (error, stackTrace) {
       debugPrint('Chaty call end persistence failed: $error\n$stackTrace');
     } finally {
-      if (!session.callId.startsWith('qa_')) {
-        final direction = session.isOutgoing
-            ? CallDirection.outgoing
-            : (duration > 0 ? CallDirection.incoming : CallDirection.missed);
-        _logCallRecord(direction, duration);
-      }
+      final direction = session.isOutgoing
+          ? CallDirection.outgoing
+          : (duration > 0 ? CallDirection.incoming : CallDirection.missed);
+      _logCallRecord(direction, duration);
       _currentSession = session.copyWith(
         state: CallSessionState.ended,
         endedAt: DateTime.now(),
@@ -622,11 +584,7 @@ class CallSignalingService extends ChangeNotifier {
   Future<void> _persistLocalCandidate(RTCIceCandidate candidate) async {
     final session = _currentSession;
     final myId = _client.auth.currentUser?.id;
-    if (session == null ||
-        myId == null ||
-        session.callId.startsWith('qa_')) {
-      return;
-    }
+    if (session == null || myId == null) return;
     try {
       await _client.from('call_ice_candidates').insert(<String, dynamic>{
         'call_id': session.callId,
@@ -718,9 +676,7 @@ class CallSignalingService extends ChangeNotifier {
     );
     debugPrint('Chaty call transport failed: $message');
     notifyListeners();
-    if (!session.callId.startsWith('qa_')) {
-      unawaited(_markServerCallFailed(session.callId));
-    }
+    unawaited(_markServerCallFailed(session.callId));
     unawaited(_disposeMediaTransport());
   }
 
