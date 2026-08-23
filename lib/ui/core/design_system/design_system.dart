@@ -1,4 +1,9 @@
 export 'tokens/app_tokens.dart';
 export 'components/app_components.dart';
 export 'components/chaty_kit.dart';
+export 'components/signature_components.dart';
+export 'components/call_activity_capsule.dart';
+export 'chaty_motion.dart';
+export 'chaty_haptics.dart';
+export 'chaty_adaptive.dart';
 export '../theme/app_theme.dart';
