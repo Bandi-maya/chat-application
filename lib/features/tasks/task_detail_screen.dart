@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../data/repositories/mock_data_store.dart';
+import '../../data/repositories/chaty_data_store.dart';
 import '../../domain/models/chat_task.dart';
 import '../../domain/models/user_profile.dart';
 import '../../ui/core/widgets/app_avatar.dart';
@@ -11,7 +11,7 @@ import '../../ui/core/design_system/design_system.dart';
 class TaskDetailScreen extends StatefulWidget {
   final ChatTask task;
   final ThemeConfig theme;
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
 
   const TaskDetailScreen({
     super.key,

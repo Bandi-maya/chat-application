@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 
-import '../../data/repositories/mock_data_store.dart';
+import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/notification_service.dart';
 import '../../data/services/profile_media_service.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
@@ -19,7 +19,7 @@ import 'profile_actions.dart';
 class ProfileScreen extends StatelessWidget {
   final ChatyPreferencesController preferencesController;
   final ThemeController themeController;
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
   final ChatyNotificationService notificationService;
 
   const ProfileScreen({

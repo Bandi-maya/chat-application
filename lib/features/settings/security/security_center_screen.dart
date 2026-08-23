@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../data/repositories/mock_data_store.dart';
+import '../../../data/repositories/chaty_data_store.dart';
 import '../../../data/services/local_lock_service.dart';
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
@@ -553,7 +553,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
                   : colors.foregroundSecondary,
               onTap: () => LockedChatsScreen.open(
                 context,
-                dataStore: locator<MockDataStore>(),
+                dataStore: locator<ChatyDataStore>(),
                 preferencesController: widget.preferencesController,
                 themeController: locator<ThemeController>(),
               ),

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:chat/data/repositories/mock_data_store.dart';
+import 'package:chat/data/repositories/chaty_data_store.dart';
 import 'package:chat/data/services/notification_service.dart';
 import 'package:chat/injection/locator.dart';
 import 'package:chat/ui/core/controllers/preferences_controller.dart';
@@ -396,7 +396,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
   /// to anyone. It intentionally respects every active setting (master
   /// switch, position, duration, avatar size, radius, elevation, colors).
   void _fireTestToast() {
-    final me = locator<MockDataStore>().currentUser;
+    final me = locator<ChatyDataStore>().currentUser;
     widget.notificationService.triggerEventNotification(
       title: '${me.displayName} is online',
       body: 'Preview — your toast style, rendered locally',

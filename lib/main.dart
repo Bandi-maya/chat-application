@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:chat/data/repositories/mock_data_store.dart';
+import 'package:chat/data/repositories/chaty_data_store.dart';
 import 'package:chat/data/services/backend_service.dart';
 import 'package:chat/data/services/call_signaling_service.dart';
 import 'package:chat/data/services/notification_service.dart';
@@ -123,7 +123,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     }
     _automationService = MessageAutomationService(
       preferencesController: _preferencesController,
-      dataStore: locator<MockDataStore>(),
+      dataStore: locator<ChatyDataStore>(),
     );
     _authUiSubscription = Supabase.instance.client.auth.onAuthStateChange
         .listen(_handleAuthUiEvent);

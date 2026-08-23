@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../data/repositories/mock_data_store.dart';
+import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/notification_service.dart';
 import '../../domain/models/user_profile.dart';
 import '../../injection/locator.dart';
@@ -28,7 +28,7 @@ import 'theme_editor_screen.dart';
 class SettingsRootScreen extends StatelessWidget {
   final ChatyPreferencesController preferencesController;
   final ThemeController themeController;
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
   final ChatyNotificationService notificationService;
 
   const SettingsRootScreen({

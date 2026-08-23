@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../data/repositories/mock_data_store.dart';
+import '../../../data/repositories/chaty_data_store.dart';
 import '../../../data/services/gb_feature_backend_service.dart';
 import '../../../domain/models/preferences.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
@@ -9,7 +9,7 @@ import '../../../ui/core/theme/app_theme.dart';
 
 class MessageManagementPage extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
 
   const MessageManagementPage({
     super.key,

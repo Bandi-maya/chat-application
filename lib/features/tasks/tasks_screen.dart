@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/models/chat_task.dart';
 import '../../domain/models/task_workflow.dart';
-import '../../data/repositories/mock_data_store.dart';
+import '../../data/repositories/chaty_data_store.dart';
 import '../../ui/core/widgets/status_badge.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/design_system/design_system.dart';
@@ -15,7 +15,7 @@ import 'task_detail_screen.dart';
 
 class TasksScreen extends StatefulWidget {
   final ThemeConfig theme;
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
 
   const TasksScreen({super.key, required this.theme, required this.dataStore});
 
@@ -351,7 +351,7 @@ class _TasksScreenState extends State<TasksScreen>
   Widget _buildListView(
     List<ChatTask> tasks,
     ThemeConfig theme,
-    MockDataStore dataStore,
+    ChatyDataStore dataStore,
     ThemeData themeData,
   ) {
     final filtered = _filtered(tasks);
@@ -480,7 +480,7 @@ class _TasksScreenState extends State<TasksScreen>
   Widget _buildKanbanView(
     List<ChatTask> tasks,
     ThemeConfig theme,
-    MockDataStore dataStore,
+    ChatyDataStore dataStore,
     ThemeData themeData,
   ) {
     final filtered = _filtered(tasks);

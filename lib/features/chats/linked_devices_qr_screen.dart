@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import '../../data/repositories/mock_data_store.dart';
+import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/contact_relationship_service.dart';
 import '../../domain/models/other_models.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
@@ -12,7 +12,7 @@ import '../../ui/core/design_system/design_system.dart';
 import 'chat_detail_screen.dart';
 
 class LinkedDevicesQrScreen extends StatefulWidget {
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
   final ContactRelationshipService relationshipService;
   final ChatyPreferencesController preferencesController;
   final ThemeController themeController;

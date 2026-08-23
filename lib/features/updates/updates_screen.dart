@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../data/repositories/mock_data_store.dart';
+import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/status_service.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/widgets/app_avatar.dart';
@@ -9,7 +9,7 @@ import '../../ui/core/design_system/design_system.dart';
 
 class UpdatesScreen extends StatefulWidget {
   final ThemeConfig theme;
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
   final ChatyPreferencesController preferencesController;
 
   const UpdatesScreen({

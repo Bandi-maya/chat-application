@@ -1,6 +1,6 @@
 import 'package:get_it/get_it.dart';
 import 'package:chat/ui/core/theme/theme_controller.dart';
-import 'package:chat/data/repositories/mock_data_store.dart';
+import 'package:chat/data/repositories/chaty_data_store.dart';
 import 'package:chat/data/services/backend_service.dart';
 import 'package:chat/data/services/contact_relationship_service.dart';
 import 'package:chat/data/services/local_lock_service.dart';
@@ -28,7 +28,7 @@ void setupLocator() {
   locator.registerLazySingleton<ChatyBackendService>(
     () => ChatyBackendService(),
   );
-  locator.registerLazySingleton<MockDataStore>(() => MockDataStore());
+  locator.registerLazySingleton<ChatyDataStore>(() => ChatyDataStore());
   locator.registerLazySingleton<ChatyPreferencesController>(
     () => ChatyPreferencesController(),
   );
@@ -44,12 +44,12 @@ void setupLocator() {
   locator.registerLazySingleton<NotificationChannelManager>(
     () => NotificationChannelManager(
       preferences: locator<ChatyPreferencesController>(),
-      dataStore: locator<MockDataStore>(),
+      dataStore: locator<ChatyDataStore>(),
     ),
   );
   locator.registerLazySingleton<CallSignalingService>(
     () => CallSignalingService(
-      dataStore: locator<MockDataStore>(),
+      dataStore: locator<ChatyDataStore>(),
       backend: locator<ChatyBackendService>(),
     ),
   );
@@ -84,7 +84,7 @@ void setupLocator() {
   locator.registerFactory<MessageAutomationService>(
     () => MessageAutomationService(
       preferencesController: locator<ChatyPreferencesController>(),
-      dataStore: locator<MockDataStore>(),
+      dataStore: locator<ChatyDataStore>(),
     ),
   );
 }

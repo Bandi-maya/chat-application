@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../data/repositories/mock_data_store.dart';
+import '../../data/repositories/chaty_data_store.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/user_profile.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
@@ -15,7 +15,7 @@ import '../chats/locked_chats_screen.dart';
 
 class GlobalSearchScreen extends StatefulWidget {
   final ThemeConfig theme;
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
   final ChatyPreferencesController preferencesController;
   final ThemeController themeController;
 

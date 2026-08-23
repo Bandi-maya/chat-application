@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../data/repositories/mock_data_store.dart';
+import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/contact_relationship_service.dart';
 import '../../data/services/rich_chat_realtime_service.dart';
 import '../../domain/models/chat_message.dart';
@@ -13,7 +13,7 @@ import 'contact_privacy_screen.dart';
 
 class ContactInfoScreen extends StatefulWidget {
   final ThemeConfig theme;
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
   final Conversation conversation;
   final UserProfile contact;
   final ContactRelationshipService relationshipService;

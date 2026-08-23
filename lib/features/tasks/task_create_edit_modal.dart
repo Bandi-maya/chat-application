@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../data/repositories/mock_data_store.dart';
+import '../../data/repositories/chaty_data_store.dart';
 import '../../domain/models/chat_task.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/user_profile.dart';
@@ -8,7 +8,7 @@ import '../../ui/core/design_system/design_system.dart';
 
 class TaskCreateEditModal extends StatefulWidget {
   final ThemeConfig theme;
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
   final String sourceConversationId;
   final String? initialTitle;
   final String? sourceMessageId;

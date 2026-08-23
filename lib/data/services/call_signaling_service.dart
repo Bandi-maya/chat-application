@@ -7,7 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../domain/models/call_state.dart';
 import '../../domain/models/other_models.dart';
-import '../repositories/mock_data_store.dart';
+import '../repositories/chaty_data_store.dart';
 import 'backend_service.dart';
 
 /// Production call-session controller.
@@ -18,7 +18,7 @@ import 'backend_service.dart';
 /// connected state starts the call timer and exposes a connected UI state.
 class CallSignalingService extends ChangeNotifier {
   final SupabaseClient _client;
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
   final ChatyBackendService backend;
   final Uuid _uuid = const Uuid();
 

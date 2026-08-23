@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../data/repositories/mock_data_store.dart';
+import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/call_signaling_service.dart';
 import '../../domain/models/other_models.dart';
 import '../../injection/locator.dart';
@@ -11,7 +11,7 @@ import 'ongoing_call_screen.dart';
 
 class CallsScreen extends StatelessWidget {
   final ThemeConfig theme;
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
 
   const CallsScreen({super.key, required this.theme, required this.dataStore});
 

@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../ui/core/controllers/preferences_controller.dart';
-import '../repositories/mock_data_store.dart';
+import '../repositories/chaty_data_store.dart';
 import 'gb_feature_backend_service.dart';
 
 /// Keeps the account-side automation configuration synchronized with Supabase.
@@ -11,7 +11,7 @@ import 'gb_feature_backend_service.dart';
 /// working when the mobile process is backgrounded or terminated.
 class MessageAutomationService {
   final ChatyPreferencesController preferencesController;
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
   final GbFeatureBackendService _backend = GbFeatureBackendService();
   Timer? _syncTimer;
   bool _syncing = false;

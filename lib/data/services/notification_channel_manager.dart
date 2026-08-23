@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
-import '../repositories/mock_data_store.dart';
+import '../repositories/chaty_data_store.dart';
 
 /// Notification payload received from push or local delivery.
 class NotificationPayload {
@@ -58,7 +58,7 @@ class NotificationChannelManager extends ChangeNotifier {
   static const String _badgeCountKey = 'chaty_unread_badge_count';
 
   final ChatyPreferencesController preferences;
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
 
   int _badgeCount = 0;
   bool _educationShown = false;

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../data/repositories/mock_data_store.dart';
+import '../../data/repositories/chaty_data_store.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/design_system/design_system.dart';
 
 class GroupInfoScreen extends StatelessWidget {
   final ThemeConfig theme;
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
   final String conversationId;
 
   const GroupInfoScreen({

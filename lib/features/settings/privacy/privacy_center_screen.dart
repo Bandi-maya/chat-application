@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../data/repositories/mock_data_store.dart';
+import '../../../data/repositories/chaty_data_store.dart';
 import '../../../data/services/gb_feature_backend_service.dart';
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
@@ -33,7 +33,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
   /// Multi-select picker backing the 'My Contacts Except…' audience for
   /// Who Can Call Me. Persists the excluded user IDs on save.
   Future<void> _editCallExceptions() async {
-    final dataStore = locator<MockDataStore>();
+    final dataStore = locator<ChatyDataStore>();
     final selected = Set<String>.of(
       widget.preferencesController.privacy.whoCanCallMeExceptions,
     );
@@ -436,7 +436,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
   }
 
   Future<void> _openBlockSearch() async {
-    final dataStore = locator<MockDataStore>();
+    final dataStore = locator<ChatyDataStore>();
     final searchController = TextEditingController();
     List<dynamic> results = const <dynamic>[];
     var busy = false;

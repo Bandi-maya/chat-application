@@ -20,7 +20,7 @@ import '../services/gb_feature_backend_service.dart';
 /// The historical class name is kept so every existing screen/option can stay
 /// intact, but its data now comes from [ChatyBackendService] and Supabase rather
 /// than seeded/demo records.
-class MockDataStore extends ChangeNotifier {
+class ChatyDataStore extends ChangeNotifier {
   final ChatyBackendService _backend = ChatyBackendService();
   final GbFeatureBackendService _gbBackend = GbFeatureBackendService();
   final Map<String, Map<String, DateTime>> _typingByConversation =
@@ -29,7 +29,7 @@ class MockDataStore extends ChangeNotifier {
   StreamSubscription<AuthState>? _authSubscription;
   Timer? _typingExpiryTimer;
 
-  MockDataStore() {
+  ChatyDataStore() {
     _backend.addListener(_onBackendChanged);
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
       state,

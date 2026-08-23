@@ -7,7 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../data/repositories/mock_data_store.dart';
+import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/chat_media_service.dart';
 import '../../data/services/gb_feature_backend_service.dart';
 import '../../domain/models/chat_message.dart';
@@ -21,7 +21,7 @@ class ChatAttachmentActions {
   });
 
   final String conversationId;
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
   final ChatyPreferencesController preferencesController;
   final ChatMediaService _media = ChatMediaService();
   final GbFeatureBackendService _server = GbFeatureBackendService();

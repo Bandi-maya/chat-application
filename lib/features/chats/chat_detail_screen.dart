@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../ui/core/formatting/chat_formatters.dart';
 import '../../ui/core/theme/app_theme.dart';
-import '../../data/repositories/mock_data_store.dart';
+import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/contact_relationship_service.dart';
 import '../../data/services/rich_chat_realtime_service.dart';
 import '../../data/services/voice_note_service.dart';
@@ -38,7 +38,7 @@ import 'group_info_screen.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final ThemeConfig theme;
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
   final String conversationId;
   final ChatyPreferencesController preferencesController;
   final ThemeController? themeController;

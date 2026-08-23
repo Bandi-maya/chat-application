@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../data/repositories/mock_data_store.dart';
+import '../../data/repositories/chaty_data_store.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../chats/main_navigation_shell.dart';
@@ -14,7 +14,7 @@ class ProfileSetupScreen extends StatefulWidget {
 
 class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   late final ThemeController themeController;
-  late final MockDataStore dataStore;
+  late final ChatyDataStore dataStore;
   late final TextEditingController _nameCtrl;
   late final TextEditingController _usernameCtrl;
   late final TextEditingController _aboutCtrl;
@@ -23,7 +23,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   void initState() {
     super.initState();
     themeController = locator<ThemeController>();
-    dataStore = locator<MockDataStore>();
+    dataStore = locator<ChatyDataStore>();
     final user = dataStore.currentUser;
     _nameCtrl = TextEditingController(text: user.displayName);
     _usernameCtrl = TextEditingController(text: user.username);

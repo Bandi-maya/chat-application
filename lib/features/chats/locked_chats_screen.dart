@@ -4,14 +4,14 @@ import 'package:chat/domain/models/conversation.dart';
 import 'package:chat/ui/core/controllers/preferences_controller.dart';
 import 'package:chat/ui/core/design_system/design_system.dart';
 import 'package:chat/ui/core/widgets/app_avatar.dart';
-import 'package:chat/data/repositories/mock_data_store.dart';
+import 'package:chat/data/repositories/chaty_data_store.dart';
 import 'package:chat/data/services/local_lock_service.dart';
 import 'package:chat/data/services/protected_resource_gate.dart';
 import 'package:chat/injection/locator.dart';
 import 'chat_detail_screen.dart';
 
 class LockedChatsScreen extends StatefulWidget {
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
   final ChatyPreferencesController preferencesController;
   final ThemeController themeController;
 
@@ -24,7 +24,7 @@ class LockedChatsScreen extends StatefulWidget {
 
   static Future<void> open(
     BuildContext context, {
-    required MockDataStore dataStore,
+    required ChatyDataStore dataStore,
     required ChatyPreferencesController preferencesController,
     required ThemeController themeController,
   }) async {

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../../ui/core/design_system/settings_primitives.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
-import '../../data/repositories/mock_data_store.dart';
+import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/notification_service.dart';
 import 'settings_search_delegate.dart';
 import 'privacy/privacy_center_screen.dart';
@@ -20,7 +20,7 @@ import '../auth/welcome_screen.dart';
 class SettingsScreen extends StatelessWidget {
   final ChatyPreferencesController preferencesController;
   final ThemeController themeController;
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
   final ChatyNotificationService notificationService;
 
   const SettingsScreen({

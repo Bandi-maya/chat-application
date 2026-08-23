@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../data/repositories/mock_data_store.dart';
+import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/notification_service.dart';
 import '../../domain/models/conversation.dart';
 import '../../ui/core/controllers/appearance_variant_controller.dart';
@@ -82,7 +82,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   @override
   Widget build(BuildContext context) {
     final themeController = locator<ThemeController>();
-    final dataStore = locator<MockDataStore>();
+    final dataStore = locator<ChatyDataStore>();
     final preferencesController = locator<ChatyPreferencesController>();
     final appearanceController = locator<AppearanceVariantController>();
     final notificationService = locator<ChatyNotificationService>();
@@ -520,7 +520,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   // Real signed-in user identity (was a hardcoded letter).
                   Builder(
                     builder: (context) {
-                      final user = locator<MockDataStore>().currentUser;
+                      final user = locator<ChatyDataStore>().currentUser;
                       return CircleAvatar(
                         radius: 16,
                         backgroundColor: colors.surfaceSecondary,
@@ -578,7 +578,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
     final colors = context.colors;
     final prefs = locator<ChatyPreferencesController>();
-    final dataStore = locator<MockDataStore>();
+    final dataStore = locator<ChatyDataStore>();
     final user = dataStore.currentUser;
 
     final displayName = prefs.home.myNameOverride.isNotEmpty

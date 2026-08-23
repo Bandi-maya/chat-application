@@ -4,14 +4,14 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
 import '../../domain/models/chat_message.dart';
-import '../repositories/mock_data_store.dart';
+import '../repositories/chaty_data_store.dart';
 import 'chat_media_service.dart';
 
 class VoiceNoteService {
   VoiceNoteService({required this.conversationId, required this.dataStore});
 
   final String conversationId;
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
   final AudioRecorder _recorder = AudioRecorder();
   final ChatMediaService _media = ChatMediaService();
   DateTime? _startedAt;

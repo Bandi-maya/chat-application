@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
-import '../../data/repositories/mock_data_store.dart';
+import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/backend_service.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/design_system/design_system.dart';
@@ -19,7 +19,7 @@ import '../../data/services/profile_media_service.dart';
 /// the original Settings implementation — only the location is shared now.
 Future<void> showChatyProfileEditor(
   BuildContext context,
-  MockDataStore dataStore,
+  ChatyDataStore dataStore,
 ) async {
   final user = dataStore.currentUser;
   final backend = locator<ChatyBackendService>();
@@ -229,7 +229,7 @@ String chatyInitialsFor(String displayName) {
 /// (matching mainstream messaging behavior).
 class _ProfilePhotoRow extends StatefulWidget {
   final dynamic user;
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
 
   const _ProfilePhotoRow({required this.user, required this.dataStore});
 

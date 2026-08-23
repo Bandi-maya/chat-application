@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import '../../domain/models/preferences.dart';
 import '../../ui/core/formatting/chat_formatters.dart';
 import '../../ui/core/theme/app_theme.dart';
-import '../../data/repositories/mock_data_store.dart';
+import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/notification_service.dart';
 import '../../data/services/contact_relationship_service.dart';
 import '../../data/services/rich_chat_realtime_service.dart';
@@ -31,7 +31,7 @@ import 'new_chat_screen.dart';
 
 class ChatsHomeScreen extends StatefulWidget {
   final ThemeConfig theme;
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
   final ChatyPreferencesController preferencesController;
   final ThemeController themeController;
   final ChatyNotificationService notificationService;
@@ -1426,7 +1426,7 @@ class _EmptyChats extends StatelessWidget {
 }
 
 class _ArchivedChatsScreen extends StatefulWidget {
-  final MockDataStore dataStore;
+  final ChatyDataStore dataStore;
   final ChatyPreferencesController preferencesController;
   final ThemeController themeController;
   final ChatyNotificationService notificationService;
