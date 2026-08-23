@@ -17,12 +17,14 @@ permissions:
 
 jobs:
   verify-and-build:
+    # The integration PR has a stronger gate that first reconciles all isolated
+    # phase sources and provisions the OpenMLS native test asset. Running this
+    # generic job against its pre-reconciliation PR merge tree creates false
+    # failures, so that PR is owned exclusively by integration-release.yml.
+    if: github.event_name != 'pull_request' || github.head_ref != 'integration/phases-1-8'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      # This workflow proves release-mode compilation only. The final signed
-      # production APK is built exclusively by integration-release.yml with a
-      # persistent private keystore and a non-example application id.
       CHATY_ALLOW_CI_DEBUG_SIGNING: 'true'
     steps:
       - name: Checkout
@@ -48,6 +50,21 @@ jobs:
 
       - name: Resolve dependencies
         run: flutter pub get
+
+      - name: Provision verified OpenMLS Linux native asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tool
+          cat > tool/openmls_ci_probe.dart <<'DART'
+          import 'package:openmls/openmls.dart';
+          Future<void> main() async {
+            await Openmls.init();
+            Openmls.cleanup();
+          }
+          DART
+          dart run tool/openmls_ci_probe.dart
+          rm -f tool/openmls_ci_probe.dart
 
       - name: Analyze
         run: flutter analyze --no-fatal-infos
