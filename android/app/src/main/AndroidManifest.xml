@@ -67,7 +67,7 @@
 
 
         <activity-alias
-            android:name=".LauncherWarm"
+            android:name="com.example.chat.LauncherWarm"
             android:targetActivity=".MainActivity"
             android:enabled="true"
             android:exported="true"

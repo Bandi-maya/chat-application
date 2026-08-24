@@ -1,5 +1,4 @@
-import 'dart:async';
-import 'dart:math' as math;
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 
@@ -11,10 +10,10 @@ import 'package:chat/ui/core/controllers/app_icon_controller.dart';
 import 'package:chat/ui/core/widgets/app_brand_icon.dart';
 import 'package:chat/ui/core/theme/app_theme.dart';
 
-/// Ultra-fast ~380ms branded startup motion that smoothly hands off to Home.
+/// Instant, ultra-fast WhatsApp-like startup handoff (~120ms) with clean fade-in.
 ///
 /// Never blocks the first frame on heavy network or database work.
-/// Features a crisp dimensional message brand mark with subtle scale & depth settle.
+/// Features clean, instant transition directly into Home or Welcome screen.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -25,8 +24,6 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _animCtrl;
-  late final Animation<double> _scaleAnim;
-  late final Animation<double> _rotateAnim;
   late final Animation<double> _fadeAnim;
 
   @override
@@ -34,33 +31,13 @@ class _SplashScreenState extends State<SplashScreen>
     super.initState();
     _animCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 380),
+      duration: const Duration(milliseconds: 100),
     );
 
-    _scaleAnim = TweenSequence<double>([
-      TweenSequenceItem(
-        tween: Tween<double>(begin: 0.90, end: 1.05)
-            .chain(CurveTween(curve: Curves.easeOutCubic)),
-        weight: 60,
-      ),
-      TweenSequenceItem(
-        tween: Tween<double>(begin: 1.05, end: 1.0)
-            .chain(CurveTween(curve: Curves.easeInOut)),
-        weight: 40,
-      ),
-    ]).animate(_animCtrl);
-
-    _rotateAnim = Tween<double>(begin: -0.06, end: 0.0).animate(
+    _fadeAnim = Tween<double>(begin: 0.8, end: 1.0).animate(
       CurvedAnimation(
         parent: _animCtrl,
-        curve: const Interval(0.0, 0.75, curve: Curves.easeOutBack),
-      ),
-    );
-
-    _fadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animCtrl,
-        curve: const Interval(0.0, 0.45, curve: Curves.easeIn),
+        curve: Curves.easeOut,
       ),
     );
 
@@ -85,7 +62,7 @@ class _SplashScreenState extends State<SplashScreen>
     }
 
     final elapsed = DateTime.now().difference(start).inMilliseconds;
-    final remaining = 380 - elapsed;
+    final remaining = 120 - elapsed;
     if (remaining > 0) {
       await Future<void>.delayed(Duration(milliseconds: remaining));
     }
@@ -103,11 +80,11 @@ class _SplashScreenState extends State<SplashScreen>
             FadeTransition(
           opacity: CurvedAnimation(
             parent: animation,
-            curve: Curves.easeInOut,
+            curve: Curves.easeOut,
           ),
           child: child,
         ),
-        transitionDuration: const Duration(milliseconds: 140),
+        transitionDuration: const Duration(milliseconds: 80),
       ),
     );
   }
@@ -120,39 +97,16 @@ class _SplashScreenState extends State<SplashScreen>
     return Scaffold(
       backgroundColor: colors.background,
       body: Center(
-        child: AnimatedBuilder(
-          animation: _animCtrl,
-          builder: (context, _) {
-            return FadeTransition(
-              opacity: _fadeAnim,
-              child: Transform.rotate(
-                angle: _rotateAnim.value * math.pi,
-                child: Transform.scale(
-                  scale: _scaleAnim.value,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: colors.primary.withValues(alpha: 0.25),
-                          blurRadius: 36,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(26),
-                      child: ChatyBrandIcon(
-                        controller: appIconController,
-                        size: 88,
-                        borderRadius: 26,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
+        child: FadeTransition(
+          opacity: _fadeAnim,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(26),
+            child: ChatyBrandIcon(
+              controller: appIconController,
+              size: 80,
+              borderRadius: 26,
+            ),
+          ),
         ),
       ),
     );

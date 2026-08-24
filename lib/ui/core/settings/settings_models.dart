@@ -50,16 +50,10 @@ enum SettingsCategory {
     subtitle: 'Call permissions, who can call you & call appearance',
     icon: Icons.call_outlined,
   ),
-  updatesAndMedia(
-    id: 'updates_media',
-    title: 'Updates & Media',
-    subtitle: 'Media quality, auto-download limits & status duration',
-    icon: Icons.perm_media_outlined,
-  ),
-  storage(
-    id: 'storage',
+  storageAndMedia(
+    id: 'storage_media',
     title: 'Storage & Data',
-    subtitle: 'Network usage, cache management & storage cleaner',
+    subtitle: 'Media quality, upload limits & device cache retention',
     icon: Icons.storage_rounded,
   ),
   devices(
@@ -68,17 +62,17 @@ enum SettingsCategory {
     subtitle: 'Active web/desktop sessions, QR code scanner & sync',
     icon: Icons.devices_rounded,
   ),
-  accessibility(
-    id: 'accessibility',
-    title: 'Accessibility',
-    subtitle: 'Font scaling, high contrast & reduced motion',
-    icon: Icons.accessibility_new_rounded,
+  effects(
+    id: 'effects',
+    title: 'Interactive Effects',
+    subtitle: 'Touch particle animations, navigation effects & falling items',
+    icon: Icons.animation_rounded,
   ),
-  advanced(
-    id: 'advanced',
-    title: 'Advanced',
-    subtitle: 'Power-user tweaks, experimental toggles & system diagnostics',
-    icon: Icons.tune_rounded,
+  permissions(
+    id: 'permissions',
+    title: 'System Permissions',
+    subtitle: 'Hardware, notifications, storage & OS rights',
+    icon: Icons.admin_panel_settings_outlined,
   ),
   about(
     id: 'about',
@@ -141,14 +135,14 @@ class SettingDefinition<T> {
 class SettingsCluster {
   final String id;
   final String title;
-  final String? description;
+  final String description;
   final SettingsCategory category;
   final List<SettingDefinition> settings;
 
   const SettingsCluster({
     required this.id,
     required this.title,
-    this.description,
+    required this.description,
     required this.category,
     required this.settings,
   });

@@ -9,15 +9,18 @@ import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/design_system/settings_primitives.dart';
 import '../../ui/core/theme/theme_controller.dart';
 import '../../ui/core/widgets/app_avatar.dart';
-import '../../ui/core/widgets/app_brand_icon.dart';
 import '../../ui/core/settings/settings_registry.dart';
-import '../profile/profile_actions.dart';
+import 'account/account_settings_screen.dart';
 import 'appearance/app_icon_settings_screen.dart';
 import 'appearance/universal_appearance_screen.dart';
+import 'calls/call_settings_screen.dart';
+import 'templates/templates_settings_screen.dart';
+import '../../ui/core/templates/template_controller.dart';
+import '../profile/profile_actions.dart';
 import 'conversation/conversation_settings_page.dart';
 import 'effects/navigation_effects_page.dart';
-import 'gb_features/gb_feature_center_screen.dart';
 import 'home/home_screen_settings_page.dart';
+import 'media/storage_and_media_settings_screen.dart';
 import 'message_management/message_management_page.dart';
 import 'notifications/notification_settings_page.dart';
 import 'permissions/system_permissions_screen.dart';
@@ -79,7 +82,10 @@ class SettingsRootScreen extends StatelessWidget {
   Widget _destinationForRoute(String route) {
     return switch (route) {
       '/settings/account' => _reactive(
-          () => PrivacyCenterScreen(preferencesController: preferencesController),
+          () => AccountSettingsScreen(
+            preferencesController: preferencesController,
+            dataStore: dataStore,
+          ),
         ),
       '/settings/privacy' => _reactive(
           () => PrivacyCenterScreen(preferencesController: preferencesController),
@@ -97,6 +103,7 @@ class SettingsRootScreen extends StatelessWidget {
           ),
         ),
       '/settings/themes' => ThemeEditorScreen(themeController: themeController),
+      '/settings/templates' => const TemplatesSettingsScreen(),
       '/settings/app_icon' => AppIconSettingsScreen(
           appIconController: _appIconController,
         ),
@@ -112,17 +119,26 @@ class SettingsRootScreen extends StatelessWidget {
             notificationService: notificationService,
           ),
         ),
+      '/settings/calls' => _reactive(
+          () => CallSettingsScreen(preferencesController: preferencesController),
+        ),
+      '/settings/storage' => _reactive(
+          () => StorageAndMediaSettingsScreen(preferencesController: preferencesController),
+        ),
+      '/settings/effects' => _reactive(
+          () => NavigationEffectsPage(preferencesController: preferencesController),
+        ),
       '/settings/permissions' => _reactive(
           () => SystemPermissionsScreen(
             preferencesController: preferencesController,
             notificationService: notificationService,
           ),
         ),
-      '/settings/advanced' => _reactive(
-          () => GbFeatureCenterScreen(preferencesController: preferencesController),
-        ),
       _ => _reactive(
-          () => UniversalAppearanceScreen(preferencesController: preferencesController),
+          () => AccountSettingsScreen(
+            preferencesController: preferencesController,
+            dataStore: dataStore,
+          ),
         ),
     };
   }
@@ -155,27 +171,38 @@ class SettingsRootScreen extends StatelessWidget {
           const SizedBox(height: 8),
 
           // -------------------------------------------------------------------
-          // ACCOUNT & SECURITY
+          // 1. ACCOUNT
           // -------------------------------------------------------------------
           ChatySettingsSection(
-            title: 'Account & Security',
+            title: 'Account',
             children: [
-              if (!preferencesController.privacy.hidePrivacyOption)
-                ChatySettingsTile(
-                  icon: Icons.visibility_off_rounded,
-                  title: 'Privacy',
-                  subtitle: 'Last seen, read receipts, status & chat privacy',
-                  onTap: () => _push(
-                    context,
-                    () => PrivacyCenterScreen(
-                      preferencesController: preferencesController,
-                    ),
+              ChatySettingsTile(
+                icon: Icons.person_outline_rounded,
+                title: 'Account & Profile',
+                subtitle: 'Display name, username, bio & credentials',
+                onTap: () => _push(
+                  context,
+                  () => AccountSettingsScreen(
+                    preferencesController: preferencesController,
+                    dataStore: dataStore,
                   ),
                 ),
+              ),
+              ChatySettingsTile(
+                icon: Icons.visibility_off_outlined,
+                title: 'Privacy',
+                subtitle: 'Last seen, online presence, receipts & anti-delete',
+                onTap: () => _push(
+                  context,
+                  () => PrivacyCenterScreen(
+                    preferencesController: preferencesController,
+                  ),
+                ),
+              ),
               ChatySettingsTile(
                 icon: Icons.lock_outline_rounded,
-                title: 'Security & App Lock',
-                subtitle: 'Biometric, PIN, pattern lock and screenshot guard',
+                title: 'Security & Lock',
+                subtitle: 'App lock, biometric, PIN & hidden chats',
                 onTap: () => _push(
                   context,
                   () => SecurityCenterScreen(
@@ -183,45 +210,64 @@ class SettingsRootScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              ChatySettingsTile(
-                icon: Icons.admin_panel_settings_outlined,
-                title: 'System Permissions',
-                subtitle: 'Camera, microphone, media, contacts and notifications',
-                onTap: () => _push(
-                  context,
-                  () => SystemPermissionsScreen(
-                    preferencesController: preferencesController,
-                    notificationService: notificationService,
-                  ),
-                ),
-              ),
             ],
           ),
 
           // -------------------------------------------------------------------
-          // EXPERIENCE & DESIGN
+          // 2. EXPERIENCE
           // -------------------------------------------------------------------
           ChatySettingsSection(
-            title: 'Experience & Design',
+            title: 'Experience',
             children: [
               ChatySettingsTile(
-                icon: Icons.palette_rounded,
-                title: 'Theme & Design Studio',
-                subtitle: 'Dark, light & custom presets, palette generator',
+                icon: Icons.chat_bubble_outline_rounded,
+                title: 'Chats',
+                subtitle: 'Bubbles, ticks, swipe actions & animated emoji',
+                onTap: () => _push(
+                  context,
+                  () => ConversationSettingsPage(
+                    preferencesController: preferencesController,
+                  ),
+                ),
+              ),
+              ChatySettingsTile(
+                icon: Icons.palette_outlined,
+                title: 'Appearance & Themes',
+                subtitle: 'Theme presets, custom palette & typography',
                 onTap: () => _push(
                   context,
                   () => ThemeEditorScreen(themeController: themeController),
                   listenToPreferences: false,
                 ),
               ),
+              ListenableBuilder(
+                listenable: locator<TemplateController>(),
+                builder: (context, _) {
+                  final templateCtrl = locator<TemplateController>();
+                  final activeTemplate = templateCtrl.baseTemplate.displayName;
+                  final overrideCount = templateCtrl.componentOverrides.length;
+                  final subtitle = overrideCount > 0
+                      ? ' •  component overrides'
+                      : activeTemplate;
+
+                  return ChatySettingsTile(
+                    icon: Icons.dashboard_customize_rounded,
+                    title: 'Templates',
+                    subtitle: subtitle,
+                    badgeText: 'NEW',
+                    badgeColor: Theme.of(context).colorScheme.primary,
+                    onTap: () => _push(
+                      context,
+                      () => const TemplatesSettingsScreen(),
+                      listenToPreferences: false,
+                    ),
+                  );
+                },
+              ),
               ChatySettingsTile(
-                leading: ChatyBrandIcon(
-                  controller: appIconController,
-                  size: 36,
-                  borderRadius: 10,
-                ),
+                icon: Icons.apps_rounded,
                 title: 'App Icon',
-                subtitle: 'Launcher: ',
+                subtitle: 'Launcher icon & custom brand artwork',
                 onTap: () => _push(
                   context,
                   () => AppIconSettingsScreen(
@@ -233,21 +279,10 @@ class SettingsRootScreen extends StatelessWidget {
               ChatySettingsTile(
                 icon: Icons.home_outlined,
                 title: 'Home & Navigation',
-                subtitle: 'Layout mode, bottom bar design, header & stories strip',
+                subtitle: 'Layout mode, stories strip & group separation',
                 onTap: () => _push(
                   context,
                   () => HomeScreenSettingsPage(
-                    preferencesController: preferencesController,
-                  ),
-                ),
-              ),
-              ChatySettingsTile(
-                icon: Icons.auto_awesome_rounded,
-                title: 'Typography & Motion',
-                subtitle: 'Text density, font scale & screen transitions',
-                onTap: () => _push(
-                  context,
-                  () => UniversalAppearanceScreen(
                     preferencesController: preferencesController,
                   ),
                 ),
@@ -256,26 +291,67 @@ class SettingsRootScreen extends StatelessWidget {
           ),
 
           // -------------------------------------------------------------------
-          // CHATS & NOTIFICATIONS
+          // 3. COMMUNICATION
           // -------------------------------------------------------------------
           ChatySettingsSection(
-            title: 'Chats & Notifications',
+            title: 'Communication',
             children: [
               ChatySettingsTile(
-                icon: Icons.chat_bubble_outline_rounded,
-                title: 'Conversation & Bubbles',
-                subtitle: '48 bubble styles, 16 ticks, wallpaper & quick sidebar',
+                icon: Icons.notifications_outlined,
+                title: 'Notifications',
+                subtitle: 'Toast alerts, preview, sounds & presence alerts',
                 onTap: () => _push(
                   context,
-                  () => ConversationSettingsPage(
+                  () => NotificationSettingsPage(
                     preferencesController: preferencesController,
+                    notificationService: notificationService,
                   ),
                 ),
               ),
               ChatySettingsTile(
+                icon: Icons.call_outlined,
+                title: 'Calls',
+                subtitle: 'Who can call you, audio quality & call island',
+                onTap: () => _push(
+                  context,
+                  () => CallSettingsScreen(
+                    preferencesController: preferencesController,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // -------------------------------------------------------------------
+          // 4. MEDIA & DATA
+          // -------------------------------------------------------------------
+          ChatySettingsSection(
+            title: 'Media & Data',
+            children: [
+              ChatySettingsTile(
+                icon: Icons.storage_rounded,
+                title: 'Storage & Data',
+                subtitle: 'HD media sending, upload thresholds & cache cleaner',
+                onTap: () => _push(
+                  context,
+                  () => StorageAndMediaSettingsScreen(
+                    preferencesController: preferencesController,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // -------------------------------------------------------------------
+          // 5. SYSTEM & AUTOMATION
+          // -------------------------------------------------------------------
+          ChatySettingsSection(
+            title: 'System & Automation',
+            children: [
+              ChatySettingsTile(
                 icon: Icons.schedule_send_rounded,
-                title: 'Message Management',
-                subtitle: 'Auto-reply rules, quick responses & scheduling',
+                title: 'Message Automation',
+                subtitle: 'Auto-reply rules & scheduled messaging',
                 onTap: () => _push(
                   context,
                   () => MessageManagementPage(
@@ -285,45 +361,25 @@ class SettingsRootScreen extends StatelessWidget {
                 ),
               ),
               ChatySettingsTile(
-                icon: Icons.notifications_outlined,
-                title: 'Notifications & Alerts',
-                subtitle: 'Toast alerts, previews, sounds & online activity',
-                onTap: () => _push(
-                  context,
-                  () => NotificationSettingsPage(
-                    preferencesController: preferencesController,
-                    notificationService: notificationService,
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          // -------------------------------------------------------------------
-          // ADVANCED & ABOUT
-          // -------------------------------------------------------------------
-          ChatySettingsSection(
-            title: 'Advanced & System',
-            children: [
-              ChatySettingsTile(
-                icon: Icons.tune_rounded,
-                title: 'Advanced Features',
-                subtitle: 'Power-user controls, media limits & behavior options',
-                onTap: () => _push(
-                  context,
-                  () => GbFeatureCenterScreen(
-                    preferencesController: preferencesController,
-                  ),
-                ),
-              ),
-              ChatySettingsTile(
                 icon: Icons.animation_rounded,
                 title: 'Interactive Effects',
-                subtitle: 'Touch particle animations & falling effects',
+                subtitle: 'Touch particle animations & falling emoji effects',
                 onTap: () => _push(
                   context,
                   () => NavigationEffectsPage(
                     preferencesController: preferencesController,
+                  ),
+                ),
+              ),
+              ChatySettingsTile(
+                icon: Icons.admin_panel_settings_outlined,
+                title: 'System Permissions',
+                subtitle: 'Hardware, notifications, storage & OS rights',
+                onTap: () => _push(
+                  context,
+                  () => SystemPermissionsScreen(
+                    preferencesController: preferencesController,
+                    notificationService: notificationService,
                   ),
                 ),
               ),
@@ -335,13 +391,12 @@ class SettingsRootScreen extends StatelessWidget {
               ChatySettingsTile(
                 icon: Icons.logout_rounded,
                 iconColor: Theme.of(context).colorScheme.error,
-                title: 'Log out',
-                subtitle: 'Sign out of this Chaty account on this device',
+                title: 'Log Out',
+                subtitle: 'Sign out of your session on this device',
                 onTap: () => _logout(context),
               ),
             ],
           ),
-          const SizedBox(height: 18),
         ],
       ),
     );
@@ -361,7 +416,7 @@ class _PreferencesReactiveRoute extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: preferencesController,
-      builder: (_, _) => builder(),
+      builder: (context, _) => builder(),
     );
   }
 }
@@ -374,79 +429,72 @@ class _ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: scheme.surfaceContainerLow,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: onEdit,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: scheme.outlineVariant.withValues(alpha: 0.5),
-            ),
+    final theme = Theme.of(context);
+    final initials = user.avatarInitials;
+
+    return InkWell(
+      onTap: onEdit,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: theme.dividerColor.withValues(alpha: 0.12),
+            width: 1,
           ),
-          child: Row(
-            children: [
-              AppAvatar(
-                initials: user.avatarInitials.isNotEmpty
-                    ? user.avatarInitials
-                    : (user.displayName.isNotEmpty
-                          ? user.displayName.substring(0, 1).toUpperCase()
-                          : 'C'),
-                colorHex: user.avatarColorHex,
-                size: 52,
-                showOnlineBadge: true,
-                presence: user.presence,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      user.displayName.isNotEmpty
-                          ? user.displayName
-                          : 'Alex Rivera',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: scheme.onSurface,
+        ),
+        child: Row(
+          children: [
+            AppAvatar(
+              initials: initials,
+              colorHex: user.avatarColorHex,
+              size: 56,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user.displayName.isNotEmpty
+                        ? user.displayName
+                        : 'Set Display Name',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '@',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: theme.textTheme.bodyMedium?.color?.withValues(
+                        alpha: 0.7,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                  ),
+                  if (user.about.isNotEmpty) ...[
+                    const SizedBox(height: 4),
                     Text(
-                      '@',
+                      user.about,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 12.5,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                    if (user.about.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        user.about,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: scheme.onSurface.withValues(alpha: 0.7),
+                        fontSize: 12,
+                        color: theme.textTheme.bodyMedium?.color?.withValues(
+                          alpha: 0.55,
                         ),
                       ),
-                    ],
+                    ),
                   ],
-                ),
+                ],
               ),
-              Icon(
-                Icons.edit_outlined,
-                size: 20,
-                color: scheme.primary,
-              ),
-            ],
-          ),
+            ),
+            const Icon(Icons.edit_outlined, size: 20),
+          ],
         ),
       ),
     );

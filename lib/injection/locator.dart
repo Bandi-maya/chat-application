@@ -9,6 +9,7 @@ import 'package:chat/data/services/rich_chat_realtime_service.dart';
 import 'package:chat/ui/core/controllers/app_icon_controller.dart';
 import 'package:chat/ui/core/controllers/preferences_controller.dart';
 import 'package:chat/ui/core/controllers/appearance_variant_controller.dart';
+import 'package:chat/ui/core/templates/template_controller.dart';
 import 'package:chat/data/services/notification_service.dart';
 import 'package:chat/data/services/message_automation_service.dart';
 import 'package:chat/data/services/push_token_service.dart';
@@ -35,6 +36,9 @@ void setupLocator() {
   );
   locator.registerLazySingleton<AppearanceVariantController>(
     () => AppearanceVariantController(),
+  );
+  locator.registerLazySingleton<TemplateController>(
+    () => TemplateController(),
   );
   locator.registerLazySingleton<ChatyNotificationService>(
     () => ChatyNotificationService(),

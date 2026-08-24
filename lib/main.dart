@@ -32,6 +32,7 @@ import 'package:chat/ui/core/design_system/design_system.dart';
 import 'package:chat/ui/core/controllers/app_icon_controller.dart';
 import 'package:chat/ui/core/controllers/appearance_variant_controller.dart';
 import 'package:chat/ui/core/controllers/preferences_controller.dart';
+import 'package:chat/ui/core/templates/template_controller.dart';
 import 'package:chat/ui/core/gb/gb_theme_overrides.dart';
 import 'package:chat/ui/core/widgets/app_avatar.dart';
 import 'package:chat/ui/core/widgets/event_toast_overlay.dart';
@@ -61,6 +62,10 @@ Future<void> main() async {
   // paint from local state immediately; platform services catch up right
   // after the first frame instead of gating it.
   await locator<ThemeController>().init();
+  await locator<TemplateController>().init(
+    appearanceController: locator<AppearanceVariantController>(),
+    preferencesController: locator<ChatyPreferencesController>(),
+  );
   runApp(const ChatyApp());
   WidgetsBinding.instance.addPostFrameCallback((_) {
     unawaited(_initializeDeferredPlatformServices());
@@ -128,6 +133,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     _themeController = locator<ThemeController>();
     _rootSignals = Listenable.merge(<Listenable>[
       _themeController,
+      locator<TemplateController>(),
       locator<ChatyPreferencesController>(),
       locator<AppearanceVariantController>(),
       locator<ChatyBackendService>(),
