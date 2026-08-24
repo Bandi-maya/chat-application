@@ -1069,10 +1069,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               onPressed: () => _startCall(true),
             ),
           // Chat overflow menu: wallpaper, mute, clear, block and more.
-          IconButton(
-            tooltip: 'Chat options',
-            icon: Icon(Icons.more_vert_rounded, color: theme.primaryTextColor),
-            onPressed: () => _openChatMenu(conversation, otherUser),
+          Builder(
+            builder: (btnCtx) => IconButton(
+              tooltip: 'Chat options',
+              icon: Icon(Icons.more_vert_rounded, color: theme.primaryTextColor),
+              onPressed: () => _openChatMenu(btnCtx, conversation, otherUser),
+            ),
           ),
         ],
       ),
@@ -1517,11 +1519,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   // ---------------------------------------------------------------------------
   // Chat overflow menu (3-dots in the header): everything below is REAL.
   // ---------------------------------------------------------------------------
-  void _openChatMenu(Conversation conversation, UserProfile? otherUser) {
+  void _openChatMenu(BuildContext anchorContext, Conversation conversation, UserProfile? otherUser) {
     final isDirect =
         conversation.type == ConversationType.direct && otherUser != null;
     ChatyMenuSheet.show(
-      context,
+      anchorContext,
       title: conversation.title,
       items: [
         ChatyMenuItem(

@@ -9,6 +9,7 @@ import '../../data/services/contact_relationship_service.dart';
 import '../../domain/models/other_models.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/design_system/design_system.dart';
+import '../../ui/core/widgets/app_brand_icon.dart';
 import 'chat_detail_screen.dart';
 
 class LinkedDevicesQrScreen extends StatefulWidget {
@@ -357,18 +358,47 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen>
                   ),
                 ],
               ),
-              child: QrImageView(
-                data: _myQrPayload,
-                size: 230,
-                version: QrVersions.auto,
-                eyeStyle: QrEyeStyle(
-                  eyeShape: QrEyeShape.square,
-                  color: colors.foreground,
-                ),
-                dataModuleStyle: QrDataModuleStyle(
-                  dataModuleShape: QrDataModuleShape.square,
-                  color: colors.foreground,
-                ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  QrImageView(
+                    data: _myQrPayload,
+                    size: 230,
+                    version: QrVersions.auto,
+                    errorCorrectionLevel: QrErrorCorrectLevel.H,
+                    eyeStyle: QrEyeStyle(
+                      eyeShape: QrEyeShape.square,
+                      color: colors.foreground,
+                    ),
+                    dataModuleStyle: QrDataModuleStyle(
+                      dataModuleShape: QrDataModuleShape.square,
+                      color: colors.foreground,
+                    ),
+                  ),
+                  // Center quiet-zone badge with high-contrast Chaty mark
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: colors.surface,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: colors.shadow.withValues(alpha: 0.15),
+                          blurRadius: 6,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: ChatyBrandMark(
+                        variant: ChatyBrandIconVariant.filled,
+                        size: 26,
+                        color: colors.primary,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: ChatySpacing.lg),

@@ -5,12 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../ui/core/design_system/settings_primitives.dart';
+import '../../../ui/core/design_system/components/adaptive_selection_panel.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/theme/app_theme.dart';
 import '../../../ui/core/bubbles/bubble_style_id.dart';
 import '../../../ui/core/bubbles/bubble_style_registry.dart';
 import '../../../ui/core/bubbles/bubble_painter.dart';
-import '../../../ui/core/bubbles/bubble_style_preview.dart';
 import '../../../ui/core/ticks/delivery_icon_style.dart';
 import '../../../ui/core/ticks/delivery_status_icon.dart';
 import '../../../domain/models/chat_message.dart';
@@ -81,178 +81,80 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
 
   static const List<double> _playbackSpeeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
-  void _showBubbleStylePicker(BuildContext context, String currentStyle) {
+  Future<void> _showBubbleStylePicker(BuildContext context, String currentStyle) async {
     final activeId = BubbleStyleIdExtension.fromString(currentStyle);
     final theme = Theme.of(context);
 
-    showModalBottomSheet<void>(
+    final selected = await AdaptiveSelectionPanel.show<BubbleStyleId>(
       context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.75,
-          minChildSize: 0.5,
-          maxChildSize: 0.95,
-          builder: (_, scrollController) {
-            return Container(
-              decoration: BoxDecoration(
-                color: theme.cardColor,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      title: 'Bubble Style Geometry',
+      subtitle: 'Choose from 48 discrete bubble contours',
+      selectedValue: activeId,
+      options: BubbleStyleId.values.map((styleId) {
+        return SelectionOptionItem<BubbleStyleId>(
+          value: styleId,
+          title: styleId.displayName,
+          subtitle: 'Custom shape geometry',
+          preview: SizedBox(
+            width: 60,
+            height: 32,
+            child: CustomPaint(
+              painter: BubblePainter(
+                styleId: styleId,
+                isMe: true,
+                fillColor: theme.colorScheme.primary,
+                strokeColor: theme.colorScheme.primary.withValues(alpha: 0.3),
+                accentColor: theme.colorScheme.primary,
               ),
-              child: Column(
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(top: 10, bottom: 8),
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Bubble Styles (${BubbleStyleId.values.length})',
-                          style: TextStyle(
-                            color: theme.colorScheme.onSurface,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close_rounded),
-                          onPressed: () => Navigator.of(ctx).pop(),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: ListView.builder(
-                      controller: scrollController,
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                      itemCount: BubbleStyleId.values.length,
-                      itemBuilder: (_, idx) {
-                        final styleId = BubbleStyleId.values[idx];
-                        final isSelected = styleId == activeId;
-                        return BubbleStylePreviewTile(
-                          styleId: styleId,
-                          label: styleId.displayName,
-                          isSelected: isSelected,
-                          accentColor: theme.colorScheme.primary,
-                          onTap: () {
-                            widget.preferencesController.updateConversation(
-                              widget.preferencesController.conversation.copyWith(
-                                bubbleStyle: styleId.displayName,
-                              ),
-                              logTitle: 'Bubble Style',
-                            );
-                            Navigator.of(ctx).pop();
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
+            ),
+          ),
         );
-      },
+      }).toList(),
     );
+
+    if (selected != null) {
+      widget.preferencesController.updateConversation(
+        widget.preferencesController.conversation.copyWith(
+          bubbleStyle: selected.displayName,
+        ),
+        logTitle: 'Bubble Style',
+      );
+    }
   }
 
-  void _showTickStylePicker(BuildContext context, String currentTick) {
+  Future<void> _showTickStylePicker(BuildContext context, String currentTick) async {
     final activeStyle = DeliveryIconStyleExtension.fromString(currentTick);
     final theme = Theme.of(context);
 
-    showModalBottomSheet<void>(
+    final selected = await AdaptiveSelectionPanel.show<DeliveryIconStyle>(
       context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.65,
-          minChildSize: 0.4,
-          maxChildSize: 0.9,
-          builder: (_, scrollController) {
-            return Container(
-              decoration: BoxDecoration(
-                color: theme.cardColor,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(top: 10, bottom: 8),
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Delivery Tick Styles (${DeliveryIconStyle.values.length})',
-                          style: TextStyle(
-                            color: theme.colorScheme.onSurface,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close_rounded),
-                          onPressed: () => Navigator.of(ctx).pop(),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: ListView.builder(
-                      controller: scrollController,
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                      itemCount: DeliveryIconStyle.values.length,
-                      itemBuilder: (_, idx) {
-                        final tickStyle = DeliveryIconStyle.values[idx];
-                        final isSelected = tickStyle == activeStyle;
-                        return DeliveryStatusPreviewTile(
-                          style: tickStyle,
-                          isSelected: isSelected,
-                          onTap: () {
-                            widget.preferencesController.updateConversation(
-                              widget.preferencesController.conversation.copyWith(
-                                tickStyle: tickStyle.displayName,
-                              ),
-                              logTitle: 'Tick Style',
-                            );
-                            Navigator.of(ctx).pop();
-                          },
-                          primaryTextColor: theme.colorScheme.onSurface,
-                          accentColor: theme.colorScheme.primary,
-                          unreadColor: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                          readColor: theme.colorScheme.primary,
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
+      title: 'Delivery Tick Style',
+      subtitle: 'Choose from 16 custom vector delivery ticks',
+      selectedValue: activeStyle,
+      options: DeliveryIconStyle.values.map((tickStyle) {
+        return SelectionOptionItem<DeliveryIconStyle>(
+          value: tickStyle,
+          title: tickStyle.displayName,
+          subtitle: 'Vector status glyph',
+          preview: DeliveryStatusIcon(
+            style: tickStyle,
+            state: DeliveryState.read,
+            unreadColor: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+            readColor: theme.colorScheme.primary,
+            size: 18,
+          ),
         );
-      },
+      }).toList(),
     );
+
+    if (selected != null) {
+      widget.preferencesController.updateConversation(
+        widget.preferencesController.conversation.copyWith(
+          tickStyle: selected.displayName,
+        ),
+        logTitle: 'Tick Style',
+      );
+    }
   }
 
   @override

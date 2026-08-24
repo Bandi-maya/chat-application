@@ -16,6 +16,7 @@ import 'package:chat/data/services/notification_channel_manager.dart';
 import 'package:chat/data/services/call_signaling_service.dart';
 import 'package:chat/data/services/call_foreground_service.dart';
 import 'package:chat/data/services/call_lifecycle_coordinator.dart';
+import 'package:chat/features/calls/call_presentation_controller.dart';
 import 'package:chat/features/camera/effects/effect_engine.dart';
 
 final GetIt locator = GetIt.instance;
@@ -62,9 +63,13 @@ void setupLocator() {
       foregroundService: locator<ChatyCallForegroundService>(),
     )..start(),
   );
-  // Lifecycle policy must be active even before a call screen is opened so
-  // incoming/reconnecting calls cannot become stranded server sessions.
-  locator<CallLifecycleCoordinator>();
+  locator.registerLazySingleton<CallPresentationController>(
+    () => CallPresentationController(
+      callService: locator<CallSignalingService>(),
+    ),
+  );
+  // Eagerly instantiate to begin tracking presentations immediately
+  locator<CallPresentationController>();
   locator.registerLazySingleton<EffectEngine>(
     () => EffectEngine(),
   );

@@ -3,14 +3,16 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../ui/core/design_system/design_system.dart';
+import '../../ui/core/design_system/components/adaptive_selection_panel.dart';
 import '../messages/message_bubble.dart';
 import '../../domain/models/chat_message.dart';
 import '../../ui/core/bubbles/bubble_style_id.dart';
-import '../../ui/core/bubbles/bubble_style_preview.dart';
+import '../../ui/core/bubbles/bubble_painter.dart';
 import '../../ui/core/ticks/delivery_icon_style.dart';
 import '../../ui/core/ticks/delivery_status_icon.dart';
 import '../../ui/core/theme/chaty_theme_manager.dart';
 import '../../ui/core/theme/image_theme_generator.dart';
+import '../../ui/core/theme/theme_preview_card.dart';
 
 class ThemeEditorScreen extends StatefulWidget {
   final ThemeController themeController;
@@ -107,190 +109,8 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
     }
   }
 
-  void _showBubblePicker() {
-    final theme = Theme.of(context);
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.75,
-          minChildSize: 0.5,
-          maxChildSize: 0.95,
-          builder: (_, scrollController) {
-            return Container(
-              decoration: BoxDecoration(
-                color: theme.cardColor,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(top: 10, bottom: 8),
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Bubble Styles (${BubbleStyleId.values.length})',
-                          style: TextStyle(
-                            color: theme.colorScheme.onSurface,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close_rounded),
-                          onPressed: () => Navigator.of(ctx).pop(),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: ListView.builder(
-                      controller: scrollController,
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                      itemCount: BubbleStyleId.values.length,
-                      itemBuilder: (_, idx) {
-                        final styleId = BubbleStyleId.values[idx];
-                        final isSelected = styleId == _current.bubbleStyle;
-                        return BubbleStylePreviewTile(
-                          styleId: styleId,
-                          label: styleId.displayName,
-                          isSelected: isSelected,
-                          accentColor: _current.accentColor,
-                          onTap: () {
-                            setState(() => _current = _current.copyWith(bubbleStyle: styleId));
-                            Navigator.of(ctx).pop();
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _showTickPicker() {
-    final theme = Theme.of(context);
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.65,
-          minChildSize: 0.4,
-          maxChildSize: 0.9,
-          builder: (_, scrollController) {
-            return Container(
-              decoration: BoxDecoration(
-                color: theme.cardColor,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(top: 10, bottom: 8),
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Delivery Tick Styles (${DeliveryIconStyle.values.length})',
-                          style: TextStyle(
-                            color: theme.colorScheme.onSurface,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close_rounded),
-                          onPressed: () => Navigator.of(ctx).pop(),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: ListView.builder(
-                      controller: scrollController,
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                      itemCount: DeliveryIconStyle.values.length,
-                      itemBuilder: (_, idx) {
-                        final tickStyle = DeliveryIconStyle.values[idx];
-                        final isSelected = tickStyle == _current.deliveryTickStyle;
-                        return DeliveryStatusPreviewTile(
-                          style: tickStyle,
-                          isSelected: isSelected,
-                          onTap: () {
-                            setState(() => _current = _current.copyWith(deliveryTickStyle: tickStyle));
-                            Navigator.of(ctx).pop();
-                          },
-                          primaryTextColor: _current.primaryTextColor,
-                          accentColor: _current.accentColor,
-                          unreadColor: _current.secondaryTextColor,
-                          readColor: _current.accentColor,
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _navModeChip(String label, AppNavigationMode mode) {
-    final isSel = _current.navigationMode == mode;
-    final themeData = Theme.of(context);
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSel,
-      selectedColor: _current.accentColor.withValues(alpha: 0.2),
-      backgroundColor: themeData.colorScheme.surface,
-      labelStyle: TextStyle(
-        color: isSel ? _current.accentColor : themeData.colorScheme.onSurface,
-        fontWeight: isSel ? FontWeight.w700 : FontWeight.normal,
-        fontSize: 12.5,
-      ),
-      onSelected: (val) {
-        if (val) {
-          setState(() => _current = _current.copyWith(navigationMode: mode));
-        }
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final themeData = Theme.of(context);
 
     return ChatyScaffold(
       appBar: ChatyAppBar(
@@ -366,32 +186,42 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
               ),
             ),
 
-            // Presets
+            // Presets Header & Grid
             ChatyGroupedSection(
-              title: 'Theme Presets',
+              title: 'Theme Presets (${ThemePresets.all.length})',
               children: [
                 Padding(
                   padding: const EdgeInsets.all(ChatySpacing.md),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    child: Row(
-                      children: ThemePresets.all.map((p) {
-                        final isSel = p.id == _current.id;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
-                          child: ChoiceChip(
-                            label: Text(p.name),
-                            selected: isSel,
-                            selectedColor: p.accentColor.withValues(alpha: 0.2),
-                            backgroundColor: themeData.colorScheme.surface,
-                            onSelected: (val) {
-                              if (val) setState(() => _current = p);
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isWide = constraints.maxWidth >= 600;
+                      final crossAxisCount = isWide ? 3 : (constraints.maxWidth >= 380 ? 2 : 1);
+
+                      return GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: ThemePresets.all.length,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          mainAxisExtent: 220,
+                        ),
+                        itemBuilder: (context, index) {
+                          final preset = ThemePresets.all[index];
+                          final isSelected = preset.id == _current.id;
+
+                          return ThemePreviewCard(
+                            themeConfig: preset,
+                            isSelected: isSelected,
+                            onTap: () {
+                              setState(() => _current = preset);
+                              widget.themeController.updateThemeConfig(preset);
                             },
-                          ),
-                        );
-                      }).toList(),
-                    ),
+                          );
+                        },
+                      );
+                    },
                   ),
                 ),
               ],
@@ -406,40 +236,134 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
                 ChatyListTile(
                   leading: const Icon(Icons.chat_bubble_outline_rounded),
                   title: const Text('Bubble Style Geometry'),
-                  subtitle: Text(_current.bubbleStyle.name),
+                  subtitle: Text(_current.bubbleStyle.displayName),
                   trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: _showBubblePicker,
+                  onTap: () async {
+                    final selected = await AdaptiveSelectionPanel.show<BubbleStyleId>(
+                      context: context,
+                      title: 'Bubble Style Geometry',
+                      subtitle: 'Choose from 48 discrete bubble contours',
+                      selectedValue: _current.bubbleStyle,
+                      options: BubbleStyleId.values.map((styleId) {
+                        return SelectionOptionItem<BubbleStyleId>(
+                          value: styleId,
+                          title: styleId.displayName,
+                          subtitle: 'Custom shape geometry',
+                          preview: SizedBox(
+                            width: 60,
+                            height: 32,
+                            child: CustomPaint(
+                              painter: BubblePainter(
+                                styleId: styleId,
+                                isMe: true,
+                                fillColor: _current.accentColor,
+                                strokeColor: _current.accentColor.withValues(alpha: 0.3),
+                                accentColor: _current.accentColor,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    );
+                    if (selected != null) {
+                      setState(() => _current = _current.copyWith(bubbleStyle: selected));
+                    }
+                  },
                 ),
                 ChatyListTile(
                   leading: const Icon(Icons.done_all_rounded),
                   title: const Text('Delivery Tick Style'),
-                  subtitle: Text(_current.deliveryTickStyle.name),
+                  subtitle: Text(_current.deliveryTickStyle.displayName),
                   trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: _showTickPicker,
+                  onTap: () async {
+                    final selected = await AdaptiveSelectionPanel.show<DeliveryIconStyle>(
+                      context: context,
+                      title: 'Delivery Tick Style',
+                      subtitle: 'Choose from 16 custom vector delivery ticks',
+                      selectedValue: _current.deliveryTickStyle,
+                      options: DeliveryIconStyle.values.map((tickStyle) {
+                        return SelectionOptionItem<DeliveryIconStyle>(
+                          value: tickStyle,
+                          title: tickStyle.displayName,
+                          subtitle: 'Vector status glyph',
+                          preview: DeliveryStatusIcon(
+                            style: tickStyle,
+                            state: DeliveryState.read,
+                            unreadColor: _current.secondaryTextColor,
+                            readColor: _current.accentColor,
+                            size: 18,
+                          ),
+                        );
+                      }).toList(),
+                    );
+                    if (selected != null) {
+                      setState(() => _current = _current.copyWith(deliveryTickStyle: selected));
+                    }
+                  },
                 ),
               ],
             ),
 
             const SizedBox(height: ChatySpacing.lg),
 
-            // Navigation Architecture
+            // Navigation Architecture Selection
             ChatyGroupedSection(
               title: 'Navigation Layout Architecture',
               children: [
-                Padding(
-                  padding: const EdgeInsets.all(ChatySpacing.md),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _navModeChip('Bottom Nav Bar', AppNavigationMode.bottomNav),
-                      _navModeChip('Top WhatsApp Bar', AppNavigationMode.topWhatsAppBar),
-                      _navModeChip('Floating Island Rail', AppNavigationMode.floatingIslandRail),
-                      _navModeChip('3D Perspective Drawer', AppNavigationMode.perspective3DDrawer),
-                      _navModeChip('Modern Side Menu', AppNavigationMode.modernSideMenu),
-                      _navModeChip('Gesture Tabs', AppNavigationMode.gestureTabs),
-                    ],
-                  ),
+                ChatyListTile(
+                  leading: const Icon(Icons.dock_rounded),
+                  title: const Text('Navigation Bar Layout'),
+                  subtitle: Text(_current.navigationMode.name),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () async {
+                    final selected = await AdaptiveSelectionPanel.show<AppNavigationMode>(
+                      context: context,
+                      title: 'Navigation Layout Architecture',
+                      subtitle: 'Select your preferred main screen navigation structure',
+                      selectedValue: _current.navigationMode,
+                      options: [
+                        const SelectionOptionItem(
+                          value: AppNavigationMode.bottomNav,
+                          title: 'Bottom Navigation Bar',
+                          subtitle: 'Classic bottom tabs with animated indicator',
+                          leadingIcon: Icons.call_to_action_outlined,
+                        ),
+                        const SelectionOptionItem(
+                          value: AppNavigationMode.topWhatsAppBar,
+                          title: 'Top WhatsApp Bar',
+                          subtitle: 'WhatsApp-style top tab bar with camera shortcut',
+                          leadingIcon: Icons.table_rows_outlined,
+                        ),
+                        const SelectionOptionItem(
+                          value: AppNavigationMode.floatingIslandRail,
+                          title: 'Floating Island Rail',
+                          subtitle: 'Detached floating navigation capsule dock',
+                          leadingIcon: Icons.lens_blur_rounded,
+                        ),
+                        const SelectionOptionItem(
+                          value: AppNavigationMode.perspective3DDrawer,
+                          title: '3D Perspective Drawer',
+                          subtitle: 'Spatial 3D folding side menu panel',
+                          leadingIcon: Icons.view_in_ar_rounded,
+                        ),
+                        const SelectionOptionItem(
+                          value: AppNavigationMode.modernSideMenu,
+                          title: 'Modern Side Menu',
+                          subtitle: 'Sleek swipeable navigation side drawer',
+                          leadingIcon: Icons.menu_open_rounded,
+                        ),
+                        const SelectionOptionItem(
+                          value: AppNavigationMode.gestureTabs,
+                          title: 'Gesture Tabs',
+                          subtitle: 'Full gesture swipe-based screen transitions',
+                          leadingIcon: Icons.swipe_rounded,
+                        ),
+                      ],
+                    );
+                    if (selected != null) {
+                      setState(() => _current = _current.copyWith(navigationMode: selected));
+                    }
+                  },
                 ),
               ],
             ),

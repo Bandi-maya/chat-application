@@ -10,7 +10,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../ui/core/design_system/chaty_haptics.dart';
-import '../../ui/core/design_system/chaty_motion.dart';
 import 'effects/effect_engine.dart';
 import 'effects/effect_model.dart';
 import 'effects/effect_registry.dart';
@@ -324,21 +323,194 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
     );
   }
 
-  // --- Viewfinder -----------------------------------------------------------
-
   Widget _buildCamera() {
-    return Column(
+    return Stack(
+      fit: StackFit.expand,
       children: [
-        Expanded(child: _buildViewfinder()),
-        AnimatedContainer(
-          duration: ChatyMotion.duration(context, preferred: ChatyMotion.base),
-          curve: ChatyMotion.standard,
-          height: _effectsOpen ? 148 : 0,
-          onEnd: () {},
-          child: _effectsOpen ? _buildEffectTray() : null,
+        _buildViewfinder(),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: _buildBottomControls(),
         ),
-        _buildBottomBar(),
       ],
+    );
+  }
+
+  Widget _buildBottomControls() {
+    final ready = _phase == _CameraPhase.ready;
+    final allEffects = EffectRegistry.allEffects;
+
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.transparent, Colors.black87, Colors.black],
+        ),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + 12,
+        top: 16,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Filter carousel centered horizontally with snap physics
+          if (ready && _effectsOpen) ...[
+            SizedBox(
+              height: 74,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                padding: EdgeInsets.symmetric(
+                  horizontal: MediaQuery.sizeOf(context).width * 0.38,
+                ),
+                itemCount: allEffects.length,
+                itemBuilder: (context, index) {
+                  final effect = allEffects[index];
+                  final isSelected = _engine.activeEffect.id == effect.id;
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: GestureDetector(
+                      onTap: () {
+                        ChatyHaptics.selection();
+                        _engine.selectEffect(effect);
+                      },
+                      child: AnimatedScale(
+                        scale: isSelected ? 1.08 : 0.86,
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeOutCubic,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: effect.previewColor.withValues(
+                                  alpha: isSelected ? 0.95 : 0.4,
+                                ),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? Colors.white
+                                      : Colors.white30,
+                                  width: isSelected ? 2.5 : 1.2,
+                                ),
+                              ),
+                              child: Icon(
+                                effect.icon,
+                                size: 22,
+                                color: isSelected ? Colors.black : Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              effect.name,
+                              style: TextStyle(
+                                color: isSelected
+                                    ? Colors.white
+                                    : Colors.white60,
+                                fontSize: 10,
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          // Main Controls Row: Gallery, Capture Shutter, Flip Camera
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Semantics(
+                  button: true,
+                  label: 'Pick image from gallery',
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(26),
+                    onTap: _pickFromGallery,
+                    child: const SizedBox.square(
+                      dimension: 52,
+                      child: Center(
+                        child: Icon(
+                          Icons.photo_library_rounded,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                _buildShutter(enabled: ready),
+                Semantics(
+                  button: true,
+                  label: 'Switch camera',
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(26),
+                    onTap: ready ? _flipCamera : null,
+                    child: SizedBox.square(
+                      dimension: 52,
+                      child: Icon(
+                        Icons.cameraswitch_rounded,
+                        color: ready ? Colors.white : Colors.white30,
+                        size: 28,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShutter({required bool enabled}) {
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: 'Take photo',
+      child: GestureDetector(
+        onTap: enabled ? _shutter : null,
+        child: Container(
+          width: 76,
+          height: 76,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 4),
+          ),
+          padding: const EdgeInsets.all(5),
+          child: _capturing
+              ? const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 3,
+                  ),
+                )
+              : DecoratedBox(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: enabled ? Colors.white : Colors.white38,
+                  ),
+                ),
+        ),
+      ),
     );
   }
 
@@ -428,170 +600,7 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
     );
   }
 
-  Widget _buildBottomBar() {
-    final ready = _phase == _CameraPhase.ready;
-    return Container(
-      color: Colors.black,
-      padding: EdgeInsets.fromLTRB(
-        18,
-        12,
-        18,
-        MediaQuery.paddingOf(context).bottom + 14,
-      ),
-      child: Row(
-        children: [
-          Semantics(
-            button: true,
-            label: 'Pick image from gallery',
-            child: InkWell(
-              borderRadius: BorderRadius.circular(26),
-              onTap: _pickFromGallery,
-              child: const SizedBox.square(
-                dimension: 52,
-                child: Center(
-                  child: Icon(
-                    Icons.photo_library_rounded,
-                    color: Colors.white,
-                    size: 28,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: Center(child: _buildShutter(enabled: ready)),
-          ),
-          Semantics(
-            button: true,
-            label: 'Switch camera',
-            child: InkWell(
-              borderRadius: BorderRadius.circular(26),
-              onTap: ready ? _flipCamera : null,
-              child: SizedBox.square(
-                dimension: 52,
-                child: Icon(
-                  Icons.cameraswitch_rounded,
-                  color: ready ? Colors.white : Colors.white30,
-                  size: 28,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildShutter({required bool enabled}) {
-    return Semantics(
-      button: true,
-      enabled: enabled,
-      label: 'Take photo',
-      child: GestureDetector(
-        onTap: enabled ? _shutter : null,
-        child: Container(
-          width: 76,
-          height: 76,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 4),
-          ),
-          padding: const EdgeInsets.all(5),
-          child: _capturing
-              ? const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 3,
-                  ),
-                )
-              : DecoratedBox(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: enabled ? Colors.white : Colors.white38,
-                  ),
-                ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEffectTray() {
-    return Material(
-      color: Colors.black,
-      child: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              itemCount: EffectRegistry.allEffects.length,
-              itemBuilder: (context, index) {
-                final effect = EffectRegistry.allEffects[index];
-                final selected = _engine.activeEffect.id == effect.id;
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Semantics(
-                    button: true,
-                    selected: selected,
-                    label: 'Effect ${effect.name}',
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(24),
-                      onTap: () {
-                        ChatyHaptics.selection();
-                        _engine.selectEffect(effect);
-                      },
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          CircleAvatar(
-                            radius: 22,
-                            backgroundColor: effect.previewColor.withValues(
-                              alpha: selected ? 0.95 : 0.45,
-                            ),
-                            child: Icon(
-                              effect.icon,
-                              size: 20,
-                              color: selected ? Colors.black : Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            effect.name,
-                            style: TextStyle(
-                              color: selected ? Colors.white : Colors.white60,
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          if (_engine.activeEffect.colorMatrix != null)
-            Semantics(
-              label: 'Effect strength',
-              child: SliderTheme(
-                data: SliderThemeData(
-                  activeTrackColor: Colors.white70,
-                  inactiveTrackColor: Colors.white24,
-                  thumbColor: Colors.white,
-                  trackHeight: 2,
-                ),
-                child: Slider(
-                  value: _engine.intensity,
-                  onChanged: _engine.setIntensity,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
 
   // --- Confirm pane ---------------------------------------------------------
 

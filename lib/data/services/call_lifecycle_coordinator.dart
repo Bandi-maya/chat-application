@@ -14,11 +14,10 @@ import 'call_signaling_service.dart';
 /// state, and terminates stranded server/media state when Flutter detaches.
 class CallLifecycleCoordinator with WidgetsBindingObserver {
   CallLifecycleCoordinator({
-    required CallSignalingService callService,
-    required ChatyCallForegroundService foregroundService,
+    required this._callService,
+    required this._foregroundService,
     this.reconnectGracePeriod = const Duration(seconds: 15),
-  })  : _callService = callService,
-        _foregroundService = foregroundService;
+  });
 
   final CallSignalingService _callService;
   final ChatyCallForegroundService _foregroundService;

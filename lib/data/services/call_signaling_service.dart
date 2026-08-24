@@ -305,10 +305,87 @@ class CallSignalingService extends ChangeNotifier {
     notifyListeners();
   }
 
+  MediaStream? _screenStream;
+
+  bool get isSharingScreen => _currentSession?.isSharingScreen ?? false;
+
+  Future<void> startScreenShare() async {
+    final session = _currentSession;
+    final peer = _peerConnection;
+    if (session == null || peer == null || !session.isVideo) return;
+    if (session.isSharingScreen) return;
+
+    try {
+      final screenStream = await navigator.mediaDevices.getDisplayMedia(<String, dynamic>{
+        'video': true,
+        'audio': false,
+      });
+      final screenTracks = screenStream.getVideoTracks();
+      if (screenTracks.isEmpty) return;
+
+      final senders = await peer.getSenders();
+      final videoSender = senders.where((s) => s.track?.kind == 'video').firstOrNull;
+      if (videoSender != null) {
+        await videoSender.replaceTrack(screenTracks.first);
+      }
+
+      _screenStream = screenStream;
+      screenTracks.first.onEnded = () {
+        unawaited(stopScreenShare());
+      };
+
+      _currentSession = session.copyWith(isSharingScreen: true);
+      notifyListeners();
+    } catch (error, stackTrace) {
+      debugPrint('Chaty screen sharing failed: $error\n$stackTrace');
+      rethrow;
+    }
+  }
+
+  Future<void> stopScreenShare() async {
+    final session = _currentSession;
+    final peer = _peerConnection;
+    if (session == null || !session.isSharingScreen) return;
+
+    final screenStream = _screenStream;
+    _screenStream = null;
+    if (screenStream != null) {
+      for (final track in screenStream.getTracks()) {
+        await track.stop();
+      }
+      await screenStream.dispose();
+    }
+
+    final localVideoTrack = _localStream?.getVideoTracks().firstOrNull;
+    if (peer != null && localVideoTrack != null) {
+      try {
+        final senders = await peer.getSenders();
+        final videoSender = senders.where((s) => s.track?.kind == 'video').firstOrNull;
+        if (videoSender != null) {
+          await videoSender.replaceTrack(localVideoTrack);
+        }
+      } catch (error) {
+        debugPrint('Chaty screen share restore video track failed: $error');
+      }
+    }
+
+    _currentSession = session.copyWith(isSharingScreen: false);
+    notifyListeners();
+  }
+
+  Future<void> toggleScreenShare() async {
+    if (isSharingScreen) {
+      await stopScreenShare();
+    } else {
+      await startScreenShare();
+    }
+  }
+
   Future<void> switchCamera() async {
     final session = _currentSession;
     final stream = _localStream;
     if (session == null || stream == null || !session.isVideo) return;
+    if (session.isSharingScreen) return;
     final tracks = stream.getVideoTracks();
     if (tracks.isEmpty) return;
     final switched = await Helper.switchCamera(tracks.first);
@@ -736,11 +813,19 @@ class CallSignalingService extends ChangeNotifier {
     _queuedRemoteCandidates.clear();
     final local = _localStream;
     final remote = _remoteStream;
+    final screen = _screenStream;
     final peer = _peerConnection;
     _localStream = null;
     _remoteStream = null;
+    _screenStream = null;
     _peerConnection = null;
 
+    if (screen != null) {
+      for (final track in screen.getTracks()) {
+        await track.stop();
+      }
+      await screen.dispose();
+    }
     if (local != null) {
       for (final track in local.getTracks()) {
         await track.stop();

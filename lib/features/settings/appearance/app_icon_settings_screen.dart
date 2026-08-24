@@ -81,15 +81,14 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen>
     final controller = widget.appIconController;
     if (controller.isBusy) return;
     if (controller.brandIconSource == BrandIconSource.custom &&
-        controller.activeCustomPresetId == preset.id &&
-        controller.customLauncherState == CustomLauncherState.active) {
+        controller.activeCustomPresetId == preset.id) {
       return;
     }
 
     final success = await controller.activateCustomPreset(preset.id);
     if (!mounted) return;
     if (!success) {
-      _showError(controller.lastError ?? 'Could not apply the custom icon.');
+      _showError(controller.lastError ?? 'Could not apply the custom brand icon.');
       return;
     }
     _showCustomStateMessage();
@@ -98,9 +97,9 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen>
   Future<void> _deleteCustomPreset(CustomIconPreset preset) async {
     final confirmed = await ChatyConfirmDialog.show(
       context,
-      title: 'Delete custom icon?',
+      title: 'Delete custom brand icon?',
       message:
-          'This removes only this saved custom icon. Other custom and built-in icons are not changed.',
+          'This removes this custom icon preset. Built-in icons are not affected.',
       confirmLabel: 'Delete',
       destructive: true,
     );
@@ -207,20 +206,11 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen>
   }
 
   void _showCustomStateMessage() {
-    final state = widget.appIconController.customLauncherState;
-    final message = switch (state) {
-      CustomLauncherState.active => 'Custom Chaty icon applied.',
-      CustomLauncherState.pending =>
-        'Approve the one-time Android Home-screen request. Later custom icon changes reuse the same launcher entry.',
-      CustomLauncherState.unsupported =>
-        'This launcher cannot activate the runtime custom Home icon. The preset is still saved.',
-      CustomLauncherState.failed =>
-        'The custom preset was saved, but Android could not activate it.',
-      CustomLauncherState.inactive => 'Custom icon preset saved.',
-    };
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..showSnackBar(
+        const SnackBar(content: Text('Custom Chaty brand icon applied.')),
+      );
   }
 
   void _showError(String message) {
@@ -233,13 +223,7 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen>
     if (controller.brandIconSource == BrandIconSource.bundled) {
       return 'Launcher: ${controller.launcherIcon.title}';
     }
-    return switch (controller.customLauncherState) {
-      CustomLauncherState.active => 'Launcher: Custom icon active',
-      CustomLauncherState.pending => 'Launcher: Custom icon awaiting approval',
-      CustomLauncherState.unsupported => 'Launcher: Custom preset saved',
-      CustomLauncherState.failed => 'Launcher: Custom icon activation failed',
-      CustomLauncherState.inactive => 'Launcher: Custom preset selected',
-    };
+    return 'In-app brand: Custom brand icon active';
   }
 
   @override
@@ -274,7 +258,7 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen>
                       children: [
                         Text(
                           controller.brandIconSource == BrandIconSource.custom
-                              ? 'Custom Chaty icon'
+                              ? 'Custom Chaty brand icon'
                               : controller.launcherIcon.title,
                           style: const TextStyle(
                             fontSize: 16,
@@ -297,9 +281,9 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen>
               ),
             ),
             ChatySettingsSection(
-              title: 'App icon',
+              title: 'Launcher Icons',
               description:
-                  'Built-in icons and every custom image you add live in the same icon library. Tap any icon to apply it.',
+                  'Choose from six distinctive Chaty brand identities. Tap any icon to apply it as your device launcher icon.',
               children: [
                 Padding(
                   padding: const EdgeInsets.all(12),
@@ -353,38 +337,31 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen>
                     },
                   ),
                 ),
-                if (controller.launcherIcon != LauncherIconVariant.original ||
+                if (controller.launcherIcon != LauncherIconVariant.warm ||
                     controller.brandIconSource == BrandIconSource.custom)
                   ChatySettingsTile(
                     icon: Icons.restore_rounded,
-                    title: 'Restore original launcher icon',
-                    subtitle: 'Use Chaty’s original packaged icon',
+                    title: 'Restore Warm Signature icon',
+                    subtitle: 'Use Chaty’s default Warm Neutral launcher mark',
                     onTap: controller.isBusy
                         ? null
-                        : () =>
-                              _selectLauncherIcon(LauncherIconVariant.original),
+                        : () => _selectLauncherIcon(LauncherIconVariant.warm),
                   ),
               ],
             ),
             if (customPresets.isNotEmpty)
               ChatySettingsSection(
-                title: 'Custom icon library',
+                title: 'In-app brand icon library',
                 description:
-                    '${customPresets.length} saved custom icon${customPresets.length == 1 ? '' : 's'}. Long-press any custom tile above to delete only that preset.',
+                    '${customPresets.length} saved custom brand icon${customPresets.length == 1 ? '' : 's'}. Long-press any custom tile above to delete.',
                 children: [
                   ChatySettingsTile(
                     icon: Icons.add_photo_alternate_outlined,
-                    title: 'Add another custom icon',
+                    title: 'Add custom brand icon',
                     subtitle: 'Photo Picker or Camera • crop, zoom and rotate',
                     onTap: controller.isBusy ? null : _openCustomSourcePicker,
                   ),
                 ],
-              ),
-            if (controller.customLauncherState == CustomLauncherState.pending)
-              const ChatyInfoTile(
-                message:
-                    'The first custom Home icon requires Android launcher approval. After it is added once, switching between your saved custom presets updates the same launcher entry.',
-                icon: Icons.pending_actions_rounded,
               ),
             if (controller.lastError != null)
               ChatyInfoTile(

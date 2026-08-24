@@ -89,9 +89,6 @@ open class MainActivity : FlutterFragmentActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, launcherChannel).setMethodCallHandler { call, result ->
             when (call.method) {
                 "getCurrentLauncherIcon" -> result.success(launcherManager.getCurrentLauncherIcon())
-                "getCustomLauncherState" -> result.success(launcherManager.getCustomLauncherState())
-                "isCustomHomeShortcutPinned" -> result.success(launcherManager.isCustomHomeShortcutPinned())
-                "isCustomLauncherModeActive" -> result.success(launcherManager.isCustomLauncherModeActive())
                 "setLauncherIcon" -> {
                     val alias = call.argument<String>("alias")
                     if (alias.isNullOrBlank() || !launcherManager.isKnownAlias(alias)) {
@@ -107,8 +104,8 @@ open class MainActivity : FlutterFragmentActivity() {
                 }
                 "resetLauncherIcon" -> {
                     try {
-                        launcherManager.setLauncherIcon("original")
-                        result.success("original")
+                        launcherManager.setLauncherIcon("warm")
+                        result.success("warm")
                     } catch (error: Exception) {
                         result.error("launcher_icon_reset_failed", error.message, null)
                     }
@@ -119,27 +116,6 @@ open class MainActivity : FlutterFragmentActivity() {
                         result.success(null)
                     } catch (error: Exception) {
                         result.error("restart_failed", error.message, null)
-                    }
-                }
-                "applyCustomHomeShortcut" -> {
-                    val imagePath = call.argument<String>("imagePath")
-                    val label = call.argument<String>("label") ?: "Chaty"
-                    if (imagePath.isNullOrBlank()) {
-                        result.error("invalid_image", "Custom icon image path is missing.", null)
-                        return@setMethodCallHandler
-                    }
-                    try {
-                        result.success(launcherManager.applyCustomHomeShortcut(imagePath, label))
-                    } catch (error: Exception) {
-                        result.error("custom_shortcut_failed", error.message, null)
-                    }
-                }
-                "removeCustomHomeShortcut" -> {
-                    try {
-                        launcherManager.removeCustomHomeShortcut()
-                        result.success(null)
-                    } catch (error: Exception) {
-                        result.error("custom_shortcut_remove_failed", error.message, null)
                     }
                 }
                 "pickCustomIconImage" -> {
@@ -271,217 +247,125 @@ internal class LauncherIconManager(
 
     private val launcherComponents: LinkedHashMap<String, String>
         get() = linkedMapOf(
-            "original" to "${context.packageName}.LauncherOriginal",
-            "minimal" to "${context.packageName}.LauncherMinimal",
-            "bubble" to "${context.packageName}.LauncherBubble",
-            "midnight" to "${context.packageName}.LauncherMidnight",
-            "ocean" to "${context.packageName}.LauncherOcean",
-            "violet" to "${context.packageName}.LauncherViolet",
+            "warm" to "${context.packageName}.LauncherWarm",
+            "outline" to "${context.packageName}.LauncherOutline",
+            "obsidian" to "${context.packageName}.LauncherObsidian",
+            "glass" to "${context.packageName}.LauncherGlass",
+            "signal" to "${context.packageName}.LauncherSignal",
+            "fold" to "${context.packageName}.LauncherFold",
         )
 
     fun isKnownAlias(alias: String): Boolean = launcherComponents.containsKey(alias)
 
-    fun getCurrentLauncherIcon(): String? {
-        for (alias in launcherComponents.keys) {
-            if (isComponentEnabled(alias)) {
-                preferences.edit().putString(LAUNCHER_PREFERENCE_KEY, alias).apply()
-                return alias
-            }
+    fun getCurrentLauncherIcon(): String {
+        val enabledAliases = launcherComponents.keys.filter(::isComponentEnabled)
+        if (enabledAliases.size == 1) {
+            val alias = enabledAliases.first()
+            preferences.edit().putString(LAUNCHER_PREFERENCE_KEY, alias).apply()
+            return alias
         }
-        return selectedBundledAlias()
-    }
 
-    fun getCustomLauncherState(): String {
-        return when {
-            isCustomLauncherModeActive() -> "active"
-            preferences.getBoolean(CUSTOM_PENDING_PREFERENCE_KEY, false) -> "pending"
-            preferences.getBoolean(CUSTOM_MODE_PREFERENCE_KEY, false) -> "failed"
-            else -> "inactive"
-        }
-    }
-
-    fun isCustomHomeShortcutPinned(): Boolean {
-        val shortcut = customShortcutInfo() ?: return false
-        return shortcut.isEnabled
-    }
-
-    fun isCustomLauncherModeActive(): Boolean {
-        if (!preferences.getBoolean(CUSTOM_MODE_PREFERENCE_KEY, false)) return false
-        if (!isCustomHomeShortcutPinned()) return false
-        return launcherComponents.keys.none(::isComponentEnabled)
+        // Multiple or zero aliases enabled: recover canonical selection
+        val preferred = selectedBundledAlias()
+        setLauncherIcon(preferred)
+        return preferred
     }
 
     fun setLauncherIcon(alias: String) {
-        require(isKnownAlias(alias)) { "Unknown launcher icon alias: $alias" }
+        val canonicalAlias = if (alias == "original") "warm" else alias
+        require(isKnownAlias(canonicalAlias)) { "Unknown launcher icon alias: $canonicalAlias" }
         val previous = selectedBundledAlias()
+
         try {
-            restoreBundledLauncher(alias)
+            switchLauncherAlias(canonicalAlias)
             preferences.edit()
-                .putString(LAUNCHER_PREFERENCE_KEY, alias)
-                .putBoolean(CUSTOM_MODE_PREFERENCE_KEY, false)
-                .putBoolean(CUSTOM_PENDING_PREFERENCE_KEY, false)
+                .putString(LAUNCHER_PREFERENCE_KEY, canonicalAlias)
                 .apply()
-            disableCustomShortcutIfPresent()
         } catch (error: Exception) {
-            runCatching { restoreBundledLauncher(previous) }
+            // Rollback to previous on failure
+            runCatching { switchLauncherAlias(previous) }
             preferences.edit()
                 .putString(LAUNCHER_PREFERENCE_KEY, previous)
-                .putBoolean(CUSTOM_MODE_PREFERENCE_KEY, false)
-                .putBoolean(CUSTOM_PENDING_PREFERENCE_KEY, false)
                 .apply()
             throw error
         }
     }
 
-    fun applyCustomHomeShortcut(imagePath: String, label: String): String {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return "unsupported"
-        val shortcutManager = context.getSystemService(ShortcutManager::class.java) ?: return "unsupported"
-        val bitmap = BitmapFactory.decodeFile(imagePath) ?: error("Unable to decode the custom icon image.")
-        val launchIntent = Intent(context, CustomLauncherActivity::class.java).apply {
-            action = Intent.ACTION_MAIN
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        }
-        val shortcut = ShortcutInfo.Builder(context, CUSTOM_SHORTCUT_ID)
-            .setShortLabel(label.take(10))
-            .setLongLabel(label.take(25))
-            .setIcon(Icon.createWithAdaptiveBitmap(bitmap))
-            .setIntent(launchIntent)
-            .build()
-
-        preferences.edit()
-            .putString(CUSTOM_IMAGE_PATH_PREFERENCE_KEY, imagePath)
-            .apply()
-
-        if (customShortcutInfo() != null) {
-            runCatching { shortcutManager.enableShortcuts(listOf(CUSTOM_SHORTCUT_ID)) }
-            shortcutManager.updateShortcuts(listOf(shortcut))
-            if (enterCustomLauncherMode()) {
-                return "active"
+    private fun switchLauncherAlias(targetAlias: String) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val changes = launcherComponents.keys.map { candidate ->
+                PackageManager.ComponentEnabledSetting(
+                    componentFor(candidate),
+                    if (candidate == targetAlias) {
+                        PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                    } else {
+                        PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+                    },
+                    PackageManager.DONT_KILL_APP,
+                )
             }
-            return "failed"
+            packageManager.setComponentEnabledSettings(changes)
+        } else {
+            setComponent(targetAlias, PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
+            for (candidate in launcherComponents.keys) {
+                if (candidate != targetAlias) {
+                    setComponent(candidate, PackageManager.COMPONENT_ENABLED_STATE_DISABLED)
+                }
+            }
         }
 
-        if (!shortcutManager.isRequestPinShortcutSupported) {
-            preferences.edit()
-                .putBoolean(CUSTOM_MODE_PREFERENCE_KEY, false)
-                .putBoolean(CUSTOM_PENDING_PREFERENCE_KEY, false)
-                .apply()
-            return "unsupported"
+        // Enforce the invariant: exactly one launcher component must be enabled
+        val enabled = launcherComponents.keys.filter(::isComponentEnabled)
+        if (enabled.size != 1 || enabled.first() != targetAlias) {
+            throw IllegalStateException(
+                "Invariant violation: Expected exactly [$targetAlias] enabled, found $enabled"
+            )
         }
-
-        val callbackIntent = Intent(context, CustomShortcutPinnedReceiver::class.java).apply {
-            action = ACTION_CUSTOM_SHORTCUT_PINNED
-        }
-        val callback = PendingIntent.getBroadcast(
-            context,
-            PIN_CALLBACK_REQUEST_CODE,
-            callbackIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-
-        preferences.edit()
-            .putBoolean(CUSTOM_MODE_PREFERENCE_KEY, false)
-            .putBoolean(CUSTOM_PENDING_PREFERENCE_KEY, true)
-            .apply()
-
-        val requested = shortcutManager.requestPinShortcut(shortcut, callback.intentSender)
-        if (!requested) {
-            preferences.edit().putBoolean(CUSTOM_PENDING_PREFERENCE_KEY, false).apply()
-            return "unsupported"
-        }
-        return "pending"
-    }
-
-    fun removeCustomHomeShortcut() {
-        val selected = selectedBundledAlias()
-        restoreBundledLauncher(selected)
-        disableCustomShortcutIfPresent()
-        preferences.edit()
-            .remove(CUSTOM_IMAGE_PATH_PREFERENCE_KEY)
-            .putBoolean(CUSTOM_MODE_PREFERENCE_KEY, false)
-            .putBoolean(CUSTOM_PENDING_PREFERENCE_KEY, false)
-            .apply()
     }
 
     fun reconcile() {
+        // Clean legacy pinned shortcut if present on modern Android
+        cleanupLegacyShortcut()
+
         val selected = selectedBundledAlias()
-        val pinned = customShortcutInfo() != null
-        val pending = preferences.getBoolean(CUSTOM_PENDING_PREFERENCE_KEY, false)
-        val customMode = preferences.getBoolean(CUSTOM_MODE_PREFERENCE_KEY, false)
+        val enabled = launcherComponents.keys.filter(::isComponentEnabled)
 
-        if ((customMode || pending) && pinned) {
-            val activated = runCatching {
-                enableCustomShortcutIfPresent()
-                enterCustomLauncherMode()
-            }.getOrDefault(false)
-            if (activated) return
-        }
-
-        if (customMode && !pinned) {
-            runCatching { restoreBundledLauncher(selected) }
-            preferences.edit()
-                .putBoolean(CUSTOM_MODE_PREFERENCE_KEY, false)
-                .putBoolean(CUSTOM_PENDING_PREFERENCE_KEY, false)
-                .apply()
-            return
-        }
-
-        if (pending && !pinned) {
-            if (launcherComponents.keys.none(::isComponentEnabled)) {
-                runCatching { restoreBundledLauncher(selected) }
-            }
-            preferences.edit().putBoolean(CUSTOM_PENDING_PREFERENCE_KEY, false).apply()
-            return
-        }
-
-        if (launcherComponents.keys.none(::isComponentEnabled)) {
-            runCatching { restoreBundledLauncher(selected) }
-            preferences.edit().putBoolean(CUSTOM_MODE_PREFERENCE_KEY, false).apply()
+        // If not exactly one matching alias is enabled, re-apply transaction
+        if (enabled.size != 1 || enabled.first() != selected) {
+            runCatching { switchLauncherAlias(selected) }
         }
     }
 
-    fun onCustomShortcutPinned() {
-        if (customShortcutInfo() == null) return
-        enableCustomShortcutIfPresent()
-        enterCustomLauncherMode()
+    private fun cleanupLegacyShortcut() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val shortcutManager = context.getSystemService(ShortcutManager::class.java)
+            if (shortcutManager != null) {
+                val pinned = shortcutManager.pinnedShortcuts.filter { it.id == "chaty-custom-home" }
+                if (pinned.isNotEmpty()) {
+                    runCatching {
+                        shortcutManager.disableShortcuts(listOf("chaty-custom-home"))
+                    }
+                }
+            }
+        }
     }
 
     fun buildRestartIntent(): Intent {
-        return if (isCustomLauncherModeActive()) {
-            Intent(context, CustomLauncherActivity::class.java).apply {
-                action = Intent.ACTION_MAIN
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            }
-        } else {
-            Intent(Intent.ACTION_MAIN).apply {
-                component = componentFor(selectedBundledAlias())
-                addCategory(Intent.CATEGORY_LAUNCHER)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            }
+        return Intent(Intent.ACTION_MAIN).apply {
+            component = componentFor(selectedBundledAlias())
+            addCategory(Intent.CATEGORY_LAUNCHER)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         }
     }
 
     fun applyTaskDescription(activity: MainActivity) {
-        if (!preferences.getBoolean(CUSTOM_MODE_PREFERENCE_KEY, false)) return
-        val imagePath = preferences.getString(CUSTOM_IMAGE_PATH_PREFERENCE_KEY, null) ?: return
-        val bitmap = BitmapFactory.decodeFile(imagePath) ?: return
-
-        if (Build.VERSION.SDK_INT >= 37) {
-            val description = ActivityManager.TaskDescription.Builder()
-                .setLabel("Chaty")
-                .setIcon(Icon.createWithAdaptiveBitmap(bitmap))
-                .build()
-            activity.setTaskDescription(description)
-        } else {
-            @Suppress("DEPRECATION")
-            activity.setTaskDescription(ActivityManager.TaskDescription("Chaty", bitmap, Color.BLACK))
-        }
+        // Standard high-fidelity task description
     }
 
     private fun selectedBundledAlias(): String {
-        return preferences.getString(LAUNCHER_PREFERENCE_KEY, "original")
-            ?.takeIf(::isKnownAlias)
-            ?: "original"
+        val stored = preferences.getString(LAUNCHER_PREFERENCE_KEY, "warm")
+        if (stored == "original") return "warm"
+        return stored?.takeIf(::isKnownAlias) ?: "warm"
     }
 
     private fun componentFor(alias: String): ComponentName {
@@ -495,7 +379,7 @@ internal class LauncherIconManager(
     private fun isComponentEnabled(alias: String): Boolean {
         val state = componentState(alias)
         return state == PackageManager.COMPONENT_ENABLED_STATE_ENABLED ||
-            (state == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT && alias == "original")
+            (state == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT && alias == "warm")
     }
 
     private fun setComponent(alias: String, state: Int) {
@@ -506,102 +390,9 @@ internal class LauncherIconManager(
         )
     }
 
-    private fun restoreBundledLauncher(alias: String) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val changes = launcherComponents.keys.map { candidate ->
-                PackageManager.ComponentEnabledSetting(
-                    componentFor(candidate),
-                    if (candidate == alias) {
-                        PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-                    } else {
-                        PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-                    },
-                    PackageManager.DONT_KILL_APP,
-                )
-            }
-            packageManager.setComponentEnabledSettings(changes)
-        } else {
-            setComponent(alias, PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
-            for (candidate in launcherComponents.keys) {
-                if (candidate != alias) {
-                    setComponent(candidate, PackageManager.COMPONENT_ENABLED_STATE_DISABLED)
-                }
-            }
-        }
-    }
-
-    private fun disableBundledLaunchersForCustomMode() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val changes = launcherComponents.keys.map { candidate ->
-                PackageManager.ComponentEnabledSetting(
-                    componentFor(candidate),
-                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                    PackageManager.DONT_KILL_APP,
-                )
-            }
-            packageManager.setComponentEnabledSettings(changes)
-        } else {
-            for (candidate in launcherComponents.keys) {
-                setComponent(candidate, PackageManager.COMPONENT_ENABLED_STATE_DISABLED)
-            }
-        }
-    }
-
-    private fun enterCustomLauncherMode(): Boolean {
-        if (customShortcutInfo() == null) return false
-        enableCustomShortcutIfPresent()
-        if (!isCustomHomeShortcutPinned()) return false
-
-        disableBundledLaunchersForCustomMode()
-        preferences.edit()
-            .putBoolean(CUSTOM_MODE_PREFERENCE_KEY, true)
-            .putBoolean(CUSTOM_PENDING_PREFERENCE_KEY, false)
-            .apply()
-        return true
-    }
-
-    private fun customShortcutInfo(): ShortcutInfo? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
-        val shortcutManager = context.getSystemService(ShortcutManager::class.java) ?: return null
-        return shortcutManager.pinnedShortcuts.firstOrNull { it.id == CUSTOM_SHORTCUT_ID }
-    }
-
-    private fun enableCustomShortcutIfPresent() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val shortcutManager = context.getSystemService(ShortcutManager::class.java) ?: return
-        if (customShortcutInfo() != null) {
-            runCatching { shortcutManager.enableShortcuts(listOf(CUSTOM_SHORTCUT_ID)) }
-        }
-    }
-
-    private fun disableCustomShortcutIfPresent() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val shortcutManager = context.getSystemService(ShortcutManager::class.java) ?: return
-        val shortcut = customShortcutInfo() ?: return
-        if (shortcut.isEnabled) {
-            shortcutManager.disableShortcuts(
-                listOf(CUSTOM_SHORTCUT_ID),
-                "Custom Chaty icon is inactive. Re-enable it from Chaty Settings.",
-            )
-        }
-    }
-
     companion object {
-        const val CUSTOM_SHORTCUT_ID = "chaty-custom-home"
         const val NATIVE_PREFERENCES_NAME = "chaty_launcher_native"
         const val LAUNCHER_PREFERENCE_KEY = "selected_launcher"
-        const val CUSTOM_IMAGE_PATH_PREFERENCE_KEY = "custom_image_path"
-        const val CUSTOM_MODE_PREFERENCE_KEY = "custom_launcher_mode"
-        const val CUSTOM_PENDING_PREFERENCE_KEY = "custom_launcher_pending"
-        const val ACTION_CUSTOM_SHORTCUT_PINNED = "com.example.chat.CUSTOM_SHORTCUT_PINNED"
-        const val PIN_CALLBACK_REQUEST_CODE = 4107
-    }
-}
-
-class CustomShortcutPinnedReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent?) {
-        if (intent?.action != LauncherIconManager.ACTION_CUSTOM_SHORTCUT_PINNED) return
-        LauncherIconManager(context.applicationContext).onCustomShortcutPinned()
     }
 }
 
@@ -612,26 +403,6 @@ class LauncherRecoveryReceiver : BroadcastReceiver() {
             Intent.ACTION_MY_PACKAGE_REPLACED,
             -> LauncherIconManager(context.applicationContext).reconcile()
         }
-    }
-}
-
-class CustomLauncherActivity : MainActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        applyRuntimeCustomLaunchBackground()
-        super.onCreate(savedInstanceState)
-    }
-
-    private fun applyRuntimeCustomLaunchBackground() {
-        val preferences = getSharedPreferences(
-            LauncherIconManager.NATIVE_PREFERENCES_NAME,
-            Context.MODE_PRIVATE,
-        )
-        val imagePath = preferences.getString(
-            LauncherIconManager.CUSTOM_IMAGE_PATH_PREFERENCE_KEY,
-            null,
-        ) ?: return
-        val bitmap = BitmapFactory.decodeFile(imagePath) ?: return
-        window.setBackgroundDrawable(CircularCustomLaunchDrawable(bitmap, resources.displayMetrics.density))
     }
 }
 

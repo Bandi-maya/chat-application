@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class ContextMenuItem {
   final Widget? iconWidget;
@@ -8,6 +9,7 @@ class ContextMenuItem {
   final VoidCallback onTap;
   final bool isDestructive;
   final Widget? trailing;
+  final bool isEnabled;
 
   const ContextMenuItem({
     this.iconWidget,
@@ -17,6 +19,7 @@ class ContextMenuItem {
     required this.onTap,
     this.isDestructive = false,
     this.trailing,
+    this.isEnabled = true,
   });
 }
 
@@ -30,13 +33,136 @@ class ContextMenuSection {
   });
 }
 
-/// Unified, high-performance reusable context menu for Home, Chat, Message & Profile.
+/// Unified, high-performance contextual menu system for Chaty.
+/// Supports both anchored floating popover menus (originating near the invoking widget/tap)
+/// and adaptive compact bottom sheets when anchor is not specified.
 class AppContextMenu {
   AppContextMenu._();
 
-  static Future<void> show(
-    BuildContext context, {
-    required String title,
+  /// Shows an anchored floating context menu at the specified global [anchorRect] or [anchorPosition].
+  /// Smoothly scales (0.94 -> 1.0) and fades in (160-200ms) with intelligent edge avoidance.
+  static Future<void> show({
+    required BuildContext context,
+    String? title,
+    String? subtitle,
+    required List<ContextMenuSection> sections,
+    Rect? anchorRect,
+    Offset? anchorPosition,
+    Color? backgroundColor,
+    Color? primaryTextColor,
+    Color? secondaryTextColor,
+    Color? destructiveColor,
+    double minWidth = 210.0,
+    double maxWidth = 280.0,
+  }) {
+    // If no anchor is passed, attempt to find the render box from context
+    Rect? effectiveAnchor = anchorRect;
+    if (effectiveAnchor == null && anchorPosition != null) {
+      effectiveAnchor = Rect.fromCenter(
+        center: anchorPosition,
+        width: 0,
+        height: 0,
+      );
+    }
+    if (effectiveAnchor == null) {
+      final renderBox = context.findRenderObject() as RenderBox?;
+      if (renderBox != null && renderBox.hasSize) {
+        final origin = renderBox.localToGlobal(Offset.zero);
+        effectiveAnchor = origin & renderBox.size;
+      }
+    }
+
+    // Trigger light haptic feedback on menu invocation
+    HapticFeedback.lightImpact();
+
+    if (effectiveAnchor != null) {
+      return _showAnchoredMenu(
+        context: context,
+        anchor: effectiveAnchor,
+        title: title,
+        subtitle: subtitle,
+        sections: sections,
+        backgroundColor: backgroundColor,
+        primaryTextColor: primaryTextColor,
+        secondaryTextColor: secondaryTextColor,
+        destructiveColor: destructiveColor,
+        minWidth: minWidth,
+        maxWidth: maxWidth,
+      );
+    }
+
+    return _showFallbackModal(
+      context: context,
+      title: title,
+      subtitle: subtitle,
+      sections: sections,
+      backgroundColor: backgroundColor,
+      primaryTextColor: primaryTextColor,
+      secondaryTextColor: secondaryTextColor,
+      destructiveColor: destructiveColor,
+    );
+  }
+
+  static Future<void> _showAnchoredMenu({
+    required BuildContext context,
+    required Rect anchor,
+    String? title,
+    String? subtitle,
+    required List<ContextMenuSection> sections,
+    Color? backgroundColor,
+    Color? primaryTextColor,
+    Color? secondaryTextColor,
+    Color? destructiveColor,
+    required double minWidth,
+    required double maxWidth,
+  }) {
+    final theme = Theme.of(context);
+    final bg = backgroundColor ?? theme.cardColor;
+    final primary = primaryTextColor ?? theme.colorScheme.onSurface;
+    final secondary = secondaryTextColor ?? theme.colorScheme.onSurfaceVariant;
+    final danger = destructiveColor ?? theme.colorScheme.error;
+
+    return showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Dismiss Context Menu',
+      barrierColor: Colors.black.withValues(alpha: 0.25),
+      transitionDuration: const Duration(milliseconds: 180),
+      pageBuilder: (dialogContext, anim1, anim2) {
+        return _AnchoredMenuLayout(
+          anchor: anchor,
+          minWidth: minWidth,
+          maxWidth: maxWidth,
+          backgroundColor: bg,
+          primaryColor: primary,
+          secondaryColor: secondary,
+          dangerColor: danger,
+          title: title,
+          subtitle: subtitle,
+          sections: sections,
+          onDismiss: () => Navigator.of(dialogContext).pop(),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.93, end: 1.0).animate(curved),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  static Future<void> _showFallbackModal({
+    required BuildContext context,
+    String? title,
     String? subtitle,
     required List<ContextMenuSection> sections,
     Color? backgroundColor,
@@ -56,10 +182,10 @@ class AppContextMenu {
       isScrollControlled: true,
       builder: (sheetContext) => SafeArea(
         child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
             color: bg,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: secondary.withValues(alpha: 0.15),
             ),
@@ -68,142 +194,304 @@ class AppContextMenu {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header Drag handle
-              Center(
-                child: Container(
-                  margin: const EdgeInsets.only(top: 10, bottom: 8),
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: secondary.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              // Title & Subtitle
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: primary,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    if (subtitle != null && subtitle.isNotEmpty) ...[
-                      const SizedBox(height: 2),
+              if (title != null) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        title,
                         style: TextStyle(
-                          color: secondary,
-                          fontSize: 13,
+                          color: primary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                    ],
-                  ],
-                ),
-              ),
-              Divider(height: 1, color: secondary.withValues(alpha: 0.12)),
-              // Sections
-              Flexible(
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  itemCount: sections.length,
-                  separatorBuilder: (_, __) => Divider(
-                    height: 1,
-                    color: secondary.withValues(alpha: 0.08),
-                  ),
-                  itemBuilder: (context, sIdx) {
-                    final section = sections[sIdx];
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (section.title != null)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 10, 20, 4),
-                            child: Text(
-                              section.title!.toUpperCase(),
-                              style: TextStyle(
-                                color: secondary,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ),
-                        ...section.items.map((item) {
-                          final itemColor = item.isDestructive ? danger : primary;
-                          return InkWell(
-                            onTap: () {
-                              Navigator.of(sheetContext).pop();
-                              item.onTap();
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 12,
-                              ),
-                              child: Row(
-                                children: [
-                                  if (item.iconWidget != null)
-                                    item.iconWidget!
-                                  else if (item.icon != null)
-                                    Icon(item.icon, color: itemColor, size: 20),
-                                  if (item.iconWidget != null || item.icon != null)
-                                    const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          item.label,
-                                          style: TextStyle(
-                                            color: itemColor,
-                                            fontSize: 15,
-                                            fontWeight: item.isDestructive
-                                                ? FontWeight.w600
-                                                : FontWeight.w500,
-                                          ),
-                                        ),
-                                        if (item.subtitle != null) ...[
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            item.subtitle!,
-                                            style: TextStyle(
-                                              color: secondary,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                  if (item.trailing != null) item.trailing!,
-                                ],
-                              ),
-                            ),
-                          );
-                        }),
+                      if (subtitle != null && subtitle.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: TextStyle(color: secondary, fontSize: 12),
+                        ),
                       ],
-                    );
-                  },
+                    ],
+                  ),
                 ),
+                Divider(height: 1, color: secondary.withValues(alpha: 0.12)),
+              ],
+              _buildSectionsList(
+                context: sheetContext,
+                sections: sections,
+                primary: primary,
+                secondary: secondary,
+                danger: danger,
               ),
               const SizedBox(height: 8),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  static Widget _buildSectionsList({
+    required BuildContext context,
+    required List<ContextMenuSection> sections,
+    required Color primary,
+    required Color secondary,
+    required Color danger,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (int sIdx = 0; sIdx < sections.length; sIdx++) ...[
+          if (sIdx > 0)
+            Divider(
+              height: 1,
+              thickness: 0.8,
+              color: secondary.withValues(alpha: 0.12),
+            ),
+          if (sections[sIdx].title != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Text(
+                sections[sIdx].title!.toUpperCase(),
+                style: TextStyle(
+                  color: secondary,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6,
+                ),
+              ),
+            ),
+          ...sections[sIdx].items.map((item) {
+            final itemColor = !item.isEnabled
+                ? secondary.withValues(alpha: 0.5)
+                : item.isDestructive
+                    ? danger
+                    : primary;
+
+            return InkWell(
+              onTap: item.isEnabled
+                  ? () {
+                      Navigator.of(context).pop();
+                      item.onTap();
+                    }
+                  : null,
+              borderRadius: BorderRadius.circular(10),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: [
+                    if (item.iconWidget != null)
+                      item.iconWidget!
+                    else if (item.icon != null)
+                      Icon(item.icon, color: itemColor, size: 18),
+                    if (item.iconWidget != null || item.icon != null)
+                      const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.label,
+                            style: TextStyle(
+                              color: itemColor,
+                              fontSize: 14,
+                              fontWeight: item.isDestructive
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                          if (item.subtitle != null) ...[
+                            const SizedBox(height: 1),
+                            Text(
+                              item.subtitle!,
+                              style: TextStyle(
+                                color: secondary,
+                                fontSize: 11.5,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (item.trailing != null) item.trailing!,
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
+      ],
+    );
+  }
+}
+
+class _AnchoredMenuLayout extends StatelessWidget {
+  final Rect anchor;
+  final double minWidth;
+  final double maxWidth;
+  final Color backgroundColor;
+  final Color primaryColor;
+  final Color secondaryColor;
+  final Color dangerColor;
+  final String? title;
+  final String? subtitle;
+  final List<ContextMenuSection> sections;
+  final VoidCallback onDismiss;
+
+  const _AnchoredMenuLayout({
+    required this.anchor,
+    required this.minWidth,
+    required this.maxWidth,
+    required this.backgroundColor,
+    required this.primaryColor,
+    required this.secondaryColor,
+    required this.dangerColor,
+    this.title,
+    this.subtitle,
+    required this.sections,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final screenSize = mediaQuery.size;
+    final padding = mediaQuery.padding;
+
+    // Calculate available positioning
+    final spaceBelow = screenSize.height - padding.bottom - anchor.bottom;
+    final spaceAbove = anchor.top - padding.top;
+    final showBelow = spaceBelow >= 220 || spaceBelow >= spaceAbove;
+
+    final targetWidth = (screenSize.width * 0.65).clamp(minWidth, maxWidth);
+
+    // X Positioning (align to right edge of anchor by default, or clamp within screen)
+    double left = anchor.right - targetWidth;
+    if (left < padding.left + 12) {
+      left = anchor.left;
+    }
+    if (left < padding.left + 12) {
+      left = padding.left + 12;
+    }
+    if (left + targetWidth > screenSize.width - padding.right - 12) {
+      left = screenSize.width - padding.right - 12 - targetWidth;
+    }
+
+    // Y Positioning
+    final double top = showBelow
+        ? (anchor.bottom + 6).clamp(padding.top + 10, screenSize.height - padding.bottom - 80)
+        : (anchor.top - 6).clamp(padding.top + 10, screenSize.height - padding.bottom - 80);
+
+    return Stack(
+      children: [
+        // Full screen tap-to-dismiss barrier
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onDismiss,
+            child: const SizedBox.expand(),
+          ),
+        ),
+        // Anchored popover card
+        Positioned(
+          left: left,
+          top: showBelow ? top : null,
+          bottom: showBelow ? null : (screenSize.height - top),
+          width: targetWidth,
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              decoration: BoxDecoration(
+                color: backgroundColor,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: secondaryColor.withValues(alpha: 0.18),
+                  width: 1.1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.16),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (title != null && title!.isNotEmpty) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: primaryColor,
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              if (subtitle != null && subtitle!.isNotEmpty) ...[
+                                const SizedBox(height: 1),
+                                Text(
+                                  subtitle!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: secondaryColor,
+                                    fontSize: 11.5,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        Divider(
+                          height: 1,
+                          thickness: 0.8,
+                          color: secondaryColor.withValues(alpha: 0.12),
+                        ),
+                      ],
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: AppContextMenu._buildSectionsList(
+                          context: context,
+                          sections: sections,
+                          primary: primaryColor,
+                          secondary: secondaryColor,
+                          danger: dangerColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

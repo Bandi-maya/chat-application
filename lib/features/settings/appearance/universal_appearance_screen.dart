@@ -435,12 +435,34 @@ class _VariantPickerSheetState extends State<_VariantPickerSheet> {
                           ),
                           child: Row(
                             children: [
-                              SizedBox(
-                                width: 34,
-                                child: Text(
-                                  '${index + 1}'.padLeft(2, '0'),
-                                  style: Theme.of(context).textTheme.labelSmall,
+                              // Radio indicator
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                width: 22,
+                                height: 22,
+                                margin: const EdgeInsets.only(right: 12),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: active ? scheme.primary : Colors.transparent,
+                                  border: Border.all(
+                                    color: active
+                                        ? scheme.primary
+                                        : scheme.onSurfaceVariant.withValues(alpha: 0.5),
+                                    width: 2,
+                                  ),
                                 ),
+                                child: active
+                                    ? Center(
+                                        child: Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: scheme.onPrimary,
+                                          ),
+                                        ),
+                                      )
+                                    : null,
                               ),
                               Expanded(
                                 child: Text(
@@ -449,16 +471,10 @@ class _VariantPickerSheetState extends State<_VariantPickerSheet> {
                                     fontWeight: active
                                         ? FontWeight.w800
                                         : FontWeight.w500,
+                                    color: active ? scheme.primary : scheme.onSurface,
                                   ),
                                 ),
                               ),
-                              if (active)
-                                Icon(
-                                  Icons.check_circle_rounded,
-                                  color: scheme.primary,
-                                )
-                              else
-                                const Icon(Icons.chevron_right_rounded),
                             ],
                           ),
                         ),

@@ -316,8 +316,11 @@ class ChatyPreferencesController extends ChangeNotifier {
     }
   }
 
+  int _lastLocalMutation = DateTime.now().millisecondsSinceEpoch;
+
   Map<String, dynamic> _snapshot() => <String, dynamic>{
     PreferenceKeys.schemaVersion: PreferenceKeys.currentSchemaVersion,
+    'local_updated_at': _lastLocalMutation,
     PreferenceKeys.privacy: _privacy.toMap(),
     PreferenceKeys.security: _security.toMap(),
     PreferenceKeys.home: _home.toMap(),
@@ -330,6 +333,7 @@ class ChatyPreferencesController extends ChangeNotifier {
   };
 
   void _persist() {
+    _lastLocalMutation = DateTime.now().millisecondsSinceEpoch;
     final snapshot = _snapshot();
     unawaited(
       LocalPreferencesStorage.savePreferences(snapshot, userId: _scopeUserId),
@@ -351,7 +355,7 @@ class ChatyPreferencesController extends ChangeNotifier {
     try {
       final row = await client
           .from('user_feature_settings')
-          .select('settings')
+          .select('settings, updated_at')
           .eq('user_id', user.id)
           .maybeSingle();
       if (row == null || row['settings'] is! Map) {
@@ -359,6 +363,20 @@ class ChatyPreferencesController extends ChangeNotifier {
         return;
       }
       final remoteRaw = Map<String, dynamic>.from(row['settings'] as Map);
+      
+      // Timestamp reconciliation: if local mutation is strictly newer than remote updated_at,
+      // push local state to remote rather than overwriting fresh local choices with stale remote data.
+      final remoteUpdatedAtStr = row['updated_at']?.toString() ?? remoteRaw['local_updated_at']?.toString();
+      if (remoteUpdatedAtStr != null) {
+        final remoteTime = DateTime.tryParse(remoteUpdatedAtStr)?.millisecondsSinceEpoch ??
+            int.tryParse(remoteUpdatedAtStr) ?? 0;
+        if (remoteTime > 0 && _lastLocalMutation > remoteTime + 2000) {
+          // Local changes are strictly newer; push to server
+          await _pushRemote(_snapshot());
+          return;
+        }
+      }
+
       final needsPurge = PreferencesMigrator.rawHasLegacySecrets(remoteRaw);
       final migration = PreferencesMigrator.migrate(remoteRaw);
       _applyMap(migration.data);

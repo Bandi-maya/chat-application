@@ -7,11 +7,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'custom_app_icon_processor.dart';
 
-enum LauncherIconVariant { original, minimal, bubble, midnight, ocean, violet }
+enum LauncherIconVariant { warm, outline, obsidian, glass, signal, fold }
 
 enum BrandIconSource { bundled, custom }
-
-enum CustomLauncherState { inactive, pending, active, failed, unsupported }
 
 enum CustomIconInputSource { photos, camera }
 
@@ -55,27 +53,50 @@ extension LauncherIconVariantMetadata on LauncherIconVariant {
 
   String get title {
     switch (this) {
-      case LauncherIconVariant.original:
-        return 'Original';
-      case LauncherIconVariant.minimal:
-        return 'Minimal';
-      case LauncherIconVariant.bubble:
-        return 'Bubble';
-      case LauncherIconVariant.midnight:
-        return 'Midnight';
-      case LauncherIconVariant.ocean:
-        return 'Ocean';
-      case LauncherIconVariant.violet:
-        return 'Violet';
+      case LauncherIconVariant.warm:
+        return 'Warm Signature';
+      case LauncherIconVariant.outline:
+        return 'Warm Outline';
+      case LauncherIconVariant.obsidian:
+        return 'Obsidian';
+      case LauncherIconVariant.glass:
+        return 'Spatial Glass';
+      case LauncherIconVariant.signal:
+        return 'Signal';
+      case LauncherIconVariant.fold:
+        return 'Fold';
+    }
+  }
+
+  String get subtitle {
+    switch (this) {
+      case LauncherIconVariant.warm:
+        return 'Warm Neutral ivory field with soft-depth dimensional Chaty mark';
+      case LauncherIconVariant.outline:
+        return 'Clean editorial graphite contour on warm canvas';
+      case LauncherIconVariant.obsidian:
+        return 'Near-black field with metallic ivory communication glyph';
+      case LauncherIconVariant.glass:
+        return 'Layered translucent glass facets with soft reflections';
+      case LauncherIconVariant.signal:
+        return 'Warm presence pulse geometry with core Chaty mark';
+      case LauncherIconVariant.fold:
+        return 'Origami dimensional folded conversation surfaces';
     }
   }
 
   String get androidAlias => name;
 
   static LauncherIconVariant fromId(String? value) {
+    if (value == 'original') return LauncherIconVariant.warm;
+    if (value == 'minimal') return LauncherIconVariant.outline;
+    if (value == 'midnight') return LauncherIconVariant.obsidian;
+    if (value == 'bubble') return LauncherIconVariant.glass;
+    if (value == 'ocean') return LauncherIconVariant.signal;
+    if (value == 'violet') return LauncherIconVariant.fold;
     return LauncherIconVariant.values.firstWhere(
       (variant) => variant.id == value,
-      orElse: () => LauncherIconVariant.original,
+      orElse: () => LauncherIconVariant.warm,
     );
   }
 }
@@ -86,20 +107,16 @@ class AppIconController extends ChangeNotifier {
   static const String _brandSourcePreferenceKey = 'chaty_brand_source_v1';
   static const String _customBrandPathPreferenceKey =
       'chaty_custom_brand_icon_path_v1';
-  static const String _customHomeShortcutPreferenceKey =
-      'chaty_custom_home_shortcut_v1';
   static const String _customLibraryPreferenceKey =
       'chaty_custom_icon_library_v2';
   static const String _activeCustomPresetPreferenceKey =
       'chaty_active_custom_icon_v2';
 
-  LauncherIconVariant _launcherIcon = LauncherIconVariant.original;
+  LauncherIconVariant _launcherIcon = LauncherIconVariant.warm;
   BrandIconSource _brandIconSource = BrandIconSource.bundled;
-  CustomLauncherState _customLauncherState = CustomLauncherState.inactive;
   final List<CustomIconPreset> _customIconPresets = <CustomIconPreset>[];
   String? _activeCustomPresetId;
   String? _customBrandIconPath;
-  bool _customHomeShortcutApplied = false;
   bool _initialized = false;
   bool _isApplyingLauncherIcon = false;
   bool _isSavingCustomBrandIcon = false;
@@ -108,14 +125,10 @@ class AppIconController extends ChangeNotifier {
 
   LauncherIconVariant get launcherIcon => _launcherIcon;
   BrandIconSource get brandIconSource => _brandIconSource;
-  CustomLauncherState get customLauncherState => _customLauncherState;
   String? get customBrandIconPath => _customBrandIconPath;
   String? get activeCustomPresetId => _activeCustomPresetId;
   List<CustomIconPreset> get customIconPresets =>
       List.unmodifiable(_customIconPresets);
-  bool get customHomeShortcutApplied => _customHomeShortcutApplied;
-  bool get customLauncherModeActive =>
-      _customLauncherState == CustomLauncherState.active;
   bool get hasSavedCustomIcon =>
       _customIconPresets.any((preset) => preset.exists);
   bool get initialized => _initialized;
@@ -144,8 +157,6 @@ class AppIconController extends ChangeNotifier {
             BrandIconSource.custom.name
         ? BrandIconSource.custom
         : BrandIconSource.bundled;
-    _customHomeShortcutApplied =
-        prefs.getBool(_customHomeShortcutPreferenceKey) ?? false;
 
     await _loadCustomLibrary(prefs);
     await _migrateLegacyCustomIcon(prefs);
@@ -157,7 +168,6 @@ class AppIconController extends ChangeNotifier {
     if (_brandIconSource == BrandIconSource.custom &&
         activeCustomPreset == null) {
       _brandIconSource = BrandIconSource.bundled;
-      _customLauncherState = CustomLauncherState.inactive;
       await prefs.setString(
         _brandSourcePreferenceKey,
         BrandIconSource.bundled.name,
@@ -237,22 +247,9 @@ class AppIconController extends ChangeNotifier {
         await prefs.setString(_launcherPreferenceKey, nativeVariant.id);
       }
 
-      final nativeState =
-          await _channel.invokeMethod<String>('getCustomLauncherState') ??
-          'inactive';
-      _customLauncherState = _stateFromNative(nativeState);
-      _customHomeShortcutApplied =
-          await _channel.invokeMethod<bool>('isCustomHomeShortcutPinned') ??
-          false;
-      await prefs.setBool(
-        _customHomeShortcutPreferenceKey,
-        _customHomeShortcutApplied,
-      );
-
       if (_brandIconSource == BrandIconSource.custom &&
           activeCustomPreset == null) {
         _brandIconSource = BrandIconSource.bundled;
-        _customLauncherState = CustomLauncherState.inactive;
         await prefs.setString(
           _brandSourcePreferenceKey,
           BrandIconSource.bundled.name,
@@ -275,7 +272,6 @@ class AppIconController extends ChangeNotifier {
 
     final previous = _launcherIcon;
     final previousSource = _brandIconSource;
-    final previousCustomState = _customLauncherState;
     try {
       if (!kIsWeb && Platform.isAndroid) {
         final applied = await _channel.invokeMethod<String>(
@@ -293,19 +289,15 @@ class AppIconController extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       _launcherIcon = variant;
       _brandIconSource = BrandIconSource.bundled;
-      _customLauncherState = CustomLauncherState.inactive;
-      _customHomeShortcutApplied = false;
       await prefs.setString(_launcherPreferenceKey, variant.id);
       await prefs.setString(
         _brandSourcePreferenceKey,
         BrandIconSource.bundled.name,
       );
-      await prefs.setBool(_customHomeShortcutPreferenceKey, false);
       return true;
     } catch (error) {
       _launcherIcon = previous;
       _brandIconSource = previousSource;
-      _customLauncherState = previousCustomState;
       _lastError =
           'Could not apply that launcher icon. Your previous icon is still active.';
       debugPrint('Launcher icon change failed: $error');
@@ -368,11 +360,8 @@ class AppIconController extends ChangeNotifier {
         _brandSourcePreferenceKey,
         BrandIconSource.custom.name,
       );
-
-      await _activateCustomNativeRepresentation(preset.path);
       return true;
     } catch (error) {
-      _customLauncherState = CustomLauncherState.failed;
       _lastError = 'The custom app icon could not be processed or saved.';
       debugPrint('Custom brand icon save failed: $error');
       return false;
@@ -411,11 +400,9 @@ class AppIconController extends ChangeNotifier {
         _brandSourcePreferenceKey,
         BrandIconSource.custom.name,
       );
-      await _activateCustomNativeRepresentation(preset.path);
       return true;
     } catch (error) {
-      _customLauncherState = CustomLauncherState.failed;
-      _lastError = 'Android could not activate that custom launcher icon.';
+      _lastError = 'Could not activate that custom brand icon.';
       debugPrint('Custom preset activation failed: $error');
       return false;
     } finally {
@@ -432,36 +419,6 @@ class AppIconController extends ChangeNotifier {
             : null);
     if (preset == null) return false;
     return activateCustomPreset(preset.id);
-  }
-
-  Future<void> _activateCustomNativeRepresentation(String path) async {
-    if (kIsWeb || !Platform.isAndroid) {
-      _customLauncherState = CustomLauncherState.unsupported;
-      return;
-    }
-
-    final result = await _channel.invokeMethod<String>(
-      'applyCustomHomeShortcut',
-      <String, dynamic>{'imagePath': path, 'label': 'Chaty'},
-    );
-    _customLauncherState = _stateFromNative(result ?? 'failed');
-
-    final prefs = await SharedPreferences.getInstance();
-    _customHomeShortcutApplied =
-        await _channel.invokeMethod<bool>('isCustomHomeShortcutPinned') ??
-        false;
-    await prefs.setBool(
-      _customHomeShortcutPreferenceKey,
-      _customHomeShortcutApplied,
-    );
-
-    if (_customLauncherState == CustomLauncherState.unsupported) {
-      _lastError =
-          'This launcher cannot pin a runtime custom Home icon. The preset is still saved inside Chaty.';
-    } else if (_customLauncherState == CustomLauncherState.failed) {
-      _lastError =
-          'The custom preset is saved, but Android could not activate the Home launcher entry.';
-    }
   }
 
   Future<void> removeCustomPreset(String presetId) async {
@@ -505,14 +462,6 @@ class AppIconController extends ChangeNotifier {
   }
 
   Future<void> removeCustomBrandIcon() async {
-    if (!kIsWeb && Platform.isAndroid) {
-      try {
-        await _channel.invokeMethod<void>('removeCustomHomeShortcut');
-      } catch (error) {
-        debugPrint('Custom Home Screen shortcut cleanup failed: $error');
-      }
-    }
-
     for (final preset in List<CustomIconPreset>.from(_customIconPresets)) {
       try {
         final file = File(preset.path);
@@ -525,8 +474,6 @@ class AppIconController extends ChangeNotifier {
     _customIconPresets.clear();
     _activeCustomPresetId = null;
     _customBrandIconPath = null;
-    _customHomeShortcutApplied = false;
-    _customLauncherState = CustomLauncherState.inactive;
     _brandIconSource = BrandIconSource.bundled;
 
     final prefs = await SharedPreferences.getInstance();
@@ -537,34 +484,16 @@ class AppIconController extends ChangeNotifier {
     await prefs.remove(_customBrandPathPreferenceKey);
     await prefs.remove(_activeCustomPresetPreferenceKey);
     await prefs.remove(_customLibraryPreferenceKey);
-    await prefs.setBool(_customHomeShortcutPreferenceKey, false);
     notifyListeners();
   }
 
   Future<void> resetLauncherIcon() async {
-    await applyLauncherIcon(LauncherIconVariant.original);
+    await applyLauncherIcon(LauncherIconVariant.warm);
   }
 
   void clearError() {
     if (_lastError == null) return;
     _lastError = null;
     notifyListeners();
-  }
-
-  static CustomLauncherState _stateFromNative(String value) {
-    switch (value) {
-      case 'active':
-      case 'updated':
-        return CustomLauncherState.active;
-      case 'pending':
-      case 'requested':
-        return CustomLauncherState.pending;
-      case 'unsupported':
-        return CustomLauncherState.unsupported;
-      case 'failed':
-        return CustomLauncherState.failed;
-      default:
-        return CustomLauncherState.inactive;
-    }
   }
 }

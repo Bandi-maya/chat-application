@@ -22,6 +22,9 @@ import 'package:chat/features/auth/create_new_password_screen.dart';
 import 'package:chat/features/auth/welcome_screen.dart';
 import 'package:chat/features/chats/main_navigation_shell.dart';
 import 'package:chat/features/calls/ongoing_call_screen.dart';
+import 'package:chat/features/calls/call_presentation_controller.dart';
+import 'package:chat/features/calls/widgets/chaty_call_island.dart';
+import 'package:chat/features/calls/widgets/in_app_call_pip.dart';
 import 'package:chat/features/settings/security/app_lock_overlay.dart';
 import 'package:chat/features/settings/security/security_center_screen.dart';
 import 'package:chat/injection/locator.dart';
@@ -130,6 +133,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
       locator<ChatyBackendService>(),
       locator<RichChatRealtimeService>(),
       locator<CallSignalingService>(),
+      locator<CallPresentationController>(),
       // Presence of the full call screen: the minimized-call capsule hides
       // itself while OngoingCallScreen is presented.
       OngoingCallScreen.presentedInstances,
@@ -596,11 +600,45 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
                 : null;
             final showIncoming =
                 incomingCall != null && _backend.isAuthenticated;
-            if (!shouldShowLock && !showIncoming) return appContent;
-            return Stack(
+
+            final presentation = locator<CallPresentationController>();
+            final showFloatingVideo = presentation.isInAppVideoPip && callSession != null && callSession.isActive;
+            final showIsland = presentation.isInAppIsland && callSession != null && callSession.isActive;
+
+            final baseStack = Stack(
               fit: StackFit.expand,
               children: [
                 appContent,
+                if (showIsland)
+                  ChatyCallIsland(
+                    session: callSession,
+                    durationSeconds: _callService.callDurationSeconds,
+                    onTap: () {
+                      if (callSession.isVideo) {
+                        presentation.expandFromIsland();
+                      } else {
+                        unawaited(_openOngoingCall(currentTheme));
+                      }
+                    },
+                    onExpand: () => unawaited(_openOngoingCall(currentTheme)),
+                  ),
+                if (showFloatingVideo)
+                  InAppCallPip(
+                    session: callSession,
+                    remoteRenderer: null,
+                    durationSeconds: _callService.callDurationSeconds,
+                    onTap: () => unawaited(_openOngoingCall(currentTheme)),
+                    onCollapseToIsland: () => presentation.collapseToIsland(),
+                    onEndCall: () => unawaited(_callService.endCall()),
+                  ),
+              ],
+            );
+
+            if (!shouldShowLock && !showIncoming) return baseStack;
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                baseStack,
                 if (showIncoming)
                   _IncomingCallOverlay(
                     call: incomingCall,

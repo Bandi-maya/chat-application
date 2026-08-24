@@ -1,0 +1,47 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Warm Ivory Canvas Background -->
+    <path
+        android:fillColor="#F6F3EC"
+        android:pathData="M0,0h108v108h-108z" />
+
+    <!-- Soft Depth Ambient Shadow -->
+    <path
+        android:fillColor="#222B2219"
+        android:pathData="M56,19 A33,33 0 0,1 89,52 A33,33 0 0,1 56,85 A33,33 0 0,1 32.5,75 L18,92 L24,70 A33,33 0 0,1 23,52 A33,33 0 0,1 56,19 Z" />
+
+    <!-- Dimensional Base Shape -->
+    <path
+        android:fillColor="#8C6239"
+        android:pathData="M54,16 A33,33 0 0,1 87,49 A33,33 0 0,1 54,82 A33,33 0 0,1 30.5,72 L16,89 L22,67 A33,33 0 0,1 21,49 A33,33 0 0,1 54,16 Z" />
+
+    <!-- Outer Rim Metallic Chamfer -->
+    <path
+        android:strokeColor="#C89666"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M54,19 A30,30 0 0,1 84,49 A30,30 0 0,1 54,79 A30,30 0 0,1 32.5,70 L20,85 L25,65 A30,30 0 0,1 24,49 A30,30 0 0,1 54,19 Z" />
+
+    <!-- Warm Ivory Main Bubble Fill -->
+    <path
+        android:fillColor="#F8F5EE"
+        android:pathData="M54,21 A28,28 0 0,1 82,49 A28,28 0 0,1 54,77 A28,28 0 0,1 34,68.5 L22.5,82 L26.5,64 A28,28 0 0,1 26,49 A28,28 0 0,1 54,21 Z" />
+
+    <!-- Three-dot communicative face motif -->
+    <!-- Top-left dot -->
+    <path
+        android:fillColor="#4A3B32"
+        android:pathData="M43,47 a4.5,4.5 0 1,1 -9,0 a4.5,4.5 0 1,1 9,0 z" />
+    <!-- Top-right dot -->
+    <path
+        android:fillColor="#4A3B32"
+        android:pathData="M73,47 a4.5,4.5 0 1,1 -9,0 a4.5,4.5 0 1,1 9,0 z" />
+    <!-- Center lower dot -->
+    <path
+        android:fillColor="#4A3B32"
+        android:pathData="M58,54 a4.5,4.5 0 1,1 -9,0 a4.5,4.5 0 1,1 9,0 z" />
+</vector>

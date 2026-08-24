@@ -272,7 +272,7 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                     ),
                   ),
                   const SizedBox(height: ChatySpacing.md),
-                  // Quick Action Action Row (Call, Video, Search, Share, Pay)
+                  // Quick Action Action Row (Call, Video, Search, Share)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
@@ -299,15 +299,6 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                         label: 'Search',
                         onTap: () {
                           Navigator.of(context).pop('search');
-                        },
-                      ),
-                      _QuickActionButton(
-                        icon: Icons.payment_rounded,
-                        label: 'Pay',
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Opening secure payment transfer to ${widget.contact.displayName}...')),
-                          );
                         },
                       ),
                       _QuickActionButton(

@@ -89,4 +89,12 @@ class ChatyCallSession {
       isSharingScreen: isSharingScreen ?? this.isSharingScreen,
     );
   }
+
+  /// Indicates whether the session is currently active or establishing media.
+  bool get isActive =>
+      state == CallSessionState.connecting ||
+      state == CallSessionState.connected ||
+      state == CallSessionState.reconnecting ||
+      state == CallSessionState.initiating ||
+      (state == CallSessionState.ringing && isOutgoing);
 }

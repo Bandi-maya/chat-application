@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../tokens/app_tokens.dart';
 import '../../theme/theme_extensions.dart';
+import '../../menu/app_context_menu.dart';
 
 /// ---------------------------------------------------------------------------
 /// SHARED DIALOGS / SHEETS / FEEDBACK — replaces the per-screen copies.
@@ -236,6 +237,8 @@ class ChatyMenuSheet {
     BuildContext context, {
     required String title,
     required List<ChatyMenuItem> items,
+    Rect? anchorRect,
+    Offset? anchorPosition,
     Color? surfaceColor,
     Color? textColor,
     Color? accentColor,
@@ -244,56 +247,29 @@ class ChatyMenuSheet {
     final theme = Theme.of(context);
     final surface = surfaceColor ?? theme.colorScheme.surface;
     final ink = textColor ?? theme.colorScheme.onSurface;
-    final accent = accentColor ?? theme.colorScheme.primary;
     final danger = dangerColor ?? theme.colorScheme.error;
-    return showModalBottomSheet<void>(
+
+    return AppContextMenu.show(
       context: context,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => SafeArea(
-        child: Container(
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 14),
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: ink,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 15,
-                ),
-              ),
-              const SizedBox(height: 6),
-              for (final item in items)
-                ListTile(
-                  leading: Icon(
-                    item.icon,
-                    size: 21,
-                    color: item.destructive ? danger : accent,
-                  ),
-                  title: Text(
-                    item.label,
-                    style: TextStyle(
-                      color: item.destructive ? danger : ink,
-                      fontSize: 14.5,
-                    ),
-                  ),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    item.onTap();
-                  },
-                ),
-              const SizedBox(height: 10),
-            ],
-          ),
+      title: title,
+      anchorRect: anchorRect,
+      anchorPosition: anchorPosition,
+      backgroundColor: surface,
+      primaryTextColor: ink,
+      secondaryTextColor: ink.withValues(alpha: 0.65),
+      destructiveColor: danger,
+      sections: [
+        ContextMenuSection(
+          items: items.map((item) {
+            return ContextMenuItem(
+              icon: item.icon,
+              label: item.label,
+              isDestructive: item.destructive,
+              onTap: item.onTap,
+            );
+          }).toList(),
         ),
-      ),
+      ],
     );
   }
 }

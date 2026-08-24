@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../../ui/core/design_system/settings_primitives.dart';
+import '../../ui/core/menu/app_context_menu.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/notification_service.dart';
@@ -263,69 +264,50 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  void _showResetOptions(BuildContext context) {
-    final colors = context.colors;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: colors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Reset & Preferences',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: colors.foreground,
-              ),
-            ),
-            const SizedBox(height: 12),
-            ListTile(
-              leading: Icon(Icons.restore_rounded, color: colors.primary),
-              title: const Text('Reset Theme to Default B&W'),
+  void _showResetOptions(BuildContext anchorContext) {
+    AppContextMenu.show(
+      context: anchorContext,
+      title: 'Reset & Preferences',
+      subtitle: 'Restore settings or presets',
+      sections: [
+        ContextMenuSection(
+          items: [
+            ContextMenuItem(
+              icon: Icons.restore_rounded,
+              label: 'Reset Theme to Default B&W',
+              subtitle: 'Restore default monochrome theme',
               onTap: () {
                 themeController.resetToDefaults();
-                Navigator.of(ctx).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
+                ScaffoldMessenger.of(anchorContext).showSnackBar(
                   const SnackBar(content: Text('Theme reset to default.')),
                 );
               },
             ),
-            ListTile(
-              leading: Icon(Icons.shield_outlined, color: colors.primary),
-              title: const Text('Reset Privacy Options'),
+            ContextMenuItem(
+              icon: Icons.shield_outlined,
+              label: 'Reset Privacy Options',
+              subtitle: 'Reset last seen and stealth toggles',
               onTap: () {
                 preferencesController.resetPrivacy();
-                Navigator.of(ctx).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
+                ScaffoldMessenger.of(anchorContext).showSnackBar(
                   const SnackBar(content: Text('Privacy settings reset.')),
                 );
               },
             ),
-            ListTile(
-              leading: Icon(
-                Icons.cleaning_services_rounded,
-                color: colors.error,
-              ),
-              title: Text(
-                'Reset ALL Preferences',
-                style: TextStyle(
-                  color: colors.error,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+          ],
+        ),
+        ContextMenuSection(
+          title: 'Danger Zone',
+          items: [
+            ContextMenuItem(
+              icon: Icons.cleaning_services_rounded,
+              label: 'Reset ALL Preferences',
+              subtitle: 'Restore factory defaults',
+              isDestructive: true,
               onTap: () {
                 preferencesController.resetAll();
                 themeController.resetToDefaults();
-                Navigator.of(ctx).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
+                ScaffoldMessenger.of(anchorContext).showSnackBar(
                   const SnackBar(
                     content: Text('All preferences reset to factory defaults.'),
                   ),
@@ -334,7 +316,7 @@ class SettingsScreen extends StatelessWidget {
             ),
           ],
         ),
-      ),
+      ],
     );
   }
 
@@ -420,13 +402,15 @@ class SettingsScreen extends StatelessWidget {
                           );
                         },
                       ),
-                      IconButton(
-                        icon: Icon(
-                          Icons.more_vert_rounded,
-                          color: theme.secondaryTextColor,
-                          size: 22,
+                      Builder(
+                        builder: (btnCtx) => IconButton(
+                          icon: Icon(
+                            Icons.more_vert_rounded,
+                            color: theme.secondaryTextColor,
+                            size: 22,
+                          ),
+                          onPressed: () => _showResetOptions(btnCtx),
                         ),
-                        onPressed: () => _showResetOptions(context),
                       ),
                     ],
                   ),

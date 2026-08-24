@@ -10,6 +10,7 @@ import '../../features/camera/effects/effect_registry.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../../ui/core/widgets/app_avatar.dart';
+import 'call_presentation_controller.dart';
 
 /// Full-screen voice/video call UI backed by real WebRTC media streams.
 ///
@@ -51,6 +52,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
   void initState() {
     super.initState();
     OngoingCallScreen.presentedInstances.value++;
+    locator<CallPresentationController>().showFullScreen();
     _callService.addListener(_handleCallStateChanged);
     unawaited(_initializeMediaUi());
     _startAutoHideTimer();
@@ -154,6 +156,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
   @override
   void dispose() {
     OngoingCallScreen.presentedInstances.value--;
+    locator<CallPresentationController>().minimizeToPipOrIsland();
     _callService.removeListener(_handleCallStateChanged);
     _effectEngine.dispose();
     _autoHideTimer?.cancel();
@@ -445,7 +448,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                               ? _callService.toggleMute
                               : null,
                         ),
-                        if (session.isVideo)
+                        if (session.isVideo) ...[
                           _buildCallButton(
                             label: session.isCameraOff
                                 ? 'Camera on'
@@ -459,6 +462,29 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                                 ? _callService.toggleCamera
                                 : null,
                           ),
+                          _buildCallButton(
+                            label: 'Switch camera',
+                            icon: Icons.cameraswitch_rounded,
+                            isActive: false,
+                            activeColor: colors.primary,
+                            onTap: _callService.hasLocalMedia && !session.isCameraOff && !session.isSharingScreen
+                                ? () => unawaited(_callService.switchCamera())
+                                : null,
+                          ),
+                          _buildCallButton(
+                            label: session.isSharingScreen
+                                ? 'Stop sharing'
+                                : 'Share screen',
+                            icon: session.isSharingScreen
+                                ? Icons.stop_screen_share_rounded
+                                : Icons.screen_share_rounded,
+                            isActive: session.isSharingScreen,
+                            activeColor: const Color(0xFF38BDF8),
+                            onTap: _callService.hasLocalMedia
+                                ? () => unawaited(_callService.toggleScreenShare())
+                                : null,
+                          ),
+                        ],
                         _buildCallButton(
                           label: session.audioRoute == AudioRouteType.speaker
                               ? 'Earpiece'
