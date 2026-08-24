@@ -26,12 +26,15 @@ class MessageBubble extends StatelessWidget {
   final ThemeConfig theme;
   final String? senderName;
   final VoidCallback onLongPress;
+  final void Function(Rect bubbleRect)? onLongPressWithRect;
+  final VoidCallback? onSwipeReply;
   final VoidCallback? onTaskTap;
   final Function(String emoji)? onReactionTap;
   final VoidCallback? onMediaTap;
   final VoidCallback? onDoubleTap;
   final double voicePlaybackSpeed;
   final bool showDeletedContent;
+  final bool isSelected;
 
   /// Real consumer of `privacy.showEditedMessage` (GB `key_chat_editview`):
   /// when off, the "edited" marker is hidden even though the server keeps
@@ -55,12 +58,15 @@ class MessageBubble extends StatelessWidget {
     required this.theme,
     this.senderName,
     required this.onLongPress,
+    this.onLongPressWithRect,
+    this.onSwipeReply,
     this.onTaskTap,
     this.onReactionTap,
     this.onMediaTap,
     this.onDoubleTap,
     this.voicePlaybackSpeed = 1.0,
     this.showDeletedContent = false,
+    this.isSelected = false,
     this.showEditedLabel = true,
     this.enableAnimatedEmojis = true,
     this.retainViewOnce = false,
@@ -254,20 +260,50 @@ class MessageBubble extends StatelessWidget {
                 ),
               ),
             Flexible(
-              child: GestureDetector(
-                onLongPress: onLongPress,
-                onDoubleTap: onDoubleTap,
-                child: Column(
-                  crossAxisAlignment: isMe
-                      ? CrossAxisAlignment.end
-                      : CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      constraints: BoxConstraints(
-                        maxWidth:
-                            MediaQuery.sizeOf(context).width *
-                            theme.bubbleMaxWidthFactor,
-                      ),
+              child: Builder(
+                builder: (bubbleContext) {
+                  void handleLongPress() {
+                    if (onLongPressWithRect != null) {
+                      final box = bubbleContext.findRenderObject() as RenderBox?;
+                      if (box != null && box.hasSize) {
+                        final pos = box.localToGlobal(Offset.zero);
+                        onLongPressWithRect!(pos & box.size);
+                        return;
+                      }
+                    }
+                    onLongPress();
+                  }
+
+                  return GestureDetector(
+                    onLongPress: handleLongPress,
+                    onDoubleTap: onDoubleTap,
+                    onHorizontalDragEnd: onSwipeReply != null
+                        ? (details) {
+                            if (details.primaryVelocity != null &&
+                                details.primaryVelocity! > 180) {
+                              onSwipeReply!();
+                            }
+                          }
+                        : null,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 140),
+                      decoration: isSelected
+                          ? BoxDecoration(
+                              color: theme.accentColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(16),
+                            )
+                          : null,
+                      child: Column(
+                        crossAxisAlignment: isMe
+                            ? CrossAxisAlignment.end
+                            : CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            constraints: BoxConstraints(
+                              maxWidth:
+                                  MediaQuery.sizeOf(context).width *
+                                  theme.bubbleMaxWidthFactor,
+                            ),
                       margin: BubbleStyleRegistry.getGeometry(
                         theme.bubbleStyle,
                       ).bubbleMargin,
@@ -629,12 +665,15 @@ class MessageBubble extends StatelessWidget {
                   ],
                 ),
               ),
-            ),
-          ],
+            );
+          },
         ),
       ),
-    );
-  }
+    ],
+  ),
+),
+);
+}
 }
 
 class _SignedImagePreview extends StatefulWidget {

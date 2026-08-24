@@ -14,6 +14,7 @@ import '../../domain/models/conversation.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/design_system/settings_primitives.dart';
+import '../../ui/core/menu/app_context_menu.dart';
 import '../../ui/core/design_system/components/chaty_kit.dart';
 import '../../ui/core/design_system/components/app_components.dart';
 import '../../core/emoji/widgets/animated_emoji_text.dart';
@@ -190,9 +191,67 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     }
   }
 
-  void _handleConversationLongPress(Conversation conversation) {
-    HapticFeedback.mediumImpact();
-    _toggleSelection(conversation.id);
+  void _showConversationContextMenu(Conversation conversation, Rect? anchorRect) {
+    final theme = widget.themeController.globalTheme;
+    final isPinned = conversation.isPinned;
+    final isMuted = conversation.isMuted;
+    final isArchived = conversation.isArchived;
+    final isUnread = conversation.unreadCount > 0;
+
+    final sections = <ContextMenuSection>[
+      ContextMenuSection(
+        title: conversation.title,
+        items: [
+          ContextMenuItem(
+            icon: isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
+            label: isPinned ? 'Unpin chat' : 'Pin chat',
+            onTap: () => widget.dataStore.togglePinConversation(conversation.id),
+          ),
+          ContextMenuItem(
+            icon: isMuted ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+            label: isMuted ? 'Unmute' : 'Mute',
+            onTap: () => widget.dataStore.toggleMuteConversation(conversation.id),
+          ),
+          ContextMenuItem(
+            icon: isArchived ? Icons.unarchive_rounded : Icons.archive_rounded,
+            label: isArchived ? 'Unarchive' : 'Archive',
+            onTap: () => widget.dataStore.toggleArchiveConversation(conversation.id),
+          ),
+          ContextMenuItem(
+            icon: isUnread ? Icons.mark_chat_read_rounded : Icons.mark_chat_unread_rounded,
+            label: isUnread ? 'Mark as read' : 'Mark as unread',
+            onTap: () {
+              if (isUnread) {
+                widget.dataStore.markAsRead(conversation.id);
+              } else {
+                widget.dataStore.markAsUnread(conversation.id);
+              }
+            },
+          ),
+          ContextMenuItem(
+            icon: Icons.checklist_rounded,
+            label: 'Select',
+            onTap: () => _toggleSelection(conversation.id),
+          ),
+          ContextMenuItem(
+            icon: Icons.delete_outline_rounded,
+            label: 'Delete chat',
+            isDestructive: true,
+            onTap: () => widget.dataStore.deleteConversation(conversation.id),
+          ),
+        ],
+      ),
+    ];
+
+    AppContextMenu.show(
+      context: context,
+      anchorRect: anchorRect,
+      backgroundColor: theme.surfaceColor,
+      primaryTextColor: theme.primaryTextColor,
+      secondaryTextColor: theme.secondaryTextColor,
+      destructiveColor: theme.dangerColor,
+      sections: sections,
+    );
   }
 
   void _togglePinSelected() {
@@ -1147,15 +1206,32 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
             ? theme.cardColor
             : Colors.transparent,
         borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () => _handleConversationTap(conversation),
-          onLongPress: () => _handleConversationLongPress(conversation),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: 72 * density),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-              child: Row(
+        child: Builder(
+          builder: (tileContext) {
+            void handleLongPress() {
+              HapticFeedback.mediumImpact();
+              if (_isSelectionMode) {
+                _toggleSelection(conversation.id);
+                return;
+              }
+              final box = tileContext.findRenderObject() as RenderBox?;
+              Rect? rect;
+              if (box != null && box.hasSize) {
+                final pos = box.localToGlobal(Offset.zero);
+                rect = pos & box.size;
+              }
+              _showConversationContextMenu(conversation, rect);
+            }
+
+            return InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () => _handleConversationTap(conversation),
+              onLongPress: handleLongPress,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: 72 * density),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  child: Row(
                 children: [
                   Stack(
                     children: [
@@ -1280,35 +1356,58 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                   const SizedBox(width: 4),
                                 ],
                                 Expanded(
-                                  child: AnimatedEmojiText(
-                                    text:
-                                        activity?.isTyping == true ||
-                                            activity?.isRecording == true
-                                        ? presence
-                                        : conversation.lastMessageText.isEmpty
-                                        ? presence
-                                        : conversation.lastMessageText,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    enableExpressiveSizing: false,
-                                    style: TextStyle(
-                                      color:
-                                          activity?.isTyping == true ||
-                                              activity?.isRecording == true
-                                          ? theme.successColor
-                                          : conversation.unreadCount > 0
-                                          ? theme.primaryTextColor
-                                          : theme.secondaryTextColor,
-                                      // WA-iOS: 13.5pt gray preview.
-                                      fontSize:
-                                          13.5 * density * theme.fontScale,
-                                      fontWeight:
-                                          activity?.isTyping == true ||
-                                              activity?.isRecording == true
-                                          ? FontWeight.w700
-                                          : FontWeight.w400,
-                                    ),
-                                  ),
+                                  child: conversation.draftText.isNotEmpty
+                                      ? RichText(
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          text: TextSpan(
+                                            children: [
+                                              TextSpan(
+                                                text: 'Draft: ',
+                                                style: TextStyle(
+                                                  color: theme.dangerColor,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 13.5 * density * theme.fontScale,
+                                                ),
+                                              ),
+                                              TextSpan(
+                                                text: conversation.draftText,
+                                                style: TextStyle(
+                                                  color: theme.secondaryTextColor,
+                                                  fontSize: 13.5 * density * theme.fontScale,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                      : AnimatedEmojiText(
+                                          text:
+                                              activity?.isTyping == true ||
+                                                  activity?.isRecording == true
+                                              ? presence
+                                              : conversation.lastMessageText.isEmpty
+                                              ? presence
+                                              : conversation.lastMessageText,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          enableExpressiveSizing: false,
+                                          style: TextStyle(
+                                            color:
+                                                activity?.isTyping == true ||
+                                                    activity?.isRecording == true
+                                                ? theme.successColor
+                                                : conversation.unreadCount > 0
+                                                ? theme.primaryTextColor
+                                                : theme.secondaryTextColor,
+                                            fontSize:
+                                                13.5 * density * theme.fontScale,
+                                            fontWeight:
+                                                activity?.isTyping == true ||
+                                                    activity?.isRecording == true
+                                                ? FontWeight.w700
+                                                : FontWeight.w400,
+                                          ),
+                                        ),
                                 ),
                                 if (presence.isNotEmpty &&
                                     conversation.lastMessageText.isNotEmpty &&
@@ -1387,10 +1486,12 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
+        );
+      },
+    ),
+  ),
+);
+}
 }
 
 class _ConversationSection {

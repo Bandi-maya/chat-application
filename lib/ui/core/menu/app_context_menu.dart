@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+
+import 'context_surface_engine.dart';
+export 'context_surface_engine.dart';
 
 class ContextMenuItem {
   final Widget? iconWidget;
@@ -72,9 +74,6 @@ class AppContextMenu {
       }
     }
 
-    // Trigger light haptic feedback on menu invocation
-    HapticFeedback.lightImpact();
-
     if (effectiveAnchor != null) {
       return _showAnchoredMenu(
         context: context,
@@ -122,15 +121,14 @@ class AppContextMenu {
     final secondary = secondaryTextColor ?? theme.colorScheme.onSurfaceVariant;
     final danger = destructiveColor ?? theme.colorScheme.error;
 
-    return showGeneralDialog<void>(
+    return ContextSurfaceController.showSurface<void>(
       context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Dismiss Context Menu',
-      barrierColor: Colors.black.withValues(alpha: 0.25),
-      transitionDuration: const Duration(milliseconds: 180),
-      pageBuilder: (dialogContext, anim1, anim2) {
+      anchorRect: anchor,
+      preferredSize: Size(maxWidth, 280),
+      builder: (dialogContext, resolution) {
         return _AnchoredMenuLayout(
           anchor: anchor,
+          resolution: resolution,
           minWidth: minWidth,
           maxWidth: maxWidth,
           backgroundColor: bg,
@@ -141,20 +139,6 @@ class AppContextMenu {
           subtitle: subtitle,
           sections: sections,
           onDismiss: () => Navigator.of(dialogContext).pop(),
-        );
-      },
-      transitionBuilder: (context, animation, secondaryAnimation, child) {
-        final curved = CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutCubic,
-          reverseCurve: Curves.easeInCubic,
-        );
-        return FadeTransition(
-          opacity: curved,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.93, end: 1.0).animate(curved),
-            child: child,
-          ),
         );
       },
     );
@@ -335,6 +319,7 @@ class AppContextMenu {
 
 class _AnchoredMenuLayout extends StatelessWidget {
   final Rect anchor;
+  final ContextSurfaceResolution resolution;
   final double minWidth;
   final double maxWidth;
   final Color backgroundColor;
@@ -348,6 +333,7 @@ class _AnchoredMenuLayout extends StatelessWidget {
 
   const _AnchoredMenuLayout({
     required this.anchor,
+    required this.resolution,
     required this.minWidth,
     required this.maxWidth,
     required this.backgroundColor,
@@ -362,136 +348,87 @@ class _AnchoredMenuLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mediaQuery = MediaQuery.of(context);
-    final screenSize = mediaQuery.size;
-    final padding = mediaQuery.padding;
-
-    // Calculate available positioning
-    final spaceBelow = screenSize.height - padding.bottom - anchor.bottom;
-    final spaceAbove = anchor.top - padding.top;
-    final showBelow = spaceBelow >= 220 || spaceBelow >= spaceAbove;
-
-    final targetWidth = (screenSize.width * 0.65).clamp(minWidth, maxWidth);
-
-    // X Positioning (align to right edge of anchor by default, or clamp within screen)
-    double left = anchor.right - targetWidth;
-    if (left < padding.left + 12) {
-      left = anchor.left;
-    }
-    if (left < padding.left + 12) {
-      left = padding.left + 12;
-    }
-    if (left + targetWidth > screenSize.width - padding.right - 12) {
-      left = screenSize.width - padding.right - 12 - targetWidth;
-    }
-
-    // Y Positioning
-    final double top = showBelow
-        ? (anchor.bottom + 6).clamp(padding.top + 10, screenSize.height - padding.bottom - 80)
-        : (anchor.top - 6).clamp(padding.top + 10, screenSize.height - padding.bottom - 80);
-
-    return Stack(
-      children: [
-        // Full screen tap-to-dismiss barrier
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: onDismiss,
-            child: const SizedBox.expand(),
-          ),
+    return Container(
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: secondaryColor.withValues(alpha: 0.18),
+          width: 1.1,
         ),
-        // Anchored popover card
-        Positioned(
-          left: left,
-          top: showBelow ? top : null,
-          bottom: showBelow ? null : (screenSize.height - top),
-          width: targetWidth,
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              decoration: BoxDecoration(
-                color: backgroundColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: secondaryColor.withValues(alpha: 0.18),
-                  width: 1.1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.16),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.16),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (title != null && title!.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (title != null && title!.isNotEmpty) ...[
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                title!,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: primaryColor,
-                                  fontSize: 14.5,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              if (subtitle != null && subtitle!.isNotEmpty) ...[
-                                const SizedBox(height: 1),
-                                Text(
-                                  subtitle!,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: secondaryColor,
-                                    fontSize: 11.5,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        Divider(
-                          height: 1,
-                          thickness: 0.8,
-                          color: secondaryColor.withValues(alpha: 0.12),
-                        ),
-                      ],
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: AppContextMenu._buildSectionsList(
-                          context: context,
-                          sections: sections,
-                          primary: primaryColor,
-                          secondary: secondaryColor,
-                          danger: dangerColor,
+                      Text(
+                        title!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: primaryColor,
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
+                      if (subtitle != null && subtitle!.isNotEmpty) ...[
+                        const SizedBox(height: 1),
+                        Text(
+                          subtitle!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: secondaryColor,
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
+                Divider(
+                  height: 1,
+                  thickness: 0.8,
+                  color: secondaryColor.withValues(alpha: 0.12),
+                ),
+              ],
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: AppContextMenu._buildSectionsList(
+                  context: context,
+                  sections: sections,
+                  primary: primaryColor,
+                  secondary: secondaryColor,
+                  danger: dangerColor,
+                ),
               ),
-            ),
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 }
+

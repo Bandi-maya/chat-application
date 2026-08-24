@@ -26,6 +26,7 @@ import '../../ui/core/design_system/components/chaty_kit.dart';
 import '../../ui/core/design_system/components/app_components.dart';
 import '../../ui/core/gb/gb_theme_overrides.dart';
 import '../../core/emoji/widgets/animated_emoji_text.dart';
+import '../../ui/core/menu/app_context_menu.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/widgets/chat_wallpaper.dart';
 import '../../data/services/call_signaling_service.dart';
@@ -34,7 +35,7 @@ import '../messages/attachment_sheet.dart';
 import '../messages/chat_attachment_actions.dart';
 import '../messages/emoji_picker_modal.dart';
 import '../messages/media_viewer_screen.dart';
-import '../messages/message_action_sheet.dart';
+import '../messages/message_action_registry.dart';
 import '../messages/message_bubble.dart';
 import '../tasks/task_create_edit_modal.dart';
 import 'contact_info_screen.dart';
@@ -95,6 +96,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   bool _recordLocked = false;
   bool _voiceBusy = false;
   int _voiceSeconds = 0;
+  final TextEditingController _inChatSearchCtrl = TextEditingController();
+  final FocusNode _inChatSearchFocus = FocusNode();
+  bool _isInChatSearchOpen = false;
+  int _currentSearchMatchIndex = 0;
+  List<String> _searchMatchedMessageIds = <String>[];
+  String? _highlightedSearchMessageId;
+  Timer? _searchHighlightTimer;
   ContactConnectionStatus _connectionStatus = const ContactConnectionStatus();
   // Per-chat wallpaper override ('none' | theme pattern ids). Null until the
   // persisted value loads; consumed by the ChatWallpaper layer.
@@ -207,6 +215,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     _scrollCtrl.removeListener(_handleScrollChanged);
     widget.dataStore.removeListener(_onDataStoreChanged);
     unawaited(_voice.dispose());
+    _searchHighlightTimer?.cancel();
+    _inChatSearchCtrl.dispose();
+    _inChatSearchFocus.dispose();
     _textCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
@@ -531,103 +542,135 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
   }
 
-  void _onMessageLongPress(ChatMessage message) {
+  String? _selectedMessageId;
+
+  void _onMessageLongPressWithRect(ChatMessage message, Rect bubbleRect) {
+    HapticFeedback.selectionClick();
+    setState(() => _selectedMessageId = message.id);
     final theme = _theme;
     final isMine = message.senderId == widget.dataStore.currentUser.id;
-    // Real consumer of conversation.iosStylePopupMenu: ON renders the
-    // actions as a floating iOS-style menu (dialog), OFF keeps the classic
-    // bottom sheet. Identical actions either way.
-    final iosStyle =
-        widget.preferencesController.conversation.iosStylePopupMenu;
 
-    Widget buildActions(BuildContext sheetContext) => MessageActionSheet(
+    final actions = MessageActionRegistry.getAvailableActions(
       message: message,
       isMe: isMine,
-      theme: theme,
-      useIosStyle: iosStyle,
-      onForward: () {
-        Navigator.of(sheetContext).pop();
-        _openForwardSheet(message);
-      },
-      onReact: (emoji) {
-        widget.dataStore.toggleReaction(
-          widget.conversationId,
-          message.id,
-          emoji,
-        );
-        Navigator.of(sheetContext).pop();
-      },
-      onReply: () {
-        Navigator.of(sheetContext).pop();
+    );
+
+    final sections = <ContextMenuSection>[
+      ContextMenuSection(
+        items: actions.map((act) {
+          return ContextMenuItem(
+            icon: act.icon,
+            label: act.label,
+            isDestructive: act.isDestructive,
+            onTap: () => _executeMessageAction(message, act.type, isMine),
+          );
+        }).toList(growable: false),
+      ),
+    ];
+
+    AppContextMenu.show(
+      context: context,
+      anchorRect: bubbleRect,
+      backgroundColor: theme.surfaceColor,
+      primaryTextColor: theme.primaryTextColor,
+      secondaryTextColor: theme.secondaryTextColor,
+      destructiveColor: theme.dangerColor,
+      sections: sections,
+    ).then((_) {
+      if (mounted) {
+        setState(() => _selectedMessageId = null);
+      }
+    });
+  }
+
+  void _executeMessageAction(ChatMessage message, MessageActionType type, bool isMine) async {
+    switch (type) {
+      case MessageActionType.reply:
         setState(() => _replyTarget = message);
-      },
-      onPin: () {
-        widget.dataStore.togglePinMessage(widget.conversationId, message.id);
-        Navigator.of(sheetContext).pop();
-      },
-      onStar: () {
-        widget.dataStore.toggleStarMessage(widget.conversationId, message.id);
-        Navigator.of(sheetContext).pop();
-      },
-      onCopy: () async {
-        Navigator.of(sheetContext).pop();
+        break;
+      case MessageActionType.copy:
         await Clipboard.setData(ClipboardData(text: message.text));
-        if (mounted)
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Message copied')));
-      },
-      onDeleteForMe: () {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Message copied')),
+          );
+        }
+        break;
+      case MessageActionType.forward:
+        _openForwardSheet(message);
+        break;
+      case MessageActionType.star:
+        widget.dataStore.toggleStarMessage(widget.conversationId, message.id);
+        break;
+      case MessageActionType.pin:
+        widget.dataStore.togglePinMessage(widget.conversationId, message.id);
+        break;
+      case MessageActionType.edit:
+        _textCtrl.text = message.text;
+        _textCtrl.selection = TextSelection.collapsed(offset: message.text.length);
+        _handleComposerChanged(message.text);
+        break;
+      case MessageActionType.task:
+        _openCreateTaskModal(
+          initialTitle: message.text,
+          sourceMessageId: message.id,
+        );
+        break;
+      case MessageActionType.translate:
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Translation: ${message.text}'),
+            ),
+          );
+        }
+        break;
+      case MessageActionType.select:
+        // Enter multi-select mode
+        setState(() => _selectedMessageId = message.id);
+        break;
+      case MessageActionType.deleteForMe:
         widget.dataStore.deleteMessage(
           widget.conversationId,
           message.id,
           forEveryone: false,
         );
-        Navigator.of(sheetContext).pop();
-      },
-      onDeleteForEveryone: isMine
-          ? () {
-              widget.dataStore.deleteMessage(
-                widget.conversationId,
-                message.id,
-                forEveryone: true,
-              );
-              Navigator.of(sheetContext).pop();
-            }
-          : null,
-      onReport: () {
-        Navigator.of(sheetContext).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Use Contact info → Block to stop unwanted messages.',
+        break;
+      case MessageActionType.deleteForEveryone:
+        if (isMine) {
+          widget.dataStore.deleteMessage(
+            widget.conversationId,
+            message.id,
+            forEveryone: true,
+          );
+        }
+        break;
+      case MessageActionType.report:
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Use Contact info → Block to stop unwanted messages.'),
             ),
-          ),
-        );
-      },
-      onCreateTask: () {
-        Navigator.of(sheetContext).pop();
-        _openCreateTaskModal(
-          initialTitle: message.text,
-          sourceMessageId: message.id,
-        );
-      },
-    );
-
-    if (iosStyle) {
-      showDialog<void>(
-        context: context,
-        barrierColor: Colors.black.withValues(alpha: 0.30),
-        builder: buildActions,
-      );
-    } else {
-      showModalBottomSheet<void>(
-        context: context,
-        backgroundColor: Colors.transparent,
-        isScrollControlled: true,
-        builder: buildActions,
-      );
+          );
+        }
+        break;
+      default:
+        break;
     }
+  }
+
+  void _onMessageLongPress(ChatMessage message) {
+    _onMessageLongPressWithRect(
+      message,
+      Rect.fromCenter(
+        center: Offset(
+          MediaQuery.of(context).size.width / 2,
+          MediaQuery.of(context).size.height / 2,
+        ),
+        width: 100,
+        height: 40,
+      ),
+    );
   }
 
   void _openCreateTaskModal({String? initialTitle, String? sourceMessageId}) {
@@ -932,152 +975,218 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
     Widget chat = Scaffold(
       backgroundColor: theme.backgroundColor,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: theme.surfaceColor,
-        foregroundColor: theme.primaryTextColor,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0.5,
-        leading: const Padding(
-          padding: EdgeInsets.all(6.0),
-          child: ChatyBackButton(),
-        ),
-        titleSpacing: 4,
-        title: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: conversation.type == ConversationType.group
-              ? () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => GroupInfoScreen(
-                      theme: theme,
-                      dataStore: dataStore,
-                      conversationId: widget.conversationId,
+      appBar: _isInChatSearchOpen
+          ? AppBar(
+              automaticallyImplyLeading: false,
+              backgroundColor: theme.surfaceColor,
+              foregroundColor: theme.primaryTextColor,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0.5,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                onPressed: _toggleInChatSearch,
+              ),
+              title: TextField(
+                controller: _inChatSearchCtrl,
+                focusNode: _inChatSearchFocus,
+                onChanged: _performInChatSearch,
+                style: TextStyle(
+                  color: theme.primaryTextColor,
+                  fontSize: 15.5 * theme.fontScale,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'Search conversation…',
+                  hintStyle: TextStyle(color: theme.secondaryTextColor),
+                  border: InputBorder.none,
+                ),
+              ),
+              actions: [
+                if (_searchMatchedMessageIds.isNotEmpty)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: Text(
+                        '$_currentSearchMatchIndex of ${_searchMatchedMessageIds.length}',
+                        style: TextStyle(
+                          color: theme.secondaryTextColor,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
-                )
-              : otherUser == null
-              ? null
-              : () => _openContactInfo(conversation, otherUser),
-          child: Row(
-            children: [
-              if (showHeaderAvatar)
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    AppAvatar(
-                      initials:
-                          conversation.avatarInitials ??
-                          conversation.title.characters
-                              .take(2)
-                              .toString()
-                              .toUpperCase(),
-                      colorHex: conversation.avatarColorHex ?? '0xFF6366F1',
-                      size: 38,
-                    ),
-                    if (conversation.type == ConversationType.direct &&
-                        isOnline)
-                      Positioned(
-                        right: -1,
-                        bottom: -1,
-                        child: ChatyOnlineDot(
-                          active: true,
-                          avatarSize: 38,
-                          color: theme.successColor,
-                          ringColor: theme.surfaceColor,
-                        ),
-                      ),
-                  ],
+                if (_searchMatchedMessageIds.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.keyboard_arrow_up_rounded, size: 22),
+                    tooltip: 'Previous match',
+                    onPressed: () => _jumpToSearchMatch(_currentSearchMatchIndex - 1),
+                  ),
+                if (_searchMatchedMessageIds.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 22),
+                    tooltip: 'Next match',
+                    onPressed: () => _jumpToSearchMatch(_currentSearchMatchIndex + 1),
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  tooltip: 'Clear search',
+                  onPressed: () {
+                    if (_inChatSearchCtrl.text.isNotEmpty) {
+                      _inChatSearchCtrl.clear();
+                      _performInChatSearch('');
+                    } else {
+                      _toggleInChatSearch();
+                    }
+                  },
                 ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (showHeaderName)
-                      Text(
-                        conversation.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: theme.primaryTextColor,
-                          fontSize: 15.5 * theme.fontScale,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    if (showPresenceLine)
-                      Container(
-                        padding: presencePillColor == null
-                            ? EdgeInsets.zero
-                            : const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                        margin: presencePillColor == null
-                            ? EdgeInsets.zero
-                            : const EdgeInsets.only(top: 2),
-                        decoration: BoxDecoration(
-                          color: presencePillColor,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          presence,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color:
-                                presenceTextColor ??
-                                (remoteTyping || remoteRecording || isOnline
-                                    ? theme.successColor
-                                    : theme.secondaryTextColor),
-                            fontSize: 10.5 * theme.fontScale,
-                            fontWeight: FontWeight.w500,
+              ],
+            )
+          : AppBar(
+              automaticallyImplyLeading: false,
+              backgroundColor: theme.surfaceColor,
+              foregroundColor: theme.primaryTextColor,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0.5,
+              leading: const Padding(
+                padding: EdgeInsets.all(6.0),
+                child: ChatyBackButton(),
+              ),
+              titleSpacing: 4,
+              title: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: conversation.type == ConversationType.group
+                    ? () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => GroupInfoScreen(
+                            theme: theme,
+                            dataStore: dataStore,
+                            conversationId: widget.conversationId,
                           ),
                         ),
+                      )
+                    : otherUser == null
+                    ? null
+                    : () => _openContactInfo(conversation, otherUser),
+                child: Row(
+                  children: [
+                    if (showHeaderAvatar)
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          AppAvatar(
+                            initials:
+                                conversation.avatarInitials ??
+                                conversation.title.characters
+                                    .take(2)
+                                    .toString()
+                                    .toUpperCase(),
+                            colorHex: conversation.avatarColorHex ?? '0xFF6366F1',
+                            size: 38,
+                          ),
+                          if (conversation.type == ConversationType.direct &&
+                              isOnline)
+                            Positioned(
+                              right: -1,
+                              bottom: -1,
+                              child: ChatyOnlineDot(
+                                active: true,
+                                avatarSize: 38,
+                                color: theme.successColor,
+                                ringColor: theme.surfaceColor,
+                              ),
+                            ),
+                        ],
                       ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (showHeaderName)
+                            Text(
+                              conversation.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: theme.primaryTextColor,
+                                fontSize: 15.5 * theme.fontScale,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          if (showPresenceLine)
+                            Container(
+                              padding: presencePillColor == null
+                                  ? EdgeInsets.zero
+                                  : const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                              margin: presencePillColor == null
+                                  ? EdgeInsets.zero
+                                  : const EdgeInsets.only(top: 2),
+                              decoration: BoxDecoration(
+                                color: presencePillColor,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                presence,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color:
+                                      presenceTextColor ??
+                                      (remoteTyping || remoteRecording || isOnline
+                                          ? theme.successColor
+                                          : theme.secondaryTextColor),
+                                  fontSize: 10.5 * theme.fontScale,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ],
-          ),
-        ),
-        actions: [
-          if (showHeaderCalls)
-            IconButton(
-              icon: Icon(
-                Icons.call_rounded,
-                color: _connectionStatus.callsAllowed
-                    ? null
-                    : theme.secondaryTextColor,
-              ),
-              tooltip: _connectionStatus.callsAllowed
-                  ? 'Voice call'
-                  : 'Voice call • contact acceptance required',
-              onPressed: () => _startCall(false),
+              actions: [
+                if (showHeaderCalls)
+                  IconButton(
+                    icon: Icon(
+                      Icons.call_rounded,
+                      color: _connectionStatus.callsAllowed
+                          ? null
+                          : theme.secondaryTextColor,
+                    ),
+                    tooltip: _connectionStatus.callsAllowed
+                        ? 'Voice call'
+                        : 'Voice call • contact acceptance required',
+                    onPressed: () => _startCall(false),
+                  ),
+                if (showHeaderCalls)
+                  IconButton(
+                    icon: Icon(
+                      Icons.video_camera_front_rounded,
+                      color: _connectionStatus.callsAllowed
+                          ? null
+                          : theme.secondaryTextColor,
+                    ),
+                    tooltip: _connectionStatus.callsAllowed
+                        ? 'Video call'
+                        : 'Video call • contact acceptance required',
+                    onPressed: () => _startCall(true),
+                  ),
+                // Chat overflow menu: wallpaper, mute, clear, block and more.
+                Builder(
+                  builder: (btnCtx) => IconButton(
+                    tooltip: 'Chat options',
+                    icon: Icon(Icons.more_vert_rounded, color: theme.primaryTextColor),
+                    onPressed: () => _openChatMenu(btnCtx, conversation, otherUser),
+                  ),
+                ),
+              ],
             ),
-          if (showHeaderCalls)
-            IconButton(
-              icon: Icon(
-                Icons.video_camera_front_rounded,
-                color: _connectionStatus.callsAllowed
-                    ? null
-                    : theme.secondaryTextColor,
-              ),
-              tooltip: _connectionStatus.callsAllowed
-                  ? 'Video call'
-                  : 'Video call • contact acceptance required',
-              onPressed: () => _startCall(true),
-            ),
-          // Chat overflow menu: wallpaper, mute, clear, block and more.
-          Builder(
-            builder: (btnCtx) => IconButton(
-              tooltip: 'Chat options',
-              icon: Icon(Icons.more_vert_rounded, color: theme.primaryTextColor),
-              onPressed: () => _openChatMenu(btnCtx, conversation, otherUser),
-            ),
-          ),
-        ],
-      ),
       body: SafeArea(
         top: false,
         child: Column(
@@ -1548,6 +1657,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           },
         ),
         ChatyMenuItem(
+          icon: Icons.search_rounded,
+          label: 'Search conversation',
+          onTap: _toggleInChatSearch,
+        ),
+        ChatyMenuItem(
           icon: Icons.wallpaper_rounded,
           label: 'Chat wallpaper',
           onTap: _openWallpaperPicker,
@@ -1581,6 +1695,70 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           ),
       ],
     );
+  }
+
+  void _toggleInChatSearch() {
+    setState(() {
+      _isInChatSearchOpen = !_isInChatSearchOpen;
+      if (!_isInChatSearchOpen) {
+        _inChatSearchCtrl.clear();
+        _searchMatchedMessageIds.clear();
+        _currentSearchMatchIndex = 0;
+        _highlightedSearchMessageId = null;
+      }
+    });
+    if (_isInChatSearchOpen) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _inChatSearchFocus.requestFocus();
+      });
+    }
+  }
+
+  void _performInChatSearch(String query) {
+    final cleanQuery = query.trim().toLowerCase();
+    if (cleanQuery.isEmpty) {
+      setState(() {
+        _searchMatchedMessageIds.clear();
+        _currentSearchMatchIndex = 0;
+        _highlightedSearchMessageId = null;
+      });
+      return;
+    }
+
+    final messages = widget.dataStore.getMessages(widget.conversationId);
+    final matched = <String>[];
+    for (final message in messages) {
+      if (message.text.toLowerCase().contains(cleanQuery)) {
+        matched.add(message.id);
+      }
+    }
+
+    setState(() {
+      _searchMatchedMessageIds = matched;
+      _currentSearchMatchIndex = matched.isNotEmpty ? 1 : 0;
+    });
+
+    if (matched.isNotEmpty) {
+      _highlightMessage(matched.first);
+    }
+  }
+
+  void _jumpToSearchMatch(int index) {
+    if (_searchMatchedMessageIds.isEmpty) return;
+    final clamped = index.clamp(1, _searchMatchedMessageIds.length);
+    setState(() => _currentSearchMatchIndex = clamped);
+    final targetId = _searchMatchedMessageIds[clamped - 1];
+    _highlightMessage(targetId);
+  }
+
+  void _highlightMessage(String messageId) {
+    _searchHighlightTimer?.cancel();
+    setState(() => _highlightedSearchMessageId = messageId);
+    _searchHighlightTimer = Timer(const Duration(milliseconds: 1800), () {
+      if (mounted) {
+        setState(() => _highlightedSearchMessageId = null);
+      }
+    });
   }
 
   /// Per-chat wallpaper: writes a real override consumed by ChatWallpaper.
@@ -1825,11 +2003,18 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             showDeletedContent: showDeleted,
             retainViewOnce: retainViewOnce,
             viewOnceOpened: _openedViewOnceIds.contains(message.id),
+            isSelected: _selectedMessageId == message.id ||
+                _highlightedSearchMessageId == message.id,
             onViewOnceOpen: () => _openViewOnceMedia(message, theme),
             senderName: conversation.type == ConversationType.group && !isMine
                 ? _senderName(message.senderId)
                 : null,
             onLongPress: () => _onMessageLongPress(message),
+            onLongPressWithRect: (rect) => _onMessageLongPressWithRect(message, rect),
+            onSwipeReply: () {
+              HapticFeedback.lightImpact();
+              setState(() => _replyTarget = message);
+            },
             onReactionTap: (emoji) => widget.dataStore.toggleReaction(
               conversation.id,
               message.id,
