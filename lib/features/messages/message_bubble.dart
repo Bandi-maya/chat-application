@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../camera/effects/effect_registry.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -13,6 +14,7 @@ import '../../core/emoji/widgets/animated_emoji_text.dart';
 import '../../core/emoji/widgets/animated_emoji_reaction.dart';
 import '../../data/services/chat_media_service.dart';
 import '../../domain/models/chat_message.dart';
+import '../../domain/models/chat_task.dart';
 import '../../ui/core/theme/theme_config.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/bubbles/bubble_painter.dart';
@@ -29,6 +31,9 @@ class MessageBubble extends StatelessWidget {
   final void Function(Rect bubbleRect)? onLongPressWithRect;
   final VoidCallback? onSwipeReply;
   final VoidCallback? onTaskTap;
+  final VoidCallback? onTaskToggle;
+  final void Function(Rect anchorRect)? onTaskMenu;
+  final ChatTask? task;
   final Function(String emoji)? onReactionTap;
   final VoidCallback? onMediaTap;
   final VoidCallback? onDoubleTap;
@@ -61,6 +66,9 @@ class MessageBubble extends StatelessWidget {
     this.onLongPressWithRect,
     this.onSwipeReply,
     this.onTaskTap,
+    this.onTaskToggle,
+    this.onTaskMenu,
+    this.task,
     this.onReactionTap,
     this.onMediaTap,
     this.onDoubleTap,
@@ -240,77 +248,73 @@ class MessageBubble extends StatelessWidget {
           vertical: 3 * theme.density,
           horizontal: 12,
         ),
-        child: Row(
-          mainAxisAlignment: isMe
-              ? MainAxisAlignment.end
-              : MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            if (!isMe && senderName != null)
-              Padding(
-                padding: const EdgeInsets.only(right: 8, bottom: 2),
-                child: AppAvatar(
-                  initials: senderName!
-                      .split(' ')
-                      .map((e) => e.isEmpty ? '' : e[0])
-                      .take(2)
-                      .join(),
-                  colorHex: null,
-                  size: 28,
+        child: _SwipeToReplyContainer(
+          onSwipeReply: onSwipeReply,
+          accentColor: theme.accentColor,
+          surfaceColor: theme.surfaceColor,
+          child: Row(
+            mainAxisAlignment: isMe
+                ? MainAxisAlignment.end
+                : MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (!isMe && senderName != null)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8, bottom: 2),
+                  child: AppAvatar(
+                    initials: senderName!
+                        .split(' ')
+                        .map((e) => e.isEmpty ? '' : e[0])
+                        .take(2)
+                        .join(),
+                    colorHex: null,
+                    size: 28,
+                  ),
                 ),
-              ),
-            Flexible(
-              child: Builder(
-                builder: (bubbleContext) {
-                  void handleLongPress() {
-                    if (onLongPressWithRect != null) {
-                      final box = bubbleContext.findRenderObject() as RenderBox?;
-                      if (box != null && box.hasSize) {
-                        final pos = box.localToGlobal(Offset.zero);
-                        onLongPressWithRect!(pos & box.size);
-                        return;
+              Flexible(
+                child: Builder(
+                  builder: (bubbleContext) {
+                    void handleLongPress() {
+                      if (onLongPressWithRect != null) {
+                        final box = bubbleContext.findRenderObject() as RenderBox?;
+                        if (box != null && box.hasSize) {
+                          final pos = box.localToGlobal(Offset.zero);
+                          onLongPressWithRect!(pos & box.size);
+                          return;
+                        }
                       }
+                      onLongPress();
                     }
-                    onLongPress();
-                  }
 
-                  return GestureDetector(
-                    onLongPress: handleLongPress,
-                    onDoubleTap: onDoubleTap,
-                    onHorizontalDragEnd: onSwipeReply != null
-                        ? (details) {
-                            if (details.primaryVelocity != null &&
-                                details.primaryVelocity! > 180) {
-                              onSwipeReply!();
-                            }
-                          }
-                        : null,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 140),
-                      decoration: isSelected
-                          ? BoxDecoration(
-                              color: theme.accentColor.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(16),
-                            )
-                          : null,
-                      child: Column(
-                        crossAxisAlignment: isMe
-                            ? CrossAxisAlignment.end
-                            : CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            constraints: BoxConstraints(
-                              maxWidth:
-                                  MediaQuery.sizeOf(context).width *
-                                  theme.bubbleMaxWidthFactor,
-                            ),
-                      margin: BubbleStyleRegistry.getGeometry(
-                        theme.bubbleStyle,
-                      ).bubbleMargin,
-                      child: CustomPaint(
-                        painter: BubblePainter(
-                          styleId: theme.bubbleStyle,
-                          isMe: isMe,
+                    return GestureDetector(
+                      onLongPress: handleLongPress,
+                      onDoubleTap: onDoubleTap,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 140),
+                        decoration: isSelected
+                            ? BoxDecoration(
+                                color: theme.accentColor.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(16),
+                              )
+                            : null,
+                        child: Column(
+                          crossAxisAlignment: isMe
+                              ? CrossAxisAlignment.end
+                              : CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              constraints: BoxConstraints(
+                                maxWidth:
+                                    MediaQuery.sizeOf(context).width *
+                                    theme.bubbleMaxWidthFactor,
+                              ),
+                        margin: BubbleStyleRegistry.getGeometry(
+                          theme.bubbleStyle,
+                        ).bubbleMargin,
+                        child: CustomPaint(
+                          painter: BubblePainter(
+                            styleId: theme.bubbleStyle,
+                            isMe: isMe,
                           fillColor: bubbleBg,
                           strokeColor: theme.accentColor.withValues(alpha: 0.4),
                           accentColor: theme.accentColor,
@@ -416,62 +420,192 @@ class MessageBubble extends StatelessWidget {
                                   ),
                                 ),
                               if (message.type == MessageType.taskCard)
-                                InkWell(
-                                  onTap: onTaskTap,
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Container(
-                                    margin: const EdgeInsets.symmetric(
-                                      vertical: 4,
-                                    ),
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.16,
-                                      ),
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(
-                                        color: theme.accentColor.withValues(
-                                          alpha: 0.35,
+                                Builder(
+                                  builder: (taskCtx) {
+                                    final currentTask = task;
+                                    final isCompleted = currentTask?.status == TaskStatus.completed;
+                                    final isBlocked = currentTask?.status == TaskStatus.blocked;
+                                    final isOverdue = currentTask?.isOverdue == true;
+
+                                    return Container(
+                                      margin: const EdgeInsets.symmetric(vertical: 4),
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: isCompleted
+                                            ? Colors.black.withValues(alpha: 0.1)
+                                            : theme.surfaceColor.withValues(alpha: 0.85),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: isCompleted
+                                              ? theme.successColor.withValues(alpha: 0.4)
+                                              : isBlocked
+                                                  ? theme.dangerColor.withValues(alpha: 0.5)
+                                                  : isOverdue
+                                                      ? theme.dangerColor.withValues(alpha: 0.4)
+                                                      : theme.accentColor.withValues(alpha: 0.35),
+                                          width: 1.2,
                                         ),
                                       ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.task_alt_rounded,
-                                          color: theme.accentColor,
-                                          size: 22,
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            crossAxisAlignment: CrossAxisAlignment.center,
                                             children: [
-                                              Text(
-                                                message.text,
-                                                style: TextStyle(
-                                                  color: textColor,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize:
-                                                      13 * theme.fontScale,
-                                                ),
-                                              ),
-                                              Text(
-                                                'Task • tap to open',
-                                                style: TextStyle(
-                                                  color: textColor.withValues(
-                                                    alpha: 0.7,
+                                              GestureDetector(
+                                                onTap: onTaskToggle,
+                                                child: AnimatedContainer(
+                                                  duration: const Duration(milliseconds: 200),
+                                                  width: 22,
+                                                  height: 22,
+                                                  decoration: BoxDecoration(
+                                                    color: isCompleted
+                                                        ? theme.successColor
+                                                        : Colors.transparent,
+                                                    shape: BoxShape.circle,
+                                                    border: Border.all(
+                                                      color: isCompleted
+                                                          ? theme.successColor
+                                                          : isOverdue
+                                                              ? theme.dangerColor
+                                                              : theme.accentColor,
+                                                      width: 2,
+                                                    ),
                                                   ),
-                                                  fontSize: 10.5,
+                                                  child: isCompleted
+                                                      ? const Icon(
+                                                          Icons.check_rounded,
+                                                          color: Colors.white,
+                                                          size: 14,
+                                                        )
+                                                      : null,
                                                 ),
                                               ),
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: GestureDetector(
+                                                  onTap: onTaskTap,
+                                                  child: Text(
+                                                    currentTask?.title ?? message.text,
+                                                    maxLines: 2,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      color: textColor,
+                                                      fontWeight: FontWeight.w700,
+                                                      fontSize: 14 * theme.fontScale,
+                                                      decoration: isCompleted
+                                                          ? TextDecoration.lineThrough
+                                                          : null,
+                                                      decorationColor: textColor.withValues(alpha: 0.6),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              if (onTaskMenu != null)
+                                                GestureDetector(
+                                                  onTap: () {
+                                                    final box = taskCtx.findRenderObject() as RenderBox?;
+                                                    if (box != null && box.hasSize) {
+                                                      final pos = box.localToGlobal(Offset.zero);
+                                                      onTaskMenu!(pos & box.size);
+                                                    }
+                                                  },
+                                                  child: Padding(
+                                                    padding: const EdgeInsets.only(left: 4),
+                                                    child: Icon(
+                                                      Icons.more_vert_rounded,
+                                                      size: 18,
+                                                      color: textColor.withValues(alpha: 0.6),
+                                                    ),
+                                                  ),
+                                                ),
                                             ],
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                                          if (currentTask != null) ...[
+                                            const SizedBox(height: 8),
+                                            Row(
+                                              children: [
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(
+                                                    horizontal: 6,
+                                                    vertical: 2,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: currentTask.priority == TaskPriority.urgent
+                                                        ? theme.dangerColor.withValues(alpha: 0.15)
+                                                        : currentTask.priority == TaskPriority.high
+                                                            ? Colors.orange.withValues(alpha: 0.15)
+                                                            : Colors.blue.withValues(alpha: 0.15),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: Text(
+                                                    currentTask.priority.name.toUpperCase(),
+                                                    style: TextStyle(
+                                                      fontSize: 9.5,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: currentTask.priority == TaskPriority.urgent
+                                                          ? theme.dangerColor
+                                                          : currentTask.priority == TaskPriority.high
+                                                              ? Colors.orange
+                                                              : Colors.blue,
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Icon(
+                                                  Icons.schedule_rounded,
+                                                  size: 12,
+                                                  color: isOverdue
+                                                      ? theme.dangerColor
+                                                      : textColor.withValues(alpha: 0.65),
+                                                ),
+                                                const SizedBox(width: 3),
+                                                Text(
+                                                  currentTask.dueRelativeText,
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: isOverdue ? FontWeight.w700 : FontWeight.w500,
+                                                    color: isOverdue
+                                                        ? theme.dangerColor
+                                                        : textColor.withValues(alpha: 0.75),
+                                                  ),
+                                                ),
+                                                if (currentTask.checklistItems.isNotEmpty) ...[
+                                                  const SizedBox(width: 8),
+                                                  Icon(
+                                                    Icons.checklist_rounded,
+                                                    size: 13,
+                                                    color: textColor.withValues(alpha: 0.65),
+                                                  ),
+                                                  const SizedBox(width: 3),
+                                                  Text(
+                                                    '${currentTask.completedChecklistCount}/${currentTask.checklistItems.length}',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: textColor.withValues(alpha: 0.75),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ],
+                                          const SizedBox(height: 6),
+                                          GestureDetector(
+                                            onTap: onTaskTap,
+                                            child: Text(
+                                              'View details →',
+                                              style: TextStyle(
+                                                color: theme.accentColor,
+                                                fontSize: 11.5,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
                                 ),
                               // Real consumer of the Forwarded-tag setting: the
                               // flag is baked into message metadata at send time
@@ -671,9 +805,10 @@ class MessageBubble extends StatelessWidget {
       ),
     ],
   ),
-),
-);
-}
+),  // closes _SwipeToReplyContainer
+      ),  // closes Padding
+    ); // closes RepaintBoundary
+  }
 }
 
 class _SignedImagePreview extends StatefulWidget {
@@ -1515,6 +1650,136 @@ class _ViewOnceExpiredCard extends StatelessWidget {
               color: textColor.withValues(alpha: 0.6),
               fontSize: 11,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Progressive Swipe-to-Reply gesture container with spring back and haptic trigger.
+class _SwipeToReplyContainer extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onSwipeReply;
+  final Color accentColor;
+  final Color surfaceColor;
+
+  const _SwipeToReplyContainer({
+    required this.child,
+    required this.onSwipeReply,
+    required this.accentColor,
+    required this.surfaceColor,
+  });
+
+  @override
+  State<_SwipeToReplyContainer> createState() => _SwipeToReplyContainerState();
+}
+
+class _SwipeToReplyContainerState extends State<_SwipeToReplyContainer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late Animation<double> _animation;
+  double _dragOffset = 0.0;
+  bool _triggeredHaptic = false;
+  static const double _threshold = 48.0;
+  static const double _maxDrag = 68.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _animation = Tween<double>(begin: 0, end: 0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+    );
+    _controller.addListener(() {
+      setState(() => _dragOffset = _animation.value);
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onHorizontalDragUpdate(DragUpdateDetails details) {
+    if (widget.onSwipeReply == null) return;
+    final primary = details.primaryDelta ?? 0;
+    if (_dragOffset <= 0 && primary < 0) return;
+
+    setState(() {
+      _dragOffset = (_dragOffset + primary).clamp(0.0, _maxDrag);
+      if (_dragOffset >= _threshold && !_triggeredHaptic) {
+        _triggeredHaptic = true;
+        HapticFeedback.lightImpact();
+      } else if (_dragOffset < _threshold && _triggeredHaptic) {
+        _triggeredHaptic = false;
+      }
+    });
+  }
+
+  void _onHorizontalDragEnd(DragEndDetails details) {
+    if (widget.onSwipeReply == null) return;
+    if (_dragOffset >= _threshold) {
+      widget.onSwipeReply!();
+    }
+    _triggeredHaptic = false;
+    _animation = Tween<double>(begin: _dragOffset, end: 0.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    );
+    _controller.forward(from: 0.0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.onSwipeReply == null) return widget.child;
+
+    final progress = (_dragOffset / _threshold).clamp(0.0, 1.0);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragUpdate: _onHorizontalDragUpdate,
+      onHorizontalDragEnd: _onHorizontalDragEnd,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.centerLeft,
+        children: [
+          if (_dragOffset > 2)
+            Positioned(
+              left: (_dragOffset * 0.45) - 24,
+              child: Opacity(
+                opacity: progress,
+                child: Transform.scale(
+                  scale: 0.6 + (0.4 * progress),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: widget.surfaceColor,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.12),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      Icons.reply_rounded,
+                      size: 18,
+                      color: widget.accentColor,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          Transform.translate(
+            offset: Offset(_dragOffset, 0),
+            child: widget.child,
           ),
         ],
       ),

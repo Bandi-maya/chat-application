@@ -1100,6 +1100,45 @@ class ChatyBackendService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> editMessage({
+    required String conversationId,
+    required String messageId,
+    required String newText,
+  }) async {
+    final list = _messagesByChatId[conversationId];
+    if (list != null) {
+      final index = list.indexWhere((m) => m.id == messageId);
+      if (index != -1) {
+        list[index] = list[index].copyWith(
+          text: newText.trim(),
+          editedAt: DateTime.now(),
+        );
+        notifyListeners();
+      }
+    }
+    try {
+      await _client.rpc(
+        'edit_chat_message',
+        params: <String, dynamic>{
+          'p_message_id': messageId,
+          'p_text': newText.trim(),
+        },
+      );
+    } catch (_) {
+      try {
+        await _client
+            .from('messages')
+            .update(<String, dynamic>{
+              'text': newText.trim(),
+              'edited_at': DateTime.now().toUtc().toIso8601String(),
+            })
+            .eq('id', messageId);
+      } catch (_) {}
+    }
+    await _loadMessages(conversationId);
+    notifyListeners();
+  }
+
   void deleteMessage(
     String conversationId,
     String messageId, {
@@ -1303,6 +1342,14 @@ class ChatyBackendService extends ChangeNotifier {
   }
 
   Future<void> _updateTaskStatusAsync(String taskId, TaskStatus status) async {
+    final index = _tasks.indexWhere((t) => t.id == taskId);
+    if (index != -1) {
+      _tasks[index] = _tasks[index].copyWith(
+        status: status,
+        updatedAt: DateTime.now(),
+      );
+      notifyListeners();
+    }
     await _client.rpc(
       'update_task_status',
       params: <String, dynamic>{
@@ -1310,6 +1357,54 @@ class ChatyBackendService extends ChangeNotifier {
         'p_status': taskStatusToDatabase(status),
       },
     );
+    await _loadTasks();
+    notifyListeners();
+  }
+
+  Future<void> updateTask({
+    required String taskId,
+    required String title,
+    required String description,
+    required List<String> assigneeIds,
+    required TaskPriority priority,
+    required DateTime dueAt,
+    List<String> labels = const <String>[],
+  }) async {
+    final index = _tasks.indexWhere((t) => t.id == taskId);
+    if (index != -1) {
+      _tasks[index] = _tasks[index].copyWith(
+        title: title.trim(),
+        description: description.trim(),
+        assigneeIds: assigneeIds,
+        priority: priority,
+        dueAt: dueAt,
+        labels: labels,
+        updatedAt: DateTime.now(),
+      );
+      notifyListeners();
+    }
+    await _client.rpc(
+      'update_chat_task',
+      params: <String, dynamic>{
+        'p_task_id': taskId,
+        'p_title': title.trim(),
+        'p_description': description.trim(),
+        'p_assignee_ids': assigneeIds,
+        'p_priority': _taskPriorityToDatabase(priority),
+        'p_due_at': dueAt.toUtc().toIso8601String(),
+        'p_labels': labels,
+      },
+    );
+    await _loadTasks();
+    notifyListeners();
+  }
+
+  Future<void> deleteTask(String taskId) async {
+    _tasks.removeWhere((t) => t.id == taskId);
+    notifyListeners();
+    try {
+      await _client.from('tasks').delete().eq('id', taskId);
+    } catch (_) {}
     await _loadTasks();
     notifyListeners();
   }

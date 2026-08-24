@@ -13,10 +13,12 @@ import '../../data/services/contact_relationship_service.dart';
 import '../../data/services/rich_chat_realtime_service.dart';
 import '../../data/services/voice_note_service.dart';
 import '../../domain/models/chat_message.dart';
+import '../../domain/models/chat_task.dart';
 import '../../domain/models/contact_relationship.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/user_profile.dart';
 import '../../features/camera/camera_capture_screen.dart';
+import '../../features/tasks/task_detail_screen.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/commands/chat_command_parser.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
@@ -107,6 +109,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   // Per-chat wallpaper override ('none' | theme pattern ids). Null until the
   // persisted value loads; consumed by the ChatWallpaper layer.
   String? _chatWallpaperOverride;
+
+  String? _contextualMessageId;
+  final Set<String> _selectedMessageIds = <String>{};
+  String? _editingMessageId;
+
+  bool get _isSelectionMode => _selectedMessageIds.isNotEmpty;
 
   ThemeConfig get _theme => GbThemeOverrides.resolve(
     widget.themeController?.globalTheme ?? widget.theme,
@@ -275,6 +283,44 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Future<void> _sendMessage() async {
     final text = _textCtrl.text.trim();
     if (text.isEmpty) return;
+
+    // --- Editing branch ---
+    if (_editingMessageId != null) {
+      final editId = _editingMessageId!;
+      _textCtrl.clear();
+      _typingIdleTimer?.cancel();
+      if (_typingPublished) {
+        _typingPublished = false;
+        widget.dataStore.setTyping(widget.conversationId, false);
+      }
+      setState(() {
+        _editingMessageId = null;
+        _showQuickReplyOverlay = false;
+      });
+      try {
+        await widget.dataStore.editMessage(
+          conversationId: widget.conversationId,
+          messageId: editId,
+          newText: text,
+        );
+      } catch (error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error.toString().replaceFirst('Exception: ', ''),
+            ),
+          ),
+        );
+        // Restore so user can retry
+        setState(() {
+          _editingMessageId = editId;
+          _textCtrl.text = text;
+        });
+      }
+      return;
+    }
+
     final command = ChatCommandParser.parse(text);
     if (command.type == ChatCommandType.task) {
       _textCtrl.clear();
@@ -542,11 +588,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
   }
 
-  String? _selectedMessageId;
+
+  static const List<String> _quickReactionEmojis = ['❤️', '👍', '😂', '😮', '😢', '🙏'];
 
   void _onMessageLongPressWithRect(ChatMessage message, Rect bubbleRect) {
     HapticFeedback.selectionClick();
-    setState(() => _selectedMessageId = message.id);
+    setState(() => _contextualMessageId = message.id);
     final theme = _theme;
     final isMine = message.senderId == widget.dataStore.currentUser.id;
 
@@ -568,7 +615,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       ),
     ];
 
-    AppContextMenu.show(
+    AppContextMenu.showWithReactionRail(
       context: context,
       anchorRect: bubbleRect,
       backgroundColor: theme.surfaceColor,
@@ -576,9 +623,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       secondaryTextColor: theme.secondaryTextColor,
       destructiveColor: theme.dangerColor,
       sections: sections,
+      quickReactions: _quickReactionEmojis,
+      onQuickReaction: (emoji) {
+        widget.dataStore.toggleReaction(
+          widget.conversationId,
+          message.id,
+          emoji,
+        );
+      },
     ).then((_) {
       if (mounted) {
-        setState(() => _selectedMessageId = null);
+        setState(() => _contextualMessageId = null);
       }
     });
   }
@@ -606,6 +661,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         widget.dataStore.togglePinMessage(widget.conversationId, message.id);
         break;
       case MessageActionType.edit:
+        setState(() => _editingMessageId = message.id);
         _textCtrl.text = message.text;
         _textCtrl.selection = TextSelection.collapsed(offset: message.text.length);
         _handleComposerChanged(message.text);
@@ -627,7 +683,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         break;
       case MessageActionType.select:
         // Enter multi-select mode
-        setState(() => _selectedMessageId = message.id);
+        setState(() => _selectedMessageIds.add(message.id));
         break;
       case MessageActionType.deleteForMe:
         widget.dataStore.deleteMessage(
@@ -673,7 +729,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
-  void _openCreateTaskModal({String? initialTitle, String? sourceMessageId}) {
+  void _openCreateTaskModal({
+    String? initialTitle,
+    String? sourceMessageId,
+    ChatTask? existingTask,
+  }) {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -684,7 +744,78 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         sourceConversationId: widget.conversationId,
         initialTitle: initialTitle,
         sourceMessageId: sourceMessageId,
+        existingTask: existingTask,
       ),
+    );
+  }
+
+  void _openTaskDetails(ChatTask task) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TaskDetailScreen(
+          task: task,
+          theme: _theme,
+          dataStore: widget.dataStore,
+        ),
+      ),
+    );
+  }
+
+  void _toggleTaskStatus(ChatTask task) {
+    final nextStatus = task.status == TaskStatus.completed
+        ? TaskStatus.inbox
+        : TaskStatus.completed;
+    HapticFeedback.lightImpact();
+    widget.dataStore.updateTaskStatus(task.id, nextStatus);
+  }
+
+  void _showTaskContextMenu(ChatTask task, Rect anchorRect) {
+    final theme = _theme;
+    final isCompleted = task.status == TaskStatus.completed;
+
+    final sections = <ContextMenuSection>[
+      ContextMenuSection(
+        title: task.title,
+        items: [
+          ContextMenuItem(
+            icon: isCompleted ? Icons.replay_rounded : Icons.check_circle_outline_rounded,
+            label: isCompleted ? 'Reopen task' : 'Mark completed',
+            onTap: () => _toggleTaskStatus(task),
+          ),
+          ContextMenuItem(
+            icon: Icons.edit_outlined,
+            label: 'Edit task',
+            onTap: () => _openCreateTaskModal(existingTask: task),
+          ),
+          ContextMenuItem(
+            icon: Icons.open_in_new_rounded,
+            label: 'Task details',
+            onTap: () => _openTaskDetails(task),
+          ),
+          if (task.sourceMessageId != null)
+            ContextMenuItem(
+              icon: Icons.chat_bubble_outline_rounded,
+              label: 'Go to source message',
+              onTap: () => _highlightMessage(task.sourceMessageId!),
+            ),
+          ContextMenuItem(
+            icon: Icons.delete_outline_rounded,
+            label: 'Delete task',
+            isDestructive: true,
+            onTap: () => widget.dataStore.deleteTask(task.id),
+          ),
+        ],
+      ),
+    ];
+
+    AppContextMenu.show(
+      context: context,
+      anchorRect: anchorRect,
+      backgroundColor: theme.surfaceColor,
+      primaryTextColor: theme.primaryTextColor,
+      secondaryTextColor: theme.secondaryTextColor,
+      destructiveColor: theme.dangerColor,
+      sections: sections,
     );
   }
 
@@ -975,7 +1106,83 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
     Widget chat = Scaffold(
       backgroundColor: theme.backgroundColor,
-      appBar: _isInChatSearchOpen
+      appBar: _isSelectionMode
+          ? AppBar(
+              automaticallyImplyLeading: false,
+              backgroundColor: theme.surfaceColor,
+              foregroundColor: theme.primaryTextColor,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0.5,
+              leading: IconButton(
+                icon: const Icon(Icons.close_rounded),
+                tooltip: 'Cancel selection',
+                onPressed: () => setState(() => _selectedMessageIds.clear()),
+              ),
+              title: Text(
+                '${_selectedMessageIds.length} selected',
+                style: TextStyle(
+                  color: theme.primaryTextColor,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.copy_outlined),
+                  tooltip: 'Copy',
+                  onPressed: () async {
+                    final msgs = widget.dataStore
+                        .getMessages(widget.conversationId)
+                        .where((m) => _selectedMessageIds.contains(m.id))
+                        .map((m) => m.text)
+                        .join('\n');
+                    await Clipboard.setData(ClipboardData(text: msgs));
+                    if (!mounted) return;
+                    setState(() => _selectedMessageIds.clear());
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Messages copied')),
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.forward_outlined),
+                  tooltip: 'Forward',
+                  onPressed: () {
+                    final first = widget.dataStore
+                        .getMessages(widget.conversationId)
+                        .where((m) => _selectedMessageIds.contains(m.id))
+                        .firstOrNull;
+                    if (first != null) _openForwardSheet(first);
+                    setState(() => _selectedMessageIds.clear());
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.star_border_rounded),
+                  tooltip: 'Star',
+                  onPressed: () {
+                    for (final id in _selectedMessageIds) {
+                      widget.dataStore.toggleStarMessage(widget.conversationId, id);
+                    }
+                    setState(() => _selectedMessageIds.clear());
+                  },
+                ),
+                IconButton(
+                  icon: Icon(Icons.delete_outline_rounded, color: theme.dangerColor),
+                  tooltip: 'Delete',
+                  onPressed: () {
+                    for (final id in _selectedMessageIds) {
+                      widget.dataStore.deleteMessage(
+                        widget.conversationId,
+                        id,
+                        forEveryone: false,
+                      );
+                    }
+                    setState(() => _selectedMessageIds.clear());
+                  },
+                ),
+              ],
+            )
+          : _isInChatSearchOpen
           ? AppBar(
               automaticallyImplyLeading: false,
               backgroundColor: theme.surfaceColor,
@@ -1362,6 +1569,61 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       .toList(growable: false),
                 ),
               ),
+            if (_editingMessageId != null && !_recording)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 7,
+                ),
+                color: _theme.cardColor,
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.edit_rounded,
+                      color: _theme.accentColor,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Editing message',
+                            style: TextStyle(
+                              color: _theme.accentColor,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            widget.dataStore
+                                    .getMessages(widget.conversationId)
+                                    .where((m) => m.id == _editingMessageId)
+                                    .map((m) => m.text)
+                                    .firstOrNull ??
+                                '',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: _theme.secondaryTextColor,
+                              fontSize: 11.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => setState(() {
+                        _editingMessageId = null;
+                        _textCtrl.clear();
+                        _handleComposerChanged('');
+                      }),
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                    ),
+                  ],
+                ),
+              ),
             if (_replyTarget != null && !_recording)
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -1674,11 +1936,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               ? 'Unmute notifications'
               : 'Mute notifications',
           onTap: () => widget.dataStore.toggleMuteConversation(conversation.id),
-        ),
-        ChatyMenuItem(
-          icon: Icons.emoji_emotions_outlined,
-          label: 'Clear recent emojis',
-          onTap: _clearRecentEmojis,
         ),
         ChatyMenuItem(
           icon: Icons.delete_sweep_rounded,
@@ -2003,7 +2260,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             showDeletedContent: showDeleted,
             retainViewOnce: retainViewOnce,
             viewOnceOpened: _openedViewOnceIds.contains(message.id),
-            isSelected: _selectedMessageId == message.id ||
+            isSelected: _contextualMessageId == message.id ||
+                _selectedMessageIds.contains(message.id) ||
                 _highlightedSearchMessageId == message.id,
             onViewOnceOpen: () => _openViewOnceMedia(message, theme),
             senderName: conversation.type == ConversationType.group && !isMine
@@ -2027,9 +2285,94 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             ),
             voicePlaybackSpeed:
                 widget.preferencesController.conversation.voicePlaybackSpeed,
-            onTaskTap: message.linkedTaskId == null
-                ? null
-                : () => _openCreateTaskModal(sourceMessageId: message.id),
+            task: message.linkedTaskId != null
+                ? widget.dataStore.tasks.firstWhere(
+                    (t) => t.id == message.linkedTaskId,
+                    orElse: () => ChatTask(
+                      id: message.linkedTaskId!,
+                      sourceConversationId: conversation.id,
+                      sourceMessageId: message.id,
+                      title: message.text,
+                      description: '',
+                      creatorId: message.senderId,
+                      assigneeIds: const [],
+                      dueAt: message.createdAt.add(const Duration(days: 3)),
+                      createdAt: message.createdAt,
+                      updatedAt: message.createdAt,
+                    ),
+                  )
+                : null,
+            onTaskTap: () {
+              final currentTask = message.linkedTaskId != null
+                  ? widget.dataStore.tasks.firstWhere(
+                      (t) => t.id == message.linkedTaskId,
+                      orElse: () => ChatTask(
+                        id: message.linkedTaskId!,
+                        sourceConversationId: conversation.id,
+                        sourceMessageId: message.id,
+                        title: message.text,
+                        description: '',
+                        creatorId: message.senderId,
+                        assigneeIds: const [],
+                        dueAt: message.createdAt.add(const Duration(days: 3)),
+                        createdAt: message.createdAt,
+                        updatedAt: message.createdAt,
+                      ),
+                    )
+                  : null;
+              if (currentTask != null) {
+                _openTaskDetails(currentTask);
+              } else {
+                _openCreateTaskModal(
+                  initialTitle: message.text,
+                  sourceMessageId: message.id,
+                );
+              }
+            },
+            onTaskToggle: () {
+              final currentTask = message.linkedTaskId != null
+                  ? widget.dataStore.tasks.firstWhere(
+                      (t) => t.id == message.linkedTaskId,
+                      orElse: () => ChatTask(
+                        id: message.linkedTaskId!,
+                        sourceConversationId: conversation.id,
+                        sourceMessageId: message.id,
+                        title: message.text,
+                        description: '',
+                        creatorId: message.senderId,
+                        assigneeIds: const [],
+                        dueAt: message.createdAt.add(const Duration(days: 3)),
+                        createdAt: message.createdAt,
+                        updatedAt: message.createdAt,
+                      ),
+                    )
+                  : null;
+              if (currentTask != null) {
+                _toggleTaskStatus(currentTask);
+              }
+            },
+            onTaskMenu: (anchorRect) {
+              final currentTask = message.linkedTaskId != null
+                  ? widget.dataStore.tasks.firstWhere(
+                      (t) => t.id == message.linkedTaskId,
+                      orElse: () => ChatTask(
+                        id: message.linkedTaskId!,
+                        sourceConversationId: conversation.id,
+                        sourceMessageId: message.id,
+                        title: message.text,
+                        description: '',
+                        creatorId: message.senderId,
+                        assigneeIds: const [],
+                        dueAt: message.createdAt.add(const Duration(days: 3)),
+                        createdAt: message.createdAt,
+                        updatedAt: message.createdAt,
+                      ),
+                    )
+                  : null;
+              if (currentTask != null) {
+                _showTaskContextMenu(currentTask, anchorRect);
+              }
+            },
             onMediaTap: message.attachment == null
                 ? null
                 : () => Navigator.of(context).push(

@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -11,6 +13,17 @@ enum ContextSurfacePlacement {
   sideRight,
 }
 
+/// Semantic anchor category for tailored contextual surface behavior.
+enum ContextAnchorType {
+  overflowButton,
+  messageIncoming,
+  messageOutgoing,
+  chatRow,
+  avatar,
+  navigationItem,
+  generic,
+}
+
 /// A request to calculate positioning and layout for a floating contextual surface.
 class ContextSurfaceRequest {
   final Rect anchorRect;
@@ -18,6 +31,8 @@ class ContextSurfaceRequest {
   final EdgeInsets safeInsets;
   final EdgeInsets keyboardInsets;
   final Size screenSize;
+  final ContextAnchorType anchorType;
+  final bool contentSized;
 
   const ContextSurfaceRequest({
     required this.anchorRect,
@@ -25,6 +40,8 @@ class ContextSurfaceRequest {
     required this.safeInsets,
     this.keyboardInsets = EdgeInsets.zero,
     required this.screenSize,
+    this.anchorType = ContextAnchorType.generic,
+    this.contentSized = true,
   });
 
   /// Factory helper from BuildContext and anchor Rect
@@ -32,6 +49,8 @@ class ContextSurfaceRequest {
     required BuildContext context,
     required Rect anchorRect,
     required Size preferredSize,
+    ContextAnchorType anchorType = ContextAnchorType.generic,
+    bool contentSized = true,
   }) {
     final mediaQuery = MediaQuery.of(context);
     return ContextSurfaceRequest(
@@ -40,6 +59,8 @@ class ContextSurfaceRequest {
       safeInsets: mediaQuery.padding,
       keyboardInsets: mediaQuery.viewInsets,
       screenSize: mediaQuery.size,
+      anchorType: anchorType,
+      contentSized: contentSized,
     );
   }
 }
@@ -47,11 +68,13 @@ class ContextSurfaceRequest {
 /// Result of resolving surface placement and coordinates.
 class ContextSurfaceResolution {
   final Rect targetRect;
+  final double maxHeight;
   final ContextSurfacePlacement placement;
   final Alignment transformOrigin;
 
   const ContextSurfaceResolution({
     required this.targetRect,
+    required this.maxHeight,
     required this.placement,
     required this.transformOrigin,
   });
@@ -68,19 +91,45 @@ class ContextSurfaceResolver {
     final anchor = request.anchorRect;
     final pref = request.preferredSize;
 
-    final effectiveBottom = screen.height - padding.bottom - keyboard.bottom;
-    final effectiveTop = padding.top;
+    final effectiveBottom = screen.height - padding.bottom - keyboard.bottom - 8.0;
+    final effectiveTop = padding.top + 8.0;
     final effectiveLeft = padding.left + 8.0;
     final effectiveRight = screen.width - padding.right - 8.0;
 
-    final spaceBelow = effectiveBottom - anchor.bottom;
-    final spaceAbove = anchor.top - effectiveTop;
+    final spaceBelow = (effectiveBottom - anchor.bottom).clamp(0.0, screen.height);
+    final spaceAbove = (anchor.top - effectiveTop).clamp(0.0, screen.height);
 
-    final showBelow = spaceBelow >= pref.height || spaceBelow >= spaceAbove;
+    // Determine vertical placement
+    final bool showBelow;
+    final double availableHeight;
+    if (spaceBelow >= pref.height) {
+      showBelow = true;
+      availableHeight = spaceBelow;
+    } else if (spaceAbove >= pref.height) {
+      showBelow = false;
+      availableHeight = spaceAbove;
+    } else if (spaceAbove > spaceBelow) {
+      showBelow = false;
+      availableHeight = spaceAbove;
+    } else {
+      showBelow = true;
+      availableHeight = spaceBelow;
+    }
+
+    final double targetHeight = pref.height.clamp(0.0, availableHeight);
 
     // Horizontal placement: check if anchor is on the right or left half of screen
-    final anchorCenterX = anchor.center.dx;
-    final isRightSide = anchorCenterX > (screen.width / 2);
+    final bool isRightSide;
+    if (request.anchorType == ContextAnchorType.messageOutgoing) {
+      isRightSide = true;
+    } else if (request.anchorType == ContextAnchorType.messageIncoming) {
+      isRightSide = false;
+    } else if (request.anchorType == ContextAnchorType.overflowButton) {
+      isRightSide = true;
+    } else {
+      final anchorCenterX = anchor.center.dx;
+      isRightSide = anchorCenterX > (screen.width / 2);
+    }
 
     final ContextSurfacePlacement placement;
     if (showBelow) {
@@ -93,9 +142,8 @@ class ContextSurfaceResolver {
           : ContextSurfacePlacement.aboveLeft;
     }
 
-    // Determine target width
-    final double targetWidth = pref.width.clamp(180.0, screen.width - 24.0);
-    final double targetHeight = pref.height;
+    // Determine target width (clamped between 150dp and 240dp by default for compact content-sized menus)
+    final double targetWidth = pref.width.clamp(150.0, screen.width - 24.0);
 
     // Calculate X coordinate
     double left;
@@ -132,6 +180,7 @@ class ContextSurfaceResolver {
 
     return ContextSurfaceResolution(
       targetRect: Rect.fromLTWH(left, top, targetWidth, targetHeight),
+      maxHeight: availableHeight,
       placement: placement,
       transformOrigin: transformOrigin,
     );
@@ -151,8 +200,6 @@ class ContextSurfaceController {
     Color barrierColor = const Color(0x33000000),
     Duration duration = const Duration(milliseconds: 170),
   }) {
-    HapticFeedback.lightImpact();
-
     final resolution = ContextSurfaceResolver.resolve(
       ContextSurfaceRequest.fromContext(
         context: context,
@@ -174,7 +221,12 @@ class ContextSurfaceController {
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => Navigator.of(dialogContext).pop(),
-                child: const SizedBox.expand(),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+                  child: Container(
+                    color: Colors.black.withValues(alpha: 0.18),
+                  ),
+                ),
               ),
             ),
             Positioned(

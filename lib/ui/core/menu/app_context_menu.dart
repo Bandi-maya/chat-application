@@ -54,8 +54,9 @@ class AppContextMenu {
     Color? primaryTextColor,
     Color? secondaryTextColor,
     Color? destructiveColor,
-    double minWidth = 210.0,
-    double maxWidth = 280.0,
+    ContextAnchorType anchorType = ContextAnchorType.generic,
+    double minWidth = 150.0,
+    double maxWidth = 240.0,
   }) {
     // If no anchor is passed, attempt to find the render box from context
     Rect? effectiveAnchor = anchorRect;
@@ -85,6 +86,7 @@ class AppContextMenu {
         primaryTextColor: primaryTextColor,
         secondaryTextColor: secondaryTextColor,
         destructiveColor: destructiveColor,
+        anchorType: anchorType,
         minWidth: minWidth,
         maxWidth: maxWidth,
       );
@@ -94,6 +96,80 @@ class AppContextMenu {
       context: context,
       title: title,
       subtitle: subtitle,
+      sections: sections,
+      backgroundColor: backgroundColor,
+      primaryTextColor: primaryTextColor,
+      secondaryTextColor: secondaryTextColor,
+      destructiveColor: destructiveColor,
+    );
+  }
+
+  /// Like [show] but prepends a quick-reaction emoji strip above the menu items.
+  static Future<void> showWithReactionRail({
+    required BuildContext context,
+    required List<ContextMenuSection> sections,
+    required List<String> quickReactions,
+    required void Function(String emoji) onQuickReaction,
+    Rect? anchorRect,
+    Color? backgroundColor,
+    Color? primaryTextColor,
+    Color? secondaryTextColor,
+    Color? destructiveColor,
+    ContextAnchorType anchorType = ContextAnchorType.generic,
+    double minWidth = 150.0,
+    double maxWidth = 240.0,
+  }) {
+    Rect? effectiveAnchor = anchorRect;
+    if (effectiveAnchor == null) {
+      final renderBox = context.findRenderObject() as RenderBox?;
+      if (renderBox != null && renderBox.hasSize) {
+        final origin = renderBox.localToGlobal(Offset.zero);
+        effectiveAnchor = origin & renderBox.size;
+      }
+    }
+
+    final theme = Theme.of(context);
+    final bg = backgroundColor ?? theme.cardColor;
+    final primary = primaryTextColor ?? theme.colorScheme.onSurface;
+    final secondary = secondaryTextColor ?? theme.colorScheme.onSurfaceVariant;
+    final danger = destructiveColor ?? theme.colorScheme.error;
+
+    final totalItems = sections.fold<int>(0, (sum, s) => sum + s.items.length);
+    final estimatedHeight =
+        56.0 + 8.0 + (totalItems * 44.0);
+
+    if (effectiveAnchor != null) {
+      return ContextSurfaceController.showSurface<void>(
+        context: context,
+        anchorRect: effectiveAnchor,
+        preferredSize: Size(maxWidth, estimatedHeight),
+        builder: (dialogContext, resolution) {
+          return _AnchoredMenuLayout(
+            anchor: effectiveAnchor!,
+            resolution: resolution,
+            minWidth: minWidth,
+            maxWidth: maxWidth,
+            backgroundColor: bg,
+            primaryColor: primary,
+            secondaryColor: secondary,
+            dangerColor: danger,
+            sections: sections,
+            onDismiss: () => Navigator.of(dialogContext).pop(),
+            headerWidget: _ReactionRailWidget(
+              emojis: quickReactions,
+              backgroundColor: bg,
+              onReact: (emoji) {
+                Navigator.of(dialogContext).pop();
+                onQuickReaction(emoji);
+              },
+            ),
+          );
+        },
+      );
+    }
+
+    return _showFallbackModal(
+      context: context,
       sections: sections,
       backgroundColor: backgroundColor,
       primaryTextColor: primaryTextColor,
@@ -112,6 +188,7 @@ class AppContextMenu {
     Color? primaryTextColor,
     Color? secondaryTextColor,
     Color? destructiveColor,
+    ContextAnchorType anchorType = ContextAnchorType.generic,
     required double minWidth,
     required double maxWidth,
   }) {
@@ -121,10 +198,14 @@ class AppContextMenu {
     final secondary = secondaryTextColor ?? theme.colorScheme.onSurfaceVariant;
     final danger = destructiveColor ?? theme.colorScheme.error;
 
+    // Calculate approximate items count to estimate preferred size
+    final totalItems = sections.fold<int>(0, (sum, s) => sum + s.items.length);
+    final estimatedHeight = (title != null ? 50.0 : 16.0) + (totalItems * 44.0);
+
     return ContextSurfaceController.showSurface<void>(
       context: context,
       anchorRect: anchor,
-      preferredSize: Size(maxWidth, 280),
+      preferredSize: Size(maxWidth, estimatedHeight),
       builder: (dialogContext, resolution) {
         return _AnchoredMenuLayout(
           anchor: anchor,
@@ -166,7 +247,7 @@ class AppContextMenu {
       isScrollControlled: true,
       builder: (sheetContext) => SafeArea(
         child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(20),
@@ -239,7 +320,7 @@ class AppContextMenu {
             ),
           if (sections[sIdx].title != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
               child: Text(
                 sections[sIdx].title!.toUpperCase(),
                 style: TextStyle(
@@ -267,26 +348,28 @@ class AppContextMenu {
               borderRadius: BorderRadius.circular(10),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
+                  horizontal: 10,
+                  vertical: 9,
                 ),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     if (item.iconWidget != null)
                       item.iconWidget!
                     else if (item.icon != null)
-                      Icon(item.icon, color: itemColor, size: 18),
+                      Icon(item.icon, color: itemColor, size: 21),
                     if (item.iconWidget != null || item.icon != null)
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             item.label,
                             style: TextStyle(
                               color: itemColor,
-                              fontSize: 14,
+                              fontSize: 14.5,
                               fontWeight: item.isDestructive
                                   ? FontWeight.w600
                                   : FontWeight.w500,
@@ -330,6 +413,7 @@ class _AnchoredMenuLayout extends StatelessWidget {
   final String? subtitle;
   final List<ContextMenuSection> sections;
   final VoidCallback onDismiss;
+  final Widget? headerWidget;
 
   const _AnchoredMenuLayout({
     required this.anchor,
@@ -344,11 +428,17 @@ class _AnchoredMenuLayout extends StatelessWidget {
     this.subtitle,
     required this.sections,
     required this.onDismiss,
+    this.headerWidget,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      constraints: BoxConstraints(
+        minWidth: minWidth,
+        maxWidth: maxWidth,
+        maxHeight: resolution.maxHeight,
+      ),
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(16),
@@ -372,7 +462,7 @@ class _AnchoredMenuLayout extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
+          physics: const ClampingScrollPhysics(),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -414,6 +504,14 @@ class _AnchoredMenuLayout extends StatelessWidget {
                   color: secondaryColor.withValues(alpha: 0.12),
                 ),
               ],
+              if (headerWidget != null) ...[
+                headerWidget!,
+                Divider(
+                  height: 1,
+                  thickness: 0.8,
+                  color: secondaryColor.withValues(alpha: 0.12),
+                ),
+              ],
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: AppContextMenu._buildSectionsList(
@@ -432,3 +530,38 @@ class _AnchoredMenuLayout extends StatelessWidget {
   }
 }
 
+/// Horizontal quick-reaction emoji rail rendered inside the context menu.
+class _ReactionRailWidget extends StatelessWidget {
+  final List<String> emojis;
+  final Color backgroundColor;
+  final void Function(String emoji) onReact;
+
+  const _ReactionRailWidget({
+    required this.emojis,
+    required this.backgroundColor,
+    required this.onReact,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: emojis.map((emoji) {
+          return InkWell(
+            onTap: () => onReact(emoji),
+            borderRadius: BorderRadius.circular(20),
+            child: Padding(
+              padding: const EdgeInsets.all(6),
+              child: Text(
+                emoji,
+                style: const TextStyle(fontSize: 24),
+              ),
+            ),
+          );
+        }).toList(growable: false),
+      ),
+    );
+  }
+}

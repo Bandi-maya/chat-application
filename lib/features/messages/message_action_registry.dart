@@ -46,18 +46,19 @@ class MessageActionRegistry {
     required ChatMessage message,
     required bool isMe,
     bool allowEditPolicy = true,
-    bool isTranslationAvailable = true,
   }) {
     final actions = <MessageActionDescriptor>[];
 
-    // Reply is available on all valid messages
-    actions.add(
-      const MessageActionDescriptor(
-        type: MessageActionType.reply,
-        label: 'Reply',
-        icon: Icons.reply_rounded,
-      ),
-    );
+    // Reply is available on all valid non-system messages
+    if (message.type != MessageType.system && !message.isDeletedForEveryone) {
+      actions.add(
+        const MessageActionDescriptor(
+          type: MessageActionType.reply,
+          label: 'Reply',
+          icon: Icons.reply_rounded,
+        ),
+      );
+    }
 
     // Copy is available for text messages
     if (message.text.isNotEmpty && message.type == MessageType.text) {
@@ -70,26 +71,30 @@ class MessageActionRegistry {
       );
     }
 
-    // Forward is available for all standard content
-    actions.add(
-      const MessageActionDescriptor(
-        type: MessageActionType.forward,
-        label: 'Forward',
-        icon: Icons.shortcut_rounded,
-      ),
-    );
+    // Forward is available for all standard content (excluding system/deleted messages)
+    if (message.type != MessageType.system && !message.isDeletedForEveryone) {
+      actions.add(
+        const MessageActionDescriptor(
+          type: MessageActionType.forward,
+          label: 'Forward',
+          icon: Icons.shortcut_rounded,
+        ),
+      );
+    }
 
-    // Star
-    actions.add(
-      MessageActionDescriptor(
-        type: MessageActionType.star,
-        label: message.isStarred ? 'Unstar' : 'Star',
-        icon: message.isStarred ? Icons.star_rounded : Icons.star_border_rounded,
-      ),
-    );
+    // Star (non-system messages)
+    if (message.type != MessageType.system) {
+      actions.add(
+        MessageActionDescriptor(
+          type: MessageActionType.star,
+          label: message.isStarred ? 'Unstar' : 'Star',
+          icon: message.isStarred ? Icons.star_rounded : Icons.star_border_rounded,
+        ),
+      );
+    }
 
     // Edit (only for own text messages within allowed policy window)
-    if (isMe && message.type == MessageType.text && allowEditPolicy) {
+    if (isMe && message.type == MessageType.text && !message.isDeletedForEveryone && allowEditPolicy) {
       actions.add(
         const MessageActionDescriptor(
           type: MessageActionType.edit,
@@ -100,33 +105,37 @@ class MessageActionRegistry {
       );
     }
 
-    // Pin
-    actions.add(
-      MessageActionDescriptor(
-        type: MessageActionType.pin,
-        label: message.isPinned ? 'Unpin' : 'Pin',
-        icon: Icons.push_pin_outlined,
-        isPrimary: false,
-      ),
-    );
+    // Pin (non-system messages)
+    if (message.type != MessageType.system) {
+      actions.add(
+        MessageActionDescriptor(
+          type: MessageActionType.pin,
+          label: message.isPinned ? 'Unpin' : 'Pin',
+          icon: Icons.push_pin_outlined,
+          isPrimary: false,
+        ),
+      );
+    }
 
-    // Task creation from message
-    actions.add(
-      const MessageActionDescriptor(
-        type: MessageActionType.task,
-        label: 'Create Task',
-        icon: Icons.task_alt_rounded,
-        isPrimary: false,
-      ),
-    );
-
-    // Translate (for non-empty text from other users when supported)
-    if (!isMe && message.text.isNotEmpty && isTranslationAvailable) {
+    // Task creation from text message
+    if (message.text.isNotEmpty && message.type == MessageType.text) {
       actions.add(
         const MessageActionDescriptor(
-          type: MessageActionType.translate,
-          label: 'Translate',
-          icon: Icons.translate_rounded,
+          type: MessageActionType.task,
+          label: 'Create Task',
+          icon: Icons.task_alt_rounded,
+          isPrimary: false,
+        ),
+      );
+    }
+
+    // Message Info for outgoing messages
+    if (isMe && message.type != MessageType.system) {
+      actions.add(
+        const MessageActionDescriptor(
+          type: MessageActionType.info,
+          label: 'Message info',
+          icon: Icons.info_outline_rounded,
           isPrimary: false,
         ),
       );
@@ -153,22 +162,12 @@ class MessageActionRegistry {
       ),
     );
 
-    if (isMe) {
+    if (isMe && !message.isDeletedForEveryone) {
       actions.add(
         const MessageActionDescriptor(
           type: MessageActionType.deleteForEveryone,
           label: 'Delete for everyone',
           icon: Icons.delete_forever_rounded,
-          isDestructive: true,
-          isPrimary: false,
-        ),
-      );
-    } else {
-      actions.add(
-        const MessageActionDescriptor(
-          type: MessageActionType.report,
-          label: 'Report',
-          icon: Icons.report_problem_outlined,
           isDestructive: true,
           isPrimary: false,
         ),

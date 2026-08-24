@@ -2,6 +2,44 @@ enum TaskStatus { inbox, assigned, inProgress, blocked, completed, archived }
 
 enum TaskPriority { low, medium, high, urgent }
 
+class TaskChecklistItem {
+  final String id;
+  final String title;
+  final bool isCompleted;
+
+  const TaskChecklistItem({
+    required this.id,
+    required this.title,
+    this.isCompleted = false,
+  });
+
+  TaskChecklistItem copyWith({
+    String? id,
+    String? title,
+    bool? isCompleted,
+  }) {
+    return TaskChecklistItem(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      isCompleted: isCompleted ?? this.isCompleted,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'title': title,
+    'is_completed': isCompleted,
+  };
+
+  factory TaskChecklistItem.fromMap(Map<String, dynamic> map) {
+    return TaskChecklistItem(
+      id: map['id']?.toString() ?? '',
+      title: map['title']?.toString() ?? '',
+      isCompleted: map['is_completed'] == true,
+    );
+  }
+}
+
 class TaskActivity {
   final String id;
   final String userId;
@@ -31,6 +69,7 @@ class ChatTask {
   final List<String> labels;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final List<TaskChecklistItem> checklistItems;
   final List<TaskActivity> activities;
 
   const ChatTask({
@@ -48,6 +87,7 @@ class ChatTask {
     this.labels = const [],
     required this.createdAt,
     required this.updatedAt,
+    this.checklistItems = const [],
     this.activities = const [],
   });
 
@@ -55,6 +95,38 @@ class ChatTask {
     return status != TaskStatus.completed &&
         status != TaskStatus.archived &&
         dueAt.isBefore(DateTime.now());
+  }
+
+  int get completedChecklistCount =>
+      checklistItems.where((item) => item.isCompleted).length;
+
+  String get dueRelativeText {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dueDay = DateTime(dueAt.year, dueAt.month, dueAt.day);
+    final diffDays = dueDay.difference(today).inDays;
+
+    final hour = dueAt.hour.toString().padLeft(2, '0');
+    final min = dueAt.minute.toString().padLeft(2, '0');
+    final timeStr = '$hour:$min';
+
+    if (isOverdue) {
+      if (diffDays < 0) {
+        return '${-diffDays}d overdue';
+      }
+      return 'Overdue ($timeStr)';
+    }
+
+    if (diffDays == 0) {
+      return 'Today, $timeStr';
+    } else if (diffDays == 1) {
+      return 'Tomorrow, $timeStr';
+    } else if (diffDays > 1 && diffDays <= 7) {
+      const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      return '${weekdays[dueAt.weekday - 1]}, $timeStr';
+    } else {
+      return '${dueAt.day}/${dueAt.month} $timeStr';
+    }
   }
 
   ChatTask copyWith({
@@ -72,6 +144,7 @@ class ChatTask {
     List<String>? labels,
     DateTime? createdAt,
     DateTime? updatedAt,
+    List<TaskChecklistItem>? checklistItems,
     List<TaskActivity>? activities,
   }) {
     return ChatTask(
@@ -89,6 +162,7 @@ class ChatTask {
       labels: labels ?? this.labels,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      checklistItems: checklistItems ?? this.checklistItems,
       activities: activities ?? this.activities,
     );
   }

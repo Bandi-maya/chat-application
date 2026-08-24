@@ -330,9 +330,57 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                     : (value) => setState(() => _priority = value.first),
               ),
               const SizedBox(height: ChatySpacing.base),
+              Text(
+                'Due Date',
+                style: TextStyle(
+                  color: colors.foreground,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: ChatySpacing.xs),
+              Wrap(
+                spacing: ChatySpacing.xs,
+                children: [
+                  ActionChip(
+                    label: const Text('Today 6 PM'),
+                    onPressed: _isSaving
+                        ? null
+                        : () {
+                            final now = DateTime.now();
+                            setState(() {
+                              _dueDate = DateTime(now.year, now.month, now.day, 18, 0);
+                            });
+                          },
+                  ),
+                  ActionChip(
+                    label: const Text('Tomorrow'),
+                    onPressed: _isSaving
+                        ? null
+                        : () {
+                            final tomorrow = DateTime.now().add(const Duration(days: 1));
+                            setState(() {
+                              _dueDate = DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 18, 0);
+                            });
+                          },
+                  ),
+                  ActionChip(
+                    label: const Text('Next Week'),
+                    onPressed: _isSaving
+                        ? null
+                        : () {
+                            final nextWeek = DateTime.now().add(const Duration(days: 7));
+                            setState(() {
+                              _dueDate = DateTime(nextWeek.year, nextWeek.month, nextWeek.day, 18, 0);
+                            });
+                          },
+                  ),
+                ],
+              ),
+              const SizedBox(height: ChatySpacing.xs),
               ChatySecondaryButton(
                 text:
-                    'Due ${_dueDate.day.toString().padLeft(2, '0')}/${_dueDate.month.toString().padLeft(2, '0')}/${_dueDate.year}',
+                    'Due ${_dueDate.day.toString().padLeft(2, '0')}/${_dueDate.month.toString().padLeft(2, '0')}/${_dueDate.year} at ${_dueDate.hour.toString().padLeft(2, '0')}:${_dueDate.minute.toString().padLeft(2, '0')}',
                 icon: Icons.event_rounded,
                 onPressed: _isSaving ? null : _pickDueDate,
               ),

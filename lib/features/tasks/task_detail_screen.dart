@@ -111,6 +111,28 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       ),
                     ),
                   ],
+                  const SizedBox(height: ChatySpacing.base),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ChatyPrimaryButton(
+                          text: task.status == TaskStatus.completed
+                              ? 'Reopen Task'
+                              : 'Mark Completed',
+                          icon: task.status == TaskStatus.completed
+                              ? Icons.replay_rounded
+                              : Icons.check_circle_outline_rounded,
+                          onPressed: () {
+                            final nextStatus = task.status == TaskStatus.completed
+                                ? TaskStatus.inbox
+                                : TaskStatus.completed;
+                            widget.dataStore.updateTaskStatus(task.id, nextStatus);
+                            setState(() {});
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),

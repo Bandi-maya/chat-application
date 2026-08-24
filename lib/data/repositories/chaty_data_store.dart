@@ -238,6 +238,16 @@ class ChatyDataStore extends ChangeNotifier {
   void toggleReaction(String conversationId, String messageId, String emoji) =>
       _backend.toggleReaction(conversationId, messageId, emoji);
 
+  Future<void> editMessage({
+    required String conversationId,
+    required String messageId,
+    required String newText,
+  }) => _backend.editMessage(
+    conversationId: conversationId,
+    messageId: messageId,
+    newText: newText,
+  );
+
   void deleteMessage(
     String conversationId,
     String messageId, {
@@ -458,23 +468,21 @@ class ChatyDataStore extends ChangeNotifier {
     required TaskPriority priority,
     required DateTime dueAt,
     List<String> labels = const <String>[],
-  }) async {
-    await Supabase.instance.client.rpc(
-      'update_chat_task',
-      params: <String, dynamic>{
-        'p_task_id': taskId,
-        'p_title': title.trim(),
-        'p_description': description.trim(),
-        'p_assignee_ids': assigneeIds,
-        'p_priority': _taskPriorityToDatabase(priority),
-        'p_due_at': dueAt.toUtc().toIso8601String(),
-        'p_labels': labels,
-      },
-    );
-  }
+  }) => _backend.updateTask(
+    taskId: taskId,
+    title: title,
+    description: description,
+    assigneeIds: assigneeIds,
+    priority: priority,
+    dueAt: dueAt,
+    labels: labels,
+  );
 
   Future<void> updateTaskStatus(String taskId, TaskStatus status) =>
       _backend.updateTaskStatus(taskId, status);
+
+  Future<void> deleteTask(String taskId) =>
+      _backend.deleteTask(taskId);
 
   void addStory(String content) => _backend.addStory(content);
   void markStoryViewed(String storyId) => _backend.markStoryViewed(storyId);
@@ -501,17 +509,4 @@ class ChatyDataStore extends ChangeNotifier {
   void updateCurrentUser(UserProfile updated) => updateProfile(updated);
   Future<void> updateUser(UserProfile updated) =>
       _backend.updateCurrentUser(updated);
-
-  static String _taskPriorityToDatabase(TaskPriority priority) {
-    switch (priority) {
-      case TaskPriority.low:
-        return 'low';
-      case TaskPriority.medium:
-        return 'normal';
-      case TaskPriority.high:
-        return 'high';
-      case TaskPriority.urgent:
-        return 'urgent';
-    }
-  }
 }
