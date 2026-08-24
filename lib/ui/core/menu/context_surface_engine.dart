@@ -1,7 +1,4 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 /// Placement of the context surface relative to the anchor rectangle.
 enum ContextSurfacePlacement {
@@ -221,11 +218,8 @@ class ContextSurfaceController {
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => Navigator.of(dialogContext).pop(),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                  child: Container(
-                    color: Colors.black.withValues(alpha: 0.18),
-                  ),
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.28),
                 ),
               ),
             ),

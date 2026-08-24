@@ -632,11 +632,195 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           emoji,
         );
       },
+      onAddReaction: () async {
+        final emoji = await ChatyEmojiPicker.show(context, reactionMode: true);
+        if (emoji != null && emoji.isNotEmpty && mounted) {
+          widget.dataStore.toggleReaction(
+            widget.conversationId,
+            message.id,
+            emoji,
+          );
+        }
+      },
     ).then((_) {
       if (mounted) {
         setState(() => _contextualMessageId = null);
       }
     });
+  }
+
+  void _showReactionDetailsSheet(ChatMessage message, MessageReaction reaction) {
+    final theme = _theme;
+    final currentUserId = widget.dataStore.currentUser.id;
+    final hasMyReaction = reaction.userIds.contains(currentUserId);
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => SafeArea(
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          decoration: BoxDecoration(
+            color: theme.surfaceColor,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: theme.secondaryTextColor.withValues(alpha: 0.15),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(top: 10, bottom: 6),
+                decoration: BoxDecoration(
+                  color: theme.secondaryTextColor.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: Row(
+                  children: [
+                    Text(
+                      reaction.emoji,
+                      style: const TextStyle(fontSize: 28),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Reactions',
+                            style: TextStyle(
+                              color: theme.primaryTextColor,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Text(
+                            '${reaction.userIds.length} ${reaction.userIds.length == 1 ? 'person' : 'people'} reacted',
+                            style: TextStyle(
+                              color: theme.secondaryTextColor,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      iconSize: 20,
+                      color: theme.secondaryTextColor,
+                      onPressed: () => Navigator.of(sheetContext).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(
+                height: 1,
+                color: theme.secondaryTextColor.withValues(alpha: 0.12),
+              ),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: reaction.userIds.length,
+                  itemBuilder: (context, i) {
+                    final uid = reaction.userIds[i];
+                    final isMe = uid == currentUserId;
+                    final user = widget.dataStore.getUser(uid);
+                    final displayName = isMe
+                        ? '${widget.dataStore.currentUser.displayName} (You)'
+                        : (user?.displayName ?? 'User');
+
+                    return ListTile(
+                      leading: ChatyNetworkAvatar(
+                        initials: isMe
+                            ? widget.dataStore.currentUser.avatarInitials
+                            : (user?.avatarInitials ?? 'U'),
+                        colorHex: isMe
+                            ? widget.dataStore.currentUser.avatarColorHex
+                            : (user?.avatarColorHex ?? '#6366F1'),
+                        url: isMe
+                            ? widget.dataStore.currentUser.avatarUrl
+                            : user?.avatarUrl,
+                        size: 38,
+                      ),
+                      title: Text(
+                        displayName,
+                        style: TextStyle(
+                          color: theme.primaryTextColor,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14.5,
+                        ),
+                      ),
+                      subtitle: isMe
+                          ? Text(
+                              'Tap to remove reaction',
+                              style: TextStyle(
+                                color: theme.dangerColor,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            )
+                          : null,
+                      trailing: Text(
+                        reaction.emoji,
+                        style: const TextStyle(fontSize: 20),
+                      ),
+                      onTap: isMe
+                          ? () {
+                              Navigator.of(sheetContext).pop();
+                              widget.dataStore.toggleReaction(
+                                widget.conversationId,
+                                message.id,
+                                reaction.emoji,
+                              );
+                            }
+                          : null,
+                    );
+                  },
+                ),
+              ),
+              if (hasMyReaction) ...[
+                Divider(
+                  height: 1,
+                  color: theme.secondaryTextColor.withValues(alpha: 0.12),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: TextButton.icon(
+                      onPressed: () {
+                        Navigator.of(sheetContext).pop();
+                        widget.dataStore.toggleReaction(
+                          widget.conversationId,
+                          message.id,
+                          reaction.emoji,
+                        );
+                      },
+                      icon: Icon(Icons.remove_circle_outline_rounded,
+                          color: theme.dangerColor, size: 18),
+                      label: Text(
+                        'Tap to remove your reaction',
+                        style: TextStyle(
+                          color: theme.dangerColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 6),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _executeMessageAction(ChatMessage message, MessageActionType type, bool isMine) async {
@@ -2279,6 +2463,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               message.id,
               emoji,
             ),
+            onReactionBadgeTap: (reaction) =>
+                _showReactionDetailsSheet(message, reaction),
             onDoubleTap: () => widget.dataStore.toggleReaction(
               conversation.id,
               message.id,

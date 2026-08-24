@@ -15,6 +15,7 @@ import '../settings/notifications/notification_settings_page.dart';
 import '../settings/privacy/privacy_center_screen.dart';
 import '../settings/settings_root_screen.dart';
 import 'profile_actions.dart';
+import 'profile_edit_screen.dart';
 
 /// Root "Profile" destination (bottom navigation). Settings now lives ONE
 /// level deeper: Profile → Settings → existing Settings system. Everything
@@ -56,7 +57,7 @@ class ProfileScreen extends StatelessWidget {
               displayName: displayName,
               username: user.username,
               about: user.about,
-              onEdit: () => showChatyProfileEditor(context, dataStore),
+              onEdit: () => ProfileEditScreen.open(context, dataStore),
               onEditBanner: () => _editBanner(context),
             ),
             const SizedBox(height: 8),

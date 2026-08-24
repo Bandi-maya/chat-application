@@ -1101,7 +1101,54 @@ class ChatyBackendService extends ChangeNotifier {
   }
 
   void toggleReaction(String conversationId, String messageId, String emoji) {
+    _optimisticToggleReaction(conversationId, messageId, emoji);
     unawaited(_toggleReactionAsync(conversationId, messageId, emoji));
+  }
+
+  void _optimisticToggleReaction(
+    String conversationId,
+    String messageId,
+    String emoji,
+  ) {
+    final currentUserId = currentUser?.id;
+    if (currentUserId == null) return;
+    final list = _messagesByChatId[conversationId];
+    if (list == null) return;
+    final msgIndex = list.indexWhere((m) => m.id == messageId);
+    if (msgIndex == -1) return;
+
+    final msg = list[msgIndex];
+    final updatedReactions = <MessageReaction>[];
+    bool userHadSameReaction = false;
+
+    for (final r in msg.reactions) {
+      final newUserIds = List<String>.from(r.userIds);
+      if (newUserIds.remove(currentUserId)) {
+        if (r.emoji == emoji) {
+          userHadSameReaction = true;
+        }
+      }
+      if (newUserIds.isNotEmpty) {
+        updatedReactions.add(r.copyWith(userIds: newUserIds));
+      }
+    }
+
+    if (!userHadSameReaction) {
+      final existingIndex = updatedReactions.indexWhere((r) => r.emoji == emoji);
+      if (existingIndex != -1) {
+        final r = updatedReactions[existingIndex];
+        updatedReactions[existingIndex] = r.copyWith(
+          userIds: [...r.userIds, currentUserId],
+        );
+      } else {
+        updatedReactions.add(
+          MessageReaction(emoji: emoji, userIds: [currentUserId]),
+        );
+      }
+    }
+
+    list[msgIndex] = msg.copyWith(reactions: updatedReactions);
+    notifyListeners();
   }
 
   Future<void> _toggleReactionAsync(
@@ -1109,10 +1156,12 @@ class ChatyBackendService extends ChangeNotifier {
     String messageId,
     String emoji,
   ) async {
-    await _client.rpc(
-      'toggle_message_reaction',
-      params: <String, dynamic>{'p_message_id': messageId, 'p_emoji': emoji},
-    );
+    try {
+      await _client.rpc(
+        'toggle_message_reaction',
+        params: <String, dynamic>{'p_message_id': messageId, 'p_emoji': emoji},
+      );
+    } catch (_) {}
     await _loadMessages(conversationId);
     notifyListeners();
   }

@@ -110,6 +110,7 @@ class AppContextMenu {
     required List<ContextMenuSection> sections,
     required List<String> quickReactions,
     required void Function(String emoji) onQuickReaction,
+    VoidCallback? onAddReaction,
     Rect? anchorRect,
     Color? backgroundColor,
     Color? primaryTextColor,
@@ -117,7 +118,7 @@ class AppContextMenu {
     Color? destructiveColor,
     ContextAnchorType anchorType = ContextAnchorType.generic,
     double minWidth = 150.0,
-    double maxWidth = 240.0,
+    double maxWidth = 260.0,
   }) {
     Rect? effectiveAnchor = anchorRect;
     if (effectiveAnchor == null) {
@@ -162,6 +163,12 @@ class AppContextMenu {
                 Navigator.of(dialogContext).pop();
                 onQuickReaction(emoji);
               },
+              onAdd: onAddReaction == null
+                  ? null
+                  : () {
+                      Navigator.of(dialogContext).pop();
+                      onAddReaction();
+                    },
             ),
           );
         },
@@ -200,7 +207,7 @@ class AppContextMenu {
 
     // Calculate approximate items count to estimate preferred size
     final totalItems = sections.fold<int>(0, (sum, s) => sum + s.items.length);
-    final estimatedHeight = (title != null ? 50.0 : 16.0) + (totalItems * 44.0);
+    final estimatedHeight = (title != null ? 48.0 : 0.0) + (totalItems * 44.0) + 16.0;
 
     return ContextSurfaceController.showSurface<void>(
       context: context,
@@ -243,29 +250,23 @@ class AppContextMenu {
 
     return showModalBottomSheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (sheetContext) => SafeArea(
-        child: Container(
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: secondary.withValues(alpha: 0.15),
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (title != null) ...[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
+      backgroundColor: bg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (modalContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (title != null && title.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                      child: Text(
                         title,
                         style: TextStyle(
                           color: primary,
@@ -273,30 +274,37 @@ class AppContextMenu {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      if (subtitle != null && subtitle.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
+                    ),
+                    if (subtitle != null && subtitle.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        child: Text(
                           subtitle,
-                          style: TextStyle(color: secondary, fontSize: 12),
+                          style: TextStyle(
+                            color: secondary,
+                            fontSize: 12,
+                          ),
                         ),
-                      ],
-                    ],
+                      ),
+                    Divider(
+                      height: 1,
+                      thickness: 0.8,
+                      color: secondary.withValues(alpha: 0.12),
+                    ),
+                  ],
+                  _buildSectionsList(
+                    context: modalContext,
+                    sections: sections,
+                    primary: primary,
+                    secondary: secondary,
+                    danger: danger,
                   ),
-                ),
-                Divider(height: 1, color: secondary.withValues(alpha: 0.12)),
-              ],
-              _buildSectionsList(
-                context: sheetContext,
-                sections: sections,
-                primary: primary,
-                secondary: secondary,
-                danger: danger,
+                ],
               ),
-              const SizedBox(height: 8),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -311,33 +319,32 @@ class AppContextMenu {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (int sIdx = 0; sIdx < sections.length; sIdx++) ...[
-          if (sIdx > 0)
+        for (int s = 0; s < sections.length; s++) ...[
+          if (s > 0)
             Divider(
               height: 1,
               thickness: 0.8,
               color: secondary.withValues(alpha: 0.12),
             ),
-          if (sections[sIdx].title != null)
+          if (sections[s].title != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
               child: Text(
-                sections[sIdx].title!.toUpperCase(),
+                sections[s].title!,
                 style: TextStyle(
                   color: secondary,
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.6,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.3,
                 ),
               ),
             ),
-          ...sections[sIdx].items.map((item) {
-            final itemColor = !item.isEnabled
+          ...sections[s].items.map((item) {
+            final color = !item.isEnabled
                 ? secondary.withValues(alpha: 0.5)
                 : item.isDestructive
                     ? danger
                     : primary;
-
             return InkWell(
               onTap: item.isEnabled
                   ? () {
@@ -345,21 +352,20 @@ class AppContextMenu {
                       item.onTap();
                     }
                   : null,
-              borderRadius: BorderRadius.circular(10),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 9,
+                  horizontal: 14,
+                  vertical: 10,
                 ),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    if (item.iconWidget != null)
-                      item.iconWidget!
-                    else if (item.icon != null)
-                      Icon(item.icon, color: itemColor, size: 21),
-                    if (item.iconWidget != null || item.icon != null)
-                      const SizedBox(width: 10),
+                    if (item.iconWidget != null) ...[
+                      item.iconWidget!,
+                      const SizedBox(width: 12),
+                    ] else if (item.icon != null) ...[
+                      Icon(item.icon, size: 18, color: color),
+                      const SizedBox(width: 12),
+                    ],
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -368,11 +374,9 @@ class AppContextMenu {
                           Text(
                             item.label,
                             style: TextStyle(
-                              color: itemColor,
-                              fontSize: 14.5,
-                              fontWeight: item.isDestructive
-                                  ? FontWeight.w600
-                                  : FontWeight.w500,
+                              color: color,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                           if (item.subtitle != null) ...[
@@ -535,11 +539,13 @@ class _ReactionRailWidget extends StatelessWidget {
   final List<String> emojis;
   final Color backgroundColor;
   final void Function(String emoji) onReact;
+  final VoidCallback? onAdd;
 
   const _ReactionRailWidget({
     required this.emojis,
     required this.backgroundColor,
     required this.onReact,
+    this.onAdd,
   });
 
   @override
@@ -548,19 +554,40 @@ class _ReactionRailWidget extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: emojis.map((emoji) {
-          return InkWell(
-            onTap: () => onReact(emoji),
-            borderRadius: BorderRadius.circular(20),
-            child: Padding(
-              padding: const EdgeInsets.all(6),
-              child: Text(
-                emoji,
-                style: const TextStyle(fontSize: 24),
+        children: [
+          ...emojis.map((emoji) {
+            return InkWell(
+              onTap: () => onReact(emoji),
+              borderRadius: BorderRadius.circular(20),
+              child: Padding(
+                padding: const EdgeInsets.all(5),
+                child: Text(
+                  emoji,
+                  style: const TextStyle(fontSize: 22),
+                ),
+              ),
+            );
+          }),
+          if (onAdd != null)
+            InkWell(
+              onTap: onAdd,
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                width: 32,
+                height: 32,
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                ),
+                child: Icon(
+                  Icons.add_rounded,
+                  size: 20,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
-          );
-        }).toList(growable: false),
+        ],
       ),
     );
   }

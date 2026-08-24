@@ -935,15 +935,27 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
           // Small profile avatar → Profile (real photo when uploaded).
           if (widget.forcedType == null)
             Padding(
-              padding: const EdgeInsets.only(right: 2),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: _openProfileFromHeader,
-                child: ChatyNetworkAvatar(
-                  initials: widget.dataStore.currentUser.avatarInitials,
-                  colorHex: widget.dataStore.currentUser.avatarColorHex,
-                  url: widget.dataStore.currentUser.avatarUrl,
-                  size: 34,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Center(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: _openProfileFromHeader,
+                  child: Container(
+                    padding: const EdgeInsets.all(1.8),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: theme.accentColor,
+                        width: 1.8,
+                      ),
+                    ),
+                    child: ChatyNetworkAvatar(
+                      initials: widget.dataStore.currentUser.avatarInitials,
+                      colorHex: widget.dataStore.currentUser.avatarColorHex,
+                      url: widget.dataStore.currentUser.avatarUrl,
+                      size: 28,
+                    ),
+                  ),
                 ),
               ),
             ),

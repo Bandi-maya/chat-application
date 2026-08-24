@@ -35,6 +35,7 @@ class MessageBubble extends StatelessWidget {
   final void Function(Rect anchorRect)? onTaskMenu;
   final ChatTask? task;
   final Function(String emoji)? onReactionTap;
+  final void Function(MessageReaction reaction)? onReactionBadgeTap;
   final VoidCallback? onMediaTap;
   final VoidCallback? onDoubleTap;
   final double voicePlaybackSpeed;
@@ -70,6 +71,7 @@ class MessageBubble extends StatelessWidget {
     this.onTaskMenu,
     this.task,
     this.onReactionTap,
+    this.onReactionBadgeTap,
     this.onMediaTap,
     this.onDoubleTap,
     this.voicePlaybackSpeed = 1.0,
@@ -789,8 +791,13 @@ class MessageBubble extends StatelessWidget {
                                   backgroundColor: theme.cardColor,
                                   activeBorderColor: theme.accentColor,
                                   textColor: theme.primaryTextColor,
-                                  onTap: () =>
-                                      onReactionTap?.call(reaction.emoji),
+                                  onTap: () {
+                                    if (onReactionBadgeTap != null) {
+                                      onReactionBadgeTap!(reaction);
+                                    } else {
+                                      onReactionTap?.call(reaction.emoji);
+                                    }
+                                  },
                                 );
                               })
                               .toList(growable: false),
