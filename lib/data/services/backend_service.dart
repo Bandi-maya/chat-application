@@ -14,7 +14,10 @@ import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/realtime/realtime_event_bus.dart';
 import '../../ui/core/validators/input_validators.dart';
+import 'local_snapshot_cache_service.dart';
 import 'mls_e2ee_service.dart';
+import 'pending_secure_send_store.dart';
+import 'snapshot_codec.dart';
 
 class AuthSession {
   final String userId;
@@ -30,6 +33,18 @@ class AuthSession {
   });
 }
 
+/// A message could not be MLS-encrypted yet because conversation devices are
+/// still registering. The content was persisted locally in encrypted form and
+/// will be delivered by [_retryPendingSecureSends]; it is never uploaded in
+/// plaintext as a fallback.
+class SecureSendPendingException implements Exception {
+  const SecureSendPendingException(this.code);
+  final String code;
+
+  @override
+  String toString() => code;
+}
+
 /// Server-backed application state for Chaty.
 ///
 /// Supabase Auth is the source of truth for identity/session state. Postgres +
@@ -40,6 +55,10 @@ class ChatyBackendService extends ChangeNotifier {
   static final ChatyBackendService _instance = ChatyBackendService._internal();
   factory ChatyBackendService() => _instance;
   ChatyBackendService._internal();
+
+  /// Error code surfaced when a send is queued because MLS setup is not
+  /// finished for a conversation's devices.
+  static const String secureSetupPendingCode = 'secure_setup_pending';
 
   final RealtimeEventBus eventBus = RealtimeEventBus();
   final Uuid _uuid = const Uuid();
@@ -59,6 +78,12 @@ class ChatyBackendService extends ChangeNotifier {
 
   RealtimeChannel? _realtimeChannel;
   Timer? _reconcileTimer;
+
+  /// AES-256-GCM snapshot cache (key in platform secure storage) backing
+  /// instant shell rendering and the pending secure-send queue.
+  final LocalSnapshotCacheService _snapshotCache = LocalSnapshotCacheService();
+  final PendingSecureSendStore _pendingSecureSends = PendingSecureSendStore();
+  bool _isRetryingPendingSends = false;
   final Set<String> _pendingMessageConversationIds = <String>{};
   final Set<String> _pendingMemberConversationIds = <String>{};
   bool _pendingConversationListRefresh = false;
@@ -124,8 +149,59 @@ class ChatyBackendService extends ChangeNotifier {
     }
 
     _currentSession = _mapSession(session);
-    await _hydrateAuthenticatedState();
+    // Offline-first: paint the shell from encrypted local snapshots before
+    // any network work, then refresh from the backend without blocking.
+    await _hydrateCachedState(session.user.id);
+    notifyListeners();
+    unawaited(_refreshAuthenticatedSession(session));
     await _subscribeRealtime();
+  }
+
+  /// Restores cached conversations and message timelines for [userId] so the
+  /// UI renders instantly on cold start. Snapshots are AES-256-GCM encrypted
+  /// at rest; a corrupt or missing snapshot is skipped, never fatal.
+  Future<void> _hydrateCachedState(String userId) async {
+    try {
+      final cachedConversations = await _snapshotCache.readJson(
+        userId: userId,
+        scope: 'conversations',
+      );
+      if (cachedConversations is List) {
+        for (final item in cachedConversations) {
+          if (item is! Map) continue;
+          final conversation = conversationFromJson(
+            item.map((key, value) => MapEntry(key.toString(), value)),
+          );
+          if (conversation.id.isEmpty) continue;
+          _conversationsById[conversation.id] = conversation;
+        }
+      }
+      final hydratedIds = List<String>.from(_conversationsById.keys);
+      for (final conversationId in hydratedIds) {
+        final cachedMessages = await _snapshotCache.readJson(
+          userId: userId,
+          scope: 'messages_$conversationId',
+        );
+        if (cachedMessages is! List || cachedMessages.isEmpty) continue;
+        _messagesByChatId[conversationId] = cachedMessages
+            .whereType<Map>()
+            .map(
+              (item) => chatMessageFromJson(
+                item.map((key, value) => MapEntry(key.toString(), value)),
+              ),
+            )
+            .toList(growable: true);
+      }
+    } catch (error) {
+      debugPrint('Chaty snapshot hydration skipped: $error');
+    }
+  }
+
+  /// Network-side session catch-up. Runs after snapshots have restored the
+  /// visible state; failures here leave the cached UI intact.
+  Future<void> _refreshAuthenticatedSession(Session session) async {
+    await _hydrateAuthenticatedState();
+    unawaited(_retryPendingSecureSends(session.user.id));
   }
 
   AuthSession _mapSession(Session session) {
@@ -184,7 +260,8 @@ class ChatyBackendService extends ChangeNotifier {
       } else {
         final fallback = UserProfile(
           id: user.id,
-          displayName: user.userMetadata?['display_name']?.toString() ??
+          displayName:
+              user.userMetadata?['display_name']?.toString() ??
               user.email?.split('@').first ??
               'Chaty User',
           username: user.userMetadata?['username']?.toString() ?? 'user',
@@ -204,7 +281,8 @@ class ChatyBackendService extends ChangeNotifier {
     } catch (_) {
       final fallback = UserProfile(
         id: user.id,
-        displayName: user.userMetadata?['display_name']?.toString() ??
+        displayName:
+            user.userMetadata?['display_name']?.toString() ??
             user.email?.split('@').first ??
             'Chaty User',
         username: user.userMetadata?['username']?.toString() ?? 'user',
@@ -264,6 +342,7 @@ class ChatyBackendService extends ChangeNotifier {
         ..clear()
         ..addAll(next);
       _messagesByChatId.removeWhere((id, _) => !next.containsKey(id));
+      unawaited(_persistConversationSnapshot());
 
       if (loadMembers) {
         await Future.wait<void>(next.keys.map(_loadConversationMembers));
@@ -320,6 +399,49 @@ class ChatyBackendService extends ChangeNotifier {
         lastMessageTime: latest.createdAt,
         lastMessageSenderId: latest.senderId,
       );
+    }
+    unawaited(
+      _persistMessageSnapshot(
+        conversationId,
+        _messagesByChatId[conversationId],
+      ),
+    );
+  }
+
+  /// Persists the conversation list snapshot for the signed-in user.
+  Future<void> _persistConversationSnapshot() async {
+    final userId = _currentSession?.userId;
+    if (userId == null) return;
+    try {
+      await _snapshotCache.writeJson(
+        userId: userId,
+        scope: 'conversations',
+        value: _conversationsById.values
+            .map(conversationToJson)
+            .toList(growable: false),
+      );
+    } catch (error) {
+      debugPrint('Chaty conversation snapshot skipped: $error');
+    }
+  }
+
+  /// Persists one conversation's decrypted timeline snapshot. Content is
+  /// encrypted at rest by [LocalSnapshotCacheService]; nothing plaintext is
+  /// ever written to disk.
+  Future<void> _persistMessageSnapshot(
+    String conversationId,
+    List<ChatMessage>? messages,
+  ) async {
+    final userId = _currentSession?.userId;
+    if (userId == null || messages == null || messages.isEmpty) return;
+    try {
+      await _snapshotCache.writeJson(
+        userId: userId,
+        scope: 'messages_$conversationId',
+        value: messages.map(chatMessageToJson).toList(growable: false),
+      );
+    } catch (error) {
+      debugPrint('Chaty message snapshot skipped: $error');
     }
   }
 
@@ -453,7 +575,8 @@ class ChatyBackendService extends ChangeNotifier {
   }
 
   void _scheduleMessageReconciliation(Map<String, dynamic> row) {
-    final conversationId = row['conversation_id']?.toString() ??
+    final conversationId =
+        row['conversation_id']?.toString() ??
         _conversationIdForLoadedMessage(row['id']?.toString() ?? '');
     if (conversationId != null && conversationId.isNotEmpty) {
       _pendingMessageConversationIds.add(conversationId);
@@ -544,7 +667,9 @@ class ChatyBackendService extends ChangeNotifier {
         RealtimeEvent(type: RealtimeEventType.conversationUpdated),
       );
     } catch (error, stackTrace) {
-      debugPrint('Chaty targeted realtime reconciliation failed: $error\n$stackTrace');
+      debugPrint(
+        'Chaty targeted realtime reconciliation failed: $error\n$stackTrace',
+      );
       try {
         await _hydrateAuthenticatedState();
       } catch (fallbackError, fallbackStack) {
@@ -811,23 +936,75 @@ class ChatyBackendService extends ChangeNotifier {
         },
     };
 
-    final encrypted = await locator<MlsE2eeService>().encryptPayload(
+    final pendingSend = PendingSecureSend(
+      clientMessageId: clientMessageId,
       conversationId: conversationId,
+      type: _messageTypeToDatabase(type),
+      text: text.trim(),
+      metadata: metadata,
+      createdAt: DateTime.now(),
+      attachment: attachment == null
+          ? null
+          : <String, dynamic>{
+              'id': attachment.id,
+              'type': attachment.type,
+              'name': attachment.name,
+              'size': attachment.size,
+              'url': attachment.url,
+              'duration_seconds': attachment.durationSeconds,
+            },
+      replyToMessageId: replyToMessageId,
+      replyToPreviewText: replyToPreviewText,
+      replyToSenderName: replyToSenderName,
+      linkedTaskId: linkedTaskId,
+    );
+
+    try {
+      return await _deliverEncryptedMessage(pendingSend, fallbackType: type);
+    } catch (error) {
+      if (!_isMlsSetupPendingError(error)) rethrow;
+      // Conversation devices have not finished MLS registration yet. The
+      // content is queued locally (encrypted at rest) and delivered by
+      // [_retryPendingSecureSends] once setup completes. No plaintext
+      // upload path exists.
+      await _pendingSecureSends.put(me.id, pendingSend);
+      throw SecureSendPendingException(secureSetupPendingCode);
+    }
+  }
+
+  /// Whether [error] means MLS encryption cannot happen yet because the
+  /// conversation's devices have not completed key registration.
+  bool _isMlsSetupPendingError(Object error) {
+    if (error is MlsMembershipPendingException) return true;
+    return error is MlsE2eeException &&
+        error.message.contains('MLS group is not initialized');
+  }
+
+  /// Encrypts and delivers [send], refreshing local state on success.
+  Future<ChatMessage> _deliverEncryptedMessage(
+    PendingSecureSend send, {
+    MessageType? fallbackType,
+  }) async {
+    final me = _currentUser;
+    if (me == null) throw Exception('Authentication required.');
+    final mls = locator<MlsE2eeService>();
+    final encrypted = await mls.encryptPayload(
+      conversationId: send.conversationId,
       payload: <String, dynamic>{
-        'type': _messageTypeToDatabase(type),
-        'text': text.trim(),
-        'metadata': metadata,
+        'type': send.type,
+        'text': send.text,
+        'metadata': send.metadata,
       },
     );
-    final deviceId = locator<MlsE2eeService>().currentDeviceId;
+    final deviceId = mls.currentDeviceId;
     if (deviceId == null) {
       throw StateError('Encrypted device identity is unavailable.');
     }
     final raw = await _client.rpc(
       'send_mls_message_v1',
       params: <String, dynamic>{
-        'p_conversation_id': conversationId,
-        'p_client_message_id': clientMessageId,
+        'p_conversation_id': send.conversationId,
+        'p_client_message_id': send.clientMessageId,
         'p_sender_device_id': deviceId,
         'p_group_id': encrypted.groupId,
         'p_epoch': encrypted.epoch,
@@ -836,33 +1013,74 @@ class ChatyBackendService extends ChangeNotifier {
     );
     final messageId = raw?.toString() ?? '';
     await Future.wait<void>(<Future<void>>[
-      _loadMessages(conversationId),
+      _loadMessages(send.conversationId),
       _loadConversations(loadMembers: false),
     ]);
     notifyListeners();
 
-    final result = _messagesByChatId[conversationId]!.firstWhere(
+    final result = _messagesByChatId[send.conversationId]!.firstWhere(
       (message) => message.id == messageId,
       orElse: () => ChatMessage(
         id: messageId,
-        conversationId: conversationId,
+        conversationId: send.conversationId,
         senderId: me.id,
-        type: type,
-        text: text.trim(),
-        attachment: attachment,
-        createdAt: DateTime.now(),
+        type: fallbackType ?? _messageTypeFromDatabase(send.type),
+        text: send.text,
+        attachment: send.attachment == null
+            ? null
+            : MessageAttachment(
+                id: send.attachment!['id']?.toString() ?? '',
+                type: send.attachment!['type']?.toString() ?? 'file',
+                name: send.attachment!['name']?.toString() ?? '',
+                size: send.attachment!['size']?.toString() ?? '',
+                url: send.attachment!['url']?.toString(),
+                durationSeconds:
+                    int.tryParse(
+                      '${send.attachment!['duration_seconds'] ?? 0}',
+                    ) ??
+                    0,
+              ),
+        createdAt: send.createdAt,
         deliveryState: DeliveryState.sent,
       ),
     );
     eventBus.publish(
       RealtimeEvent(
         type: RealtimeEventType.messageCreated,
-        conversationId: conversationId,
+        conversationId: send.conversationId,
         userId: me.id,
         payload: <String, dynamic>{'messageId': result.id},
       ),
     );
     return result;
+  }
+
+  /// Redelivers locally queued messages whose MLS groups have since finished
+  /// setup. Items stay queued until their send succeeds; a still-pending
+  /// group stops this pass without dropping anything.
+  Future<void> _retryPendingSecureSends(String userId) async {
+    if (_isRetryingPendingSends) return;
+    _isRetryingPendingSends = true;
+    try {
+      final items = await _pendingSecureSends.read(userId);
+      for (final item in items) {
+        if (!_conversationsById.containsKey(item.conversationId)) continue;
+        try {
+          await _deliverEncryptedMessage(
+            item,
+            fallbackType: _messageTypeFromDatabase(item.type),
+          );
+          await _pendingSecureSends.remove(userId, item.clientMessageId);
+        } catch (error) {
+          if (_isMlsSetupPendingError(error)) break;
+          debugPrint(
+            'Chaty pending secure send ${item.clientMessageId} deferred: $error',
+          );
+        }
+      }
+    } finally {
+      _isRetryingPendingSends = false;
+    }
   }
 
   void toggleReaction(String conversationId, String messageId, String emoji) {
@@ -1152,7 +1370,8 @@ class ChatyBackendService extends ChangeNotifier {
         privacy.hideLastSeenAudience == 'Nobody' &&
         privacy.hideOnlineAudience == 'Same as Last Seen';
     if (onlineHiddenFromAll &&
-        (presence == PresenceState.online || presence == PresenceState.typing)) {
+        (presence == PresenceState.online ||
+            presence == PresenceState.typing)) {
       return PresenceState.offline;
     }
     return presence;

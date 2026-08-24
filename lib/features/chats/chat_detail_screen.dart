@@ -7,6 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../ui/core/formatting/chat_formatters.dart';
 import '../../ui/core/theme/app_theme.dart';
 import '../../data/repositories/chaty_data_store.dart';
+import '../../data/services/backend_service.dart';
+import '../../data/services/chat_media_service.dart';
 import '../../data/services/contact_relationship_service.dart';
 import '../../data/services/rich_chat_realtime_service.dart';
 import '../../data/services/voice_note_service.dart';
@@ -14,10 +16,12 @@ import '../../domain/models/chat_message.dart';
 import '../../domain/models/contact_relationship.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/user_profile.dart';
+import '../../features/camera/camera_capture_screen.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/commands/chat_command_parser.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/design_system/settings_primitives.dart';
+import '../../ui/core/design_system/chaty_haptics.dart';
 import '../../ui/core/design_system/components/chaty_kit.dart';
 import '../../ui/core/design_system/components/app_components.dart';
 import '../../ui/core/gb/gb_theme_overrides.dart';
@@ -79,6 +83,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Timer? _voiceTimer;
   bool _typingPublished = false;
   bool _loadingMessages = true;
+
   /// False until the list has laid out once and been positioned at its
   /// initial offset. The list renders fully laid-out but transparent until
   /// then, so the user never sees an off-screen frame or a visible jump.
@@ -142,6 +147,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     if (mounted) {
       setState(() => _loadError = null);
     }
+    // Offline-first: whatever is already cached renders instantly; only a
+    // truly empty timeline keeps the loading state alive until the network
+    // refresh lands.
+    final cachedMessages = widget.dataStore.getMessages(widget.conversationId);
+    if (!mounted) return;
+    setState(() => _loadingMessages = cachedMessages.isEmpty);
+    if (!_loadingMessages) _scrollToBottom(animate: false);
     try {
       await widget.dataStore.ensureConversationLoaded(widget.conversationId);
       await _realtime.trackConversation(widget.conversationId);
@@ -158,6 +170,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       });
     }
   }
+
+  /// Whether a failure means MLS encryption is still being provisioned for
+  /// this conversation — a temporary, recoverable state rather than an error.
+  bool _isSecureSetupPendingError(String rawError) =>
+      rawError.contains(ChatyBackendService.secureSetupPendingCode) ||
+      rawError.contains('MLS group is not initialized') ||
+      rawError.contains('MlsMembershipPendingException');
 
   Future<void> _refreshConnectionStatus() async {
     final conversation = widget.dataStore.conversations
@@ -290,6 +309,50 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
   }
 
+  /// WhatsApp-style in-chat camera: full-screen capture with live effects,
+  /// then upload + encrypted send with the chosen look as metadata so
+  /// receivers render the same image treatment.
+  Future<void> _captureAndSendPhoto() async {
+    final conversation = widget.dataStore.conversations
+        .where((item) => item.id == widget.conversationId)
+        .firstOrNull;
+    final result = await ChatyCameraCaptureScreen.open(
+      context,
+      mode: ChatyCaptureMode.chat,
+      contactName: conversation?.title,
+    );
+    if (result == null || !mounted) return;
+    try {
+      final attachment = await ChatMediaService().uploadFile(
+        conversationId: widget.conversationId,
+        type: 'image',
+        sourcePath: result.path,
+      );
+      await widget.dataStore.sendMessage(
+        conversationId: widget.conversationId,
+        text: result.caption,
+        type: MessageType.image,
+        attachment: attachment,
+        extraMetadata: <String, dynamic>{
+          'effect': result.effectId,
+          'effect_intensity': result.effectIntensity.toString(),
+        },
+      );
+      await _realtime.trackConversation(widget.conversationId);
+      _scrollToBottom();
+      ChatyHaptics.success();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not send photo. ${error.toString().replaceFirst('Exception: ', '')}',
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _beginVoice({required bool locked}) async {
     if (_voiceBusy || _recording) return;
     if (_typingPublished) {
@@ -332,10 +395,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         _scrollToBottom();
       }
     } catch (error) {
-      if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unable to send voice note: $error')),
-        );
+      if (mounted) {
+        final raw = error.toString();
+        final message = _isSecureSetupPendingError(raw)
+            ? 'Voice note queued — it sends automatically once secure setup '
+                  'finishes for this chat.'
+            : 'Could not send voice note. ${raw.replaceFirst('Exception: ', '')}';
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+      }
     } finally {
       await _realtime.setRecording(widget.conversationId, false);
       if (mounted) {
@@ -729,9 +798,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         return;
       }
       await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => OngoingCallScreen(theme: _theme),
-        ),
+        MaterialPageRoute(builder: (_) => OngoingCallScreen(theme: _theme)),
       );
     } catch (error) {
       if (!mounted) return;
@@ -1222,6 +1289,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               theme: theme,
               controller: _textCtrl,
               onAttach: _openAttachmentSheet,
+              onCameraTap: _captureAndSendPhoto,
               onEmoji: _pickComposerEmoji,
               onSend: _sendMessage,
               onChanged: _handleComposerChanged,
@@ -1640,6 +1708,38 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     bool showDeleted,
   ) {
     if (_loadError != null && messages.isEmpty) {
+      if (_isSecureSetupPendingError(_loadError!)) {
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.verified_user_rounded,
+                  size: 42,
+                  color: theme.secondaryTextColor,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Waiting for secure chat setup',
+                  style: TextStyle(
+                    color: theme.primaryTextColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'This chat is finishing its end-to-end encryption setup. '
+                  'Messages will appear here as soon as it completes.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: theme.secondaryTextColor),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -1774,6 +1874,7 @@ class _Composer extends StatefulWidget {
   final ThemeConfig theme;
   final TextEditingController controller;
   final VoidCallback onAttach;
+  final VoidCallback onCameraTap;
   final VoidCallback onEmoji;
   final VoidCallback onSend;
   final ValueChanged<String> onChanged;
@@ -1793,6 +1894,7 @@ class _Composer extends StatefulWidget {
     required this.theme,
     required this.controller,
     required this.onAttach,
+    required this.onCameraTap,
     required this.onEmoji,
     required this.onSend,
     required this.onChanged,
@@ -1946,7 +2048,9 @@ class _ComposerState extends State<_Composer>
             ],
             const SizedBox(width: 12),
             if (widget.amplitudeProvider != null)
-              Expanded(child: _LevelMeter(levels: _levels, theme: theme))
+              Expanded(
+                child: _LevelMeter(levels: _levels, theme: theme),
+              )
             else
               const Spacer(),
             const SizedBox(width: 10),
@@ -1976,6 +2080,7 @@ class _ComposerState extends State<_Composer>
 
   // --- Text input -----------------------------------------------------------
 
+
   Widget _buildInputRow(ThemeConfig theme) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -1986,6 +2091,13 @@ class _ComposerState extends State<_Composer>
           icon: Icons.add_circle_outline_rounded,
           iconColor: theme.accentColor,
           onTap: widget.onAttach,
+        ),
+        _ComposerCircleButton(
+          theme: theme,
+          tooltip: 'Camera',
+          icon: Icons.photo_camera_rounded,
+          iconColor: theme.accentColor,
+          onTap: widget.onCameraTap,
         ),
         Expanded(
           child: TextField(

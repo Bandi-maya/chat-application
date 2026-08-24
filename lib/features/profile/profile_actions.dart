@@ -1,9 +1,14 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/backend_service.dart';
+import '../../data/services/chat_media_service.dart';
+import '../../data/services/local_snapshot_cache_service.dart';
+import '../../data/services/mls_e2ee_service.dart';
+import '../../data/services/pending_secure_send_store.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../../ui/core/validators/input_validators.dart';
@@ -205,6 +210,33 @@ Future<void> confirmChatyLogout(BuildContext context) async {
   }
 }
 
+/// Irreversibly purges every local trace of a deleted account. Called after
+/// the server-side deletion has been requested; the local device must not
+/// retain MLS identity keys, queued encrypted messages, cached snapshots,
+/// temporary media, or any other secure-storage secret for [deletingUserId].
+Future<void> purgeLocalDataForDeletedAccount(String deletingUserId) async {
+  // Queued messages that could never be delivered die with the account.
+  await EncryptedMessageOutbox().clear(deletingUserId);
+
+  // MLS identity: SQLCipher database, WAL/SHM sidecars, and derived secrets.
+  try {
+    await locator<MlsE2eeService>().purgeLocalIdentityForUser(deletingUserId);
+  } catch (error) {
+    debugPrint('Chaty MLS identity purge skipped: $error');
+  }
+
+  // Compressed-upload staging files and other temporary media artifacts.
+  await ChatMediaService().purgeLocalTemporaryFiles();
+
+  // Encrypted offline-first snapshots for this user.
+  await LocalSnapshotCacheService().deleteUser(deletingUserId);
+
+  // Final sweep of secure storage. This intentionally runs last so earlier
+  // steps can still read what they needed; it also covers anything that
+  // predates the per-service purge methods.
+  await const FlutterSecureStorage().deleteAll();
+}
+
 /// Initials for the profile avatar, shared by the editor and the Profile
 /// header so both always agree.
 String chatyInitialsFor(String displayName) {
@@ -221,7 +253,6 @@ String chatyInitialsFor(String displayName) {
   }
   return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
 }
-
 
 /// Camera/Gallery chooser + immediate upload for the profile photo. The
 /// upload persists through the normal profile-update path so every device
@@ -247,9 +278,7 @@ class _ProfilePhotoRowState extends State<_ProfilePhotoRow> {
         source: source,
         context: context,
       );
-      await widget.dataStore.updateUser(
-        widget.user.copyWith(avatarUrl: url),
-      );
+      await widget.dataStore.updateUser(widget.user.copyWith(avatarUrl: url));
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
@@ -279,11 +308,17 @@ class _ProfilePhotoRowState extends State<_ProfilePhotoRow> {
               backgroundColor: colors.surfaceContainerHighest,
               backgroundImage: (widget.user.avatarUrl ?? '').isNotEmpty
                   ? (widget.user.avatarUrl!.startsWith('http://') ||
-                          widget.user.avatarUrl!.startsWith('https://')
-                      ? NetworkImage(widget.user.avatarUrl!)
-                      : FileImage(
-                          File(widget.user.avatarUrl!.replaceFirst('file://', '')),
-                        ) as ImageProvider)
+                            widget.user.avatarUrl!.startsWith('https://')
+                        ? NetworkImage(widget.user.avatarUrl!)
+                        : FileImage(
+                                File(
+                                  widget.user.avatarUrl!.replaceFirst(
+                                    'file://',
+                                    '',
+                                  ),
+                                ),
+                              )
+                              as ImageProvider)
                   : null,
               child: (widget.user.avatarUrl ?? '').isNotEmpty
                   ? null

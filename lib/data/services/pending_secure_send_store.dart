@@ -131,3 +131,12 @@ class PendingSecureSendStore {
     );
   }
 }
+
+/// Canonical handle to the encrypted outgoing queue for lifecycle events
+/// such as permanent account deletion.
+class EncryptedMessageOutbox {
+  final PendingSecureSendStore _store = PendingSecureSendStore();
+
+  /// Removes every queued encrypted message for [userId].
+  Future<void> clear(String userId) => _store.clear(userId);
+}

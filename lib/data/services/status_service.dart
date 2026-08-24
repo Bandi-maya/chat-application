@@ -353,15 +353,14 @@ class StatusService {
           .whereType<Map>()
           .map((raw) {
             final row = Map<String, dynamic>.from(raw);
-            final profile =
-                Map<String, dynamic>.from(row['profiles'] as Map? ?? {});
+            final profile = Map<String, dynamic>.from(
+              row['profiles'] as Map? ?? {},
+            );
             return StatusViewer(
               userId: row['viewer_id']?.toString() ?? '',
-              displayName:
-                  profile['display_name']?.toString() ?? 'Chaty user',
+              displayName: profile['display_name']?.toString() ?? 'Chaty user',
               username: profile['username']?.toString() ?? 'user',
-              avatarInitials:
-                  profile['avatar_initials']?.toString() ?? 'CU',
+              avatarInitials: profile['avatar_initials']?.toString() ?? 'CU',
               avatarColorHex:
                   profile['avatar_color_hex']?.toString() ?? '0xFF6366F1',
               viewedAt:
@@ -413,6 +412,57 @@ class StatusService {
         .select()
         .single();
     return _fromRow(Map<String, dynamic>.from(row));
+  }
+
+  /// Publishes an already-captured media file (in-app camera) through the
+  /// same validation and upload pipeline as [pickAndPublish].
+  Future<StatusRecord> publishMediaFile({
+    required String path,
+    required String mediaType,
+    String text = '',
+    String? displayName,
+  }) async {
+    final file = File(path);
+    if (!await file.exists()) {
+      throw Exception('The captured photo is no longer available.');
+    }
+    final size = await file.length();
+    if (size <= 0) throw Exception('The capture is empty.');
+    final configuredMb = _preferences.gbDouble(
+      'Up_size_limit',
+      fallback: storageLimitMb.toDouble(),
+    );
+    final effectiveLimitMb = configuredMb.clamp(1, storageLimitMb).round();
+    if (size > effectiveLimitMb * 1024 * 1024) {
+      throw Exception(
+        'Capture exceeds the $effectiveLimitMb MB storage limit.',
+      );
+    }
+    final user = _client.auth.currentUser;
+    if (user == null) throw Exception('Authentication required.');
+
+    final safeName = _safeFileName(displayName ?? 'chaty_story.jpg');
+    final objectPath = '${user.id}/${_uuid.v4()}_$safeName';
+    final mimeType = lookupMimeType(path) ?? _fallbackMime(mediaType);
+    await _client.storage
+        .from(bucket)
+        .upload(
+          objectPath,
+          file,
+          fileOptions: FileOptions(
+            cacheControl: '3600',
+            upsert: false,
+            contentType: mimeType,
+          ),
+        );
+    return _insert(
+      text: text.trim(),
+      mediaType: mediaType,
+      mediaPath: objectPath,
+      mediaName: safeName,
+      mediaSize: size,
+      mimeType: mimeType,
+    );
   }
 
   void dispose() {

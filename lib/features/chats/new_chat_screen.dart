@@ -287,26 +287,35 @@ class _NewChatScreenState extends State<NewChatScreen> {
             const SizedBox(height: ChatySpacing.xs),
           ],
           Expanded(
-            child: _results.isEmpty && !_isLoading
+            child: _isLoading && _results.isEmpty
+                ? ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: ChatySpacing.base,
+                      vertical: ChatySpacing.xs,
+                    ),
+                    itemCount: 8,
+                    itemBuilder: (_, __) => const ChatySkeletonTile(),
+                  )
+                : _results.isEmpty
                 ? (_searchCtrl.text.trim().length >= 2
-                    ? ChatyNoResultsState(
-                        query: _searchCtrl.text.trim(),
-                        message:
-                            'No contacts or users matched your search keyword.',
-                        onClear: () {
-                          _searchCtrl.clear();
-                          _onSearchChanged('');
-                        },
-                      )
-                    : ChatyEmptyState(
-                        icon: Icons.person_search_rounded,
-                        title: 'Search contacts',
-                        message:
-                            'Enter a name or @username above to start an encrypted conversation.',
-                        iconColor: colors.foregroundTertiary,
-                        titleColor: colors.foreground,
-                        messageColor: colors.foregroundSecondary,
-                      ))
+                      ? ChatyNoResultsState(
+                          query: _searchCtrl.text.trim(),
+                          message:
+                              'No contacts or users matched your search keyword.',
+                          onClear: () {
+                            _searchCtrl.clear();
+                            _onSearchChanged('');
+                          },
+                        )
+                      : ChatyEmptyState(
+                          icon: Icons.person_search_rounded,
+                          title: 'Search contacts',
+                          message:
+                              'Enter a name or @username above to start an encrypted conversation.',
+                          iconColor: colors.foregroundTertiary,
+                          titleColor: colors.foreground,
+                          messageColor: colors.foregroundSecondary,
+                        ))
                 : ListView.separated(
                     padding: const EdgeInsets.symmetric(
                       horizontal: ChatySpacing.base,

@@ -4,7 +4,8 @@ import 'package:chat/data/services/notification_service.dart';
 import 'package:chat/injection/locator.dart';
 import 'package:chat/ui/core/controllers/preferences_controller.dart';
 import 'package:chat/ui/core/design_system/settings_primitives.dart';
-import 'package:chat/ui/core/design_system/design_system.dart';
+import 'package:chat/ui/core/design_system/design_system.dart'
+    hide ChatySettingsSection;
 import 'package:chat/ui/core/design_system/color_picker.dart';
 
 class NotificationSettingsPage extends StatefulWidget {

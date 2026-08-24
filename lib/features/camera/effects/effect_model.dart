@@ -16,11 +16,7 @@ enum EffectCategory {
 }
 
 /// Adaptive performance tier required by the effect
-enum EffectPerformanceTier {
-  lightweight,
-  standard,
-  gpuIntensive,
-}
+enum EffectPerformanceTier { lightweight, standard, gpuIntensive }
 
 /// Model definition for an individual camera or video-call filter/lens
 class ChatyCameraEffect {

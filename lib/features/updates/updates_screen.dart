@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/status_service.dart';
+import '../camera/camera_capture_screen.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/design_system/design_system.dart';
@@ -25,6 +26,35 @@ class UpdatesScreen extends StatefulWidget {
 
 class _UpdatesScreenState extends State<UpdatesScreen> {
   final StatusService _statusService = StatusService();
+
+  /// WhatsApp-style camera capture for stories. The chosen look is baked
+  /// into the published image because statuses carry no metadata channel.
+  Future<void> _captureStory() async {
+    final result = await ChatyCameraCaptureScreen.open(
+      context,
+      mode: ChatyCaptureMode.story,
+    );
+    if (result == null || !mounted) return;
+    try {
+      await _statusService.publishMediaFile(
+        path: result.path,
+        mediaType: 'image',
+        text: result.caption,
+        displayName: 'chaty_story.jpg',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Status posted.')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    }
+  }
 
   Future<void> _openComposer() async {
     final themeData = Theme.of(context);
@@ -589,6 +619,23 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                         ],
                       ),
                     ),
+                    Semantics(
+                      button: true,
+                      label: 'Capture photo for status',
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(22),
+                        onTap: _captureStory,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Icon(
+                            Icons.photo_camera_rounded,
+                            size: 24,
+                            color: colors.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 2),
                     Icon(
                       Icons.chevron_right_rounded,
                       color: colors.foregroundTertiary,

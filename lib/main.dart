@@ -25,14 +25,11 @@ import 'package:chat/features/calls/ongoing_call_screen.dart';
 import 'package:chat/features/settings/security/app_lock_overlay.dart';
 import 'package:chat/features/settings/security/security_center_screen.dart';
 import 'package:chat/injection/locator.dart';
+import 'package:chat/ui/core/design_system/design_system.dart';
 import 'package:chat/ui/core/controllers/app_icon_controller.dart';
 import 'package:chat/ui/core/controllers/appearance_variant_controller.dart';
 import 'package:chat/ui/core/controllers/preferences_controller.dart';
 import 'package:chat/ui/core/gb/gb_theme_overrides.dart';
-import 'package:chat/ui/core/theme/theme_config.dart';
-import 'package:chat/ui/core/theme/chaty_page_transitions.dart';
-import 'package:chat/ui/core/theme/theme_controller.dart';
-import 'package:chat/ui/core/theme/theme_presets.dart';
 import 'package:chat/ui/core/widgets/app_avatar.dart';
 import 'package:chat/ui/core/widgets/event_toast_overlay.dart';
 import 'package:chat/ui/core/widgets/click_particle_overlay.dart';
@@ -57,11 +54,35 @@ Future<void> main() async {
     debug: !kReleaseMode,
   );
   setupLocator();
+  // Only work that shapes the very first frame blocks launch. The shell must
+  // paint from local state immediately; platform services catch up right
+  // after the first frame instead of gating it.
   await locator<ThemeController>().init();
-  await locator<AppIconController>().initialize();
-  await locator<NotificationChannelManager>().initialize();
-  await locator<PushTokenService>().initialize();
   runApp(const ChatyApp());
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(_initializeDeferredPlatformServices());
+  });
+}
+
+/// Noncritical startup work deferred until after the first frame so cold
+/// start renders the cached shell immediately. Each step fails soft: a
+/// skipped service must never take the app down during boot.
+Future<void> _initializeDeferredPlatformServices() async {
+  try {
+    await locator<AppIconController>().initialize();
+  } catch (error) {
+    debugPrint('Chaty app icon bootstrap skipped: $error');
+  }
+  try {
+    await locator<NotificationChannelManager>().initialize();
+  } catch (error) {
+    debugPrint('Chaty notification channel bootstrap skipped: $error');
+  }
+  try {
+    await locator<PushTokenService>().initialize();
+  } catch (error) {
+    debugPrint('Chaty push token bootstrap skipped: $error');
+  }
 }
 
 class ChatyApp extends StatefulWidget {
@@ -80,10 +101,14 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   late final LocalLockService _lockService;
   late final ChatyNotificationService _notificationService;
   late final ContactRelationshipService _relationshipService;
-  late final RichChatRealtimeService _richRealtime;
   late final MessageAutomationService _automationService;
   late final StatusService _statusService;
   late final StreamSubscription<AuthState> _authUiSubscription;
+
+  /// Single merged signal for every global surface the root rebuilds on
+  /// (theme, preferences, appearance, backend, realtime, calls and the
+  /// presented-call-screen counter).
+  late final Listenable _rootSignals;
   bool _recoveryRouteOpen = false;
   bool _appLockRequired = false;
   bool _initialAppLockScheduled = false;
@@ -98,6 +123,17 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _themeController = locator<ThemeController>();
+    _rootSignals = Listenable.merge(<Listenable>[
+      _themeController,
+      locator<ChatyPreferencesController>(),
+      locator<AppearanceVariantController>(),
+      locator<ChatyBackendService>(),
+      locator<RichChatRealtimeService>(),
+      locator<CallSignalingService>(),
+      // Presence of the full call screen: the minimized-call capsule hides
+      // itself while OngoingCallScreen is presented.
+      OngoingCallScreen.presentedInstances,
+    ]);
     _preferencesController = locator<ChatyPreferencesController>();
     _appearanceController = locator<AppearanceVariantController>();
     _backend = locator<ChatyBackendService>();
@@ -108,14 +144,18 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     );
     _callService = locator<CallSignalingService>();
     unawaited(
-      _callService.initialize().catchError((Object error, StackTrace stackTrace) {
-        debugPrint('Chaty call signaling bootstrap failed: $error\n$stackTrace');
+      _callService.initialize().catchError((
+        Object error,
+        StackTrace stackTrace,
+      ) {
+        debugPrint(
+          'Chaty call signaling bootstrap failed: $error\n$stackTrace',
+        );
       }),
     );
     _lockService = locator<LocalLockService>();
     _notificationService = locator<ChatyNotificationService>();
     _relationshipService = locator<ContactRelationshipService>();
-    _richRealtime = locator<RichChatRealtimeService>();
     _preferencesController.addListener(_handleSecurityPreferenceChanged);
     _statusService = StatusService();
     if (Supabase.instance.client.auth.currentSession != null) {
@@ -206,7 +246,9 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     _postLoginAppLockPromptScheduled = true;
     Future<void>.delayed(const Duration(milliseconds: 650), () async {
       _postLoginAppLockPromptScheduled = false;
-      if (!mounted || !_backend.isAuthenticated || _postLoginAppLockPromptShown) {
+      if (!mounted ||
+          !_backend.isAuthenticated ||
+          _postLoginAppLockPromptShown) {
         return;
       }
       _postLoginAppLockPromptShown = true;
@@ -307,9 +349,86 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     if (mounted) setState(() => _appLockRequired = false);
   }
 
+  /// Minimized-call surface for the global activity layer. Visible while a
+  /// live outgoing/connected session exists and the full call screen is not
+  /// presented; null otherwise.
+  Widget? _buildMinimizedCallCapsule(ThemeConfig theme) {
+    final session = _callService.currentSession;
+    if (session == null || !_backend.isAuthenticated) return null;
+    switch (session.state) {
+      case CallSessionState.initiating:
+      case CallSessionState.ringing:
+      case CallSessionState.connecting:
+      case CallSessionState.connected:
+      case CallSessionState.reconnecting:
+        break;
+      case CallSessionState.incoming:
+      case CallSessionState.idle:
+      case CallSessionState.declined:
+      case CallSessionState.busy:
+      case CallSessionState.missed:
+      case CallSessionState.ended:
+      case CallSessionState.failed:
+        return null;
+    }
+    if (OngoingCallScreen.presentedInstances.value > 0) return null;
+    return ChatyCallActivityCapsule(
+      contactName: session.remoteDisplayName,
+      status: _minimizedCallStatus(session),
+      isVideo: session.isVideo,
+      isSpeaker: session.audioRoute == AudioRouteType.speaker,
+      onOpen: () => unawaited(_openOngoingCall(theme)),
+      onToggleSpeaker: () => unawaited(() async {
+        try {
+          await _callService.setAudioRoute(
+            session.audioRoute == AudioRouteType.speaker
+                ? AudioRouteType.earpiece
+                : AudioRouteType.speaker,
+          );
+        } catch (error) {
+          debugPrint('Chaty audio route switch failed: $error');
+        }
+      }()),
+      onHangUp: () => unawaited(() async {
+        try {
+          await _callService.endCall();
+        } catch (error) {
+          debugPrint('Chaty end call failed: $error');
+        }
+      }()),
+    );
+  }
+
+  String _minimizedCallStatus(ChatyCallSession session) {
+    switch (session.state) {
+      case CallSessionState.initiating:
+        return 'Calling…';
+      case CallSessionState.ringing:
+        return session.isOutgoing ? 'Ringing…' : 'Connecting…';
+      case CallSessionState.connecting:
+        return 'Connecting…';
+      case CallSessionState.reconnecting:
+        return 'Reconnecting…';
+      case CallSessionState.connected:
+        return session.isMuted ? 'Connected · muted' : 'Connected';
+      default:
+        return 'Call';
+    }
+  }
+
+  Future<void> _openOngoingCall(ThemeConfig theme) async {
+    final navigator = _rootNavigatorKey.currentState;
+    if (navigator == null) return;
+    if (OngoingCallScreen.presentedInstances.value > 0) return;
+    await navigator.push(
+      MaterialPageRoute(builder: (_) => OngoingCallScreen(theme: theme)),
+    );
+  }
+
   void _handleAuthUiEvent(AuthState state) {
     if (state.session != null) unawaited(_registerCurrentDevice());
-    if (state.event == AuthChangeEvent.passwordRecovery && !_recoveryRouteOpen) {
+    if (state.event == AuthChangeEvent.passwordRecovery &&
+        !_recoveryRouteOpen) {
       _recoveryRouteOpen = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final navigator = _rootNavigatorKey.currentState;
@@ -414,14 +533,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge(<Listenable>[
-        _themeController,
-        _preferencesController,
-        _appearanceController,
-        _backend,
-        _richRealtime,
-        _callService,
-      ]),
+      listenable: _rootSignals,
       builder: (context, _) {
         _scheduleInitialAppLockIfNeeded();
         final currentTheme = GbThemeOverrides.resolve(
@@ -458,12 +570,18 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
                 concealWhileLocked:
                     shouldShowLock &&
                     _preferencesController.security.hideLockNotificationContent,
-                child: ClickParticleOverlay(
-                  preferencesController: _preferencesController,
-                  child: FallingParticlesOverlay(
+                // Global activity surfaces (minimized call, later uploads /
+                // recording / sync) render above every route through this
+                // single host instead of per-screen overlays.
+                child: ChatyGlobalActivityHost(
+                  primaryActivity: _buildMinimizedCallCapsule(currentTheme),
+                  child: ClickParticleOverlay(
                     preferencesController: _preferencesController,
-                    currentScope: 'Home',
-                    child: child ?? const SizedBox(),
+                    child: FallingParticlesOverlay(
+                      preferencesController: _preferencesController,
+                      currentScope: 'Home',
+                      child: child ?? const SizedBox(),
+                    ),
                   ),
                 ),
               ),
@@ -473,8 +591,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
             // already enforces block/contact/Who-Can-Call-Me rules before this
             // state can exist, so a modified Flutter client cannot bypass them.
             final callSession = _callService.currentSession;
-            final incomingCall =
-                callSession?.state == CallSessionState.incoming
+            final incomingCall = callSession?.state == CallSessionState.incoming
                 ? callSession
                 : null;
             final showIncoming =
@@ -495,9 +612,8 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
                           if (!mounted) return;
                           _rootNavigatorKey.currentState?.push(
                             MaterialPageRoute(
-                              builder: (_) => OngoingCallScreen(
-                                theme: currentTheme,
-                              ),
+                              builder: (_) =>
+                                  OngoingCallScreen(theme: currentTheme),
                             ),
                           );
                         } catch (error) {

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -21,11 +22,9 @@ import 'package:uuid/uuid.dart';
 /// - Membership drift fails closed. Chaty never silently falls back to
 ///   plaintext when an MLS conversation cannot be synchronized.
 class MlsE2eeService extends ChangeNotifier {
-  MlsE2eeService({
-    SupabaseClient? client,
-    FlutterSecureStorage? secureStorage,
-  }) : _client = client ?? Supabase.instance.client,
-       _secureStorage = secureStorage ?? const FlutterSecureStorage();
+  MlsE2eeService({SupabaseClient? client, FlutterSecureStorage? secureStorage})
+    : _client = client ?? Supabase.instance.client,
+      _secureStorage = secureStorage ?? const FlutterSecureStorage();
 
   static const String protocolSuite = 'mls-rfc9420-v1';
   static const String serverCiphersuite =
@@ -271,6 +270,42 @@ class MlsE2eeService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Irreversibly removes every local trace of [userId]'s MLS identity:
+  /// closes the engine, deletes the per-user SQLCipher database including
+  /// SQLite sidecar files, and erases derived secrets from secure storage.
+  /// Used by permanent account deletion; regular logout keeps identity data.
+  Future<void> purgeLocalIdentityForUser(String userId) async {
+    final prefix = 'chaty.mls.$userId';
+    final wasLoadedForUser = _userId == userId;
+    await close();
+
+    final support = await getApplicationSupportDirectory();
+    final safeUser = userId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+    final basePath = '${support.path}/chaty_mls_$safeUser';
+    for (final path in <String>[basePath, '$basePath-wal', '$basePath-shm']) {
+      try {
+        final file = File(path);
+        if (await file.exists()) await file.delete();
+      } catch (error) {
+        debugPrint('Chaty MLS purge could not remove $path: $error');
+      }
+    }
+
+    for (final suffix in const <String>[
+      '.db_key.v1',
+      '.device_id.v1',
+      '.signer_private.v1',
+      '.signer_public.v1',
+    ]) {
+      try {
+        await _secureStorage.delete(key: '$prefix$suffix');
+      } catch (error) {
+        debugPrint('Chaty MLS purge could not clear $prefix$suffix: $error');
+      }
+    }
+    assert(!wasLoadedForUser || _engine == null);
+  }
+
   Future<MlsConversationState> _ensureConversationReadyLocked(
     String conversationId,
   ) async {
@@ -300,9 +335,7 @@ class MlsE2eeService extends ChangeNotifier {
       active = false;
     }
     if (!active) {
-      throw MlsE2eeException(
-        'MLS group is not active for device $deviceId.',
-      );
+      throw MlsE2eeException('MLS group is not active for device $deviceId.');
     }
 
     final epoch = await _requireEngine().groupEpoch(groupIdBytes: groupId);
@@ -472,10 +505,8 @@ class MlsE2eeService extends ChangeNotifier {
         .toSet();
     if (additions.isEmpty && removals.isEmpty) return state;
 
-    final eligibleCoordinators = groupActive.keys
-        .where(serverActive.containsKey)
-        .toList()
-      ..sort();
+    final eligibleCoordinators =
+        groupActive.keys.where(serverActive.containsKey).toList()..sort();
     final myKey = '${_requireUserId()}:${_requireDeviceId()}';
     if (eligibleCoordinators.isEmpty || eligibleCoordinators.first != myKey) {
       throw const MlsMembershipPendingException(
@@ -502,7 +533,10 @@ class MlsE2eeService extends ChangeNotifier {
     final removalIndices = <int>[];
     for (final member in members) {
       final credential = MlsCredential.deserialize(bytes: member.credential);
-      final identity = utf8.decode(credential.identity(), allowMalformed: false);
+      final identity = utf8.decode(
+        credential.identity(),
+        allowMalformed: false,
+      );
       if (removals.contains(identity)) removalIndices.add(member.index);
     }
     if (removalIndices.length != removals.length) {
@@ -546,13 +580,15 @@ class MlsE2eeService extends ChangeNotifier {
           'p_additions': orderedAdditions
               .map((key) => claimedByKey[key]!.serverIdentityJson)
               .toList(growable: false),
-          'p_removals': removals.map((key) {
-            final split = _splitDeviceKey(key);
-            return <String, dynamic>{
-              'user_id': split.$1,
-              'device_id': split.$2,
-            };
-          }).toList(growable: false),
+          'p_removals': removals
+              .map((key) {
+                final split = _splitDeviceKey(key);
+                return <String, dynamic>{
+                  'user_id': split.$1,
+                  'device_id': split.$2,
+                };
+              })
+              .toList(growable: false),
         },
       );
     } catch (error) {
@@ -582,9 +618,11 @@ class MlsE2eeService extends ChangeNotifier {
     return _ClaimedPackages(
       rows
           .whereType<Map>()
-          .map((row) => MlsKeyPackageDescriptor.fromJson(
-                Map<String, dynamic>.from(row),
-              ))
+          .map(
+            (row) => MlsKeyPackageDescriptor.fromJson(
+              Map<String, dynamic>.from(row),
+            ),
+          )
           .toList(growable: false),
     );
   }
@@ -713,7 +751,8 @@ class MlsE2eeService extends ChangeNotifier {
 
   Uint8List _requireSigner() {
     final value = _signerBytes;
-    if (value == null) throw const MlsE2eeException('MLS signer is unavailable.');
+    if (value == null)
+      throw const MlsE2eeException('MLS signer is unavailable.');
     return value;
   }
 
@@ -733,7 +772,8 @@ class MlsE2eeService extends ChangeNotifier {
 
   String _requireDeviceId() {
     final value = _deviceId;
-    if (value == null) throw const MlsE2eeException('MLS device is unavailable.');
+    if (value == null)
+      throw const MlsE2eeException('MLS device is unavailable.');
     return value;
   }
 
@@ -819,26 +859,21 @@ class MlsConversationState {
           ? MlsGroupDescriptor.fromJson(Map<String, dynamic>.from(groupRaw))
           : null,
       welcome: welcomeRaw is Map
-          ? MlsWelcomeDescriptor.fromJson(
-              Map<String, dynamic>.from(welcomeRaw),
-            )
+          ? MlsWelcomeDescriptor.fromJson(Map<String, dynamic>.from(welcomeRaw))
           : null,
-      controls: _mapList(
-        json['controls'],
-        MlsControlDescriptor.fromJson,
-      ),
+      controls: _mapList(json['controls'], MlsControlDescriptor.fromJson),
       serverDevices: _mapList(
         json['server_devices'],
         MlsDeviceDescriptor.fromJson,
       ),
-      groupDevices: _mapList(
-        json['group_devices'],
-        MlsGroupDevice.fromJson,
-      ),
+      groupDevices: _mapList(json['group_devices'], MlsGroupDevice.fromJson),
     );
   }
 
-  static List<T> _mapList<T>(dynamic raw, T Function(Map<String, dynamic>) map) {
+  static List<T> _mapList<T>(
+    dynamic raw,
+    T Function(Map<String, dynamic>) map,
+  ) {
     if (raw is! List) return <T>[];
     return raw
         .whereType<Map>()
@@ -947,13 +982,13 @@ class MlsGroupDevice {
   String get key => '$userId:$deviceId';
 
   factory MlsGroupDevice.fromJson(Map<String, dynamic> json) => MlsGroupDevice(
-        userId: json['user_id']?.toString() ?? '',
-        deviceId: json['device_id']?.toString() ?? '',
-        joinedEpoch: int.tryParse(json['joined_epoch']?.toString() ?? '') ?? 0,
-        removedEpoch: json['removed_epoch'] == null
-            ? null
-            : int.tryParse(json['removed_epoch'].toString()),
-      );
+    userId: json['user_id']?.toString() ?? '',
+    deviceId: json['device_id']?.toString() ?? '',
+    joinedEpoch: int.tryParse(json['joined_epoch']?.toString() ?? '') ?? 0,
+    removedEpoch: json['removed_epoch'] == null
+        ? null
+        : int.tryParse(json['removed_epoch'].toString()),
+  );
 }
 
 class MlsKeyPackageDescriptor {
@@ -972,10 +1007,10 @@ class MlsKeyPackageDescriptor {
   String get key => '$userId:$deviceId';
 
   Map<String, dynamic> get serverIdentityJson => <String, dynamic>{
-        'key_package_id': keyPackageId,
-        'user_id': userId,
-        'device_id': deviceId,
-      };
+    'key_package_id': keyPackageId,
+    'user_id': userId,
+    'device_id': deviceId,
+  };
 
   factory MlsKeyPackageDescriptor.fromJson(Map<String, dynamic> json) =>
       MlsKeyPackageDescriptor(

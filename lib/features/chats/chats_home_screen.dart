@@ -374,7 +374,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   conversation.type != widget.forcedType)
                 return false;
               // Privacy rule: Exclude hidden locked chats from regular list
-              if (widget.preferencesController.isConversationHidden(conversation.id)) {
+              if (widget.preferencesController.isConversationHidden(
+                conversation.id,
+              )) {
                 return false;
               }
               if (query.isNotEmpty &&
@@ -472,8 +474,14 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                               child: GestureDetector(
                                 behavior: HitTestBehavior.opaque,
                                 onTap: () {
-                                  if (widget.preferencesController.security.hideLockedChats &&
-                                      widget.preferencesController.security.entryByAppTitle) {
+                                  if (widget
+                                          .preferencesController
+                                          .security
+                                          .hideLockedChats &&
+                                      widget
+                                          .preferencesController
+                                          .security
+                                          .entryByAppTitle) {
                                     _openLockedChatsVault();
                                   }
                                 },
@@ -876,6 +884,18 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     );
   }
 
+  // iOS-style title swap: while the large page title is expanded the compact
+  // bar carries the account identity; once the large title collapses away the
+  // page name takes over in the bar instead of duplicating it underneath.
+  String get _compactBarTitle {
+    final fallback = widget.dataStore.currentUser.displayName.isNotEmpty
+        ? widget.dataStore.currentUser.displayName
+        : 'Chaty';
+    final largeTitleShown = _effectiveTitleCollapse < 0.5;
+    if (widget.pageTitle != null && largeTitleShown) return fallback;
+    return widget.pageTitle ?? fallback;
+  }
+
   Widget _standardAppBar(ThemeConfig theme, HomePreferences homePrefs) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 4, 6),
@@ -883,10 +903,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         children: [
           Expanded(
             child: Text(
-              widget.pageTitle ??
-                  (widget.dataStore.currentUser.displayName.isNotEmpty
-                      ? widget.dataStore.currentUser.displayName
-                      : 'Chaty'),
+              _compactBarTitle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -948,7 +965,10 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
           if (homePrefs.showDesktopIcon)
             PopupMenuButton<String>(
               tooltip: 'More',
-              icon: Icon(Icons.more_vert_rounded, color: theme.primaryTextColor),
+              icon: Icon(
+                Icons.more_vert_rounded,
+                color: theme.primaryTextColor,
+              ),
               onSelected: (value) {
                 switch (value) {
                   case 'linked':
@@ -1194,11 +1214,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                       builder: (context) {
                         final lastMine =
                             conversation.lastMessageSenderId ==
-                                    widget.dataStore.currentUser.id
-                                ? widget.dataStore
-                                      .getMessages(conversation.id)
-                                      .lastOrNull
-                                : null;
+                                widget.dataStore.currentUser.id
+                            ? widget.dataStore
+                                  .getMessages(conversation.id)
+                                  .lastOrNull
+                            : null;
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -1225,7 +1245,8 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                             // WA-iOS row metrics: 16pt name.
                                             fontSize:
                                                 16 * density * theme.fontScale,
-                                            fontWeight: conversation.unreadCount > 0
+                                            fontWeight:
+                                                conversation.unreadCount > 0
                                                 ? FontWeight.w800
                                                 : FontWeight.w600,
                                           ),
@@ -1279,7 +1300,8 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                           ? theme.primaryTextColor
                                           : theme.secondaryTextColor,
                                       // WA-iOS: 13.5pt gray preview.
-                                      fontSize: 13.5 * density * theme.fontScale,
+                                      fontSize:
+                                          13.5 * density * theme.fontScale,
                                       fontWeight:
                                           activity?.isTyping == true ||
                                               activity?.isRecording == true
@@ -1305,13 +1327,15 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                         // Real consumers: online / last-seen
                                         // text colors for chat rows.
                                         color: online
-                                            ? widget.preferencesController.gbColor(
-                                                    'ModOnlineColor',
-                                                  ) ??
+                                            ? widget.preferencesController
+                                                      .gbColor(
+                                                        'ModOnlineColor',
+                                                      ) ??
                                                   theme.successColor
-                                            : widget.preferencesController.gbColor(
-                                                    'ModlastseenColor',
-                                                  ) ??
+                                            : widget.preferencesController
+                                                      .gbColor(
+                                                        'ModlastseenColor',
+                                                      ) ??
                                                   theme.secondaryTextColor,
                                         fontSize: 9.5,
                                         fontWeight: FontWeight.w600,
@@ -1409,9 +1433,7 @@ class _EmptyChats extends StatelessWidget {
   Widget build(BuildContext context) {
     final groups = forcedType == ConversationType.group;
     return ChatyEmptyState(
-      icon: groups
-          ? Icons.groups_outlined
-          : Icons.chat_bubble_outline_rounded,
+      icon: groups ? Icons.groups_outlined : Icons.chat_bubble_outline_rounded,
       title: groups ? 'No groups yet' : 'No conversations yet',
       message: groups
           ? 'Create a group and add people to start a shared conversation.'

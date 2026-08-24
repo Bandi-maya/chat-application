@@ -100,10 +100,26 @@ class EffectEngine extends ChangeNotifier {
 
   List<double> _interpolateMatrix(List<double> target, double intensity) {
     const identity = [
-      1.0, 0.0, 0.0, 0.0, 0.0,
-      0.0, 1.0, 0.0, 0.0, 0.0,
-      0.0, 0.0, 1.0, 0.0, 0.0,
-      0.0, 0.0, 0.0, 1.0, 0.0,
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
     ];
     final result = List<double>.filled(20, 0.0);
     for (int i = 0; i < 20; i++) {
@@ -182,8 +198,16 @@ class _ParticlePainter extends CustomPainter {
         canvas.drawCircle(Offset(x, y), radius, paint);
       } else {
         // Confetti colors
-        final colors = [Colors.red, Colors.blue, Colors.green, Colors.yellow, Colors.purple];
-        paint.color = colors[i % colors.length].withValues(alpha: (1.0 - t) * 0.8);
+        final colors = [
+          Colors.red,
+          Colors.blue,
+          Colors.green,
+          Colors.yellow,
+          Colors.purple,
+        ];
+        paint.color = colors[i % colors.length].withValues(
+          alpha: (1.0 - t) * 0.8,
+        );
         canvas.drawRect(Rect.fromLTWH(x, y, radius * 2, radius * 1.5), paint);
       }
     }

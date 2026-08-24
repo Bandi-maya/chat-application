@@ -5,7 +5,11 @@ import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/notification_service.dart';
 import '../../data/services/profile_media_service.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
-import '../../ui/core/design_system/design_system.dart';
+// ChatySettingsSection is duplicated between the barrel-exported
+// components/settings_components.dart and settings_primitives.dart; this
+// screen is written against the primitives variant.
+import '../../ui/core/design_system/design_system.dart'
+    hide ChatySettingsSection;
 import '../../ui/core/design_system/settings_primitives.dart';
 import '../settings/notifications/notification_settings_page.dart';
 import '../settings/privacy/privacy_center_screen.dart';
@@ -161,7 +165,9 @@ class ProfileScreen extends StatelessWidget {
         source: source,
         context: context,
       );
-      await dataStore.updateUser(dataStore.currentUser.copyWith(bannerUrl: url));
+      await dataStore.updateUser(
+        dataStore.currentUser.copyWith(bannerUrl: url),
+      );
       if (context.mounted) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
@@ -239,41 +245,43 @@ class _ProfileHeader extends StatelessWidget {
                   borderRadius: BorderRadius.circular(19),
                   child: (bannerUrl ?? '').isNotEmpty
                       ? (bannerUrl!.startsWith('http://') ||
-                              bannerUrl!.startsWith('https://')
-                          ? Image.network(
-                              bannerUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => _BannerFallback(
-                                colors: colors,
-                              ),
-                            )
-                          : Image.file(
-                              File(bannerUrl!.replaceFirst('file://', '')),
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => _BannerFallback(
-                                colors: colors,
-                              ),
-                            ))
+                                bannerUrl!.startsWith('https://')
+                            ? Image.network(
+                                bannerUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    _BannerFallback(colors: colors),
+                              )
+                            : Image.file(
+                                File(bannerUrl!.replaceFirst('file://', '')),
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    _BannerFallback(colors: colors),
+                              ))
                       : _BannerFallback(colors: colors),
                 ),
               ),
               Positioned(
                 right: 28,
                 top: 24,
-                child: InkWell(
-                  onTap: onEditBanner,
-                  borderRadius: BorderRadius.circular(999),
-                  child: Container(
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: colors.surface.withValues(alpha: 0.85),
-                      border: Border.all(color: colors.borderSubtle),
-                    ),
-                    child: Icon(
-                      Icons.wallpaper_rounded,
-                      size: 17,
-                      color: colors.foreground,
+                child: Semantics(
+                  button: true,
+                  label: 'Change profile banner',
+                  child: InkWell(
+                    onTap: onEditBanner,
+                    borderRadius: BorderRadius.circular(999),
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: colors.surface.withValues(alpha: 0.85),
+                        border: Border.all(color: colors.borderSubtle),
+                      ),
+                      child: Icon(
+                        Icons.wallpaper_rounded,
+                        size: 17,
+                        color: colors.foreground,
+                      ),
                     ),
                   ),
                 ),
@@ -412,7 +420,6 @@ class _Chevron extends StatelessWidget {
   }
 }
 
-
 /// Token-driven placeholder shown when no banner has been uploaded yet.
 class _BannerFallback extends StatelessWidget {
   final AppColors colors;
@@ -426,7 +433,10 @@ class _BannerFallback extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [colors.primary.withValues(alpha: 0.18), colors.surfaceSecondary],
+          colors: [
+            colors.primary.withValues(alpha: 0.18),
+            colors.surfaceSecondary,
+          ],
         ),
       ),
       child: Center(

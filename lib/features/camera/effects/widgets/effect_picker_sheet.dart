@@ -138,7 +138,8 @@ class _EffectPickerSheetState extends State<EffectPickerSheet>
                   children: [
                     _buildGrid(EffectRegistry.allEffects, colors),
                     ..._categories.map(
-                      (c) => _buildGrid(EffectRegistry.getByCategory(c), colors),
+                      (c) =>
+                          _buildGrid(EffectRegistry.getByCategory(c), colors),
                     ),
                   ],
                 ),
@@ -197,7 +198,9 @@ class _EffectPickerSheetState extends State<EffectPickerSheet>
                     style: TextStyle(
                       color: isSelected ? colors.primary : colors.foreground,
                       fontSize: 11,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.w500,
                     ),
                   ),
                 ),

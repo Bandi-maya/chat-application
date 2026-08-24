@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:mime/mime.dart';
 import 'package:path_provider/path_provider.dart';
@@ -122,9 +123,7 @@ class ChatMediaService {
     final maxBytes = _maxBytes(type);
     if (size > maxBytes) {
       final limitMb = (maxBytes / (1024 * 1024)).round();
-      throw Exception(
-        'This $type exceeds the $limitMb MB storage limit.',
-      );
+      throw Exception('This $type exceeds the $limitMb MB storage limit.');
     }
 
     final authUser = _client.auth.currentUser;
@@ -182,6 +181,28 @@ class ChatMediaService {
   Future<void> deleteOwnAttachment(String objectPath) async {
     if (objectPath.trim().isEmpty) return;
     await _client.storage.from(bucket).remove(<String>[objectPath]);
+  }
+
+  /// Removes Chaty-generated staging files from the platform temporary
+  /// directory (compressed upload copies use the `chaty_` prefix). Best
+  /// effort: individual failures are logged, never fatal.
+  Future<void> purgeLocalTemporaryFiles() async {
+    try {
+      final temp = await getTemporaryDirectory();
+      if (!await temp.exists()) return;
+      await for (final entity in temp.list(followLinks: false)) {
+        if (entity is! File) continue;
+        final name = entity.uri.pathSegments.last;
+        if (!name.startsWith('chaty_')) continue;
+        try {
+          await entity.delete();
+        } catch (error) {
+          debugPrint('Chaty media purge skipped $name: $error');
+        }
+      }
+    } catch (error) {
+      debugPrint('Chaty media purge failed: $error');
+    }
   }
 
   static FileType _pickerType(String type) {

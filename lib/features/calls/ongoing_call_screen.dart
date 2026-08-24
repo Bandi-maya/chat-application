@@ -5,7 +5,10 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../../data/services/call_signaling_service.dart';
 import '../../domain/models/call_state.dart';
+import '../../features/camera/effects/effect_engine.dart';
+import '../../features/camera/effects/effect_registry.dart';
 import '../../injection/locator.dart';
+import '../../ui/core/design_system/chaty_haptics.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 
@@ -18,6 +21,11 @@ class OngoingCallScreen extends StatefulWidget {
 
   const OngoingCallScreen({super.key, required this.theme});
 
+  /// Number of call-screen instances currently presented. The root activity
+  /// layer listens to this so minimized-call controls only appear while the
+  /// full call surface is not on screen.
+  static final ValueNotifier<int> presentedInstances = ValueNotifier<int>(0);
+
   @override
   State<OngoingCallScreen> createState() => _OngoingCallScreenState();
 }
@@ -26,6 +34,12 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
   final CallSignalingService _callService = locator<CallSignalingService>();
   final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
   final RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
+
+  /// Personal viewing filter applied to the local preview and the remote
+  /// video surface on THIS device. Synchronizing one shared lens across
+  /// both peers requires frame-level signaling that is not available in the
+  /// current transport; until then this is a viewer-side effect only.
+  final EffectEngine _effectEngine = EffectEngine();
 
   bool _controlsVisible = true;
   bool _focusMode = false;
@@ -37,6 +51,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
   @override
   void initState() {
     super.initState();
+    OngoingCallScreen.presentedInstances.value++;
     _callService.addListener(_handleCallStateChanged);
     unawaited(_initializeMediaUi());
     _startAutoHideTimer();
@@ -139,7 +154,9 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
 
   @override
   void dispose() {
+    OngoingCallScreen.presentedInstances.value--;
     _callService.removeListener(_handleCallStateChanged);
+    _effectEngine.dispose();
     _autoHideTimer?.cancel();
     _localRenderer.srcObject = null;
     _remoteRenderer.srcObject = null;
@@ -164,7 +181,8 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
               child: ChatyEmptyState(
                 icon: Icons.call_end_rounded,
                 title: 'Call unavailable',
-                message: _setupError ?? 'This call session is no longer available.',
+                message:
+                    _setupError ?? 'This call session is no longer available.',
                 iconColor: colors.error,
                 titleColor: Colors.white,
                 messageColor: Colors.white70,
@@ -200,10 +218,14 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                         final size = MediaQuery.of(context).size;
                         setState(() {
                           _localPipOffset = Offset(
-                            (_localPipOffset.dx + details.delta.dx)
-                                .clamp(16.0, size.width - 136.0),
-                            (_localPipOffset.dy + details.delta.dy)
-                                .clamp(60.0, size.height - 220.0),
+                            (_localPipOffset.dx + details.delta.dx).clamp(
+                              16.0,
+                              size.width - 136.0,
+                            ),
+                            (_localPipOffset.dy + details.delta.dy).clamp(
+                              60.0,
+                              size.height - 220.0,
+                            ),
                           );
                         });
                       },
@@ -231,11 +253,13 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                             fit: StackFit.expand,
                             children: [
                               if (!session.isCameraOff)
-                                RTCVideoView(
-                                  _localRenderer,
-                                  mirror: session.isFrontCamera,
-                                  objectFit: RTCVideoViewObjectFit
-                                      .RTCVideoViewObjectFitCover,
+                                _effectEngine.renderEffect(
+                                  child: RTCVideoView(
+                                    _localRenderer,
+                                    mirror: session.isFrontCamera,
+                                    objectFit: RTCVideoViewObjectFit
+                                        .RTCVideoViewObjectFitCover,
+                                  ),
                                 )
                               else
                                 Center(
@@ -251,12 +275,15 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                                   button: true,
                                   label: 'Switch camera',
                                   child: GestureDetector(
-                                    onTap: () => unawaited(_callService.switchCamera()),
+                                    onTap: () =>
+                                        unawaited(_callService.switchCamera()),
                                     child: Container(
                                       width: 32,
                                       height: 32,
                                       decoration: BoxDecoration(
-                                        color: Colors.black.withValues(alpha: 0.62),
+                                        color: Colors.black.withValues(
+                                          alpha: 0.62,
+                                        ),
                                         shape: BoxShape.circle,
                                       ),
                                       alignment: Alignment.center,
@@ -276,7 +303,8 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                     ),
                   ),
 
-                if (_setupError != null || session.state == CallSessionState.failed)
+                if (_setupError != null ||
+                    session.state == CallSessionState.failed)
                   Positioned(
                     left: 20,
                     right: 20,
@@ -352,14 +380,30 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                             ],
                           ),
                         ),
+                        if (session.isVideo)
+                          ChatyIconButton(
+                            icon: Icons.auto_awesome_rounded,
+                            tooltip: 'Call filter',
+                            color: Colors.white,
+                            backgroundColor:
+                                _effectEngine.activeEffect.id != 'none'
+                                ? Colors.white.withValues(alpha: 0.28)
+                                : Colors.black.withValues(alpha: 0.35),
+                            onPressed: _renderersReady
+                                ? _showCallEffectSheet
+                                : null,
+                          ),
                         ChatyIconButton(
                           icon: _focusMode
                               ? Icons.fullscreen_exit_rounded
                               : Icons.fullscreen_rounded,
-                          tooltip: _focusMode ? 'Exit focus mode' : 'Focus mode',
+                          tooltip: _focusMode
+                              ? 'Exit focus mode'
+                              : 'Focus mode',
                           color: Colors.white,
                           backgroundColor: Colors.black.withValues(alpha: 0.35),
-                          onPressed: () => setState(() => _focusMode = !_focusMode),
+                          onPressed: () =>
+                              setState(() => _focusMode = !_focusMode),
                         ),
                       ],
                     ),
@@ -404,7 +448,9 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                         ),
                         if (session.isVideo)
                           _buildCallButton(
-                            label: session.isCameraOff ? 'Camera on' : 'Camera off',
+                            label: session.isCameraOff
+                                ? 'Camera on'
+                                : 'Camera off',
                             icon: session.isCameraOff
                                 ? Icons.videocam_off_rounded
                                 : Icons.videocam_rounded,
@@ -421,16 +467,17 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                           icon: session.audioRoute == AudioRouteType.speaker
                               ? Icons.volume_up_rounded
                               : Icons.hearing_rounded,
-                          isActive: session.audioRoute == AudioRouteType.speaker,
+                          isActive:
+                              session.audioRoute == AudioRouteType.speaker,
                           activeColor: colors.primary,
                           onTap: _callService.hasLocalMedia
                               ? () => unawaited(
-                                    _callService.setAudioRoute(
-                                      session.audioRoute == AudioRouteType.speaker
-                                          ? AudioRouteType.earpiece
-                                          : AudioRouteType.speaker,
-                                    ),
-                                  )
+                                  _callService.setAudioRoute(
+                                    session.audioRoute == AudioRouteType.speaker
+                                        ? AudioRouteType.earpiece
+                                        : AudioRouteType.speaker,
+                                  ),
+                                )
                               : null,
                         ),
                         Semantics(
@@ -439,7 +486,8 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                           child: GestureDetector(
                             onTap: () async {
                               await _callService.endCall();
-                              if (context.mounted) Navigator.of(context).maybePop();
+                              if (context.mounted)
+                                Navigator.of(context).maybePop();
                             },
                             child: Container(
                               width: 58,
@@ -478,10 +526,13 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             AppAvatar(
-              initials: session.remoteAvatarInitials ??
+              initials:
+                  session.remoteAvatarInitials ??
                   (session.remoteDisplayName.isEmpty
                       ? 'U'
-                      : session.remoteDisplayName.substring(0, 1).toUpperCase()),
+                      : session.remoteDisplayName
+                            .substring(0, 1)
+                            .toUpperCase()),
               colorHex: session.remoteAvatarColorHex,
               size: 108,
             ),
@@ -507,9 +558,121 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
         ),
       );
     }
-    return RTCVideoView(
-      _remoteRenderer,
-      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+    return _effectEngine.renderEffect(
+      child: RTCVideoView(
+        _remoteRenderer,
+        objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+      ),
+    );
+  }
+
+  /// Live filter picker for video calls. The selection applies to this
+  /// device's rendering of both video surfaces.
+  Future<void> _showCallEffectSheet() async {
+    ChatyHaptics.selection();
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.black87,
+      builder: (sheetContext) => SafeArea(
+        child: ListenableBuilder(
+          listenable: _effectEngine,
+          builder: (context, _) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
+                child: Row(
+                  children: [
+                    const Text(
+                      'Call filter',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      'Applies to your view',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: .55),
+                        fontSize: 11.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(
+                height: 116,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  itemCount: EffectRegistry.allEffects.length,
+                  itemBuilder: (context, index) {
+                    final effect = EffectRegistry.allEffects[index];
+                    final selected = _effectEngine.activeEffect.id == effect.id;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: Semantics(
+                        button: true,
+                        selected: selected,
+                        label: 'Filter ${effect.name}',
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(24),
+                          onTap: () => _effectEngine.selectEffect(effect),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircleAvatar(
+                                radius: 22,
+                                backgroundColor: effect.previewColor.withValues(
+                                  alpha: selected ? .95 : .45,
+                                ),
+                                child: Icon(
+                                  effect.icon,
+                                  size: 20,
+                                  color: selected ? Colors.black : Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                effect.name,
+                                style: TextStyle(
+                                  color: selected
+                                      ? Colors.white
+                                      : Colors.white60,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              if (_effectEngine.activeEffect.colorMatrix != null)
+                Semantics(
+                  label: 'Filter strength',
+                  child: SliderTheme(
+                    data: const SliderThemeData(
+                      activeTrackColor: Colors.white70,
+                      inactiveTrackColor: Colors.white24,
+                      thumbColor: Colors.white,
+                      trackHeight: 2,
+                    ),
+                    child: Slider(
+                      value: _effectEngine.intensity,
+                      onChanged: _effectEngine.setIntensity,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -521,7 +684,8 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             AppAvatar(
-              initials: session.remoteAvatarInitials ??
+              initials:
+                  session.remoteAvatarInitials ??
                   (session.remoteDisplayName.isNotEmpty
                       ? session.remoteDisplayName.substring(0, 1).toUpperCase()
                       : 'U'),

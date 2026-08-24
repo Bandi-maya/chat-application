@@ -6,7 +6,8 @@ import '../../../data/services/local_lock_service.dart';
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/settings_primitives.dart';
-import '../../../ui/core/design_system/design_system.dart';
+import '../../../ui/core/design_system/design_system.dart'
+    hide ChatySettingsSection;
 
 /// System Permissions & Hardware screen.
 ///

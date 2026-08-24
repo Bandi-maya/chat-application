@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../camera/effects/effect_registry.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:latlong2/latlong.dart';
@@ -77,8 +79,7 @@ class MessageBubble extends StatelessWidget {
       state: message.deliveryState,
       // On outgoing colored surfaces the ticks are light; on incoming light
       // surfaces they must use the secondary text color to stay visible.
-      unreadColor:
-          onLightSurface ? theme.secondaryTextColor : Colors.white70,
+      unreadColor: onLightSurface ? theme.secondaryTextColor : Colors.white70,
       readColor: _tickReadColor(),
       size: 15,
     );
@@ -154,13 +155,15 @@ class MessageBubble extends StatelessWidget {
 
     // Emoji-only messages render without the standard bubble fill so the
     // glyphs stay visually free; classification is memoized per text.
-    final isTextOnly = message.attachment == null &&
+    final isTextOnly =
+        message.attachment == null &&
         !message.isDeletedForEveryone &&
         (message.replyToMessageId == null) &&
         message.type == MessageType.text &&
         message.text.isNotEmpty;
-    final emojiInfo =
-        isTextOnly ? classifyEmojiOnly(message.text) : const EmojiOnlyInfo(false, 0);
+    final emojiInfo = isTextOnly
+        ? classifyEmojiOnly(message.text)
+        : const EmojiOnlyInfo(false, 0);
 
     final bubbleBg = isMe
         ? theme.outgoingBubbleColor
@@ -227,384 +230,409 @@ class MessageBubble extends StatelessWidget {
 
     return RepaintBoundary(
       child: Padding(
-      padding: EdgeInsets.symmetric(
-        vertical: 3 * theme.density,
-        horizontal: 12,
-      ),
-      child: Row(
-        mainAxisAlignment: isMe
-            ? MainAxisAlignment.end
-            : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          if (!isMe && senderName != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 8, bottom: 2),
-              child: AppAvatar(
-                initials: senderName!
-                    .split(' ')
-                    .map((e) => e.isEmpty ? '' : e[0])
-                    .take(2)
-                    .join(),
-                colorHex: null,
-                size: 28,
+        padding: EdgeInsets.symmetric(
+          vertical: 3 * theme.density,
+          horizontal: 12,
+        ),
+        child: Row(
+          mainAxisAlignment: isMe
+              ? MainAxisAlignment.end
+              : MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (!isMe && senderName != null)
+              Padding(
+                padding: const EdgeInsets.only(right: 8, bottom: 2),
+                child: AppAvatar(
+                  initials: senderName!
+                      .split(' ')
+                      .map((e) => e.isEmpty ? '' : e[0])
+                      .take(2)
+                      .join(),
+                  colorHex: null,
+                  size: 28,
+                ),
               ),
-            ),
-          Flexible(
-            child: GestureDetector(
-              onLongPress: onLongPress,
-              onDoubleTap: onDoubleTap,
-              child: Column(
-                crossAxisAlignment: isMe
-                    ? CrossAxisAlignment.end
-                    : CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    constraints: BoxConstraints(
-                      maxWidth:
-                          MediaQuery.sizeOf(context).width *
-                          theme.bubbleMaxWidthFactor,
-                    ),
-                    margin: BubbleStyleRegistry.getGeometry(theme.bubbleStyle).bubbleMargin,
-                    child: CustomPaint(
-                      painter: BubblePainter(
-                        styleId: theme.bubbleStyle,
-                        isMe: isMe,
-                        fillColor: bubbleBg,
-                        strokeColor: theme.accentColor.withValues(alpha: 0.4),
-                        accentColor: theme.accentColor,
+            Flexible(
+              child: GestureDetector(
+                onLongPress: onLongPress,
+                onDoubleTap: onDoubleTap,
+                child: Column(
+                  crossAxisAlignment: isMe
+                      ? CrossAxisAlignment.end
+                      : CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      constraints: BoxConstraints(
+                        maxWidth:
+                            MediaQuery.sizeOf(context).width *
+                            theme.bubbleMaxWidthFactor,
                       ),
-                      child: Padding(
-                        padding: BubbleStyleRegistry.getGeometry(theme.bubbleStyle).contentPadding,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (!isMe && senderName != null) ...[
-                              Text(
-                                senderName!,
-                                style: TextStyle(
-                                  color: theme.accentColor,
-                                  fontSize: 11.5 * theme.fontScale,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                            ],
-                        if (message.isDeletedForEveryone && showDeletedContent)
-                          Container(
-                            margin: const EdgeInsets.only(bottom: 7),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.cancel_outlined,
-                                  size: 14,
-                                  color: textColor.withValues(alpha: 0.8),
-                                ),
-                                const SizedBox(width: 5),
+                      margin: BubbleStyleRegistry.getGeometry(
+                        theme.bubbleStyle,
+                      ).bubbleMargin,
+                      child: CustomPaint(
+                        painter: BubblePainter(
+                          styleId: theme.bubbleStyle,
+                          isMe: isMe,
+                          fillColor: bubbleBg,
+                          strokeColor: theme.accentColor.withValues(alpha: 0.4),
+                          accentColor: theme.accentColor,
+                        ),
+                        child: Padding(
+                          padding: BubbleStyleRegistry.getGeometry(
+                            theme.bubbleStyle,
+                          ).contentPadding,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (!isMe && senderName != null) ...[
                                 Text(
-                                  'Deleted message',
+                                  senderName!,
                                   style: TextStyle(
-                                    color: textColor.withValues(alpha: 0.8),
-                                    fontSize: 10.5,
+                                    color: theme.accentColor,
+                                    fontSize: 11.5 * theme.fontScale,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
+                                const SizedBox(height: 3),
                               ],
-                            ),
-                          ),
-                        if (message.replyToMessageId != null)
-                          Container(
-                            margin: const EdgeInsets.only(bottom: 6),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.13),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border(
-                                left: BorderSide(
-                                  color: isMe
-                                      ? Colors.white70
-                                      : theme.accentColor,
-                                  width: 3,
-                                ),
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  message.replyToSenderName ?? 'Reply',
-                                  style: TextStyle(
-                                    color: isMe
-                                        ? Colors.white
-                                        : theme.accentColor,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
+                              if (message.isDeletedForEveryone &&
+                                  showDeletedContent)
+                                Container(
+                                  margin: const EdgeInsets.only(bottom: 7),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
                                   ),
-                                ),
-                                AnimatedEmojiText(
-                                  text: message.replyToPreviewText ?? '',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: textColor.withValues(alpha: 0.8),
-                                    fontSize: 11,
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
-                                  enableExpressiveSizing: false,
-                                ),
-                              ],
-                            ),
-                          ),
-                        if (message.type == MessageType.taskCard)
-                          InkWell(
-                            onTap: onTaskTap,
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(vertical: 4),
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.16),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: theme.accentColor.withValues(
-                                    alpha: 0.35,
-                                  ),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.task_alt_rounded,
-                                    color: theme.accentColor,
-                                    size: 22,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          message.text,
-                                          style: TextStyle(
-                                            color: textColor,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13 * theme.fontScale,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.cancel_outlined,
+                                        size: 14,
+                                        color: textColor.withValues(alpha: 0.8),
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        'Deleted message',
+                                        style: TextStyle(
+                                          color: textColor.withValues(
+                                            alpha: 0.8,
                                           ),
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w700,
                                         ),
-                                        Text(
-                                          'Task • tap to open',
-                                          style: TextStyle(
-                                            color: textColor.withValues(
-                                              alpha: 0.7,
-                                            ),
-                                            fontSize: 10.5,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              if (message.replyToMessageId != null)
+                                Container(
+                                  margin: const EdgeInsets.only(bottom: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.13),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border(
+                                      left: BorderSide(
+                                        color: isMe
+                                            ? Colors.white70
+                                            : theme.accentColor,
+                                        width: 3,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        message.replyToSenderName ?? 'Reply',
+                                        style: TextStyle(
+                                          color: isMe
+                                              ? Colors.white
+                                              : theme.accentColor,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      AnimatedEmojiText(
+                                        text: message.replyToPreviewText ?? '',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: textColor.withValues(
+                                            alpha: 0.8,
+                                          ),
+                                          fontSize: 11,
+                                        ),
+                                        enableExpressiveSizing: false,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              if (message.type == MessageType.taskCard)
+                                InkWell(
+                                  onTap: onTaskTap,
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Container(
+                                    margin: const EdgeInsets.symmetric(
+                                      vertical: 4,
+                                    ),
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.16,
+                                      ),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: theme.accentColor.withValues(
+                                          alpha: 0.35,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.task_alt_rounded,
+                                          color: theme.accentColor,
+                                          size: 22,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                message.text,
+                                                style: TextStyle(
+                                                  color: textColor,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize:
+                                                      13 * theme.fontScale,
+                                                ),
+                                              ),
+                                              Text(
+                                                'Task • tap to open',
+                                                style: TextStyle(
+                                                  color: textColor.withValues(
+                                                    alpha: 0.7,
+                                                  ),
+                                                  fontSize: 10.5,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
+                                ),
+                              // Real consumer of the Forwarded-tag setting: the
+                              // flag is baked into message metadata at send time
+                              // (yoDisableFwd suppresses it there).
+                              if (message.metadata['forwarded'] == true)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.shortcut_rounded,
+                                        size: 11,
+                                        color: textColor.withValues(alpha: 0.6),
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        'Forwarded',
+                                        style: TextStyle(
+                                          color: textColor.withValues(
+                                            alpha: 0.6,
+                                          ),
+                                          fontSize: 10,
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              // Real consumer of Anti View-Once: recipients see a
+                              // locked card until they open it once; afterwards the
+                              // media is retained (pref on) or expired (pref off).
+                              if (message.metadata['view_once'] == true &&
+                                  !isMe &&
+                                  !viewOnceOpened &&
+                                  (message.attachment?.type == 'image' ||
+                                      message.attachment?.type == 'video'))
+                                _ViewOnceLockedCard(
+                                  isVideo: message.attachment?.type == 'video',
+                                  textColor: textColor,
+                                  accentColor: theme.accentColor,
+                                  surfaceColor: theme.surfaceColor,
+                                  onTap: onViewOnceOpen,
+                                )
+                              else if (message.metadata['view_once'] == true &&
+                                  !isMe &&
+                                  viewOnceOpened &&
+                                  !retainViewOnce &&
+                                  (message.attachment?.type == 'image' ||
+                                      message.attachment?.type == 'video'))
+                                _ViewOnceExpiredCard(textColor: textColor)
+                              else ...[
+                                if (message.attachment?.type == 'image')
+                                  _SignedImagePreview(
+                                    storagePath: message.attachment!.url,
+                                    semanticLabel: message.attachment!.name,
+                                    effectMetadata: message.metadata,
+                                    onTap: onMediaTap,
+                                  ),
+                                if (message.attachment?.type == 'video')
+                                  _SignedVideoPreview(
+                                    attachment: message.attachment!,
+                                    onOpen: onMediaTap,
+                                  ),
+                              ],
+                              if (message.attachment?.type == 'audio')
+                                _VoiceNotePlayer(
+                                  attachment: message.attachment!,
+                                  textColor: textColor,
+                                  accentColor: theme.accentColor,
+                                  playbackSpeed: voicePlaybackSpeed,
+                                ),
+                              if (message.attachment?.type == 'document')
+                                _DocumentPreview(
+                                  attachment: message.attachment!,
+                                  textColor: textColor,
+                                  accentColor: theme.accentColor,
+                                  onTap: onMediaTap,
+                                ),
+                              if (message.type == MessageType.location)
+                                _LocationMapCard(
+                                  message: message,
+                                  textColor: textColor,
+                                  accentColor: theme.accentColor,
+                                ),
+                              if (message.type == MessageType.contact)
+                                _ContactCard(
+                                  message: message,
+                                  textColor: textColor,
+                                  accentColor: theme.accentColor,
+                                ),
+                              if (message.type != MessageType.taskCard &&
+                                  message.type != MessageType.location &&
+                                  message.type != MessageType.contact &&
+                                  message.text.isNotEmpty)
+                                enableAnimatedEmojis
+                                    ? AnimatedEmojiText(
+                                        text: message.text,
+                                        style: TextStyle(
+                                          color: textColor,
+                                          fontSize: 14 * theme.fontScale,
+                                          height: 1.35,
+                                        ),
+                                      )
+                                    : Text(
+                                        message.text,
+                                        style: TextStyle(
+                                          color: textColor,
+                                          fontSize: 14 * theme.fontScale,
+                                          height: 1.35,
+                                        ),
+                                      ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  if (message.editedAt != null &&
+                                      showEditedLabel) ...[
+                                    Text(
+                                      'edited',
+                                      style: TextStyle(
+                                        color: textColor.withValues(
+                                          alpha: 0.58,
+                                        ),
+                                        fontSize: 9.5,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                  ],
+                                  if (message.isPinned) ...[
+                                    Icon(
+                                      Icons.push_pin_rounded,
+                                      size: 11,
+                                      color: textColor.withValues(alpha: 0.7),
+                                    ),
+                                    const SizedBox(width: 3),
+                                  ],
+                                  if (message.isStarred) ...[
+                                    const Icon(
+                                      Icons.star_rounded,
+                                      size: 11,
+                                      color: Colors.amber,
+                                    ),
+                                    const SizedBox(width: 3),
+                                  ],
+                                  Text(
+                                    _formatTime(message.createdAt),
+                                    style: TextStyle(
+                                      color: textColor.withValues(alpha: 0.65),
+                                      fontSize: 10.5 * theme.fontScale,
+                                    ),
+                                  ),
+                                  if (isMe) ...[
+                                    const SizedBox(width: 4),
+                                    _deliveryIcon(onLightSurface: false),
+                                  ],
                                 ],
                               ),
-                            ),
-                          ),
-                        // Real consumer of the Forwarded-tag setting: the
-                        // flag is baked into message metadata at send time
-                        // (yoDisableFwd suppresses it there).
-                        if (message.metadata['forwarded'] == true)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 4),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.shortcut_rounded,
-                                  size: 11,
-                                  color: textColor.withValues(alpha: 0.6),
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  'Forwarded',
-                                  style: TextStyle(
-                                    color: textColor.withValues(alpha: 0.6),
-                                    fontSize: 10,
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        // Real consumer of Anti View-Once: recipients see a
-                        // locked card until they open it once; afterwards the
-                        // media is retained (pref on) or expired (pref off).
-                        if (message.metadata['view_once'] == true &&
-                            !isMe &&
-                            !viewOnceOpened &&
-                            (message.attachment?.type == 'image' ||
-                                message.attachment?.type == 'video'))
-                          _ViewOnceLockedCard(
-                            isVideo: message.attachment?.type == 'video',
-                            textColor: textColor,
-                            accentColor: theme.accentColor,
-                            surfaceColor: theme.surfaceColor,
-                            onTap: onViewOnceOpen,
-                          )
-                        else if (message.metadata['view_once'] == true &&
-                            !isMe &&
-                            viewOnceOpened &&
-                            !retainViewOnce &&
-                            (message.attachment?.type == 'image' ||
-                                message.attachment?.type == 'video'))
-                          _ViewOnceExpiredCard(textColor: textColor)
-                        else ...[
-                          if (message.attachment?.type == 'image')
-                            _SignedImagePreview(
-                              storagePath: message.attachment!.url,
-                              semanticLabel: message.attachment!.name,
-                              onTap: onMediaTap,
-                            ),
-                          if (message.attachment?.type == 'video')
-                            _SignedVideoPreview(
-                              attachment: message.attachment!,
-                              onOpen: onMediaTap,
-                            ),
-                        ],
-                        if (message.attachment?.type == 'audio')
-                          _VoiceNotePlayer(
-                            attachment: message.attachment!,
-                            textColor: textColor,
-                            accentColor: theme.accentColor,
-                            playbackSpeed: voicePlaybackSpeed,
-                          ),
-                        if (message.attachment?.type == 'document')
-                          _DocumentPreview(
-                            attachment: message.attachment!,
-                            textColor: textColor,
-                            accentColor: theme.accentColor,
-                            onTap: onMediaTap,
-                          ),
-                        if (message.type == MessageType.location)
-                          _LocationMapCard(
-                            message: message,
-                            textColor: textColor,
-                            accentColor: theme.accentColor,
-                          ),
-                        if (message.type == MessageType.contact)
-                          _ContactCard(
-                            message: message,
-                            textColor: textColor,
-                            accentColor: theme.accentColor,
-                          ),
-                        if (message.type != MessageType.taskCard &&
-                            message.type != MessageType.location &&
-                            message.type != MessageType.contact &&
-                            message.text.isNotEmpty)
-                          enableAnimatedEmojis
-                              ? AnimatedEmojiText(
-                                  text: message.text,
-                                  style: TextStyle(
-                                    color: textColor,
-                                    fontSize: 14 * theme.fontScale,
-                                    height: 1.35,
-                                  ),
-                                )
-                              : Text(
-                                  message.text,
-                                  style: TextStyle(
-                                    color: textColor,
-                                    fontSize: 14 * theme.fontScale,
-                                    height: 1.35,
-                                  ),
-                                ),
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            if (message.editedAt != null && showEditedLabel) ...[
-                              Text(
-                                'edited',
-                                style: TextStyle(
-                                  color: textColor.withValues(alpha: 0.58),
-                                  fontSize: 9.5,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
                             ],
-                            if (message.isPinned) ...[
-                              Icon(
-                                Icons.push_pin_rounded,
-                                size: 11,
-                                color: textColor.withValues(alpha: 0.7),
-                              ),
-                              const SizedBox(width: 3),
-                            ],
-                            if (message.isStarred) ...[
-                              const Icon(
-                                Icons.star_rounded,
-                                size: 11,
-                                color: Colors.amber,
-                              ),
-                              const SizedBox(width: 3),
-                            ],
-                            Text(
-                              _formatTime(message.createdAt),
-                              style: TextStyle(
-                                color: textColor.withValues(alpha: 0.65),
-                                fontSize: 10.5 * theme.fontScale,
-                              ),
-                            ),
-                            if (isMe) ...[
-                              const SizedBox(width: 4),
-                              _deliveryIcon(onLightSurface: false),
-                            ],
-                          ],
+                          ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              if (message.reactions.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2, left: 4, right: 4),
-                      child: Wrap(
-                        spacing: 4,
-                        runSpacing: 4,
-                        children: message.reactions
-                            .map((reaction) {
-                              return AnimatedEmojiReaction(
-                                emoji: reaction.emoji,
-                                count: reaction.userIds.length,
-                                isSelected: isMe,
-                                backgroundColor: theme.cardColor,
-                                activeBorderColor: theme.accentColor,
-                                textColor: theme.primaryTextColor,
-                                onTap: () =>
-                                    onReactionTap?.call(reaction.emoji),
-                              );
-                            })
-                            .toList(growable: false),
                       ),
                     ),
-                ],
+                    if (message.reactions.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          top: 2,
+                          left: 4,
+                          right: 4,
+                        ),
+                        child: Wrap(
+                          spacing: 4,
+                          runSpacing: 4,
+                          children: message.reactions
+                              .map((reaction) {
+                                return AnimatedEmojiReaction(
+                                  emoji: reaction.emoji,
+                                  count: reaction.userIds.length,
+                                  isSelected: isMe,
+                                  backgroundColor: theme.cardColor,
+                                  activeBorderColor: theme.accentColor,
+                                  textColor: theme.primaryTextColor,
+                                  onTap: () =>
+                                      onReactionTap?.call(reaction.emoji),
+                                );
+                              })
+                              .toList(growable: false),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
     );
   }
 }
@@ -612,10 +640,12 @@ class MessageBubble extends StatelessWidget {
 class _SignedImagePreview extends StatefulWidget {
   final String? storagePath;
   final String semanticLabel;
+  final Map<String, dynamic> effectMetadata;
   final VoidCallback? onTap;
   const _SignedImagePreview({
     required this.storagePath,
     required this.semanticLabel,
+    this.effectMetadata = const <String, dynamic>{},
     this.onTap,
   });
 
@@ -671,16 +701,21 @@ class _SignedImagePreviewState extends State<_SignedImagePreview> {
                             child: Icon(Icons.broken_image_outlined),
                           ),
                         );
-                      return Image.network(
-                        url,
-                        fit: BoxFit.cover,
-                        gaplessPlayback: true,
-                        errorBuilder: (_, __, ___) => const ColoredBox(
-                          color: Colors.black26,
-                          child: Center(
-                            child: Icon(Icons.broken_image_outlined),
+                      // Sender-chosen camera look travels via metadata so
+                      // receivers render the same image treatment.
+                      return EffectRegistry.applyStored(
+                        Image.network(
+                          url,
+                          fit: BoxFit.cover,
+                          gaplessPlayback: true,
+                          errorBuilder: (_, __, ___) => const ColoredBox(
+                            color: Colors.black26,
+                            child: Center(
+                              child: Icon(Icons.broken_image_outlined),
+                            ),
                           ),
                         ),
+                        widget.effectMetadata,
                       );
                     },
                   ),

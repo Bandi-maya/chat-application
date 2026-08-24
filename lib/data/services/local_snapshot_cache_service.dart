@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
@@ -112,7 +111,8 @@ class LocalSnapshotCacheService {
       final directory = await getApplicationSupportDirectory();
       await for (final entity in directory.list(followLinks: false)) {
         if (entity is! File) continue;
-        if (!entity.uri.pathSegments.last.startsWith('chaty_snapshot_')) continue;
+        if (!entity.uri.pathSegments.last.startsWith('chaty_snapshot_'))
+          continue;
         try {
           await entity.delete();
         } catch (_) {}

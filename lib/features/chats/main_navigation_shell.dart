@@ -6,6 +6,7 @@ import '../../data/services/notification_service.dart';
 import '../../domain/models/conversation.dart';
 import '../../ui/core/controllers/appearance_variant_controller.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
+import '../../ui/core/design_system/chaty_haptics.dart';
 import '../../ui/core/gb/gb_theme_overrides.dart';
 import '../calls/calls_screen.dart';
 import '../settings/settings_root_screen.dart';
@@ -216,7 +217,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             .map((item) => item.builder(context))
             .toList(growable: false);
 
-        final effectiveIndex = _currentIndex.clamp(0, allDestinations.length - 1);
+        final effectiveIndex = _currentIndex.clamp(
+          0,
+          allDestinations.length - 1,
+        );
         if (effectiveIndex != _currentIndex) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) setState(() => _currentIndex = 0);
@@ -336,6 +340,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 navItems: navItems,
                 selectedIndex: bottomNavSelectedIndex,
                 onDestinationTap: (idx) {
+                  ChatyHaptics.selection();
                   if (hasOverflow && idx == 3) {
                     _showMoreMenu(
                       context,
@@ -1035,11 +1040,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   itemBuilder: (context, i) {
                     final item = overflowDestinations[i];
                     return ListTile(
-                      leading: Icon(
-                        item.icon,
-                        color: colors.primary,
-                        size: 22,
-                      ),
+                      leading: Icon(item.icon, color: colors.primary, size: 22),
                       title: Text(
                         item.label,
                         style: TextStyle(

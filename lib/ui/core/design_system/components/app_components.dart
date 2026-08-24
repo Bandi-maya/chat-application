@@ -836,3 +836,117 @@ class ChatyInput extends StatelessWidget {
     );
   }
 }
+
+/// ---------------------------------------------------------------------------
+/// CHATY SKELETON (Reduced-motion-aware loading placeholder)
+/// ---------------------------------------------------------------------------
+/// Structural placeholder shown while content loads, so screens read as
+/// "instant" instead of "stuck". Pulses gently; renders as static tinted
+/// blocks when the OS reports reduced animations.
+class ChatySkeleton extends StatefulWidget {
+  final double width;
+  final double height;
+  final BorderRadius borderRadius;
+
+  const ChatySkeleton({
+    super.key,
+    this.width = double.infinity,
+    required this.height,
+    this.borderRadius = const BorderRadius.all(Radius.circular(8)),
+  });
+
+  @override
+  State<ChatySkeleton> createState() => _ChatySkeletonState();
+}
+
+class _ChatySkeletonState extends State<ChatySkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final base = colors.surfaceElevated;
+    final highlight = colors.borderSubtle;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+
+    Widget block() => Container(
+      width: widget.width,
+      height: widget.height,
+      decoration: BoxDecoration(
+        color: base,
+        borderRadius: widget.borderRadius,
+        border: Border.all(color: highlight, width: 0.5),
+      ),
+    );
+
+    if (reduceMotion) return block();
+
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, _) {
+        final t = Curves.easeInOut.transform(_pulse.value);
+        return Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            color: Color.lerp(base, highlight, t * .6),
+            borderRadius: widget.borderRadius,
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Ready-made skeleton row matching conversation/list-tile geometry.
+class ChatySkeletonTile extends StatelessWidget {
+  final bool showTrailing;
+
+  const ChatySkeletonTile({super.key, this.showTrailing = true});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          const ChatySkeleton(width: 48, height: 48),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ChatySkeleton(
+                  width: MediaQuery.sizeOf(context).width * .42,
+                  height: 13,
+                ),
+                const SizedBox(height: 8),
+                const ChatySkeleton(width: 180, height: 11),
+              ],
+            ),
+          ),
+          if (showTrailing) ...[
+            const SizedBox(width: 10),
+            const ChatySkeleton(width: 34, height: 10),
+          ],
+        ],
+      ),
+    );
+  }
+}

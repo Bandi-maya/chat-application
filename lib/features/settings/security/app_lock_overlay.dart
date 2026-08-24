@@ -106,7 +106,8 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
       _hasConfiguredCredential = hasCredential;
       _cooldownSeconds = cooldown;
       if (cooldown > 0) {
-        _errorMessage = 'Too many failed attempts. Try again in $cooldown seconds.';
+        _errorMessage =
+            'Too many failed attempts. Try again in $cooldown seconds.';
       }
     });
   }
@@ -153,7 +154,8 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
     if (cooldown > 0) {
       setState(() {
         _cooldownSeconds = cooldown;
-        _errorMessage = 'Too many failed attempts. Try again in $cooldown seconds.';
+        _errorMessage =
+            'Too many failed attempts. Try again in $cooldown seconds.';
         _enteredPin = '';
         _passwordController.clear();
       });
@@ -179,7 +181,8 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
       _passwordController.clear();
       _cooldownSeconds = newCooldown;
       if (newCooldown > 0) {
-        _errorMessage = 'Too many failed attempts. Try again in $newCooldown seconds.';
+        _errorMessage =
+            'Too many failed attempts. Try again in $newCooldown seconds.';
       } else {
         _errorMessage = 'Incorrect ${method.toLowerCase()}. Try again.';
       }
@@ -187,7 +190,8 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
   }
 
   Future<void> _verifyPinDigit(String digit) async {
-    if (_busy || _enteredPin.length >= _pinLength || _cooldownSeconds > 0) return;
+    if (_busy || _enteredPin.length >= _pinLength || _cooldownSeconds > 0)
+      return;
     final next = '$_enteredPin$digit';
     setState(() {
       _enteredPin = next;
@@ -250,12 +254,16 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                       : () => _verifyPinDigit(digit),
                 );
               }),
-              IconButton(
-                tooltip: 'Use biometric',
-                onPressed: _busy || !_biometricAvailable
+              // Overlay-safe action keys: this modal renders above the
+              // Navigator (no Overlay ancestor), where Tooltip-backed
+              // IconButtons crash with "No Overlay widget found". Semantics
+              // carries accessibility instead.
+              _PinActionKey(
+                semanticsLabel: 'Use biometric',
+                icon: Icons.fingerprint_rounded,
+                onTap: (_busy || !_biometricAvailable)
                     ? null
                     : () => _runNativeAuthentication('Biometric'),
-                icon: const Icon(Icons.fingerprint_rounded, size: 30),
               ),
               _NumberKey(
                 label: '0',
@@ -263,9 +271,10 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                     ? null
                     : () => _verifyPinDigit('0'),
               ),
-              IconButton(
-                tooltip: 'Delete digit',
-                onPressed: _busy || _enteredPin.isEmpty
+              _PinActionKey(
+                semanticsLabel: 'Delete digit',
+                icon: Icons.backspace_outlined,
+                onTap: (_busy || _enteredPin.isEmpty)
                     ? null
                     : () => setState(
                         () => _enteredPin = _enteredPin.substring(
@@ -273,7 +282,6 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                           _enteredPin.length - 1,
                         ),
                       ),
-                icon: const Icon(Icons.backspace_outlined),
               ),
             ],
           ),
@@ -481,6 +489,45 @@ class _NumberKey extends StatelessWidget {
             style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w700,
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Pin-pad action key that never depends on a Tooltip/Overlay. This modal is
+/// hosted above the Navigator by MaterialApp.builder, so Overlay-dependent
+/// widgets must not appear here. Accessibility comes from Semantics; the
+/// grid geometry keeps the key comfortably above the 48dp minimum target.
+class _PinActionKey extends StatelessWidget {
+  final String semanticsLabel;
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  const _PinActionKey({
+    required this.semanticsLabel,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Semantics(
+      button: true,
+      enabled: onTap != null,
+      label: semanticsLabel,
+      child: Material(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.55,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(22),
+          child: Center(
+            child: Icon(icon, size: 26, color: theme.colorScheme.onSurface),
           ),
         ),
       ),
