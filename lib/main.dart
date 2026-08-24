@@ -61,11 +61,13 @@ Future<void> main() async {
   // Only work that shapes the very first frame blocks launch. The shell must
   // paint from local state immediately; platform services catch up right
   // after the first frame instead of gating it.
-  await locator<ThemeController>().init();
-  await locator<TemplateController>().init(
-    appearanceController: locator<AppearanceVariantController>(),
-    preferencesController: locator<ChatyPreferencesController>(),
-  );
+  await Future.wait<void>(<Future<void>>[
+    locator<ThemeController>().init(),
+    locator<TemplateController>().init(
+      appearanceController: locator<AppearanceVariantController>(),
+      preferencesController: locator<ChatyPreferencesController>(),
+    ),
+  ]);
   runApp(const ChatyApp());
   WidgetsBinding.instance.addPostFrameCallback((_) {
     unawaited(_initializeDeferredPlatformServices());

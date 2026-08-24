@@ -6,6 +6,7 @@ export 'components/call_activity_capsule.dart';
 export 'components/global_activity_host.dart';
 export 'components/messaging_components.dart';
 export 'components/media_draft_tray.dart';
+export 'components/composer_components.dart';
 export 'components/social_components.dart';
 export 'components/settings_components.dart';
 export 'components/single_choice_modal.dart';

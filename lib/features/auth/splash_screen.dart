@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 
@@ -59,12 +59,6 @@ class _SplashScreenState extends State<SplashScreen>
       if (!backend.isInitialized) await backend.initialize();
     } catch (_) {
       // Authentication remains the source of truth.
-    }
-
-    final elapsed = DateTime.now().difference(start).inMilliseconds;
-    final remaining = 120 - elapsed;
-    if (remaining > 0) {
-      await Future<void>.delayed(Duration(milliseconds: remaining));
     }
 
     if (!mounted) return;

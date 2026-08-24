@@ -72,8 +72,6 @@ void setupLocator() {
       callService: locator<CallSignalingService>(),
     ),
   );
-  // Eagerly instantiate to begin tracking presentations immediately
-  locator<CallPresentationController>();
   locator.registerLazySingleton<EffectEngine>(
     () => EffectEngine(),
   );

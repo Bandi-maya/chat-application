@@ -26,6 +26,8 @@ class CallSignalingService extends ChangeNotifier {
   Timer? _ringTimeoutTimer;
   Timer? _durationTimer;
   int _callDurationSeconds = 0;
+  Future<void>? _endCallFuture;
+  String? _endingCallId;
 
   RTCPeerConnection? _peerConnection;
   MediaStream? _localStream;
@@ -43,9 +45,7 @@ class CallSignalingService extends ChangeNotifier {
     SupabaseClient? client,
     required this.dataStore,
     required this.backend,
-  }) : _client = client ?? Supabase.instance.client {
-    unawaited(initialize());
-  }
+  }) : _client = client ?? Supabase.instance.client;
 
   ChatyCallSession? get currentSession => _currentSession;
   int get callDurationSeconds => _callDurationSeconds;
@@ -249,10 +249,27 @@ class CallSignalingService extends ChangeNotifier {
     }
   }
 
-  Future<void> endCall({String reason = 'ended'}) async {
+  Future<void> endCall({String reason = 'ended'}) {
     final session = _currentSession;
-    if (session == null) return;
+    if (session == null || session.state.isTerminal) {
+      return Future<void>.value();
+    }
+    if (_endingCallId == session.callId && _endCallFuture != null) {
+      return _endCallFuture!;
+    }
 
+    final operation = _endCallSession(session);
+    _endingCallId = session.callId;
+    _endCallFuture = operation;
+    return operation.whenComplete(() {
+      if (identical(_endCallFuture, operation)) {
+        _endCallFuture = null;
+        _endingCallId = null;
+      }
+    });
+  }
+
+  Future<void> _endCallSession(ChatyCallSession session) async {
     _ringTimeoutTimer?.cancel();
     _stopDurationTimer();
     final duration = _callDurationSeconds;

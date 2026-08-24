@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -7,6 +9,7 @@ import '../camera/camera_capture_screen.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/design_system/design_system.dart';
+import 'status_view_session.dart';
 
 class UpdatesScreen extends StatefulWidget {
   final ThemeConfig theme;
@@ -26,6 +29,7 @@ class UpdatesScreen extends StatefulWidget {
 
 class _UpdatesScreenState extends State<UpdatesScreen> {
   final StatusService _statusService = StatusService();
+  final StatusViewSession _viewSession = StatusViewSession();
 
   /// WhatsApp-style camera capture for stories. The chosen look is baked
   /// into the published image because statuses carry no metadata channel.
@@ -248,6 +252,11 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
     }
     if (!mounted) return;
 
+    final viewerId = widget.dataStore.currentUser.id;
+    if (_viewSession.tryBegin(status, viewerId)) {
+      unawaited(_recordStatusView(status, viewerId));
+    }
+
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
@@ -355,6 +364,16 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
         );
       },
     );
+  }
+
+  Future<void> _recordStatusView(StatusRecord status, String viewerId) async {
+    try {
+      final published = await _statusService.markViewed(status);
+      if (!published) _viewSession.rollback(status, viewerId);
+    } catch (error, stackTrace) {
+      _viewSession.rollback(status, viewerId);
+      debugPrint('Chaty status view publication failed: $error\n$stackTrace');
+    }
   }
 
   Widget _buildViewsControl(BuildContext dialogContext, StatusRecord status) {

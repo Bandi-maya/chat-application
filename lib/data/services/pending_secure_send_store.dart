@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'local_snapshot_cache_service.dart';
 
 /// A user-authored message that cannot be MLS-encrypted yet because one or
@@ -79,11 +81,12 @@ class PendingSecureSendStore {
   static const String _scope = 'pending_secure_sends';
   static const int maxPending = 128;
   final LocalSnapshotCacheService _cache;
+  Future<void> _mutationBarrier = Future<void>.value();
 
   Future<List<PendingSecureSend>> read(String userId) async {
     final value = await _cache.readJson(userId: userId, scope: _scope);
     if (value is! List) return <PendingSecureSend>[];
-    final result = <PendingSecureSend>[];
+    final byClientMessageId = <String, PendingSecureSend>{};
     for (final item in value) {
       if (item is! Map) continue;
       final pending = PendingSecureSend.fromJson(
@@ -92,36 +95,63 @@ class PendingSecureSendStore {
       if (pending.clientMessageId.isEmpty || pending.conversationId.isEmpty) {
         continue;
       }
-      result.add(pending);
+      // A client message ID is the idempotency key. Keep only one entry even
+      // if an older/corrupt snapshot contains duplicates.
+      byClientMessageId[pending.clientMessageId] = pending;
     }
+    final result = byClientMessageId.values.toList(growable: true);
     result.sort((a, b) => a.createdAt.compareTo(b.createdAt));
     return result;
   }
 
   Future<void> put(String userId, PendingSecureSend item) async {
-    final items = await read(userId);
-    final index = items.indexWhere(
-      (value) => value.clientMessageId == item.clientMessageId,
-    );
-    if (index >= 0) {
-      items[index] = item;
-    } else {
-      if (items.length >= maxPending) {
-        throw StateError('Secure pending-send queue is full.');
+    return _serializeMutation(() async {
+      final items = await read(userId);
+      final index = items.indexWhere(
+        (value) => value.clientMessageId == item.clientMessageId,
+      );
+      if (index >= 0) {
+        items[index] = item;
+      } else {
+        if (items.length >= maxPending) {
+          throw StateError('Secure pending-send queue is full.');
+        }
+        items.add(item);
       }
-      items.add(item);
-    }
-    await _write(userId, items);
+      await _write(userId, items);
+    });
   }
 
   Future<void> remove(String userId, String clientMessageId) async {
-    final items = await read(userId)
-      ..removeWhere((item) => item.clientMessageId == clientMessageId);
-    await _write(userId, items);
+    return _serializeMutation(() async {
+      final items = await read(userId)
+        ..removeWhere((item) => item.clientMessageId == clientMessageId);
+      await _write(userId, items);
+    });
   }
 
-  Future<void> clear(String userId) =>
-      _cache.writeJson(userId: userId, scope: _scope, value: const []);
+  Future<void> clear(String userId) => _serializeMutation(
+    () => _cache.writeJson(userId: userId, scope: _scope, value: const []),
+  );
+
+  /// Serializes the queue's read-modify-write operations.
+  ///
+  /// Multiple composer sends and background retries can run concurrently.
+  /// Without this barrier, both can read the same snapshot and the last write
+  /// silently drops the other's update. A failed mutation is reported to its
+  /// caller but does not poison subsequent queue operations.
+  Future<void> _serializeMutation(Future<void> Function() mutation) {
+    final completer = Completer<void>();
+    _mutationBarrier = _mutationBarrier.then((_) async {
+      try {
+        await mutation();
+        completer.complete();
+      } catch (error, stackTrace) {
+        completer.completeError(error, stackTrace);
+      }
+    });
+    return completer.future;
+  }
 
   Future<void> _write(String userId, List<PendingSecureSend> items) {
     return _cache.writeJson(

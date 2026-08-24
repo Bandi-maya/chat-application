@@ -26,6 +26,7 @@ import '../../ui/core/design_system/settings_primitives.dart';
 import '../../ui/core/design_system/chaty_haptics.dart';
 import '../../ui/core/design_system/components/chaty_kit.dart';
 import '../../ui/core/design_system/components/app_components.dart';
+import '../../ui/core/design_system/components/composer_components.dart';
 import '../../ui/core/gb/gb_theme_overrides.dart';
 import '../../core/emoji/widgets/animated_emoji_text.dart';
 import '../../ui/core/menu/app_context_menu.dart';
@@ -2554,8 +2555,9 @@ class _ComposerState extends State<_Composer>
       children: [
         Row(
           children: [
-            _ComposerCircleButton(
+            ChatyComposerActionButton(
               theme: theme,
+              semanticsLabel: 'Cancel recording',
               tooltip: 'Cancel recording',
               icon: Icons.delete_outline_rounded,
               iconColor: theme.dangerColor,
@@ -2592,13 +2594,14 @@ class _ComposerState extends State<_Composer>
             const SizedBox(width: 12),
             if (widget.amplitudeProvider != null)
               Expanded(
-                child: _LevelMeter(levels: _levels, theme: theme),
+                child: ChatyVoiceLevelMeter(levels: _levels, theme: theme),
               )
             else
               const Spacer(),
             const SizedBox(width: 10),
-            _ComposerCircleButton(
+            ChatyComposerActionButton(
               theme: theme,
+              semanticsLabel: 'Send voice note',
               tooltip: 'Send voice note',
               icon: Icons.send_rounded,
               fillColor: theme.accentColor,
@@ -2628,15 +2631,17 @@ class _ComposerState extends State<_Composer>
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        _ComposerCircleButton(
+        ChatyComposerActionButton(
           theme: theme,
+          semanticsLabel: 'Attach',
           tooltip: 'Attach',
           icon: Icons.add_circle_outline_rounded,
           iconColor: theme.accentColor,
           onTap: widget.onAttach,
         ),
-        _ComposerCircleButton(
+        ChatyComposerActionButton(
           theme: theme,
+          semanticsLabel: 'Camera',
           tooltip: 'Camera',
           icon: Icons.photo_camera_rounded,
           iconColor: theme.accentColor,
@@ -2683,18 +2688,19 @@ class _ComposerState extends State<_Composer>
           builder: (context, value, _) {
             final hasText = value.text.trim().isNotEmpty;
             if (hasText) {
-              return _ComposerCircleButton(
+              return ChatyComposerActionButton(
                 theme: theme,
+                semanticsLabel: 'Send message',
                 tooltip: 'Send',
                 icon: Icons.send_rounded,
                 fillColor: theme.accentColor,
                 iconColor: theme.onAccentColor,
+                emphasized: true,
                 onTap: widget.onSend,
               );
             }
-            return _ComposerCircleButton(
+            return ChatyComposerActionButton(
               theme: theme,
-              size: 46,
               icon: Icons.mic_rounded,
               fillColor: theme.accentColor,
               iconColor: theme.onAccentColor,
@@ -2709,138 +2715,5 @@ class _ComposerState extends State<_Composer>
         ),
       ],
     );
-  }
-}
-
-/// Real-amplitude level meter: one rounded bar per sample, newest on the
-/// right. Heights animate at the poll cadence so transitions stay
-/// interruptible.
-class _LevelMeter extends StatelessWidget {
-  final List<double> levels;
-  final ThemeConfig theme;
-
-  const _LevelMeter({required this.levels, required this.theme});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 26,
-      child: Row(
-        children: [
-          for (final level in levels)
-            Expanded(
-              child: Center(
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 90),
-                  curve: Curves.easeOut,
-                  width: 3,
-                  height: 4 + 20 * level,
-                  decoration: BoxDecoration(
-                    color: theme.accentColor.withValues(
-                      alpha: 0.45 + 0.55 * level,
-                    ),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Uniform circular action used across the composer: one geometry (44/46dp),
-/// optional accent fill, busy spinner, subtle press-scale feedback and an
-/// optional hold-to-record gesture set. All colors come from the theme.
-class _ComposerCircleButton extends StatefulWidget {
-  final ThemeConfig theme;
-  final String? tooltip;
-  final IconData? icon;
-  final Color? iconColor;
-  final Color? fillColor;
-  final VoidCallback? onTap;
-  final GestureLongPressStartCallback? onLongPressStart;
-  final GestureLongPressMoveUpdateCallback? onLongPressMoveUpdate;
-  final GestureLongPressEndCallback? onLongPressEnd;
-  final String? semanticsLabel;
-  final bool busy;
-  final double size;
-
-  const _ComposerCircleButton({
-    required this.theme,
-    this.tooltip,
-    this.icon,
-    this.iconColor,
-    this.fillColor,
-    this.onTap,
-    this.onLongPressStart,
-    this.onLongPressMoveUpdate,
-    this.onLongPressEnd,
-    this.semanticsLabel,
-    this.busy = false,
-    this.size = 44,
-  });
-
-  @override
-  State<_ComposerCircleButton> createState() => _ComposerCircleButtonState();
-}
-
-class _ComposerCircleButtonState extends State<_ComposerCircleButton> {
-  bool _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = widget.onTap != null || widget.onLongPressStart != null;
-    final content = Container(
-      width: widget.size,
-      height: widget.size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: widget.fillColor ?? Colors.transparent,
-      ),
-      child: widget.busy
-          ? Padding(
-              padding: const EdgeInsets.all(12),
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: widget.iconColor,
-              ),
-            )
-          : Icon(widget.icon, size: 21, color: widget.iconColor),
-    );
-
-    Widget button = GestureDetector(
-      onTap: widget.onTap,
-      onLongPressStart: widget.onLongPressStart,
-      onLongPressMoveUpdate: widget.onLongPressMoveUpdate,
-      onLongPressEnd: widget.onLongPressEnd,
-      behavior: HitTestBehavior.opaque,
-      onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
-      onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
-      onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
-      child: AnimatedScale(
-        scale: _pressed ? 0.94 : 1.0,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOutCubic,
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 120),
-          opacity: !enabled ? 0.45 : (_pressed ? 0.85 : 1.0),
-          child: content,
-        ),
-      ),
-    );
-
-    if (widget.semanticsLabel != null) {
-      button = Semantics(
-        button: true,
-        label: widget.semanticsLabel!,
-        child: button,
-      );
-    }
-    if (widget.tooltip != null) {
-      button = Tooltip(message: widget.tooltip!, child: button);
-    }
-    return button;
   }
 }

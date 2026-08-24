@@ -7,6 +7,7 @@ import 'package:mime/mime.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../domain/models/privacy_publication_policy.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import 'backend_service.dart';
@@ -65,14 +66,18 @@ class StatusService {
   StatusService({
     SupabaseClient? client,
     ChatyPreferencesController? preferences,
+    PrivacyPublicationPolicy publicationPolicy =
+        const PrivacyPublicationPolicy(),
   }) : _client = client ?? Supabase.instance.client,
-       _preferences = preferences ?? locator<ChatyPreferencesController>();
+       _preferences = preferences ?? locator<ChatyPreferencesController>(),
+       _publicationPolicy = publicationPolicy;
 
   static const String bucket = 'status-media';
   static const int storageLimitMb = 50;
 
   final SupabaseClient _client;
   final ChatyPreferencesController _preferences;
+  final PrivacyPublicationPolicy _publicationPolicy;
   final Uuid _uuid = const Uuid();
 
   StreamSubscription<List<Map<String, dynamic>>>? _revocationSub;
@@ -328,14 +333,23 @@ class StatusService {
     return _client.storage.from(bucket).createSignedUrl(path, expiresInSeconds);
   }
 
-  Future<void> markViewed(StatusRecord status) async {
-    final hide =
-        _preferences.privacy.hideViewStatus ||
-        _preferences.gbBool('yoHideStatViewV2');
+  Future<bool> markViewed(StatusRecord status) async {
+    if (!_preferences.preferencesReady) return false;
+    final mayPublish =
+        _publicationPolicy.allows(
+          PrivacyPublication.statusView,
+          _preferences.privacy,
+        ) &&
+        !_preferences.gbBool('yoHideStatViewV2');
+    if (!mayPublish) return false;
     await _client.rpc(
       'mark_status_viewed',
-      params: <String, dynamic>{'p_status_id': status.id, 'p_hide_view': hide},
+      params: <String, dynamic>{
+        'p_status_id': status.id,
+        'p_hide_view': false,
+      },
     );
+    return true;
   }
 
   Future<List<StatusViewer>> viewersFor(String statusId) async {

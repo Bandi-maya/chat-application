@@ -16,6 +16,7 @@ import 'linked_devices_qr_screen.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../../ui/core/widgets/app_avatar.dart';
+import '../../ui/core/templates/template_shell.dart';
 
 class MainNavigationShell extends StatefulWidget {
   const MainNavigationShell({super.key});
@@ -685,45 +686,24 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           ),
         ),
       ),
-      body: SafeArea(
-        bottom: false,
-        child: Column(
+      body: Column(
           children: [
-            // Integrated top navigation header bar (no floating button overlaying content)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: theme.surfaceColor,
-                border: Border(
-                  bottom: BorderSide(color: colors.border, width: 0.8),
-                ),
+            TemplateShellHeader(
+              title: navItems[selectedIndex].label,
+              navigation: IconButton(
+                icon: const Icon(Icons.menu_rounded),
+                color: theme.primaryTextColor,
+                tooltip: 'Open menu',
+                onPressed: () => scaffoldKey.currentState?.openDrawer(),
               ),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.menu_rounded),
-                    color: theme.primaryTextColor,
-                    tooltip: 'Open Menu',
-                    onPressed: () => scaffoldKey.currentState?.openDrawer(),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    navItems[selectedIndex].label,
-                    style: TextStyle(
-                      color: theme.primaryTextColor,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const Spacer(),
-                ],
-              ),
+              backgroundColor: theme.surfaceColor,
+              foregroundColor: theme.primaryTextColor,
+              dividerColor: colors.border,
             ),
             Expanded(
               child: IndexedStack(index: selectedIndex, children: screens),
             ),
           ],
-        ),
       ),
     );
   }
@@ -1708,38 +1688,24 @@ class _PerspectiveDrawerScaffoldState extends State<_PerspectiveDrawerScaffold>
                 alignment: Alignment.centerLeft,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(val * 28),
-                  child: Stack(
+                  child: Column(
                     children: [
-                      widget.child,
-                      Positioned(
-                        left: 12,
-                        top: 12 + MediaQuery.paddingOf(context).top,
-                        child: GestureDetector(
-                          onTap: _toggle,
-                          child: Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: colors.surface,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: colors.shadow,
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
-                            ),
-                            child: Icon(
-                              val > 0.5
-                                  ? Icons.close_rounded
-                                  : Icons.menu_rounded,
-                              size: 20,
-                              color: colors.foreground,
-                            ),
+                      TemplateShellHeader(
+                        title: widget.navItems[widget.selectedIndex].label,
+                        navigation: IconButton(
+                          tooltip: val > 0.5 ? 'Close menu' : 'Open menu',
+                          onPressed: _toggle,
+                          icon: Icon(
+                            val > 0.5
+                                ? Icons.close_rounded
+                                : Icons.menu_rounded,
                           ),
                         ),
+                        backgroundColor: colors.surface,
+                        foregroundColor: colors.foreground,
+                        dividerColor: colors.divider,
                       ),
+                      Expanded(child: widget.child),
                     ],
                   ),
                 ),

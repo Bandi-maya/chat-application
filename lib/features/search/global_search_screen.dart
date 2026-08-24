@@ -12,6 +12,7 @@ import '../../data/services/local_lock_service.dart';
 import '../../injection/locator.dart';
 import '../chats/chat_detail_screen.dart';
 import '../chats/locked_chats_screen.dart';
+import 'search_request_guard.dart';
 
 class GlobalSearchScreen extends StatefulWidget {
   final ThemeConfig theme;
@@ -38,7 +39,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
   bool _isSearching = false;
   bool _isOpeningChat = false;
   Timer? _debounce;
-  int _searchEpoch = 0;
+  final SearchRequestGuard _requestGuard = SearchRequestGuard();
 
   @override
   void initState() {
@@ -58,12 +59,15 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
     _debounce?.cancel();
     final query = _searchController.text.trim();
     final lower = query.toLowerCase();
+    // Invalidate an in-flight remote request even when the new query is empty
+    // or too short to start another remote request.
+    final requestId = _requestGuard.begin();
 
     // Check secret search phrase for revealing locked vault
     if (query.isNotEmpty) {
       final lockService = locator<LocalLockService>();
       lockService.verifySecretPhrase(query).then((isMatch) {
-        if (isMatch && mounted) {
+        if (isMatch && mounted && _requestGuard.isCurrent(requestId)) {
           _searchController.clear();
           LockedChatsScreen.open(
             context,
@@ -99,22 +103,21 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
       _matchedConversations = conversations;
       _isSearching = true;
     });
-    final epoch = ++_searchEpoch;
     _debounce = Timer(const Duration(milliseconds: 280), () {
-      unawaited(_performRemoteSearch(query, epoch));
+      unawaited(_performRemoteSearch(query, requestId));
     });
   }
 
-  Future<void> _performRemoteSearch(String query, int epoch) async {
+  Future<void> _performRemoteSearch(String query, int requestId) async {
     try {
       final users = await widget.dataStore.searchUsersRemote(query);
-      if (!mounted || epoch != _searchEpoch) return;
+      if (!mounted || !_requestGuard.isCurrent(requestId)) return;
       setState(() {
-        _matchedUsers = users;
+        _matchedUsers = _requestGuard.deduplicate(users, (user) => user.id);
         _isSearching = false;
       });
     } catch (error) {
-      if (!mounted || epoch != _searchEpoch) return;
+      if (!mounted || !_requestGuard.isCurrent(requestId)) return;
       setState(() => _isSearching = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Search failed: ${_cleanError(error)}')),

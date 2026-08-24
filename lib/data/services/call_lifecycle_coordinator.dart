@@ -34,14 +34,7 @@ class CallLifecycleCoordinator with WidgetsBindingObserver {
       state == CallSessionState.reconnecting;
 
   @visibleForTesting
-  static bool isTerminalState(CallSessionState state) {
-    return state == CallSessionState.ended ||
-        state == CallSessionState.declined ||
-        state == CallSessionState.failed ||
-        state == CallSessionState.missed ||
-        state == CallSessionState.busy ||
-        state == CallSessionState.idle;
-  }
+  static bool isTerminalState(CallSessionState state) => state.isTerminal;
 
   void start() {
     if (_started || _disposed) return;

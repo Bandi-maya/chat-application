@@ -44,6 +44,7 @@ class ChatyPreferencesController extends ChangeNotifier {
   Timer? _remoteSyncDebounce;
   StreamSubscription<AuthState>? _authSubscription;
   bool _disposed = false;
+  bool _preferencesReady = false;
 
   ChatyPreferencesController({LocalLockService? lockService})
     : _lockService = lockService ?? LocalLockService() {
@@ -65,6 +66,7 @@ class ChatyPreferencesController extends ChangeNotifier {
   }
 
   PrivacyPreferences get privacy => _privacy;
+  bool get preferencesReady => _preferencesReady;
   SecurityPreferences get security => _security;
   HomePreferences get home => _home;
   ConversationPreferences get conversation => _conversation;
@@ -136,6 +138,7 @@ class ChatyPreferencesController extends ChangeNotifier {
       return;
     }
     _scopeUserId = newUserId;
+    _preferencesReady = false;
     _resetInMemory();
     if (!_disposed) notifyListeners();
     unawaited(_loadForUser(newUserId));
@@ -161,6 +164,7 @@ class ChatyPreferencesController extends ChangeNotifier {
       );
     }
 
+    if (_scopeUserId == userId) _preferencesReady = true;
     if (!_disposed) notifyListeners();
     await _syncFromRemote();
   }

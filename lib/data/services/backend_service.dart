@@ -78,6 +78,8 @@ class ChatyBackendService extends ChangeNotifier {
 
   RealtimeChannel? _realtimeChannel;
   Timer? _reconcileTimer;
+  StreamSubscription<AuthState>? _authSubscription;
+  Future<void>? _initializeFuture;
 
   /// AES-256-GCM snapshot cache (key in platform secure storage) backing
   /// instant shell rendering and the pending secure-send queue.
@@ -119,16 +121,29 @@ class ChatyBackendService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> initialize() async {
-    if (_isInitialized) return;
+  Future<void> initialize() {
+    if (_isInitialized) return Future<void>.value();
+    return _initializeFuture ??= _initialize();
+  }
 
-    _client.auth.onAuthStateChange.listen((AuthState state) {
-      unawaited(_handleSession(state.session));
-    });
+  Future<void> _initialize() async {
+    try {
+      _authSubscription ??= _client.auth.onAuthStateChange.listen(
+        (AuthState state) {
+          unawaited(_handleSession(state.session));
+        },
+      );
 
-    await _handleSession(_client.auth.currentSession);
-    _isInitialized = true;
-    notifyListeners();
+      await _handleSession(_client.auth.currentSession);
+      _isInitialized = true;
+      notifyListeners();
+    } catch (_) {
+      // A transient local-storage or platform failure must not permanently
+      // poison initialization. Concurrent callers still share this attempt;
+      // a later caller may retry once the failed future has completed.
+      _initializeFuture = null;
+      rethrow;
+    }
   }
 
   Future<void> _handleSession(Session? session) async {
@@ -177,21 +192,23 @@ class ChatyBackendService extends ChangeNotifier {
         }
       }
       final hydratedIds = List<String>.from(_conversationsById.keys);
-      for (final conversationId in hydratedIds) {
-        final cachedMessages = await _snapshotCache.readJson(
-          userId: userId,
-          scope: 'messages_$conversationId',
-        );
-        if (cachedMessages is! List || cachedMessages.isEmpty) continue;
-        _messagesByChatId[conversationId] = cachedMessages
-            .whereType<Map>()
-            .map(
-              (item) => chatMessageFromJson(
-                item.map((key, value) => MapEntry(key.toString(), value)),
-              ),
-            )
-            .toList(growable: true);
-      }
+      await Future.wait<void>(
+        hydratedIds.map((conversationId) async {
+          final cachedMessages = await _snapshotCache.readJson(
+            userId: userId,
+            scope: 'messages_$conversationId',
+          );
+          if (cachedMessages is! List || cachedMessages.isEmpty) return;
+          _messagesByChatId[conversationId] = cachedMessages
+              .whereType<Map>()
+              .map(
+                (item) => chatMessageFromJson(
+                  item.map((key, value) => MapEntry(key.toString(), value)),
+                ),
+              )
+              .toList(growable: true);
+        }),
+      );
     } catch (error) {
       debugPrint('Chaty snapshot hydration skipped: $error');
     }

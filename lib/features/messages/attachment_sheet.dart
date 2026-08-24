@@ -24,215 +24,115 @@ class AttachmentSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final groups = <_OrbitGroup>[
-      _OrbitGroup('Media', <_OrbitAction>[
-        _OrbitAction(
-          Icons.photo_library_rounded,
-          'Gallery',
-          'Photos',
-          colors.accent,
-          () => onMediaRequested('image'),
-        ),
-        _OrbitAction(
-          Icons.videocam_rounded,
-          'Video',
-          'Clips',
-          colors.accent,
-          () => onMediaRequested('video'),
-        ),
-      ]),
-      _OrbitGroup('Files', <_OrbitAction>[
-        _OrbitAction(
-          Icons.insert_drive_file_rounded,
-          'Document',
-          'Files',
-          colors.primary,
-          () => onMediaRequested('document'),
-        ),
-        _OrbitAction(
-          Icons.graphic_eq_rounded,
-          'Audio',
-          'Sound',
-          colors.warning,
-          () => onMediaRequested('audio'),
-        ),
-      ]),
-      _OrbitGroup('People & places', <_OrbitAction>[
-        _OrbitAction(
-          Icons.location_on_rounded,
-          'Location',
-          'Place',
-          colors.success,
-          onLocationRequested,
-        ),
-        _OrbitAction(
-          Icons.person_rounded,
-          'Contact',
-          'Person',
-          colors.info,
-          onContactRequested,
-        ),
-      ]),
-      _OrbitGroup('Create', <_OrbitAction>[
-        _OrbitAction(
-          Icons.poll_rounded,
-          'Poll',
-          'Ask',
-          colors.primary,
-          onPollRequested,
-        ),
-        _OrbitAction(
-          Icons.task_alt_rounded,
-          'Task',
-          'Assign',
-          colors.error,
-          onTaskOption,
-        ),
-      ]),
+
+    final actions = <_AttachmentItem>[
+      _AttachmentItem(
+        icon: Icons.insert_drive_file_rounded,
+        label: 'document',
+        gradient: const [Color(0xFF7F66FF), Color(0xFF5E35B1)],
+        onTap: () => onMediaRequested('document'),
+      ),
+      _AttachmentItem(
+        icon: Icons.photo_library_rounded,
+        label: 'gallery',
+        gradient: const [Color(0xFFE91E63), Color(0xFFC2185B)],
+        onTap: () => onMediaRequested('image'),
+      ),
+      _AttachmentItem(
+        icon: Icons.videocam_rounded,
+        label: 'video',
+        gradient: const [Color(0xFFFF5722), Color(0xFFE64A19)],
+        onTap: () => onMediaRequested('video'),
+      ),
+      _AttachmentItem(
+        icon: Icons.graphic_eq_rounded,
+        label: 'audio',
+        gradient: const [Color(0xFFFF9800), Color(0xFFF57C00)],
+        onTap: () => onMediaRequested('audio'),
+      ),
+      _AttachmentItem(
+        icon: Icons.location_on_rounded,
+        label: 'location',
+        gradient: const [Color(0xFF2E7D32), Color(0xFF1B5E20)],
+        onTap: onLocationRequested,
+      ),
+      _AttachmentItem(
+        icon: Icons.person_rounded,
+        label: 'contact',
+        gradient: const [Color(0xFF0097A7), Color(0xFF006064)],
+        onTap: onContactRequested,
+      ),
+      _AttachmentItem(
+        icon: Icons.poll_rounded,
+        label: 'poll',
+        gradient: const [Color(0xFF0288D1), Color(0xFF01579B)],
+        onTap: onPollRequested,
+      ),
+      _AttachmentItem(
+        icon: Icons.task_alt_rounded,
+        label: 'task',
+        gradient: const [Color(0xFF00BFA5), Color(0xFF00897B)],
+        onTap: onTaskOption,
+      ),
     ];
 
     return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * .78,
-      ),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
       child: SafeArea(
         top: false,
-        child: SingleChildScrollView(
+        child: Padding(
           padding: const EdgeInsets.fromLTRB(
-            ChatySpacing.base,
+            ChatySpacing.md,
             ChatySpacing.sm,
-            ChatySpacing.base,
+            ChatySpacing.md,
             ChatySpacing.lg,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Center(
                 child: Container(
-                  width: 38,
-                  height: 4.5,
+                  width: 36,
+                  height: 4,
                   decoration: BoxDecoration(
-                    color: colors.foregroundSecondary.withValues(alpha: .2),
+                    color: colors.foregroundSecondary.withValues(alpha: 0.25),
                     borderRadius: BorderRadius.circular(ChatyRadius.full),
                   ),
                 ),
               ),
-              const SizedBox(height: ChatySpacing.base),
-              Row(
-                children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: colors.primary.withValues(alpha: .12),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(
-                      Icons.add_rounded,
-                      color: colors.primary,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 11),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Create or share',
-                          style: TextStyle(
-                            color: colors.foreground,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                          ),
+              const SizedBox(height: ChatySpacing.md),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final crossAxisCount = constraints.maxWidth > 420 ? 4 : 4;
+                  final itemWidth = (constraints.maxWidth - (crossAxisCount - 1) * 12) / crossAxisCount;
+
+                  return Wrap(
+                    spacing: 12,
+                    runSpacing: 18,
+                    alignment: WrapAlignment.start,
+                    children: actions.map((item) {
+                      return SizedBox(
+                        width: itemWidth,
+                        child: _AttachmentGridTile(
+                          item: item,
+                          onTap: () => _closeAnd(context, item.onTap),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Choose what you want to add to this conversation.',
-                          style: ChatyTypography.caption(
-                            colors.foregroundSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Semantics(
-                    label: 'Media encryption enabled',
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: colors.success.withValues(alpha: .10),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.lock_rounded,
-                            size: 13,
-                            color: colors.success,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Secure',
-                            style: TextStyle(
-                              color: colors.success,
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+                      );
+                    }).toList(growable: false),
+                  );
+                },
               ),
-              const SizedBox(height: ChatySpacing.base),
-              for (int index = 0; index < groups.length; index++) ...[
-                _OrbitSection(
-                  group: groups[index],
-                  onAction: (action) => _closeAnd(context, action.onTap),
-                ),
-                if (index != groups.length - 1)
-                  const SizedBox(height: ChatySpacing.base),
-              ],
-              const SizedBox(height: ChatySpacing.base),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 9,
-                ),
-                decoration: BoxDecoration(
-                  color: colors.surfaceSecondary,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.shield_outlined,
-                      size: 17,
-                      color: colors.primary,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Attachments are encrypted on this device before upload.',
-                        style: ChatyTypography.caption(
-                          colors.foregroundSecondary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              const SizedBox(height: ChatySpacing.sm),
             ],
           ),
         ),
@@ -247,148 +147,86 @@ class AttachmentSheet extends StatelessWidget {
   }
 }
 
-class _OrbitGroup {
-  const _OrbitGroup(this.label, this.actions);
-
-  final String label;
-  final List<_OrbitAction> actions;
-}
-
-class _OrbitAction {
-  const _OrbitAction(
-    this.icon,
-    this.label,
-    this.hint,
-    this.color,
-    this.onTap,
-  );
+class _AttachmentItem {
+  const _AttachmentItem({
+    required this.icon,
+    required this.label,
+    required this.gradient,
+    required this.onTap,
+  });
 
   final IconData icon;
   final String label;
-  final String hint;
-  final Color color;
+  final List<Color> gradient;
   final VoidCallback onTap;
 }
 
-class _OrbitSection extends StatelessWidget {
-  const _OrbitSection({required this.group, required this.onAction});
+class _AttachmentGridTile extends StatelessWidget {
+  const _AttachmentGridTile({
+    required this.item,
+    required this.onTap,
+  });
 
-  final _OrbitGroup group;
-  final ValueChanged<_OrbitAction> onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 2, bottom: 8),
-          child: Text(
-            group.label,
-            style: TextStyle(
-              color: colors.foregroundSecondary,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: .3,
-            ),
-          ),
-        ),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final gap = 10.0;
-            final itemWidth = (constraints.maxWidth - gap) / 2;
-            return Wrap(
-              spacing: gap,
-              runSpacing: gap,
-              children: group.actions
-                  .map(
-                    (action) => SizedBox(
-                      width: itemWidth,
-                      child: _OrbitTile(
-                        action: action,
-                        onTap: () => onAction(action),
-                      ),
-                    ),
-                  )
-                  .toList(growable: false),
-            );
-          },
-        ),
-      ],
-    );
-  }
-}
-
-class _OrbitTile extends StatelessWidget {
-  const _OrbitTile({required this.action, required this.onTap});
-
-  final _OrbitAction action;
+  final _AttachmentItem item;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+
     return Semantics(
       button: true,
-      label: '${action.label}. ${action.hint}',
+      label: item.label,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
           onTap: onTap,
-          child: Ink(
-            height: 72,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
-            decoration: BoxDecoration(
-              color: Color.alphaBlend(
-                action.color.withValues(alpha: .055),
-                colors.surfaceSecondary,
-              ),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: action.color.withValues(alpha: .16),
-              ),
-            ),
-            child: Row(
+          splashColor: item.gradient.first.withValues(alpha: 0.2),
+          highlightColor: item.gradient.first.withValues(alpha: 0.1),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Container(
-                  width: 42,
-                  height: 42,
+                  width: 54,
+                  height: 54,
                   decoration: BoxDecoration(
-                    color: action.color.withValues(alpha: .13),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(action.icon, color: action.color, size: 22),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        action.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: colors.foreground,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        action.hint,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: colors.foregroundSecondary,
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: item.gradient,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: item.gradient.last.withValues(alpha: 0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
                       ),
                     ],
+                  ),
+                  child: Center(
+                    child: Icon(
+                      item.icon,
+                      color: Colors.white,
+                      size: 26,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  item.label,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colors.foreground.withValues(alpha: 0.85),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: -0.1,
                   ),
                 ),
               ],

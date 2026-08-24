@@ -44,6 +44,11 @@ void main() {
 
       for (final state in CallSessionState.values) {
         expect(
+          state.isTerminal,
+          terminal.contains(state),
+          reason: 'Unexpected domain terminal-state policy for $state',
+        );
+        expect(
           CallLifecycleCoordinator.isTerminalState(state),
           terminal.contains(state),
           reason: 'Unexpected terminal-state policy for $state',

@@ -14,6 +14,17 @@ enum CallSessionState {
   failed,
 }
 
+extension CallSessionStatePolicy on CallSessionState {
+  /// Terminal states cannot transition back into a live media session.
+  bool get isTerminal =>
+      this == CallSessionState.idle ||
+      this == CallSessionState.declined ||
+      this == CallSessionState.busy ||
+      this == CallSessionState.missed ||
+      this == CallSessionState.ended ||
+      this == CallSessionState.failed;
+}
+
 /// Available audio routing outputs.
 enum AudioRouteType {
   earpiece,

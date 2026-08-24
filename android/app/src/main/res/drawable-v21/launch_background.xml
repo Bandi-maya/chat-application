@@ -1,13 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Launch background with enlarged rounded icon for API 21+ -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@android:color/black" />
-    <item
-        android:width="120dp"
-        android:height="120dp"
-        android:gravity="center">
-        <bitmap
-            android:gravity="fill"
-            android:src="@mipmap/ic_launcher" />
-    </item>
+    <item android:drawable="@drawable/ic_launcher_original" android:gravity="center" />
 </layer-list>

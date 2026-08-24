@@ -31,6 +31,59 @@ class NotificationPayload {
   }
 }
 
+/// Rejects repeated notification tap intents before they reach navigation.
+///
+/// Android can redeliver the same launch intent during activity recreation,
+/// and push SDKs may emit both an initial-message event and a tap event. The
+/// server identifiers are stable, so they form a safer deduplication key than
+/// timing alone.
+class NotificationTapDeduplicator {
+  NotificationTapDeduplicator({
+    this.window = const Duration(seconds: 10),
+    DateTime Function()? clock,
+  }) : _clock = clock ?? DateTime.now;
+
+  static const int _maxRemembered = 128;
+  final Duration window;
+  final DateTime Function() _clock;
+  final Map<String, DateTime> _seenAt = <String, DateTime>{};
+
+  bool shouldDispatch(NotificationPayload payload) {
+    final key = _keyFor(payload);
+    if (key == null) return false;
+
+    final now = _clock();
+    final cutoff = now.subtract(window);
+    _seenAt.removeWhere((_, seenAt) => seenAt.isBefore(cutoff));
+    final previous = _seenAt[key];
+    if (previous != null && now.difference(previous) <= window) return false;
+
+    _seenAt[key] = now;
+    if (_seenAt.length > _maxRemembered) {
+      final oldest = _seenAt.entries.reduce(
+        (left, right) => left.value.isBefore(right.value) ? left : right,
+      );
+      _seenAt.remove(oldest.key);
+    }
+    return true;
+  }
+
+  String? _keyFor(NotificationPayload payload) {
+    if (payload.conversationId.isEmpty) return null;
+    final callId = payload.callId;
+    if (callId != null && callId.isNotEmpty) {
+      return 'call:$callId';
+    }
+    final messageId = payload.messageId;
+    if (messageId != null && messageId.isNotEmpty) {
+      return 'message:$messageId';
+    }
+    // Payloads without an event ID cannot be safely distinguished. Use their
+    // target and kind to suppress immediate duplicate launch intents.
+    return '${payload.isCall ? 'call' : 'conversation'}:${payload.conversationId}';
+  }
+}
+
 /// Notification Channel Configuration
 class ChatyNotificationChannel {
   final String id;
@@ -64,6 +117,8 @@ class NotificationChannelManager extends ChangeNotifier {
   bool _educationShown = false;
   final StreamController<NotificationPayload> _deepLinkController =
       StreamController<NotificationPayload>.broadcast();
+  final NotificationTapDeduplicator _tapDeduplicator =
+      NotificationTapDeduplicator();
 
   NotificationChannelManager({
     required this.preferences,
@@ -136,7 +191,7 @@ class NotificationChannelManager extends ChangeNotifier {
   /// Routes incoming deep-link payload from push click or system notification tap
   void handleNotificationTap(Map<String, dynamic> rawPayload) {
     final payload = NotificationPayload.fromMap(rawPayload);
-    if (payload.conversationId.isNotEmpty) {
+    if (_tapDeduplicator.shouldDispatch(payload)) {
       _deepLinkController.add(payload);
     }
   }

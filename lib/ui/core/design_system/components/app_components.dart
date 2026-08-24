@@ -236,6 +236,8 @@ class ChatyPrimaryButton extends StatefulWidget {
   final double? width;
   final double borderRadius;
 
+  final EdgeInsetsGeometry? padding;
+
   const ChatyPrimaryButton({
     super.key,
     required this.text,
@@ -247,6 +249,7 @@ class ChatyPrimaryButton extends StatefulWidget {
     this.height = ChatyTouchTargets.buttonHeight,
     this.width = double.infinity,
     this.borderRadius = ChatyRadius.lg,
+    this.padding,
   });
 
   @override
@@ -262,6 +265,9 @@ class _ChatyPrimaryButtonState extends State<ChatyPrimaryButton> {
     final isEnabled = widget.onPressed != null && !widget.isLoading;
     final bg = widget.backgroundColor ?? theme.colorScheme.primary;
     final fg = widget.foregroundColor ?? Colors.white;
+    final defaultHorizontalPadding = (widget.height < 40 || (widget.width != null && widget.width! < 100))
+        ? ChatySpacing.sm
+        : ChatySpacing.lg;
 
     return AnimatedScale(
       scale: _isPressed && isEnabled ? ChatyMotion.activeScale : 1.0,
@@ -283,7 +289,9 @@ class _ChatyPrimaryButtonState extends State<ChatyPrimaryButton> {
             disabledBackgroundColor: bg.withValues(alpha: 0.45),
             disabledForegroundColor: fg.withValues(alpha: 0.6),
             elevation: 0,
-            padding: const EdgeInsets.symmetric(horizontal: ChatySpacing.lg),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: widget.padding ?? EdgeInsets.symmetric(horizontal: defaultHorizontalPadding),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(widget.borderRadius),
             ),
@@ -315,15 +323,19 @@ class _ChatyPrimaryButtonState extends State<ChatyPrimaryButton> {
                       children: [
                         if (widget.icon != null) ...[
                           Icon(widget.icon, size: ChatyIconSize.md, color: fg),
-                          const SizedBox(width: ChatySpacing.sm),
+                          const SizedBox(width: ChatySpacing.xs),
                         ],
-                        Text(
-                          widget.text,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: -0.2,
-                            color: fg,
+                        Flexible(
+                          child: Text(
+                            widget.text,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: widget.height < 40 ? 13 : 15,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: -0.2,
+                              color: fg,
+                            ),
                           ),
                         ),
                       ],
@@ -346,6 +358,8 @@ class ChatySecondaryButton extends StatefulWidget {
   final double? width;
   final double borderRadius;
 
+  final EdgeInsetsGeometry? padding;
+
   const ChatySecondaryButton({
     super.key,
     required this.text,
@@ -356,6 +370,7 @@ class ChatySecondaryButton extends StatefulWidget {
     this.height = ChatyTouchTargets.buttonHeight,
     this.width = double.infinity,
     this.borderRadius = ChatyRadius.lg,
+    this.padding,
   });
 
   @override
@@ -371,6 +386,9 @@ class _ChatySecondaryButtonState extends State<ChatySecondaryButton> {
     final isEnabled = widget.onPressed != null;
     final border = widget.borderColor ?? colors.border;
     final fg = widget.textColor ?? colors.foreground;
+    final defaultHorizontalPadding = (widget.height < 40 || (widget.width != null && widget.width! < 100))
+        ? ChatySpacing.sm
+        : ChatySpacing.lg;
 
     return AnimatedScale(
       scale: _isPressed && isEnabled ? ChatyMotion.activeScale : 1.0,
@@ -392,7 +410,9 @@ class _ChatySecondaryButtonState extends State<ChatySecondaryButton> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(widget.borderRadius),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: ChatySpacing.lg),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: widget.padding ?? EdgeInsets.symmetric(horizontal: defaultHorizontalPadding),
           ),
           child: Listener(
             onPointerDown: (_) {
@@ -410,15 +430,19 @@ class _ChatySecondaryButtonState extends State<ChatySecondaryButton> {
               children: [
                 if (widget.icon != null) ...[
                   Icon(widget.icon, size: ChatyIconSize.md, color: fg),
-                  const SizedBox(width: ChatySpacing.sm),
+                  const SizedBox(width: ChatySpacing.xs),
                 ],
-                Text(
-                  widget.text,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -0.2,
-                    color: fg,
+                Flexible(
+                  child: Text(
+                    widget.text,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: widget.height < 40 ? 13 : 15,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.2,
+                      color: fg,
+                    ),
                   ),
                 ),
               ],
