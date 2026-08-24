@@ -703,70 +703,128 @@ class MessageBubble extends StatelessWidget {
                                   message.type != MessageType.location &&
                                   message.type != MessageType.contact &&
                                   message.text.isNotEmpty)
-                                enableAnimatedEmojis
-                                    ? AnimatedEmojiText(
-                                        text: message.text,
-                                        style: TextStyle(
-                                          color: textColor,
-                                          fontSize: 14 * theme.fontScale,
-                                          height: 1.35,
+                                LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final metaWidget = Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      children: [
+                                        if (message.editedAt != null && showEditedLabel) ...[
+                                          Text(
+                                            'edited',
+                                            style: TextStyle(
+                                              color: textColor.withValues(alpha: 0.58),
+                                              fontSize: 9.5,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                        ],
+                                        if (message.isPinned) ...[
+                                          Icon(
+                                            Icons.push_pin_rounded,
+                                            size: 11,
+                                            color: textColor.withValues(alpha: 0.7),
+                                          ),
+                                          const SizedBox(width: 3),
+                                        ],
+                                        if (message.isStarred) ...[
+                                          const Icon(
+                                            Icons.star_rounded,
+                                            size: 11,
+                                            color: Colors.amber,
+                                          ),
+                                          const SizedBox(width: 3),
+                                        ],
+                                        Text(
+                                          _formatTime(message.createdAt),
+                                          style: TextStyle(
+                                            color: textColor.withValues(alpha: 0.65),
+                                            fontSize: 10.5 * theme.fontScale,
+                                          ),
                                         ),
-                                      )
-                                    : Text(
-                                        message.text,
+                                        if (isMe) ...[
+                                          const SizedBox(width: 4),
+                                          _deliveryIcon(onLightSurface: false),
+                                        ],
+                                      ],
+                                    );
+
+                                    final textStyle = TextStyle(
+                                      color: textColor,
+                                      fontSize: 14 * theme.fontScale,
+                                      height: 1.35,
+                                    );
+
+                                    return Wrap(
+                                      alignment: WrapAlignment.end,
+                                      crossAxisAlignment: WrapCrossAlignment.end,
+                                      spacing: 8,
+                                      runSpacing: 2,
+                                      children: [
+                                        enableAnimatedEmojis
+                                            ? AnimatedEmojiText(
+                                                text: message.text,
+                                                style: textStyle,
+                                              )
+                                            : Text(
+                                                message.text,
+                                                style: textStyle,
+                                              ),
+                                        Padding(
+                                          padding: const EdgeInsets.only(bottom: 1),
+                                          child: metaWidget,
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                )
+                              else
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    if (message.editedAt != null &&
+                                        showEditedLabel) ...[
+                                      Text(
+                                        'edited',
                                         style: TextStyle(
-                                          color: textColor,
-                                          fontSize: 14 * theme.fontScale,
-                                          height: 1.35,
+                                          color: textColor.withValues(
+                                            alpha: 0.58,
+                                          ),
+                                          fontSize: 9.5,
                                         ),
                                       ),
-                              const SizedBox(height: 4),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  if (message.editedAt != null &&
-                                      showEditedLabel) ...[
+                                      const SizedBox(width: 4),
+                                    ],
+                                    if (message.isPinned) ...[
+                                      Icon(
+                                        Icons.push_pin_rounded,
+                                        size: 11,
+                                        color: textColor.withValues(alpha: 0.7),
+                                      ),
+                                      const SizedBox(width: 3),
+                                    ],
+                                    if (message.isStarred) ...[
+                                      const Icon(
+                                        Icons.star_rounded,
+                                        size: 11,
+                                        color: Colors.amber,
+                                      ),
+                                      const SizedBox(width: 3),
+                                    ],
                                     Text(
-                                      'edited',
+                                      _formatTime(message.createdAt),
                                       style: TextStyle(
-                                        color: textColor.withValues(
-                                          alpha: 0.58,
-                                        ),
-                                        fontSize: 9.5,
+                                        color: textColor.withValues(alpha: 0.65),
+                                        fontSize: 10.5 * theme.fontScale,
                                       ),
                                     ),
-                                    const SizedBox(width: 4),
+                                    if (isMe) ...[
+                                      const SizedBox(width: 4),
+                                      _deliveryIcon(onLightSurface: false),
+                                    ],
                                   ],
-                                  if (message.isPinned) ...[
-                                    Icon(
-                                      Icons.push_pin_rounded,
-                                      size: 11,
-                                      color: textColor.withValues(alpha: 0.7),
-                                    ),
-                                    const SizedBox(width: 3),
-                                  ],
-                                  if (message.isStarred) ...[
-                                    const Icon(
-                                      Icons.star_rounded,
-                                      size: 11,
-                                      color: Colors.amber,
-                                    ),
-                                    const SizedBox(width: 3),
-                                  ],
-                                  Text(
-                                    _formatTime(message.createdAt),
-                                    style: TextStyle(
-                                      color: textColor.withValues(alpha: 0.65),
-                                      fontSize: 10.5 * theme.fontScale,
-                                    ),
-                                  ),
-                                  if (isMe) ...[
-                                    const SizedBox(width: 4),
-                                    _deliveryIcon(onLightSurface: false),
-                                  ],
-                                ],
-                              ),
+                                ),
                             ],
                           ),
                         ),

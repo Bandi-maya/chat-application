@@ -53,7 +53,6 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _routeFromRealSession() async {
     final backend = locator<ChatyBackendService>();
-    final start = DateTime.now();
 
     try {
       if (!backend.isInitialized) await backend.initialize();

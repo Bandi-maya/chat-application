@@ -2262,28 +2262,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
-  Future<void> _clearRecentEmojis() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final keys = prefs
-          .getKeys()
-          .where((key) => key.contains('emoji_picker'))
-          .toList();
-      for (final key in keys) {
-        await prefs.remove(key);
-      }
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            keys.isEmpty
-                ? 'Recent emojis already empty.'
-                : 'Recent emojis cleared.',
-          ),
-        ),
-      );
-    } catch (_) {}
-  }
+
 
   Future<void> _clearConversation() async {
     final confirmed = await ChatyConfirmDialog.show(

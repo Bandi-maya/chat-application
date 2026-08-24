@@ -151,9 +151,17 @@ class _PatternPainter extends CustomPainter {
 
     // Draw lines connecting selected dots if trace is NOT hidden
     if (!hideTrace && selected.isNotEmpty) {
+      // Glow underlay for trace
+      final glowPaint = Paint()
+        ..color = activeColor.withValues(alpha: 0.25)
+        ..strokeWidth = 10.0
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke;
+
       final linePaint = Paint()
-        ..color = activeColor.withValues(alpha: 0.85)
-        ..strokeWidth = 5.0
+        ..color = activeColor
+        ..strokeWidth = 4.5
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
         ..style = PaintingStyle.stroke;
@@ -166,6 +174,7 @@ class _PatternPainter extends CustomPainter {
       if (pointer != null) {
         path.lineTo(pointer!.dx, pointer!.dy);
       }
+      canvas.drawPath(path, glowPaint);
       canvas.drawPath(path, linePaint);
     }
 
@@ -174,37 +183,44 @@ class _PatternPainter extends CustomPainter {
       final isSelected = selected.contains(index);
 
       if (isSelected) {
-        // Outer halo when selected
+        // Outer glow halo when selected
         if (!hideTrace) {
           final outerHalo = Paint()
-            ..color = activeColor.withValues(alpha: 0.25)
+            ..color = activeColor.withValues(alpha: 0.18)
             ..style = PaintingStyle.fill;
-          canvas.drawCircle(centers[index], 24, outerHalo);
+          canvas.drawCircle(centers[index], 28, outerHalo);
 
           final outerBorder = Paint()
-            ..color = activeColor
-            ..strokeWidth = 2.5
+            ..color = activeColor.withValues(alpha: 0.75)
+            ..strokeWidth = 2.0
             ..style = PaintingStyle.stroke;
           canvas.drawCircle(centers[index], 24, outerBorder);
         }
 
-        // Inner solid dot
+        // Inner solid dot with core shine
         final centerDot = Paint()
           ..color = (!hideTrace) ? activeColor : inactiveColor
           ..style = PaintingStyle.fill;
-        canvas.drawCircle(centers[index], (!hideTrace) ? 8 : 6, centerDot);
-      } else {
-        // Inactive unselected dot
-        final inactiveDot = Paint()
-          ..color = inactiveColor
-          ..style = PaintingStyle.fill;
-        canvas.drawCircle(centers[index], 6, inactiveDot);
+        canvas.drawCircle(centers[index], (!hideTrace) ? 8.5 : 6.5, centerDot);
 
+        if (!hideTrace) {
+          final centerCore = Paint()
+            ..color = Colors.white.withValues(alpha: 0.8)
+            ..style = PaintingStyle.fill;
+          canvas.drawCircle(centers[index], 3.0, centerCore);
+        }
+      } else {
+        // Inactive unselected dot with subtle glass ring
         final inactiveRing = Paint()
-          ..color = inactiveColor.withValues(alpha: 0.15)
+          ..color = inactiveColor.withValues(alpha: 0.14)
           ..strokeWidth = 1.5
           ..style = PaintingStyle.stroke;
-        canvas.drawCircle(centers[index], 16, inactiveRing);
+        canvas.drawCircle(centers[index], 20, inactiveRing);
+
+        final inactiveDot = Paint()
+          ..color = inactiveColor.withValues(alpha: 0.65)
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(centers[index], 6, inactiveDot);
       }
     }
   }

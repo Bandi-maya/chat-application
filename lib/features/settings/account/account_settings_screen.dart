@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../data/repositories/chaty_data_store.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/design_system.dart' hide ChatySettingsSection;
@@ -39,18 +39,14 @@ class AccountSettingsScreen extends StatelessWidget {
                     color: colors.primary,
                     size: 40,
                   ),
-                  title: user.displayName.isNotEmpty ? user.displayName : 'Set Display Name',
-                  subtitle: '@ • Tap to edit profile',
-                  trailing: const Icon(Icons.edit_outlined),
-                  onTap: () => showChatyProfileEditor(context, dataStore),
+                  title: user.displayName.isNotEmpty ? user.displayName : 'Display Name',
+                  subtitle: '@',
                 ),
                 ChatySettingsTile(
                   icon: Icons.info_outline_rounded,
                   iconColor: colors.primary,
                   title: 'About / Bio',
                   subtitle: user.about.isNotEmpty ? user.about : 'No bio set',
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => showChatyProfileEditor(context, dataStore),
                 ),
               ],
             ),

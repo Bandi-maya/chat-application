@@ -223,29 +223,52 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
 
   Widget _buildUnicodePicker(BuildContext context, double height) {
     final theme = Theme.of(context);
-    return EmojiPicker(
-      onEmojiSelected: (category, emoji) {
-        HapticFeedback.selectionClick();
-        Navigator.of(context).pop(emoji.emoji);
-      },
-      config: Config(
-        height: height - 120,
-        checkPlatformCompatibility: true,
-        emojiViewConfig: const EmojiViewConfig(
-          emojiSizeMax: 28,
-          columns: 8,
-          recentsLimit: 32,
-        ),
-        categoryViewConfig: CategoryViewConfig(
-          backgroundColor: theme.colorScheme.surface,
-          iconColor: theme.colorScheme.onSurfaceVariant,
-          iconColorSelected: theme.colorScheme.primary,
-          indicatorColor: theme.colorScheme.primary,
-        ),
-        bottomActionBarConfig: const BottomActionBarConfig(enabled: true),
-        searchViewConfig: SearchViewConfig(
-          backgroundColor: theme.colorScheme.surface,
-          buttonIconColor: theme.colorScheme.primary,
+    final isDark = theme.brightness == Brightness.dark;
+    final primary = theme.colorScheme.primary;
+    final surfaceColor = theme.colorScheme.surface;
+    final iconColor = isDark
+        ? theme.colorScheme.onSurface.withValues(alpha: 0.65)
+        : theme.colorScheme.onSurface.withValues(alpha: 0.7);
+
+    return Container(
+      color: surfaceColor,
+      child: EmojiPicker(
+        onEmojiSelected: (category, emoji) {
+          HapticFeedback.selectionClick();
+          Navigator.of(context).pop(emoji.emoji);
+        },
+        config: Config(
+          height: height - 110,
+          checkPlatformCompatibility: true,
+          emojiViewConfig: EmojiViewConfig(
+            emojiSizeMax: 30,
+            columns: 8,
+            recentsLimit: 32,
+            backgroundColor: surfaceColor,
+            buttonMode: ButtonMode.MATERIAL,
+          ),
+          categoryViewConfig: CategoryViewConfig(
+            backgroundColor: surfaceColor,
+            iconColor: iconColor,
+            iconColorSelected: primary,
+            indicatorColor: primary,
+            dividerColor: isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.06),
+            tabBarHeight: 44,
+          ),
+          bottomActionBarConfig: BottomActionBarConfig(
+            enabled: true,
+            backgroundColor: surfaceColor,
+            buttonColor: primary,
+            buttonIconColor: Colors.white,
+            showBackspaceButton: false,
+          ),
+          searchViewConfig: SearchViewConfig(
+            backgroundColor: surfaceColor,
+            buttonIconColor: primary,
+            hintText: 'Search emoji…',
+          ),
         ),
       ),
     );

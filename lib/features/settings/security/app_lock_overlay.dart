@@ -236,28 +236,60 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
         ),
         const SizedBox(height: 24),
         ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 330),
+          constraints: const BoxConstraints(maxWidth: 320),
           child: GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             crossAxisCount: 3,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            childAspectRatio: 1.35,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 1.30,
             children: [
-              ...List<Widget>.generate(9, (index) {
-                final digit = '${index + 1}';
-                return _NumberKey(
-                  label: digit,
-                  onTap: (_busy || _cooldownSeconds > 0)
-                      ? null
-                      : () => _verifyPinDigit(digit),
-                );
-              }),
-              // Overlay-safe action keys: this modal renders above the
-              // Navigator (no Overlay ancestor), where Tooltip-backed
-              // IconButtons crash with "No Overlay widget found". Semantics
-              // carries accessibility instead.
+              _NumberKey(
+                label: '1',
+                sublabel: '',
+                onTap: (_busy || _cooldownSeconds > 0) ? null : () => _verifyPinDigit('1'),
+              ),
+              _NumberKey(
+                label: '2',
+                sublabel: 'ABC',
+                onTap: (_busy || _cooldownSeconds > 0) ? null : () => _verifyPinDigit('2'),
+              ),
+              _NumberKey(
+                label: '3',
+                sublabel: 'DEF',
+                onTap: (_busy || _cooldownSeconds > 0) ? null : () => _verifyPinDigit('3'),
+              ),
+              _NumberKey(
+                label: '4',
+                sublabel: 'GHI',
+                onTap: (_busy || _cooldownSeconds > 0) ? null : () => _verifyPinDigit('4'),
+              ),
+              _NumberKey(
+                label: '5',
+                sublabel: 'JKL',
+                onTap: (_busy || _cooldownSeconds > 0) ? null : () => _verifyPinDigit('5'),
+              ),
+              _NumberKey(
+                label: '6',
+                sublabel: 'MNO',
+                onTap: (_busy || _cooldownSeconds > 0) ? null : () => _verifyPinDigit('6'),
+              ),
+              _NumberKey(
+                label: '7',
+                sublabel: 'PQRS',
+                onTap: (_busy || _cooldownSeconds > 0) ? null : () => _verifyPinDigit('7'),
+              ),
+              _NumberKey(
+                label: '8',
+                sublabel: 'TUV',
+                onTap: (_busy || _cooldownSeconds > 0) ? null : () => _verifyPinDigit('8'),
+              ),
+              _NumberKey(
+                label: '9',
+                sublabel: 'WXYZ',
+                onTap: (_busy || _cooldownSeconds > 0) ? null : () => _verifyPinDigit('9'),
+              ),
               _PinActionKey(
                 semanticsLabel: 'Use biometric',
                 icon: Icons.fingerprint_rounded,
@@ -267,9 +299,8 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
               ),
               _NumberKey(
                 label: '0',
-                onTap: (_busy || _cooldownSeconds > 0)
-                    ? null
-                    : () => _verifyPinDigit('0'),
+                sublabel: '+',
+                onTap: (_busy || _cooldownSeconds > 0) ? null : () => _verifyPinDigit('0'),
               ),
               _PinActionKey(
                 semanticsLabel: 'Delete digit',
@@ -381,25 +412,65 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                         icon: const Icon(Icons.security_rounded),
                         label: Text('Set up $method'),
                       ),
-                    ] else if (method == 'PIN')
-                      _buildPinPad(theme)
-                    else if (method == 'Pattern') ...[
+                    ] else if (method == 'PIN') ...[
+                      _buildPinPad(theme),
+                      const SizedBox(height: 12),
+                      if (_biometricAvailable)
+                        TextButton.icon(
+                          onPressed: _busy
+                              ? null
+                              : () => _runNativeAuthentication('Biometric'),
+                          icon: const Icon(Icons.fingerprint_rounded, size: 18),
+                          label: const Text('Use fingerprint / Face unlock'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: theme.colorScheme.primary,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          ),
+                        ),
+                      TextButton(
+                        onPressed: _busy
+                            ? null
+                            : () => _runNativeAuthentication('Device Credential'),
+                        child: Text(
+                          'Can\'t remember? Use device screen lock',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ),
+                    ] else if (method == 'Pattern') ...[
                       PatternLockPad(
                         hideTrace: security.makePatternInvisible,
                         enableHaptics: !security.disablePatternVibration,
                         onPatternComplete: (pattern) =>
                             _verifySecret('Pattern', pattern),
                       ),
-                      if (_biometricAvailable) ...[
-                        const SizedBox(height: 8),
+                      const SizedBox(height: 14),
+                      if (_biometricAvailable)
                         TextButton.icon(
                           onPressed: _busy
                               ? null
                               : () => _runNativeAuthentication('Biometric'),
-                          icon: const Icon(Icons.fingerprint_rounded),
-                          label: const Text('Use biometric instead'),
+                          icon: const Icon(Icons.fingerprint_rounded, size: 18),
+                          label: const Text('Use fingerprint / Face unlock'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: theme.colorScheme.primary,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          ),
                         ),
-                      ],
+                      TextButton(
+                        onPressed: _busy
+                            ? null
+                            : () => _runNativeAuthentication('Device Credential'),
+                        child: Text(
+                          'Can\'t remember? Use device screen lock',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ),
                     ] else if (method == 'Password') ...[
                       TextField(
                         controller: _passwordController,
@@ -408,9 +479,13 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                         autofocus: true,
                         onSubmitted: (value) =>
                             _verifySecret('Password', value),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Password',
-                          border: OutlineInputBorder(),
+                          filled: true,
+                          fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -421,6 +496,12 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                                 'Password',
                                 _passwordController.text,
                               ),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
                         child: _busy
                             ? const SizedBox.square(
                                 dimension: 20,
@@ -430,6 +511,7 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                               )
                             : const Text('Unlock'),
                       ),
+                      const SizedBox(height: 10),
                       if (_biometricAvailable)
                         TextButton.icon(
                           onPressed: _busy
@@ -438,6 +520,18 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                           icon: const Icon(Icons.fingerprint_rounded),
                           label: const Text('Use biometric instead'),
                         ),
+                      TextButton(
+                        onPressed: _busy
+                            ? null
+                            : () => _runNativeAuthentication('Device Credential'),
+                        child: Text(
+                          'Can\'t remember? Use device screen lock',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ),
                     ] else ...[
                       const SizedBox(height: 8),
                       if (_busy)
@@ -468,26 +562,78 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
   }
 }
 
-class _NumberKey extends StatelessWidget {
+class _NumberKey extends StatefulWidget {
   final String label;
+  final String sublabel;
   final VoidCallback? onTap;
 
-  const _NumberKey({required this.label, required this.onTap});
+  const _NumberKey({
+    required this.label,
+    this.sublabel = '',
+    required this.onTap,
+  });
+
+  @override
+  State<_NumberKey> createState() => _NumberKeyState();
+}
+
+class _NumberKeyState extends State<_NumberKey> {
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Material(
-      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
-      borderRadius: BorderRadius.circular(22),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Center(
-          child: Text(
-            label,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w700,
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.colorScheme.primary;
+
+    return AnimatedScale(
+      scale: _pressed ? 0.94 : 1.0,
+      duration: const Duration(milliseconds: 100),
+      curve: Curves.easeOutCubic,
+      child: Material(
+        color: isDark
+            ? (_pressed
+                ? primaryColor.withValues(alpha: 0.22)
+                : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45))
+            : (_pressed
+                ? primaryColor.withValues(alpha: 0.15)
+                : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6)),
+        borderRadius: BorderRadius.circular(28),
+        child: InkWell(
+          onTap: widget.onTap,
+          onTapDown: widget.onTap == null ? null : (_) => setState(() => _pressed = true),
+          onTapUp: (_) => setState(() => _pressed = false),
+          onTapCancel: () => setState(() => _pressed = false),
+          borderRadius: BorderRadius.circular(28),
+          splashColor: primaryColor.withValues(alpha: 0.15),
+          highlightColor: Colors.transparent,
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  widget.label,
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 24,
+                    height: 1.1,
+                  ),
+                ),
+                if (widget.sublabel.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      widget.sublabel,
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.5,
+                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
@@ -496,11 +642,8 @@ class _NumberKey extends StatelessWidget {
   }
 }
 
-/// Pin-pad action key that never depends on a Tooltip/Overlay. This modal is
-/// hosted above the Navigator by MaterialApp.builder, so Overlay-dependent
-/// widgets must not appear here. Accessibility comes from Semantics; the
-/// grid geometry keeps the key comfortably above the 48dp minimum target.
-class _PinActionKey extends StatelessWidget {
+/// Pin-pad action key with tactile spring physics and glassmorphism.
+class _PinActionKey extends StatefulWidget {
   final String semanticsLabel;
   final IconData icon;
   final VoidCallback? onTap;
@@ -512,22 +655,45 @@ class _PinActionKey extends StatelessWidget {
   });
 
   @override
+  State<_PinActionKey> createState() => _PinActionKeyState();
+}
+
+class _PinActionKeyState extends State<_PinActionKey> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Semantics(
       button: true,
-      enabled: onTap != null,
-      label: semanticsLabel,
-      child: Material(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.55,
-        ),
-        borderRadius: BorderRadius.circular(22),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(22),
-          child: Center(
-            child: Icon(icon, size: 26, color: theme.colorScheme.onSurface),
+      enabled: widget.onTap != null,
+      label: widget.semanticsLabel,
+      child: AnimatedScale(
+        scale: _pressed ? 0.94 : 1.0,
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeOutCubic,
+        child: Material(
+          color: isDark
+              ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
+              : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(28),
+          child: InkWell(
+            onTap: widget.onTap,
+            onTapDown: widget.onTap == null ? null : (_) => setState(() => _pressed = true),
+            onTapUp: (_) => setState(() => _pressed = false),
+            onTapCancel: () => setState(() => _pressed = false),
+            borderRadius: BorderRadius.circular(28),
+            child: Center(
+              child: Icon(
+                widget.icon,
+                size: 24,
+                color: widget.onTap != null
+                    ? theme.colorScheme.onSurface
+                    : theme.colorScheme.onSurface.withValues(alpha: 0.3),
+              ),
+            ),
           ),
         ),
       ),
