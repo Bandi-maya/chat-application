@@ -26,6 +26,9 @@ class PreferenceKeys {
   /// before the first frame (before auth is known) to avoid a theme flash.
   static const String themeState = 'chaty_theme_v1';
 
+  /// Device-global UI template configuration state.
+  static const String templateState = 'chaty_template_v1';
+
   /// Id of the last authenticated user, used to safely adopt a legacy global
   /// blob into its rightful owner's namespace exactly once.
   static const String storedUserId = 'chaty_stored_user_id';

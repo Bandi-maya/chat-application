@@ -92,6 +92,27 @@ class LocalPreferencesStorage {
   }
 
   // ---------------------------------------------------------------------------
+  // Device-global template configuration state.
+  // ---------------------------------------------------------------------------
+
+  static Future<Map<String, dynamic>> loadTemplateState() async {
+    return _loadJsonMap(PreferenceKeys.templateState, 'template state');
+  }
+
+  static Future<bool> saveTemplateState(Map<String, dynamic> data) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return await prefs.setString(
+        PreferenceKeys.templateState,
+        jsonEncode(data),
+      );
+    } catch (_) {
+      debugPrint('LocalPreferencesStorage: failed to save template state');
+      return false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Stored authenticated-user id (used to safely adopt a legacy global blob).
   // ---------------------------------------------------------------------------
 
