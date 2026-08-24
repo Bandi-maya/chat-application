@@ -982,87 +982,150 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     required ValueChanged<int> onSelect,
   }) {
     final colors = context.colors;
-    showModalBottomSheet<void>(
+    showGeneralDialog<void>(
       context: context,
-      backgroundColor: Colors.transparent,
-      showDragHandle: false,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Container(
-            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            decoration: BoxDecoration(
-              color: colors.surfaceElevated,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: colors.borderSubtle, width: 0.8),
-              boxShadow: [
-                BoxShadow(
-                  color: colors.shadow,
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+      barrierDismissible: true,
+      barrierLabel: 'More Menu',
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 180),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 380,
+              maxHeight: 520,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 12),
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: colors.foregroundTertiary.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2),
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                decoration: BoxDecoration(
+                  color: colors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: colors.borderSubtle, width: 0.8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colors.shadow,
+                      blurRadius: 28,
+                      offset: const Offset(0, 10),
                     ),
-                  ),
+                  ],
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
-                  child: Text(
-                    'More',
-                    style: TextStyle(
-                      color: colors.foreground,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 18, 16, 12),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: colors.primary.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.grid_view_rounded,
+                              color: colors.primary,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'More Destinations',
+                                  style: TextStyle(
+                                    color: colors.foreground,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                Text(
+                                  'Quick access to extended views',
+                                  style: TextStyle(
+                                    color: colors.foregroundSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded),
+                            iconSize: 20,
+                            color: colors.foregroundSecondary,
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ),
-                Divider(color: colors.divider, height: 1),
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  itemCount: overflowDestinations.length,
-                  separatorBuilder: (_, index) =>
-                      Divider(color: colors.divider, height: 1, indent: 56),
-                  itemBuilder: (context, i) {
-                    final item = overflowDestinations[i];
-                    return ListTile(
-                      leading: Icon(item.icon, color: colors.primary, size: 22),
-                      title: Text(
-                        item.label,
-                        style: TextStyle(
-                          color: colors.foreground,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                        ),
+                    Divider(color: colors.divider, height: 1),
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                        itemCount: overflowDestinations.length,
+                        separatorBuilder: (_, index) =>
+                            Divider(color: colors.divider.withValues(alpha: 0.5), height: 1, indent: 48),
+                        itemBuilder: (context, i) {
+                          final item = overflowDestinations[i];
+                          return ListTile(
+                            dense: true,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            leading: Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: colors.surfaceSecondary,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(item.icon, color: colors.primary, size: 20),
+                            ),
+                            title: Text(
+                              item.label,
+                              style: TextStyle(
+                                color: colors.foreground,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14.5,
+                              ),
+                            ),
+                            trailing: Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              color: colors.foregroundTertiary,
+                              size: 14,
+                            ),
+                            onTap: () {
+                              Navigator.of(dialogContext).pop();
+                              onSelect(i);
+                            },
+                          );
+                        },
                       ),
-                      trailing: Icon(
-                        Icons.chevron_right_rounded,
-                        color: colors.foregroundTertiary,
-                        size: 20,
-                      ),
-                      onTap: () {
-                        Navigator.of(sheetContext).pop();
-                        onSelect(i);
-                      },
-                    );
-                  },
+                    ),
+                    const SizedBox(height: 6),
+                  ],
                 ),
-                const SizedBox(height: 8),
-              ],
+              ),
             ),
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.94, end: 1.0).animate(curved),
+            child: child,
           ),
         );
       },

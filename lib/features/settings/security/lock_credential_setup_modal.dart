@@ -251,15 +251,21 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
   }
 
   Future<void> _handlePatternContinue() async {
-    if (_firstPatternDrawn == null) {
-      setState(() => _error = 'Draw your pattern first.');
+    final pattern = _currentStep == StepState.confirmNew
+        ? _confirmPatternDrawn
+        : _firstPatternDrawn;
+
+    if (pattern == null) {
+      setState(() => _error = _currentStep == StepState.confirmNew
+          ? 'Draw the confirmation pattern first.'
+          : 'Draw your pattern first.');
       return;
     }
 
     if (_currentStep == StepState.enterCurrent) {
       setState(() => _busy = true);
       final isValid =
-          await widget.lockService.verifyCredential('Pattern', _firstPatternDrawn!);
+          await widget.lockService.verifyCredential('Pattern', pattern);
       if (!mounted) return;
       setState(() => _busy = false);
       if (isValid) {
@@ -277,7 +283,7 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
         });
       }
     } else if (_currentStep == StepState.enterNew) {
-      _newSecret = _firstPatternDrawn!;
+      _newSecret = pattern;
       _padKey.currentState?.reset();
       setState(() {
         _firstPatternDrawn = null;
@@ -286,11 +292,7 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
         _error = '';
       });
     } else if (_currentStep == StepState.confirmNew) {
-      if (_confirmPatternDrawn == null) {
-        setState(() => _error = 'Draw the confirmation pattern.');
-        return;
-      }
-      if (_confirmPatternDrawn != _newSecret) {
+      if (pattern != _newSecret) {
         _padKey.currentState?.reset();
         setState(() {
           _confirmPatternDrawn = null;

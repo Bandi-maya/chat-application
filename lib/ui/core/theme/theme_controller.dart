@@ -128,6 +128,13 @@ class ThemeController extends ChangeNotifier {
 
   void toggleBrightness() {
     final currentId = _globalTheme.id.toLowerCase();
+    if (currentId == 'warm_neutral') {
+      setGlobalTheme(ThemePresets.warmNeutralDark);
+      return;
+    } else if (currentId == 'warm_neutral_dark') {
+      setGlobalTheme(ThemePresets.warmNeutral);
+      return;
+    }
 
     // Check if there is an exact registered preset counterpart
     if (currentId.contains('dark') || currentId.contains('light')) {
