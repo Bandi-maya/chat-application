@@ -82,10 +82,12 @@ class EffectEngine extends ChangeNotifier {
       );
     }
 
-    // Overlay animated AR stickers (confetti, sparkles, hearts) if applicable
+    // Overlay animated AR stickers & Face Overlays if applicable
     if (_activeEffect.category == EffectCategory.celebration ||
         _activeEffect.id == 'face_sparkles' ||
-        _activeEffect.id == 'face_hearts_float') {
+        _activeEffect.id == 'face_hearts_float' ||
+        _activeEffect.id == 'face_dog_filter' ||
+        _activeEffect.id == 'face_neon_crown') {
       current = Stack(
         fit: StackFit.passthrough,
         children: [
@@ -182,6 +184,15 @@ class _ParticlePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (effectId == 'face_dog_filter') {
+      _paintDogFace(canvas, size);
+      return;
+    }
+    if (effectId == 'face_neon_crown') {
+      _paintNeonCrown(canvas, size);
+      return;
+    }
+
     final paint = Paint()..style = PaintingStyle.fill;
 
     for (int i = 0; i < 15; i++) {
@@ -211,6 +222,79 @@ class _ParticlePainter extends CustomPainter {
         canvas.drawRect(Rect.fromLTWH(x, y, radius * 2, radius * 1.5), paint);
       }
     }
+  }
+
+  void _paintDogFace(Canvas canvas, Size size) {
+    final centerX = size.width * 0.5;
+    final centerY = size.height * 0.45;
+    final headWidth = size.width * 0.55;
+
+    final earPaint = Paint()
+      ..color = const Color(0xFF8D5B4C)
+      ..style = PaintingStyle.fill;
+    final earInnerPaint = Paint()
+      ..color = const Color(0xFFFBB6CE)
+      ..style = PaintingStyle.fill;
+
+    // Left Ear
+    final leftEarX = centerX - headWidth * 0.45;
+    final earY = centerY - headWidth * 0.55;
+    final earW = headWidth * 0.32;
+    final earH = headWidth * 0.55;
+    canvas.save();
+    canvas.translate(leftEarX, earY);
+    canvas.rotate(-0.25);
+    canvas.drawOval(Rect.fromCenter(center: Offset.zero, width: earW, height: earH), earPaint);
+    canvas.drawOval(Rect.fromCenter(center: Offset.zero, width: earW * 0.65, height: earH * 0.65), earInnerPaint);
+    canvas.restore();
+
+    // Right Ear
+    final rightEarX = centerX + headWidth * 0.45;
+    canvas.save();
+    canvas.translate(rightEarX, earY);
+    canvas.rotate(0.25);
+    canvas.drawOval(Rect.fromCenter(center: Offset.zero, width: earW, height: earH), earPaint);
+    canvas.drawOval(Rect.fromCenter(center: Offset.zero, width: earW * 0.65, height: earH * 0.65), earInnerPaint);
+    canvas.restore();
+
+    // Nose & Muzzle
+    final noseY = centerY + headWidth * 0.05;
+    final nosePaint = Paint()..color = const Color(0xFF1E1E1E)..style = PaintingStyle.fill;
+    final nosePath = Path();
+    nosePath.moveTo(centerX - 18, noseY - 6);
+    nosePath.quadraticBezierTo(centerX, noseY - 10, centerX + 18, noseY - 6);
+    nosePath.quadraticBezierTo(centerX + 14, noseY + 14, centerX, noseY + 18);
+    nosePath.quadraticBezierTo(centerX - 14, noseY + 14, centerX - 18, noseY - 6);
+    nosePath.close();
+    canvas.drawPath(nosePath, nosePaint);
+
+    // Whiskers / muzzle blush
+    final blushPaint = Paint()..color = Colors.pinkAccent.withValues(alpha: 0.25)..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(centerX - 42, noseY + 8), 16, blushPaint);
+    canvas.drawCircle(Offset(centerX + 42, noseY + 8), 16, blushPaint);
+  }
+
+  void _paintNeonCrown(Canvas canvas, Size size) {
+    final centerX = size.width * 0.5;
+    final crownY = size.height * 0.22;
+    final crownPaint = Paint()
+      ..color = const Color(0xFFFBBF24)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final path = Path();
+    path.moveTo(centerX - 50, crownY + 10);
+    path.lineTo(centerX - 40, crownY - 20);
+    path.lineTo(centerX - 18, crownY - 5);
+    path.lineTo(centerX, crownY - 35);
+    path.lineTo(centerX + 18, crownY - 5);
+    path.lineTo(centerX + 40, crownY - 20);
+    path.lineTo(centerX + 50, crownY + 10);
+    path.close();
+
+    canvas.drawPath(path, crownPaint);
   }
 
   @override

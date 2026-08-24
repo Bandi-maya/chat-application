@@ -313,19 +313,39 @@ class ThemePresets {
     id: 'warm_neutral',
     name: 'Warm Neutral',
     brightness: Brightness.light,
-    accentColor: Color(0xFF78350F),
-    backgroundColor: Color(0xFFFEF3C7),
-    surfaceColor: Color(0xFFFFFBEB),
-    cardColor: Color(0xFFFDE68A),
-    primaryTextColor: Color(0xFF451A03),
-    secondaryTextColor: Color(0xFF78350F),
-    outgoingBubbleColor: Color(0xFF92400E),
-    incomingBubbleColor: Color(0xFFFEF3C7),
+    accentColor: Color(0xFF8C5E3C),
+    backgroundColor: Color(0xFFF7F5F0),
+    surfaceColor: Color(0xFFFFFFFF),
+    cardColor: Color(0xFFEDE8DF),
+    primaryTextColor: Color(0xFF2B2623),
+    secondaryTextColor: Color(0xFF7D756D),
+    outgoingBubbleColor: Color(0xFF8C5E3C),
+    incomingBubbleColor: Color(0xFFEDE8DF),
     outgoingTextColor: Color(0xFFFFFFFF),
-    incomingTextColor: Color(0xFF451A03),
-    linkColor: Color(0xFFB45309),
+    incomingTextColor: Color(0xFF2B2623),
+    linkColor: Color(0xFF9A5B32),
     dangerColor: Color(0xFFDC2626),
     successColor: Color(0xFF16A34A),
+    cornerRadius: 16.0,
+  );
+
+  static const ThemeConfig warmNeutralDark = ThemeConfig(
+    id: 'warm_neutral_dark',
+    name: 'Warm Neutral Dark',
+    brightness: Brightness.dark,
+    accentColor: Color(0xFFD4A373),
+    backgroundColor: Color(0xFF1C1917),
+    surfaceColor: Color(0xFF292524),
+    cardColor: Color(0xFF383330),
+    primaryTextColor: Color(0xFFFAF7F2),
+    secondaryTextColor: Color(0xFFA8A29E),
+    outgoingBubbleColor: Color(0xFF8C5E3C),
+    incomingBubbleColor: Color(0xFF292524),
+    outgoingTextColor: Color(0xFFFFFFFF),
+    incomingTextColor: Color(0xFFFAF7F2),
+    linkColor: Color(0xFFE6AD7A),
+    dangerColor: Color(0xFFEF4444),
+    successColor: Color(0xFF22C55E),
     cornerRadius: 16.0,
   );
 
@@ -502,6 +522,7 @@ class ThemePresets {
     arctic,
     amoled,
     warmNeutral,
+    warmNeutralDark,
     cobalt,
     sage,
     burgundy,
@@ -513,7 +534,7 @@ class ThemePresets {
     final brightness =
         platformBrightness ??
         WidgetsBinding.instance.platformDispatcher.platformBrightness;
-    return brightness == Brightness.light ? whatsappIosLight : whatsappIosDark;
+    return brightness == Brightness.light ? warmNeutral : warmNeutralDark;
   }
 
   static ThemeConfig getById(String id) {

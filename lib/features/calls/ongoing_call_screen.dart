@@ -8,7 +8,6 @@ import '../../domain/models/call_state.dart';
 import '../../features/camera/effects/effect_engine.dart';
 import '../../features/camera/effects/effect_registry.dart';
 import '../../injection/locator.dart';
-import '../../ui/core/design_system/chaty_haptics.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 

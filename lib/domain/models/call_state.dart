@@ -39,6 +39,7 @@ class ChatyCallSession {
   final bool isMuted;
   final bool isCameraOff;
   final bool isFrontCamera;
+  final bool isSharingScreen;
 
   const ChatyCallSession({
     required this.callId,
@@ -56,6 +57,7 @@ class ChatyCallSession {
     this.isMuted = false,
     this.isCameraOff = false,
     this.isFrontCamera = true,
+    this.isSharingScreen = false,
   });
 
   ChatyCallSession copyWith({
@@ -66,6 +68,7 @@ class ChatyCallSession {
     bool? isMuted,
     bool? isCameraOff,
     bool? isFrontCamera,
+    bool? isSharingScreen,
   }) {
     return ChatyCallSession(
       callId: callId,
@@ -83,6 +86,7 @@ class ChatyCallSession {
       isMuted: isMuted ?? this.isMuted,
       isCameraOff: isCameraOff ?? this.isCameraOff,
       isFrontCamera: isFrontCamera ?? this.isFrontCamera,
+      isSharingScreen: isSharingScreen ?? this.isSharingScreen,
     );
   }
 }

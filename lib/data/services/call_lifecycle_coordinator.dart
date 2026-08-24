@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../domain/models/call_state.dart';
@@ -18,8 +17,8 @@ class CallLifecycleCoordinator with WidgetsBindingObserver {
     required CallSignalingService callService,
     required ChatyCallForegroundService foregroundService,
     this.reconnectGracePeriod = const Duration(seconds: 15),
-  }) : _callService = callService,
-       _foregroundService = foregroundService;
+  })  : _callService = callService,
+        _foregroundService = foregroundService;
 
   final CallSignalingService _callService;
   final ChatyCallForegroundService _foregroundService;

@@ -86,6 +86,8 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
   bool _effectsOpen = false;
   bool _capturing = false;
 
+  bool _switchingCamera = false;
+
   XFile? _capturedFile;
   final TextEditingController _captionCtrl = TextEditingController();
   final FocusNode _captionFocus = FocusNode();
@@ -127,8 +129,17 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
   }
 
   Future<void> _startController(CameraDescription description) async {
-    setState(() => _phase = _CameraPhase.initializing);
+    if (_controller != null) {
+      setState(() => _phase = _CameraPhase.initializing);
+    }
     final previous = _controller;
+    _controller = null;
+    if (previous != null) {
+      try {
+        await previous.dispose();
+      } catch (_) {}
+    }
+
     final controller = CameraController(
       description,
       ResolutionPreset.high,
@@ -142,7 +153,15 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
         return;
       }
       _controller = controller;
-      await previous?.dispose();
+      if (_flashOn && description.lensDirection == CameraLensDirection.back) {
+        try {
+          await controller.setFlashMode(FlashMode.torch);
+        } catch (_) {
+          if (mounted) setState(() => _flashOn = false);
+        }
+      } else if (_flashOn) {
+        if (mounted) setState(() => _flashOn = false);
+      }
       setState(() => _phase = _CameraPhase.ready);
     } on CameraException catch (error) {
       await controller.dispose();
@@ -191,21 +210,27 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
   }
 
   Future<void> _flipCamera() async {
+    if (_switchingCamera || _phase == _CameraPhase.initializing) return;
+    _switchingCamera = true;
     ChatyHaptics.selection();
-    final List<CameraDescription> cameras;
     try {
-      cameras = await availableCameras();
-    } catch (_) {
-      return;
+      final List<CameraDescription> cameras;
+      try {
+        cameras = await availableCameras();
+      } catch (_) {
+        return;
+      }
+      if (cameras.length < 2) return;
+      final current = _controller?.description;
+      final next = cameras.firstWhere(
+        (camera) =>
+            current == null || camera.lensDirection != current.lensDirection,
+        orElse: () => cameras.first,
+      );
+      await _startController(next);
+    } finally {
+      _switchingCamera = false;
     }
-    if (cameras.length < 2) return;
-    final current = _controller?.description;
-    final next = cameras.firstWhere(
-      (camera) =>
-          current == null || camera.lensDirection != current.lensDirection,
-      orElse: () => cameras.first,
-    );
-    await _startController(next);
   }
 
   Future<void> _pickFromGallery() async {

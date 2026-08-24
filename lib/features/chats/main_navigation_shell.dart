@@ -6,7 +6,6 @@ import '../../data/services/notification_service.dart';
 import '../../domain/models/conversation.dart';
 import '../../ui/core/controllers/appearance_variant_controller.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
-import '../../ui/core/design_system/chaty_haptics.dart';
 import '../../ui/core/gb/gb_theme_overrides.dart';
 import '../calls/calls_screen.dart';
 import '../settings/settings_root_screen.dart';

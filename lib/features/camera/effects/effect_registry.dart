@@ -14,6 +14,22 @@ class EffectRegistry {
       previewColor: Color(0xFF64748B),
     ),
 
+    // Dog Face AR Effect (Ears, Nose & Paws Overlay)
+    const ChatyCameraEffect(
+      id: 'face_dog_filter',
+      name: 'Puppy Face',
+      category: EffectCategory.faceAR,
+      icon: Icons.pets_rounded,
+      previewColor: Color(0xFFB45309),
+      isFaceTrackingRequired: true,
+      colorMatrix: [
+        1.08, 0.0, 0.0, 0.0, 8.0,
+        0.0, 1.04, 0.0, 0.0, 6.0,
+        0.0, 0.0, 1.02, 0.0, 4.0,
+        0.0, 0.0, 0.0, 1.0, 0.0,
+      ],
+    ),
+
     // --- BEAUTY (10 effects) ---
     const ChatyCameraEffect(
       id: 'beauty_soft_smooth',

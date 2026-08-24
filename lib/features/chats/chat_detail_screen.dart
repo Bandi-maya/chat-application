@@ -299,12 +299,25 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       _scrollToBottom();
     } catch (error) {
       if (!mounted) return;
-      _textCtrl.text = text;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.toString().replaceFirst('Exception: ', '')),
-        ),
-      );
+      final raw = error.toString();
+      if (_isSecureSetupPendingError(raw)) {
+        await _realtime.trackConversation(widget.conversationId);
+        _scrollToBottom();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Message queued — sending automatically once secure setup finishes.',
+            ),
+          ),
+        );
+      } else {
+        _textCtrl.text = text;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(raw.replaceFirst('Exception: ', '')),
+          ),
+        );
+      }
       setState(() {});
     }
   }
