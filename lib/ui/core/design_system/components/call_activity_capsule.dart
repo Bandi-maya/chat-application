@@ -129,9 +129,7 @@ class ChatyCallActivityCapsule extends StatelessWidget {
                     ),
                   ),
                   _OverlaySafeCallAction(
-                    semanticsLabel: isSpeaker
-                        ? 'Use earpiece'
-                        : 'Use speaker',
+                    semanticsLabel: isSpeaker ? 'Use earpiece' : 'Use speaker',
                     icon: isSpeaker
                         ? Icons.volume_up_rounded
                         : Icons.hearing_rounded,
@@ -187,9 +185,7 @@ class _OverlaySafeCallAction extends StatelessWidget {
           child: InkWell(
             customBorder: const CircleBorder(),
             onTap: onPressed,
-            child: Center(
-              child: Icon(icon, color: foregroundColor, size: 22),
-            ),
+            child: Center(child: Icon(icon, color: foregroundColor, size: 22)),
           ),
         ),
       ),

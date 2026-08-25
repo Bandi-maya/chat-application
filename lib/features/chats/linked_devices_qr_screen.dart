@@ -284,55 +284,54 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen>
                       size: 20,
                     ),
                   ),
-                        title: Text(
-                          device.deviceName,
-                          style: TextStyle(
-                            color: themeData.colorScheme.onSurface,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
+                  title: Text(
+                    device.deviceName,
+                    style: TextStyle(
+                      color: themeData.colorScheme.onSurface,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${device.platform}${device.location.isEmpty ? '' : ' • ${device.location}'}\n${_lastActive(device)}',
+                    style: ChatyTypography.caption(
+                      themeData.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  trailing: device.isCurrentDevice
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
                           ),
-                        ),
-                        subtitle: Text(
-                          '${device.platform}${device.location.isEmpty ? '' : ' • ${device.location}'}\n${_lastActive(device)}',
-                          style: ChatyTypography.caption(
-                            themeData.colorScheme.onSurface.withValues(
-                              alpha: 0.6,
+                          decoration: BoxDecoration(
+                            color: themeData.colorScheme.primary.withValues(
+                              alpha: 0.12,
+                            ),
+                            borderRadius: BorderRadius.circular(
+                              ChatyRadius.full,
                             ),
                           ),
+                          child: Text(
+                            'This Device',
+                            style: TextStyle(
+                              color: themeData.colorScheme.primary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        )
+                      : ChatyIconButton(
+                          tooltip: 'Log out device',
+                          icon: Icons.logout_rounded,
+                          color: context.colors.error,
+                          onPressed: () => _revoke(device),
                         ),
-                        trailing: device.isCurrentDevice
-                            ? Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: themeData.colorScheme.primary
-                                      .withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(
-                                    ChatyRadius.full,
-                                  ),
-                                ),
-                                child: Text(
-                                  'This Device',
-                                  style: TextStyle(
-                                    color: themeData.colorScheme.primary,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              )
-                            : ChatyIconButton(
-                                tooltip: 'Log out device',
-                                icon: Icons.logout_rounded,
-                                color: context.colors.error,
-                                onPressed: () => _revoke(device),
-                              ),
-                      ),
-                  ],
                 ),
-              ],
-            ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 

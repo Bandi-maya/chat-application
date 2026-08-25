@@ -610,8 +610,14 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
                 incomingCall != null && _backend.isAuthenticated;
 
             final presentation = locator<CallPresentationController>();
-            final showFloatingVideo = presentation.isInAppVideoPip && callSession != null && callSession.isActive;
-            final showIsland = presentation.isInAppIsland && callSession != null && callSession.isActive;
+            final showFloatingVideo =
+                presentation.isInAppVideoPip &&
+                callSession != null &&
+                callSession.isActive;
+            final showIsland =
+                presentation.isInAppIsland &&
+                callSession != null &&
+                callSession.isActive;
 
             final baseStack = Stack(
               fit: StackFit.expand,

@@ -15,14 +15,17 @@ void main() {
     }
   });
 
-  test('unknown launcher icon preference safely falls back to warm default', () {
-    expect(
-      LauncherIconVariantMetadata.fromId('removed_future_icon'),
-      LauncherIconVariant.warm,
-    );
-    expect(
-      LauncherIconVariantMetadata.fromId('original'),
-      LauncherIconVariant.warm,
-    );
-  });
+  test(
+    'unknown launcher icon preference safely falls back to warm default',
+    () {
+      expect(
+        LauncherIconVariantMetadata.fromId('removed_future_icon'),
+        LauncherIconVariant.warm,
+      );
+      expect(
+        LauncherIconVariantMetadata.fromId('original'),
+        LauncherIconVariant.warm,
+      );
+    },
+  );
 }

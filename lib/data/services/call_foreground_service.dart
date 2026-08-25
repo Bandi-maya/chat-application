@@ -135,9 +135,7 @@ class ChatyCallForegroundService {
       // WebRTC remains the media source of truth. A foreground-service failure
       // must be visible in diagnostics but must never be presented as a
       // successful background-call guarantee.
-      debugPrint(
-        'Chaty foreground call service failed: $error\n$stackTrace',
-      );
+      debugPrint('Chaty foreground call service failed: $error\n$stackTrace');
     } finally {
       _startInFlight = false;
     }

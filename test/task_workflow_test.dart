@@ -6,16 +6,13 @@ import 'package:chat/domain/models/task_workflow.dart';
 void main() {
   group('TaskWorkflow stage order', () {
     test('board order is Todo → In Process → In Review → Testing → Done', () {
-      expect(
-        TaskWorkflow.stages,
-        const [
-          TaskStatus.inbox,
-          TaskStatus.inProgress,
-          TaskStatus.assigned,
-          TaskStatus.blocked,
-          TaskStatus.completed,
-        ],
-      );
+      expect(TaskWorkflow.stages, const [
+        TaskStatus.inbox,
+        TaskStatus.inProgress,
+        TaskStatus.assigned,
+        TaskStatus.blocked,
+        TaskStatus.completed,
+      ]);
     });
 
     test('next() advances every stage and stops at Done', () {

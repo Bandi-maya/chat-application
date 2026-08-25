@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -14,6 +15,7 @@ import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/realtime/realtime_event_bus.dart';
 import '../../ui/core/validators/input_validators.dart';
+import 'connection_health_service.dart';
 import 'local_snapshot_cache_service.dart';
 import 'mls_e2ee_service.dart';
 import 'pending_secure_send_store.dart';
@@ -128,16 +130,16 @@ class ChatyBackendService extends ChangeNotifier {
 
   Future<void> _initialize() async {
     try {
-      _authSubscription ??= _client.auth.onAuthStateChange.listen(
-        (AuthState state) {
-          unawaited(_handleSession(state.session));
-        },
-      );
+      _authSubscription ??= _client.auth.onAuthStateChange.listen((
+        AuthState state,
+      ) {
+        unawaited(_handleSession(state.session));
+      });
 
       await _handleSession(_client.auth.currentSession);
       _isInitialized = true;
       notifyListeners();
-    } catch (_) {
+    } catch (e) {
       // A transient local-storage or platform failure must not permanently
       // poison initialization. Concurrent callers still share this attempt;
       // a later caller may retry once the failed future has completed.
@@ -295,7 +297,8 @@ class ChatyBackendService extends ChangeNotifier {
         _currentUser = fallback;
         _usersById[fallback.id] = fallback;
       }
-    } catch (_) {
+    } catch (e, stackTrace) {
+      debugPrint('Error loading current profile: $e\n$stackTrace');
       final fallback = UserProfile(
         id: user.id,
         displayName:
@@ -709,7 +712,9 @@ class ChatyBackendService extends ChangeNotifier {
     if (channel != null) {
       try {
         await _client.removeChannel(channel);
-      } catch (_) {}
+      } catch (e, stackTrace) {
+        debugPrint('Error removing realtime channel: $e\n$stackTrace');
+      }
     }
   }
 
@@ -979,13 +984,54 @@ class ChatyBackendService extends ChangeNotifier {
     try {
       return await _deliverEncryptedMessage(pendingSend, fallbackType: type);
     } catch (error) {
-      if (!_isMlsSetupPendingError(error)) rethrow;
-      // Conversation devices have not finished MLS registration yet. The
-      // content is queued locally (encrypted at rest) and delivered by
-      // [_retryPendingSecureSends] once setup completes. No plaintext
-      // upload path exists.
+      // If error is due to MLS group setup or network / backend unavailability:
+      // Enqueue to persistent store and insert an optimistic local message in sending / queued state.
       await _pendingSecureSends.put(me.id, pendingSend);
-      throw SecureSendPendingException(secureSetupPendingCode);
+      
+      final optimisticMsg = ChatMessage(
+        id: clientMessageId,
+        conversationId: conversationId,
+        senderId: me.id,
+        type: type,
+        text: text.trim(),
+        attachment: attachment,
+        replyToMessageId: replyToMessageId,
+        replyToPreviewText: replyToPreviewText,
+        replyToSenderName: replyToSenderName,
+        linkedTaskId: linkedTaskId,
+        metadata: metadata,
+        createdAt: pendingSend.createdAt,
+        deliveryState: DeliveryState.queued,
+      );
+
+      final list = _messagesByChatId.putIfAbsent(
+        conversationId,
+        () => <ChatMessage>[],
+      );
+      if (!list.any((m) => m.id == clientMessageId)) {
+        list.add(optimisticMsg);
+      }
+      notifyListeners();
+
+      if (locator.isRegistered<ConnectionHealthService>()) {
+        final pendingList = await _pendingSecureSends.read(me.id);
+        locator<ConnectionHealthService>().updateQueuedCount(pendingList.length);
+      }
+
+      if (_isMlsSetupPendingError(error)) {
+        throw SecureSendPendingException(secureSetupPendingCode);
+      }
+
+      // Check if network error (SocketException, Timeout, 5xx, or offline)
+      if (error is SocketException ||
+          error is TimeoutException ||
+          error.toString().contains('Failed to connect') ||
+          error.toString().contains('SocketException') ||
+          error.toString().contains('ClientException')) {
+        return optimisticMsg;
+      }
+
+      rethrow;
     }
   }
 
@@ -1134,7 +1180,9 @@ class ChatyBackendService extends ChangeNotifier {
     }
 
     if (!userHadSameReaction) {
-      final existingIndex = updatedReactions.indexWhere((r) => r.emoji == emoji);
+      final existingIndex = updatedReactions.indexWhere(
+        (r) => r.emoji == emoji,
+      );
       if (existingIndex != -1) {
         final r = updatedReactions[existingIndex];
         updatedReactions[existingIndex] = r.copyWith(
@@ -1161,7 +1209,9 @@ class ChatyBackendService extends ChangeNotifier {
         'toggle_message_reaction',
         params: <String, dynamic>{'p_message_id': messageId, 'p_emoji': emoji},
       );
-    } catch (_) {}
+    } catch (e, stackTrace) {
+      debugPrint('Error toggling reaction: $e\n$stackTrace');
+    }
     await _loadMessages(conversationId);
     notifyListeners();
   }
@@ -1190,7 +1240,8 @@ class ChatyBackendService extends ChangeNotifier {
           'p_text': newText.trim(),
         },
       );
-    } catch (_) {
+    } catch (e, stackTrace) {
+      debugPrint('Error editing message via RPC: $e\n$stackTrace');
       try {
         await _client
             .from('messages')
@@ -1199,7 +1250,9 @@ class ChatyBackendService extends ChangeNotifier {
               'edited_at': DateTime.now().toUtc().toIso8601String(),
             })
             .eq('id', messageId);
-      } catch (_) {}
+      } catch (e, stackTrace) {
+        debugPrint('Error editing message: $e\n$stackTrace');
+      }
     }
     await _loadMessages(conversationId);
     notifyListeners();
@@ -1281,7 +1334,9 @@ class ChatyBackendService extends ChangeNotifier {
         'mark_conversation_unread',
         params: <String, dynamic>{'p_conversation_id': conversationId},
       );
-    } catch (_) {}
+    } catch (e, stackTrace) {
+      debugPrint('Error marking conversation as unread: $e\n$stackTrace');
+    }
   }
 
   Future<void> deleteConversation(String conversationId) async {
@@ -1293,10 +1348,13 @@ class ChatyBackendService extends ChangeNotifier {
         'delete_conversation',
         params: <String, dynamic>{'p_conversation_id': conversationId},
       );
-    } catch (_) {
+    } catch (e, stackTrace) {
+      debugPrint('Error deleting conversation via RPC: $e\n$stackTrace');
       try {
         await _client.from('conversations').delete().eq('id', conversationId);
-      } catch (_) {}
+      } catch (e, stackTrace) {
+        debugPrint('Error deleting conversation directly: $e\n$stackTrace');
+      }
     }
     await _loadConversations();
     notifyListeners();
@@ -1470,7 +1528,9 @@ class ChatyBackendService extends ChangeNotifier {
     notifyListeners();
     try {
       await _client.from('tasks').delete().eq('id', taskId);
-    } catch (_) {}
+    } catch (e, stackTrace) {
+      debugPrint('Error deleting task: $e\n$stackTrace');
+    }
     await _loadTasks();
     notifyListeners();
   }
@@ -1563,7 +1623,11 @@ class ChatyBackendService extends ChangeNotifier {
   Future<void> logout() async {
     try {
       await setPresence(PresenceState.offline);
-    } catch (_) {}
+    } catch (e, stackTrace) {
+      debugPrint(
+        'Error setting presence to offline during logout: $e\n$stackTrace',
+      );
+    }
     if (locator.isRegistered<MlsE2eeService>()) {
       await locator<MlsE2eeService>().close();
     }

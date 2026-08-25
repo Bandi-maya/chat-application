@@ -11,7 +11,9 @@ void main() {
   });
 
   group('Empty & No Results State Components Tests', () {
-    testWidgets('ChatyEmptyState renders title, message, and action button', (tester) async {
+    testWidgets('ChatyEmptyState renders title, message, and action button', (
+      tester,
+    ) async {
       var actionTapped = false;
       await tester.pumpWidget(
         MaterialApp(
@@ -36,7 +38,9 @@ void main() {
       expect(actionTapped, isTrue);
     });
 
-    testWidgets('ChatyNoResultsState renders clear action and query title', (tester) async {
+    testWidgets('ChatyNoResultsState renders clear action and query title', (
+      tester,
+    ) async {
       var cleared = false;
       await tester.pumpWidget(
         MaterialApp(

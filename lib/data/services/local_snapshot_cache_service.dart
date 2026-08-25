@@ -22,6 +22,8 @@ class LocalSnapshotCacheService {
   static const int _version = 1;
   final FlutterSecureStorage _secureStorage;
   final AesGcm _cipher = AesGcm.with256bits();
+  SecretKey? _cachedKey;
+  Future<SecretKey>? _loadKeyFuture;
 
   Future<void> writeJson({
     required String userId,
@@ -117,21 +119,39 @@ class LocalSnapshotCacheService {
           await entity.delete();
         } catch (_) {}
       }
+      _cachedKey = null;
+      _loadKeyFuture = null;
       await _secureStorage.delete(key: _keyName);
     } catch (_) {}
   }
 
-  Future<SecretKey> _loadOrCreateKey() async {
-    final existing = await _secureStorage.read(key: _keyName);
-    if (existing != null && existing.isNotEmpty) {
-      try {
-        final bytes = base64Decode(existing);
-        if (bytes.length == 32) return SecretKey(bytes);
-      } catch (_) {}
+  Future<SecretKey> _loadOrCreateKey() {
+    final cached = _cachedKey;
+    if (cached != null) return Future<SecretKey>.value(cached);
+    return _loadKeyFuture ??= _performLoadOrCreateKey();
+  }
+
+  Future<SecretKey> _performLoadOrCreateKey() async {
+    try {
+      final existing = await _secureStorage.read(key: _keyName);
+      if (existing != null && existing.isNotEmpty) {
+        try {
+          final bytes = base64Decode(existing);
+          if (bytes.length == 32) {
+            final key = SecretKey(bytes);
+            _cachedKey = key;
+            return key;
+          }
+        } catch (_) {}
+      }
+      final bytes = _randomBytes(32);
+      await _secureStorage.write(key: _keyName, value: base64Encode(bytes));
+      final key = SecretKey(bytes);
+      _cachedKey = key;
+      return key;
+    } finally {
+      _loadKeyFuture = null;
     }
-    final bytes = _randomBytes(32);
-    await _secureStorage.write(key: _keyName, value: base64Encode(bytes));
-    return SecretKey(bytes);
   }
 
   Future<File> _fileFor(String userId, String scope) async {

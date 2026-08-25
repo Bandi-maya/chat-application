@@ -86,10 +86,15 @@ class DeliveryStatusPreviewTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? accentColor.withValues(alpha: 0.1) : Colors.transparent,
+          color: isSelected
+              ? accentColor.withValues(alpha: 0.1)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: isSelected
-              ? Border.all(color: accentColor.withValues(alpha: 0.4), width: 1.5)
+              ? Border.all(
+                  color: accentColor.withValues(alpha: 0.4),
+                  width: 1.5,
+                )
               : null,
         ),
         child: Row(
@@ -131,7 +136,9 @@ class DeliveryStatusPreviewTile extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected ? accentColor : primaryTextColor.withValues(alpha: 0.3),
+                  color: isSelected
+                      ? accentColor
+                      : primaryTextColor.withValues(alpha: 0.3),
                   width: 2,
                 ),
               ),

@@ -24,7 +24,8 @@ enum CallPresentationMode {
 }
 
 /// Single authoritative manager for the active call UI presentation state machine.
-class CallPresentationController extends ChangeNotifier with WidgetsBindingObserver {
+class CallPresentationController extends ChangeNotifier
+    with WidgetsBindingObserver {
   final CallSignalingService _callService;
 
   CallPresentationMode _mode = CallPresentationMode.none;
@@ -32,8 +33,8 @@ class CallPresentationController extends ChangeNotifier with WidgetsBindingObser
   bool _isBackgrounded = false;
 
   CallPresentationController({required CallSignalingService callService})
-      // ignore: prefer_initializing_formals
-      : _callService = callService {
+    // ignore: prefer_initializing_formals
+    : _callService = callService {
     WidgetsBinding.instance.addObserver(this);
     _callService.addListener(_handleCallStateChanged);
     _handleCallStateChanged();
@@ -45,7 +46,8 @@ class CallPresentationController extends ChangeNotifier with WidgetsBindingObser
   bool get isInAppVideoPip => _mode == CallPresentationMode.inAppVideoPip;
   bool get isInAppIsland => _mode == CallPresentationMode.inAppIsland;
   bool get isSystemPip => _mode == CallPresentationMode.systemPip;
-  bool get isBackgroundNotification => _mode == CallPresentationMode.backgroundNotification;
+  bool get isBackgroundNotification =>
+      _mode == CallPresentationMode.backgroundNotification;
   bool get isNone => _mode == CallPresentationMode.none;
 
   /// Invoked when [OngoingCallScreen] is mounted or pushed to full-screen.
@@ -156,7 +158,8 @@ class CallPresentationController extends ChangeNotifier with WidgetsBindingObser
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    _isBackgrounded = state == AppLifecycleState.paused ||
+    _isBackgrounded =
+        state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached;
     _reconcilePresentationMode();

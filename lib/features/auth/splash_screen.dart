@@ -34,12 +34,10 @@ class _SplashScreenState extends State<SplashScreen>
       duration: const Duration(milliseconds: 100),
     );
 
-    _fadeAnim = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animCtrl,
-        curve: Curves.easeOut,
-      ),
-    );
+    _fadeAnim = Tween<double>(
+      begin: 0.8,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut));
 
     _animCtrl.forward();
     unawaited(_routeFromRealSession());
@@ -71,12 +69,12 @@ class _SplashScreenState extends State<SplashScreen>
         pageBuilder: (_, animation, secondaryAnimation) => destination,
         transitionsBuilder: (_, animation, secondaryAnimation, child) =>
             FadeTransition(
-          opacity: CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOut,
-          ),
-          child: child,
-        ),
+              opacity: CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOut,
+              ),
+              child: child,
+            ),
         transitionDuration: const Duration(milliseconds: 80),
       ),
     );

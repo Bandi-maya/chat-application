@@ -50,14 +50,20 @@ class ChatyBrandGlyphPainter extends CustomPainter {
       ..lineTo(cx - radius * 0.10, cy + radius * 0.95)
       ..close();
 
-    final combinedPath = Path.combine(PathOperation.union, bubblePath, tailPath);
+    final combinedPath = Path.combine(
+      PathOperation.union,
+      bubblePath,
+      tailPath,
+    );
     canvas.drawPath(combinedPath, paint);
 
     // Signature 3-dot communicative face / connection motif
     // Top dot (higher center) and two bottom dots (left and right) in inverted triangle formation
     final dotRadius = w * 0.052;
     final dotColor = variant == ChatyBrandIconVariant.filled
-        ? (color.computeLuminance() > 0.6 ? const Color(0xFF1E1E1E) : Colors.white)
+        ? (color.computeLuminance() > 0.6
+              ? const Color(0xFF1E1E1E)
+              : Colors.white)
         : color;
 
     final dotPaint = Paint()
@@ -67,9 +73,17 @@ class ChatyBrandGlyphPainter extends CustomPainter {
     // Top center dot
     canvas.drawCircle(Offset(cx, cy + h * 0.04), dotRadius, dotPaint);
     // Bottom-left dot
-    canvas.drawCircle(Offset(cx - w * 0.12, cy - h * 0.02), dotRadius, dotPaint);
+    canvas.drawCircle(
+      Offset(cx - w * 0.12, cy - h * 0.02),
+      dotRadius,
+      dotPaint,
+    );
     // Bottom-right dot
-    canvas.drawCircle(Offset(cx + w * 0.12, cy - h * 0.02), dotRadius, dotPaint);
+    canvas.drawCircle(
+      Offset(cx + w * 0.12, cy - h * 0.02),
+      dotRadius,
+      dotPaint,
+    );
   }
 
   @override
@@ -383,8 +397,14 @@ class _LauncherCompositionPainter extends CustomPainter {
           ..close();
 
         canvas.drawPath(foldPath1, Paint()..color = iconColor);
-        canvas.drawPath(foldPath2, Paint()..color = accentColor.withValues(alpha: 0.65));
-        canvas.drawPath(foldPath3, Paint()..color = accentColor.withValues(alpha: 0.85));
+        canvas.drawPath(
+          foldPath2,
+          Paint()..color = accentColor.withValues(alpha: 0.65),
+        );
+        canvas.drawPath(
+          foldPath3,
+          Paint()..color = accentColor.withValues(alpha: 0.85),
+        );
         canvas.drawPath(foldPath4, Paint()..color = iconColor);
     }
   }

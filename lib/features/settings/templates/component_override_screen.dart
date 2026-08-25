@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/appearance_variant_controller.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
@@ -11,10 +11,7 @@ import '../../../ui/core/templates/template_registry.dart';
 class ComponentOverrideScreen extends StatelessWidget {
   final TemplateComponentType component;
 
-  const ComponentOverrideScreen({
-    super.key,
-    required this.component,
-  });
+  const ComponentOverrideScreen({super.key, required this.component});
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +22,9 @@ class ComponentOverrideScreen extends StatelessWidget {
     return ListenableBuilder(
       listenable: templateController,
       builder: (context, _) {
-        final currentEffective = templateController.resolveTemplateFor(component);
+        final currentEffective = templateController.resolveTemplateFor(
+          component,
+        );
         final isOverridden = templateController.config.isOverridden(component);
         final baseTemplate = templateController.baseTemplate;
 
@@ -47,8 +46,10 @@ class ComponentOverrideScreen extends StatelessWidget {
                   onPressed: () {
                     templateController.removeComponentOverride(
                       component,
-                      appearanceController: locator<AppearanceVariantController>(),
-                      preferencesController: locator<ChatyPreferencesController>(),
+                      appearanceController:
+                          locator<AppearanceVariantController>(),
+                      preferencesController:
+                          locator<ChatyPreferencesController>(),
                     );
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Reset  to base template ()')),
@@ -78,7 +79,11 @@ class ComponentOverrideScreen extends StatelessWidget {
                           color: colors.primary.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Icon(component.icon, color: colors.primary, size: 22),
+                        child: Icon(
+                          component.icon,
+                          color: colors.primary,
+                          size: 22,
+                        ),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -142,21 +147,31 @@ class ComponentOverrideScreen extends StatelessWidget {
                                     children: [
                                       Text(
                                         tmpl.name,
-                                        style: theme.textTheme.titleSmall?.copyWith(
-                                          fontWeight: FontWeight.w800,
-                                          color: colors.foreground,
-                                        ),
+                                        style: theme.textTheme.titleSmall
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                              color: colors.foreground,
+                                            ),
                                       ),
                                       if (isCurrentlyUsed) ...[
                                         const SizedBox(width: 8),
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 2,
+                                          ),
                                           decoration: BoxDecoration(
-                                            color: colors.primary.withValues(alpha: 0.15),
-                                            borderRadius: BorderRadius.circular(6),
+                                            color: colors.primary.withValues(
+                                              alpha: 0.15,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
                                           ),
                                           child: Text(
-                                            isFromBase ? 'Base Template' : 'Active Override',
+                                            isFromBase
+                                                ? 'Base Template'
+                                                : 'Active Override',
                                             style: TextStyle(
                                               fontSize: 10,
                                               fontWeight: FontWeight.w700,
@@ -202,8 +217,12 @@ class ComponentOverrideScreen extends StatelessWidget {
                                     templateController.applyComponent(
                                       component: component,
                                       templateId: tmpl.id,
-                                      appearanceController: locator<AppearanceVariantController>(),
-                                      preferencesController: locator<ChatyPreferencesController>(),
+                                      appearanceController:
+                                          locator<
+                                            AppearanceVariantController
+                                          >(),
+                                      preferencesController:
+                                          locator<ChatyPreferencesController>(),
                                     );
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
@@ -211,9 +230,11 @@ class ComponentOverrideScreen extends StatelessWidget {
                                       ),
                                     );
                                   },
-                            child: Text(isCurrentlyUsed
-                                ? 'Currently Active'
-                                : 'Use This '),
+                            child: Text(
+                              isCurrentlyUsed
+                                  ? 'Currently Active'
+                                  : 'Use This ',
+                            ),
                           ),
                         ),
                       ],
@@ -246,7 +267,11 @@ class ComponentOverrideScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               Icon(Icons.chat_bubble_rounded, size: 20, color: colors.primary),
-              Icon(Icons.auto_stories_rounded, size: 20, color: colors.foregroundSecondary),
+              Icon(
+                Icons.auto_stories_rounded,
+                size: 20,
+                color: colors.foregroundSecondary,
+              ),
               if (tmpl.navigation.hasCenterAction)
                 Container(
                   width: 32,
@@ -256,13 +281,22 @@ class ComponentOverrideScreen extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    tmpl.navigation.centerActionIcon ?? Icons.camera_alt_rounded,
+                    tmpl.navigation.centerActionIcon ??
+                        Icons.camera_alt_rounded,
                     size: 18,
                     color: Colors.white,
                   ),
                 ),
-              Icon(Icons.call_rounded, size: 20, color: colors.foregroundSecondary),
-              Icon(Icons.person_rounded, size: 20, color: colors.foregroundSecondary),
+              Icon(
+                Icons.call_rounded,
+                size: 20,
+                color: colors.foregroundSecondary,
+              ),
+              Icon(
+                Icons.person_rounded,
+                size: 20,
+                color: colors.foregroundSecondary,
+              ),
             ],
           ),
         );
@@ -277,16 +311,27 @@ class ComponentOverrideScreen extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Icon(Icons.emoji_emotions_outlined, size: 20, color: colors.foregroundSecondary),
+              Icon(
+                Icons.emoji_emotions_outlined,
+                size: 20,
+                color: colors.foregroundSecondary,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Message ()...',
-                  style: TextStyle(fontSize: 12, color: colors.foregroundSecondary),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colors.foregroundSecondary,
+                  ),
                 ),
               ),
               if (tmpl.composer.showCameraShortcut) ...[
-                Icon(Icons.camera_alt_outlined, size: 18, color: colors.foregroundSecondary),
+                Icon(
+                  Icons.camera_alt_outlined,
+                  size: 18,
+                  color: colors.foregroundSecondary,
+                ),
                 const SizedBox(width: 8),
               ],
               Icon(Icons.send_rounded, size: 18, color: colors.primary),
@@ -305,20 +350,33 @@ class ComponentOverrideScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: colors.primary,
-                  borderRadius: BorderRadius.circular(tmpl.conversation.bubbleCornerRadius),
+                  borderRadius: BorderRadius.circular(
+                    tmpl.conversation.bubbleCornerRadius,
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       ' bubble',
-                      style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(width: 6),
-                    const Icon(Icons.done_all_rounded, size: 12, color: Colors.white70),
+                    const Icon(
+                      Icons.done_all_rounded,
+                      size: 12,
+                      color: Colors.white70,
+                    ),
                   ],
                 ),
               ),

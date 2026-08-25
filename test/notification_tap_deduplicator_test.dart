@@ -1,4 +1,4 @@
-import 'package:chaty/data/services/notification_channel_manager.dart';
+import 'package:chat/data/services/notification_channel_manager.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -33,17 +33,20 @@ void main() {
     expect(deduplicator.shouldDispatch(message), isTrue);
   });
 
-  test('rejects malformed payloads and deduplicates ID-less launch intents', () {
-    final deduplicator = NotificationTapDeduplicator();
+  test(
+    'rejects malformed payloads and deduplicates ID-less launch intents',
+    () {
+      final deduplicator = NotificationTapDeduplicator();
 
-    expect(
-      deduplicator.shouldDispatch(
-        const NotificationPayload(conversationId: ''),
-      ),
-      isFalse,
-    );
-    const payload = NotificationPayload(conversationId: 'conversation-a');
-    expect(deduplicator.shouldDispatch(payload), isTrue);
-    expect(deduplicator.shouldDispatch(payload), isFalse);
-  });
+      expect(
+        deduplicator.shouldDispatch(
+          const NotificationPayload(conversationId: ''),
+        ),
+        isFalse,
+      );
+      const payload = NotificationPayload(conversationId: 'conversation-a');
+      expect(deduplicator.shouldDispatch(payload), isTrue);
+      expect(deduplicator.shouldDispatch(payload), isFalse);
+    },
+  );
 }

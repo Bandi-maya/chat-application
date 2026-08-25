@@ -68,6 +68,22 @@ class ChatyIconSize {
 }
 
 /// ---------------------------------------------------------------------------
+/// CHATY ATTACHMENT PALETTE TOKENS
+/// ---------------------------------------------------------------------------
+/// Brand gradient pairs for create-dock attachment actions. Centralized here so
+/// feature widgets never hardcode color literals outside the token layer.
+class ChatyAttachmentPalette {
+  static const List<Color> gallery = <Color>[Color(0xFFE91E63), Color(0xFFC2185B)];
+  static const List<Color> video = <Color>[Color(0xFFFF5722), Color(0xFFE64A19)];
+  static const List<Color> document = <Color>[Color(0xFF7F66FF), Color(0xFF5E35B1)];
+  static const List<Color> audio = <Color>[Color(0xFFFF9800), Color(0xFFF57C00)];
+  static const List<Color> location = <Color>[Color(0xFF2E7D32), Color(0xFF1B5E20)];
+  static const List<Color> contact = <Color>[Color(0xFF0097A7), Color(0xFF006064)];
+  static const List<Color> poll = <Color>[Color(0xFF0288D1), Color(0xFF01579B)];
+  static const List<Color> task = <Color>[Color(0xFF00BFA5), Color(0xFF00897B)];
+}
+
+/// ---------------------------------------------------------------------------
 /// CHATY MOTION TOKENS (Emil Kowalski restrained motion curves & durations)
 /// ---------------------------------------------------------------------------
 class ChatyMotion {

@@ -39,13 +39,11 @@ class ChatyComposerActionButton extends StatefulWidget {
       _ChatyComposerActionButtonState();
 }
 
-class _ChatyComposerActionButtonState
-    extends State<ChatyComposerActionButton> {
+class _ChatyComposerActionButtonState extends State<ChatyComposerActionButton> {
   bool _pressed = false;
 
   bool get _enabled =>
-      !widget.busy &&
-      (widget.onTap != null || widget.onLongPressStart != null);
+      !widget.busy && (widget.onTap != null || widget.onLongPressStart != null);
 
   void _setPressed(bool value) {
     if (_pressed == value || !mounted) return;
@@ -59,10 +57,7 @@ class _ChatyComposerActionButtonState
 
   @override
   Widget build(BuildContext context) {
-    final duration = ChatyMotion.duration(
-      context,
-      preferred: ChatyMotion.fast,
-    );
+    final duration = ChatyMotion.duration(context, preferred: ChatyMotion.fast);
     final content = SizedBox.square(
       dimension: 48,
       child: DecoratedBox(

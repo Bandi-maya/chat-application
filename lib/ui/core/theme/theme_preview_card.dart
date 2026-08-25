@@ -74,7 +74,9 @@ class ThemePreviewCard extends StatelessWidget {
                         border: Border.all(
                           color: isSelected
                               ? themeConfig.accentColor
-                              : themeConfig.secondaryTextColor.withValues(alpha: 0.6),
+                              : themeConfig.secondaryTextColor.withValues(
+                                  alpha: 0.6,
+                                ),
                           width: 2,
                         ),
                       ),
@@ -85,7 +87,8 @@ class ThemePreviewCard extends StatelessWidget {
                                 height: 8,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: themeConfig.brightness == Brightness.dark
+                                  color:
+                                      themeConfig.brightness == Brightness.dark
                                       ? Colors.black
                                       : Colors.white,
                                 ),
@@ -107,16 +110,23 @@ class ThemePreviewCard extends StatelessWidget {
                     ),
                     // Brightness pill
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: themeConfig.surfaceColor,
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
-                          color: themeConfig.secondaryTextColor.withValues(alpha: 0.2),
+                          color: themeConfig.secondaryTextColor.withValues(
+                            alpha: 0.2,
+                          ),
                         ),
                       ),
                       child: Text(
-                        themeConfig.brightness == Brightness.dark ? 'DARK' : 'LIGHT',
+                        themeConfig.brightness == Brightness.dark
+                            ? 'DARK'
+                            : 'LIGHT',
                         style: TextStyle(
                           color: themeConfig.secondaryTextColor,
                           fontSize: 10,
@@ -130,12 +140,17 @@ class ThemePreviewCard extends StatelessWidget {
 
                 // Mini App Canvas Preview
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: themeConfig.surfaceColor,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: themeConfig.secondaryTextColor.withValues(alpha: 0.15),
+                      color: themeConfig.secondaryTextColor.withValues(
+                        alpha: 0.15,
+                      ),
                     ),
                   ),
                   child: Column(
@@ -191,11 +206,15 @@ class ThemePreviewCard extends StatelessWidget {
                             styleId: bubbleStyle,
                             isMe: false,
                             fillColor: themeConfig.incomingBubbleColor,
-                            strokeColor: themeConfig.secondaryTextColor.withValues(alpha: 0.1),
+                            strokeColor: themeConfig.secondaryTextColor
+                                .withValues(alpha: 0.1),
                             accentColor: themeConfig.accentColor,
                           ),
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
                             child: Text(
                               'Sounds good! 9:41',
                               style: TextStyle(
@@ -216,11 +235,16 @@ class ThemePreviewCard extends StatelessWidget {
                             styleId: bubbleStyle,
                             isMe: true,
                             fillColor: themeConfig.outgoingBubbleColor,
-                            strokeColor: themeConfig.accentColor.withValues(alpha: 0.2),
+                            strokeColor: themeConfig.accentColor.withValues(
+                              alpha: 0.2,
+                            ),
                             accentColor: themeConfig.accentColor,
                           ),
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -235,8 +259,10 @@ class ThemePreviewCard extends StatelessWidget {
                                 DeliveryStatusIcon(
                                   style: tickStyle,
                                   state: DeliveryState.read,
-                                  unreadColor: themeConfig.outgoingTextColor.withValues(alpha: 0.6),
-                                  readColor: themeConfig.brightness == Brightness.dark
+                                  unreadColor: themeConfig.outgoingTextColor
+                                      .withValues(alpha: 0.6),
+                                  readColor:
+                                      themeConfig.brightness == Brightness.dark
                                       ? themeConfig.accentColor
                                       : Colors.white,
                                   size: 13,
@@ -269,7 +295,9 @@ class ThemePreviewCard extends StatelessWidget {
                             ? themeConfig.accentColor
                             : themeConfig.secondaryTextColor,
                         fontSize: 11.5,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.w500,
                       ),
                     ),
                   ],

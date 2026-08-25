@@ -58,7 +58,9 @@ class GbThemeOverrides {
         _bubbleStyle(prefs.conversation.bubbleStyle) ??
         base.bubbleStyle;
 
-    final deliveryTickStyle = DeliveryIconStyleExtension.fromString(prefs.conversation.tickStyle);
+    final deliveryTickStyle = DeliveryIconStyleExtension.fromString(
+      prefs.conversation.tickStyle,
+    );
 
     final candidate = base.copyWith(
       accentColor: accent,
@@ -181,6 +183,8 @@ class GbThemeOverrides {
     }
     if (minCandidate >= 3.5) return foreground;
     if (minFallback >= 3.5) return fallback;
-    return backgrounds.first.computeLuminance() > 0.45 ? Colors.black : Colors.white;
+    return backgrounds.first.computeLuminance() > 0.45
+        ? Colors.black
+        : Colors.white;
   }
 }

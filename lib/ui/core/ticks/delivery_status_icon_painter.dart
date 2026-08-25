@@ -166,8 +166,16 @@ class DeliveryStatusIconPainter extends CustomPainter {
           paint,
         );
         // Eyes
-        canvas.drawCircle(Offset(size.width * 0.35, size.height * 0.4), 1.2, fillPaint);
-        canvas.drawCircle(Offset(size.width * 0.65, size.height * 0.4), 1.2, fillPaint);
+        canvas.drawCircle(
+          Offset(size.width * 0.35, size.height * 0.4),
+          1.2,
+          fillPaint,
+        );
+        canvas.drawCircle(
+          Offset(size.width * 0.65, size.height * 0.4),
+          1.2,
+          fillPaint,
+        );
         // Smile
         final smile = Path()
           ..arcTo(
@@ -189,14 +197,22 @@ class DeliveryStatusIconPainter extends CustomPainter {
           ..moveTo(size.width * 0.2, size.height * 0.2)
           ..lineTo(size.width * 0.8, size.height * 0.2)
           ..lineTo(size.width * 0.8, size.height * 0.55)
-          ..quadraticBezierTo(size.width * 0.5, size.height * 0.95, size.width * 0.2, size.height * 0.55)
+          ..quadraticBezierTo(
+            size.width * 0.5,
+            size.height * 0.95,
+            size.width * 0.2,
+            size.height * 0.55,
+          )
           ..close();
         canvas.drawPath(shield, isRead ? fillPaint : paint);
         final checkP = Path()
           ..moveTo(size.width * 0.35, size.height * 0.5)
           ..lineTo(size.width * 0.48, size.height * 0.62)
           ..lineTo(size.width * 0.68, size.height * 0.38);
-        canvas.drawPath(checkP, paint..color = isRead ? Colors.white : activeColor);
+        canvas.drawPath(
+          checkP,
+          paint..color = isRead ? Colors.white : activeColor,
+        );
         break;
 
       // 10. Green Tick & RC Tick: Bold modern check pair
@@ -219,7 +235,11 @@ class DeliveryStatusIconPainter extends CustomPainter {
 
       // 11. Letter Circle: Monogram badge
       case DeliveryIconStyle.letterCircle:
-        canvas.drawCircle(Offset(size.width / 2, size.height / 2), size.width / 2 - 1, fillPaint);
+        canvas.drawCircle(
+          Offset(size.width / 2, size.height / 2),
+          size.width / 2 - 1,
+          fillPaint,
+        );
         final letterPaint = Paint()
           ..color = Colors.white
           ..style = PaintingStyle.stroke
@@ -247,9 +267,17 @@ class DeliveryStatusIconPainter extends CustomPainter {
 
       // 13. VantCircle: Glow circular target indicator
       case DeliveryIconStyle.vantCircle:
-        canvas.drawCircle(Offset(size.width / 2, size.height / 2), size.width / 2 - 1, paint);
+        canvas.drawCircle(
+          Offset(size.width / 2, size.height / 2),
+          size.width / 2 - 1,
+          paint,
+        );
         if (isDelivered || isRead) {
-          canvas.drawCircle(Offset(size.width / 2, size.height / 2), 3, fillPaint);
+          canvas.drawCircle(
+            Offset(size.width / 2, size.height / 2),
+            3,
+            fillPaint,
+          );
         }
         break;
     }
@@ -260,7 +288,11 @@ class DeliveryStatusIconPainter extends CustomPainter {
       ..color = unreadColor.withValues(alpha: 0.7)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.4;
-    canvas.drawCircle(Offset(size.width / 2, size.height / 2), size.width / 2 - 1.5, paint);
+    canvas.drawCircle(
+      Offset(size.width / 2, size.height / 2),
+      size.width / 2 - 1.5,
+      paint,
+    );
     // Clock hands
     final hands = Path()
       ..moveTo(size.width / 2, size.height * 0.28)
@@ -274,12 +306,20 @@ class DeliveryStatusIconPainter extends CustomPainter {
       ..color = Colors.redAccent
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.6;
-    canvas.drawCircle(Offset(size.width / 2, size.height / 2), size.width / 2 - 1, paint);
+    canvas.drawCircle(
+      Offset(size.width / 2, size.height / 2),
+      size.width / 2 - 1,
+      paint,
+    );
     final excl = Path()
       ..moveTo(size.width / 2, size.height * 0.28)
       ..lineTo(size.width / 2, size.height * 0.56);
     canvas.drawPath(excl, paint);
-    canvas.drawCircle(Offset(size.width / 2, size.height * 0.72), 1.2, Paint()..color = Colors.redAccent);
+    canvas.drawCircle(
+      Offset(size.width / 2, size.height * 0.72),
+      1.2,
+      Paint()..color = Colors.redAccent,
+    );
   }
 
   @override

@@ -69,10 +69,13 @@ class ChatyDataStore extends ChangeNotifier {
               final updatedAt = DateTime.tryParse(
                 row['updated_at']?.toString() ?? '',
               )?.toLocal();
-              if (conversationId.isEmpty || userId.isEmpty || updatedAt == null) {
+              if (conversationId.isEmpty ||
+                  userId.isEmpty ||
+                  updatedAt == null) {
                 continue;
               }
-              (next[conversationId] ??= <String, DateTime>{})[userId] = updatedAt;
+              (next[conversationId] ??= <String, DateTime>{})[userId] =
+                  updatedAt;
             }
             _typingByConversation
               ..clear()
@@ -117,8 +120,9 @@ class ChatyDataStore extends ChangeNotifier {
     if (authUser == null) {
       throw StateError('No authenticated Chaty user is available.');
     }
-    final displayName =
-        authUser.userMetadata?['display_name']?.toString().trim();
+    final displayName = authUser.userMetadata?['display_name']
+        ?.toString()
+        .trim();
     final username = authUser.userMetadata?['username']?.toString().trim();
     final effectiveName = displayName != null && displayName.isNotEmpty
         ? displayName
@@ -298,7 +302,9 @@ class ChatyDataStore extends ChangeNotifier {
           ? decoded.map((k, v) => MapEntry(k.toString(), v.toString()))
           : <String, String>{};
     } catch (error, stackTrace) {
-      debugPrint('Chaty wallpaper preferences failed to load: $error\n$stackTrace');
+      debugPrint(
+        'Chaty wallpaper preferences failed to load: $error\n$stackTrace',
+      );
       _chatWallpapers = <String, String>{};
     }
     return _chatWallpapers!;
@@ -312,7 +318,9 @@ class ChatyDataStore extends ChangeNotifier {
         jsonEncode(_chatWallpapers ?? <String, String>{}),
       );
     } catch (error, stackTrace) {
-      debugPrint('Chaty wallpaper preferences failed to save: $error\n$stackTrace');
+      debugPrint(
+        'Chaty wallpaper preferences failed to save: $error\n$stackTrace',
+      );
     }
   }
 
@@ -481,8 +489,7 @@ class ChatyDataStore extends ChangeNotifier {
   Future<void> updateTaskStatus(String taskId, TaskStatus status) =>
       _backend.updateTaskStatus(taskId, status);
 
-  Future<void> deleteTask(String taskId) =>
-      _backend.deleteTask(taskId);
+  Future<void> deleteTask(String taskId) => _backend.deleteTask(taskId);
 
   void addStory(String content) => _backend.addStory(content);
   void markStoryViewed(String storyId) => _backend.markStoryViewed(storyId);

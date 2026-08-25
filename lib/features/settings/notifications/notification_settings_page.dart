@@ -272,92 +272,89 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                     logTitle: 'Event Toast Position',
                   ),
             ),
-              ChatySliderTile(
-                icon: Icons.person_rounded,
-                title: 'Toast avatar size',
-                subtitle: 'Scales the profile picture and toast height',
-                value: widget.preferencesController.gbDouble(
+            ChatySliderTile(
+              icon: Icons.person_rounded,
+              title: 'Toast avatar size',
+              subtitle: 'Scales the profile picture and toast height',
+              value: widget.preferencesController.gbDouble(
+                'toast_avatar_size',
+                fallback: 40,
+              ),
+              min: 24,
+              max: 56,
+              divisions: 8,
+              valueFormatter: (v) => '${v.round()} px',
+              onChanged: (v) => setState(
+                () => widget.preferencesController.updateGbFeature(
                   'toast_avatar_size',
-                  fallback: 40,
-                ),
-                min: 24,
-                max: 56,
-                divisions: 8,
-                valueFormatter: (v) => '${v.round()} px',
-                onChanged: (v) => setState(
-                  () => widget.preferencesController.updateGbFeature(
-                    'toast_avatar_size',
-                    v.round(),
-                    logTitle: 'Toast Avatar Size',
-                  ),
+                  v.round(),
+                  logTitle: 'Toast Avatar Size',
                 ),
               ),
-              ChatySliderTile(
-                icon: Icons.rounded_corner_rounded,
-                title: 'Corner radius',
-                value: widget.preferencesController.gbDouble(
-                  'toast_corner_radius',
-                  fallback: 18,
-                ),
-                min: 4,
-                max: 32,
-                divisions: 7,
-                valueFormatter: (v) => '${v.round()} px',
-                onChanged: (v) =>
-                    widget.preferencesController.updateGbFeature(
-                      'toast_corner_radius',
-                      v.round(),
-                      logTitle: 'Toast Corner Radius',
-                    ),
+            ),
+            ChatySliderTile(
+              icon: Icons.rounded_corner_rounded,
+              title: 'Corner radius',
+              value: widget.preferencesController.gbDouble(
+                'toast_corner_radius',
+                fallback: 18,
               ),
-              ChatySliderTile(
-                icon: Icons.layers_rounded,
-                title: 'Elevation',
-                value: widget.preferencesController.gbDouble(
-                  'toast_elevation',
-                  fallback: 10,
-                ),
-                min: 0,
-                max: 24,
-                divisions: 8,
-                valueFormatter: (v) => v.round().toString(),
-                onChanged: (v) =>
-                    widget.preferencesController.updateGbFeature(
-                      'toast_elevation',
-                      v.round(),
-                      logTitle: 'Toast Elevation',
-                    ),
+              min: 4,
+              max: 32,
+              divisions: 7,
+              valueFormatter: (v) => '${v.round()} px',
+              onChanged: (v) => widget.preferencesController.updateGbFeature(
+                'toast_corner_radius',
+                v.round(),
+                logTitle: 'Toast Corner Radius',
               ),
-              ChatySettingsTile(
-                icon: Icons.format_color_fill_rounded,
-                title: 'Background color',
-                subtitle:
-                    _bgColor == null ? 'Theme surface' : 'Custom color set',
-                trailing: Container(
-                  width: 22,
-                  height: 22,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _bgColor ?? context.colors.surface,
-                    border: Border.all(color: context.colors.border),
-                  ),
-                ),
-                onTap: () async {
-                  final picked = await ChatyColorPickerModal.show(
-                    context,
-                    title: 'Toast background',
-                    currentColor: _bgColor ?? context.colors.surface,
-                    backgroundContextColor: context.colors.background,
-                  );
-                  if (!mounted) return;
-                  widget.preferencesController.updateGbFeature(
-                    'event_toast_bg',
-                    picked?.toARGB32() ?? 0,
-                    logTitle: 'Toast Background',
-                  );
-                  setState(() {});
-                },
+            ),
+            ChatySliderTile(
+              icon: Icons.layers_rounded,
+              title: 'Elevation',
+              value: widget.preferencesController.gbDouble(
+                'toast_elevation',
+                fallback: 10,
               ),
+              min: 0,
+              max: 24,
+              divisions: 8,
+              valueFormatter: (v) => v.round().toString(),
+              onChanged: (v) => widget.preferencesController.updateGbFeature(
+                'toast_elevation',
+                v.round(),
+                logTitle: 'Toast Elevation',
+              ),
+            ),
+            ChatySettingsTile(
+              icon: Icons.format_color_fill_rounded,
+              title: 'Background color',
+              subtitle: _bgColor == null ? 'Theme surface' : 'Custom color set',
+              trailing: Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _bgColor ?? context.colors.surface,
+                  border: Border.all(color: context.colors.border),
+                ),
+              ),
+              onTap: () async {
+                final picked = await ChatyColorPickerModal.show(
+                  context,
+                  title: 'Toast background',
+                  currentColor: _bgColor ?? context.colors.surface,
+                  backgroundContextColor: context.colors.background,
+                );
+                if (!mounted) return;
+                widget.preferencesController.updateGbFeature(
+                  'event_toast_bg',
+                  picked?.toARGB32() ?? 0,
+                  logTitle: 'Toast Background',
+                );
+                setState(() {});
+              },
+            ),
             ChatyChoiceTile<int>(
               title: 'Toast duration',
               options: _toastDurations,
@@ -408,5 +405,4 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       avatarColorHex: me.avatarColorHex,
     );
   }
-
 }

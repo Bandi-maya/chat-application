@@ -40,23 +40,28 @@ void main() {
       }
     });
 
-    test('ConversationPreferences correctly deserializes legacy bubble and tick styles', () {
-      final legacyMap = <String, dynamic>{
-        'bubbleShape': 'Squircle',
-        'tickStyle': 'iOS Style',
-        'bubbleRadius': 20.0,
-      };
+    test(
+      'ConversationPreferences correctly deserializes legacy bubble and tick styles',
+      () {
+        final legacyMap = <String, dynamic>{
+          'bubbleShape': 'Squircle',
+          'tickStyle': 'iOS Style',
+          'bubbleRadius': 20.0,
+        };
 
-      final prefs = ConversationPreferences.fromMap(legacyMap);
-      expect(prefs.bubbleStyle, 'Squircle');
-      expect(prefs.tickStyle, 'iOS Style');
+        final prefs = ConversationPreferences.fromMap(legacyMap);
+        expect(prefs.bubbleStyle, 'Squircle');
+        expect(prefs.tickStyle, 'iOS Style');
 
-      final bubbleId = BubbleStyleIdExtension.fromString(prefs.bubbleStyle);
-      expect(bubbleId, BubbleStyleId.gabiSqua);
+        final bubbleId = BubbleStyleIdExtension.fromString(prefs.bubbleStyle);
+        expect(bubbleId, BubbleStyleId.gabiSqua);
 
-      final tickStyle = DeliveryIconStyleExtension.fromString(prefs.tickStyle);
-      expect(tickStyle, DeliveryIconStyle.rcIos11);
-    });
+        final tickStyle = DeliveryIconStyleExtension.fromString(
+          prefs.tickStyle,
+        );
+        expect(tickStyle, DeliveryIconStyle.rcIos11);
+      },
+    );
 
     test('ChatyThemeManager exports and validates ThemeConfig JSON', () {
       const theme = ThemeConfig(

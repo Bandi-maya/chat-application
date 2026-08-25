@@ -17,6 +17,8 @@ class ContactRelationshipService {
   final SupabaseClient _client;
   final FlutterSecureStorage _secureStorage;
   final Uuid _uuid = const Uuid();
+  String? _cachedDeviceId;
+  Future<String>? _fetchDeviceIdFuture;
 
   String get _userId {
     final id = _client.auth.currentUser?.id;
@@ -99,13 +101,26 @@ class ContactRelationshipService {
     return id;
   }
 
-  Future<String> currentDeviceId() async {
-    var value = await _secureStorage.read(key: _deviceIdStorageKey);
-    if (value == null || value.isEmpty) {
-      value = _uuid.v4();
-      await _secureStorage.write(key: _deviceIdStorageKey, value: value);
+  Future<String> currentDeviceId() {
+    final cached = _cachedDeviceId;
+    if (cached != null && cached.isNotEmpty) {
+      return Future<String>.value(cached);
     }
-    return value;
+    return _fetchDeviceIdFuture ??= _performCurrentDeviceId();
+  }
+
+  Future<String> _performCurrentDeviceId() async {
+    try {
+      var value = await _secureStorage.read(key: _deviceIdStorageKey);
+      if (value == null || value.isEmpty) {
+        value = _uuid.v4();
+        await _secureStorage.write(key: _deviceIdStorageKey, value: value);
+      }
+      _cachedDeviceId = value;
+      return value;
+    } finally {
+      _fetchDeviceIdFuture = null;
+    }
   }
 
   String get _platformLabel {

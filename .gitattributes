@@ -1,0 +1,9 @@
+# Checksum manifests must stay byte-identical to what sha256sum verifies;
+# CRLF conversion in Windows worktrees breaks tools/check_migration_versions.sh.
+*.sha256 text eol=lf
+
+# Shell scripts with LF endings keep shebangs and heredocs intact everywhere.
+*.sh text eol=lf
+
+# SQL migrations are hashed byte-for-byte by the canonical manifest.
+*.sql text eol=lf

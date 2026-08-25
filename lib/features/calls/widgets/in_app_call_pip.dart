@@ -46,10 +46,7 @@ class _InAppCallPipState extends State<InAppCallPip> {
     if (_position == null) {
       final size = MediaQuery.of(context).size;
       final padding = MediaQuery.of(context).padding;
-      _position = Offset(
-        size.width - _pipWidth - 16,
-        padding.top + 50,
-      );
+      _position = Offset(size.width - _pipWidth - 16, padding.top + 50);
     }
   }
 
@@ -145,9 +142,12 @@ class _InAppCallPipState extends State<InAppCallPip> {
                   color: const Color(0xFF1E1E24),
                   child: Center(
                     child: AppAvatar(
-                      initials: widget.session.remoteAvatarInitials ??
+                      initials:
+                          widget.session.remoteAvatarInitials ??
                           (widget.session.remoteDisplayName.isNotEmpty
-                              ? widget.session.remoteDisplayName.substring(0, 1).toUpperCase()
+                              ? widget.session.remoteDisplayName
+                                    .substring(0, 1)
+                                    .toUpperCase()
                               : 'U'),
                       colorHex: widget.session.remoteAvatarColorHex,
                       size: 46,
@@ -161,7 +161,10 @@ class _InAppCallPipState extends State<InAppCallPip> {
                 left: 8,
                 right: 8,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.65),
                     borderRadius: BorderRadius.circular(10),
@@ -203,7 +206,11 @@ class _InAppCallPipState extends State<InAppCallPip> {
                       children: [
                         // Fullscreen expand
                         IconButton(
-                          icon: const Icon(Icons.fullscreen_rounded, color: Colors.white, size: 22),
+                          icon: const Icon(
+                            Icons.fullscreen_rounded,
+                            color: Colors.white,
+                            size: 22,
+                          ),
                           tooltip: 'Expand call',
                           onPressed: () {
                             ChatyHaptics.selection();
@@ -212,7 +219,11 @@ class _InAppCallPipState extends State<InAppCallPip> {
                         ),
                         // Collapse to Island
                         IconButton(
-                          icon: const Icon(Icons.minimize_rounded, color: Colors.white70, size: 20),
+                          icon: const Icon(
+                            Icons.minimize_rounded,
+                            color: Colors.white70,
+                            size: 20,
+                          ),
                           tooltip: 'Minimize to Island',
                           onPressed: () {
                             ChatyHaptics.selection();
@@ -221,7 +232,11 @@ class _InAppCallPipState extends State<InAppCallPip> {
                         ),
                         // Hang up
                         IconButton(
-                          icon: const Icon(Icons.call_end_rounded, color: Color(0xFFEF4444), size: 22),
+                          icon: const Icon(
+                            Icons.call_end_rounded,
+                            color: Color(0xFFEF4444),
+                            size: 22,
+                          ),
                           tooltip: 'End call',
                           onPressed: () {
                             ChatyHaptics.warning();

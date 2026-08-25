@@ -295,7 +295,9 @@ class CallSignalingService extends ChangeNotifier {
   }
 
   Future<void> sendCallReaction(String emoji) async {
-    throw UnsupportedError('Call reactions are not available in production yet.');
+    throw UnsupportedError(
+      'Call reactions are not available in production yet.',
+    );
   }
 
   void toggleMute() {
@@ -333,15 +335,16 @@ class CallSignalingService extends ChangeNotifier {
     if (session.isSharingScreen) return;
 
     try {
-      final screenStream = await navigator.mediaDevices.getDisplayMedia(<String, dynamic>{
-        'video': true,
-        'audio': false,
-      });
+      final screenStream = await navigator.mediaDevices.getDisplayMedia(
+        <String, dynamic>{'video': true, 'audio': false},
+      );
       final screenTracks = screenStream.getVideoTracks();
       if (screenTracks.isEmpty) return;
 
       final senders = await peer.getSenders();
-      final videoSender = senders.where((s) => s.track?.kind == 'video').firstOrNull;
+      final videoSender = senders
+          .where((s) => s.track?.kind == 'video')
+          .firstOrNull;
       if (videoSender != null) {
         await videoSender.replaceTrack(screenTracks.first);
       }
@@ -377,7 +380,9 @@ class CallSignalingService extends ChangeNotifier {
     if (peer != null && localVideoTrack != null) {
       try {
         final senders = await peer.getSenders();
-        final videoSender = senders.where((s) => s.track?.kind == 'video').firstOrNull;
+        final videoSender = senders
+            .where((s) => s.track?.kind == 'video')
+            .firstOrNull;
         if (videoSender != null) {
           await videoSender.replaceTrack(localVideoTrack);
         }
@@ -407,9 +412,7 @@ class CallSignalingService extends ChangeNotifier {
     if (tracks.isEmpty) return;
     final switched = await Helper.switchCamera(tracks.first);
     if (!switched) return;
-    _currentSession = session.copyWith(
-      isFrontCamera: !session.isFrontCamera,
-    );
+    _currentSession = session.copyWith(isFrontCamera: !session.isFrontCamera);
     notifyListeners();
   }
 
@@ -417,7 +420,9 @@ class CallSignalingService extends ChangeNotifier {
     final session = _currentSession;
     if (session == null) return;
     if (route != AudioRouteType.speaker && route != AudioRouteType.earpiece) {
-      throw UnsupportedError('Select Bluetooth/headset through the system audio route.');
+      throw UnsupportedError(
+        'Select Bluetooth/headset through the system audio route.',
+      );
     }
     await Helper.setSpeakerphoneOn(route == AudioRouteType.speaker);
     _currentSession = session.copyWith(audioRoute: route);
@@ -503,27 +508,31 @@ class CallSignalingService extends ChangeNotifier {
     await _removeDatabaseChannels();
 
     final sessionChannel = _client.channel('chaty-call-sessions-$userId');
-    sessionChannel.onPostgresChanges(
-      event: PostgresChangeEvent.all,
-      schema: 'public',
-      table: 'call_sessions',
-      callback: (payload) {
-        final row = Map<String, dynamic>.from(payload.newRecord);
-        if (row.isNotEmpty) unawaited(_handleCallSessionRow(row));
-      },
-    ).subscribe();
+    sessionChannel
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'call_sessions',
+          callback: (payload) {
+            final row = Map<String, dynamic>.from(payload.newRecord);
+            if (row.isNotEmpty) unawaited(_handleCallSessionRow(row));
+          },
+        )
+        .subscribe();
     _sessionChannel = sessionChannel;
 
     final candidateChannel = _client.channel('chaty-call-candidates-$userId');
-    candidateChannel.onPostgresChanges(
-      event: PostgresChangeEvent.insert,
-      schema: 'public',
-      table: 'call_ice_candidates',
-      callback: (payload) {
-        final row = Map<String, dynamic>.from(payload.newRecord);
-        if (row.isNotEmpty) unawaited(_handleRemoteCandidateRow(row));
-      },
-    ).subscribe();
+    candidateChannel
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'call_ice_candidates',
+          callback: (payload) {
+            final row = Map<String, dynamic>.from(payload.newRecord);
+            if (row.isNotEmpty) unawaited(_handleRemoteCandidateRow(row));
+          },
+        )
+        .subscribe();
     _candidateChannel = candidateChannel;
   }
 
@@ -656,8 +665,7 @@ class CallSignalingService extends ChangeNotifier {
       if (raw is List) {
         for (final item in raw.whereType<Map>()) {
           final row = Map<String, dynamic>.from(item);
-          final id =
-              row['user_id']?.toString() ?? row['id']?.toString() ?? '';
+          final id = row['user_id']?.toString() ?? row['id']?.toString() ?? '';
           if (id != userId) continue;
           final name =
               row['display_name']?.toString() ?? row['username']?.toString();

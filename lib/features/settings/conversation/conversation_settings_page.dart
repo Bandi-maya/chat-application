@@ -81,7 +81,10 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
 
   static const List<double> _playbackSpeeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
-  Future<void> _showBubbleStylePicker(BuildContext context, String currentStyle) async {
+  Future<void> _showBubbleStylePicker(
+    BuildContext context,
+    String currentStyle,
+  ) async {
     final activeId = BubbleStyleIdExtension.fromString(currentStyle);
     final theme = Theme.of(context);
 
@@ -122,7 +125,10 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
     }
   }
 
-  Future<void> _showTickStylePicker(BuildContext context, String currentTick) async {
+  Future<void> _showTickStylePicker(
+    BuildContext context,
+    String currentTick,
+  ) async {
     final activeStyle = DeliveryIconStyleExtension.fromString(currentTick);
     final theme = Theme.of(context);
 
@@ -139,7 +145,9 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
           preview: DeliveryStatusIcon(
             style: tickStyle,
             state: DeliveryState.read,
-            unreadColor: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+            unreadColor: theme.colorScheme.onSurfaceVariant.withValues(
+              alpha: 0.7,
+            ),
             readColor: theme.colorScheme.primary,
             size: 18,
           ),
@@ -161,7 +169,9 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
   Widget build(BuildContext context) {
     final conv = widget.preferencesController.conversation;
     final activeBubbleId = BubbleStyleIdExtension.fromString(conv.bubbleStyle);
-    final activeTickStyle = DeliveryIconStyleExtension.fromString(conv.tickStyle);
+    final activeTickStyle = DeliveryIconStyleExtension.fromString(
+      conv.tickStyle,
+    );
 
     return ChatySettingsPage(
       title: 'Conversation Screen Settings',
@@ -193,17 +203,23 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Container(
-                        margin: BubbleStyleRegistry.getGeometry(activeBubbleId).bubbleMargin,
+                        margin: BubbleStyleRegistry.getGeometry(
+                          activeBubbleId,
+                        ).bubbleMargin,
                         child: CustomPaint(
                           painter: BubblePainter(
                             styleId: activeBubbleId,
                             isMe: false,
                             fillColor: context.colors.surfaceSecondary,
-                            strokeColor: context.colors.primary.withValues(alpha: 0.4),
+                            strokeColor: context.colors.primary.withValues(
+                              alpha: 0.4,
+                            ),
                             accentColor: context.colors.primary,
                           ),
                           child: Padding(
-                            padding: BubbleStyleRegistry.getGeometry(activeBubbleId).contentPadding,
+                            padding: BubbleStyleRegistry.getGeometry(
+                              activeBubbleId,
+                            ).contentPadding,
                             child: Text(
                               'Incoming message preview',
                               style: TextStyle(
@@ -220,17 +236,23 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: Container(
-                        margin: BubbleStyleRegistry.getGeometry(activeBubbleId).bubbleMargin,
+                        margin: BubbleStyleRegistry.getGeometry(
+                          activeBubbleId,
+                        ).bubbleMargin,
                         child: CustomPaint(
                           painter: BubblePainter(
                             styleId: activeBubbleId,
                             isMe: true,
                             fillColor: context.colors.primary,
-                            strokeColor: context.colors.primary.withValues(alpha: 0.4),
+                            strokeColor: context.colors.primary.withValues(
+                              alpha: 0.4,
+                            ),
                             accentColor: context.colors.primary,
                           ),
                           child: Padding(
-                            padding: BubbleStyleRegistry.getGeometry(activeBubbleId).contentPadding,
+                            padding: BubbleStyleRegistry.getGeometry(
+                              activeBubbleId,
+                            ).contentPadding,
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -245,7 +267,8 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
                                 DeliveryStatusIcon(
                                   style: activeTickStyle,
                                   state: DeliveryState.read,
-                                  unreadColor: context.colors.onPrimary.withValues(alpha: 0.7),
+                                  unreadColor: context.colors.onPrimary
+                                      .withValues(alpha: 0.7),
                                   readColor: Colors.white,
                                   size: 16,
                                 ),

@@ -687,23 +687,23 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         ),
       ),
       body: Column(
-          children: [
-            TemplateShellHeader(
-              title: navItems[selectedIndex].label,
-              navigation: IconButton(
-                icon: const Icon(Icons.menu_rounded),
-                color: theme.primaryTextColor,
-                tooltip: 'Open menu',
-                onPressed: () => scaffoldKey.currentState?.openDrawer(),
-              ),
-              backgroundColor: theme.surfaceColor,
-              foregroundColor: theme.primaryTextColor,
-              dividerColor: colors.border,
+        children: [
+          TemplateShellHeader(
+            title: navItems[selectedIndex].label,
+            navigation: IconButton(
+              icon: const Icon(Icons.menu_rounded),
+              color: theme.primaryTextColor,
+              tooltip: 'Open menu',
+              onPressed: () => scaffoldKey.currentState?.openDrawer(),
             ),
-            Expanded(
-              child: IndexedStack(index: selectedIndex, children: screens),
-            ),
-          ],
+            backgroundColor: theme.surfaceColor,
+            foregroundColor: theme.primaryTextColor,
+            dividerColor: colors.border,
+          ),
+          Expanded(
+            child: IndexedStack(index: selectedIndex, children: screens),
+          ),
+        ],
       ),
     );
   }
@@ -1049,10 +1049,16 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 Flexible(
                   child: ListView.separated(
                     shrinkWrap: true,
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 8,
+                      horizontal: 8,
+                    ),
                     itemCount: overflowDestinations.length,
-                    separatorBuilder: (_, index) =>
-                        Divider(color: colors.divider.withValues(alpha: 0.5), height: 1, indent: 48),
+                    separatorBuilder: (_, index) => Divider(
+                      color: colors.divider.withValues(alpha: 0.5),
+                      height: 1,
+                      indent: 48,
+                    ),
                     itemBuilder: (context, i) {
                       final item = overflowDestinations[i];
                       return ListTile(
@@ -1067,7 +1073,11 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                             color: colors.surfaceSecondary,
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Icon(item.icon, color: colors.primary, size: 20),
+                          child: Icon(
+                            item.icon,
+                            color: colors.primary,
+                            size: 20,
+                          ),
                         ),
                         title: Text(
                           item.label,

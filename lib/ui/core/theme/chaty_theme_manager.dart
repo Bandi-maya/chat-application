@@ -35,7 +35,9 @@ class ChatyThemeManager {
 
     final ver = decoded['schemaVersion'];
     if (ver == null || (ver is int && ver > schemaVersion)) {
-      throw const FormatException('Unsupported or missing theme schema version.');
+      throw const FormatException(
+        'Unsupported or missing theme schema version.',
+      );
     }
 
     final rawTheme = decoded['theme'];
@@ -47,7 +49,9 @@ class ChatyThemeManager {
 
     // Validate contrast and key token validity
     if (theme.primaryTextColor.toARGB32() == theme.backgroundColor.toARGB32()) {
-      throw const FormatException('Imported theme fails minimal readability check (text same as background).');
+      throw const FormatException(
+        'Imported theme fails minimal readability check (text same as background).',
+      );
     }
 
     return theme;
@@ -56,8 +60,12 @@ class ChatyThemeManager {
   /// Saves a theme file to the user's exported themes directory.
   static Future<File> saveThemeToFile(ThemeConfig theme) async {
     final dir = await getApplicationDocumentsDirectory();
-    final safeName = theme.name.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_').toLowerCase();
-    final file = File('${dir.path}/chaty_theme_${safeName}_${DateTime.now().millisecondsSinceEpoch}.json');
+    final safeName = theme.name
+        .replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_')
+        .toLowerCase();
+    final file = File(
+      '${dir.path}/chaty_theme_${safeName}_${DateTime.now().millisecondsSinceEpoch}.json',
+    );
     final jsonStr = exportTheme(theme);
     return file.writeAsString(jsonStr);
   }

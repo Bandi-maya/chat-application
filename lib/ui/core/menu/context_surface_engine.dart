@@ -88,12 +88,16 @@ class ContextSurfaceResolver {
     final anchor = request.anchorRect;
     final pref = request.preferredSize;
 
-    final effectiveBottom = screen.height - padding.bottom - keyboard.bottom - 8.0;
+    final effectiveBottom =
+        screen.height - padding.bottom - keyboard.bottom - 8.0;
     final effectiveTop = padding.top + 8.0;
     final effectiveLeft = padding.left + 8.0;
     final effectiveRight = screen.width - padding.right - 8.0;
 
-    final spaceBelow = (effectiveBottom - anchor.bottom).clamp(0.0, screen.height);
+    final spaceBelow = (effectiveBottom - anchor.bottom).clamp(
+      0.0,
+      screen.height,
+    );
     final spaceAbove = (anchor.top - effectiveTop).clamp(0.0, screen.height);
 
     // Determine vertical placement
@@ -164,7 +168,10 @@ class ContextSurfaceResolver {
     if (showBelow) {
       top = anchor.bottom + 6.0;
       if (top + targetHeight > effectiveBottom) {
-        top = (effectiveBottom - targetHeight).clamp(effectiveTop, effectiveBottom);
+        top = (effectiveBottom - targetHeight).clamp(
+          effectiveTop,
+          effectiveBottom,
+        );
       }
       transformOrigin = isRightSide ? Alignment.topRight : Alignment.topLeft;
     } else {
@@ -172,7 +179,9 @@ class ContextSurfaceResolver {
       if (top < effectiveTop) {
         top = effectiveTop;
       }
-      transformOrigin = isRightSide ? Alignment.bottomRight : Alignment.bottomLeft;
+      transformOrigin = isRightSide
+          ? Alignment.bottomRight
+          : Alignment.bottomLeft;
     }
 
     return ContextSurfaceResolution(
@@ -192,7 +201,11 @@ class ContextSurfaceController {
   static Future<T?> showSurface<T>({
     required BuildContext context,
     required Rect anchorRect,
-    required Widget Function(BuildContext dialogContext, ContextSurfaceResolution resolution) builder,
+    required Widget Function(
+      BuildContext dialogContext,
+      ContextSurfaceResolution resolution,
+    )
+    builder,
     Size preferredSize = const Size(240, 280),
     Color barrierColor = const Color(0x33000000),
     Duration duration = const Duration(milliseconds: 170),
@@ -218,9 +231,7 @@ class ContextSurfaceController {
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => Navigator.of(dialogContext).pop(),
-                child: Container(
-                  color: Colors.black.withValues(alpha: 0.28),
-                ),
+                child: Container(color: Colors.black.withValues(alpha: 0.28)),
               ),
             ),
             Positioned(

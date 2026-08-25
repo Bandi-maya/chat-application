@@ -46,9 +46,10 @@ class _FallingParticlesOverlayState extends State<FallingParticlesOverlay>
   @override
   void initState() {
     super.initState();
-    _controller =
-        AnimationController(vsync: this, duration: const Duration(seconds: 10))
-          ..addListener(_updateParticles);
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 10),
+    )..addListener(_updateParticles);
   }
 
   @override

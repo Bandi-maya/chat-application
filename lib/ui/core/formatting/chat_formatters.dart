@@ -46,9 +46,11 @@ String formatConversationTimestamp(DateTime timestamp, {DateTime? now}) {
   final yesterday = ref.subtract(const Duration(days: 1));
   if (_sameCalendarDay(local, yesterday)) return 'Yesterday';
 
-  final diffDays = DateTime(ref.year, ref.month, ref.day)
-      .difference(DateTime(local.year, local.month, local.day))
-      .inDays;
+  final diffDays = DateTime(
+    ref.year,
+    ref.month,
+    ref.day,
+  ).difference(DateTime(local.year, local.month, local.day)).inDays;
   if (diffDays > 0 && diffDays < 7) {
     // DateTime.weekday: Mon=1 … Sun=7.
     return _weekdays[local.weekday - 1];

@@ -18,9 +18,6 @@ void main() {
   test('service locator does not eagerly resolve call presentation', () {
     final source = File('lib/injection/locator.dart').readAsStringSync();
 
-    expect(
-      source,
-      isNot(contains('locator<CallPresentationController>();')),
-    );
+    expect(source, isNot(contains('locator<CallPresentationController>();')));
   });
 }

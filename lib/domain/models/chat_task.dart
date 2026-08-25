@@ -13,11 +13,7 @@ class TaskChecklistItem {
     this.isCompleted = false,
   });
 
-  TaskChecklistItem copyWith({
-    String? id,
-    String? title,
-    bool? isCompleted,
-  }) {
+  TaskChecklistItem copyWith({String? id, String? title, bool? isCompleted}) {
     return TaskChecklistItem(
       id: id ?? this.id,
       title: title ?? this.title,

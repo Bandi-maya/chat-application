@@ -32,10 +32,12 @@ class NotificationPermissionSheet extends StatefulWidget {
   }
 
   @override
-  State<NotificationPermissionSheet> createState() => _NotificationPermissionSheetState();
+  State<NotificationPermissionSheet> createState() =>
+      _NotificationPermissionSheetState();
 }
 
-class _NotificationPermissionSheetState extends State<NotificationPermissionSheet> {
+class _NotificationPermissionSheetState
+    extends State<NotificationPermissionSheet> {
   bool _requesting = false;
 
   Future<void> _handleContinue() async {
@@ -55,7 +57,9 @@ class _NotificationPermissionSheetState extends State<NotificationPermissionShee
       if (status.isPermanentlyDenied) {
         messenger.showSnackBar(
           SnackBar(
-            content: const Text('Notifications are disabled in system settings.'),
+            content: const Text(
+              'Notifications are disabled in system settings.',
+            ),
             action: SnackBarAction(
               label: 'Settings',
               onPressed: () => openAppSettings(),
@@ -73,7 +77,9 @@ class _NotificationPermissionSheetState extends State<NotificationPermissionShee
     return Container(
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(ChatyRadius.xxl)),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(ChatyRadius.xxl),
+        ),
         border: Border(top: BorderSide(color: colors.borderSubtle)),
       ),
       padding: const EdgeInsets.fromLTRB(
@@ -143,7 +149,8 @@ class _NotificationPermissionSheetState extends State<NotificationPermissionShee
                       ),
                     ),
                     onPressed: () async {
-                      await locator<NotificationChannelManager>().markEducationShown();
+                      await locator<NotificationChannelManager>()
+                          .markEducationShown();
                       if (context.mounted) Navigator.of(context).pop();
                     },
                     child: Text(

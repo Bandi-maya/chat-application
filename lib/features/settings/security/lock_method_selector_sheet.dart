@@ -78,10 +78,7 @@ class _LockMethodSelectorSheetState extends State<LockMethodSelectorSheet> {
             const SizedBox(height: 4),
             Text(
               'You will set it up in the next step. You can change it later.',
-              style: TextStyle(
-                color: colors.foregroundSecondary,
-                fontSize: 13,
-              ),
+              style: TextStyle(color: colors.foregroundSecondary, fontSize: 13),
             ),
             const SizedBox(height: 16),
             _MethodCard(
@@ -128,12 +125,9 @@ class _LockMethodSelectorSheetState extends State<LockMethodSelectorSheet> {
               subtitle:
                   'The PIN / pattern / password managed by Android or iOS',
               enabled: true,
-              selected: widget.currentMethod ==
-                  LockMethodType.deviceCredential,
-              onEnabledTap: () => Navigator.pop(
-                context,
-                LockMethodType.deviceCredential,
-              ),
+              selected: widget.currentMethod == LockMethodType.deviceCredential,
+              onEnabledTap: () =>
+                  Navigator.pop(context, LockMethodType.deviceCredential),
             ),
           ],
         ),
@@ -172,71 +166,71 @@ class _MethodCardState extends State<_MethodCard> {
       selected: widget.selected,
       label: widget.selected ? '${widget.title}, selected' : widget.title,
       child: GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapCancel: () => setState(() => _pressed = false),
-      onTapUp: (_) => setState(() => _pressed = false),
-      onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: _pressed ? 0.98 : 1.0,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOutCubic,
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: colors.surfaceElevated,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: widget.selected ? colors.primary : colors.borderSubtle,
-              width: widget.selected ? 1.6 : 1,
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: _pressed ? 0.98 : 1.0,
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOutCubic,
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: colors.surfaceElevated,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: widget.selected ? colors.primary : colors.borderSubtle,
+                width: widget.selected ? 1.6 : 1,
+              ),
             ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: colors.primary.withValues(alpha: 0.12),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: colors.primary.withValues(alpha: 0.12),
+                  ),
+                  child: Icon(widget.icon, size: 21, color: colors.primary),
                 ),
-                child: Icon(widget.icon, size: 21, color: colors.primary),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.title,
-                      style: TextStyle(
-                        color: colors.foreground,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.title,
+                        style: TextStyle(
+                          color: colors.foreground,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      widget.subtitle,
-                      style: TextStyle(
-                        color: colors.foregroundSecondary,
-                        fontSize: 12.5,
+                      const SizedBox(height: 2),
+                      Text(
+                        widget.subtitle,
+                        style: TextStyle(
+                          color: colors.foregroundSecondary,
+                          fontSize: 12.5,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              Icon(
-                widget.selected
-                    ? Icons.radio_button_checked_rounded
-                    : Icons.radio_button_off_rounded,
-                size: 20,
-                color: widget.selected
-                    ? colors.primary
-                    : colors.foregroundTertiary,
-              ),
-            ],
-          ),
+                Icon(
+                  widget.selected
+                      ? Icons.radio_button_checked_rounded
+                      : Icons.radio_button_off_rounded,
+                  size: 20,
+                  color: widget.selected
+                      ? colors.primary
+                      : colors.foregroundTertiary,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -348,6 +342,10 @@ class _OsAuthCard extends StatelessWidget {
       ),
     );
     if (!enabled) return card;
-    return InkWell(onTap: onEnabledTap, borderRadius: BorderRadius.circular(16), child: card);
+    return InkWell(
+      onTap: onEnabledTap,
+      borderRadius: BorderRadius.circular(16),
+      child: card,
+    );
   }
 }

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'template_models.dart';
 
 /// Authoritative central registry containing the 6 original Chaty UI Templates.
@@ -9,7 +9,8 @@ class ChatyTemplateRegistry {
     id: ChatyTemplateId.visualSocial,
     name: 'Visual Social',
     subtitle: 'Media-First & Expressive Stories',
-    description: 'Prominent circular stories rail, floating pill navigation with action focus, and expressive message surfaces.',
+    description:
+        'Prominent circular stories rail, floating pill navigation with action focus, and expressive message surfaces.',
     navigation: NavigationTemplate(
       layout: NavigationLayoutType.floatingPill,
       primaryDestinationIds: ['chats', 'updates', 'calls'],
@@ -65,7 +66,8 @@ class ChatyTemplateRegistry {
     id: ChatyTemplateId.stream,
     name: 'Stream',
     subtitle: 'Text-Forward Timeline & Fast Scanning',
-    description: 'High information density, compact avatars, minimal decorative padding, and text-prioritized chat rows.',
+    description:
+        'High information density, compact avatars, minimal decorative padding, and text-prioritized chat rows.',
     navigation: NavigationTemplate(
       layout: NavigationLayoutType.flatTabs,
       primaryDestinationIds: ['chats', 'updates', 'calls'],
@@ -121,7 +123,8 @@ class ChatyTemplateRegistry {
     id: ChatyTemplateId.cameraFirst,
     name: 'Camera First',
     subtitle: 'Instant Capture & Fast Media Dispatch',
-    description: 'Elevated central capture action in the navigation bar with immediate camera access and visual feedback.',
+    description:
+        'Elevated central capture action in the navigation bar with immediate camera access and visual feedback.',
     navigation: NavigationTemplate(
       layout: NavigationLayoutType.centerActionDock,
       primaryDestinationIds: ['chats', 'updates', 'calls'],
@@ -180,7 +183,8 @@ class ChatyTemplateRegistry {
     id: ChatyTemplateId.messageFirst,
     name: 'Message First',
     subtitle: 'Clean & Balanced Direct Messaging',
-    description: 'Straightforward, low-noise communication with standard 4-item bottom navigation and classic bubble geometry.',
+    description:
+        'Straightforward, low-noise communication with standard 4-item bottom navigation and classic bubble geometry.',
     navigation: NavigationTemplate(
       layout: NavigationLayoutType.floatingPill,
       primaryDestinationIds: ['chats', 'updates', 'calls'],
@@ -236,7 +240,8 @@ class ChatyTemplateRegistry {
     id: ChatyTemplateId.powerChat,
     name: 'Power Chat',
     subtitle: 'Productivity, Folders & Utility Density',
-    description: 'Separate chat/group tabs, compact utility navigation with More panel, and rich action composer for power users.',
+    description:
+        'Separate chat/group tabs, compact utility navigation with More panel, and rich action composer for power users.',
     navigation: NavigationTemplate(
       layout: NavigationLayoutType.utilityBar,
       primaryDestinationIds: ['chats', 'updates', 'calls'],
@@ -292,7 +297,8 @@ class ChatyTemplateRegistry {
     id: ChatyTemplateId.community,
     name: 'Community',
     subtitle: 'Spaces, Identity Bar & Group Dynamics',
-    description: 'Identity-forward navigation surface, distinct channel grouping, squircle badges, and community spaces focus.',
+    description:
+        'Identity-forward navigation surface, distinct channel grouping, squircle badges, and community spaces focus.',
     navigation: NavigationTemplate(
       layout: NavigationLayoutType.identityBar,
       primaryDestinationIds: ['chats', 'updates', 'calls'],
@@ -357,5 +363,6 @@ class ChatyTemplateRegistry {
     return all[id] ?? messageFirst;
   }
 
-  static List<ChatyTemplateDefinition> get list => all.values.toList(growable: false);
+  static List<ChatyTemplateDefinition> get list =>
+      all.values.toList(growable: false);
 }

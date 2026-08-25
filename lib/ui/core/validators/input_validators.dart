@@ -85,7 +85,9 @@ class ChatyValidators {
     if (!RegExp(r'[0-9]').hasMatch(value)) {
       return 'Password must include a number';
     }
-    if (!RegExp(r'''[!@#$%^&*()_+\-=\[\]{};'\\:"|<>?,./`~]''').hasMatch(value)) {
+    if (!RegExp(
+      r'''[!@#$%^&*()_+\-=\[\]{};'\\:"|<>?,./`~]''',
+    ).hasMatch(value)) {
       return 'Password must include a symbol';
     }
     return null;

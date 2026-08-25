@@ -39,7 +39,8 @@ class ChatyAdaptiveSplitView extends StatelessWidget {
               color: colors.outlineVariant.withValues(alpha: .55),
             ),
         Expanded(
-          child: secondary ??
+          child:
+              secondary ??
               placeholder ??
               Center(
                 child: Text(

@@ -16,10 +16,7 @@ abstract final class ChatyMotion {
   static const Curve exit = Curves.easeInCubic;
   static const Curve springSoft = Curves.easeOutBack;
 
-  static Duration duration(
-    BuildContext context, {
-    Duration preferred = base,
-  }) {
+  static Duration duration(BuildContext context, {Duration preferred = base}) {
     return MediaQuery.maybeOf(context)?.disableAnimations == true
         ? Duration.zero
         : preferred;

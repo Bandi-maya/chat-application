@@ -57,12 +57,17 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   Future<void> _save() async {
     if (_saving || _formKey.currentState?.validate() != true) return;
     final user = widget.dataStore.currentUser;
-    final normalized = ChatyValidators.normalizeUsername(_usernameController.text);
-    final unchanged = normalized == ChatyValidators.normalizeUsername(user.username);
+    final normalized = ChatyValidators.normalizeUsername(
+      _usernameController.text,
+    );
+    final unchanged =
+        normalized == ChatyValidators.normalizeUsername(user.username);
 
     if (!unchanged && _usernameAvailable != true) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Choose an available username before saving.')),
+        const SnackBar(
+          content: Text('Choose an available username before saving.'),
+        ),
       );
       return;
     }
@@ -225,13 +230,11 @@ class _ProfilePhotoEditSection extends StatefulWidget {
   final dynamic user;
   final ChatyDataStore dataStore;
 
-  const _ProfilePhotoEditSection({
-    required this.user,
-    required this.dataStore,
-  });
+  const _ProfilePhotoEditSection({required this.user, required this.dataStore});
 
   @override
-  State<_ProfilePhotoEditSection> createState() => _ProfilePhotoEditSectionState();
+  State<_ProfilePhotoEditSection> createState() =>
+      _ProfilePhotoEditSectionState();
 }
 
 class _ProfilePhotoEditSectionState extends State<_ProfilePhotoEditSection> {
@@ -291,7 +294,10 @@ class _ProfilePhotoEditSectionState extends State<_ProfilePhotoEditSection> {
                     shape: BoxShape.circle,
                   ),
                   child: const Center(
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2.5,
+                    ),
                   ),
                 ),
               ),
@@ -302,13 +308,17 @@ class _ProfilePhotoEditSectionState extends State<_ProfilePhotoEditSection> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextButton.icon(
-              onPressed: _uploading ? null : () => _changePhoto(ProfileMediaSource.camera),
+              onPressed: _uploading
+                  ? null
+                  : () => _changePhoto(ProfileMediaSource.camera),
               icon: const Icon(Icons.photo_camera_rounded, size: 18),
               label: const Text('Camera'),
             ),
             const SizedBox(width: 8),
             TextButton.icon(
-              onPressed: _uploading ? null : () => _changePhoto(ProfileMediaSource.gallery),
+              onPressed: _uploading
+                  ? null
+                  : () => _changePhoto(ProfileMediaSource.gallery),
               icon: const Icon(Icons.photo_library_rounded, size: 18),
               label: const Text('Gallery'),
             ),

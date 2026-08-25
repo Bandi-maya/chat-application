@@ -39,7 +39,8 @@ class TemplatesSettingsScreen extends StatelessWidget {
             ),
             title: const Text('Templates'),
             actions: [
-              if (overridesCount > 0 || config.baseTemplate != ChatyTemplateId.messageFirst)
+              if (overridesCount > 0 ||
+                  config.baseTemplate != ChatyTemplateId.messageFirst)
                 IconButton(
                   tooltip: 'Reset All Templates',
                   icon: const Icon(Icons.restart_alt_rounded),
@@ -65,7 +66,10 @@ class TemplatesSettingsScreen extends StatelessWidget {
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: colors.primary.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(8),
@@ -161,10 +165,11 @@ class TemplatesSettingsScreen extends StatelessWidget {
                                 children: [
                                   Text(
                                     tmpl.name,
-                                    style: theme.textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.w800,
-                                      color: colors.foreground,
-                                    ),
+                                    style: theme.textTheme.titleMedium
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w800,
+                                          color: colors.foreground,
+                                        ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
@@ -190,18 +195,28 @@ class TemplatesSettingsScreen extends StatelessWidget {
                             Expanded(
                               child: FilledButton(
                                 style: FilledButton.styleFrom(
-                                  backgroundColor: isBase ? colors.surfaceElevated : colors.primary,
-                                  foregroundColor: isBase ? colors.foregroundSecondary : Colors.white,
+                                  backgroundColor: isBase
+                                      ? colors.surfaceElevated
+                                      : colors.primary,
+                                  foregroundColor: isBase
+                                      ? colors.foregroundSecondary
+                                      : Colors.white,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
                                 onPressed: isBase && overridesCount == 0
                                     ? null
-                                    : () => _applyFullTemplate(context, templateController, tmpl),
-                                child: Text(isBase && overridesCount == 0
-                                    ? 'Currently Used'
-                                    : 'Apply Complete Template'),
+                                    : () => _applyFullTemplate(
+                                        context,
+                                        templateController,
+                                        tmpl,
+                                      ),
+                                child: Text(
+                                  isBase && overridesCount == 0
+                                      ? 'Currently Used'
+                                      : 'Apply Complete Template',
+                                ),
                               ),
                             ),
                           ],
@@ -231,7 +246,9 @@ class TemplatesSettingsScreen extends StatelessWidget {
                 const SizedBox(height: 12),
 
                 ...TemplateComponentType.values.map((component) {
-                  final effectiveId = templateController.resolveTemplateFor(component);
+                  final effectiveId = templateController.resolveTemplateFor(
+                    component,
+                  );
                   final isOverridden = config.isOverridden(component);
                   final effectiveTmpl = ChatyTemplateRegistry.get(effectiveId);
 
@@ -243,7 +260,10 @@ class TemplatesSettingsScreen extends StatelessWidget {
                       border: Border.all(color: colors.border),
                     ),
                     child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
+                      ),
                       leading: Container(
                         width: 38,
                         height: 38,
@@ -251,25 +271,41 @@ class TemplatesSettingsScreen extends StatelessWidget {
                           color: colors.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Icon(component.icon, color: colors.primary, size: 20),
+                        child: Icon(
+                          component.icon,
+                          color: colors.primary,
+                          size: 20,
+                        ),
                       ),
                       title: Text(
                         component.title,
-                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: colors.foreground),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: colors.foreground,
+                        ),
                       ),
                       subtitle: Text(
                         '${effectiveTmpl.name} ${isOverridden ? "• (Customized)" : "• (From base)"}',
                         style: TextStyle(
                           fontSize: 12,
-                          color: isOverridden ? colors.primary : colors.foregroundSecondary,
-                          fontWeight: isOverridden ? FontWeight.w600 : FontWeight.w400,
+                          color: isOverridden
+                              ? colors.primary
+                              : colors.foregroundSecondary,
+                          fontWeight: isOverridden
+                              ? FontWeight.w600
+                              : FontWeight.w400,
                         ),
                       ),
-                      trailing: Icon(Icons.chevron_right_rounded, color: colors.foregroundSecondary),
+                      trailing: Icon(
+                        Icons.chevron_right_rounded,
+                        color: colors.foregroundSecondary,
+                      ),
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
-                            builder: (_) => ComponentOverrideScreen(component: component),
+                            builder: (_) =>
+                                ComponentOverrideScreen(component: component),
                           ),
                         );
                       },
@@ -309,9 +345,9 @@ class TemplatesSettingsScreen extends StatelessWidget {
                 appearanceController: locator<AppearanceVariantController>(),
                 preferencesController: locator<ChatyPreferencesController>(),
               );
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Applied full  template')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text('Applied full  template')));
             },
             child: const Text('Apply'),
           ),
@@ -320,10 +356,7 @@ class TemplatesSettingsScreen extends StatelessWidget {
     );
   }
 
-  void _confirmReset(
-    BuildContext context,
-    TemplateController controller,
-  ) {
+  void _confirmReset(BuildContext context, TemplateController controller) {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(

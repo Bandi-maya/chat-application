@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../controllers/appearance_variant_controller.dart';
 import '../controllers/preferences_controller.dart';
@@ -19,7 +19,8 @@ class TemplateController extends ChangeNotifier {
 
   UserTemplateConfiguration get config => _config;
   ChatyTemplateId get baseTemplate => _config.baseTemplate;
-  Map<TemplateComponentType, ChatyTemplateId> get componentOverrides => _config.componentOverrides;
+  Map<TemplateComponentType, ChatyTemplateId> get componentOverrides =>
+      _config.componentOverrides;
 
   /// Resolves the effective template ID for a specific component.
   ChatyTemplateId resolveTemplateFor(TemplateComponentType component) {
@@ -27,29 +28,37 @@ class TemplateController extends ChangeNotifier {
   }
 
   /// Resolves the concrete component definition for a specific component.
-  NavigationTemplate get navigation =>
-      ChatyTemplateRegistry.get(resolveTemplateFor(TemplateComponentType.navigation)).navigation;
+  NavigationTemplate get navigation => ChatyTemplateRegistry.get(
+    resolveTemplateFor(TemplateComponentType.navigation),
+  ).navigation;
 
-  HomeTemplate get home =>
-      ChatyTemplateRegistry.get(resolveTemplateFor(TemplateComponentType.home)).home;
+  HomeTemplate get home => ChatyTemplateRegistry.get(
+    resolveTemplateFor(TemplateComponentType.home),
+  ).home;
 
-  ChatListTemplate get chatList =>
-      ChatyTemplateRegistry.get(resolveTemplateFor(TemplateComponentType.chatList)).chatList;
+  ChatListTemplate get chatList => ChatyTemplateRegistry.get(
+    resolveTemplateFor(TemplateComponentType.chatList),
+  ).chatList;
 
-  ConversationTemplate get conversation =>
-      ChatyTemplateRegistry.get(resolveTemplateFor(TemplateComponentType.conversation)).conversation;
+  ConversationTemplate get conversation => ChatyTemplateRegistry.get(
+    resolveTemplateFor(TemplateComponentType.conversation),
+  ).conversation;
 
-  ComposerTemplate get composer =>
-      ChatyTemplateRegistry.get(resolveTemplateFor(TemplateComponentType.composer)).composer;
+  ComposerTemplate get composer => ChatyTemplateRegistry.get(
+    resolveTemplateFor(TemplateComponentType.composer),
+  ).composer;
 
-  UpdatesTemplate get updates =>
-      ChatyTemplateRegistry.get(resolveTemplateFor(TemplateComponentType.updates)).updates;
+  UpdatesTemplate get updates => ChatyTemplateRegistry.get(
+    resolveTemplateFor(TemplateComponentType.updates),
+  ).updates;
 
-  ProfileTemplate get profile =>
-      ChatyTemplateRegistry.get(resolveTemplateFor(TemplateComponentType.profile)).profile;
+  ProfileTemplate get profile => ChatyTemplateRegistry.get(
+    resolveTemplateFor(TemplateComponentType.profile),
+  ).profile;
 
-  CallTemplate get calls =>
-      ChatyTemplateRegistry.get(resolveTemplateFor(TemplateComponentType.calls)).calls;
+  CallTemplate get calls => ChatyTemplateRegistry.get(
+    resolveTemplateFor(TemplateComponentType.calls),
+  ).calls;
 
   /// Initializes the template controller and restores saved configuration from storage.
   Future<void> init({

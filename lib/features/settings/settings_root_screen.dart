@@ -82,64 +82,74 @@ class SettingsRootScreen extends StatelessWidget {
   Widget _destinationForRoute(String route) {
     return switch (route) {
       '/settings/account' => _reactive(
-          () => AccountSettingsScreen(
-            preferencesController: preferencesController,
-            dataStore: dataStore,
-          ),
+        () => AccountSettingsScreen(
+          preferencesController: preferencesController,
+          dataStore: dataStore,
         ),
+      ),
       '/settings/privacy' => _reactive(
-          () => PrivacyCenterScreen(preferencesController: preferencesController),
-        ),
+        () => PrivacyCenterScreen(preferencesController: preferencesController),
+      ),
       '/settings/security' => _reactive(
-          () => SecurityCenterScreen(preferencesController: preferencesController),
-        ),
+        () =>
+            SecurityCenterScreen(preferencesController: preferencesController),
+      ),
       '/settings/conversation' => _reactive(
-          () => ConversationSettingsPage(preferencesController: preferencesController),
+        () => ConversationSettingsPage(
+          preferencesController: preferencesController,
         ),
+      ),
       '/settings/message_management' => _reactive(
-          () => MessageManagementPage(
-            preferencesController: preferencesController,
-            dataStore: dataStore,
-          ),
+        () => MessageManagementPage(
+          preferencesController: preferencesController,
+          dataStore: dataStore,
         ),
+      ),
       '/settings/themes' => ThemeEditorScreen(themeController: themeController),
       '/settings/templates' => const TemplatesSettingsScreen(),
       '/settings/app_icon' => AppIconSettingsScreen(
-          appIconController: _appIconController,
-        ),
+        appIconController: _appIconController,
+      ),
       '/settings/universal_appearance' => _reactive(
-          () => UniversalAppearanceScreen(preferencesController: preferencesController),
+        () => UniversalAppearanceScreen(
+          preferencesController: preferencesController,
         ),
+      ),
       '/settings/home' => _reactive(
-          () => HomeScreenSettingsPage(preferencesController: preferencesController),
+        () => HomeScreenSettingsPage(
+          preferencesController: preferencesController,
         ),
+      ),
       '/settings/notifications' => _reactive(
-          () => NotificationSettingsPage(
-            preferencesController: preferencesController,
-            notificationService: notificationService,
-          ),
+        () => NotificationSettingsPage(
+          preferencesController: preferencesController,
+          notificationService: notificationService,
         ),
+      ),
       '/settings/calls' => _reactive(
-          () => CallSettingsScreen(preferencesController: preferencesController),
-        ),
+        () => CallSettingsScreen(preferencesController: preferencesController),
+      ),
       '/settings/storage' => _reactive(
-          () => StorageAndMediaSettingsScreen(preferencesController: preferencesController),
+        () => StorageAndMediaSettingsScreen(
+          preferencesController: preferencesController,
         ),
+      ),
       '/settings/effects' => _reactive(
-          () => NavigationEffectsPage(preferencesController: preferencesController),
-        ),
+        () =>
+            NavigationEffectsPage(preferencesController: preferencesController),
+      ),
       '/settings/permissions' => _reactive(
-          () => SystemPermissionsScreen(
-            preferencesController: preferencesController,
-            notificationService: notificationService,
-          ),
+        () => SystemPermissionsScreen(
+          preferencesController: preferencesController,
+          notificationService: notificationService,
         ),
+      ),
       _ => _reactive(
-          () => AccountSettingsScreen(
-            preferencesController: preferencesController,
-            dataStore: dataStore,
-          ),
+        () => AccountSettingsScreen(
+          preferencesController: preferencesController,
+          dataStore: dataStore,
         ),
+      ),
     };
   }
 

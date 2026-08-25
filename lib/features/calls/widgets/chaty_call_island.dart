@@ -115,8 +115,8 @@ class _ChatyCallIslandState extends State<ChatyCallIsland>
                     widget.session.state == CallSessionState.connected
                         ? _formatDuration(widget.durationSeconds)
                         : (widget.session.state == CallSessionState.reconnecting
-                            ? 'Reconnecting'
-                            : 'Calling…'),
+                              ? 'Reconnecting'
+                              : 'Calling…'),
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 12.5,
@@ -133,7 +133,8 @@ class _ChatyCallIslandState extends State<ChatyCallIsland>
                       return Row(
                         mainAxisSize: MainAxisSize.min,
                         children: List.generate(4, (index) {
-                          final phase = (_waveCtrl.value + (index * 0.25)) % 1.0;
+                          final phase =
+                              (_waveCtrl.value + (index * 0.25)) % 1.0;
                           final height = 4.0 + math.sin(phase * math.pi) * 10.0;
                           return Container(
                             margin: const EdgeInsets.symmetric(horizontal: 1.2),

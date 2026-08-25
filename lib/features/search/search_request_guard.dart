@@ -10,6 +10,8 @@ class SearchRequestGuard {
   /// Preserves backend ordering while removing repeated canonical records.
   List<T> deduplicate<T>(Iterable<T> values, String Function(T value) idOf) {
     final seen = <String>{};
-    return values.where((value) => seen.add(idOf(value))).toList(growable: false);
+    return values
+        .where((value) => seen.add(idOf(value)))
+        .toList(growable: false);
   }
 }

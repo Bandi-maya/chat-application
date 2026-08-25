@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../domain/models/chat_message.dart';
+import '../../domain/models/connection_health.dart';
 import '../../domain/models/user_profile.dart';
+import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import 'backend_service.dart';
+import 'connection_health_service.dart';
 import 'notification_service.dart';
 
 class ContactActivityState {
@@ -479,7 +482,21 @@ class RichChatRealtimeService extends ChangeNotifier {
             _handleProfileChange(Map<String, dynamic>.from(row));
           },
         )
-        .subscribe();
+        .subscribe((status, [error]) {
+          if (locator.isRegistered<ConnectionHealthService>()) {
+            final socketStatus = switch (status) {
+              RealtimeSubscribeStatus.subscribed =>
+                RealtimeSocketStatus.connected,
+              RealtimeSubscribeStatus.timedOut =>
+                RealtimeSocketStatus.reconnecting,
+              RealtimeSubscribeStatus.closed =>
+                RealtimeSocketStatus.disconnected,
+              RealtimeSubscribeStatus.channelError =>
+                RealtimeSocketStatus.disconnected,
+            };
+            locator<ConnectionHealthService>().notifyRealtimeStatus(socketStatus);
+          }
+        });
     _channel = channel;
   }
 

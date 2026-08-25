@@ -41,7 +41,8 @@ class ThemeConfig {
   final BubbleStyleId bubbleStyle;
   final DeliveryIconStyle deliveryTickStyle;
   final String tickStyle; // preserved as string alias
-  final String wallpaperId; // 'none', 'subtle_dots', 'geometric', 'gradient_mesh', 'constellation'
+  final String
+  wallpaperId; // 'none', 'subtle_dots', 'geometric', 'gradient_mesh', 'constellation'
   final double animationLevel; // 0.0 to 1.0
   final bool highContrast;
 
@@ -568,7 +569,7 @@ class ThemeConfig {
     'cornerRadius': cornerRadius,
     'density': density,
     'fontScale': fontScale,
-        'highContrast': highContrast,
+    'highContrast': highContrast,
     'navigationMode': navigationMode.name,
     'layoutMode': layoutMode.name,
     'bubbleStyle': bubbleStyle.name,
@@ -580,7 +581,8 @@ class ThemeConfig {
 
   factory ThemeConfig.fromMap(Map<String, dynamic> map) {
     final bubbleStyleRaw = map['bubbleStyle'] as String?;
-    final tickStyleRaw = map['deliveryTickStyle'] as String? ?? map['tickStyle'] as String?;
+    final tickStyleRaw =
+        map['deliveryTickStyle'] as String? ?? map['tickStyle'] as String?;
 
     return ThemeConfig(
       id: map['id'] is String && (map['id'] as String).isNotEmpty

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../ui/core/formatting/chat_formatters.dart';
 import '../../ui/core/theme/app_theme.dart';
@@ -43,6 +42,11 @@ import '../messages/message_bubble.dart';
 import '../tasks/task_create_edit_modal.dart';
 import 'contact_info_screen.dart';
 import 'group_info_screen.dart';
+import '../../data/services/connection_health_service.dart';
+import '../../data/services/outgoing_message_queue_engine.dart';
+import '../../ui/core/connection/connection_health_indicator.dart';
+import '../../ui/core/connection/connection_detail_sheet.dart';
+import '../../ui/core/connection/global_connection_banner.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final ThemeConfig theme;
@@ -308,9 +312,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              error.toString().replaceFirst('Exception: ', ''),
-            ),
+            content: Text(error.toString().replaceFirst('Exception: ', '')),
           ),
         );
         // Restore so user can retry
@@ -371,9 +373,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       } else {
         _textCtrl.text = text;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(raw.replaceFirst('Exception: ', '')),
-          ),
+          SnackBar(content: Text(raw.replaceFirst('Exception: ', ''))),
         );
       }
       setState(() {});
@@ -589,8 +589,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
   }
 
-
-  static const List<String> _quickReactionEmojis = ['❤️', '👍', '😂', '😮', '😢', '🙏'];
+  static const List<String> _quickReactionEmojis = [
+    '❤️',
+    '👍',
+    '😂',
+    '😮',
+    '😢',
+    '🙏',
+  ];
 
   void _onMessageLongPressWithRect(ChatMessage message, Rect bubbleRect) {
     HapticFeedback.selectionClick();
@@ -605,14 +611,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
     final sections = <ContextMenuSection>[
       ContextMenuSection(
-        items: actions.map((act) {
-          return ContextMenuItem(
-            icon: act.icon,
-            label: act.label,
-            isDestructive: act.isDestructive,
-            onTap: () => _executeMessageAction(message, act.type, isMine),
-          );
-        }).toList(growable: false),
+        items: actions
+            .map((act) {
+              return ContextMenuItem(
+                icon: act.icon,
+                label: act.label,
+                isDestructive: act.isDestructive,
+                onTap: () => _executeMessageAction(message, act.type, isMine),
+              );
+            })
+            .toList(growable: false),
       ),
     ];
 
@@ -649,7 +657,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     });
   }
 
-  void _showReactionDetailsSheet(ChatMessage message, MessageReaction reaction) {
+  void _showReactionDetailsSheet(
+    ChatMessage message,
+    MessageReaction reaction,
+  ) {
     final theme = _theme;
     final currentUserId = widget.dataStore.currentUser.id;
     final hasMyReaction = reaction.userIds.contains(currentUserId);
@@ -683,10 +694,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                 child: Row(
                   children: [
-                    Text(
-                      reaction.emoji,
-                      style: const TextStyle(fontSize: 28),
-                    ),
+                    Text(reaction.emoji, style: const TextStyle(fontSize: 28)),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
@@ -790,7 +798,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   color: theme.secondaryTextColor.withValues(alpha: 0.12),
                 ),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   child: SizedBox(
                     width: double.infinity,
                     child: TextButton.icon(
@@ -802,8 +813,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                           reaction.emoji,
                         );
                       },
-                      icon: Icon(Icons.remove_circle_outline_rounded,
-                          color: theme.dangerColor, size: 18),
+                      icon: Icon(
+                        Icons.remove_circle_outline_rounded,
+                        color: theme.dangerColor,
+                        size: 18,
+                      ),
                       label: Text(
                         'Tap to remove your reaction',
                         style: TextStyle(
@@ -823,7 +837,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
-  void _executeMessageAction(ChatMessage message, MessageActionType type, bool isMine) async {
+  void _executeMessageAction(
+    ChatMessage message,
+    MessageActionType type,
+    bool isMine,
+  ) async {
     switch (type) {
       case MessageActionType.reply:
         setState(() => _replyTarget = message);
@@ -831,9 +849,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       case MessageActionType.copy:
         await Clipboard.setData(ClipboardData(text: message.text));
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Message copied')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Message copied')));
         }
         break;
       case MessageActionType.forward:
@@ -848,7 +866,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       case MessageActionType.edit:
         setState(() => _editingMessageId = message.id);
         _textCtrl.text = message.text;
-        _textCtrl.selection = TextSelection.collapsed(offset: message.text.length);
+        _textCtrl.selection = TextSelection.collapsed(
+          offset: message.text.length,
+        );
         _handleComposerChanged(message.text);
         break;
       case MessageActionType.task:
@@ -860,9 +880,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       case MessageActionType.translate:
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Translation: ${message.text}'),
-            ),
+            SnackBar(content: Text('Translation: ${message.text}')),
           );
         }
         break;
@@ -890,7 +908,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Use Contact info → Block to stop unwanted messages.'),
+              content: Text(
+                'Use Contact info → Block to stop unwanted messages.',
+              ),
             ),
           );
         }
@@ -963,7 +983,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         title: task.title,
         items: [
           ContextMenuItem(
-            icon: isCompleted ? Icons.replay_rounded : Icons.check_circle_outline_rounded,
+            icon: isCompleted
+                ? Icons.replay_rounded
+                : Icons.check_circle_outline_rounded,
             label: isCompleted ? 'Reopen task' : 'Mark completed',
             onTap: () => _toggleTaskStatus(task),
           ),
@@ -1346,13 +1368,19 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   tooltip: 'Star',
                   onPressed: () {
                     for (final id in _selectedMessageIds) {
-                      widget.dataStore.toggleStarMessage(widget.conversationId, id);
+                      widget.dataStore.toggleStarMessage(
+                        widget.conversationId,
+                        id,
+                      );
                     }
                     setState(() => _selectedMessageIds.clear());
                   },
                 ),
                 IconButton(
-                  icon: Icon(Icons.delete_outline_rounded, color: theme.dangerColor),
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    color: theme.dangerColor,
+                  ),
                   tooltip: 'Delete',
                   onPressed: () {
                     for (final id in _selectedMessageIds) {
@@ -1411,13 +1439,18 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   IconButton(
                     icon: const Icon(Icons.keyboard_arrow_up_rounded, size: 22),
                     tooltip: 'Previous match',
-                    onPressed: () => _jumpToSearchMatch(_currentSearchMatchIndex - 1),
+                    onPressed: () =>
+                        _jumpToSearchMatch(_currentSearchMatchIndex - 1),
                   ),
                 if (_searchMatchedMessageIds.isNotEmpty)
                   IconButton(
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 22),
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 22,
+                    ),
                     tooltip: 'Next match',
-                    onPressed: () => _jumpToSearchMatch(_currentSearchMatchIndex + 1),
+                    onPressed: () =>
+                        _jumpToSearchMatch(_currentSearchMatchIndex + 1),
                   ),
                 IconButton(
                   icon: const Icon(Icons.close_rounded),
@@ -1472,7 +1505,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                                     .take(2)
                                     .toString()
                                     .toUpperCase(),
-                            colorHex: conversation.avatarColorHex ?? '0xFF6366F1',
+                            colorHex:
+                                conversation.avatarColorHex ?? '0xFF6366F1',
                             size: 38,
                           ),
                           if (conversation.type == ConversationType.direct &&
@@ -1528,7 +1562,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                                 style: TextStyle(
                                   color:
                                       presenceTextColor ??
-                                      (remoteTyping || remoteRecording || isOnline
+                                      (remoteTyping ||
+                                              remoteRecording ||
+                                              isOnline
                                           ? theme.successColor
                                           : theme.secondaryTextColor),
                                   fontSize: 10.5 * theme.fontScale,
@@ -1569,12 +1605,33 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         : 'Video call • contact acceptance required',
                     onPressed: () => _startCall(true),
                   ),
+                if (locator.isRegistered<ConnectionHealthService>())
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Center(
+                      child: ListenableBuilder(
+                        listenable: locator<ConnectionHealthService>(),
+                        builder: (context, _) {
+                          final health = locator<ConnectionHealthService>().health;
+                          return ConnectionHealthIndicator(
+                            health: health,
+                            size: 15,
+                            onTap: () => ConnectionDetailSheet.show(context),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
                 // Chat overflow menu: wallpaper, mute, clear, block and more.
                 Builder(
                   builder: (btnCtx) => IconButton(
                     tooltip: 'Chat options',
-                    icon: Icon(Icons.more_vert_rounded, color: theme.primaryTextColor),
-                    onPressed: () => _openChatMenu(btnCtx, conversation, otherUser),
+                    icon: Icon(
+                      Icons.more_vert_rounded,
+                      color: theme.primaryTextColor,
+                    ),
+                    onPressed: () =>
+                        _openChatMenu(btnCtx, conversation, otherUser),
                   ),
                 ),
               ],
@@ -1583,34 +1640,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         top: false,
         child: Column(
           children: [
-            if (!_realtime.isConnected)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 4,
-                  horizontal: 12,
-                ),
-                color: context.colors.warning.withValues(alpha: 0.15),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.wifi_off_rounded,
-                      size: 14,
-                      color: context.colors.warning,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'No internet connection • Working offline with cached media',
-                      style: TextStyle(
-                        fontSize: 11.5 * theme.fontScale,
-                        fontWeight: FontWeight.w600,
-                        color: context.colors.foreground,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            const GlobalConnectionBanner(),
             Expanded(
               // Wallpaper layer sits behind the transparent message list.
               child: ClipRect(
@@ -2075,7 +2105,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   // ---------------------------------------------------------------------------
   // Chat overflow menu (3-dots in the header): everything below is REAL.
   // ---------------------------------------------------------------------------
-  void _openChatMenu(BuildContext anchorContext, Conversation conversation, UserProfile? otherUser) {
+  void _openChatMenu(
+    BuildContext anchorContext,
+    Conversation conversation,
+    UserProfile? otherUser,
+  ) {
     final isDirect =
         conversation.type == ConversationType.direct && otherUser != null;
     ChatyMenuSheet.show(
@@ -2262,8 +2296,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
-
-
   Future<void> _clearConversation() async {
     final confirmed = await ChatyConfirmDialog.show(
       context,
@@ -2424,15 +2456,34 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             showDeletedContent: showDeleted,
             retainViewOnce: retainViewOnce,
             viewOnceOpened: _openedViewOnceIds.contains(message.id),
-            isSelected: _contextualMessageId == message.id ||
+            isSelected:
+                _contextualMessageId == message.id ||
                 _selectedMessageIds.contains(message.id) ||
                 _highlightedSearchMessageId == message.id,
             onViewOnceOpen: () => _openViewOnceMedia(message, theme),
+            onRetry: isMine && message.deliveryState == DeliveryState.failed
+                ? () async {
+                    if (locator.isRegistered<OutgoingMessageQueueEngine>()) {
+                      final success = await locator<OutgoingMessageQueueEngine>()
+                          .retryMessage(message.id);
+                      if (!success && mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Retry failed — check your connection.',
+                            ),
+                          ),
+                        );
+                      }
+                    }
+                  }
+                : null,
             senderName: conversation.type == ConversationType.group && !isMine
                 ? _senderName(message.senderId)
                 : null,
             onLongPress: () => _onMessageLongPress(message),
-            onLongPressWithRect: (rect) => _onMessageLongPressWithRect(message, rect),
+            onLongPressWithRect: (rect) =>
+                _onMessageLongPressWithRect(message, rect),
             onSwipeReply: () {
               HapticFeedback.lightImpact();
               setState(() => _replyTarget = message);
@@ -2790,7 +2841,6 @@ class _ComposerState extends State<_Composer>
   }
 
   // --- Text input -----------------------------------------------------------
-
 
   Widget _buildInputRow(ThemeConfig theme) {
     return Row(

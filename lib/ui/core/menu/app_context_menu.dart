@@ -29,10 +29,7 @@ class ContextMenuSection {
   final String? title;
   final List<ContextMenuItem> items;
 
-  const ContextMenuSection({
-    this.title,
-    required this.items,
-  });
+  const ContextMenuSection({this.title, required this.items});
 }
 
 /// Unified, high-performance contextual menu system for Chaty.
@@ -136,8 +133,7 @@ class AppContextMenu {
     final danger = destructiveColor ?? theme.colorScheme.error;
 
     final totalItems = sections.fold<int>(0, (sum, s) => sum + s.items.length);
-    final estimatedHeight =
-        56.0 + 8.0 + (totalItems * 44.0);
+    final estimatedHeight = 56.0 + 8.0 + (totalItems * 44.0);
 
     if (effectiveAnchor != null) {
       return ContextSurfaceController.showSurface<void>(
@@ -207,7 +203,8 @@ class AppContextMenu {
 
     // Calculate approximate items count to estimate preferred size
     final totalItems = sections.fold<int>(0, (sum, s) => sum + s.items.length);
-    final estimatedHeight = (title != null ? 48.0 : 0.0) + (totalItems * 44.0) + 16.0;
+    final estimatedHeight =
+        (title != null ? 48.0 : 0.0) + (totalItems * 44.0) + 16.0;
 
     return ContextSurfaceController.showSurface<void>(
       context: context,
@@ -280,10 +277,7 @@ class AppContextMenu {
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                         child: Text(
                           subtitle,
-                          style: TextStyle(
-                            color: secondary,
-                            fontSize: 12,
-                          ),
+                          style: TextStyle(color: secondary, fontSize: 12),
                         ),
                       ),
                     Divider(
@@ -343,8 +337,8 @@ class AppContextMenu {
             final color = !item.isEnabled
                 ? secondary.withValues(alpha: 0.5)
                 : item.isDestructive
-                    ? danger
-                    : primary;
+                ? danger
+                : primary;
             return InkWell(
               onTap: item.isEnabled
                   ? () {
@@ -561,10 +555,7 @@ class _ReactionRailWidget extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               child: Padding(
                 padding: const EdgeInsets.all(5),
-                child: Text(
-                  emoji,
-                  style: const TextStyle(fontSize: 22),
-                ),
+                child: Text(emoji, style: const TextStyle(fontSize: 22)),
               ),
             );
           }),
@@ -578,7 +569,9 @@ class _ReactionRailWidget extends StatelessWidget {
                 margin: const EdgeInsets.symmetric(horizontal: 2),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
                 ),
                 child: Icon(
                   Icons.add_rounded,

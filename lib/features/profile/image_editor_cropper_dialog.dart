@@ -43,12 +43,14 @@ class ImageEditorCropperDialog extends StatefulWidget {
   }
 
   @override
-  State<ImageEditorCropperDialog> createState() => _ImageEditorCropperDialogState();
+  State<ImageEditorCropperDialog> createState() =>
+      _ImageEditorCropperDialogState();
 }
 
 class _ImageEditorCropperDialogState extends State<ImageEditorCropperDialog> {
   final GlobalKey _cropKey = GlobalKey();
-  final TransformationController _transformController = TransformationController();
+  final TransformationController _transformController =
+      TransformationController();
   int _quarterRotations = 0;
   bool _isProcessing = false;
 
@@ -114,7 +116,9 @@ class _ImageEditorCropperDialogState extends State<ImageEditorCropperDialog> {
     final colors = context.colors;
     final size = MediaQuery.of(context).size;
     final cropBoxWidth = size.width - 48;
-    final cropBoxHeight = widget.isAvatar ? cropBoxWidth : (cropBoxWidth * 9 / 16);
+    final cropBoxHeight = widget.isAvatar
+        ? cropBoxWidth
+        : (cropBoxWidth * 9 / 16);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -165,7 +169,9 @@ class _ImageEditorCropperDialogState extends State<ImageEditorCropperDialog> {
                   height: cropBoxHeight,
                   decoration: BoxDecoration(
                     color: const Color(0xFF1E293B),
-                    borderRadius: BorderRadius.circular(widget.isAvatar ? cropBoxWidth / 2 : 16),
+                    borderRadius: BorderRadius.circular(
+                      widget.isAvatar ? cropBoxWidth / 2 : 16,
+                    ),
                     border: Border.all(
                       color: colors.primary.withValues(alpha: 0.8),
                       width: 2.5,
@@ -221,7 +227,10 @@ class _ImageEditorCropperDialogState extends State<ImageEditorCropperDialog> {
                         ),
                       ),
                       onPressed: () => Navigator.of(context).pop(null),
-                      child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 14),

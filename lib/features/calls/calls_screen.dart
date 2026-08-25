@@ -167,18 +167,19 @@ class _CallsScreenState extends State<CallsScreen> {
                             final isMissed =
                                 call.direction == CallDirection.missed;
                             final isVideo = call.type == CallType.video;
-                            final canCall = remoteUserId.isNotEmpty &&
+                            final canCall =
+                                remoteUserId.isNotEmpty &&
                                 remoteUserId != currentUserId;
 
                             Future<void> redial() => _startCall(
-                                  context,
-                                  remoteUserId: remoteUserId,
-                                  remoteDisplayName:
-                                      contact?.displayName ?? 'Chaty contact',
-                                  remoteAvatarInitials: contact?.avatarInitials,
-                                  remoteAvatarColorHex: contact?.avatarColorHex,
-                                  isVideo: isVideo,
-                                );
+                              context,
+                              remoteUserId: remoteUserId,
+                              remoteDisplayName:
+                                  contact?.displayName ?? 'Chaty contact',
+                              remoteAvatarInitials: contact?.avatarInitials,
+                              remoteAvatarColorHex: contact?.avatarColorHex,
+                              isVideo: isVideo,
+                            );
 
                             return ChatyListTile(
                               contentPadding: const EdgeInsets.symmetric(
@@ -207,9 +208,9 @@ class _CallsScreenState extends State<CallsScreen> {
                                     call.direction == CallDirection.incoming
                                         ? Icons.call_received_rounded
                                         : call.direction ==
-                                                CallDirection.outgoing
-                                            ? Icons.call_made_rounded
-                                            : Icons.call_missed_rounded,
+                                              CallDirection.outgoing
+                                        ? Icons.call_made_rounded
+                                        : Icons.call_missed_rounded,
                                     size: 14,
                                     color: isMissed
                                         ? colors.error
@@ -232,8 +233,7 @@ class _CallsScreenState extends State<CallsScreen> {
                                 icon: isVideo
                                     ? Icons.videocam_rounded
                                     : Icons.call_rounded,
-                                tooltip:
-                                    isVideo ? 'Video call' : 'Voice call',
+                                tooltip: isVideo ? 'Video call' : 'Voice call',
                                 size: 44,
                                 iconSize: 20,
                                 backgroundColor: colors.surfaceSecondary,

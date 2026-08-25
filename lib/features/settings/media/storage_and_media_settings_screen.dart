@@ -1,6 +1,7 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
-import '../../../ui/core/design_system/design_system.dart' hide ChatySettingsSection;
+import '../../../ui/core/design_system/design_system.dart'
+    hide ChatySettingsSection;
 import '../../../ui/core/design_system/settings_primitives.dart';
 
 /// Dedicated canonical screen for Storage, Network Data, and Media Limits.
@@ -26,13 +27,15 @@ class StorageAndMediaSettingsScreen extends StatelessWidget {
             // 1. MEDIA QUALITY & UPLOAD LIMITS
             ChatySettingsSection(
               title: 'Media Upload & Quality',
-              description: 'Configure resolution and maximum upload size thresholds.',
+              description:
+                  'Configure resolution and maximum upload size thresholds.',
               children: [
                 ChatySwitchTile(
                   icon: Icons.hd_rounded,
                   iconColor: colors.primary,
                   title: 'Send Images in High Resolution',
-                  subtitle: 'Preserve photographic detail and avoid aggressive downscaling.',
+                  subtitle:
+                      'Preserve photographic detail and avoid aggressive downscaling.',
                   value: true,
                   onChanged: (val) {},
                 ),
@@ -40,7 +43,8 @@ class StorageAndMediaSettingsScreen extends StatelessWidget {
                   icon: Icons.upload_file_rounded,
                   iconColor: colors.primary,
                   title: 'Increased Upload Limit (Up to 700MB)',
-                  subtitle: 'Allow sending large audio, video, and document payloads.',
+                  subtitle:
+                      'Allow sending large audio, video, and document payloads.',
                   value: true,
                   onChanged: (val) {},
                 ),
@@ -86,11 +90,14 @@ class StorageAndMediaSettingsScreen extends StatelessWidget {
                   icon: Icons.cleaning_services_rounded,
                   iconColor: colors.primary,
                   title: 'Clear Local Media Cache',
-                  subtitle: 'Free up local disk space without deleting server chats',
+                  subtitle:
+                      'Free up local disk space without deleting server chats',
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Media cache cleared successfully.')),
+                      const SnackBar(
+                        content: Text('Media cache cleared successfully.'),
+                      ),
                     );
                   },
                 ),

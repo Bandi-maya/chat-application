@@ -59,7 +59,11 @@ class ChatyMomentRing extends StatelessWidget {
                           shape: BoxShape.circle,
                           border: Border.all(color: scheme.surface, width: 2),
                         ),
-                        child: Icon(Icons.add_rounded, color: scheme.onPrimary, size: 14),
+                        child: Icon(
+                          Icons.add_rounded,
+                          color: scheme.onPrimary,
+                          size: 14,
+                        ),
                       ),
                     ),
                 ],
@@ -105,7 +109,11 @@ class ChatyMomentProgress extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(999),
               child: LinearProgressIndicator(
-                value: i < index ? 1 : i == index ? progress.clamp(0, 1) : 0,
+                value: i < index
+                    ? 1
+                    : i == index
+                    ? progress.clamp(0, 1)
+                    : 0,
                 minHeight: 2.5,
                 backgroundColor: Colors.white.withValues(alpha: .32),
                 valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
@@ -170,7 +178,11 @@ class ChatyStreamCard extends StatelessWidget {
                       ),
                       if (verified) ...[
                         const SizedBox(width: 4),
-                        Icon(Icons.verified_rounded, size: 15, color: scheme.primary),
+                        Icon(
+                          Icons.verified_rounded,
+                          size: 15,
+                          color: scheme.primary,
+                        ),
                       ],
                       const Spacer(),
                       Text(
@@ -199,7 +211,10 @@ class ChatyStreamCard extends StatelessWidget {
                       if (unreadCount > 0)
                         Container(
                           margin: const EdgeInsets.only(left: 8),
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: scheme.primary,
                             borderRadius: BorderRadius.circular(999),
@@ -303,8 +318,7 @@ class ChatyProfileCanvas extends StatelessWidget {
                   ],
                 ),
               ),
-              if (actions.isNotEmpty)
-                Wrap(spacing: 4, children: actions),
+              if (actions.isNotEmpty) Wrap(spacing: 4, children: actions),
             ],
           ),
         ),
@@ -367,7 +381,10 @@ class ChatyViewsSheet extends StatelessWidget {
                   subtitle: Text(item.timeLabel),
                   trailing: item.reaction == null
                       ? null
-                      : Text(item.reaction!, style: const TextStyle(fontSize: 22)),
+                      : Text(
+                          item.reaction!,
+                          style: const TextStyle(fontSize: 22),
+                        ),
                 );
               },
             ),

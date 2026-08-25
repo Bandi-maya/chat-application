@@ -125,11 +125,12 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
     final cornerRadius = prefs
         .gbDouble('toast_corner_radius', fallback: 18)
         .clamp(4.0, 32.0);
-    final elevation = prefs.gbDouble('toast_elevation', fallback: 10)
+    final elevation = prefs
+        .gbDouble('toast_elevation', fallback: 10)
         .clamp(0.0, 24.0);
     final backgroundOverride = prefs.gbColor('event_toast_bg');
-    final horizontalPad =
-        (12 * MediaQuery.textScalerOf(context).scale(1.0)).clamp(10.0, 20.0);
+    final horizontalPad = (12 * MediaQuery.textScalerOf(context).scale(1.0))
+        .clamp(10.0, 20.0);
     final maxWidth = (MediaQuery.sizeOf(context).width * 0.9).clamp(
       260.0,
       430.0,
@@ -161,8 +162,7 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
                           constraints: BoxConstraints(maxWidth: maxWidth),
                           child: Material(
                             elevation: elevation,
-                            color:
-                                backgroundOverride ?? context.colors.surface,
+                            color: backgroundOverride ?? context.colors.surface,
                             shadowColor: context.colors.shadow,
                             borderRadius: BorderRadius.circular(cornerRadius),
                             child: Container(

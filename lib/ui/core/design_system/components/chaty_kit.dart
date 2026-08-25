@@ -150,8 +150,7 @@ class ChatyEmptyState extends StatelessWidget {
                 ),
               ),
             ],
-            if (secondaryActionLabel != null &&
-                onSecondaryAction != null) ...[
+            if (secondaryActionLabel != null && onSecondaryAction != null) ...[
               const SizedBox(height: 8),
               TextButton(
                 onPressed: onSecondaryAction,
@@ -647,7 +646,6 @@ class _ChatySwipeActionsState extends State<ChatySwipeActions>
   }
 }
 
-
 /// Avatar that renders the user's uploaded photo when available and falls
 /// back to the flat [ChatyAvatarCore] initials otherwise. Used everywhere a
 /// real profile photo can appear (home header, chat header preview, profile).
@@ -677,7 +675,8 @@ class ChatyNetworkAvatar extends StatelessWidget {
     }
     final parsed = _parseColor(colorHex, fallback: const Color(0xFF6366F1));
     final cleanUrl = url!;
-    final isLocalFile = !cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://');
+    final isLocalFile =
+        !cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://');
 
     return ClipOval(
       child: SizedBox(
@@ -687,14 +686,20 @@ class ChatyNetworkAvatar extends StatelessWidget {
             ? Image.file(
                 File(cleanUrl.replaceFirst('file://', '')),
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
-                    ChatyAvatarCore(initials: initials, color: parsed, size: size),
+                errorBuilder: (_, __, ___) => ChatyAvatarCore(
+                  initials: initials,
+                  color: parsed,
+                  size: size,
+                ),
               )
             : Image.network(
                 cleanUrl,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
-                    ChatyAvatarCore(initials: initials, color: parsed, size: size),
+                errorBuilder: (_, __, ___) => ChatyAvatarCore(
+                  initials: initials,
+                  color: parsed,
+                  size: size,
+                ),
               ),
       ),
     );
@@ -835,9 +840,7 @@ class _ChatySearchFieldState extends State<ChatySearchField> {
                   ),
                 ),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            vertical: ChatySpacing.md,
-          ),
+          contentPadding: const EdgeInsets.symmetric(vertical: ChatySpacing.md),
         ),
       ),
     );
@@ -878,14 +881,13 @@ class ChatySegmentedControl<T> extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final segmentWidth =
-              (constraints.maxWidth - 6) / (options.isEmpty ? 1 : options.length);
+              (constraints.maxWidth - 6) /
+              (options.isEmpty ? 1 : options.length);
           return Stack(
             children: [
               if (index >= 0)
                 AnimatedAlign(
-                  duration: reduceMotion
-                      ? Duration.zero
-                      : ChatyMotion.standard,
+                  duration: reduceMotion ? Duration.zero : ChatyMotion.standard,
                   curve: ChatyMotion.enter,
                   alignment: Alignment(
                     -1 + 2 * ((index + 0.5) / options.length),

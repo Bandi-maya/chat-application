@@ -75,10 +75,7 @@ class _AnimatedActivitySlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final duration = ChatyMotion.duration(
-      context,
-      preferred: ChatyMotion.base,
-    );
+    final duration = ChatyMotion.duration(context, preferred: ChatyMotion.base);
     return AnimatedSwitcher(
       duration: duration,
       switchInCurve: ChatyMotion.enter,
@@ -105,7 +102,11 @@ class _AnimatedActivitySlot extends StatelessWidget {
 }
 
 class _ActivitySlot extends StatelessWidget {
-  const _ActivitySlot({super.key, required this.child, required this.ignorePointer});
+  const _ActivitySlot({
+    super.key,
+    required this.child,
+    required this.ignorePointer,
+  });
 
   final Widget child;
   final bool ignorePointer;
@@ -115,11 +116,7 @@ class _ActivitySlot extends StatelessWidget {
     return IgnorePointer(
       ignoring: ignorePointer,
       child: RepaintBoundary(
-        child: Semantics(
-          container: true,
-          liveRegion: true,
-          child: child,
-        ),
+        child: Semantics(container: true, liveRegion: true, child: child),
       ),
     );
   }

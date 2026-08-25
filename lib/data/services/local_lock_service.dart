@@ -166,15 +166,14 @@ class LocalLockService {
   /// Normalizes a secret phrase (word, emoji sequence, etc.) deterministically.
   static String normalizeSecretPhrase(String phrase) {
     // Trim leading/trailing whitespace, collapse contiguous spaces, lower-case
-    return phrase
-        .trim()
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .toLowerCase();
+    return phrase.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
   }
 
   Future<bool> hasSecretPhrase() async {
     try {
-      return (await _secureStorage.read(key: _secretPhraseHashKey))?.isNotEmpty ==
+      return (await _secureStorage.read(
+                key: _secretPhraseHashKey,
+              ))?.isNotEmpty ==
               true &&
           (await _secureStorage.read(key: _secretPhraseSaltKey))?.isNotEmpty ==
               true;
@@ -262,13 +261,19 @@ class LocalLockService {
 
     // Progressive cooldown: 5 failures -> 30s, 10 failures -> 60s, 15+ failures -> 300s
     if (attempts >= 15) {
-      final lockout = DateTime.now().add(const Duration(minutes: 5)).millisecondsSinceEpoch;
+      final lockout = DateTime.now()
+          .add(const Duration(minutes: 5))
+          .millisecondsSinceEpoch;
       await _secureStorage.write(key: _lockoutUntilKey, value: '$lockout');
     } else if (attempts >= 10) {
-      final lockout = DateTime.now().add(const Duration(seconds: 60)).millisecondsSinceEpoch;
+      final lockout = DateTime.now()
+          .add(const Duration(seconds: 60))
+          .millisecondsSinceEpoch;
       await _secureStorage.write(key: _lockoutUntilKey, value: '$lockout');
     } else if (attempts >= 5) {
-      final lockout = DateTime.now().add(const Duration(seconds: 30)).millisecondsSinceEpoch;
+      final lockout = DateTime.now()
+          .add(const Duration(seconds: 30))
+          .millisecondsSinceEpoch;
       await _secureStorage.write(key: _lockoutUntilKey, value: '$lockout');
     }
   }

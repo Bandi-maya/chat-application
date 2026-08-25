@@ -12,13 +12,13 @@ void main() {
     ).readAsStringSync();
 
     expect(store, contains('LocalSnapshotCacheService'));
-    expect(store, contains("static const String _scope = 'pending_secure_sends'"));
+    expect(
+      store,
+      contains("static const String _scope = 'pending_secure_sends'"),
+    );
     expect(backend, contains('_isMlsSetupPendingError(error)'));
     expect(backend, contains('secure_setup_pending'));
     expect(backend, contains('_retryPendingSecureSends(String userId)'));
-    expect(
-      backend,
-      isNot(contains('plaintext fallback')),
-    );
+    expect(backend, isNot(contains('plaintext fallback')));
   });
 }

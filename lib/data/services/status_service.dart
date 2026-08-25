@@ -66,11 +66,9 @@ class StatusService {
   StatusService({
     SupabaseClient? client,
     ChatyPreferencesController? preferences,
-    PrivacyPublicationPolicy publicationPolicy =
-        const PrivacyPublicationPolicy(),
+    this._publicationPolicy = const PrivacyPublicationPolicy(),
   }) : _client = client ?? Supabase.instance.client,
-       _preferences = preferences ?? locator<ChatyPreferencesController>(),
-       _publicationPolicy = publicationPolicy;
+       _preferences = preferences ?? locator<ChatyPreferencesController>();
 
   static const String bucket = 'status-media';
   static const int storageLimitMb = 50;
@@ -344,10 +342,7 @@ class StatusService {
     if (!mayPublish) return false;
     await _client.rpc(
       'mark_status_viewed',
-      params: <String, dynamic>{
-        'p_status_id': status.id,
-        'p_hide_view': false,
-      },
+      params: <String, dynamic>{'p_status_id': status.id, 'p_hide_view': false},
     );
     return true;
   }

@@ -13,7 +13,6 @@ class NavigationEffectsPage extends StatefulWidget {
 }
 
 class _NavigationEffectsPageState extends State<NavigationEffectsPage> {
-
   static const List<String> _clickSymbols = ['✨', '❤️', '🔥', '⚡', '⭐', '🌸'];
 
   static const List<String> _fallingObjects = [

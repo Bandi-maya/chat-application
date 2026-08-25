@@ -328,12 +328,7 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
       fit: StackFit.expand,
       children: [
         _buildViewfinder(),
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: _buildBottomControls(),
-        ),
+        Positioned(left: 0, right: 0, bottom: 0, child: _buildBottomControls()),
       ],
     );
   }
@@ -599,8 +594,6 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
       ),
     );
   }
-
-
 
   // --- Confirm pane ---------------------------------------------------------
 

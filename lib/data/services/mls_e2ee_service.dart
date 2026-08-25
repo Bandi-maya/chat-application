@@ -125,7 +125,7 @@ class MlsE2eeService extends ChangeNotifier {
 
       await _registerAndReplenishDevice();
       notifyListeners();
-    } catch (_) {
+    } catch (e) {
       await close();
       rethrow;
     } finally {
@@ -257,7 +257,9 @@ class MlsE2eeService extends ChangeNotifier {
     if (engine != null) {
       try {
         await engine.close();
-      } catch (_) {}
+      } catch (e, stackTrace) {
+        debugPrint('Error closing MLS engine: $e\n$stackTrace');
+      }
     }
     _zero(_signerBytes);
     _zero(_signerPublicKey);
@@ -331,7 +333,8 @@ class MlsE2eeService extends ChangeNotifier {
     bool active;
     try {
       active = await _requireEngine().groupIsActive(groupIdBytes: groupId);
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Chaty MLS group establish failed: $error');
       active = false;
     }
     if (!active) {
@@ -394,7 +397,11 @@ class MlsE2eeService extends ChangeNotifier {
       // local group is cryptographically unrelated and must be discarded.
       try {
         await engine.deleteGroup(groupIdBytes: groupId);
-      } catch (_) {}
+      } catch (e, stackTrace) {
+        debugPrint(
+          'Error deleting MLS group during initial group creation: $e\n$stackTrace',
+        );
+      }
       final server = await _fetchState(conversationId, afterEpoch: 0);
       if (server.group == null) rethrow;
       return _joinOrCatchUp(conversationId, server);
@@ -417,7 +424,8 @@ class MlsE2eeService extends ChangeNotifier {
       if (localGroupExists) {
         localEpoch = (await engine.groupEpoch(groupIdBytes: groupId)).toInt();
       }
-    } catch (_) {
+    } catch (e, stackTrace) {
+      debugPrint('Error checking MLS group status: $e\n$stackTrace');
       localGroupExists = false;
     }
 

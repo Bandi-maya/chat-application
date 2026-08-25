@@ -4,11 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../data/services/local_lock_service.dart';
 import 'pattern_lock_pad.dart';
 
-enum StepState {
-  enterCurrent,
-  enterNew,
-  confirmNew,
-}
+enum StepState { enterCurrent, enterNew, confirmNew }
 
 class LockCredentialSetupModal extends StatefulWidget {
   final String method;
@@ -149,7 +145,9 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
         }
       } else if (_currentStep == StepState.enterNew) {
         if (RegExp(r'^(\d)\1+$').hasMatch(pin)) {
-          setState(() => _error = 'Weak PIN. Avoid repeating digits like 0000.');
+          setState(
+            () => _error = 'Weak PIN. Avoid repeating digits like 0000.',
+          );
           return;
         }
         _newSecret = pin;
@@ -175,7 +173,10 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
 
       if (_currentStep == StepState.enterCurrent) {
         setState(() => _busy = true);
-        final isValid = await widget.lockService.verifyCredential('Password', pass);
+        final isValid = await widget.lockService.verifyCredential(
+          'Password',
+          pass,
+        );
         if (!mounted) return;
         setState(() => _busy = false);
         if (isValid) {
@@ -189,7 +190,9 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
         }
       } else if (_currentStep == StepState.enterNew) {
         if (pass.length < 6) {
-          setState(() => _error = 'Password must contain at least 6 characters.');
+          setState(
+            () => _error = 'Password must contain at least 6 characters.',
+          );
           return;
         }
         _newSecret = pass;
@@ -256,16 +259,20 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
         : _firstPatternDrawn;
 
     if (pattern == null) {
-      setState(() => _error = _currentStep == StepState.confirmNew
-          ? 'Draw the confirmation pattern first.'
-          : 'Draw your pattern first.');
+      setState(
+        () => _error = _currentStep == StepState.confirmNew
+            ? 'Draw the confirmation pattern first.'
+            : 'Draw your pattern first.',
+      );
       return;
     }
 
     if (_currentStep == StepState.enterCurrent) {
       setState(() => _busy = true);
-      final isValid =
-          await widget.lockService.verifyCredential('Pattern', pattern);
+      final isValid = await widget.lockService.verifyCredential(
+        'Pattern',
+        pattern,
+      );
       if (!mounted) return;
       setState(() => _busy = false);
       if (isValid) {
@@ -350,7 +357,8 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
         return 'Please authenticate with your existing ${widget.method} to continue.';
       case StepState.enterNew:
         if (_isPin) return 'Choose a ${widget.pinLength}-digit PIN code.';
-        if (_isPattern) return 'Draw an unlock pattern connecting at least 4 dots.';
+        if (_isPattern)
+          return 'Draw an unlock pattern connecting at least 4 dots.';
         if (_isPassword) return 'Enter a password (min 6 characters).';
         return 'Choose your credential.';
       case StepState.confirmNew:
@@ -367,7 +375,9 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
           height: 56,
           margin: const EdgeInsets.symmetric(horizontal: 5),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.5,
+            ),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: _pinFocusNodes[index].hasFocus
@@ -388,9 +398,7 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
               fontWeight: FontWeight.bold,
               color: theme.colorScheme.onSurface,
             ),
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-            ],
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             decoration: const InputDecoration(
               counterText: '',
               border: InputBorder.none,
@@ -438,12 +446,12 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
                     _isPattern
                         ? Icons.pattern_rounded
                         : _isBiometric
-                            ? Icons.fingerprint_rounded
-                            : _isDeviceCredential
-                                ? Icons.phonelink_lock_rounded
-                                : _isPassword
-                                    ? Icons.password_rounded
-                                    : Icons.pin_rounded,
+                        ? Icons.fingerprint_rounded
+                        : _isDeviceCredential
+                        ? Icons.phonelink_lock_rounded
+                        : _isPassword
+                        ? Icons.password_rounded
+                        : Icons.pin_rounded,
                     color: theme.colorScheme.primary,
                   ),
                 ),
@@ -508,14 +516,17 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: _busy ? null : () => _padKey.currentState?.reset(),
+                      onPressed: _busy
+                          ? null
+                          : () => _padKey.currentState?.reset(),
                       child: const Text('Clear'),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: FilledButton(
-                      onPressed: ((_currentStep == StepState.confirmNew
+                      onPressed:
+                          ((_currentStep == StepState.confirmNew
                                   ? _confirmPatternDrawn != null
                                   : _firstPatternDrawn != null) &&
                               !_busy)
@@ -526,9 +537,11 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
                               dimension: 18,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Text(_currentStep == StepState.confirmNew
-                              ? 'Confirm & Save'
-                              : 'Continue'),
+                          : Text(
+                              _currentStep == StepState.confirmNew
+                                  ? 'Confirm & Save'
+                                  : 'Continue',
+                            ),
                     ),
                   ),
                 ],
@@ -559,8 +572,8 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
                   _busy
                       ? 'Verifying…'
                       : (_isBiometric
-                          ? 'Verify biometric'
-                          : 'Verify device lock'),
+                            ? 'Verify biometric'
+                            : 'Verify device lock'),
                 ),
               ),
             ] else if (_isPin) ...[
@@ -574,9 +587,11 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
                         dimension: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : Text(_currentStep == StepState.confirmNew
-                        ? 'Confirm PIN'
-                        : 'Continue'),
+                    : Text(
+                        _currentStep == StepState.confirmNew
+                            ? 'Confirm PIN'
+                            : 'Continue',
+                      ),
               ),
             ] else ...[
               TextField(
@@ -590,8 +605,8 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
                   labelText: _currentStep == StepState.enterCurrent
                       ? 'Current Password'
                       : _currentStep == StepState.enterNew
-                          ? 'New Password'
-                          : 'Confirm Password',
+                      ? 'New Password'
+                      : 'Confirm Password',
                   border: const OutlineInputBorder(),
                 ),
               ),
@@ -603,9 +618,11 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
                         dimension: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : Text(_currentStep == StepState.confirmNew
-                        ? 'Save Password'
-                        : 'Continue'),
+                    : Text(
+                        _currentStep == StepState.confirmNew
+                            ? 'Save Password'
+                            : 'Continue',
+                      ),
               ),
             ],
             const SizedBox(height: 14),

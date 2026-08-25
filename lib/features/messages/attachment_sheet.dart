@@ -3,6 +3,12 @@ import 'package:flutter/services.dart';
 
 import '../../ui/core/design_system/design_system.dart';
 
+/// Grouped create-dock attachment sheet.
+///
+/// Contract (test/create_dock_contract_test.dart): actions are grouped by user
+/// intent into `_OrbitGroup` sections — Media, Files, People & places, Create —
+/// each tile exposes Semantics, and the on-device encryption notice is
+/// rendered where the user chooses an attachment.
 class AttachmentSheet extends StatelessWidget {
   final ThemeConfig theme;
   final ValueChanged<String> onMediaRequested;
@@ -25,54 +31,66 @@ class AttachmentSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    final actions = <_AttachmentItem>[
-      _AttachmentItem(
-        icon: Icons.insert_drive_file_rounded,
-        label: 'document',
-        gradient: const [Color(0xFF7F66FF), Color(0xFF5E35B1)],
-        onTap: () => onMediaRequested('document'),
+    final groups = <_OrbitGroup>[
+      _OrbitGroup('Media', actions: <_AttachmentItem>[
+          _AttachmentItem(
+            icon: Icons.photo_library_rounded,
+            label: 'Gallery',
+            gradient: ChatyAttachmentPalette.gallery,
+            onTap: () => onMediaRequested('image'),
+          ),
+          _AttachmentItem(
+            icon: Icons.videocam_rounded,
+            label: 'Video',
+            gradient: ChatyAttachmentPalette.video,
+            onTap: () => onMediaRequested('video'),
+          ),
+        ],
       ),
-      _AttachmentItem(
-        icon: Icons.photo_library_rounded,
-        label: 'gallery',
-        gradient: const [Color(0xFFE91E63), Color(0xFFC2185B)],
-        onTap: () => onMediaRequested('image'),
+      _OrbitGroup('Files', actions: <_AttachmentItem>[
+          _AttachmentItem(
+            icon: Icons.insert_drive_file_rounded,
+            label: 'Document',
+            gradient: ChatyAttachmentPalette.document,
+            onTap: () => onMediaRequested('document'),
+          ),
+          _AttachmentItem(
+            icon: Icons.graphic_eq_rounded,
+            label: 'Audio',
+            gradient: ChatyAttachmentPalette.audio,
+            onTap: () => onMediaRequested('audio'),
+          ),
+        ],
       ),
-      _AttachmentItem(
-        icon: Icons.videocam_rounded,
-        label: 'video',
-        gradient: const [Color(0xFFFF5722), Color(0xFFE64A19)],
-        onTap: () => onMediaRequested('video'),
+      _OrbitGroup('People & places', actions: <_AttachmentItem>[
+          _AttachmentItem(
+            icon: Icons.location_on_rounded,
+            label: 'Location',
+            gradient: ChatyAttachmentPalette.location,
+            onTap: onLocationRequested,
+          ),
+          _AttachmentItem(
+            icon: Icons.person_rounded,
+            label: 'Contact',
+            gradient: ChatyAttachmentPalette.contact,
+            onTap: onContactRequested,
+          ),
+        ],
       ),
-      _AttachmentItem(
-        icon: Icons.graphic_eq_rounded,
-        label: 'audio',
-        gradient: const [Color(0xFFFF9800), Color(0xFFF57C00)],
-        onTap: () => onMediaRequested('audio'),
-      ),
-      _AttachmentItem(
-        icon: Icons.location_on_rounded,
-        label: 'location',
-        gradient: const [Color(0xFF2E7D32), Color(0xFF1B5E20)],
-        onTap: onLocationRequested,
-      ),
-      _AttachmentItem(
-        icon: Icons.person_rounded,
-        label: 'contact',
-        gradient: const [Color(0xFF0097A7), Color(0xFF006064)],
-        onTap: onContactRequested,
-      ),
-      _AttachmentItem(
-        icon: Icons.poll_rounded,
-        label: 'poll',
-        gradient: const [Color(0xFF0288D1), Color(0xFF01579B)],
-        onTap: onPollRequested,
-      ),
-      _AttachmentItem(
-        icon: Icons.task_alt_rounded,
-        label: 'task',
-        gradient: const [Color(0xFF00BFA5), Color(0xFF00897B)],
-        onTap: onTaskOption,
+      _OrbitGroup('Create', actions: <_AttachmentItem>[
+          _AttachmentItem(
+            icon: Icons.poll_rounded,
+            label: 'Poll',
+            gradient: ChatyAttachmentPalette.poll,
+            onTap: onPollRequested,
+          ),
+          _AttachmentItem(
+            icon: Icons.task_alt_rounded,
+            label: 'Task',
+            gradient: ChatyAttachmentPalette.task,
+            onTap: onTaskOption,
+          ),
+        ],
       ),
     ];
 
@@ -99,6 +117,7 @@ class AttachmentSheet extends StatelessWidget {
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Center(
                 child: Container(
@@ -111,16 +130,70 @@ class AttachmentSheet extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: ChatySpacing.md),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final crossAxisCount = constraints.maxWidth > 420 ? 4 : 4;
-                  final itemWidth = (constraints.maxWidth - (crossAxisCount - 1) * 12) / crossAxisCount;
+              ...groups,
+              const SizedBox(height: ChatySpacing.sm),
+              Text(
+                'Attachments are encrypted on this device before upload.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: colors.foregroundSecondary.withValues(alpha: 0.8),
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-                  return Wrap(
-                    spacing: 12,
-                    runSpacing: 18,
-                    alignment: WrapAlignment.start,
-                    children: actions.map((item) {
+/// A titled intent group inside the create dock.
+class _OrbitGroup extends StatelessWidget {
+  final String label;
+  final List<_AttachmentItem> actions;
+
+  const _OrbitGroup(this.label, {required this.actions});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: ChatySpacing.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: ChatySpacing.xs,
+              vertical: ChatySpacing.xs,
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: colors.foregroundSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const crossAxisCount = 4;
+              final itemWidth =
+                  (constraints.maxWidth - (crossAxisCount - 1) * 12) /
+                  crossAxisCount;
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 18,
+                alignment: WrapAlignment.start,
+                children: actions
+                    .map((item) {
                       return SizedBox(
                         width: itemWidth,
                         child: _AttachmentGridTile(
@@ -128,14 +201,12 @@ class AttachmentSheet extends StatelessWidget {
                           onTap: () => _closeAnd(context, item.onTap),
                         ),
                       );
-                    }).toList(growable: false),
-                  );
-                },
-              ),
-              const SizedBox(height: ChatySpacing.sm),
-            ],
+                    })
+                    .toList(growable: false),
+              );
+            },
           ),
-        ),
+        ],
       ),
     );
   }
@@ -162,10 +233,7 @@ class _AttachmentItem {
 }
 
 class _AttachmentGridTile extends StatelessWidget {
-  const _AttachmentGridTile({
-    required this.item,
-    required this.onTap,
-  });
+  const _AttachmentGridTile({required this.item, required this.onTap});
 
   final _AttachmentItem item;
   final VoidCallback onTap;
@@ -209,11 +277,7 @@ class _AttachmentGridTile extends StatelessWidget {
                     ],
                   ),
                   child: Center(
-                    child: Icon(
-                      item.icon,
-                      color: Colors.white,
-                      size: 26,
-                    ),
+                    child: Icon(item.icon, color: Colors.white, size: 26),
                   ),
                 ),
                 const SizedBox(height: 7),

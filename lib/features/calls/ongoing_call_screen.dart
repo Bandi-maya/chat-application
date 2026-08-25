@@ -467,7 +467,10 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                             icon: Icons.cameraswitch_rounded,
                             isActive: false,
                             activeColor: colors.primary,
-                            onTap: _callService.hasLocalMedia && !session.isCameraOff && !session.isSharingScreen
+                            onTap:
+                                _callService.hasLocalMedia &&
+                                    !session.isCameraOff &&
+                                    !session.isSharingScreen
                                 ? () => unawaited(_callService.switchCamera())
                                 : null,
                           ),
@@ -481,7 +484,9 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                             isActive: session.isSharingScreen,
                             activeColor: const Color(0xFF38BDF8),
                             onTap: _callService.hasLocalMedia
-                                ? () => unawaited(_callService.toggleScreenShare())
+                                ? () => unawaited(
+                                    _callService.toggleScreenShare(),
+                                  )
                                 : null,
                           ),
                         ],

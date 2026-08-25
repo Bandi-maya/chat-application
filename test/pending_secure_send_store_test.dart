@@ -1,11 +1,13 @@
-import 'package:chaty/data/services/local_snapshot_cache_service.dart';
-import 'package:chaty/data/services/pending_secure_send_store.dart';
+import 'package:chat/data/services/local_snapshot_cache_service.dart';
+import 'package:chat/data/services/pending_secure_send_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('PendingSecureSendStore', () {
     test('does not lose concurrent enqueues', () async {
-      final cache = _MemorySnapshotCache(writeDelay: const Duration(milliseconds: 5));
+      final cache = _MemorySnapshotCache(
+        writeDelay: const Duration(milliseconds: 5),
+      );
       final store = PendingSecureSendStore(cache: cache);
 
       await Future.wait(<Future<void>>[
@@ -20,30 +22,33 @@ void main() {
       );
     });
 
-    test('upserts by idempotency key and repairs duplicate snapshots', () async {
-      final cache = _MemorySnapshotCache();
-      final store = PendingSecureSendStore(cache: cache);
-      await cache.writeJson(
-        userId: 'user',
-        scope: 'pending_secure_sends',
-        value: <Map<String, dynamic>>[
-          _send('same', seconds: 1).toJson(),
-          _send('same', seconds: 2, text: 'latest').toJson(),
-        ],
-      );
+    test(
+      'upserts by idempotency key and repairs duplicate snapshots',
+      () async {
+        final cache = _MemorySnapshotCache();
+        final store = PendingSecureSendStore(cache: cache);
+        await cache.writeJson(
+          userId: 'user',
+          scope: 'pending_secure_sends',
+          value: <Map<String, dynamic>>[
+            _send('same', seconds: 1).toJson(),
+            _send('same', seconds: 2, text: 'latest').toJson(),
+          ],
+        );
 
-      final repaired = await store.read('user');
-      expect(repaired, hasLength(1));
-      expect(repaired.single.text, 'latest');
+        final repaired = await store.read('user');
+        expect(repaired, hasLength(1));
+        expect(repaired.single.text, 'latest');
 
-      await Future.wait(<Future<void>>[
-        store.put('user', _send('same', seconds: 3, text: 'retry')),
-        store.put('user', _send('other', seconds: 4)),
-      ]);
-      final result = await store.read('user');
-      expect(result, hasLength(2));
-      expect(result.first.text, 'retry');
-    });
+        await Future.wait(<Future<void>>[
+          store.put('user', _send('same', seconds: 3, text: 'retry')),
+          store.put('user', _send('other', seconds: 4)),
+        ]);
+        final result = await store.read('user');
+        expect(result, hasLength(2));
+        expect(result.first.text, 'retry');
+      },
+    );
   });
 }
 

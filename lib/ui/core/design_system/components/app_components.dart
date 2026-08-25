@@ -265,7 +265,8 @@ class _ChatyPrimaryButtonState extends State<ChatyPrimaryButton> {
     final isEnabled = widget.onPressed != null && !widget.isLoading;
     final bg = widget.backgroundColor ?? theme.colorScheme.primary;
     final fg = widget.foregroundColor ?? Colors.white;
-    final defaultHorizontalPadding = (widget.height < 40 || (widget.width != null && widget.width! < 100))
+    final defaultHorizontalPadding =
+        (widget.height < 40 || (widget.width != null && widget.width! < 100))
         ? ChatySpacing.sm
         : ChatySpacing.lg;
 
@@ -291,7 +292,9 @@ class _ChatyPrimaryButtonState extends State<ChatyPrimaryButton> {
             elevation: 0,
             minimumSize: Size.zero,
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            padding: widget.padding ?? EdgeInsets.symmetric(horizontal: defaultHorizontalPadding),
+            padding:
+                widget.padding ??
+                EdgeInsets.symmetric(horizontal: defaultHorizontalPadding),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(widget.borderRadius),
             ),
@@ -386,7 +389,8 @@ class _ChatySecondaryButtonState extends State<ChatySecondaryButton> {
     final isEnabled = widget.onPressed != null;
     final border = widget.borderColor ?? colors.border;
     final fg = widget.textColor ?? colors.foreground;
-    final defaultHorizontalPadding = (widget.height < 40 || (widget.width != null && widget.width! < 100))
+    final defaultHorizontalPadding =
+        (widget.height < 40 || (widget.width != null && widget.width! < 100))
         ? ChatySpacing.sm
         : ChatySpacing.lg;
 
@@ -412,7 +416,9 @@ class _ChatySecondaryButtonState extends State<ChatySecondaryButton> {
             ),
             minimumSize: Size.zero,
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            padding: widget.padding ?? EdgeInsets.symmetric(horizontal: defaultHorizontalPadding),
+            padding:
+                widget.padding ??
+                EdgeInsets.symmetric(horizontal: defaultHorizontalPadding),
           ),
           child: Listener(
             onPointerDown: (_) {

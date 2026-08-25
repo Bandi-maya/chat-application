@@ -9,9 +9,16 @@ class ImageThemeGenerator {
   ImageThemeGenerator._();
 
   /// Generates a semantic ThemeConfig from an image file.
-  static Future<ThemeConfig> generateFromImageFile(File imageFile, {bool isDark = true}) async {
+  static Future<ThemeConfig> generateFromImageFile(
+    File imageFile, {
+    bool isDark = true,
+  }) async {
     final bytes = await imageFile.readAsBytes();
-    final codec = await ui.instantiateImageCodec(bytes, targetWidth: 64, targetHeight: 64);
+    final codec = await ui.instantiateImageCodec(
+      bytes,
+      targetWidth: 64,
+      targetHeight: 64,
+    );
     final frame = await codec.getNextFrame();
     final image = frame.image;
     final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
@@ -35,7 +42,12 @@ class ImageThemeGenerator {
         }
       }
       if (count > 0) {
-        dominant = Color.fromARGB(255, rSum ~/ count, gSum ~/ count, bSum ~/ count);
+        dominant = Color.fromARGB(
+          255,
+          rSum ~/ count,
+          gSum ~/ count,
+          bSum ~/ count,
+        );
       }
     }
 
@@ -52,11 +64,17 @@ class ImageThemeGenerator {
         ? Color.lerp(const Color(0xFF1E293B), dominant, 0.30)!
         : const Color(0xFFFFFFFF);
 
-    final primaryText = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
-    final secondaryText = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final primaryText = isDark
+        ? const Color(0xFFF8FAFC)
+        : const Color(0xFF0F172A);
+    final secondaryText = isDark
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
 
     final outgoingBubble = vibrant;
-    final outgoingText = vibrant.computeLuminance() > 0.5 ? Colors.black : Colors.white;
+    final outgoingText = vibrant.computeLuminance() > 0.5
+        ? Colors.black
+        : Colors.white;
 
     final incomingBubble = surfaceColor;
     final incomingText = primaryText;

@@ -46,7 +46,8 @@ class _ChatyCachedRemoteImageState extends State<ChatyCachedRemoteImage> {
 
   Future<void> _restoreThenRefresh() async {
     final url = widget.url.trim();
-    if (url.isEmpty || !(url.startsWith('https://') || url.startsWith('http://'))) {
+    if (url.isEmpty ||
+        !(url.startsWith('https://') || url.startsWith('http://'))) {
       return;
     }
     final file = await _cacheFile(url);

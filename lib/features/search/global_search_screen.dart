@@ -83,7 +83,9 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
         ? <Conversation>[]
         : widget.dataStore.conversations.where((conversation) {
             // Privacy rule: Exclude hidden locked chats from global search
-            if (widget.preferencesController.isConversationHidden(conversation.id)) {
+            if (widget.preferencesController.isConversationHidden(
+              conversation.id,
+            )) {
               return false;
             }
             return conversation.title.toLowerCase().contains(lower) ||

@@ -28,9 +28,9 @@ void main() {
       contains('_authSubscription ??= _client.auth.onAuthStateChange.listen('),
     );
     expect(
-      RegExp(r'_client\.auth\.onAuthStateChange\.listen\(')
-          .allMatches(backend)
-          .length,
+      RegExp(
+        r'_client\.auth\.onAuthStateChange\.listen\(',
+      ).allMatches(backend).length,
       1,
     );
   });

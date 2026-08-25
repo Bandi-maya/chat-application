@@ -1,13 +1,37 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 /// The 6 original Chaty UI templates derived from mobile UX archetypes.
 enum ChatyTemplateId {
-  visualSocial('visual_social', 'Visual Social', 'Media-first layout with prominent updates and strong identity'),
-  stream('stream', 'Stream', 'Information-dense, text-forward timeline layout for fast scanning'),
-  cameraFirst('camera_first', 'Camera First', 'Capture-centric layout with prominent center camera action'),
-  messageFirst('message_first', 'Message First', 'Clean, conversation-first communication layout with minimal visual noise'),
-  powerChat('power_chat', 'Power Chat', 'Utility-dense layout with folders, rich composer and power menus'),
-  community('community', 'Community', 'Spaces and identity-focused layout with persistent navigation surface');
+  visualSocial(
+    'visual_social',
+    'Visual Social',
+    'Media-first layout with prominent updates and strong identity',
+  ),
+  stream(
+    'stream',
+    'Stream',
+    'Information-dense, text-forward timeline layout for fast scanning',
+  ),
+  cameraFirst(
+    'camera_first',
+    'Camera First',
+    'Capture-centric layout with prominent center camera action',
+  ),
+  messageFirst(
+    'message_first',
+    'Message First',
+    'Clean, conversation-first communication layout with minimal visual noise',
+  ),
+  powerChat(
+    'power_chat',
+    'Power Chat',
+    'Utility-dense layout with folders, rich composer and power menus',
+  ),
+  community(
+    'community',
+    'Community',
+    'Spaces and identity-focused layout with persistent navigation surface',
+  );
 
   final String key;
   final String displayName;
@@ -25,14 +49,46 @@ enum ChatyTemplateId {
 
 /// The major independently selectable and overridable component types.
 enum TemplateComponentType {
-  navigation('Navigation', 'Bottom bar / dock layout and destination arrangement', Icons.dock_rounded),
-  home('Home Structure', 'Home feed composition, header, and stories rail', Icons.home_outlined),
-  chatList('Chat List', 'Row density, avatar treatment, and unread badges', Icons.format_list_bulleted_rounded),
-  conversation('Conversation', 'Bubble contours, timestamps, and message spacing', Icons.chat_bubble_outline_rounded),
-  composer('Composer', 'Action density, attachment position, and send morph', Icons.input_rounded),
-  updates('Updates', 'Status rails, story rings, and media presentation', Icons.auto_stories_outlined),
-  profile('Profile', 'Identity hierarchy, banner, and statistics layout', Icons.person_outline_rounded),
-  calls('Calls', 'Call controls, participant grid, and island styling', Icons.call_outlined);
+  navigation(
+    'Navigation',
+    'Bottom bar / dock layout and destination arrangement',
+    Icons.dock_rounded,
+  ),
+  home(
+    'Home Structure',
+    'Home feed composition, header, and stories rail',
+    Icons.home_outlined,
+  ),
+  chatList(
+    'Chat List',
+    'Row density, avatar treatment, and unread badges',
+    Icons.format_list_bulleted_rounded,
+  ),
+  conversation(
+    'Conversation',
+    'Bubble contours, timestamps, and message spacing',
+    Icons.chat_bubble_outline_rounded,
+  ),
+  composer(
+    'Composer',
+    'Action density, attachment position, and send morph',
+    Icons.input_rounded,
+  ),
+  updates(
+    'Updates',
+    'Status rails, story rings, and media presentation',
+    Icons.auto_stories_outlined,
+  ),
+  profile(
+    'Profile',
+    'Identity hierarchy, banner, and statistics layout',
+    Icons.person_outline_rounded,
+  ),
+  calls(
+    'Calls',
+    'Call controls, participant grid, and island styling',
+    Icons.call_outlined,
+  );
 
   final String title;
   final String description;
@@ -75,12 +131,7 @@ class NavigationTemplate {
   });
 }
 
-enum HomeHeaderStyle {
-  compact,
-  prominentIdentity,
-  searchForward,
-  storiesFirst,
-}
+enum HomeHeaderStyle { compact, prominentIdentity, searchForward, storiesFirst }
 
 class HomeTemplate {
   final HomeHeaderStyle headerStyle;
@@ -243,7 +294,9 @@ class UserTemplateConfiguration {
     TemplateComponentType component,
     ChatyTemplateId template,
   ) {
-    final next = Map<TemplateComponentType, ChatyTemplateId>.of(componentOverrides);
+    final next = Map<TemplateComponentType, ChatyTemplateId>.of(
+      componentOverrides,
+    );
     if (template == baseTemplate) {
       next.remove(component);
     } else {
@@ -256,7 +309,9 @@ class UserTemplateConfiguration {
   }
 
   UserTemplateConfiguration removeOverride(TemplateComponentType component) {
-    final next = Map<TemplateComponentType, ChatyTemplateId>.of(componentOverrides);
+    final next = Map<TemplateComponentType, ChatyTemplateId>.of(
+      componentOverrides,
+    );
     next.remove(component);
     return UserTemplateConfiguration(
       baseTemplate: baseTemplate,
@@ -267,9 +322,7 @@ class UserTemplateConfiguration {
   Map<String, dynamic> toMap() => {
     'version': 1,
     'base': baseTemplate.key,
-    'overrides': componentOverrides.map(
-      (k, v) => MapEntry(k.name, v.key),
-    ),
+    'overrides': componentOverrides.map((k, v) => MapEntry(k.name, v.key)),
   };
 
   factory UserTemplateConfiguration.fromMap(Map<String, dynamic>? map) {
@@ -278,7 +331,9 @@ class UserTemplateConfiguration {
     final rawOverrides = map['overrides'] as Map<String, dynamic>? ?? {};
     final overrides = <TemplateComponentType, ChatyTemplateId>{};
     for (final entry in rawOverrides.entries) {
-      final comp = TemplateComponentType.values.where((e) => e.name == entry.key).firstOrNull;
+      final comp = TemplateComponentType.values
+          .where((e) => e.name == entry.key)
+          .firstOrNull;
       if (comp != null) {
         overrides[comp] = ChatyTemplateId.fromKey(entry.value as String?);
       }

@@ -8,7 +8,12 @@ void main() {
       'lib/features/messages/attachment_sheet.dart',
     ).readAsStringSync();
 
-    for (final section in <String>['Media', 'Files', 'People & places', 'Create']) {
+    for (final section in <String>[
+      'Media',
+      'Files',
+      'People & places',
+      'Create',
+    ]) {
       expect(source, contains("_OrbitGroup('$section'"));
     }
     for (final action in <String>[
@@ -23,7 +28,10 @@ void main() {
     ]) {
       expect(source, contains("'$action'"));
     }
-    expect(source, contains('Attachments are encrypted on this device before upload.'));
+    expect(
+      source,
+      contains('Attachments are encrypted on this device before upload.'),
+    );
     expect(source, contains('Semantics('));
   });
 }

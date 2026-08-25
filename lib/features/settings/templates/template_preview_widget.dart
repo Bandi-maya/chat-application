@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../ui/core/design_system/design_system.dart';
 import '../../../ui/core/templates/template_models.dart';
 
@@ -36,7 +36,7 @@ class TemplateCompositePreview extends StatelessWidget {
                   color: colors.primary.withValues(alpha: 0.18),
                   blurRadius: 16,
                   offset: const Offset(0, 4),
-                )
+                ),
               ]
             : null,
       ),
@@ -48,7 +48,9 @@ class TemplateCompositePreview extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: colors.surface,
-              border: Border(bottom: BorderSide(color: colors.border, width: 0.8)),
+              border: Border(
+                bottom: BorderSide(color: colors.border, width: 0.8),
+              ),
             ),
             child: Row(
               children: [
@@ -84,9 +86,17 @@ class TemplateCompositePreview extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                Icon(Icons.search_rounded, size: 16, color: colors.foregroundSecondary),
+                Icon(
+                  Icons.search_rounded,
+                  size: 16,
+                  color: colors.foregroundSecondary,
+                ),
                 const SizedBox(width: 8),
-                Icon(Icons.more_vert_rounded, size: 16, color: colors.foregroundSecondary),
+                Icon(
+                  Icons.more_vert_rounded,
+                  size: 16,
+                  color: colors.foregroundSecondary,
+                ),
               ],
             ),
           ),
@@ -105,7 +115,9 @@ class TemplateCompositePreview extends StatelessWidget {
                     margin: const EdgeInsets.only(right: 8),
                     decoration: BoxDecoration(
                       shape: isSquircle ? BoxShape.rectangle : BoxShape.circle,
-                      borderRadius: isSquircle ? BorderRadius.circular(8) : null,
+                      borderRadius: isSquircle
+                          ? BorderRadius.circular(8)
+                          : null,
                       border: Border.all(
                         color: index == 0 ? colors.primary : colors.border,
                         width: 1.5,
@@ -116,7 +128,9 @@ class TemplateCompositePreview extends StatelessWidget {
                       child: Icon(
                         index == 0 ? Icons.add_rounded : Icons.person_rounded,
                         size: 14,
-                        color: index == 0 ? colors.primary : colors.foregroundSecondary,
+                        color: index == 0
+                            ? colors.primary
+                            : colors.foregroundSecondary,
                       ),
                     ),
                   );
@@ -131,25 +145,48 @@ class TemplateCompositePreview extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildMiniChatRow(colors, 'Alex Rivera', 'Hey, did you see the new template?', '12:45'),
-                  _buildMiniChatRow(colors, 'Design Team', 'The component overrides work perfectly', '12:30'),
+                  _buildMiniChatRow(
+                    colors,
+                    'Alex Rivera',
+                    'Hey, did you see the new template?',
+                    '12:45',
+                  ),
+                  _buildMiniChatRow(
+                    colors,
+                    'Design Team',
+                    'The component overrides work perfectly',
+                    '12:30',
+                  ),
                   Align(
                     alignment: Alignment.centerRight,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: colors.primary,
-                        borderRadius: BorderRadius.circular(template.conversation.bubbleCornerRadius),
+                        borderRadius: BorderRadius.circular(
+                          template.conversation.bubbleCornerRadius,
+                        ),
                       ),
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             'Looks amazing!',
-                            style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                           SizedBox(width: 4),
-                          Icon(Icons.done_all_rounded, size: 10, color: Colors.white70),
+                          Icon(
+                            Icons.done_all_rounded,
+                            size: 10,
+                            color: Colors.white70,
+                          ),
                         ],
                       ),
                     ),
@@ -181,7 +218,8 @@ class TemplateCompositePreview extends StatelessWidget {
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      template.navigation.centerActionIcon ?? Icons.camera_alt_rounded,
+                      template.navigation.centerActionIcon ??
+                          Icons.camera_alt_rounded,
                       size: 16,
                       color: Colors.white,
                     ),
@@ -196,7 +234,12 @@ class TemplateCompositePreview extends StatelessWidget {
     );
   }
 
-  Widget _buildMiniChatRow(AppColors colors, String name, String snippet, String time) {
+  Widget _buildMiniChatRow(
+    AppColors colors,
+    String name,
+    String snippet,
+    String time,
+  ) {
     return Row(
       children: [
         Container(
@@ -211,7 +254,11 @@ class TemplateCompositePreview extends StatelessWidget {
                 ? BorderRadius.circular(6)
                 : null,
           ),
-          child: Icon(Icons.person_rounded, size: 12, color: colors.foregroundSecondary),
+          child: Icon(
+            Icons.person_rounded,
+            size: 12,
+            color: colors.foregroundSecondary,
+          ),
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -222,15 +269,31 @@ class TemplateCompositePreview extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(name, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: colors.foreground)),
-                  Text(time, style: TextStyle(fontSize: 8, color: colors.foregroundSecondary)),
+                  Text(
+                    name,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: colors.foreground,
+                    ),
+                  ),
+                  Text(
+                    time,
+                    style: TextStyle(
+                      fontSize: 8,
+                      color: colors.foregroundSecondary,
+                    ),
+                  ),
                 ],
               ),
               Text(
                 snippet,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 9, color: colors.foregroundSecondary),
+                style: TextStyle(
+                  fontSize: 9,
+                  color: colors.foregroundSecondary,
+                ),
               ),
             ],
           ),

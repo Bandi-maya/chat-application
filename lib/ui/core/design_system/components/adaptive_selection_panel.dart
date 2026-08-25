@@ -68,7 +68,10 @@ class AdaptiveSelectionPanel<T> extends StatefulWidget {
         barrierDismissible: true,
         builder: (dialogCtx) => Dialog(
           backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 40,
+            vertical: 24,
+          ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520, maxHeight: 680),
             child: AdaptiveSelectionPanel<T>(
@@ -91,9 +94,7 @@ class AdaptiveSelectionPanel<T> extends StatefulWidget {
       backgroundColor: Colors.transparent,
       builder: (sheetCtx) => SafeArea(
         child: Container(
-          constraints: BoxConstraints(
-            maxHeight: media.size.height * 0.85,
-          ),
+          constraints: BoxConstraints(maxHeight: media.size.height * 0.85),
           margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
           child: AdaptiveSelectionPanel<T>(
             title: title,
@@ -110,7 +111,8 @@ class AdaptiveSelectionPanel<T> extends StatefulWidget {
   }
 
   @override
-  State<AdaptiveSelectionPanel<T>> createState() => _AdaptiveSelectionPanelState<T>();
+  State<AdaptiveSelectionPanel<T>> createState() =>
+      _AdaptiveSelectionPanelState<T>();
 }
 
 class _AdaptiveSelectionPanelState<T> extends State<AdaptiveSelectionPanel<T>> {
@@ -191,7 +193,11 @@ class _AdaptiveSelectionPanelState<T> extends State<AdaptiveSelectionPanel<T>> {
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.close_rounded, color: colors.foregroundSecondary, size: 20),
+                  icon: Icon(
+                    Icons.close_rounded,
+                    color: colors.foregroundSecondary,
+                    size: 20,
+                  ),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -329,7 +335,9 @@ class SelectionOptionTile<T> extends StatelessWidget {
                   Icon(
                     option.leadingIcon,
                     size: 20,
-                    color: isSelected ? colors.primary : colors.foregroundSecondary,
+                    color: isSelected
+                        ? colors.primary
+                        : colors.foregroundSecondary,
                   ),
                   const SizedBox(width: 12),
                 ],
@@ -345,16 +353,23 @@ class SelectionOptionTile<T> extends StatelessWidget {
                             child: Text(
                               option.title,
                               style: TextStyle(
-                                color: isSelected ? colors.primary : colors.foreground,
+                                color: isSelected
+                                    ? colors.primary
+                                    : colors.foreground,
                                 fontSize: 14.5,
-                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
                               ),
                             ),
                           ),
                           if (option.badgeText != null) ...[
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: colors.primary.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(6),
@@ -371,7 +386,8 @@ class SelectionOptionTile<T> extends StatelessWidget {
                           ],
                         ],
                       ),
-                      if (option.subtitle != null && option.subtitle!.isNotEmpty) ...[
+                      if (option.subtitle != null &&
+                          option.subtitle!.isNotEmpty) ...[
                         const SizedBox(height: 2),
                         Text(
                           option.subtitle!,

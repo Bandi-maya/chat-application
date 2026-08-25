@@ -1,3 +1,5 @@
+import 'package:chat/ui/core/bubbles/bubble_style_id.dart';
+import 'package:chat/ui/core/ticks/delivery_icon_style.dart';
 import 'package:chat/ui/core/design_system/components/composer_components.dart';
 import 'package:chat/ui/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -57,10 +59,7 @@ void main() {
         home: MediaQuery(
           data: MediaQueryData(disableAnimations: true),
           child: Scaffold(
-            body: ChatyVoiceLevelMeter(
-              levels: [-1, 0.5, 2],
-              theme: _theme,
-            ),
+            body: ChatyVoiceLevelMeter(levels: [-1, 0.5, 2], theme: _theme),
           ),
         ),
       ),

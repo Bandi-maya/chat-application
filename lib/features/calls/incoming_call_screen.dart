@@ -46,13 +46,17 @@ class IncomingCallScreen extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      session.isVideo ? Icons.videocam_rounded : Icons.call_rounded,
+                      session.isVideo
+                          ? Icons.videocam_rounded
+                          : Icons.call_rounded,
                       size: 15,
                       color: colors.primary,
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      session.isVideo ? 'Incoming Video Call' : 'Incoming Voice Call',
+                      session.isVideo
+                          ? 'Incoming Video Call'
+                          : 'Incoming Voice Call',
                       style: TextStyle(
                         color: colors.primary,
                         fontSize: 13,
@@ -67,9 +71,12 @@ class IncomingCallScreen extends StatelessWidget {
               // Caller Avatar with pulsing visual indicator
               Center(
                 child: AppAvatar(
-                  initials: session.remoteAvatarInitials ??
+                  initials:
+                      session.remoteAvatarInitials ??
                       (session.remoteDisplayName.isNotEmpty
-                          ? session.remoteDisplayName.substring(0, 1).toUpperCase()
+                          ? session.remoteDisplayName
+                                .substring(0, 1)
+                                .toUpperCase()
                           : 'U'),
                   colorHex: session.remoteAvatarColorHex,
                   size: 110,
@@ -114,7 +121,8 @@ class IncomingCallScreen extends StatelessWidget {
                         GestureDetector(
                           onTap: () async {
                             await callService.declineCall();
-                            if (context.mounted && Navigator.of(context).canPop()) {
+                            if (context.mounted &&
+                                Navigator.of(context).canPop()) {
                               Navigator.of(context).pop();
                             }
                           },
@@ -161,7 +169,8 @@ class IncomingCallScreen extends StatelessWidget {
                             if (context.mounted) {
                               Navigator.of(context).pushReplacement(
                                 MaterialPageRoute(
-                                  builder: (_) => OngoingCallScreen(theme: theme),
+                                  builder: (_) =>
+                                      OngoingCallScreen(theme: theme),
                                 ),
                               );
                             }
@@ -181,7 +190,9 @@ class IncomingCallScreen extends StatelessWidget {
                               ],
                             ),
                             child: Icon(
-                              session.isVideo ? Icons.videocam_rounded : Icons.call_rounded,
+                              session.isVideo
+                                  ? Icons.videocam_rounded
+                                  : Icons.call_rounded,
                               color: colors.onSuccess,
                               size: 32,
                             ),

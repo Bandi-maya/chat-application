@@ -1,22 +1,8 @@
 import 'package:flutter/material.dart';
 
-enum IconMotionState {
-  idle,
-  pressed,
-  activated,
-  deactivated,
-  success,
-}
+enum IconMotionState { idle, pressed, activated, deactivated, success }
 
-enum SemanticIconType {
-  task,
-  pin,
-  archive,
-  lock,
-  favourite,
-  mute,
-  search,
-}
+enum SemanticIconType { task, pin, archive, lock, favourite, mute, search }
 
 /// Dynamic semantic icon animator providing rich micro-interactions (circle->tick, pin settle, archive drawer slide, lock shackle pivot).
 class AnimatedAppIcon extends StatefulWidget {
@@ -195,7 +181,12 @@ class _SemanticIconPainter extends CustomPainter {
       case SemanticIconType.archive:
         canvas.drawRRect(
           RRect.fromRectAndRadius(
-            Rect.fromLTWH(size.width * 0.12, size.height * 0.15, size.width * 0.76, size.height * 0.22),
+            Rect.fromLTWH(
+              size.width * 0.12,
+              size.height * 0.15,
+              size.width * 0.76,
+              size.height * 0.22,
+            ),
             const Radius.circular(3),
           ),
           paint,
@@ -219,7 +210,12 @@ class _SemanticIconPainter extends CustomPainter {
       case SemanticIconType.lock:
         canvas.drawRRect(
           RRect.fromRectAndRadius(
-            Rect.fromLTWH(size.width * 0.2, size.height * 0.44, size.width * 0.6, size.height * 0.44),
+            Rect.fromLTWH(
+              size.width * 0.2,
+              size.height * 0.44,
+              size.width * 0.6,
+              size.height * 0.44,
+            ),
             const Radius.circular(4),
           ),
           paint,
@@ -228,8 +224,14 @@ class _SemanticIconPainter extends CustomPainter {
         final shackle = Path()
           ..moveTo(size.width * 0.34, size.height * 0.44)
           ..lineTo(size.width * 0.34, shackleH)
-          ..arcToPoint(Offset(size.width * 0.66, shackleH), radius: Radius.circular(size.width * 0.16))
-          ..lineTo(size.width * 0.66, size.height * 0.44 * (1.0 - progress * 0.4));
+          ..arcToPoint(
+            Offset(size.width * 0.66, shackleH),
+            radius: Radius.circular(size.width * 0.16),
+          )
+          ..lineTo(
+            size.width * 0.66,
+            size.height * 0.44 * (1.0 - progress * 0.4),
+          );
         canvas.drawPath(shackle, paint);
         break;
 
@@ -237,13 +239,44 @@ class _SemanticIconPainter extends CustomPainter {
       case SemanticIconType.favourite:
         final p = Path()
           ..moveTo(size.width * 0.5, size.height * 0.82)
-          ..cubicTo(size.width * 0.2, size.height * 0.55, size.width * 0.08, size.height * 0.35, size.width * 0.25, size.height * 0.20)
-          ..cubicTo(size.width * 0.38, size.height * 0.10, size.width * 0.48, size.height * 0.24, size.width * 0.5, size.height * 0.28)
-          ..cubicTo(size.width * 0.52, size.height * 0.24, size.width * 0.62, size.height * 0.10, size.width * 0.75, size.height * 0.20)
-          ..cubicTo(size.width * 0.92, size.height * 0.35, size.width * 0.80, size.height * 0.55, size.width * 0.5, size.height * 0.82)
+          ..cubicTo(
+            size.width * 0.2,
+            size.height * 0.55,
+            size.width * 0.08,
+            size.height * 0.35,
+            size.width * 0.25,
+            size.height * 0.20,
+          )
+          ..cubicTo(
+            size.width * 0.38,
+            size.height * 0.10,
+            size.width * 0.48,
+            size.height * 0.24,
+            size.width * 0.5,
+            size.height * 0.28,
+          )
+          ..cubicTo(
+            size.width * 0.52,
+            size.height * 0.24,
+            size.width * 0.62,
+            size.height * 0.10,
+            size.width * 0.75,
+            size.height * 0.20,
+          )
+          ..cubicTo(
+            size.width * 0.92,
+            size.height * 0.35,
+            size.width * 0.80,
+            size.height * 0.55,
+            size.width * 0.5,
+            size.height * 0.82,
+          )
           ..close();
         if (progress > 0.0) {
-          canvas.drawPath(p, fillPaint..color = color.withValues(alpha: progress));
+          canvas.drawPath(
+            p,
+            fillPaint..color = color.withValues(alpha: progress),
+          );
         }
         canvas.drawPath(p, paint);
         break;
@@ -274,7 +307,11 @@ class _SemanticIconPainter extends CustomPainter {
       // 7. Search: Lens expands subtly
       case SemanticIconType.search:
         final radius = size.width * (0.24 + progress * 0.04);
-        canvas.drawCircle(Offset(size.width * 0.42, size.height * 0.42), radius, paint);
+        canvas.drawCircle(
+          Offset(size.width * 0.42, size.height * 0.42),
+          radius,
+          paint,
+        );
         canvas.drawLine(
           Offset(size.width * 0.60, size.height * 0.60),
           Offset(size.width * 0.86, size.height * 0.86),

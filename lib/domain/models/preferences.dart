@@ -255,8 +255,7 @@ class SecurityPreferences {
         hideLockedChats: map['hideLockedChats'] as bool? ?? false,
         entryByAppTitle: map['entryByAppTitle'] as bool? ?? true,
         entryBySecretPhrase: map['entryBySecretPhrase'] as bool? ?? false,
-        protectFromScreenshots:
-            map['protectFromScreenshots'] as bool? ?? false,
+        protectFromScreenshots: map['protectFromScreenshots'] as bool? ?? false,
       );
 }
 
@@ -351,8 +350,10 @@ class HomePreferences {
 
 /// Conversation Screen Customization Model
 class ConversationPreferences {
-  final String bubbleStyle; // 48 discrete styles (e.g. 'Stock', 'RC iOS 11', '3D', etc.)
-  final String tickStyle; // 16 discrete styles (e.g. 'RC iOS 11', 'Sticker', 'Green Tick', etc.)
+  final String
+  bubbleStyle; // 48 discrete styles (e.g. 'Stock', 'RC iOS 11', '3D', etc.)
+  final String
+  tickStyle; // 16 discrete styles (e.g. 'RC iOS 11', 'Sticker', 'Green Tick', etc.)
   final bool enableQuickContactSidebar;
   final String sidebarPosition; // 'Left', 'Right'
   final double sidebarOpacity;
@@ -701,7 +702,8 @@ class MessageAutomationPreferences {
 }
 
 /// Navigation Effects & Particle Config Model
-class NavigationEffectPreferences { // 'Fade', 'Slide', 'Grow', 'Scale', 'Shared Axis', 'Fade Through', 'Cupertino', 'None'
+class NavigationEffectPreferences {
+  // 'Fade', 'Slide', 'Grow', 'Scale', 'Shared Axis', 'Fade Through', 'Cupertino', 'None'
   final bool enableClickParticles;
   final String clickParticleSymbol; // '✨', '❤️', '🔥', '⚡', '⭐', '🌸'
   final double clickParticleSpeed;

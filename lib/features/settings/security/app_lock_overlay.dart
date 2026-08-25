@@ -248,47 +248,65 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
               _NumberKey(
                 label: '1',
                 sublabel: '',
-                onTap: (_busy || _cooldownSeconds > 0) ? null : () => _verifyPinDigit('1'),
+                onTap: (_busy || _cooldownSeconds > 0)
+                    ? null
+                    : () => _verifyPinDigit('1'),
               ),
               _NumberKey(
                 label: '2',
                 sublabel: 'ABC',
-                onTap: (_busy || _cooldownSeconds > 0) ? null : () => _verifyPinDigit('2'),
+                onTap: (_busy || _cooldownSeconds > 0)
+                    ? null
+                    : () => _verifyPinDigit('2'),
               ),
               _NumberKey(
                 label: '3',
                 sublabel: 'DEF',
-                onTap: (_busy || _cooldownSeconds > 0) ? null : () => _verifyPinDigit('3'),
+                onTap: (_busy || _cooldownSeconds > 0)
+                    ? null
+                    : () => _verifyPinDigit('3'),
               ),
               _NumberKey(
                 label: '4',
                 sublabel: 'GHI',
-                onTap: (_busy || _cooldownSeconds > 0) ? null : () => _verifyPinDigit('4'),
+                onTap: (_busy || _cooldownSeconds > 0)
+                    ? null
+                    : () => _verifyPinDigit('4'),
               ),
               _NumberKey(
                 label: '5',
                 sublabel: 'JKL',
-                onTap: (_busy || _cooldownSeconds > 0) ? null : () => _verifyPinDigit('5'),
+                onTap: (_busy || _cooldownSeconds > 0)
+                    ? null
+                    : () => _verifyPinDigit('5'),
               ),
               _NumberKey(
                 label: '6',
                 sublabel: 'MNO',
-                onTap: (_busy || _cooldownSeconds > 0) ? null : () => _verifyPinDigit('6'),
+                onTap: (_busy || _cooldownSeconds > 0)
+                    ? null
+                    : () => _verifyPinDigit('6'),
               ),
               _NumberKey(
                 label: '7',
                 sublabel: 'PQRS',
-                onTap: (_busy || _cooldownSeconds > 0) ? null : () => _verifyPinDigit('7'),
+                onTap: (_busy || _cooldownSeconds > 0)
+                    ? null
+                    : () => _verifyPinDigit('7'),
               ),
               _NumberKey(
                 label: '8',
                 sublabel: 'TUV',
-                onTap: (_busy || _cooldownSeconds > 0) ? null : () => _verifyPinDigit('8'),
+                onTap: (_busy || _cooldownSeconds > 0)
+                    ? null
+                    : () => _verifyPinDigit('8'),
               ),
               _NumberKey(
                 label: '9',
                 sublabel: 'WXYZ',
-                onTap: (_busy || _cooldownSeconds > 0) ? null : () => _verifyPinDigit('9'),
+                onTap: (_busy || _cooldownSeconds > 0)
+                    ? null
+                    : () => _verifyPinDigit('9'),
               ),
               _PinActionKey(
                 semanticsLabel: 'Use biometric',
@@ -300,7 +318,9 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
               _NumberKey(
                 label: '0',
                 sublabel: '+',
-                onTap: (_busy || _cooldownSeconds > 0) ? null : () => _verifyPinDigit('0'),
+                onTap: (_busy || _cooldownSeconds > 0)
+                    ? null
+                    : () => _verifyPinDigit('0'),
               ),
               _PinActionKey(
                 semanticsLabel: 'Delete digit',
@@ -424,18 +444,23 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                           label: const Text('Use fingerprint / Face unlock'),
                           style: TextButton.styleFrom(
                             foregroundColor: theme.colorScheme.primary,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
                           ),
                         ),
                       TextButton(
                         onPressed: _busy
                             ? null
-                            : () => _runNativeAuthentication('Device Credential'),
+                            : () =>
+                                  _runNativeAuthentication('Device Credential'),
                         child: Text(
                           'Can\'t remember? Use device screen lock',
                           style: TextStyle(
                             fontSize: 12.5,
-                            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                            color: theme.colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.8),
                           ),
                         ),
                       ),
@@ -456,18 +481,23 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                           label: const Text('Use fingerprint / Face unlock'),
                           style: TextButton.styleFrom(
                             foregroundColor: theme.colorScheme.primary,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
                           ),
                         ),
                       TextButton(
                         onPressed: _busy
                             ? null
-                            : () => _runNativeAuthentication('Device Credential'),
+                            : () =>
+                                  _runNativeAuthentication('Device Credential'),
                         child: Text(
                           'Can\'t remember? Use device screen lock',
                           style: TextStyle(
                             fontSize: 12.5,
-                            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                            color: theme.colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.8),
                           ),
                         ),
                       ),
@@ -482,7 +512,8 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                         decoration: InputDecoration(
                           labelText: 'Password',
                           filled: true,
-                          fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                          fillColor: theme.colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.35),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
@@ -523,12 +554,14 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                       TextButton(
                         onPressed: _busy
                             ? null
-                            : () => _runNativeAuthentication('Device Credential'),
+                            : () =>
+                                  _runNativeAuthentication('Device Credential'),
                         child: Text(
                           'Can\'t remember? Use device screen lock',
                           style: TextStyle(
                             fontSize: 12.5,
-                            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                            color: theme.colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.8),
                           ),
                         ),
                       ),
@@ -593,15 +626,21 @@ class _NumberKeyState extends State<_NumberKey> {
       child: Material(
         color: isDark
             ? (_pressed
-                ? primaryColor.withValues(alpha: 0.22)
-                : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45))
+                  ? primaryColor.withValues(alpha: 0.22)
+                  : theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.45,
+                    ))
             : (_pressed
-                ? primaryColor.withValues(alpha: 0.15)
-                : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6)),
+                  ? primaryColor.withValues(alpha: 0.15)
+                  : theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.6,
+                    )),
         borderRadius: BorderRadius.circular(28),
         child: InkWell(
           onTap: widget.onTap,
-          onTapDown: widget.onTap == null ? null : (_) => setState(() => _pressed = true),
+          onTapDown: widget.onTap == null
+              ? null
+              : (_) => setState(() => _pressed = true),
           onTapUp: (_) => setState(() => _pressed = false),
           onTapCancel: () => setState(() => _pressed = false),
           borderRadius: BorderRadius.circular(28),
@@ -629,7 +668,9 @@ class _NumberKeyState extends State<_NumberKey> {
                         fontSize: 9.5,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 1.5,
-                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                        color: theme.colorScheme.onSurfaceVariant.withValues(
+                          alpha: 0.7,
+                        ),
                       ),
                     ),
                   ),
@@ -677,11 +718,15 @@ class _PinActionKeyState extends State<_PinActionKey> {
         child: Material(
           color: isDark
               ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
-              : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+              : theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.45,
+                ),
           borderRadius: BorderRadius.circular(28),
           child: InkWell(
             onTap: widget.onTap,
-            onTapDown: widget.onTap == null ? null : (_) => setState(() => _pressed = true),
+            onTapDown: widget.onTap == null
+                ? null
+                : (_) => setState(() => _pressed = true),
             onTapUp: (_) => setState(() => _pressed = false),
             onTapCancel: () => setState(() => _pressed = false),
             borderRadius: BorderRadius.circular(28),

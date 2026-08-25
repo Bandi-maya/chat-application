@@ -36,7 +36,10 @@ void main() {
     final service = File(
       'lib/data/services/status_service.dart',
     ).readAsStringSync();
-    final guard = service.indexOf('if (!mayPublish) return;');
+    // Prefix literal (no semicolon): the guard returns `false` from a
+    // Future<bool>, so the exact statement is `return false;`. The invariant
+    // under contract — suppression precedes any network RPC — is unchanged.
+    final guard = service.indexOf('if (!mayPublish) return');
     final rpc = service.indexOf("'mark_status_viewed'", guard);
 
     expect(guard, greaterThanOrEqualTo(0));

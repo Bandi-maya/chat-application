@@ -33,14 +33,12 @@ class SecurityFlowPlan {
   const SecurityFlowPlan._();
 
   /// True when the given method stores a local secret that can be verified.
-  static bool hasVerifiableSecret(LockMethodType method) =>
-      switch (method) {
-        LockMethodType.pin ||
-        LockMethodType.pattern ||
-        LockMethodType.password => true,
-        LockMethodType.biometric ||
-        LockMethodType.deviceCredential => false,
-      };
+  static bool hasVerifiableSecret(LockMethodType method) => switch (method) {
+    LockMethodType.pin ||
+    LockMethodType.pattern ||
+    LockMethodType.password => true,
+    LockMethodType.biometric || LockMethodType.deviceCredential => false,
+  };
 
   static String methodStorageKey(LockMethodType method) => switch (method) {
     LockMethodType.pin => 'PIN',

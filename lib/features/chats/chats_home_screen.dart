@@ -28,6 +28,10 @@ import 'linked_devices_qr_screen.dart';
 import '../profile/profile_screen.dart';
 import 'locked_chats_screen.dart';
 import 'new_chat_screen.dart';
+import '../../ui/core/connection/connection_health_indicator.dart';
+import '../../ui/core/connection/connection_detail_sheet.dart';
+import '../../ui/core/connection/global_connection_banner.dart';
+import '../../data/services/connection_health_service.dart';
 
 class ChatsHomeScreen extends StatefulWidget {
   final ThemeConfig theme;
@@ -450,6 +454,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
             body: SafeArea(
               child: Column(
                 children: [
+                  const GlobalConnectionBanner(),
                   _isSelectionMode
                       ? _selectionAppBar(theme, conversations)
                       : _standardAppBar(theme, homePrefs),
@@ -897,16 +902,36 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              _compactBarTitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: theme.primaryTextColor,
-                fontSize: 22 * theme.fontScale,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.4,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    _compactBarTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: theme.primaryTextColor,
+                      fontSize: 22 * theme.fontScale,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (locator.isRegistered<ConnectionHealthService>())
+                  ListenableBuilder(
+                    listenable: locator<ConnectionHealthService>(),
+                    builder: (context, _) {
+                      final health = locator<ConnectionHealthService>().health;
+                      return ConnectionHealthIndicator(
+                        health: health,
+                        size: 15,
+                        onTap: () => ConnectionDetailSheet.show(context),
+                      );
+                    },
+                  ),
+              ],
             ),
           ),
           if (homePrefs.showCameraIcon)
@@ -944,10 +969,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                     padding: const EdgeInsets.all(1.8),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color: theme.accentColor,
-                        width: 1.8,
-                      ),
+                      border: Border.all(color: theme.accentColor, width: 1.8),
                     ),
                     child: ChatyNetworkAvatar(
                       initials: widget.dataStore.currentUser.avatarInitials,
@@ -1170,268 +1192,298 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: 72 * density),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                  child: Row(
-                children: [
-                  Stack(
-                    children: [
-                      ChatyAvatar(
-                        initials:
-                            conversation.avatarInitials ??
-                            conversation.title.characters
-                                .take(2)
-                                .toString()
-                                .toUpperCase(),
-                        color: conversation.avatarColorHex == null
-                            ? theme.accentColor
-                            : Color(int.parse(conversation.avatarColorHex!)),
-                        size: 50 * density,
-                        shape: widget.preferencesController.home.avatarShape,
-                      ),
-                      if (selected)
-                        Positioned.fill(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: theme.accentColor.withValues(alpha: 0.86),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.check_rounded,
-                              color: theme.onAccentColor,
-                              size: 26,
-                            ),
-                          ),
-                        )
-                      else if (online &&
-                          widget.preferencesController.gbBool(
-                            'onlineDotchat',
-                            fallback: true,
-                          ))
-                        // WA-iOS presence dot sits bottom-right.
-                        Positioned(
-                          right: -1,
-                          bottom: -1,
-                          child: ChatyOnlineDot(
-                            active: true,
-                            avatarSize: 50 * density,
-                            color:
-                                widget.preferencesController.gbColor(
-                                  'onlineDotchatColor',
-                                ) ??
-                                theme.successColor,
-                            ringColor: theme.backgroundColor,
-                          ),
-                        ),
-                    ],
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 10,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Builder(
-                      builder: (context) {
-                        final lastMine =
-                            conversation.lastMessageSenderId ==
-                                widget.dataStore.currentUser.id
-                            ? widget.dataStore
-                                  .getMessages(conversation.id)
-                                  .lastOrNull
-                            : null;
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+                  child: Row(
+                    children: [
+                      Stack(
+                        children: [
+                          ChatyAvatar(
+                            initials:
+                                conversation.avatarInitials ??
+                                conversation.title.characters
+                                    .take(2)
+                                    .toString()
+                                    .toUpperCase(),
+                            color: conversation.avatarColorHex == null
+                                ? theme.accentColor
+                                : Color(
+                                    int.parse(conversation.avatarColorHex!),
+                                  ),
+                            size: 50 * density,
+                            shape:
+                                widget.preferencesController.home.avatarShape,
+                          ),
+                          if (selected)
+                            Positioned.fill(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: theme.accentColor.withValues(
+                                    alpha: 0.86,
+                                  ),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.check_rounded,
+                                  color: theme.onAccentColor,
+                                  size: 26,
+                                ),
+                              ),
+                            )
+                          else if (online &&
+                              widget.preferencesController.gbBool(
+                                'onlineDotchat',
+                                fallback: true,
+                              ))
+                            // WA-iOS presence dot sits bottom-right.
+                            Positioned(
+                              right: -1,
+                              bottom: -1,
+                              child: ChatyOnlineDot(
+                                active: true,
+                                avatarSize: 50 * density,
+                                color:
+                                    widget.preferencesController.gbColor(
+                                      'onlineDotchatColor',
+                                    ) ??
+                                    theme.successColor,
+                                ringColor: theme.backgroundColor,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Builder(
+                          builder: (context) {
+                            final lastMine =
+                                conversation.lastMessageSenderId ==
+                                    widget.dataStore.currentUser.id
+                                ? widget.dataStore
+                                      .getMessages(conversation.id)
+                                      .lastOrNull
+                                : null;
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(
-                                  child: Row(
-                                    children: [
-                                      if (locked) ...[
-                                        Icon(
-                                          Icons.lock_rounded,
-                                          size: 14,
-                                          color: theme.accentColor,
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          if (locked) ...[
+                                            Icon(
+                                              Icons.lock_rounded,
+                                              size: 14,
+                                              color: theme.accentColor,
+                                            ),
+                                            const SizedBox(width: 4),
+                                          ],
+                                          Flexible(
+                                            child: Text(
+                                              conversation.title,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: theme.primaryTextColor,
+                                                // WA-iOS row metrics: 16pt name.
+                                                fontSize:
+                                                    16 *
+                                                    density *
+                                                    theme.fontScale,
+                                                fontWeight:
+                                                    conversation.unreadCount > 0
+                                                    ? FontWeight.w800
+                                                    : FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ChatyTimeLabel(
+                                      text: _formatMessageTime(
+                                        conversation.lastMessageTime,
+                                      ),
+                                      highlight: conversation.unreadCount > 0,
+                                      color: theme.secondaryTextColor,
+                                      highlightColor: theme.accentColor,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    if (lastMine != null) ...[
+                                      DeliveryStatusIcon(
+                                        style: theme.deliveryTickStyle,
+                                        state: lastMine.deliveryState,
+                                        unreadColor: theme.secondaryTextColor,
+                                        readColor: theme.accentColor,
+                                        size: 13,
+                                      ),
+                                      const SizedBox(width: 4),
+                                    ],
+                                    Expanded(
+                                      child: conversation.draftText.isNotEmpty
+                                          ? RichText(
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              text: TextSpan(
+                                                children: [
+                                                  TextSpan(
+                                                    text: 'Draft: ',
+                                                    style: TextStyle(
+                                                      color: theme.dangerColor,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      fontSize:
+                                                          13.5 *
+                                                          density *
+                                                          theme.fontScale,
+                                                    ),
+                                                  ),
+                                                  TextSpan(
+                                                    text:
+                                                        conversation.draftText,
+                                                    style: TextStyle(
+                                                      color: theme
+                                                          .secondaryTextColor,
+                                                      fontSize:
+                                                          13.5 *
+                                                          density *
+                                                          theme.fontScale,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            )
+                                          : AnimatedEmojiText(
+                                              text:
+                                                  activity?.isTyping == true ||
+                                                      activity?.isRecording ==
+                                                          true
+                                                  ? presence
+                                                  : conversation
+                                                        .lastMessageText
+                                                        .isEmpty
+                                                  ? presence
+                                                  : conversation
+                                                        .lastMessageText,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              enableExpressiveSizing: false,
+                                              style: TextStyle(
+                                                color:
+                                                    activity?.isTyping ==
+                                                            true ||
+                                                        activity?.isRecording ==
+                                                            true
+                                                    ? theme.successColor
+                                                    : conversation.unreadCount >
+                                                          0
+                                                    ? theme.primaryTextColor
+                                                    : theme.secondaryTextColor,
+                                                fontSize:
+                                                    13.5 *
+                                                    density *
+                                                    theme.fontScale,
+                                                fontWeight:
+                                                    activity?.isTyping ==
+                                                            true ||
+                                                        activity?.isRecording ==
+                                                            true
+                                                    ? FontWeight.w700
+                                                    : FontWeight.w400,
+                                              ),
+                                            ),
+                                    ),
+                                    if (presence.isNotEmpty &&
+                                        conversation
+                                            .lastMessageText
+                                            .isNotEmpty &&
+                                        activity?.isTyping != true &&
+                                        activity?.isRecording != true) ...[
+                                      const SizedBox(width: 8),
+                                      ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                          maxWidth: 105,
                                         ),
-                                        const SizedBox(width: 4),
-                                      ],
-                                      Flexible(
                                         child: Text(
-                                          conversation.title,
+                                          presence,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
-                                            color: theme.primaryTextColor,
-                                            // WA-iOS row metrics: 16pt name.
-                                            fontSize:
-                                                16 * density * theme.fontScale,
-                                            fontWeight:
-                                                conversation.unreadCount > 0
-                                                ? FontWeight.w800
-                                                : FontWeight.w600,
+                                            // Real consumers: online / last-seen
+                                            // text colors for chat rows.
+                                            color: online
+                                                ? widget.preferencesController
+                                                          .gbColor(
+                                                            'ModOnlineColor',
+                                                          ) ??
+                                                      theme.successColor
+                                                : widget.preferencesController
+                                                          .gbColor(
+                                                            'ModlastseenColor',
+                                                          ) ??
+                                                      theme.secondaryTextColor,
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.w600,
                                           ),
                                         ),
                                       ),
                                     ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                ChatyTimeLabel(
-                                  text: _formatMessageTime(
-                                    conversation.lastMessageTime,
-                                  ),
-                                  highlight: conversation.unreadCount > 0,
-                                  color: theme.secondaryTextColor,
-                                  highlightColor: theme.accentColor,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                if (lastMine != null) ...[
-                                  DeliveryStatusIcon(
-                                    style: theme.deliveryTickStyle,
-                                    state: lastMine.deliveryState,
-                                    unreadColor: theme.secondaryTextColor,
-                                    readColor: theme.accentColor,
-                                    size: 13,
-                                  ),
-                                  const SizedBox(width: 4),
-                                ],
-                                Expanded(
-                                  child: conversation.draftText.isNotEmpty
-                                      ? RichText(
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          text: TextSpan(
-                                            children: [
-                                              TextSpan(
-                                                text: 'Draft: ',
-                                                style: TextStyle(
-                                                  color: theme.dangerColor,
-                                                  fontWeight: FontWeight.w700,
-                                                  fontSize: 13.5 * density * theme.fontScale,
-                                                ),
-                                              ),
-                                              TextSpan(
-                                                text: conversation.draftText,
-                                                style: TextStyle(
-                                                  color: theme.secondaryTextColor,
-                                                  fontSize: 13.5 * density * theme.fontScale,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        )
-                                      : AnimatedEmojiText(
-                                          text:
-                                              activity?.isTyping == true ||
-                                                  activity?.isRecording == true
-                                              ? presence
-                                              : conversation.lastMessageText.isEmpty
-                                              ? presence
-                                              : conversation.lastMessageText,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          enableExpressiveSizing: false,
-                                          style: TextStyle(
-                                            color:
-                                                activity?.isTyping == true ||
-                                                    activity?.isRecording == true
-                                                ? theme.successColor
-                                                : conversation.unreadCount > 0
-                                                ? theme.primaryTextColor
-                                                : theme.secondaryTextColor,
-                                            fontSize:
-                                                13.5 * density * theme.fontScale,
-                                            fontWeight:
-                                                activity?.isTyping == true ||
-                                                    activity?.isRecording == true
-                                                ? FontWeight.w700
-                                                : FontWeight.w400,
-                                          ),
-                                        ),
-                                ),
-                                if (presence.isNotEmpty &&
-                                    conversation.lastMessageText.isNotEmpty &&
-                                    activity?.isTyping != true &&
-                                    activity?.isRecording != true) ...[
-                                  const SizedBox(width: 8),
-                                  ConstrainedBox(
-                                    constraints: const BoxConstraints(
-                                      maxWidth: 105,
-                                    ),
-                                    child: Text(
-                                      presence,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        // Real consumers: online / last-seen
-                                        // text colors for chat rows.
-                                        color: online
-                                            ? widget.preferencesController
-                                                      .gbColor(
-                                                        'ModOnlineColor',
-                                                      ) ??
-                                                  theme.successColor
-                                            : widget.preferencesController
-                                                      .gbColor(
-                                                        'ModlastseenColor',
-                                                      ) ??
-                                                  theme.secondaryTextColor,
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.w600,
+                                    if (conversation.isMuted) ...[
+                                      const SizedBox(width: 6),
+                                      Icon(
+                                        Icons.volume_off_rounded,
+                                        size: 14,
+                                        color: theme.secondaryTextColor,
                                       ),
-                                    ),
-                                  ),
-                                ],
-                                if (conversation.isMuted) ...[
-                                  const SizedBox(width: 6),
-                                  Icon(
-                                    Icons.volume_off_rounded,
-                                    size: 14,
-                                    color: theme.secondaryTextColor,
-                                  ),
-                                ],
-                                if (conversation.isPinned) ...[
-                                  const SizedBox(width: 6),
-                                  Icon(
-                                    Icons.push_pin_rounded,
-                                    size: 14,
-                                    color: theme.secondaryTextColor,
-                                  ),
-                                ],
-                                if (conversation.unreadCount > 0) ...[
-                                  const SizedBox(width: 7),
-                                  // Real consumer: unread badge color keys.
-                                  ChatyCountBadge(
-                                    count: conversation.unreadCount,
-                                    color:
-                                        widget.preferencesController.gbColor(
-                                          'HomeCounterBK',
-                                        ) ??
-                                        theme.accentColor,
-                                    textColor:
-                                        widget.preferencesController.gbColor(
-                                          'HomeCounterText',
-                                        ) ??
-                                        theme.onAccentColor,
-                                  ),
-                                ],
+                                    ],
+                                    if (conversation.isPinned) ...[
+                                      const SizedBox(width: 6),
+                                      Icon(
+                                        Icons.push_pin_rounded,
+                                        size: 14,
+                                        color: theme.secondaryTextColor,
+                                      ),
+                                    ],
+                                    if (conversation.unreadCount > 0) ...[
+                                      const SizedBox(width: 7),
+                                      // Real consumer: unread badge color keys.
+                                      ChatyCountBadge(
+                                        count: conversation.unreadCount,
+                                        color:
+                                            widget.preferencesController
+                                                .gbColor('HomeCounterBK') ??
+                                            theme.accentColor,
+                                        textColor:
+                                            widget.preferencesController
+                                                .gbColor('HomeCounterText') ??
+                                            theme.onAccentColor,
+                                      ),
+                                    ],
+                                  ],
+                                ),
                               ],
-                            ),
-                          ],
-                        );
-                      },
-                    ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
-        );
-      },
-    ),
-  ),
-);
-}
+            );
+          },
+        ),
+      ),
+    );
+  }
 }
 
 class _ConversationSection {

@@ -174,10 +174,7 @@ void main() {
           restored.lockedConversationIds,
           containsAll(['conv_1', 'conv_2']),
         );
-        expect(
-          restored.hiddenConversationIds,
-          containsAll(['conv_2']),
-        );
+        expect(restored.hiddenConversationIds, containsAll(['conv_2']));
         expect(restored.hideLockedChats, isTrue);
         expect(restored.entryByAppTitle, isTrue);
         expect(restored.entryBySecretPhrase, isTrue);

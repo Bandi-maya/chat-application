@@ -64,8 +64,6 @@
             </intent-filter>
         </activity>
 
-
-
         <activity-alias
             android:name="com.example.chat.LauncherWarm"
             android:targetActivity=".MainActivity"

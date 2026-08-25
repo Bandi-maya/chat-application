@@ -88,7 +88,9 @@ class _AppIconSettingsScreenState extends State<AppIconSettingsScreen>
     final success = await controller.activateCustomPreset(preset.id);
     if (!mounted) return;
     if (!success) {
-      _showError(controller.lastError ?? 'Could not apply the custom brand icon.');
+      _showError(
+        controller.lastError ?? 'Could not apply the custom brand icon.',
+      );
       return;
     }
     _showCustomStateMessage();

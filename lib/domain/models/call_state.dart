@@ -26,12 +26,7 @@ extension CallSessionStatePolicy on CallSessionState {
 }
 
 /// Available audio routing outputs.
-enum AudioRouteType {
-  earpiece,
-  speaker,
-  wiredHeadset,
-  bluetooth,
-}
+enum AudioRouteType { earpiece, speaker, wiredHeadset, bluetooth }
 
 /// Information model representing an active or recent call session.
 class ChatyCallSession {

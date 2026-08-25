@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Fail closed: a missing tool must never produce a vacuous PASS.
+command -v grep >/dev/null 2>&1 || {
+  echo 'FAIL: grep is unavailable; mock guard cannot run meaningfully.' >&2
+  exit 1
+}
+
 fail=0
 
 if grep -RIn --include='*.dart' -E 'MockDataStore|mock_data_store\.dart' lib/; then

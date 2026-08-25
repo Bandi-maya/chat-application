@@ -58,15 +58,14 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
   // Nothing is persisted until every step passes (see SecurityFlowPlan).
   // ---------------------------------------------------------------------------
 
-  static LockMethodType _methodTypeOf(String stored) =>
-      switch (stored) {
-        'PIN' => LockMethodType.pin,
-        'Pattern' => LockMethodType.pattern,
-        'Password' => LockMethodType.password,
-        'Biometric' => LockMethodType.biometric,
-        'Device Credential' => LockMethodType.deviceCredential,
-        _ => LockMethodType.pin,
-      };
+  static LockMethodType _methodTypeOf(String stored) => switch (stored) {
+    'PIN' => LockMethodType.pin,
+    'Pattern' => LockMethodType.pattern,
+    'Password' => LockMethodType.password,
+    'Biometric' => LockMethodType.biometric,
+    'Device Credential' => LockMethodType.deviceCredential,
+    _ => LockMethodType.pin,
+  };
 
   static String _storageKeyOf(LockMethodType type) => switch (type) {
     LockMethodType.pin => 'PIN',
@@ -171,9 +170,9 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
               _toast(
                 chosen == LockMethodType.biometric
                     ? 'Biometric unavailable or not confirmed — pick another '
-                        'lock type so you cannot be locked out.'
+                          'lock type so you cannot be locked out.'
                     : 'Device lock not confirmed — set a device screen lock '
-                        'first or pick another lock type.',
+                          'first or pick another lock type.',
               );
             }
             return false;
@@ -381,10 +380,8 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
                   size: 20,
                   color: colors.foregroundTertiary,
                 ),
-                onTap: () => _runFlow(
-                  intent: SecurityIntent.changeMethod,
-                  target: null,
-                ),
+                onTap: () =>
+                    _runFlow(intent: SecurityIntent.changeMethod, target: null),
               ),
               if (security.lockMethod == 'Biometric')
                 ChatySettingsTile(
@@ -434,10 +431,10 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
                   selectedOption: _pinLength == 6 ? '6 digits' : '4 digits',
                   optionLabel: (value) => value,
                   onSelected: (value) => _runFlow(
-                intent: SecurityIntent.changeCredential,
-                target: LockMethodType.pin,
-                setupPinLength: value == '6 digits' ? 6 : 4,
-              ),
+                    intent: SecurityIntent.changeCredential,
+                    target: LockMethodType.pin,
+                    setupPinLength: value == '6 digits' ? 6 : 4,
+                  ),
                 ),
                 ChatySettingsTile(
                   icon: Icons.pin_rounded,
@@ -561,18 +558,19 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
             ChatySwitchTile(
               icon: Icons.touch_app_rounded,
               title: 'Unlock via Chaty Title Tap',
-              subtitle: 'Tap the main screen Chaty header to authenticate and open locked chats',
+              subtitle:
+                  'Tap the main screen Chaty header to authenticate and open locked chats',
               value: security.entryByAppTitle,
-              onChanged: (value) =>
-                  widget.preferencesController.updateSecurity(
-                    security.copyWith(entryByAppTitle: value),
-                    logTitle: 'Title tap vault entry',
-                  ),
+              onChanged: (value) => widget.preferencesController.updateSecurity(
+                security.copyWith(entryByAppTitle: value),
+                logTitle: 'Title tap vault entry',
+              ),
             ),
             ChatySwitchTile(
               icon: Icons.key_rounded,
               title: 'Secret Code Search Discovery',
-              subtitle: 'Reveal hidden locked chats only when typing your secret word or emoji in search',
+              subtitle:
+                  'Reveal hidden locked chats only when typing your secret word or emoji in search',
               value: security.entryBySecretPhrase,
               onChanged: (value) async {
                 if (value) {
@@ -594,13 +592,13 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
             ChatySwitchTile(
               icon: Icons.screenshot_rounded,
               title: 'Protect Screen & App Previews',
-              subtitle: 'Blank out app thumbnail in multi-tasking view and block screenshots on supported devices',
+              subtitle:
+                  'Blank out app thumbnail in multi-tasking view and block screenshots on supported devices',
               value: security.protectFromScreenshots,
-              onChanged: (value) =>
-                  widget.preferencesController.updateSecurity(
-                    security.copyWith(protectFromScreenshots: value),
-                    logTitle: 'Screen & preview security',
-                  ),
+              onChanged: (value) => widget.preferencesController.updateSecurity(
+                security.copyWith(protectFromScreenshots: value),
+                logTitle: 'Screen & preview security',
+              ),
             ),
             ChatySettingsTile(
               icon: Icons.verified_user_outlined,

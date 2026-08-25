@@ -123,10 +123,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                               ? Icons.replay_rounded
                               : Icons.check_circle_outline_rounded,
                           onPressed: () {
-                            final nextStatus = task.status == TaskStatus.completed
+                            final nextStatus =
+                                task.status == TaskStatus.completed
                                 ? TaskStatus.inbox
                                 : TaskStatus.completed;
-                            widget.dataStore.updateTaskStatus(task.id, nextStatus);
+                            widget.dataStore.updateTaskStatus(
+                              task.id,
+                              nextStatus,
+                            );
                             setState(() {});
                           },
                         ),

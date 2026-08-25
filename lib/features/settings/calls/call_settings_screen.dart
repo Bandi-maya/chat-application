@@ -1,18 +1,16 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../data/repositories/chaty_data_store.dart';
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
-import '../../../ui/core/design_system/design_system.dart' hide ChatySettingsSection;
+import '../../../ui/core/design_system/design_system.dart'
+    hide ChatySettingsSection;
 import '../../../ui/core/design_system/settings_primitives.dart';
 
 /// Dedicated canonical settings screen for Audio/Video Calls, privacy exceptions, and island controls.
 class CallSettingsScreen extends StatelessWidget {
   final ChatyPreferencesController preferencesController;
 
-  const CallSettingsScreen({
-    super.key,
-    required this.preferencesController,
-  });
+  const CallSettingsScreen({super.key, required this.preferencesController});
 
   static const List<String> _audienceOptions = <String>[
     'Everyone',
@@ -96,7 +94,8 @@ class CallSettingsScreen extends StatelessWidget {
             // 1. INCOMING CALL PRIVACY
             ChatySettingsSection(
               title: 'Incoming Call Privacy',
-              description: 'Control who is permitted to initiate voice and video calls with you.',
+              description:
+                  'Control who is permitted to initiate voice and video calls with you.',
               children: [
                 ChatySettingsTile(
                   icon: Icons.ring_volume_rounded,
@@ -108,7 +107,8 @@ class CallSettingsScreen extends StatelessWidget {
                     final chosen = await ChatySingleChoiceModal.show<String>(
                       context: context,
                       title: 'Who Can Call Me',
-                      description: 'Choose who can reach you via audio and video calls.',
+                      description:
+                          'Choose who can reach you via audio and video calls.',
                       value: privacy.whoCanCallMe,
                       options: _audienceOptions,
                       labelBuilder: (v) => v,
@@ -144,7 +144,8 @@ class CallSettingsScreen extends StatelessWidget {
                   icon: Icons.bubble_chart_rounded,
                   iconColor: colors.primary,
                   title: 'Dynamic Call Island',
-                  subtitle: 'Display interactive floating capsule when navigating away from active calls.',
+                  subtitle:
+                      'Display interactive floating capsule when navigating away from active calls.',
                   value: true,
                   onChanged: (val) {},
                 ),
@@ -152,7 +153,8 @@ class CallSettingsScreen extends StatelessWidget {
                   icon: Icons.picture_in_picture_rounded,
                   iconColor: colors.primary,
                   title: 'Picture-in-Picture Video',
-                  subtitle: 'Automatically minimize video stream into PiP window when switching apps.',
+                  subtitle:
+                      'Automatically minimize video stream into PiP window when switching apps.',
                   value: true,
                   onChanged: (val) {},
                 ),
@@ -167,7 +169,8 @@ class CallSettingsScreen extends StatelessWidget {
                   icon: Icons.speaker_phone_rounded,
                   iconColor: colors.success,
                   title: 'Low Data Usage for Calls',
-                  subtitle: 'Optimize WebRTC bandwidth consumption on cellular connections.',
+                  subtitle:
+                      'Optimize WebRTC bandwidth consumption on cellular connections.',
                   value: false,
                   onChanged: (val) {},
                 ),

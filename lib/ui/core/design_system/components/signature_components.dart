@@ -149,10 +149,7 @@ class ChatyActivityIsland extends StatelessWidget {
 }
 
 class ChatyGlassSheet {
-  static Future<T?> show<T>(
-    BuildContext context, {
-    required Widget child,
-  }) {
+  static Future<T?> show<T>(BuildContext context, {required Widget child}) {
     return showModalBottomSheet<T>(
       context: context,
       useSafeArea: true,
@@ -165,11 +162,17 @@ class ChatyGlassSheet {
           filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
           child: Container(
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.96),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+              color: Theme.of(
+                context,
+              ).colorScheme.surface.withValues(alpha: 0.96),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(30),
+              ),
               border: Border(
                 top: BorderSide(
-                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.18),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.18),
                 ),
               ),
             ),
@@ -486,7 +489,9 @@ class ChatyMiniPlayer extends StatelessWidget {
         children: [
           IconButton.filledTonal(
             onPressed: onPlayPause,
-            icon: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+            icon: Icon(
+              playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+            ),
           ),
           Expanded(
             child: Column(
@@ -514,7 +519,11 @@ class ChatyMiniPlayer extends StatelessWidget {
 }
 
 class ChatyMediaCarousel extends StatelessWidget {
-  const ChatyMediaCarousel({super.key, required this.children, this.height = 190});
+  const ChatyMediaCarousel({
+    super.key,
+    required this.children,
+    this.height = 190,
+  });
   final List<Widget> children;
   final double height;
 
@@ -537,7 +546,11 @@ class ChatyMediaCarousel extends StatelessWidget {
 }
 
 class ChatyComposerShell extends StatelessWidget {
-  const ChatyComposerShell({super.key, required this.child, this.commandMode = false});
+  const ChatyComposerShell({
+    super.key,
+    required this.child,
+    this.commandMode = false,
+  });
   final Widget child;
   final bool commandMode;
 
@@ -602,7 +615,12 @@ class ChatyQuickPeek extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+          Text(
+            title,
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+          ),
           const SizedBox(height: 14),
           child,
         ],
@@ -628,13 +646,21 @@ class ChatyCommandPalette {
           mainAxisSize: MainAxisSize.min,
           children: [
             const ListTile(
-              title: Text('Chaty Commands', style: TextStyle(fontWeight: FontWeight.w800)),
-              subtitle: Text('Turn a message into an action without leaving the chat.'),
+              title: Text(
+                'Chaty Commands',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+              subtitle: Text(
+                'Turn a message into an action without leaving the chat.',
+              ),
             ),
             ...commands.map(
               (command) => ListTile(
                 leading: Icon(command.$3),
-                title: Text(command.$1, style: const TextStyle(fontWeight: FontWeight.w700)),
+                title: Text(
+                  command.$1,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
                 subtitle: Text(command.$2),
                 onTap: () => Navigator.pop(context, command.$1),
               ),

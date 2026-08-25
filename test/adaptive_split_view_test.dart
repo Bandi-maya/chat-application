@@ -22,7 +22,9 @@ void main() {
     expect(find.text('secondary'), findsNothing);
   });
 
-  testWidgets('expanded width renders primary and secondary panes', (tester) async {
+  testWidgets('expanded width renders primary and secondary panes', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1000, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);

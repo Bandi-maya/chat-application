@@ -11,74 +11,95 @@ void main() {
   FlutterSecureStorage.setMockInitialValues({});
 
   group('LocalLockService & PBKDF2 Hashing Security Tests', () {
-    test('Normalizes secret search phrases with Unicode, whitespace, and case', () {
-      expect(
-        LocalLockService.normalizeSecretPhrase('  🔒  Vault   Key  '),
-        '🔒 vault key',
-      );
-      expect(
-        LocalLockService.normalizeSecretPhrase('SecretPassword123'),
-        'secretpassword123',
-      );
-      expect(
-        LocalLockService.normalizeSecretPhrase('🎉 🚀 ✨'),
-        '🎉 🚀 ✨',
-      );
-    });
+    test(
+      'Normalizes secret search phrases with Unicode, whitespace, and case',
+      () {
+        expect(
+          LocalLockService.normalizeSecretPhrase('  🔒  Vault   Key  '),
+          '🔒 vault key',
+        );
+        expect(
+          LocalLockService.normalizeSecretPhrase('SecretPassword123'),
+          'secretpassword123',
+        );
+        expect(LocalLockService.normalizeSecretPhrase('🎉 🚀 ✨'), '🎉 🚀 ✨');
+      },
+    );
 
-    test('Pattern validator requires at least 4 unique dots between 0 and 8', () async {
-      final service = LocalLockService();
-      // Valid pattern
-      await expectLater(service.setCredential('Pattern', '0-1-2-4'), completes);
-      // Under 4 points
-      expect(
-        () => service.setCredential('Pattern', '0-1-2'),
-        throwsA(isA<ArgumentError>()),
-      );
-      // Out-of-bounds nodes
-      expect(
-        () => service.setCredential('Pattern', '0-1-2-9'),
-        throwsA(isA<ArgumentError>()),
-      );
-      // Duplicate nodes
-      expect(
-        () => service.setCredential('Pattern', '0-1-2-1'),
-        throwsA(isA<ArgumentError>()),
-      );
-    });
+    test(
+      'Pattern validator requires at least 4 unique dots between 0 and 8',
+      () async {
+        final service = LocalLockService();
+        // Valid pattern
+        await expectLater(
+          service.setCredential('Pattern', '0-1-2-4'),
+          completes,
+        );
+        // Under 4 points
+        expect(
+          () => service.setCredential('Pattern', '0-1-2'),
+          throwsA(isA<ArgumentError>()),
+        );
+        // Out-of-bounds nodes
+        expect(
+          () => service.setCredential('Pattern', '0-1-2-9'),
+          throwsA(isA<ArgumentError>()),
+        );
+        // Duplicate nodes
+        expect(
+          () => service.setCredential('Pattern', '0-1-2-1'),
+          throwsA(isA<ArgumentError>()),
+        );
+      },
+    );
 
-    test('PIN validator strictly enforces digit length and numeric format', () async {
-      final service = LocalLockService();
-      // Valid 4-digit PIN
-      await expectLater(service.setCredential('PIN', '1234', pinLength: 4), completes);
-      // Valid 6-digit PIN
-      await expectLater(service.setCredential('PIN', '123456', pinLength: 6), completes);
-      // Non-numeric
-      expect(
-        () => service.setCredential('PIN', '12a4', pinLength: 4),
-        throwsA(isA<ArgumentError>()),
-      );
-      // Length mismatch
-      expect(
-        () => service.setCredential('PIN', '12345', pinLength: 4),
-        throwsA(isA<ArgumentError>()),
-      );
-    });
+    test(
+      'PIN validator strictly enforces digit length and numeric format',
+      () async {
+        final service = LocalLockService();
+        // Valid 4-digit PIN
+        await expectLater(
+          service.setCredential('PIN', '1234', pinLength: 4),
+          completes,
+        );
+        // Valid 6-digit PIN
+        await expectLater(
+          service.setCredential('PIN', '123456', pinLength: 6),
+          completes,
+        );
+        // Non-numeric
+        expect(
+          () => service.setCredential('PIN', '12a4', pinLength: 4),
+          throwsA(isA<ArgumentError>()),
+        );
+        // Length mismatch
+        expect(
+          () => service.setCredential('PIN', '12345', pinLength: 4),
+          throwsA(isA<ArgumentError>()),
+        );
+      },
+    );
 
-    test('PBKDF2 credential verification succeeds on exact match and rejects wrong input', () async {
-      final service = LocalLockService();
-      await service.setCredential('PIN', '4321', pinLength: 4);
-      expect(await service.verifyCredential('PIN', '4321'), isTrue);
-      expect(await service.verifyCredential('PIN', '0000'), isFalse);
-    });
+    test(
+      'PBKDF2 credential verification succeeds on exact match and rejects wrong input',
+      () async {
+        final service = LocalLockService();
+        await service.setCredential('PIN', '4321', pinLength: 4);
+        expect(await service.verifyCredential('PIN', '4321'), isTrue);
+        expect(await service.verifyCredential('PIN', '0000'), isFalse);
+      },
+    );
 
-    test('Secret search phrase verification works with normalized Unicode', () async {
-      final service = LocalLockService();
-      await service.setSecretPhrase('  🔒 Secret Vault  ');
-      expect(await service.verifySecretPhrase('🔒 secret vault'), isTrue);
-      expect(await service.verifySecretPhrase('🔒 Secret Vault'), isTrue);
-      expect(await service.verifySecretPhrase('wrong password'), isFalse);
-    });
+    test(
+      'Secret search phrase verification works with normalized Unicode',
+      () async {
+        final service = LocalLockService();
+        await service.setSecretPhrase('  🔒 Secret Vault  ');
+        expect(await service.verifySecretPhrase('🔒 secret vault'), isTrue);
+        expect(await service.verifySecretPhrase('🔒 Secret Vault'), isTrue);
+        expect(await service.verifySecretPhrase('wrong password'), isFalse);
+      },
+    );
   });
 
   group('Preferences Controller Chat Lock & Hidden State Tests', () {

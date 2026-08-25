@@ -57,7 +57,9 @@ class ChatyMediaDraftTray extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    items.length == 1 ? 'Ready to send' : '${items.length} items ready',
+                    items.length == 1
+                        ? 'Ready to send'
+                        : '${items.length} items ready',
                     style: TextStyle(
                       color: scheme.onSurface,
                       fontWeight: FontWeight.w800,
@@ -119,11 +121,7 @@ class ChatyMediaDraftTray extends StatelessWidget {
             const SizedBox(height: 10),
             Row(
               children: [
-                Icon(
-                  Icons.lock_rounded,
-                  size: 15,
-                  color: scheme.primary,
-                ),
+                Icon(Icons.lock_rounded, size: 15, color: scheme.primary),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -226,7 +224,11 @@ class _DraftTile extends StatelessWidget {
                     color: Color(0xB8000000),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.close_rounded, color: Colors.white, size: 17),
+                  child: const Icon(
+                    Icons.close_rounded,
+                    color: Colors.white,
+                    size: 17,
+                  ),
                 ),
               ),
             ),

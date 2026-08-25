@@ -14,7 +14,9 @@ void main() {
   });
 
   test('frontend master patch owns stable listenable groups', () {
-    final patch = File('tools/apply_frontend_master_plan.py').readAsStringSync();
+    final patch = File(
+      'tools/apply_frontend_master_plan.py',
+    ).readAsStringSync();
     expect(patch, contains('late final Listenable _rootSignals;'));
     expect(patch, contains('late final Listenable _navigationSignals;'));
     expect(patch, contains('late final Listenable _homeSignals;'));
@@ -24,7 +26,9 @@ void main() {
   });
 
   test('UI Lab is deterministic and isolated from production repositories', () {
-    final screen = File('lib/features/ui_lab/ui_lab_screen.dart').readAsStringSync();
+    final screen = File(
+      'lib/features/ui_lab/ui_lab_screen.dart',
+    ).readAsStringSync();
     final repository = File(
       'lib/features/ui_lab/ui_lab_repository.dart',
     ).readAsStringSync();
@@ -34,20 +38,27 @@ void main() {
     expect(repository, isNot(contains('ChatyBackendService')));
   });
 
-  test('canonical design system exports the master-plan component families', () {
-    final source = File(
-      'lib/ui/core/design_system/design_system.dart',
-    ).readAsStringSync();
-    for (final export in <String>[
-      'chaty_motion.dart',
-      'chaty_haptics.dart',
-      'chaty_adaptive.dart',
-      'component_state.dart',
-      'messaging_components.dart',
-      'social_components.dart',
-      'settings_components.dart',
-    ]) {
-      expect(source, contains(export), reason: 'Missing design-system export: $export');
-    }
-  });
+  test(
+    'canonical design system exports the master-plan component families',
+    () {
+      final source = File(
+        'lib/ui/core/design_system/design_system.dart',
+      ).readAsStringSync();
+      for (final export in <String>[
+        'chaty_motion.dart',
+        'chaty_haptics.dart',
+        'chaty_adaptive.dart',
+        'component_state.dart',
+        'messaging_components.dart',
+        'social_components.dart',
+        'settings_components.dart',
+      ]) {
+        expect(
+          source,
+          contains(export),
+          reason: 'Missing design-system export: $export',
+        );
+      }
+    },
+  );
 }

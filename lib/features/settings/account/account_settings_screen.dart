@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../data/repositories/chaty_data_store.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
-import '../../../ui/core/design_system/design_system.dart' hide ChatySettingsSection;
+import '../../../ui/core/design_system/design_system.dart'
+    hide ChatySettingsSection;
 import '../../../ui/core/design_system/settings_primitives.dart';
 import '../../profile/profile_actions.dart';
 
@@ -39,7 +40,9 @@ class AccountSettingsScreen extends StatelessWidget {
                     color: colors.primary,
                     size: 40,
                   ),
-                  title: user.displayName.isNotEmpty ? user.displayName : 'Display Name',
+                  title: user.displayName.isNotEmpty
+                      ? user.displayName
+                      : 'Display Name',
                   subtitle: '@',
                 ),
                 ChatySettingsTile(

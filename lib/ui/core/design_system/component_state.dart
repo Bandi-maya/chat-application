@@ -24,10 +24,4 @@ enum ChatyDeliveryState {
   failed,
 }
 
-enum ChatyPresenceState {
-  offline,
-  online,
-  typing,
-  recording,
-  calling,
-}
+enum ChatyPresenceState { offline, online, typing, recording, calling }

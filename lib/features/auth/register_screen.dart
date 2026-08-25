@@ -236,7 +236,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const SizedBox(height: 18),
                     AuthTextField(
                       label: 'Password',
-                      hintText: '12+ characters with upper/lowercase, number & symbol',
+                      hintText:
+                          '12+ characters with upper/lowercase, number & symbol',
                       controller: _passwordController,
                       obscureText: _obscurePassword,
                       theme: theme,

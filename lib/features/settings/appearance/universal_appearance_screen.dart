@@ -69,7 +69,8 @@ class UniversalAppearanceScreen extends StatelessWidget {
                 _VariantSection(
                   kind: _PreviewKind.entryMotion,
                   title: 'Screen entry animation',
-                  subtitle: 'Motion applied when navigating forward into a screen',
+                  subtitle:
+                      'Motion applied when navigating forward into a screen',
                   value: controller.entryAnimation,
                   options: AppearanceVariantController.entryAnimations,
                   icon: Icons.login_rounded,
@@ -78,7 +79,8 @@ class UniversalAppearanceScreen extends StatelessWidget {
                 _VariantSection(
                   kind: _PreviewKind.exitMotion,
                   title: 'Screen exit animation',
-                  subtitle: 'Motion applied when dismissing or popping a screen',
+                  subtitle:
+                      'Motion applied when dismissing or popping a screen',
                   value: controller.exitAnimation,
                   options: AppearanceVariantController.exitAnimations,
                   icon: Icons.logout_rounded,
@@ -106,9 +108,7 @@ class _AppearanceOverview extends StatelessWidget {
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: 0.4),
-        ),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -303,13 +303,19 @@ class _VariantSection extends StatelessWidget {
                   child: Text(
                     opt,
                     style: TextStyle(
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w500,
                       color: isSelected ? scheme.primary : scheme.onSurface,
                     ),
                   ),
                 ),
                 if (isSelected)
-                  Icon(Icons.check_circle_rounded, color: scheme.primary, size: 20),
+                  Icon(
+                    Icons.check_circle_rounded,
+                    color: scheme.primary,
+                    size: 20,
+                  ),
               ],
             ),
           ),

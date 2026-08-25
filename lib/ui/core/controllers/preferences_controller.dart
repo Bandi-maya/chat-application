@@ -367,13 +367,17 @@ class ChatyPreferencesController extends ChangeNotifier {
         return;
       }
       final remoteRaw = Map<String, dynamic>.from(row['settings'] as Map);
-      
+
       // Timestamp reconciliation: if local mutation is strictly newer than remote updated_at,
       // push local state to remote rather than overwriting fresh local choices with stale remote data.
-      final remoteUpdatedAtStr = row['updated_at']?.toString() ?? remoteRaw['local_updated_at']?.toString();
+      final remoteUpdatedAtStr =
+          row['updated_at']?.toString() ??
+          remoteRaw['local_updated_at']?.toString();
       if (remoteUpdatedAtStr != null) {
-        final remoteTime = DateTime.tryParse(remoteUpdatedAtStr)?.millisecondsSinceEpoch ??
-            int.tryParse(remoteUpdatedAtStr) ?? 0;
+        final remoteTime =
+            DateTime.tryParse(remoteUpdatedAtStr)?.millisecondsSinceEpoch ??
+            int.tryParse(remoteUpdatedAtStr) ??
+            0;
         if (remoteTime > 0 && _lastLocalMutation > remoteTime + 2000) {
           // Local changes are strictly newer; push to server
           await _pushRemote(_snapshot());
@@ -694,7 +698,8 @@ class ChatyPreferencesController extends ChangeNotifier {
       _security.hiddenConversationIds.contains(conversationId);
 
   bool isConversationProtected(String conversationId) =>
-      isConversationLocked(conversationId) || isConversationHidden(conversationId);
+      isConversationLocked(conversationId) ||
+      isConversationHidden(conversationId);
 
   void toggleLockConversation(String conversationId, {bool? lock}) {
     final list = List<String>.from(_security.lockedConversationIds);

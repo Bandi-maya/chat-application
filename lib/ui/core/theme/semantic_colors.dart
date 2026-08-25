@@ -57,6 +57,12 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color info;
   final Color onInfo;
 
+  // Connection Strength & Message Delivery Health Tokens
+  final Color connectionExcellent;
+  final Color connectionWeak;
+  final Color connectionPoor;
+  final Color connectionOffline;
+
   // Utility
   final Color link;
   final Color icon;
@@ -102,6 +108,10 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.onError,
     required this.info,
     required this.onInfo,
+    this.connectionExcellent = const Color(0xFF10B981), // Emerald 500
+    this.connectionWeak = const Color(0xFFF59E0B),      // Amber 500
+    this.connectionPoor = const Color(0xFFEF4444),      // Red 500
+    this.connectionOffline = const Color(0xFF71717A),   // Zinc 500
     required this.link,
     required this.icon,
     required this.iconSecondary,
@@ -150,6 +160,10 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? onError,
     Color? info,
     Color? onInfo,
+    Color? connectionExcellent,
+    Color? connectionWeak,
+    Color? connectionPoor,
+    Color? connectionOffline,
     Color? link,
     Color? icon,
     Color? iconSecondary,
@@ -194,6 +208,10 @@ class AppColors extends ThemeExtension<AppColors> {
       onError: onError ?? this.onError,
       info: info ?? this.info,
       onInfo: onInfo ?? this.onInfo,
+      connectionExcellent: connectionExcellent ?? this.connectionExcellent,
+      connectionWeak: connectionWeak ?? this.connectionWeak,
+      connectionPoor: connectionPoor ?? this.connectionPoor,
+      connectionOffline: connectionOffline ?? this.connectionOffline,
       link: link ?? this.link,
       icon: icon ?? this.icon,
       iconSecondary: iconSecondary ?? this.iconSecondary,
@@ -259,6 +277,16 @@ class AppColors extends ThemeExtension<AppColors> {
       onError: Color.lerp(onError, other.onError, t) ?? onError,
       info: Color.lerp(info, other.info, t) ?? info,
       onInfo: Color.lerp(onInfo, other.onInfo, t) ?? onInfo,
+      connectionExcellent:
+          Color.lerp(connectionExcellent, other.connectionExcellent, t) ??
+          connectionExcellent,
+      connectionWeak:
+          Color.lerp(connectionWeak, other.connectionWeak, t) ?? connectionWeak,
+      connectionPoor:
+          Color.lerp(connectionPoor, other.connectionPoor, t) ?? connectionPoor,
+      connectionOffline:
+          Color.lerp(connectionOffline, other.connectionOffline, t) ??
+          connectionOffline,
       link: Color.lerp(link, other.link, t) ?? link,
       icon: Color.lerp(icon, other.icon, t) ?? icon,
       iconSecondary:

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 
 /// Modal dialog with radio options and optional custom preview builders.
@@ -115,7 +115,10 @@ class ChatySingleChoiceModal<T> extends StatelessWidget {
                   return InkWell(
                     onTap: () => Navigator.of(context).pop(option),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
@@ -126,7 +129,8 @@ class ChatySingleChoiceModal<T> extends StatelessWidget {
                               if (val != null) Navigator.of(context).pop(val);
                             },
                             activeColor: colors.primary,
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
                           ),
                           const SizedBox(width: 10),
                           Expanded(
@@ -137,8 +141,12 @@ class ChatySingleChoiceModal<T> extends StatelessWidget {
                                   label,
                                   style: TextStyle(
                                     fontSize: 14.5,
-                                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                    color: isSelected ? colors.primary : colors.foreground,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    color: isSelected
+                                        ? colors.primary
+                                        : colors.foreground,
                                   ),
                                 ),
                                 if (desc != null && desc.isNotEmpty) ...[
@@ -174,7 +182,10 @@ class ChatySingleChoiceModal<T> extends StatelessWidget {
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: Text('Cancel', style: TextStyle(color: colors.foregroundSecondary)),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(color: colors.foregroundSecondary),
+                  ),
                 ),
               ),
             ),

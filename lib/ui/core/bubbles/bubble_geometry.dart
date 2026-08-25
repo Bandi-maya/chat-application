@@ -17,7 +17,10 @@ class BubbleGeometry {
 
   const BubbleGeometry({
     required this.styleId,
-    this.contentPadding = const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    this.contentPadding = const EdgeInsets.symmetric(
+      horizontal: 12,
+      vertical: 8,
+    ),
     this.bubbleMargin = const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
     this.tailWidth = 6.0,
     this.tailHeight = 10.0,
@@ -130,8 +133,12 @@ class BubbleGeometry {
             rect,
             topLeft: const Radius.circular(18),
             topRight: const Radius.circular(18),
-            bottomLeft: isMe ? const Radius.circular(18) : const Radius.circular(4),
-            bottomRight: isMe ? const Radius.circular(4) : const Radius.circular(18),
+            bottomLeft: isMe
+                ? const Radius.circular(18)
+                : const Radius.circular(4),
+            bottomRight: isMe
+                ? const Radius.circular(4)
+                : const Radius.circular(18),
           ),
         );
         break;
@@ -143,8 +150,12 @@ class BubbleGeometry {
             rect,
             topLeft: const Radius.circular(16),
             topRight: const Radius.circular(16),
-            bottomLeft: isMe ? const Radius.circular(16) : const Radius.circular(2),
-            bottomRight: isMe ? const Radius.circular(2) : const Radius.circular(16),
+            bottomLeft: isMe
+                ? const Radius.circular(16)
+                : const Radius.circular(2),
+            bottomRight: isMe
+                ? const Radius.circular(2)
+                : const Radius.circular(16),
           ),
         );
         break;
@@ -201,8 +212,12 @@ class BubbleGeometry {
             rect,
             topLeft: const Radius.circular(14),
             topRight: const Radius.circular(14),
-            bottomLeft: isMe ? const Radius.circular(14) : const Radius.circular(2),
-            bottomRight: isMe ? const Radius.circular(2) : const Radius.circular(14),
+            bottomLeft: isMe
+                ? const Radius.circular(14)
+                : const Radius.circular(2),
+            bottomRight: isMe
+                ? const Radius.circular(2)
+                : const Radius.circular(14),
           ),
         );
         break;
@@ -216,7 +231,12 @@ class BubbleGeometry {
       // 13. Roundle: Organic circle pill
       case BubbleStyleId.roundle:
       case BubbleStyleId.gabyRon:
-        path.addRRect(RRect.fromRectAndRadius(rect, Radius.circular(math.min(24.0, height / 2))));
+        path.addRRect(
+          RRect.fromRectAndRadius(
+            rect,
+            Radius.circular(math.min(24.0, height / 2)),
+          ),
+        );
         break;
 
       // 14. Stock / Whatsapp LB / Telegram: Classic messaging tail
@@ -294,8 +314,12 @@ class BubbleGeometry {
             rect,
             topLeft: const Radius.circular(16),
             topRight: const Radius.circular(16),
-            bottomLeft: isMe ? const Radius.circular(16) : const Radius.circular(4),
-            bottomRight: isMe ? const Radius.circular(4) : const Radius.circular(16),
+            bottomLeft: isMe
+                ? const Radius.circular(16)
+                : const Radius.circular(4),
+            bottomRight: isMe
+                ? const Radius.circular(4)
+                : const Radius.circular(16),
           ),
         );
         break;
@@ -309,20 +333,38 @@ class BubbleGeometry {
           path.lineTo(right - 12, top);
           path.lineTo(right, top + 12);
           path.lineTo(right, bottom - 12);
-          path.arcToPoint(Offset(right - 12, bottom), radius: const Radius.circular(12));
+          path.arcToPoint(
+            Offset(right - 12, bottom),
+            radius: const Radius.circular(12),
+          );
           path.lineTo(left + 12, bottom);
-          path.arcToPoint(Offset(left, bottom - 12), radius: const Radius.circular(12));
+          path.arcToPoint(
+            Offset(left, bottom - 12),
+            radius: const Radius.circular(12),
+          );
           path.lineTo(left, top + 12);
-          path.arcToPoint(Offset(left + 12, top), radius: const Radius.circular(12));
+          path.arcToPoint(
+            Offset(left + 12, top),
+            radius: const Radius.circular(12),
+          );
         } else {
           path.moveTo(left + 12, top + 12);
           path.lineTo(left, top);
           path.lineTo(right - 12, top);
-          path.arcToPoint(Offset(right, top + 12), radius: const Radius.circular(12));
+          path.arcToPoint(
+            Offset(right, top + 12),
+            radius: const Radius.circular(12),
+          );
           path.lineTo(right, bottom - 12);
-          path.arcToPoint(Offset(right - 12, bottom), radius: const Radius.circular(12));
+          path.arcToPoint(
+            Offset(right - 12, bottom),
+            radius: const Radius.circular(12),
+          );
           path.lineTo(left + 12, bottom);
-          path.arcToPoint(Offset(left, bottom - 12), radius: const Radius.circular(12));
+          path.arcToPoint(
+            Offset(left, bottom - 12),
+            radius: const Radius.circular(12),
+          );
           path.close();
         }
         break;
@@ -360,8 +402,12 @@ class BubbleGeometry {
             rect,
             topLeft: const Radius.circular(20),
             topRight: const Radius.circular(20),
-            bottomLeft: isMe ? const Radius.circular(20) : const Radius.circular(6),
-            bottomRight: isMe ? const Radius.circular(6) : const Radius.circular(20),
+            bottomLeft: isMe
+                ? const Radius.circular(20)
+                : const Radius.circular(6),
+            bottomRight: isMe
+                ? const Radius.circular(6)
+                : const Radius.circular(20),
           ),
         );
         break;

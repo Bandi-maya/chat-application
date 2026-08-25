@@ -41,8 +41,7 @@ class GbFeatureCatalog {
         'home_stories_key,home_stories_style,abu9aleh_status_audio',
     'Chat bubbles & ticks':
         'tick_style,bubble_style,text_size_pick,ConvoBack,ModChatRightBubble,ModChatBubbleText,date_right_color,ModChatLeftBubble,ModChatBubbleTextLeft,date_left_color',
-    'Universal behavior':
-        'Pop_Heds,always_online,Img_highres_seek',
+    'Universal behavior': 'Pop_Heds,always_online,Img_highres_seek',
     'Calls appearance':
         'ModCallsBackground,ModCallsTextColor,ModCallsIconColors',
     'Conversation header':
@@ -55,62 +54,68 @@ class GbFeatureCatalog {
     'Composer appearance': 'BGColor',
   };
 
-  static const Map<String, List<String>>
-  _choiceOptions = <String, List<String>>{
-    'ui_home_styleV3': <String>[
-      'Chaty',
-      'Classic',
-      'Compact',
-      'Cards',
-      'Minimal',
-      'Stories first',
-    ],
-    'home_stories_style': <String>[
-      'Circular',
-      'Squircle',
-      'Cards',
-      'Compact',
-      'Minimal',
-    ],
-    'tick_style': <String>['Default', 'Double check', 'iOS', 'Minimal', 'Neon'],
-    'bubble_style': <String>[
-      'Rounded',
-      'Tail',
-      'Tail-less',
-      'Compact',
-      'Squircle',
-      'Card',
-      'Pill',
-    ],
-    'Language': <String>[
-      'System',
-      'English',
-      'Hindi',
-      'Telugu',
-      'Tamil',
-      'Spanish',
-      'French',
-      'German',
-      'Arabic',
-    ],
-    'abu_saleh_quickcontact': <String>['Off', 'Left', 'Right', 'Floating'],
-    'MasOption': <String>['Default', 'Compact', 'Expanded', 'Bottom sheet'],
-    'yoCallsPrivacy': <String>[
-      'Everyone',
-      'My contacts',
-      'My contacts except',
-      'Nobody',
-    ],
-    'tap_emoji': <String>['✨', '❤️', '🔥', '⚡', '⭐', '🌸', '💫', '🎉'],
-    'fall_emoji': <String>[
-      'Stars',
-      'Hearts',
-      'Snowflakes',
-      'Leaves',
-      'Bubbles',
-      'Sparks',
-    ],
-  };
+  static const Map<String, List<String>> _choiceOptions =
+      <String, List<String>>{
+        'ui_home_styleV3': <String>[
+          'Chaty',
+          'Classic',
+          'Compact',
+          'Cards',
+          'Minimal',
+          'Stories first',
+        ],
+        'home_stories_style': <String>[
+          'Circular',
+          'Squircle',
+          'Cards',
+          'Compact',
+          'Minimal',
+        ],
+        'tick_style': <String>[
+          'Default',
+          'Double check',
+          'iOS',
+          'Minimal',
+          'Neon',
+        ],
+        'bubble_style': <String>[
+          'Rounded',
+          'Tail',
+          'Tail-less',
+          'Compact',
+          'Squircle',
+          'Card',
+          'Pill',
+        ],
+        'Language': <String>[
+          'System',
+          'English',
+          'Hindi',
+          'Telugu',
+          'Tamil',
+          'Spanish',
+          'French',
+          'German',
+          'Arabic',
+        ],
+        'abu_saleh_quickcontact': <String>['Off', 'Left', 'Right', 'Floating'],
+        'MasOption': <String>['Default', 'Compact', 'Expanded', 'Bottom sheet'],
+        'yoCallsPrivacy': <String>[
+          'Everyone',
+          'My contacts',
+          'My contacts except',
+          'Nobody',
+        ],
+        'tap_emoji': <String>['✨', '❤️', '🔥', '⚡', '⭐', '🌸', '💫', '🎉'],
+        'fall_emoji': <String>[
+          'Stars',
+          'Hearts',
+          'Snowflakes',
+          'Leaves',
+          'Bubbles',
+          'Sparks',
+        ],
+      };
 
   static const Map<String, String> _descriptions = <String, String>{
     'yoHideSeen': 'Control read receipts / blue ticks.',

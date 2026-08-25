@@ -147,11 +147,7 @@ class _PermissionOnboardingScreenState
                       width: 1.5,
                     ),
                   ),
-                  child: Icon(
-                    step.icon,
-                    color: step.accentColor,
-                    size: 44,
-                  ),
+                  child: Icon(step.icon, color: step.accentColor, size: 44),
                 ),
               ),
               const SizedBox(height: 32),

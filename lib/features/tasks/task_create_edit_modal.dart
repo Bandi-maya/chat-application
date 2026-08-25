@@ -349,7 +349,13 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                         : () {
                             final now = DateTime.now();
                             setState(() {
-                              _dueDate = DateTime(now.year, now.month, now.day, 18, 0);
+                              _dueDate = DateTime(
+                                now.year,
+                                now.month,
+                                now.day,
+                                18,
+                                0,
+                              );
                             });
                           },
                   ),
@@ -358,9 +364,17 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                     onPressed: _isSaving
                         ? null
                         : () {
-                            final tomorrow = DateTime.now().add(const Duration(days: 1));
+                            final tomorrow = DateTime.now().add(
+                              const Duration(days: 1),
+                            );
                             setState(() {
-                              _dueDate = DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 18, 0);
+                              _dueDate = DateTime(
+                                tomorrow.year,
+                                tomorrow.month,
+                                tomorrow.day,
+                                18,
+                                0,
+                              );
                             });
                           },
                   ),
@@ -369,9 +383,17 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                     onPressed: _isSaving
                         ? null
                         : () {
-                            final nextWeek = DateTime.now().add(const Duration(days: 7));
+                            final nextWeek = DateTime.now().add(
+                              const Duration(days: 7),
+                            );
                             setState(() {
-                              _dueDate = DateTime(nextWeek.year, nextWeek.month, nextWeek.day, 18, 0);
+                              _dueDate = DateTime(
+                                nextWeek.year,
+                                nextWeek.month,
+                                nextWeek.day,
+                                18,
+                                0,
+                              );
                             });
                           },
                   ),

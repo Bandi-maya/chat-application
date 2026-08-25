@@ -63,7 +63,10 @@ extension DeliveryIconStyleExtension on DeliveryIconStyle {
 
     for (final style in DeliveryIconStyle.values) {
       if (style.name.toLowerCase() == normalized ||
-          style.displayName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '') ==
+          style.displayName.toLowerCase().replaceAll(
+                RegExp(r'[^a-z0-9]'),
+                '',
+              ) ==
               normalized) {
         return style;
       }

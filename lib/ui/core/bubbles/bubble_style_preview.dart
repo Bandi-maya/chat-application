@@ -35,10 +35,7 @@ class ChatyBubbleContainer extends StatelessWidget {
         strokeColor: effectiveStroke,
         accentColor: accentColor,
       ),
-      child: Padding(
-        padding: geometry.contentPadding,
-        child: child,
-      ),
+      child: Padding(padding: geometry.contentPadding, child: child),
     );
   }
 }
@@ -66,7 +63,9 @@ class BubbleStylePreviewTile extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final incomingFill = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
+    final incomingFill = isDark
+        ? const Color(0xFF1E293B)
+        : const Color(0xFFE2E8F0);
     final outgoingFill = accentColor.withValues(alpha: 0.85);
 
     return InkWell(
@@ -80,7 +79,9 @@ class BubbleStylePreviewTile extends StatelessWidget {
               : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? accentColor : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+            color: isSelected
+                ? accentColor
+                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -94,14 +95,22 @@ class BubbleStylePreviewTile extends StatelessWidget {
                   child: Text(
                     label,
                     style: TextStyle(
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.w600,
                       fontSize: 14,
-                      color: isSelected ? accentColor : theme.textTheme.bodyMedium?.color,
+                      color: isSelected
+                          ? accentColor
+                          : theme.textTheme.bodyMedium?.color,
                     ),
                   ),
                 ),
                 if (isSelected)
-                  Icon(Icons.check_circle_rounded, size: 18, color: accentColor),
+                  Icon(
+                    Icons.check_circle_rounded,
+                    size: 18,
+                    color: accentColor,
+                  ),
               ],
             ),
             const SizedBox(height: 10),
@@ -117,7 +126,11 @@ class BubbleStylePreviewTile extends StatelessWidget {
                   width: 90,
                   child: Text(
                     'Hey there!',
-                    style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ),

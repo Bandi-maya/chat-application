@@ -281,7 +281,11 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                         label: 'Call',
                         onTap: () {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Starting voice call with ${widget.contact.displayName}...')),
+                            SnackBar(
+                              content: Text(
+                                'Starting voice call with ${widget.contact.displayName}...',
+                              ),
+                            ),
                           );
                         },
                       ),
@@ -290,7 +294,11 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                         label: 'Video',
                         onTap: () {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Starting video call with ${widget.contact.displayName}...')),
+                            SnackBar(
+                              content: Text(
+                                'Starting video call with ${widget.contact.displayName}...',
+                              ),
+                            ),
                           );
                         },
                       ),
@@ -306,7 +314,11 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                         label: 'Share',
                         onTap: () {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Sharing contact card for ${widget.contact.displayName}...')),
+                            SnackBar(
+                              content: Text(
+                                'Sharing contact card for ${widget.contact.displayName}...',
+                              ),
+                            ),
                           );
                         },
                       ),
@@ -594,8 +606,13 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                     children: [
                       ChatyListTile(
                         leading: CircleAvatar(
-                          backgroundColor: context.colors.primary.withValues(alpha: 0.15),
-                          child: Icon(Icons.groups_rounded, color: context.colors.primary),
+                          backgroundColor: context.colors.primary.withValues(
+                            alpha: 0.15,
+                          ),
+                          child: Icon(
+                            Icons.groups_rounded,
+                            color: context.colors.primary,
+                          ),
                         ),
                         title: Text(
                           'Flutter Architects & Core Devs',
@@ -614,8 +631,13 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                       ),
                       ChatyListTile(
                         leading: CircleAvatar(
-                          backgroundColor: context.colors.secondary.withValues(alpha: 0.15),
-                          child: Icon(Icons.palette_rounded, color: context.colors.secondary),
+                          backgroundColor: context.colors.secondary.withValues(
+                            alpha: 0.15,
+                          ),
+                          child: Icon(
+                            Icons.palette_rounded,
+                            color: context.colors.secondary,
+                          ),
                         ),
                         title: Text(
                           'Design Systems & Motion Craft',

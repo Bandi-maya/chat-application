@@ -18,7 +18,8 @@ class ProtectedResourceGate {
   ProtectedResourceGate._();
 
   // In-memory unlocked conversation session cache with timestamp
-  static final Map<String, DateTime> _unlockedConversations = <String, DateTime>{};
+  static final Map<String, DateTime> _unlockedConversations =
+      <String, DateTime>{};
 
   // General unlocked session timestamp for app-level or settings changes
   static DateTime? _lastAppUnlockTime;

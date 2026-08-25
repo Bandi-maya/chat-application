@@ -46,7 +46,11 @@ class TemplateShellHeader extends StatelessWidget {
             constraints: const BoxConstraints(minHeight: 56),
             child: Row(
               children: [
-                SizedBox(width: 56, height: 56, child: Center(child: navigation)),
+                SizedBox(
+                  width: 56,
+                  height: 56,
+                  child: Center(child: _MinTouchTarget(child: navigation)),
+                ),
                 Expanded(
                   child: Text(
                     title,
@@ -61,7 +65,13 @@ class TemplateShellHeader extends StatelessWidget {
                 if (actions.isNotEmpty)
                   ConstrainedBox(
                     constraints: const BoxConstraints(minHeight: 56),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: actions),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        for (final action in actions)
+                          _MinTouchTarget(child: action),
+                      ],
+                    ),
                   ),
                 const SizedBox(width: 8),
               ],
@@ -69,6 +79,24 @@ class TemplateShellHeader extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Guarantees any caller-provided control meets the 48dp accessibility floor.
+///
+/// The shell owns this contract so feature screens cannot regress touch-target
+/// size by supplying compact controls such as a default Material IconButton.
+class _MinTouchTarget extends StatelessWidget {
+  const _MinTouchTarget({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+      child: child,
     );
   }
 }

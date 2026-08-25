@@ -39,41 +39,44 @@ void main() {
         expect(setting.searchKeywords.isNotEmpty, isTrue);
         for (final kw in setting.searchKeywords) {
           expect(kw, kw.toLowerCase(), reason: 'Keyword " must be lowercased');
- }
- }
- });
- });
+        }
+      }
+    });
+  });
 
- group('Navigation Destination XOR More Overflow Invariant', () {
- test('Primary navigation bar slots XOR More overflow items are mutually disjoint', () {
- const List<String> candidateDestinations = [
- 'chats',
- 'groups',
- 'updates',
- 'tasks',
- 'calls',
- 'settings',
- 'desktop',
- ];
+  group('Navigation Destination XOR More Overflow Invariant', () {
+    test(
+      'Primary navigation bar slots XOR More overflow items are mutually disjoint',
+      () {
+        const List<String> candidateDestinations = [
+          'chats',
+          'groups',
+          'updates',
+          'tasks',
+          'calls',
+          'settings',
+          'desktop',
+        ];
 
- final hasOverflow = candidateDestinations.length > 4;
- expect(hasOverflow, isTrue);
+        final hasOverflow = candidateDestinations.length > 4;
+        expect(hasOverflow, isTrue);
 
- final primaryItems = candidateDestinations.take(3).toList();
- final overflowItems = candidateDestinations.skip(3).toList();
+        final primaryItems = candidateDestinations.take(3).toList();
+        final overflowItems = candidateDestinations.skip(3).toList();
 
- final primarySet = primaryItems.toSet();
- final overflowSet = overflowItems.toSet();
+        final primarySet = primaryItems.toSet();
+        final overflowSet = overflowItems.toSet();
 
- // Invariant: visibleNavIds.intersection(moreIds).isEmpty
- final intersection = primarySet.intersection(overflowSet);
- expect(
- intersection.isEmpty,
- isTrue,
- reason: 'Primary items and More overflow items must never overlap',
- );
- expect(primaryItems.length, 3);
- expect(overflowItems.length, 4);
- });
- });
+        // Invariant: visibleNavIds.intersection(moreIds).isEmpty
+        final intersection = primarySet.intersection(overflowSet);
+        expect(
+          intersection.isEmpty,
+          isTrue,
+          reason: 'Primary items and More overflow items must never overlap',
+        );
+        expect(primaryItems.length, 3);
+        expect(overflowItems.length, 4);
+      },
+    );
+  });
 }

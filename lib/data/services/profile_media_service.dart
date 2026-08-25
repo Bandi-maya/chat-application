@@ -47,15 +47,14 @@ class ProfileMediaService {
   Future<String> uploadBanner({
     required ProfileMediaSource source,
     BuildContext? context,
-  }) =>
-      _pickCompressUpload(
-        source: source,
-        folder: 'banners',
-        square: 1280,
-        quality: 85,
-        isAvatar: false,
-        context: context,
-      );
+  }) => _pickCompressUpload(
+    source: source,
+    folder: 'banners',
+    square: 1280,
+    quality: 85,
+    isAvatar: false,
+    context: context,
+  );
 
   Future<String> _pickCompressUpload({
     required ProfileMediaSource source,
@@ -128,15 +127,17 @@ class ProfileMediaService {
 
     final objectPath = '$userId/$folder/${_uuid.v4()}.jpg';
     try {
-      await _client.storage.from(bucket).upload(
-        objectPath,
-        file,
-        fileOptions: const FileOptions(
-          cacheControl: '3600',
-          upsert: false,
-          contentType: 'image/jpeg',
-        ),
-      );
+      await _client.storage
+          .from(bucket)
+          .upload(
+            objectPath,
+            file,
+            fileOptions: const FileOptions(
+              cacheControl: '3600',
+              upsert: false,
+              contentType: 'image/jpeg',
+            ),
+          );
     } on StorageException {
       rethrow;
     } catch (_) {

@@ -244,8 +244,18 @@ class _ParticlePainter extends CustomPainter {
     canvas.save();
     canvas.translate(leftEarX, earY);
     canvas.rotate(-0.25);
-    canvas.drawOval(Rect.fromCenter(center: Offset.zero, width: earW, height: earH), earPaint);
-    canvas.drawOval(Rect.fromCenter(center: Offset.zero, width: earW * 0.65, height: earH * 0.65), earInnerPaint);
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset.zero, width: earW, height: earH),
+      earPaint,
+    );
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset.zero,
+        width: earW * 0.65,
+        height: earH * 0.65,
+      ),
+      earInnerPaint,
+    );
     canvas.restore();
 
     // Right Ear
@@ -253,23 +263,42 @@ class _ParticlePainter extends CustomPainter {
     canvas.save();
     canvas.translate(rightEarX, earY);
     canvas.rotate(0.25);
-    canvas.drawOval(Rect.fromCenter(center: Offset.zero, width: earW, height: earH), earPaint);
-    canvas.drawOval(Rect.fromCenter(center: Offset.zero, width: earW * 0.65, height: earH * 0.65), earInnerPaint);
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset.zero, width: earW, height: earH),
+      earPaint,
+    );
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset.zero,
+        width: earW * 0.65,
+        height: earH * 0.65,
+      ),
+      earInnerPaint,
+    );
     canvas.restore();
 
     // Nose & Muzzle
     final noseY = centerY + headWidth * 0.05;
-    final nosePaint = Paint()..color = const Color(0xFF1E1E1E)..style = PaintingStyle.fill;
+    final nosePaint = Paint()
+      ..color = const Color(0xFF1E1E1E)
+      ..style = PaintingStyle.fill;
     final nosePath = Path();
     nosePath.moveTo(centerX - 18, noseY - 6);
     nosePath.quadraticBezierTo(centerX, noseY - 10, centerX + 18, noseY - 6);
     nosePath.quadraticBezierTo(centerX + 14, noseY + 14, centerX, noseY + 18);
-    nosePath.quadraticBezierTo(centerX - 14, noseY + 14, centerX - 18, noseY - 6);
+    nosePath.quadraticBezierTo(
+      centerX - 14,
+      noseY + 14,
+      centerX - 18,
+      noseY - 6,
+    );
     nosePath.close();
     canvas.drawPath(nosePath, nosePaint);
 
     // Whiskers / muzzle blush
-    final blushPaint = Paint()..color = Colors.pinkAccent.withValues(alpha: 0.25)..style = PaintingStyle.fill;
+    final blushPaint = Paint()
+      ..color = Colors.pinkAccent.withValues(alpha: 0.25)
+      ..style = PaintingStyle.fill;
     canvas.drawCircle(Offset(centerX - 42, noseY + 8), 16, blushPaint);
     canvas.drawCircle(Offset(centerX + 42, noseY + 8), 16, blushPaint);
   }

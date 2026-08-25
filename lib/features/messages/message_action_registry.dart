@@ -88,13 +88,18 @@ class MessageActionRegistry {
         MessageActionDescriptor(
           type: MessageActionType.star,
           label: message.isStarred ? 'Unstar' : 'Star',
-          icon: message.isStarred ? Icons.star_rounded : Icons.star_border_rounded,
+          icon: message.isStarred
+              ? Icons.star_rounded
+              : Icons.star_border_rounded,
         ),
       );
     }
 
     // Edit (only for own text messages within allowed policy window)
-    if (isMe && message.type == MessageType.text && !message.isDeletedForEveryone && allowEditPolicy) {
+    if (isMe &&
+        message.type == MessageType.text &&
+        !message.isDeletedForEveryone &&
+        allowEditPolicy) {
       actions.add(
         const MessageActionDescriptor(
           type: MessageActionType.edit,

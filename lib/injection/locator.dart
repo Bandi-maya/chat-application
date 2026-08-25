@@ -6,6 +6,8 @@ import 'package:chat/data/services/contact_relationship_service.dart';
 import 'package:chat/data/services/local_lock_service.dart';
 import 'package:chat/data/services/mls_e2ee_service.dart';
 import 'package:chat/data/services/rich_chat_realtime_service.dart';
+import 'package:chat/data/services/connection_health_service.dart';
+import 'package:chat/data/services/outgoing_message_queue_engine.dart';
 import 'package:chat/ui/core/controllers/app_icon_controller.dart';
 import 'package:chat/ui/core/controllers/preferences_controller.dart';
 import 'package:chat/ui/core/controllers/appearance_variant_controller.dart';
@@ -26,9 +28,15 @@ void setupLocator() {
   if (locator.isRegistered<ThemeController>()) return;
 
   locator.registerLazySingleton<ThemeController>(() => ThemeController());
+  locator.registerLazySingleton<ConnectionHealthService>(
+    () => ConnectionHealthService(),
+  );
   locator.registerLazySingleton<MlsE2eeService>(() => MlsE2eeService());
   locator.registerLazySingleton<ChatyBackendService>(
     () => ChatyBackendService(),
+  );
+  locator.registerLazySingleton<OutgoingMessageQueueEngine>(
+    () => OutgoingMessageQueueEngine(),
   );
   locator.registerLazySingleton<ChatyDataStore>(() => ChatyDataStore());
   locator.registerLazySingleton<ChatyPreferencesController>(
@@ -37,15 +45,11 @@ void setupLocator() {
   locator.registerLazySingleton<AppearanceVariantController>(
     () => AppearanceVariantController(),
   );
-  locator.registerLazySingleton<TemplateController>(
-    () => TemplateController(),
-  );
+  locator.registerLazySingleton<TemplateController>(() => TemplateController());
   locator.registerLazySingleton<ChatyNotificationService>(
     () => ChatyNotificationService(),
   );
-  locator.registerLazySingleton<PushTokenService>(
-    () => PushTokenService(),
-  );
+  locator.registerLazySingleton<PushTokenService>(() => PushTokenService());
   locator.registerLazySingleton<NotificationChannelManager>(
     () => NotificationChannelManager(
       preferences: locator<ChatyPreferencesController>(),
@@ -72,9 +76,7 @@ void setupLocator() {
       callService: locator<CallSignalingService>(),
     ),
   );
-  locator.registerLazySingleton<EffectEngine>(
-    () => EffectEngine(),
-  );
+  locator.registerLazySingleton<EffectEngine>(() => EffectEngine());
   locator.registerLazySingleton<AppIconController>(() => AppIconController());
   locator.registerLazySingleton<LocalLockService>(() => LocalLockService());
   locator.registerLazySingleton<ContactRelationshipService>(

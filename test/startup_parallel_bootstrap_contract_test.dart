@@ -13,6 +13,9 @@ void main() {
     expect(mainBody, contains('Future.wait<void>'));
     expect(mainBody, contains('locator<ThemeController>().init()'));
     expect(mainBody, contains('locator<TemplateController>().init('));
-    expect(mainBody.indexOf('Future.wait<void>'), lessThan(mainBody.indexOf('runApp')));
+    expect(
+      mainBody.indexOf('Future.wait<void>'),
+      lessThan(mainBody.indexOf('runApp')),
+    );
   });
 }

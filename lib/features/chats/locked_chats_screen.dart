@@ -97,9 +97,7 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: theme.cardColor,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
             Container(
@@ -108,7 +106,11 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
                 color: theme.accentColor.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(Icons.key_rounded, color: theme.accentColor, size: 22),
+              child: Icon(
+                Icons.key_rounded,
+                color: theme.accentColor,
+                size: 22,
+              ),
             ),
             const SizedBox(width: 12),
             Text(
@@ -150,7 +152,10 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('Cancel', style: TextStyle(color: theme.secondaryTextColor)),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: theme.secondaryTextColor),
+            ),
           ),
           if (_hasSecretPhrase)
             TextButton(
@@ -205,7 +210,9 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
   }
 
   void _showChatLockSettings(Conversation conversation) {
-    final isHidden = widget.preferencesController.isConversationHidden(conversation.id);
+    final isHidden = widget.preferencesController.isConversationHidden(
+      conversation.id,
+    );
     final theme = widget.themeController.globalTheme;
 
     showModalBottomSheet<void>(
@@ -235,8 +242,12 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
                       ? theme.accentColor.withValues(alpha: 0.15)
                       : theme.secondaryTextColor.withValues(alpha: 0.15),
                   child: Icon(
-                    isHidden ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                    color: isHidden ? theme.accentColor : theme.primaryTextColor,
+                    isHidden
+                        ? Icons.visibility_off_rounded
+                        : Icons.visibility_rounded,
+                    color: isHidden
+                        ? theme.accentColor
+                        : theme.primaryTextColor,
                   ),
                 ),
                 title: Text(
@@ -250,7 +261,10 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
                   isHidden
                       ? 'Show in standard chat list with locked badge'
                       : 'Keep hidden and only discoverable via secret code or title tap',
-                  style: TextStyle(color: theme.secondaryTextColor, fontSize: 12),
+                  style: TextStyle(
+                    color: theme.secondaryTextColor,
+                    fontSize: 12,
+                  ),
                 ),
                 onTap: () {
                   Navigator.of(ctx).pop();
@@ -263,7 +277,10 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
               ListTile(
                 leading: CircleAvatar(
                   backgroundColor: theme.dangerColor.withValues(alpha: 0.15),
-                  child: Icon(Icons.lock_open_rounded, color: theme.dangerColor),
+                  child: Icon(
+                    Icons.lock_open_rounded,
+                    color: theme.dangerColor,
+                  ),
                 ),
                 title: Text(
                   'Unlock & Remove Protection',
@@ -274,7 +291,10 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
                 ),
                 subtitle: Text(
                   'Removes PIN / biometric requirement from this conversation',
-                  style: TextStyle(color: theme.secondaryTextColor, fontSize: 12),
+                  style: TextStyle(
+                    color: theme.secondaryTextColor,
+                    fontSize: 12,
+                  ),
                 ),
                 onTap: () {
                   Navigator.of(ctx).pop();
@@ -296,9 +316,11 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
     final security = widget.preferencesController.security;
 
     // Retrieve all conversations that are locked or hidden
-    final lockedConversations = widget.dataStore.conversations.where((c) {
-      return widget.preferencesController.isConversationProtected(c.id);
-    }).toList(growable: false);
+    final lockedConversations = widget.dataStore.conversations
+        .where((c) {
+          return widget.preferencesController.isConversationProtected(c.id);
+        })
+        .toList(growable: false);
 
     return Scaffold(
       backgroundColor: theme.backgroundColor,
@@ -319,10 +341,7 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
             ),
             Text(
               '${lockedConversations.length} protected conversations',
-              style: TextStyle(
-                color: theme.secondaryTextColor,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: theme.secondaryTextColor, fontSize: 12),
             ),
           ],
         ),
@@ -331,7 +350,9 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
             tooltip: 'Secret Search Code Settings',
             icon: Icon(
               _hasSecretPhrase ? Icons.key_rounded : Icons.key_off_outlined,
-              color: _hasSecretPhrase ? theme.accentColor : theme.secondaryTextColor,
+              color: _hasSecretPhrase
+                  ? theme.accentColor
+                  : theme.secondaryTextColor,
             ),
             onPressed: _showSecretCodeDialog,
           ),
@@ -413,9 +434,8 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
                   ),
                 ),
                 ...lockedConversations.map((conversation) {
-                  final isHidden = widget.preferencesController.isConversationHidden(
-                    conversation.id,
-                  );
+                  final isHidden = widget.preferencesController
+                      .isConversationHidden(conversation.id);
                   return ListTile(
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -448,7 +468,9 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
                                   ? Icons.visibility_off_rounded
                                   : Icons.lock_rounded,
                               size: 12,
-                              color: isHidden ? Colors.white : theme.accentColor,
+                              color: isHidden
+                                  ? Colors.white
+                                  : theme.accentColor,
                             ),
                           ),
                         ),
@@ -463,11 +485,17 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
                       ),
                     ),
                     subtitle: Text(
-                      isHidden ? 'Hidden & Locked' : 'Locked with ${security.lockMethod}',
+                      isHidden
+                          ? 'Hidden & Locked'
+                          : 'Locked with ${security.lockMethod}',
                       style: TextStyle(
-                        color: isHidden ? theme.accentColor : theme.secondaryTextColor,
+                        color: isHidden
+                            ? theme.accentColor
+                            : theme.secondaryTextColor,
                         fontSize: 13,
-                        fontWeight: isHidden ? FontWeight.w600 : FontWeight.normal,
+                        fontWeight: isHidden
+                            ? FontWeight.w600
+                            : FontWeight.normal,
                       ),
                     ),
                     trailing: IconButton(
