@@ -5,8 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:uuid/uuid.dart';
-
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/chat_task.dart';
 import '../../domain/models/conversation.dart';
@@ -16,8 +14,6 @@ import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../services/backend_service.dart';
 import '../services/gb_feature_backend_service.dart';
-import '../services/message_transport_compatibility_service.dart';
-import '../services/pending_secure_send_store.dart';
 
 /// Compatibility adapter used by the existing presentation layer.
 ///
