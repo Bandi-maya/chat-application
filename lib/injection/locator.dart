@@ -7,6 +7,7 @@ import 'package:chat/data/services/local_lock_service.dart';
 import 'package:chat/data/services/mls_e2ee_service.dart';
 import 'package:chat/data/services/rich_chat_realtime_service.dart';
 import 'package:chat/data/services/connection_health_service.dart';
+import 'package:chat/data/services/message_transport_compatibility_service.dart';
 import 'package:chat/data/services/outgoing_message_queue_engine.dart';
 import 'package:chat/ui/core/controllers/app_icon_controller.dart';
 import 'package:chat/ui/core/controllers/preferences_controller.dart';
@@ -34,6 +35,9 @@ void setupLocator() {
   locator.registerLazySingleton<MlsE2eeService>(() => MlsE2eeService());
   locator.registerLazySingleton<ChatyBackendService>(
     () => ChatyBackendService(),
+  );
+  locator.registerLazySingleton<MessageTransportCompatibilityService>(
+    () => MessageTransportCompatibilityService(),
   );
   locator.registerLazySingleton<OutgoingMessageQueueEngine>(
     () => OutgoingMessageQueueEngine(),

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:uuid/uuid.dart';
+
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/chat_task.dart';
 import '../../domain/models/conversation.dart';
@@ -14,6 +16,8 @@ import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../services/backend_service.dart';
 import '../services/gb_feature_backend_service.dart';
+import '../services/message_transport_compatibility_service.dart';
+import '../services/pending_secure_send_store.dart';
 
 /// Compatibility adapter used by the existing presentation layer.
 ///
@@ -226,6 +230,62 @@ class ChatyDataStore extends ChangeNotifier {
     String? linkedTaskId,
     Map<String, dynamic>? extraMetadata,
   }) async {
+    final compatService = locator.isRegistered<MessageTransportCompatibilityService>()
+        ? locator<MessageTransportCompatibilityService>()
+        : null;
+
+    if (compatService != null) {
+      final requiresLegacy =
+          await compatService.conversationRequiresLegacyTransport(conversationId);
+      if (requiresLegacy) {
+        final clientMessageId = const Uuid().v4();
+        final metadata = <String, dynamic>{
+          if (replyToMessageId != null) 'reply_to_message_id': replyToMessageId,
+          if (replyToPreviewText != null)
+            'reply_to_preview_text': replyToPreviewText,
+          if (replyToSenderName != null)
+            'reply_to_sender_name': replyToSenderName,
+          if (linkedTaskId != null) 'linked_task_id': linkedTaskId,
+          ...?extraMetadata,
+          if (attachment != null)
+            'attachment': <String, dynamic>{
+              'id': attachment.id,
+              'type': attachment.type,
+              'name': attachment.name,
+              'size': attachment.size,
+              'url': attachment.url,
+              'duration_seconds': attachment.durationSeconds,
+            },
+        };
+
+        final send = PendingSecureSend(
+          clientMessageId: clientMessageId,
+          conversationId: conversationId,
+          type: type.name,
+          text: text.trim(),
+          metadata: metadata,
+          createdAt: DateTime.now(),
+          attachment: attachment == null
+              ? null
+              : <String, dynamic>{
+                  'id': attachment.id,
+                  'type': attachment.type,
+                  'name': attachment.name,
+                  'size': attachment.size,
+                  'url': attachment.url,
+                  'duration_seconds': attachment.durationSeconds,
+                },
+          replyToMessageId: replyToMessageId,
+          replyToPreviewText: replyToPreviewText,
+          replyToSenderName: replyToSenderName,
+          linkedTaskId: linkedTaskId,
+        );
+
+        await compatService.deliverLegacyMessage(send, fallbackType: type);
+        return;
+      }
+    }
+
     await _backend.sendMessage(
       conversationId: conversationId,
       text: text,

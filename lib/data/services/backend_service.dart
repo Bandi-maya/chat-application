@@ -983,6 +983,7 @@ class ChatyBackendService extends ChangeNotifier {
     String? replyToSenderName,
     String? linkedTaskId,
     Map<String, dynamic>? extraMetadata,
+    String? clientMessageId,
   }) async {
     final me = _currentUser;
     if (me == null) throw Exception('Authentication required.');
@@ -992,7 +993,7 @@ class ChatyBackendService extends ChangeNotifier {
       throw StateError('Encrypted message transport is unavailable.');
     }
 
-    final clientMessageId = _uuid.v4();
+    final effectiveClientMessageId = clientMessageId ?? _uuid.v4();
     final metadata = <String, dynamic>{
       if (replyToMessageId != null) 'reply_to_message_id': replyToMessageId,
       if (replyToPreviewText != null)
@@ -1012,7 +1013,7 @@ class ChatyBackendService extends ChangeNotifier {
     };
 
     final pendingSend = PendingSecureSend(
-      clientMessageId: clientMessageId,
+      clientMessageId: effectiveClientMessageId,
       conversationId: conversationId,
       type: _messageTypeToDatabase(type),
       text: text.trim(),
@@ -1050,7 +1051,7 @@ class ChatyBackendService extends ChangeNotifier {
       await _pendingSecureSends.put(me.id, pendingSend);
 
       final optimisticMsg = ChatMessage(
-        id: clientMessageId,
+        id: effectiveClientMessageId,
         conversationId: conversationId,
         senderId: me.id,
         type: type,
@@ -1069,7 +1070,7 @@ class ChatyBackendService extends ChangeNotifier {
         conversationId,
         () => <ChatMessage>[],
       );
-      if (!list.any((m) => m.id == clientMessageId)) {
+      if (!list.any((m) => m.id == effectiveClientMessageId)) {
         list.add(optimisticMsg);
       }
       notifyListeners();

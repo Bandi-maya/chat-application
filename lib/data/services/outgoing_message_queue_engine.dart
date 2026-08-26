@@ -9,6 +9,7 @@ import '../../domain/models/connection_health.dart';
 import '../../injection/locator.dart';
 import 'backend_service.dart';
 import 'connection_health_service.dart';
+import 'message_transport_compatibility_service.dart';
 import 'pending_secure_send_store.dart';
 
 /// Robust outgoing message queue engine that handles:
@@ -111,29 +112,42 @@ class OutgoingMessageQueueEngine extends ChangeNotifier {
     if (target == null) return false;
 
     try {
-      await _backend.sendMessage(
-        conversationId: target.conversationId,
-        text: target.text,
-        type: _messageTypeFromString(target.type),
-        attachment: target.attachment == null
-            ? null
-            : MessageAttachment(
-                id: target.attachment!['id']?.toString() ?? '',
-                type: target.attachment!['type']?.toString() ?? 'file',
-                name: target.attachment!['name']?.toString() ?? '',
-                size: target.attachment!['size']?.toString() ?? '',
-                url: target.attachment!['url']?.toString(),
-                durationSeconds: int.tryParse(
-                      '${target.attachment!['duration_seconds'] ?? 0}',
-                    ) ??
-                    0,
-              ),
-        replyToMessageId: target.replyToMessageId,
-        replyToPreviewText: target.replyToPreviewText,
-        replyToSenderName: target.replyToSenderName,
-        linkedTaskId: target.linkedTaskId,
-        extraMetadata: target.metadata,
-      );
+      final compatService = locator.isRegistered<MessageTransportCompatibilityService>()
+          ? locator<MessageTransportCompatibilityService>()
+          : null;
+
+      if (compatService != null &&
+          await compatService.conversationRequiresLegacyTransport(target.conversationId)) {
+        await compatService.deliverLegacyMessage(
+          target,
+          fallbackType: _messageTypeFromString(target.type),
+        );
+      } else {
+        await _backend.sendMessage(
+          conversationId: target.conversationId,
+          text: target.text,
+          type: _messageTypeFromString(target.type),
+          attachment: target.attachment == null
+              ? null
+              : MessageAttachment(
+                  id: target.attachment!['id']?.toString() ?? '',
+                  type: target.attachment!['type']?.toString() ?? 'file',
+                  name: target.attachment!['name']?.toString() ?? '',
+                  size: target.attachment!['size']?.toString() ?? '',
+                  url: target.attachment!['url']?.toString(),
+                  durationSeconds: int.tryParse(
+                        '${target.attachment!['duration_seconds'] ?? 0}',
+                      ) ??
+                      0,
+                ),
+          replyToMessageId: target.replyToMessageId,
+          replyToPreviewText: target.replyToPreviewText,
+          replyToSenderName: target.replyToSenderName,
+          linkedTaskId: target.linkedTaskId,
+          extraMetadata: target.metadata,
+          clientMessageId: target.clientMessageId,
+        );
+      }
       await _store.remove(userId, clientMessageId);
       await _updateQueuedCount();
       return true;
@@ -182,29 +196,43 @@ class OutgoingMessageQueueEngine extends ChangeNotifier {
           }
 
           try {
-            await _backend.sendMessage(
-              conversationId: item.conversationId,
-              text: item.text,
-              type: _messageTypeFromString(item.type),
-              attachment: item.attachment == null
-                  ? null
-                  : MessageAttachment(
-                      id: item.attachment!['id']?.toString() ?? '',
-                      type: item.attachment!['type']?.toString() ?? 'file',
-                      name: item.attachment!['name']?.toString() ?? '',
-                      size: item.attachment!['size']?.toString() ?? '',
-                      url: item.attachment!['url']?.toString(),
-                      durationSeconds: int.tryParse(
-                            '${item.attachment!['duration_seconds'] ?? 0}',
-                          ) ??
-                          0,
-                    ),
-              replyToMessageId: item.replyToMessageId,
-              replyToPreviewText: item.replyToPreviewText,
-              replyToSenderName: item.replyToSenderName,
-              linkedTaskId: item.linkedTaskId,
-              extraMetadata: item.metadata,
-            );
+            final compatService =
+                locator.isRegistered<MessageTransportCompatibilityService>()
+                    ? locator<MessageTransportCompatibilityService>()
+                    : null;
+
+            if (compatService != null &&
+                await compatService.conversationRequiresLegacyTransport(item.conversationId)) {
+              await compatService.deliverLegacyMessage(
+                item,
+                fallbackType: _messageTypeFromString(item.type),
+              );
+            } else {
+              await _backend.sendMessage(
+                conversationId: item.conversationId,
+                text: item.text,
+                type: _messageTypeFromString(item.type),
+                attachment: item.attachment == null
+                    ? null
+                    : MessageAttachment(
+                        id: item.attachment!['id']?.toString() ?? '',
+                        type: item.attachment!['type']?.toString() ?? 'file',
+                        name: item.attachment!['name']?.toString() ?? '',
+                        size: item.attachment!['size']?.toString() ?? '',
+                        url: item.attachment!['url']?.toString(),
+                        durationSeconds: int.tryParse(
+                              '${item.attachment!['duration_seconds'] ?? 0}',
+                            ) ??
+                            0,
+                      ),
+                replyToMessageId: item.replyToMessageId,
+                replyToPreviewText: item.replyToPreviewText,
+                replyToSenderName: item.replyToSenderName,
+                linkedTaskId: item.linkedTaskId,
+                extraMetadata: item.metadata,
+                clientMessageId: item.clientMessageId,
+              );
+            }
 
             // Successfully sent: remove from store and clear retry trackers
             await _store.remove(userId, item.clientMessageId);
