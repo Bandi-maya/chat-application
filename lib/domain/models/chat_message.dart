@@ -10,6 +10,30 @@ enum MessageType {
   system,
 }
 
+String messageTypeToDatabase(MessageType type) => switch (type) {
+      MessageType.image => 'image',
+      MessageType.video => 'video',
+      MessageType.audio => 'audio',
+      MessageType.document => 'document',
+      MessageType.location => 'location',
+      MessageType.contact => 'contact',
+      MessageType.taskCard => 'task',
+      MessageType.system => 'system',
+      MessageType.text => 'text',
+    };
+
+MessageType messageTypeFromDatabase(String? type) => switch (type) {
+      'image' => MessageType.image,
+      'video' => MessageType.video,
+      'audio' => MessageType.audio,
+      'document' => MessageType.document,
+      'location' => MessageType.location,
+      'contact' => MessageType.contact,
+      'task' => MessageType.taskCard,
+      'system' => MessageType.system,
+      _ => MessageType.text,
+    };
+
 enum DeliveryState { queued, sending, sent, delivered, read, failed }
 
 class MessageReaction {

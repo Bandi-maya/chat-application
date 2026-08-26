@@ -16,6 +16,7 @@ import '../../ui/core/realtime/realtime_event_bus.dart';
 import '../../ui/core/validators/input_validators.dart';
 import 'connection_health_service.dart';
 import 'local_snapshot_cache_service.dart';
+import 'message_transport_compatibility_service.dart';
 import 'mls_e2ee_service.dart';
 import 'pending_secure_send_store.dart';
 import 'snapshot_codec.dart';
@@ -266,7 +267,11 @@ class ChatyBackendService extends ChangeNotifier {
     try {
       await _loadCurrentProfile();
       if (locator.isRegistered<MlsE2eeService>()) {
-        await locator<MlsE2eeService>().initializeForCurrentSession();
+        final mls = locator<MlsE2eeService>();
+        await mls.initializeForCurrentSession();
+        if (!mls.isReady) {
+          debugPrint('Chaty MLS secure messaging setup is pending device enrollment.');
+        }
       }
       await Future.wait<void>(<Future<void>>[
         _loadConversations(),
@@ -635,6 +640,24 @@ class ChatyBackendService extends ChangeNotifier {
           table: 'mls_key_packages',
           callback: (_) => _scheduleKeyExchangeReconciliation(),
         )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'mls_conversation_groups',
+          callback: (_) => _scheduleKeyExchangeReconciliation(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'mls_control_messages',
+          callback: (_) => _scheduleKeyExchangeReconciliation(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'mls_welcomes',
+          callback: (_) => _scheduleKeyExchangeReconciliation(),
+        )
         .subscribe();
     _realtimeChannel = channel;
   }
@@ -677,6 +700,9 @@ class ChatyBackendService extends ChangeNotifier {
   }
 
   void _scheduleKeyExchangeReconciliation() {
+    if (locator.isRegistered<MessageTransportCompatibilityService>()) {
+      locator<MessageTransportCompatibilityService>().invalidateAll();
+    }
     _armRealtimeReconciliation();
   }
 

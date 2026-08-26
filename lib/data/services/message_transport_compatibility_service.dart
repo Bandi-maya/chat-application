@@ -27,7 +27,7 @@ class MessageTransportCompatibilityService {
     try {
       final res = await _client.rpc(
         'conversation_requires_legacy_transport',
-        params: {'conversation_id': conversationId},
+        params: <String, dynamic>{'p_conversation_id': conversationId},
       );
       final requiresLegacy = res == true;
       _legacyTransportCache[conversationId] = requiresLegacy;
@@ -43,6 +43,11 @@ class MessageTransportCompatibilityService {
     _legacyTransportCache.remove(conversationId);
   }
 
+  /// Clears all cached transport capability states across all conversations.
+  void invalidateAll() {
+    _legacyTransportCache.clear();
+  }
+
   /// Delivers a message via the authenticated legacy `send_message` RPC,
   /// preserving [send.clientMessageId] for idempotency.
   Future<ChatMessage> deliverLegacyMessage(
@@ -55,11 +60,11 @@ class MessageTransportCompatibilityService {
     final raw = await _client.rpc(
       'send_message',
       params: <String, dynamic>{
-        'conversation_id': send.conversationId,
-        'client_message_id': send.clientMessageId,
-        'type': send.type,
-        'text': send.text,
-        'metadata': send.metadata,
+        'p_conversation_id': send.conversationId,
+        'p_client_message_id': send.clientMessageId,
+        'p_body': send.text,
+        'p_type': send.type,
+        'p_metadata': send.metadata,
       },
     );
 

@@ -230,62 +230,6 @@ class ChatyDataStore extends ChangeNotifier {
     String? linkedTaskId,
     Map<String, dynamic>? extraMetadata,
   }) async {
-    final compatService = locator.isRegistered<MessageTransportCompatibilityService>()
-        ? locator<MessageTransportCompatibilityService>()
-        : null;
-
-    if (compatService != null) {
-      final requiresLegacy =
-          await compatService.conversationRequiresLegacyTransport(conversationId);
-      if (requiresLegacy) {
-        final clientMessageId = const Uuid().v4();
-        final metadata = <String, dynamic>{
-          if (replyToMessageId != null) 'reply_to_message_id': replyToMessageId,
-          if (replyToPreviewText != null)
-            'reply_to_preview_text': replyToPreviewText,
-          if (replyToSenderName != null)
-            'reply_to_sender_name': replyToSenderName,
-          if (linkedTaskId != null) 'linked_task_id': linkedTaskId,
-          ...?extraMetadata,
-          if (attachment != null)
-            'attachment': <String, dynamic>{
-              'id': attachment.id,
-              'type': attachment.type,
-              'name': attachment.name,
-              'size': attachment.size,
-              'url': attachment.url,
-              'duration_seconds': attachment.durationSeconds,
-            },
-        };
-
-        final send = PendingSecureSend(
-          clientMessageId: clientMessageId,
-          conversationId: conversationId,
-          type: type.name,
-          text: text.trim(),
-          metadata: metadata,
-          createdAt: DateTime.now(),
-          attachment: attachment == null
-              ? null
-              : <String, dynamic>{
-                  'id': attachment.id,
-                  'type': attachment.type,
-                  'name': attachment.name,
-                  'size': attachment.size,
-                  'url': attachment.url,
-                  'duration_seconds': attachment.durationSeconds,
-                },
-          replyToMessageId: replyToMessageId,
-          replyToPreviewText: replyToPreviewText,
-          replyToSenderName: replyToSenderName,
-          linkedTaskId: linkedTaskId,
-        );
-
-        await compatService.deliverLegacyMessage(send, fallbackType: type);
-        return;
-      }
-    }
-
     await _backend.sendMessage(
       conversationId: conversationId,
       text: text,

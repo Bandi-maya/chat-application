@@ -120,13 +120,13 @@ class OutgoingMessageQueueEngine extends ChangeNotifier {
           await compatService.conversationRequiresLegacyTransport(target.conversationId)) {
         await compatService.deliverLegacyMessage(
           target,
-          fallbackType: _messageTypeFromString(target.type),
+          fallbackType: messageTypeFromDatabase(target.type),
         );
       } else {
         await _backend.sendMessage(
           conversationId: target.conversationId,
           text: target.text,
-          type: _messageTypeFromString(target.type),
+          type: messageTypeFromDatabase(target.type),
           attachment: target.attachment == null
               ? null
               : MessageAttachment(
@@ -205,13 +205,13 @@ class OutgoingMessageQueueEngine extends ChangeNotifier {
                 await compatService.conversationRequiresLegacyTransport(item.conversationId)) {
               await compatService.deliverLegacyMessage(
                 item,
-                fallbackType: _messageTypeFromString(item.type),
+                fallbackType: messageTypeFromDatabase(item.type),
               );
             } else {
               await _backend.sendMessage(
                 conversationId: item.conversationId,
                 text: item.text,
-                type: _messageTypeFromString(item.type),
+                type: messageTypeFromDatabase(item.type),
                 attachment: item.attachment == null
                     ? null
                     : MessageAttachment(
@@ -260,7 +260,7 @@ class OutgoingMessageQueueEngine extends ChangeNotifier {
     }
   }
 
-  static MessageType _messageTypeFromString(String type) => switch (type) {
+  static MessageType messageTypeFromDatabase(String type) => switch (type) {
         'image' => MessageType.image,
         'video' => MessageType.video,
         'audio' => MessageType.audio,
