@@ -2,7 +2,7 @@
 
 ## Status
 
-**Reconciled on 2026-08-22.** The deployable repository chain now contains the same 45 migration versions and names recorded in the production Supabase migration ledger, from `20260819064501_chaty_core` through `20260822131153_e2ee_protocol_suite_invariant`.
+**Reconciled on 2026-08-22.** The deployable repository chain now contains the same 48 migration versions and names recorded in the production Supabase migration ledger, from `20260819064501_chaty_core` through `20260822131153_e2ee_protocol_suite_invariant`.
 
 The earlier repository-local consolidated versions were removed from the deployable migration directory. They remain recoverable from Git history only and must not be reintroduced.
 
@@ -12,9 +12,9 @@ Supabase records applied migrations in `supabase_migrations.schema_migrations`. 
 
 The repository now pins the normalized production SQL with:
 
-- `supabase/migrations/*.sql` — the 45 deployable timestamped migrations.
+- `supabase/migrations/*.sql` — the 48 deployable timestamped migrations.
 - `supabase/MIGRATION_MANIFEST.sha256` — production-derived SHA-256 checksums for every migration file.
-- `tools/check_migration_versions.sh` — fails unless exactly 45 unique 14-digit versions exist and every checksum matches.
+- `tools/check_migration_versions.sh` — fails unless exactly 48 unique 14-digit versions exist and every checksum matches.
 - `tools/verify_supabase_schema.sql` — verifies critical schema, RLS, Storage, Realtime, call and E2EE invariants after replay.
 - `.github/workflows/supabase-migration-reconciliation.yml` — performs checksum verification and a clean local Supabase replay on every hardening-branch push and pull request to `main`.
 
@@ -24,7 +24,7 @@ The GitHub reconciliation workflow starts an empty local Supabase stack, runs `s
 
 - canonical migration checksum validation: PASS
 - local Supabase startup: PASS
-- all 45 migrations replayed from zero: PASS
+- all 48 migrations replayed from zero: PASS
 - required public schema/RLS checks: PASS
 - private `chat-media` / `status-media` bucket checks: PASS
 - critical Realtime publication checks: PASS

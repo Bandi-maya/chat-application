@@ -547,7 +547,9 @@ class RichChatRealtimeService extends ChangeNotifier {
     if (channel != null) {
       try {
         await _client.removeChannel(channel);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Chaty realtime: channel removal notice: $e');
+      }
     }
     _presenceByUserId.clear();
     _lastSeenByUserId.clear();

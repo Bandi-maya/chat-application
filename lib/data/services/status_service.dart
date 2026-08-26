@@ -154,7 +154,9 @@ class StatusService {
                 avatarInitials: profile?.avatarInitials,
                 avatarColorHex: profile?.avatarColorHex,
               );
-            } catch (_) {}
+            } catch (e) {
+              debugPrint('StatusService: failed to dispatch revocation alert: $e');
+            }
           }
         },
         onError: (Object error) {

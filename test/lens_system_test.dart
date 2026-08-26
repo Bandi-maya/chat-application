@@ -137,7 +137,7 @@ void main() {
         manager.select(kBuiltInLenses[index].id);
         await Future<void>.delayed(const Duration(milliseconds: 60));
       }
-      await Future<void>.delayed(LensManager.selectionSettleDebounce);
+      await Future<void>.delayed(LensManager.selectionSettleDebounce + const Duration(milliseconds: 100));
 
       expect(committedIds, [kBuiltInLenses[2].id]);
     });

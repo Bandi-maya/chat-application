@@ -80,7 +80,9 @@ class OutgoingMessageQueueEngine extends ChangeNotifier {
       final items = await _store.read(userId);
       _healthService?.updateQueuedCount(items.length);
       notifyListeners();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Chaty queue: failed to read queued message count: $e');
+    }
   }
 
   /// Enqueues a message for offline sending or retry.

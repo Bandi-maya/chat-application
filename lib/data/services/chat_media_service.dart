@@ -114,7 +114,9 @@ class ChatMediaService {
               mimeType = 'image/jpeg';
             }
           }
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('Chaty media: optional image compression bypassed: $e');
+        }
       }
     }
 
