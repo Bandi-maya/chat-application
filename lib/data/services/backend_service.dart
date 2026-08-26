@@ -18,6 +18,7 @@ import 'connection_health_service.dart';
 import 'local_snapshot_cache_service.dart';
 import 'message_transport_compatibility_service.dart';
 import 'mls_e2ee_service.dart';
+import 'outgoing_message_queue_engine.dart';
 import 'pending_secure_send_store.dart';
 import 'snapshot_codec.dart';
 
@@ -242,7 +243,11 @@ class ChatyBackendService extends ChangeNotifier {
   /// visible state; failures here leave the cached UI intact.
   Future<void> _refreshAuthenticatedSession(Session session) async {
     await _hydrateAuthenticatedState();
-    unawaited(_retryPendingSecureSends(session.user.id));
+    if (locator.isRegistered<OutgoingMessageQueueEngine>()) {
+      unawaited(locator<OutgoingMessageQueueEngine>().processQueue());
+    } else {
+      unawaited(_retryPendingSecureSends(session.user.id));
+    }
   }
 
   AuthSession _mapSession(Session session) {
@@ -759,7 +764,11 @@ class ChatyBackendService extends ChangeNotifier {
       }
       final currentUserId = _currentSession?.userId;
       if (currentUserId != null) {
-        unawaited(_retryPendingSecureSends(currentUserId));
+        if (locator.isRegistered<OutgoingMessageQueueEngine>()) {
+          unawaited(locator<OutgoingMessageQueueEngine>().processQueue());
+        } else {
+          unawaited(_retryPendingSecureSends(currentUserId));
+        }
       }
       notifyListeners();
       eventBus.publish(

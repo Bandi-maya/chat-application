@@ -9,7 +9,6 @@ import '../../domain/models/connection_health.dart';
 import '../../injection/locator.dart';
 import 'backend_service.dart';
 import 'connection_health_service.dart';
-import 'message_transport_compatibility_service.dart';
 import 'pending_secure_send_store.dart';
 
 /// Robust outgoing message queue engine that handles:
@@ -99,6 +98,33 @@ class OutgoingMessageQueueEngine extends ChangeNotifier {
     }
   }
 
+  Future<void> _sendQueuedItem(PendingSecureSend item) async {
+    await _backend.sendMessage(
+      conversationId: item.conversationId,
+      text: item.text,
+      type: messageTypeFromDatabase(item.type),
+      attachment: item.attachment == null
+          ? null
+          : MessageAttachment(
+              id: item.attachment!['id']?.toString() ?? '',
+              type: item.attachment!['type']?.toString() ?? 'file',
+              name: item.attachment!['name']?.toString() ?? '',
+              size: item.attachment!['size']?.toString() ?? '',
+              url: item.attachment!['url']?.toString(),
+              durationSeconds: int.tryParse(
+                    '${item.attachment!['duration_seconds'] ?? 0}',
+                  ) ??
+                  0,
+            ),
+      replyToMessageId: item.replyToMessageId,
+      replyToPreviewText: item.replyToPreviewText,
+      replyToSenderName: item.replyToSenderName,
+      linkedTaskId: item.linkedTaskId,
+      extraMetadata: item.metadata,
+      clientMessageId: item.clientMessageId,
+    );
+  }
+
   /// Manually retries a specific message by clientMessageId, bypassing backoff timer.
   Future<bool> retryMessage(String clientMessageId) async {
     final userId = _backend.currentUser?.id;
@@ -112,42 +138,7 @@ class OutgoingMessageQueueEngine extends ChangeNotifier {
     if (target == null) return false;
 
     try {
-      final compatService = locator.isRegistered<MessageTransportCompatibilityService>()
-          ? locator<MessageTransportCompatibilityService>()
-          : null;
-
-      if (compatService != null &&
-          await compatService.conversationRequiresLegacyTransport(target.conversationId)) {
-        await compatService.deliverLegacyMessage(
-          target,
-          fallbackType: messageTypeFromDatabase(target.type),
-        );
-      } else {
-        await _backend.sendMessage(
-          conversationId: target.conversationId,
-          text: target.text,
-          type: messageTypeFromDatabase(target.type),
-          attachment: target.attachment == null
-              ? null
-              : MessageAttachment(
-                  id: target.attachment!['id']?.toString() ?? '',
-                  type: target.attachment!['type']?.toString() ?? 'file',
-                  name: target.attachment!['name']?.toString() ?? '',
-                  size: target.attachment!['size']?.toString() ?? '',
-                  url: target.attachment!['url']?.toString(),
-                  durationSeconds: int.tryParse(
-                        '${target.attachment!['duration_seconds'] ?? 0}',
-                      ) ??
-                      0,
-                ),
-          replyToMessageId: target.replyToMessageId,
-          replyToPreviewText: target.replyToPreviewText,
-          replyToSenderName: target.replyToSenderName,
-          linkedTaskId: target.linkedTaskId,
-          extraMetadata: target.metadata,
-          clientMessageId: target.clientMessageId,
-        );
-      }
+      await _sendQueuedItem(target);
       await _store.remove(userId, clientMessageId);
       await _updateQueuedCount();
       return true;
@@ -196,43 +187,7 @@ class OutgoingMessageQueueEngine extends ChangeNotifier {
           }
 
           try {
-            final compatService =
-                locator.isRegistered<MessageTransportCompatibilityService>()
-                    ? locator<MessageTransportCompatibilityService>()
-                    : null;
-
-            if (compatService != null &&
-                await compatService.conversationRequiresLegacyTransport(item.conversationId)) {
-              await compatService.deliverLegacyMessage(
-                item,
-                fallbackType: messageTypeFromDatabase(item.type),
-              );
-            } else {
-              await _backend.sendMessage(
-                conversationId: item.conversationId,
-                text: item.text,
-                type: messageTypeFromDatabase(item.type),
-                attachment: item.attachment == null
-                    ? null
-                    : MessageAttachment(
-                        id: item.attachment!['id']?.toString() ?? '',
-                        type: item.attachment!['type']?.toString() ?? 'file',
-                        name: item.attachment!['name']?.toString() ?? '',
-                        size: item.attachment!['size']?.toString() ?? '',
-                        url: item.attachment!['url']?.toString(),
-                        durationSeconds: int.tryParse(
-                              '${item.attachment!['duration_seconds'] ?? 0}',
-                            ) ??
-                            0,
-                      ),
-                replyToMessageId: item.replyToMessageId,
-                replyToPreviewText: item.replyToPreviewText,
-                replyToSenderName: item.replyToSenderName,
-                linkedTaskId: item.linkedTaskId,
-                extraMetadata: item.metadata,
-                clientMessageId: item.clientMessageId,
-              );
-            }
+            await _sendQueuedItem(item);
 
             // Successfully sent: remove from store and clear retry trackers
             await _store.remove(userId, item.clientMessageId);
@@ -259,18 +214,6 @@ class OutgoingMessageQueueEngine extends ChangeNotifier {
       _isProcessing = false;
     }
   }
-
-  static MessageType messageTypeFromDatabase(String type) => switch (type) {
-        'image' => MessageType.image,
-        'video' => MessageType.video,
-        'audio' => MessageType.audio,
-        'document' => MessageType.document,
-        'location' => MessageType.location,
-        'contact' => MessageType.contact,
-        'task_card' => MessageType.taskCard,
-        'system' => MessageType.system,
-        _ => MessageType.text,
-      };
 
   @override
   void dispose() {
