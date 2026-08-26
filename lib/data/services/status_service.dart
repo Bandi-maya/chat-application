@@ -83,13 +83,9 @@ class StatusService {
   final Set<String> _revocationAlerted = <String>{};
   final Set<String> _statusAlertSeenIds = <String>{};
   bool _statusAlertBaselineDone = false;
-  StreamSubscription<List<Map<String, dynamic>>>? _viewEventsSub;
-  final Set<String> _statusViewAlerted = <String>{};
-  bool _statusViewBaselineDone = false;
 
   void startRevocationWatch() {
     if (_revocationSub != null) return;
-    _startViewEventsWatch();
     _revocationSub = _client
         .from('status_updates')
         .stream(primaryKey: const <String>['id'])
@@ -168,69 +164,16 @@ class StatusService {
       );
   }
 
-  void _startViewEventsWatch() {
-    if (_viewEventsSub != null) return;
-    _viewEventsSub = _client
-        .from('status_view_events')
-        .stream(primaryKey: const <String>['id'])
-        .listen(
-          (rows) {
-            final myId = _client.auth.currentUser?.id;
-            if (myId == null || myId.isEmpty) return;
-            final baselineBatch = !_statusViewBaselineDone;
-            for (final raw in rows) {
-              final row = Map<String, dynamic>.from(raw);
-              final ownerId = row['status_owner_id']?.toString() ?? '';
-              if (ownerId != myId) continue;
-              final viewerId = row['viewer_id']?.toString() ?? '';
-              final statusId = row['status_id']?.toString() ?? '';
-              if (viewerId.isEmpty || viewerId == myId) continue;
-              final key = '$statusId:$viewerId';
-              if (_statusViewAlerted.contains(key)) continue;
-              _statusViewAlerted.add(key);
-              if (baselineBatch) continue;
-              if (!_preferences.notification.enableGlobalNotifications) continue;
-              if (!_preferences.notification.notifyStatusViewed) continue;
-              try {
-                final profile = locator<ChatyBackendService>().getUserById(
-                  viewerId,
-                );
-                locator<ChatyNotificationService>().triggerEventNotification(
-                  title: 'Status viewed',
-                  body:
-                      '${profile?.displayName ?? 'Someone'}'
-                      ' viewed your status.',
-                  icon: Icons.visibility_rounded,
-                  color: const Color(0xFF10B981),
-                  userId: viewerId,
-                  avatarInitials: profile?.avatarInitials,
-                  avatarColorHex: profile?.avatarColorHex,
-                );
-              } catch (_) {}
-            }
-            _statusViewBaselineDone = true;
-          },
-          onError: (Object error) {
-            debugPrint('StatusService status_view_events stream unavailable: $error');
-          },
-          cancelOnError: false,
-        );
-  }
-
   void resetRevocationTracking() {
     _revocationSeenAlive.clear();
     _revocationAlerted.clear();
     _statusAlertSeenIds.clear();
     _statusAlertBaselineDone = false;
-    _statusViewAlerted.clear();
-    _statusViewBaselineDone = false;
   }
 
   void stopRevocationWatch() {
     _revocationSub?.cancel();
     _revocationSub = null;
-    _viewEventsSub?.cancel();
-    _viewEventsSub = null;
     resetRevocationTracking();
   }
 

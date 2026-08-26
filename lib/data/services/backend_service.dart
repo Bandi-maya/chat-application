@@ -519,12 +519,38 @@ class ChatyBackendService extends ChangeNotifier {
     if (row['encryption_protocol'] != MlsE2eeService.protocolSuite) return row;
     if (row['deleted_at'] != null) return row;
 
+    final senderId = row['sender_id']?.toString() ?? '';
+    final senderDeviceId = row['sender_device_id']?.toString() ?? '';
+    final currentUserId = _client.auth.currentUser?.id;
+    final mls = locator.isRegistered<MlsE2eeService>() ? locator<MlsE2eeService>() : null;
+    final currentDeviceId = mls?.currentDeviceId;
+
+    // If this message was sent by the current user from this local MLS device,
+    // do not feed it back through processMessage(). Use the existing local text / optimistic payload.
+    if (currentUserId != null &&
+        senderId == currentUserId &&
+        currentDeviceId != null &&
+        senderDeviceId == currentDeviceId) {
+      final existing = (_messagesByChatId[conversationId] ?? const <ChatMessage>[])
+          .where((m) => m.id == row['id'] || (row['client_message_id'] != null && m.id == row['client_message_id']))
+          .firstOrNull;
+      if (existing != null && existing.text.isNotEmpty) {
+        row['body'] = existing.text;
+        row['type'] = _messageTypeToDatabase(existing.type);
+        return row;
+      }
+      // If we don't have it in memory, body may already be populated from cached snapshot
+      if (row['body'] != null && row['body'].toString().isNotEmpty) {
+        return row;
+      }
+    }
+
     final ciphertext = row['encrypted_payload']?.toString() ?? '';
-    if (ciphertext.isEmpty || !locator.isRegistered<MlsE2eeService>()) {
+    if (ciphertext.isEmpty || mls == null) {
       return _decryptionFailureRow(row);
     }
     try {
-      final decrypted = await locator<MlsE2eeService>().decryptPayload(
+      final decrypted = await mls.decryptPayload(
         conversationId: conversationId,
         ciphertext: ciphertext,
       );

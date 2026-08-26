@@ -112,14 +112,8 @@ class MlsE2eeService extends ChangeNotifier {
       try {
         engine = await MlsEngine.create(dbPath: dbPath, encryptionKey: dbKey);
       } catch (error) {
-        debugPrint(
-          'Chaty MLS disk storage initialization failed ($error); falling back to in-memory MLS engine.',
-        );
-        try {
-          engine = await MlsEngine.create(dbPath: ':memory:', encryptionKey: dbKey);
-        } catch (inner) {
-          throw MlsStorageInitializationException.fromCause(inner);
-        }
+        debugPrint('Chaty MLS disk storage initialization failed: $error');
+        throw MlsStorageInitializationException.fromCause(error);
       }
 
       final signerBytes = serializeSigner(

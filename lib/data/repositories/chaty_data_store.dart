@@ -112,14 +112,17 @@ class ChatyDataStore extends ChangeNotifier {
     super.dispose();
   }
 
-  UserProfile get currentUser {
+  bool get hasAuthenticatedUser =>
+      _backend.currentUser != null ||
+      Supabase.instance.client.auth.currentUser != null;
+
+  UserProfile? get currentUserOrNull {
     final hydrated = _backend.currentUser;
     if (hydrated != null) return hydrated;
 
     final authUser = Supabase.instance.client.auth.currentUser;
-    if (authUser == null) {
-      throw StateError('No authenticated Chaty user is available.');
-    }
+    if (authUser == null) return null;
+
     final displayName = authUser.userMetadata?['display_name']
         ?.toString()
         .trim();
@@ -140,15 +143,33 @@ class ChatyDataStore extends ChangeNotifier {
       displayName: effectiveName,
       username: effectiveUsername,
       avatarInitials: initials,
-      avatarColorHex:
-          authUser.userMetadata?['avatar_color_hex']?.toString() ??
-          '0xFF6366F1',
-      about: authUser.userMetadata?['about']?.toString() ?? '',
-      presence: PresenceState.offline,
+      avatarColorHex: '0xFF6366F1',
+      about: '',
+      presence: PresenceState.online,
       lastSeenAt: DateTime.now(),
       isVerified: false,
       email: authUser.email ?? '',
       phone: authUser.phone ?? '',
+      safetyNumber: '',
+    );
+  }
+
+  UserProfile get currentUser {
+    final user = currentUserOrNull;
+    if (user != null) return user;
+    // Return a safe placeholder profile instead of throwing during transient unmount/auth transitions
+    return UserProfile(
+      id: '',
+      displayName: 'Chaty User',
+      username: 'user',
+      avatarInitials: 'CU',
+      avatarColorHex: '0xFF6366F1',
+      about: '',
+      presence: PresenceState.offline,
+      lastSeenAt: DateTime.now(),
+      isVerified: false,
+      email: '',
+      phone: '',
       safetyNumber: '',
     );
   }
