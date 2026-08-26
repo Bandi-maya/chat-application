@@ -451,8 +451,17 @@ class RichChatRealtimeService extends ChangeNotifier {
                 ? payload.oldRecord
                 : payload.newRecord;
             final conversationId = row['conversation_id']?.toString() ?? '';
-            if (!_trackedConversationIds.contains(conversationId)) return;
+            final senderId = row['sender_id']?.toString() ?? '';
             final id = row['id']?.toString() ?? '';
+
+            if (payload.eventType == PostgresChangeEvent.insert &&
+                senderId.isNotEmpty &&
+                senderId != _currentUserId &&
+                conversationId.isNotEmpty) {
+              unawaited(markConversationDelivered(conversationId));
+            }
+
+            if (!_trackedConversationIds.contains(conversationId)) return;
             if (payload.eventType == PostgresChangeEvent.delete) {
               _metadataByMessageId.remove(id);
               _senderByMessageId.remove(id);

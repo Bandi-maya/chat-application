@@ -275,6 +275,9 @@ class ChatyBackendService extends ChangeNotifier {
         final mls = locator<MlsE2eeService>();
         await mls.initializeForCurrentSession();
         if (!mls.isReady) {
+          await mls.retryDeviceEnrollment();
+        }
+        if (!mls.isReady) {
           debugPrint('Chaty MLS secure messaging setup is pending device enrollment.');
         }
       }
@@ -1143,6 +1146,17 @@ class ChatyBackendService extends ChangeNotifier {
         errorStr.contains('mls group is not initialized') ||
         errorStr.contains('no key packages available') ||
         errorStr.contains('mls_membership_pending');
+  }
+
+  /// Retries sending a previously enqueued pending secure message directly
+  /// without creating duplicate optimistic messages or re-enqueuing into store.
+  Future<ChatMessage> retryPendingSecureMessage(
+    PendingSecureSend item,
+  ) {
+    return _deliverEncryptedMessage(
+      item,
+      fallbackType: _messageTypeFromDatabase(item.type),
+    );
   }
 
   /// Encrypts and delivers [send], refreshing local state on success.

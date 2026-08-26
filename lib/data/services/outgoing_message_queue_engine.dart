@@ -4,7 +4,6 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../domain/models/chat_message.dart';
 import '../../domain/models/connection_health.dart';
 import '../../injection/locator.dart';
 import 'backend_service.dart';
@@ -99,30 +98,7 @@ class OutgoingMessageQueueEngine extends ChangeNotifier {
   }
 
   Future<void> _sendQueuedItem(PendingSecureSend item) async {
-    await _backend.sendMessage(
-      conversationId: item.conversationId,
-      text: item.text,
-      type: messageTypeFromDatabase(item.type),
-      attachment: item.attachment == null
-          ? null
-          : MessageAttachment(
-              id: item.attachment!['id']?.toString() ?? '',
-              type: item.attachment!['type']?.toString() ?? 'file',
-              name: item.attachment!['name']?.toString() ?? '',
-              size: item.attachment!['size']?.toString() ?? '',
-              url: item.attachment!['url']?.toString(),
-              durationSeconds: int.tryParse(
-                    '${item.attachment!['duration_seconds'] ?? 0}',
-                  ) ??
-                  0,
-            ),
-      replyToMessageId: item.replyToMessageId,
-      replyToPreviewText: item.replyToPreviewText,
-      replyToSenderName: item.replyToSenderName,
-      linkedTaskId: item.linkedTaskId,
-      extraMetadata: item.metadata,
-      clientMessageId: item.clientMessageId,
-    );
+    await _backend.retryPendingSecureMessage(item);
   }
 
   /// Manually retries a specific message by clientMessageId, bypassing backoff timer.
@@ -182,8 +158,8 @@ class OutgoingMessageQueueEngine extends ChangeNotifier {
         for (final item in sortedList) {
           final nextAllowed = _nextAllowedRetryByMessageId[item.clientMessageId];
           if (nextAllowed != null && now.isBefore(nextAllowed)) {
-            // Still in backoff window, skip for now
-            continue;
+            // Still in backoff window; break out of this conversation loop to preserve strict FIFO
+            break;
           }
 
           try {
@@ -193,6 +169,14 @@ class OutgoingMessageQueueEngine extends ChangeNotifier {
             await _store.remove(userId, item.clientMessageId);
             _retryCountByMessageId.remove(item.clientMessageId);
             _nextAllowedRetryByMessageId.remove(item.clientMessageId);
+          } on SecureSendPendingException {
+            // MLS encryption prerequisites (keys/devices) are pending on receiver.
+            // Preserve strict FIFO and stop hammering Supabase for this conversation.
+            // Queue drain will be triggered when an MLS capability/device/key event is received.
+            debugPrint(
+              'Chaty queue send paused for ${item.conversationId}: receiver MLS setup pending.',
+            );
+            break;
           } catch (error) {
             final retries = (_retryCountByMessageId[item.clientMessageId] ?? 0) + 1;
             _retryCountByMessageId[item.clientMessageId] = retries;
@@ -201,10 +185,8 @@ class OutgoingMessageQueueEngine extends ChangeNotifier {
 
             debugPrint('Chaty queue item ${item.clientMessageId} failed (retry $retries): $error');
 
-            // If network is offline or unrecoverable error for this conversation, break out of this conversation loop
-            if (_healthService?.health == ConnectionHealth.offline) {
-              break;
-            }
+            // An earlier message in this conversation failed; stop this conversation queue to maintain FIFO
+            break;
           }
         }
       }
