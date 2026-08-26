@@ -225,102 +225,56 @@ class _VariantSection extends StatelessWidget {
             color: scheme.outlineVariant.withValues(alpha: 0.35),
           ),
         ),
-        child: ExpansionTile(
-          shape: const Border(),
-          collapsedShape: const Border(),
-          leading: Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: scheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: scheme.primary, size: 20),
+        child: ChatyChoiceTile<String>(
+          title: title,
+          subtitle: subtitle,
+          options: options,
+          selectedOption: value,
+          optionLabel: (option) => option,
+          onSelected: onSelected,
+          requireApply: true,
+          previewBuilder: (context, option) => _buildPreview(
+            context,
+            option,
           ),
-          title: Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-          ),
-          subtitle: Text(
-            'Active: ',
-            style: TextStyle(
-              color: scheme.primary,
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
-            ),
-          ),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                subtitle,
-                style: TextStyle(
-                  color: scheme.onSurfaceVariant,
-                  fontSize: 12.5,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildInteractivePicker(context),
-          ],
         ),
       ),
     );
   }
 
-  Widget _buildInteractivePicker(BuildContext context) {
+  Widget _buildPreview(BuildContext context, String option) {
     final scheme = Theme.of(context).colorScheme;
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: options.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 6),
-      itemBuilder: (context, index) {
-        final opt = options[index];
-        final isSelected = opt == value;
-        return InkWell(
-          onTap: () => onSelected(opt),
-          borderRadius: BorderRadius.circular(12),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? scheme.primary.withValues(alpha: 0.12)
-                  : scheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isSelected
-                    ? scheme.primary
-                    : scheme.outlineVariant.withValues(alpha: 0.2),
-                width: isSelected ? 1.5 : 1.0,
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    return AnimatedContainer(
+      duration: reduceMotion
+          ? Duration.zero
+          : const Duration(milliseconds: 180),
+      width: 180,
+      constraints: const BoxConstraints(minHeight: 52),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: scheme.primary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: scheme.primary, size: 20),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Text(
+              kind == _PreviewKind.typography
+                  ? 'Aa · $option'
+                  : option,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: scheme.onSurface,
+                fontWeight: FontWeight.w700,
               ),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    opt,
-                    style: TextStyle(
-                      fontWeight: isSelected
-                          ? FontWeight.w700
-                          : FontWeight.w500,
-                      color: isSelected ? scheme.primary : scheme.onSurface,
-                    ),
-                  ),
-                ),
-                if (isSelected)
-                  Icon(
-                    Icons.check_circle_rounded,
-                    color: scheme.primary,
-                    size: 20,
-                  ),
-              ],
-            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }

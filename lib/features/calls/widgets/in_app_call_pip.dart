@@ -12,7 +12,7 @@ import '../../../ui/core/widgets/app_avatar.dart';
 /// Supports smooth dragging with safe snap boundaries and drag-to-top-center to collapse into Call Island.
 class InAppCallPip extends StatefulWidget {
   final ChatyCallSession session;
-  final RTCVideoRenderer? remoteRenderer;
+  final MediaStream? remoteStream;
   final int durationSeconds;
   final VoidCallback onTap;
   final VoidCallback onCollapseToIsland;
@@ -21,7 +21,7 @@ class InAppCallPip extends StatefulWidget {
   const InAppCallPip({
     super.key,
     required this.session,
-    required this.remoteRenderer,
+    required this.remoteStream,
     required this.durationSeconds,
     required this.onTap,
     required this.onCollapseToIsland,
@@ -33,12 +33,47 @@ class InAppCallPip extends StatefulWidget {
 }
 
 class _InAppCallPipState extends State<InAppCallPip> {
+  final RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
+  bool _rendererReady = false;
   Offset? _position;
   bool _isDragging = false;
   bool _showControls = false;
 
   static const double _pipWidth = 120.0;
   static const double _pipHeight = 175.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeRenderer();
+  }
+
+  Future<void> _initializeRenderer() async {
+    await _remoteRenderer.initialize();
+    if (!mounted) {
+      await _remoteRenderer.dispose();
+      return;
+    }
+    setState(() {
+      _rendererReady = true;
+      _remoteRenderer.srcObject = widget.remoteStream;
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant InAppCallPip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_rendererReady && !identical(oldWidget.remoteStream, widget.remoteStream)) {
+      _remoteRenderer.srcObject = widget.remoteStream;
+    }
+  }
+
+  @override
+  void dispose() {
+    _remoteRenderer.srcObject = null;
+    _remoteRenderer.dispose();
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
@@ -131,10 +166,10 @@ class _InAppCallPipState extends State<InAppCallPip> {
               // Remote video or avatar fallback
               if (widget.session.isVideo &&
                   !widget.session.isCameraOff &&
-                  widget.remoteRenderer != null &&
-                  widget.remoteRenderer!.srcObject != null)
+                  _rendererReady &&
+                  _remoteRenderer.srcObject != null)
                 RTCVideoView(
-                  widget.remoteRenderer!,
+                  _remoteRenderer,
                   objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
                 )
               else

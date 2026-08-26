@@ -160,7 +160,12 @@ class StatusService {
               );
             } catch (_) {}
           }
-        });
+        },
+        onError: (Object error) {
+          debugPrint('StatusService status_updates stream error: $error');
+        },
+        cancelOnError: false,
+      );
   }
 
   void _startViewEventsWatch() {
@@ -168,42 +173,48 @@ class StatusService {
     _viewEventsSub = _client
         .from('status_view_events')
         .stream(primaryKey: const <String>['id'])
-        .listen((rows) {
-          final myId = _client.auth.currentUser?.id;
-          if (myId == null || myId.isEmpty) return;
-          final baselineBatch = !_statusViewBaselineDone;
-          for (final raw in rows) {
-            final row = Map<String, dynamic>.from(raw);
-            final ownerId = row['status_owner_id']?.toString() ?? '';
-            if (ownerId != myId) continue;
-            final viewerId = row['viewer_id']?.toString() ?? '';
-            final statusId = row['status_id']?.toString() ?? '';
-            if (viewerId.isEmpty || viewerId == myId) continue;
-            final key = '$statusId:$viewerId';
-            if (_statusViewAlerted.contains(key)) continue;
-            _statusViewAlerted.add(key);
-            if (baselineBatch) continue;
-            if (!_preferences.notification.enableGlobalNotifications) continue;
-            if (!_preferences.notification.notifyStatusViewed) continue;
-            try {
-              final profile = locator<ChatyBackendService>().getUserById(
-                viewerId,
-              );
-              locator<ChatyNotificationService>().triggerEventNotification(
-                title: 'Status viewed',
-                body:
-                    '${profile?.displayName ?? 'Someone'}'
-                    ' viewed your status.',
-                icon: Icons.visibility_rounded,
-                color: const Color(0xFF10B981),
-                userId: viewerId,
-                avatarInitials: profile?.avatarInitials,
-                avatarColorHex: profile?.avatarColorHex,
-              );
-            } catch (_) {}
-          }
-          _statusViewBaselineDone = true;
-        });
+        .listen(
+          (rows) {
+            final myId = _client.auth.currentUser?.id;
+            if (myId == null || myId.isEmpty) return;
+            final baselineBatch = !_statusViewBaselineDone;
+            for (final raw in rows) {
+              final row = Map<String, dynamic>.from(raw);
+              final ownerId = row['status_owner_id']?.toString() ?? '';
+              if (ownerId != myId) continue;
+              final viewerId = row['viewer_id']?.toString() ?? '';
+              final statusId = row['status_id']?.toString() ?? '';
+              if (viewerId.isEmpty || viewerId == myId) continue;
+              final key = '$statusId:$viewerId';
+              if (_statusViewAlerted.contains(key)) continue;
+              _statusViewAlerted.add(key);
+              if (baselineBatch) continue;
+              if (!_preferences.notification.enableGlobalNotifications) continue;
+              if (!_preferences.notification.notifyStatusViewed) continue;
+              try {
+                final profile = locator<ChatyBackendService>().getUserById(
+                  viewerId,
+                );
+                locator<ChatyNotificationService>().triggerEventNotification(
+                  title: 'Status viewed',
+                  body:
+                      '${profile?.displayName ?? 'Someone'}'
+                      ' viewed your status.',
+                  icon: Icons.visibility_rounded,
+                  color: const Color(0xFF10B981),
+                  userId: viewerId,
+                  avatarInitials: profile?.avatarInitials,
+                  avatarColorHex: profile?.avatarColorHex,
+                );
+              } catch (_) {}
+            }
+            _statusViewBaselineDone = true;
+          },
+          onError: (Object error) {
+            debugPrint('StatusService status_view_events stream unavailable: $error');
+          },
+          cancelOnError: false,
+        );
   }
 
   void resetRevocationTracking() {

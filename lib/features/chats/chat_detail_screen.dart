@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import '../../ui/core/formatting/chat_formatters.dart';
@@ -121,6 +122,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   bool get _isSelectionMode => _selectedMessageIds.isNotEmpty;
 
+  ChatyPreferencesController get _preferences => widget.preferencesController;
+
   ThemeConfig get _theme => GbThemeOverrides.resolve(
     widget.themeController?.globalTheme ?? widget.theme,
     widget.preferencesController,
@@ -194,10 +197,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   /// Whether a failure means MLS encryption is still being provisioned for
   /// this conversation — a temporary, recoverable state rather than an error.
-  bool _isSecureSetupPendingError(String rawError) =>
-      rawError.contains(ChatyBackendService.secureSetupPendingCode) ||
-      rawError.contains('MLS group is not initialized') ||
-      rawError.contains('MlsMembershipPendingException');
+  bool _isSecureSetupPendingError(String rawError) {
+    final lower = rawError.toLowerCase();
+    return rawError.contains(ChatyBackendService.secureSetupPendingCode) ||
+        lower.contains('mls group is not initialized') ||
+        lower.contains('every conversation member must register an mls device') ||
+        lower.contains('must register an mls device') ||
+        lower.contains('no key packages available') ||
+        rawError.contains('MlsMembershipPendingException');
+  }
 
   Future<void> _refreshConnectionStatus() async {
     final conversation = widget.dataStore.conversations
@@ -362,21 +370,32 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       final raw = error.toString();
       if (_isSecureSetupPendingError(raw)) {
         await _realtime.trackConversation(widget.conversationId);
+        if (!mounted) return;
         _scrollToBottom();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Message queued — sending automatically once secure setup finishes.',
-            ),
-          ),
+        final bgColor = _preferences.gbColor('abu_saleh_toast_status_bc') ??
+            const Color(0xFF6366F1);
+        ChatyToast.show(
+          context,
+          'Message queued. Sending securely in background...',
+          background: bgColor,
         );
       } else {
         _textCtrl.text = text;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(raw.replaceFirst('Exception: ', ''))),
+        String userFriendlyMsg = 'Could not send message. Please check your connection.';
+        if (raw.contains('Authentication required')) {
+          userFriendlyMsg = 'Session expired. Please re-open or log in.';
+        } else if (raw.contains('Conversation not found')) {
+          userFriendlyMsg = 'Conversation could not be loaded.';
+        }
+        final bgColor = _preferences.gbColor('abu_saleh_toast_status_bc') ??
+            const Color(0xFFEF4444);
+        ChatyToast.show(
+          context,
+          userFriendlyMsg,
+          background: bgColor,
         );
       }
-      setState(() {});
+      if (mounted) setState(() {});
     }
   }
 
@@ -571,21 +590,31 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   ///   in the badge on the floating down-arrow instead;
   /// - own outgoing messages always scroll down (handled by _sendMessage).
   void _onDataStoreChanged() {
-    final count = _currentMessageCount;
-    final previous = _lastKnownMessageCount;
-    if (count == previous) return;
-    _lastKnownMessageCount = count;
-    final grew = count > previous;
     if (!mounted) return;
-    if (!grew) {
-      if (_pendingBelowCount != 0) setState(() => _pendingBelowCount = 0);
-      return;
+    void update() {
+      if (!mounted) return;
+      final count = _currentMessageCount;
+      final previous = _lastKnownMessageCount;
+      if (count == previous) return;
+      _lastKnownMessageCount = count;
+      final grew = count > previous;
+      if (!grew) {
+        if (_pendingBelowCount != 0) setState(() => _pendingBelowCount = 0);
+        return;
+      }
+      if (_isNearBottom) {
+        _scrollToBottom();
+        if (_pendingBelowCount != 0) setState(() => _pendingBelowCount = 0);
+      } else {
+        setState(() => _pendingBelowCount += count - previous);
+      }
     }
-    if (_isNearBottom) {
-      _scrollToBottom();
-      if (_pendingBelowCount != 0) setState(() => _pendingBelowCount = 0);
+
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => update());
     } else {
-      setState(() => _pendingBelowCount += count - previous);
+      update();
     }
   }
 
@@ -2682,14 +2711,15 @@ class _ComposerState extends State<_Composer>
   static const double _dbFloor = -60;
   final List<double> _levels = List<double>.filled(_barCount, 0.0);
   Timer? _levelTimer;
-  late final AnimationController _pulse = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  );
+  late final AnimationController _pulse;
 
   @override
   void initState() {
     super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
     if (widget.recording) {
       _pulse.repeat(reverse: true);
       _startLevelPolling();

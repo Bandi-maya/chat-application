@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../ui/core/design_system/design_system.dart';
-import '../../ui/core/design_system/settings_primitives.dart';
 import '../../ui/core/menu/app_context_menu.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../data/repositories/chaty_data_store.dart';

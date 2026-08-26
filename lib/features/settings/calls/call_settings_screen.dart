@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../../data/repositories/chaty_data_store.dart';
 import '../../../injection/locator.dart';
@@ -5,12 +7,25 @@ import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/design_system.dart'
     hide ChatySettingsSection;
 import '../../../ui/core/design_system/settings_primitives.dart';
+import 'call_presentation_preferences.dart';
 
 /// Dedicated canonical settings screen for Audio/Video Calls, privacy exceptions, and island controls.
-class CallSettingsScreen extends StatelessWidget {
+class CallSettingsScreen extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
+  final CallPresentationPreferencesStore? callPreferences;
 
-  const CallSettingsScreen({super.key, required this.preferencesController});
+  const CallSettingsScreen({
+    super.key,
+    required this.preferencesController,
+    this.callPreferences,
+  });
+
+  @override
+  State<CallSettingsScreen> createState() => _CallSettingsScreenState();
+}
+
+class _CallSettingsScreenState extends State<CallSettingsScreen> {
+  late final CallPresentationPreferencesStore _callPreferences;
 
   static const List<String> _audienceOptions = <String>[
     'Everyone',
@@ -18,6 +33,17 @@ class CallSettingsScreen extends StatelessWidget {
     'My Contacts Except…',
     'Nobody',
   ];
+
+  ChatyPreferencesController get preferencesController =>
+      widget.preferencesController;
+
+  @override
+  void initState() {
+    super.initState();
+    _callPreferences =
+        widget.callPreferences ?? CallPresentationPreferencesStore.instance;
+    unawaited(_callPreferences.initialize());
+  }
 
   Future<void> _editCallExceptions(BuildContext context) async {
     final dataStore = locator<ChatyDataStore>();
@@ -83,9 +109,13 @@ class CallSettingsScreen extends StatelessWidget {
     final colors = context.colors;
 
     return ListenableBuilder(
-      listenable: preferencesController,
+      listenable: Listenable.merge(<Listenable>[
+        preferencesController,
+        _callPreferences,
+      ]),
       builder: (context, _) {
         final privacy = preferencesController.privacy;
+        final callPreferences = _callPreferences.value;
 
         return ChatySettingsPage(
           title: 'Calls',
@@ -146,8 +176,10 @@ class CallSettingsScreen extends StatelessWidget {
                   title: 'Dynamic Call Island',
                   subtitle:
                       'Display interactive floating capsule when navigating away from active calls.',
-                  value: true,
-                  onChanged: (val) {},
+                  value: callPreferences.dynamicIslandEnabled,
+                  onChanged: (value) => unawaited(
+                    _callPreferences.setDynamicIslandEnabled(value),
+                  ),
                 ),
                 ChatySwitchTile(
                   icon: Icons.picture_in_picture_rounded,
@@ -155,8 +187,10 @@ class CallSettingsScreen extends StatelessWidget {
                   title: 'Picture-in-Picture Video',
                   subtitle:
                       'Automatically minimize video stream into PiP window when switching apps.',
-                  value: true,
-                  onChanged: (val) {},
+                  value: callPreferences.pictureInPictureEnabled,
+                  onChanged: (value) => unawaited(
+                    _callPreferences.setPictureInPictureEnabled(value),
+                  ),
                 ),
               ],
             ),
@@ -171,8 +205,10 @@ class CallSettingsScreen extends StatelessWidget {
                   title: 'Low Data Usage for Calls',
                   subtitle:
                       'Optimize WebRTC bandwidth consumption on cellular connections.',
-                  value: false,
-                  onChanged: (val) {},
+                  value: callPreferences.lowDataUsageEnabled,
+                  onChanged: (value) => unawaited(
+                    _callPreferences.setLowDataUsageEnabled(value),
+                  ),
                 ),
               ],
             ),

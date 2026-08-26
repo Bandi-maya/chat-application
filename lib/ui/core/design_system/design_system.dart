@@ -9,6 +9,7 @@ export 'components/media_draft_tray.dart';
 export 'components/composer_components.dart';
 export 'components/social_components.dart';
 export 'components/settings_components.dart';
+export 'settings_primitives.dart' hide ChatySettingsSection;
 export 'components/single_choice_modal.dart';
 export 'components/adaptive_split_view.dart';
 // chaty_motion.dart is intentionally NOT re-exported here: tokens/app_tokens.dart

@@ -43,7 +43,7 @@ class AdaptiveSelectionPanel<T> extends StatefulWidget {
     required this.options,
     required this.onSelected,
     this.headerPreview,
-    this.showApplyButton = false,
+    this.showApplyButton = true,
     this.applyButtonText = 'Apply',
     this.isScrollable = true,
   });
@@ -57,12 +57,13 @@ class AdaptiveSelectionPanel<T> extends StatefulWidget {
     required T selectedValue,
     required List<SelectionOptionItem<T>> options,
     Widget? headerPreview,
-    bool showApplyButton = false,
+    bool showApplyButton = true,
+    bool preferCenteredDialog = false,
   }) {
     final media = MediaQuery.of(context);
     final isTablet = media.size.width >= 600;
 
-    if (isTablet) {
+    if (isTablet || preferCenteredDialog) {
       return showDialog<T>(
         context: context,
         barrierDismissible: true,
@@ -73,7 +74,10 @@ class AdaptiveSelectionPanel<T> extends StatefulWidget {
             vertical: 24,
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520, maxHeight: 680),
+            constraints: BoxConstraints(
+              maxWidth: 520,
+              maxHeight: media.size.height * 0.85,
+            ),
             child: AdaptiveSelectionPanel<T>(
               title: title,
               subtitle: subtitle,
@@ -213,6 +217,49 @@ class _AdaptiveSelectionPanelState<T> extends State<AdaptiveSelectionPanel<T>> {
             const SizedBox(height: 6),
           ],
 
+          if (widget.showApplyButton &&
+              widget.options.any(
+                (option) => option.value == _current && option.preview != null,
+              ))
+            Semantics(
+              liveRegion: true,
+              label: 'Selected preview',
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 56),
+                margin: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: colors.surfaceSecondary,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        widget.options
+                            .firstWhere((option) => option.value == _current)
+                            .title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colors.foreground,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    widget.options
+                        .firstWhere((option) => option.value == _current)
+                        .preview!,
+                  ],
+                ),
+              ),
+            ),
+
           Divider(height: 1, color: colors.borderSubtle),
 
           // Options List
@@ -248,7 +295,9 @@ class _AdaptiveSelectionPanelState<T> extends State<AdaptiveSelectionPanel<T>> {
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
               child: ChatyPrimaryButton(
                 text: widget.applyButtonText,
-                onPressed: () => widget.onSelected(_current),
+                onPressed: _current == widget.selectedValue
+                    ? null
+                    : () => widget.onSelected(_current),
               ),
             ),
           ],
@@ -275,138 +324,148 @@ class SelectionOptionTile<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeInOut,
-      decoration: BoxDecoration(
-        color: isSelected
-            ? colors.primary.withValues(alpha: 0.10)
-            : colors.surfaceSecondary.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
+    final motionDuration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 180);
+
+    return Semantics(
+      selected: isSelected,
+      inMutuallyExclusiveGroup: true,
+      button: true,
+      label: option.title,
+      child: AnimatedContainer(
+        duration: motionDuration,
+        curve: Curves.easeInOut,
+        decoration: BoxDecoration(
           color: isSelected
-              ? colors.primary.withValues(alpha: 0.6)
-              : colors.borderSubtle,
-          width: isSelected ? 1.4 : 1.0,
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: onTap,
+              ? colors.primary.withValues(alpha: 0.10)
+              : colors.surfaceSecondary.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Row(
-              children: [
-                // Radio Indicator
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  width: 22,
-                  height: 22,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isSelected ? colors.primary : Colors.transparent,
-                    border: Border.all(
+          border: Border.all(
+            color: isSelected
+                ? colors.primary.withValues(alpha: 0.6)
+                : colors.borderSubtle,
+            width: isSelected ? 1.4 : 1.0,
+          ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  // Radio Indicator
+                  AnimatedContainer(
+                    duration: motionDuration,
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isSelected ? colors.primary : Colors.transparent,
+                      border: Border.all(
+                        color: isSelected
+                            ? colors.primary
+                            : colors.foregroundSecondary.withValues(alpha: 0.5),
+                        width: 2,
+                      ),
+                    ),
+                    child: isSelected
+                        ? Center(
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: colors.onPrimary,
+                              ),
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 14),
+
+                  // Leading Icon if provided
+                  if (option.leadingIcon != null) ...[
+                    Icon(
+                      option.leadingIcon,
+                      size: 20,
                       color: isSelected
                           ? colors.primary
-                          : colors.foregroundSecondary.withValues(alpha: 0.5),
-                      width: 2,
+                          : colors.foregroundSecondary,
                     ),
-                  ),
-                  child: isSelected
-                      ? Center(
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: colors.onPrimary,
-                            ),
-                          ),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 14),
+                    const SizedBox(width: 12),
+                  ],
 
-                // Leading Icon if provided
-                if (option.leadingIcon != null) ...[
-                  Icon(
-                    option.leadingIcon,
-                    size: 20,
-                    color: isSelected
-                        ? colors.primary
-                        : colors.foregroundSecondary,
-                  ),
-                  const SizedBox(width: 12),
-                ],
-
-                // Title & Subtitle
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              option.title,
-                              style: TextStyle(
-                                color: isSelected
-                                    ? colors.primary
-                                    : colors.foreground,
-                                fontSize: 14.5,
-                                fontWeight: isSelected
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          if (option.badgeText != null) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: colors.primary.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
+                  // Title & Subtitle
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
                               child: Text(
-                                option.badgeText!,
+                                option.title,
                                 style: TextStyle(
-                                  color: colors.primary,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
+                                  color: isSelected
+                                      ? colors.primary
+                                      : colors.foreground,
+                                  fontSize: 14.5,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
                                 ),
                               ),
                             ),
+                            if (option.badgeText != null) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colors.primary.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  option.badgeText!,
+                                  style: TextStyle(
+                                    color: colors.primary,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
-                        ],
-                      ),
-                      if (option.subtitle != null &&
-                          option.subtitle!.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          option.subtitle!,
-                          style: TextStyle(
-                            color: colors.foregroundSecondary,
-                            fontSize: 12,
-                          ),
                         ),
+                        if (option.subtitle != null &&
+                            option.subtitle!.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            option.subtitle!,
+                            style: TextStyle(
+                              color: colors.foregroundSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
 
-                // Trailing Preview Widget if present
-                if (option.preview != null) ...[
-                  const SizedBox(width: 10),
-                  option.preview!,
+                  // Trailing Preview Widget if present
+                  if (option.preview != null) ...[
+                    const SizedBox(width: 10),
+                    option.preview!,
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),

@@ -48,7 +48,7 @@ class MlsE2eeService extends ChangeNotifier {
   String? _userId;
   String? _deviceId;
   String? _credentialIdentity;
-  bool _initializing = false;
+  Future<void>? _initializationFuture;
 
   bool get isReady =>
       _engine != null &&
@@ -73,14 +73,21 @@ class MlsE2eeService extends ChangeNotifier {
     );
   }
 
-  Future<void> initializeForCurrentSession() async {
-    if (_initializing) {
-      while (_initializing) {
-        await Future<void>.delayed(const Duration(milliseconds: 20));
-      }
-      return;
-    }
+  Future<void> initializeForCurrentSession() {
+    final active = _initializationFuture;
+    if (active != null) return active;
 
+    late final Future<void> tracked;
+    tracked = _initializeForCurrentSession().whenComplete(() {
+      if (identical(_initializationFuture, tracked)) {
+        _initializationFuture = null;
+      }
+    });
+    _initializationFuture = tracked;
+    return tracked;
+  }
+
+  Future<void> _initializeForCurrentSession() async {
     final user = _client.auth.currentUser;
     if (user == null) {
       await close();
@@ -88,7 +95,6 @@ class MlsE2eeService extends ChangeNotifier {
     }
     if (isReady && _userId == user.id) return;
 
-    _initializing = true;
     try {
       await close();
       await Openmls.init();
@@ -102,10 +108,19 @@ class MlsE2eeService extends ChangeNotifier {
       final support = await getApplicationSupportDirectory();
       final safeUser = userId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
       final dbPath = '${support.path}/chaty_mls_$safeUser.db';
-      final engine = await MlsEngine.create(
-        dbPath: dbPath,
-        encryptionKey: dbKey,
-      );
+      MlsEngine engine;
+      try {
+        engine = await MlsEngine.create(dbPath: dbPath, encryptionKey: dbKey);
+      } catch (error) {
+        debugPrint(
+          'Chaty MLS disk storage initialization failed ($error); falling back to in-memory MLS engine.',
+        );
+        try {
+          engine = await MlsEngine.create(dbPath: ':memory:', encryptionKey: dbKey);
+        } catch (inner) {
+          throw MlsStorageInitializationException.fromCause(inner);
+        }
+      }
 
       final signerBytes = serializeSigner(
         ciphersuite: _ciphersuite,
@@ -128,8 +143,6 @@ class MlsE2eeService extends ChangeNotifier {
     } catch (e) {
       await close();
       rethrow;
-    } finally {
-      _initializing = false;
     }
   }
 
@@ -1039,6 +1052,51 @@ class MlsE2eeException implements Exception {
 
 class MlsMembershipPendingException extends MlsE2eeException {
   const MlsMembershipPendingException(super.message);
+}
+
+enum MlsStorageInitializationFailure {
+  unsupportedPlatformLock,
+  databaseInUse,
+  unavailable,
+}
+
+/// A typed, non-secret-bearing failure raised before MLS state can be opened.
+///
+/// Native bridge errors must not leak database paths into user-facing UI or be
+/// mistaken for transient network errors. In particular, Android versions of
+/// openmls that use `std::fs::File.try_lock` report an unsupported operation;
+/// that is a native-library compatibility fault, not a condition a send retry
+/// can repair. A real lock conflict remains separately identifiable so callers
+/// can wait for the active engine to close.
+class MlsStorageInitializationException extends MlsE2eeException {
+  final MlsStorageInitializationFailure failure;
+
+  const MlsStorageInitializationException._(this.failure, super.message);
+
+  factory MlsStorageInitializationException.fromCause(Object cause) {
+    final normalized = cause.toString().toLowerCase();
+    if (normalized.contains('try_lock() not supported') ||
+        normalized.contains('try_lock not supported') ||
+        (normalized.contains('failed to lock') &&
+            normalized.contains('not supported'))) {
+      return const MlsStorageInitializationException._(
+        MlsStorageInitializationFailure.unsupportedPlatformLock,
+        'Encrypted messaging storage is not supported by this native build.',
+      );
+    }
+    if (normalized.contains('database is already open') ||
+        normalized.contains('another connection or process') ||
+        normalized.contains('database is locked')) {
+      return const MlsStorageInitializationException._(
+        MlsStorageInitializationFailure.databaseInUse,
+        'Encrypted messaging storage is already in use.',
+      );
+    }
+    return const MlsStorageInitializationException._(
+      MlsStorageInitializationFailure.unavailable,
+      'Encrypted messaging storage could not be opened.',
+    );
+  }
 }
 
 class _ClaimedPackages {

@@ -93,6 +93,8 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
       title: 'Bubble Style Geometry',
       subtitle: 'Choose from 48 discrete bubble contours',
       selectedValue: activeId,
+      showApplyButton: true,
+      preferCenteredDialog: true,
       options: BubbleStyleId.values.map((styleId) {
         return SelectionOptionItem<BubbleStyleId>(
           value: styleId,
@@ -137,6 +139,8 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
       title: 'Delivery Tick Style',
       subtitle: 'Choose from 16 custom vector delivery ticks',
       selectedValue: activeStyle,
+      showApplyButton: true,
+      preferCenteredDialog: true,
       options: DeliveryIconStyle.values.map((tickStyle) {
         return SelectionOptionItem<DeliveryIconStyle>(
           value: tickStyle,
@@ -331,6 +335,7 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
             if (conv.enableQuickContactSidebar) ...[
               ChatyChoiceTile<String>(
                 title: 'Sidebar Position',
+                requireApply: true,
                 options: const ['Left', 'Right'],
                 selectedOption: conv.sidebarPosition,
                 optionLabel: (s) => s,
@@ -394,6 +399,7 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
             ),
             ChatyChoiceTile<String>(
               title: 'Double-Tap Reaction Emoji',
+              requireApply: true,
               options: _reactionEmojis,
               selectedOption: conv.doubleTapReactionEmoji,
               optionLabel: (s) => s,
@@ -413,6 +419,7 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
           children: [
             ChatyChoiceTile<String>(
               title: 'Background Wallpaper',
+              requireApply: true,
               options: _wallpaperTypes,
               selectedOption: conv.wallpaperType,
               optionLabel: (s) => s,
@@ -449,6 +456,7 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
             ],
             ChatyChoiceTile<double>(
               title: 'Voice Note Speed',
+              requireApply: true,
               options: _playbackSpeeds,
               selectedOption: conv.voicePlaybackSpeed,
               optionLabel: (v) => '${v}x',

@@ -1,4 +1,3 @@
-import 'package:animated_emoji/animated_emoji.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -41,13 +40,13 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
   late final TabController _tabController;
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
-  List<AnimatedEmojiData> _filteredAnimated = const <AnimatedEmojiData>[];
+  List<ChatyEmojiEntry> _filteredAnimated = const <ChatyEmojiEntry>[];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _filteredAnimated = ChatyEmojiRegistry.allAnimated;
+    _filteredAnimated = ChatyEmojiRegistry.entries;
     _searchCtrl.addListener(_onSearchChanged);
   }
 
@@ -57,13 +56,10 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
     setState(() {
       _searchQuery = q;
       if (q.isEmpty) {
-        _filteredAnimated = ChatyEmojiRegistry.allAnimated;
+        _filteredAnimated = ChatyEmojiRegistry.entries;
       } else {
-        _filteredAnimated = ChatyEmojiRegistry.allAnimated
-            .where((e) {
-              return e.id.toLowerCase().contains(q) ||
-                  e.toUnicodeEmoji().contains(q);
-            })
+        _filteredAnimated = ChatyEmojiRegistry.entries
+            .where((entry) => entry.matches(q))
             .toList(growable: false);
       }
     });
@@ -182,37 +178,72 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
                     style: TextStyle(color: colorScheme.onSurfaceVariant),
                   ),
                 )
-              : GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 5,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                  ),
-                  itemCount: _filteredAnimated.length,
-                  itemBuilder: (context, index) {
-                    final emojiData = _filteredAnimated[index];
-                    final unicode = emojiData.toUnicodeEmoji();
-                    return Material(
-                      color: colorScheme.surfaceContainerHighest.withValues(
-                        alpha: 0.35,
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final textScale = MediaQuery.textScalerOf(context).scale(1);
+                    final columns =
+                        (constraints.maxWidth / (textScale > 1.3 ? 88 : 72))
+                            .floor()
+                            .clamp(3, 6);
+                    return GridView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: columns,
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 10,
+                        childAspectRatio: 0.82,
                       ),
-                      borderRadius: BorderRadius.circular(14),
-                      child: InkWell(
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          Navigator.of(context).pop(unicode);
-                        },
-                        borderRadius: BorderRadius.circular(14),
-                        child: Center(
-                          child: AnimatedEmojiView(
-                            unicode: unicode,
-                            size: 38.0,
-                            animate: true,
-                            mode: EmojiDisplayMode.picker,
+                      itemCount: _filteredAnimated.length,
+                      itemBuilder: (context, index) {
+                        final entry = _filteredAnimated[index];
+                        final unicode = entry.unicode;
+                        return Material(
+                          color: colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.35,
                           ),
-                        ),
-                      ),
+                          borderRadius: BorderRadius.circular(14),
+                          child: InkWell(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              Navigator.of(context).pop(unicode);
+                            },
+                            borderRadius: BorderRadius.circular(14),
+                            child: Semantics(
+                              button: true,
+                              label: entry.label,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 6,
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    AnimatedEmojiView(
+                                      unicode: unicode,
+                                      size: 36.0,
+                                      animate: !MediaQuery.disableAnimationsOf(
+                                        context,
+                                      ),
+                                      mode: EmojiDisplayMode.picker,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      entry.label,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.center,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.labelSmall,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     );
                   },
                 ),

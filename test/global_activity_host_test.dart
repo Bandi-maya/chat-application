@@ -2,8 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:chat/ui/core/design_system/components/call_activity_capsule.dart';
 import 'package:chat/ui/core/design_system/components/global_activity_host.dart';
+import 'package:chat/features/calls/call_presentation_controller.dart';
 
 void main() {
+  setUp(() {
+    CallPresentationController.presentationModeSignal.value =
+        CallPresentationMode.none;
+  });
+
   testWidgets(
     'global activity host preserves routed child and activity slots',
     (tester) async {
@@ -36,6 +42,34 @@ void main() {
 
     expect(find.text('route-only'), findsOneWidget);
     expect(find.byType(AnimatedSwitcher), findsNWidgets(3));
+  });
+
+  testWidgets('specialized call presentation suppresses generic capsule', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChatyGlobalActivityHost(
+          primaryActivity: ChatyCallActivityCapsule(
+            contactName: 'Ada Lovelace',
+            status: 'Connected',
+            isVideo: true,
+            isSpeaker: false,
+            onOpen: () {},
+            onToggleSpeaker: () {},
+            onHangUp: () {},
+          ),
+          child: const Text('route-content'),
+        ),
+      ),
+    );
+
+    expect(find.text('Ada Lovelace'), findsOneWidget);
+    CallPresentationController.presentationModeSignal.value =
+        CallPresentationMode.inAppVideoPip;
+    await tester.pump();
+    expect(find.text('Ada Lovelace'), findsNothing);
+    expect(find.text('route-content'), findsOneWidget);
   });
 
   testWidgets('minimized call capsule renders above routes and fires actions', (

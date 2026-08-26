@@ -639,7 +639,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
                 if (showFloatingVideo)
                   InAppCallPip(
                     session: callSession,
-                    remoteRenderer: null,
+                    remoteStream: _callService.remoteStream,
                     durationSeconds: _callService.callDurationSeconds,
                     onTap: () => unawaited(_openOngoingCall(currentTheme)),
                     onCollapseToIsland: () => presentation.collapseToIsland(),

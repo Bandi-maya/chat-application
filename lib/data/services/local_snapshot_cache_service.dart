@@ -54,10 +54,22 @@ class LocalSnapshotCacheService {
         'm': base64Encode(box.mac.bytes),
       };
       final file = await _fileFor(userId, scope);
+      await file.parent.create(recursive: true);
       final tmp = File('${file.path}.tmp');
-      await tmp.writeAsString(jsonEncode(envelope), flush: true);
-      if (await file.exists()) await file.delete();
-      await tmp.rename(file.path);
+      final content = jsonEncode(envelope);
+      await tmp.writeAsString(content, flush: true);
+      try {
+        if (await file.exists()) await file.delete();
+        await tmp.rename(file.path);
+      } catch (_) {
+        // Fallback for filesystems/sandboxes that fail on atomic rename
+        await file.writeAsString(content, flush: true);
+        if (await tmp.exists()) {
+          try {
+            await tmp.delete();
+          } catch (_) {}
+        }
+      }
     } catch (error, stackTrace) {
       debugPrint('Chaty snapshot write skipped [$scope]: $error\n$stackTrace');
     }

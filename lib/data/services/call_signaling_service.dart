@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../domain/models/call_state.dart';
 import '../../domain/models/other_models.dart';
+import '../../features/settings/calls/call_presentation_preferences.dart';
 import '../repositories/chaty_data_store.dart';
 import 'backend_service.dart';
 
@@ -33,6 +34,7 @@ class CallSignalingService extends ChangeNotifier {
   MediaStream? _localStream;
   MediaStream? _remoteStream;
   final List<RTCIceCandidate> _queuedRemoteCandidates = <RTCIceCandidate>[];
+  final Set<String> _processedRemoteCandidateIds = <String>{};
   bool _remoteDescriptionReady = false;
 
   RealtimeChannel? _sessionChannel;
@@ -40,6 +42,8 @@ class CallSignalingService extends ChangeNotifier {
   StreamSubscription<AuthState>? _authSubscription;
   bool _initialized = false;
   Future<void>? _initializeFuture;
+  Future<void>? _signalingReconnectFuture;
+  bool _databaseSignalingReady = false;
 
   CallSignalingService({
     SupabaseClient? client,
@@ -53,6 +57,7 @@ class CallSignalingService extends ChangeNotifier {
   MediaStream? get remoteStream => _remoteStream;
   bool get hasLocalMedia => _localStream != null;
   bool get hasRemoteMedia => _remoteStream != null;
+  bool get databaseSignalingReady => _databaseSignalingReady;
 
   bool get isInActiveCall =>
       _currentSession != null &&
@@ -80,6 +85,21 @@ class CallSignalingService extends ChangeNotifier {
       await _hydrateLatestIncomingCall();
     }
     _initialized = true;
+  }
+
+  /// Rebuilds realtime channels after Android/iOS may have suspended the
+  /// process network connection. Unlike [initialize], this always performs a
+  /// fresh subscription and reconciles missed incoming-call state.
+  Future<void> reconnectSignaling() {
+    if (_client.auth.currentSession == null) return Future<void>.value();
+    return _signalingReconnectFuture ??= _reconnectSignaling().whenComplete(() {
+      _signalingReconnectFuture = null;
+    });
+  }
+
+  Future<void> _reconnectSignaling() async {
+    await _subscribeDatabaseSignaling();
+    await _hydrateLatestIncomingCall();
   }
 
   /// Starts a real outgoing WebRTC call. The direct conversation and call row
@@ -467,14 +487,24 @@ class CallSignalingService extends ChangeNotifier {
 
   Future<void> _openLocalMedia({required bool isVideo}) async {
     if (_localStream != null) return;
+    final callPreferences = CallPresentationPreferencesStore.instance;
+    await callPreferences.initialize();
+    final lowData = callPreferences.value.lowDataUsageEnabled;
     _localStream = await navigator.mediaDevices.getUserMedia(<String, dynamic>{
-      'audio': true,
+      'audio': lowData
+          ? <String, dynamic>{
+              'echoCancellation': true,
+              'noiseSuppression': true,
+              'autoGainControl': true,
+              'channelCount': 1,
+            }
+          : true,
       'video': isVideo
           ? <String, dynamic>{
               'facingMode': 'user',
-              'width': <String, dynamic>{'ideal': 1280},
-              'height': <String, dynamic>{'ideal': 720},
-              'frameRate': <String, dynamic>{'ideal': 30},
+              'width': <String, dynamic>{'ideal': lowData ? 640 : 1280},
+              'height': <String, dynamic>{'ideal': lowData ? 360 : 720},
+              'frameRate': <String, dynamic>{'ideal': lowData ? 15 : 30},
             }
           : false,
     });
@@ -505,9 +535,13 @@ class CallSignalingService extends ChangeNotifier {
   Future<void> _subscribeDatabaseSignaling() async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return;
+    _databaseSignalingReady = false;
     await _removeDatabaseChannels();
+    final sessionsReady = Completer<void>();
+    final candidatesReady = Completer<void>();
 
     final sessionChannel = _client.channel('chaty-call-sessions-$userId');
+    _sessionChannel = sessionChannel;
     sessionChannel
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
@@ -518,10 +552,16 @@ class CallSignalingService extends ChangeNotifier {
             if (row.isNotEmpty) unawaited(_handleCallSessionRow(row));
           },
         )
-        .subscribe();
-    _sessionChannel = sessionChannel;
+        .subscribe((status, error) {
+          _handleSignalingStatus('sessions', status, error);
+          if (status == RealtimeSubscribeStatus.subscribed &&
+              !sessionsReady.isCompleted) {
+            sessionsReady.complete();
+          }
+        });
 
     final candidateChannel = _client.channel('chaty-call-candidates-$userId');
+    _candidateChannel = candidateChannel;
     candidateChannel
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
@@ -532,8 +572,67 @@ class CallSignalingService extends ChangeNotifier {
             if (row.isNotEmpty) unawaited(_handleRemoteCandidateRow(row));
           },
         )
-        .subscribe();
-    _candidateChannel = candidateChannel;
+        .subscribe((status, error) {
+          _handleSignalingStatus('candidates', status, error);
+          if (status == RealtimeSubscribeStatus.subscribed &&
+              !candidatesReady.isCompleted) {
+            candidatesReady.complete();
+          }
+        });
+    try {
+      await Future.wait<void>([
+        sessionsReady.future,
+        candidatesReady.future,
+      ]).timeout(const Duration(seconds: 12));
+    } catch (error) {
+      debugPrint('Chaty call signaling channels subscription delayed or timed out: $error');
+    }
+    await _reconcileRemoteCandidates();
+  }
+
+  Future<void> _reconcileRemoteCandidates() async {
+    final session = _currentSession;
+    final myId = _client.auth.currentUser?.id;
+    if (session == null || myId == null || _peerConnection == null) return;
+    try {
+      final rows = await _client
+          .from('call_ice_candidates')
+          .select()
+          .eq('call_id', session.callId)
+          .neq('sender_id', myId)
+          .order('created_at');
+      for (final row in rows) {
+        await _handleRemoteCandidateRow(Map<String, dynamic>.from(row));
+      }
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Chaty ICE candidate reconciliation failed: $error\n$stackTrace',
+      );
+    }
+  }
+
+  bool _sessionSubscribed = false;
+  bool _candidateSubscribed = false;
+
+  void _handleSignalingStatus(
+    String channel,
+    RealtimeSubscribeStatus status,
+    Object? error,
+  ) {
+    if (channel == 'sessions') {
+      _sessionSubscribed = status == RealtimeSubscribeStatus.subscribed;
+    } else if (channel == 'candidates') {
+      _candidateSubscribed = status == RealtimeSubscribeStatus.subscribed;
+    }
+
+    final ready = _sessionSubscribed && _candidateSubscribed;
+    if (_databaseSignalingReady != ready) {
+      _databaseSignalingReady = ready;
+      notifyListeners();
+    }
+    if (error != null) {
+      debugPrint('Chaty call $channel signaling error ($status): $error');
+    }
   }
 
   Future<void> _hydrateLatestIncomingCall() async {
@@ -707,6 +806,9 @@ class CallSignalingService extends ChangeNotifier {
     if (row['call_id']?.toString() != session.callId) return;
     if (row['sender_id']?.toString() == myId) return;
 
+    final rowId = row['id']?.toString();
+    if (rowId != null && !_processedRemoteCandidateIds.add(rowId)) return;
+
     final candidateText = row['candidate']?.toString();
     if (candidateText == null || candidateText.isEmpty) return;
     final indexRaw = row['sdp_mline_index'];
@@ -836,6 +938,7 @@ class CallSignalingService extends ChangeNotifier {
   Future<void> _disposeMediaTransport() async {
     _remoteDescriptionReady = false;
     _queuedRemoteCandidates.clear();
+    _processedRemoteCandidateIds.clear();
     final local = _localStream;
     final remote = _remoteStream;
     final screen = _screenStream;
@@ -871,6 +974,10 @@ class CallSignalingService extends ChangeNotifier {
     final candidates = _candidateChannel;
     _sessionChannel = null;
     _candidateChannel = null;
+    if (_databaseSignalingReady) {
+      _databaseSignalingReady = false;
+      notifyListeners();
+    }
     if (sessions != null) await _client.removeChannel(sessions);
     if (candidates != null) await _client.removeChannel(candidates);
   }

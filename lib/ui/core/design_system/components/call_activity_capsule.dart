@@ -2,6 +2,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../../../features/calls/call_presentation_controller.dart';
+
 /// Compact global call surface shown above any Chaty screen while a call is
 /// active. Android's foreground notification remains the system-level surface;
 /// this is the in-app counterpart so users never have to navigate back to the
@@ -34,6 +36,25 @@ class ChatyCallActivityCapsule extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder<CallPresentationMode>(
+      valueListenable: CallPresentationController.presentationModeSignal,
+      builder: (context, mode, _) {
+        if (_specializedSurfaceOwnsPresentation(mode)) {
+          return const SizedBox.shrink();
+        }
+        return _buildCapsule(context);
+      },
+    );
+  }
+
+  static bool _specializedSurfaceOwnsPresentation(CallPresentationMode mode) {
+    return mode == CallPresentationMode.fullScreen ||
+        mode == CallPresentationMode.inAppIsland ||
+        mode == CallPresentationMode.inAppVideoPip ||
+        mode == CallPresentationMode.systemPip;
+  }
+
+  Widget _buildCapsule(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return SafeArea(
       bottom: false,
@@ -129,7 +150,11 @@ class ChatyCallActivityCapsule extends StatelessWidget {
                     ),
                   ),
                   _OverlaySafeCallAction(
-                    semanticsLabel: isSpeaker ? 'Use earpiece' : 'Use speaker',
+                    semanticsLabel: 'Speaker',
+                    semanticsHint: isSpeaker
+                        ? 'Double tap to use the earpiece'
+                        : 'Double tap to use the speaker',
+                    toggled: isSpeaker,
                     icon: isSpeaker
                         ? Icons.volume_up_rounded
                         : Icons.hearing_rounded,
@@ -163,6 +188,8 @@ class _OverlaySafeCallAction extends StatelessWidget {
     required this.foregroundColor,
     required this.onPressed,
     this.backgroundColor,
+    this.toggled,
+    this.semanticsHint,
   });
 
   final String semanticsLabel;
@@ -170,12 +197,16 @@ class _OverlaySafeCallAction extends StatelessWidget {
   final Color foregroundColor;
   final Color? backgroundColor;
   final VoidCallback onPressed;
+  final bool? toggled;
+  final String? semanticsHint;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
       label: semanticsLabel,
+      hint: semanticsHint,
+      toggled: toggled,
       child: ConstrainedBox(
         constraints: const BoxConstraints.tightFor(width: 48, height: 48),
         child: Material(

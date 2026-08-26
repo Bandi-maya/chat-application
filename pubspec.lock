@@ -995,10 +995,9 @@ packages:
   openmls:
     dependency: "direct main"
     description:
-      name: openmls
-      sha256: d1c753047450870a202585f22d8f73ce13059ed2ce9963d0f1b3dad9972369c3
-      url: "https://pub.dev"
-    source: hosted
+      path: "third_party/openmls_android"
+      relative: true
+    source: path
     version: "2.0.1"
   package_config:
     dependency: transitive

@@ -3,6 +3,7 @@ package com.example.chat
 import android.Manifest
 import android.app.ActivityManager
 import android.app.PendingIntent
+import android.app.PictureInPictureParams
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
@@ -10,6 +11,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ShortcutInfo
 import android.content.pm.ShortcutManager
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.BitmapShader
@@ -20,6 +22,7 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.RectF
+import android.util.Rational
 import android.graphics.Shader
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.Icon
@@ -41,6 +44,8 @@ import java.util.concurrent.Executors
 
 open class MainActivity : FlutterFragmentActivity() {
     private val launcherChannel = "chaty/launcher_icon"
+    private val callPipChannel = "chaty/call_pip"
+    private var callPipMethodChannel: MethodChannel? = null
     private val imageExecutor: ExecutorService = Executors.newSingleThreadExecutor()
 
     private var pendingImageResult: MethodChannel.Result? = null
@@ -125,6 +130,43 @@ open class MainActivity : FlutterFragmentActivity() {
                 else -> result.notImplemented()
             }
         }
+        callPipMethodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, callPipChannel)
+        callPipMethodChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "isSupported" -> result.success(
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                        packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
+                )
+                "isInPictureInPictureMode" -> result.success(
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode
+                )
+                "enter" -> {
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                        result.success(false)
+                        return@setMethodCallHandler
+                    }
+                    val width = call.argument<Int>("width") ?: 9
+                    val height = call.argument<Int>("height") ?: 16
+                    try {
+                        val params = PictureInPictureParams.Builder()
+                            .setAspectRatio(Rational(width.coerceAtLeast(1), height.coerceAtLeast(1)))
+                            .build()
+                        result.success(enterPictureInPictureMode(params))
+                    } catch (error: Exception) {
+                        result.error("pip_failed", error.message, null)
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: Configuration,
+    ) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        callPipMethodChannel?.invokeMethod("pipModeChanged", isInPictureInPictureMode)
     }
 
     override fun onResume() {
@@ -134,6 +176,8 @@ open class MainActivity : FlutterFragmentActivity() {
     }
 
     override fun onDestroy() {
+        callPipMethodChannel?.setMethodCallHandler(null)
+        callPipMethodChannel = null
         pendingImageResult?.error("activity_destroyed", "Image selection was interrupted.", null)
         pendingImageResult = null
         imageExecutor.shutdownNow()

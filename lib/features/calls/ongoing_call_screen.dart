@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../../data/services/call_signaling_service.dart';
+import '../../data/services/native_call_pip_service.dart';
 import '../../domain/models/call_state.dart';
 import '../../features/camera/effects/effect_engine.dart';
 import '../../features/camera/effects/effect_registry.dart';
+import '../settings/calls/call_presentation_preferences.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../../ui/core/widgets/app_avatar.dart';
@@ -40,12 +42,14 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
   /// both peers requires frame-level signaling that is not available in the
   /// current transport; until then this is a viewer-side effect only.
   final EffectEngine _effectEngine = EffectEngine();
+  final NativeCallPipService _nativePip = NativeCallPipService();
 
   bool _controlsVisible = true;
   bool _focusMode = false;
   bool _renderersReady = false;
   String? _setupError;
   Timer? _autoHideTimer;
+  StreamSubscription<bool>? _pipModeSubscription;
   Offset _localPipOffset = const Offset(20, 80);
 
   @override
@@ -55,7 +59,35 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
     locator<CallPresentationController>().showFullScreen();
     _callService.addListener(_handleCallStateChanged);
     unawaited(_initializeMediaUi());
+    _pipModeSubscription = _nativePip.modeChanges.listen((active) {
+      if (!mounted) return;
+      setState(() {
+        _focusMode = active;
+        _controlsVisible = !active;
+      });
+    });
     _startAutoHideTimer();
+  }
+
+  Future<void> _enterNativePip() async {
+    final preferences = CallPresentationPreferencesStore.instance;
+    await preferences.initialize();
+    if (!preferences.value.pictureInPictureEnabled) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Picture-in-picture is disabled in Call settings.'),
+          ),
+        );
+      }
+      return;
+    }
+    final entered = await _nativePip.enter();
+    if (!entered && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Picture-in-picture is unavailable.')),
+      );
+    }
   }
 
   Future<void> _initializeMediaUi() async {
@@ -155,6 +187,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
 
   @override
   void dispose() {
+    unawaited(_pipModeSubscription?.cancel());
     OngoingCallScreen.presentedInstances.value--;
     locator<CallPresentationController>().minimizeToPipOrIsland();
     _callService.removeListener(_handleCallStateChanged);
@@ -382,6 +415,18 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                             ],
                           ),
                         ),
+                        if (session.isVideo)
+                          ChatyIconButton(
+                            icon: Icons.picture_in_picture_alt_rounded,
+                            tooltip: 'Picture-in-picture',
+                            color: Colors.white,
+                            backgroundColor: Colors.black.withValues(
+                              alpha: 0.35,
+                            ),
+                            onPressed: session.isActive
+                                ? () => unawaited(_enterNativePip())
+                                : null,
+                          ),
                         if (session.isVideo)
                           ChatyIconButton(
                             icon: Icons.auto_awesome_rounded,

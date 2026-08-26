@@ -53,5 +53,9 @@ flutter:
     - assets/app_icon.png
 
 dependency_overrides:
+  # Repository-owned OpenMLS fork: Rust std file locking is unsupported on
+  # Android, so the fork uses fs4/flock only for that target.
+  openmls:
+    path: third_party/openmls_android
   # openmls ships FRB codegen 2.12.0; a newer transitive runtime fails its sanity check.
   flutter_rust_bridge: 2.12.0

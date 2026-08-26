@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'tokens/app_tokens.dart';
 import 'components/app_components.dart';
 import 'components/chaty_kit.dart';
+import 'components/single_choice_modal.dart';
 import '../theme/app_theme.dart';
 
 /// Comprehensive Chaty Settings UI Primitives & Design System Tokens
@@ -528,6 +529,8 @@ class ChatyChoiceTile<T> extends StatelessWidget {
   final T selectedOption;
   final String Function(T) optionLabel;
   final ValueChanged<T> onSelected;
+  final bool requireApply;
+  final Widget Function(BuildContext, T)? previewBuilder;
 
   const ChatyChoiceTile({
     super.key,
@@ -537,11 +540,50 @@ class ChatyChoiceTile<T> extends StatelessWidget {
     required this.selectedOption,
     required this.optionLabel,
     required this.onSelected,
+    this.requireApply = false,
+    this.previewBuilder,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    if (requireApply) {
+      return Semantics(
+        button: true,
+        label: '$title, ${optionLabel(selectedOption)}',
+        hint: 'Opens single-choice options',
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 4,
+          ),
+          title: Text(
+            title,
+            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
+          ),
+          subtitle: Text(
+            subtitle == null
+                ? 'Selected: ${optionLabel(selectedOption)}'
+                : '$subtitle\nSelected: ${optionLabel(selectedOption)}',
+          ),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () async {
+            final selected = await ChatySingleChoiceModal.show<T>(
+              context: context,
+              title: title,
+              description: subtitle,
+              value: selectedOption,
+              options: options,
+              labelBuilder: optionLabel,
+              previewBuilder: previewBuilder,
+            );
+            if (selected != null && selected != selectedOption) {
+              onSelected(selected);
+            }
+          },
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Column(

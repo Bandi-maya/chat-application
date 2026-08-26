@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 
+import '../../data/services/native_call_pip_service.dart';
 import '../../data/services/call_signaling_service.dart';
+import '../settings/calls/call_presentation_preferences.dart';
 
 /// Authoritative modes for rendering active call state in Chaty.
 enum CallPresentationMode {
@@ -26,17 +30,39 @@ enum CallPresentationMode {
 /// Single authoritative manager for the active call UI presentation state machine.
 class CallPresentationController extends ChangeNotifier
     with WidgetsBindingObserver {
+  /// Process-wide presentation signal used by globally hosted call surfaces.
+  ///
+  /// The app shell builds the generic activity capsule independently from the
+  /// feature call overlays. Publishing the authoritative mode here lets the
+  /// capsule suppress itself whenever an island or PiP surface owns the call,
+  /// preventing two minimized controls from being shown at once.
+  static final ValueNotifier<CallPresentationMode> presentationModeSignal =
+      ValueNotifier<CallPresentationMode>(CallPresentationMode.none);
+
   final CallSignalingService _callService;
+  final CallPresentationPreferencesStore _preferences;
 
   CallPresentationMode _mode = CallPresentationMode.none;
   int _fullScreenPresentations = 0;
   bool _isBackgrounded = false;
+  StreamSubscription<bool>? _nativePipSubscription;
 
-  CallPresentationController({required CallSignalingService callService})
+  CallPresentationController({
+    required CallSignalingService callService,
+    CallPresentationPreferencesStore? preferences,
+  })
     // ignore: prefer_initializing_formals
-    : _callService = callService {
+    : _callService = callService,
+       _preferences = preferences ?? CallPresentationPreferencesStore.instance {
     WidgetsBinding.instance.addObserver(this);
     _callService.addListener(_handleCallStateChanged);
+    _preferences.addListener(_reconcilePresentationMode);
+    unawaited(
+      _preferences.initialize().then((_) => _reconcilePresentationMode()),
+    );
+    _nativePipSubscription = NativeCallPipService().modeChanges.listen(
+      reportNativePipMode,
+    );
     _handleCallStateChanged();
   }
 
@@ -54,6 +80,7 @@ class CallPresentationController extends ChangeNotifier
   void showFullScreen() {
     _fullScreenPresentations = 1;
     _mode = CallPresentationMode.fullScreen;
+    _publishMode();
     notifyListeners();
   }
 
@@ -63,19 +90,23 @@ class CallPresentationController extends ChangeNotifier
     final session = _callService.currentSession;
     if (session == null || !session.isActive) {
       _mode = CallPresentationMode.none;
-    } else if (session.isVideo) {
+    } else if (session.isVideo && _preferences.value.pictureInPictureEnabled) {
       _mode = CallPresentationMode.inAppVideoPip;
-    } else {
+    } else if (_preferences.value.dynamicIslandEnabled) {
       _mode = CallPresentationMode.inAppIsland;
+    } else {
+      _mode = CallPresentationMode.none;
     }
-    notifyListeners();
+    _publishAndNotify();
   }
 
   /// Transition from Video PiP to Call Island.
   void collapseToIsland() {
     if (_mode == CallPresentationMode.inAppVideoPip) {
-      _mode = CallPresentationMode.inAppIsland;
-      notifyListeners();
+      _mode = _preferences.value.dynamicIslandEnabled
+          ? CallPresentationMode.inAppIsland
+          : CallPresentationMode.none;
+      _publishAndNotify();
     }
   }
 
@@ -89,20 +120,54 @@ class CallPresentationController extends ChangeNotifier
     } else {
       _mode = CallPresentationMode.fullScreen;
     }
-    notifyListeners();
+    _publishAndNotify();
   }
 
   /// Expand floating Video PiP to full screen.
   void expandToFullScreen() {
+    final session = _callService.currentSession;
+    if (session == null || !session.isActive || _isBackgrounded) return;
     _mode = CallPresentationMode.fullScreen;
-    notifyListeners();
+    _fullScreenPresentations = 1;
+    _publishAndNotify();
   }
 
   /// Force a specific presentation mode if allowable.
   void setMode(CallPresentationMode nextMode) {
+    final session = _callService.currentSession;
+    if (nextMode != CallPresentationMode.none &&
+        (session == null || !session.isActive)) {
+      return;
+    }
+    if (nextMode == CallPresentationMode.inAppVideoPip &&
+        session?.isVideo != true) {
+      return;
+    }
+    if (nextMode == CallPresentationMode.systemPip) {
+      // Native PiP must be confirmed through reportNativePipMode(). Merely
+      // backgrounding the app is not proof that Android entered PiP.
+      return;
+    }
     if (_mode == nextMode) return;
     _mode = nextMode;
-    notifyListeners();
+    _publishAndNotify();
+  }
+
+  /// Synchronizes presentation with the native Android PiP callback.
+  void reportNativePipMode(bool active) {
+    final session = _callService.currentSession;
+    if (active) {
+      if (!_preferences.value.pictureInPictureEnabled) return;
+      if (session == null || !session.isActive || !session.isVideo) return;
+      _mode = CallPresentationMode.systemPip;
+      _publishAndNotify();
+      return;
+    }
+    if (_mode != CallPresentationMode.systemPip) return;
+    _mode = _isBackgrounded
+        ? CallPresentationMode.backgroundNotification
+        : CallPresentationMode.none;
+    _reconcilePresentationMode();
   }
 
   void _handleCallStateChanged() {
@@ -117,18 +182,21 @@ class CallPresentationController extends ChangeNotifier
       if (_mode != CallPresentationMode.none) {
         _mode = CallPresentationMode.none;
         _fullScreenPresentations = 0;
-        notifyListeners();
+        _publishAndNotify();
       }
       return;
     }
 
     if (_isBackgrounded) {
-      final targetBg = session.isVideo
+      // Android PiP is entered explicitly and confirmed through
+      // reportNativePipMode(). Until then the foreground notification is the
+      // truthful system-level presentation for both audio and video.
+      final targetBg = _mode == CallPresentationMode.systemPip
           ? CallPresentationMode.systemPip
           : CallPresentationMode.backgroundNotification;
       if (_mode != targetBg) {
         _mode = targetBg;
-        notifyListeners();
+        _publishAndNotify();
       }
       return;
     }
@@ -136,23 +204,27 @@ class CallPresentationController extends ChangeNotifier
     if (_fullScreenPresentations > 0) {
       if (_mode != CallPresentationMode.fullScreen) {
         _mode = CallPresentationMode.fullScreen;
-        notifyListeners();
+        _publishAndNotify();
       }
       return;
     }
 
     // Call is active in foreground:
-    if (_mode == CallPresentationMode.inAppIsland) {
+    if (_mode == CallPresentationMode.inAppIsland &&
+        _preferences.value.dynamicIslandEnabled) {
       return; // Preserve user's minimized choice
     }
 
-    final targetMode = session.isVideo
+    final targetMode =
+        session.isVideo && _preferences.value.pictureInPictureEnabled
         ? CallPresentationMode.inAppVideoPip
-        : CallPresentationMode.inAppIsland;
+        : _preferences.value.dynamicIslandEnabled
+        ? CallPresentationMode.inAppIsland
+        : CallPresentationMode.none;
 
     if (_mode != targetMode) {
       _mode = targetMode;
-      notifyListeners();
+      _publishAndNotify();
     }
   }
 
@@ -165,10 +237,26 @@ class CallPresentationController extends ChangeNotifier
     _reconcilePresentationMode();
   }
 
+  void _publishMode() {
+    if (presentationModeSignal.value != _mode) {
+      presentationModeSignal.value = _mode;
+    }
+  }
+
+  void _publishAndNotify() {
+    _publishMode();
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _callService.removeListener(_handleCallStateChanged);
+    _preferences.removeListener(_reconcilePresentationMode);
+    unawaited(_nativePipSubscription?.cancel());
+    if (presentationModeSignal.value == _mode) {
+      presentationModeSignal.value = CallPresentationMode.none;
+    }
     super.dispose();
   }
 }

@@ -82,8 +82,9 @@ class CallLifecycleCoordinator with WidgetsBindingObserver {
 
     if (state == AppLifecycleState.resumed) {
       // Re-establish database signaling if the OS suspended sockets while the
-      // app was backgrounded. initialize() is idempotent.
-      unawaited(_callService.initialize());
+      // app was backgrounded. This intentionally bypasses initialize()'s
+      // one-time guard and also reconciles events missed while suspended.
+      unawaited(_callService.reconnectSignaling());
       _handleCallStateChanged();
       return;
     }

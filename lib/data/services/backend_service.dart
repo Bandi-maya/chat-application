@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -166,6 +165,28 @@ class ChatyBackendService extends ChangeNotifier {
     }
 
     _currentSession = _mapSession(session);
+    if (_currentUser == null || _currentUser!.id != session.user.id) {
+      final user = session.user;
+      final fallback = UserProfile(
+        id: user.id,
+        displayName:
+            user.userMetadata?['display_name']?.toString() ??
+            user.email?.split('@').first ??
+            'Chaty User',
+        username: user.userMetadata?['username']?.toString() ?? 'user',
+        avatarInitials: _initials(user.email ?? 'CU'),
+        avatarColorHex: '0xFF6366F1',
+        about: '',
+        presence: PresenceState.online,
+        lastSeenAt: DateTime.now(),
+        isVerified: false,
+        email: user.email ?? '',
+        phone: user.phone ?? '',
+        safetyNumber: '',
+      );
+      _currentUser = fallback;
+      _usersById[fallback.id] = fallback;
+    }
     // Offline-first: paint the shell from encrypted local snapshots before
     // any network work, then refresh from the backend without blocking.
     await _hydrateCachedState(session.user.id);
@@ -409,6 +430,18 @@ class ChatyBackendService extends ChangeNotifier {
     }
     final messages = hydratedRows.map(_messageFromRow).toList()
       ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+    // Retain any optimistic / queued messages currently in memory so they don't disappear on reload
+    final currentList = _messagesByChatId[conversationId] ?? const <ChatMessage>[];
+    for (final current in currentList) {
+      if (current.deliveryState == DeliveryState.queued ||
+          current.deliveryState == DeliveryState.sending) {
+        if (!messages.any((m) => m.id == current.id)) {
+          messages.add(current);
+        }
+      }
+    }
+    messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
     _messagesByChatId[conversationId] = messages;
 
     final conversation = _conversationsById[conversationId];
@@ -590,6 +623,18 @@ class ChatyBackendService extends ChangeNotifier {
           table: 'tasks',
           callback: (_) => _scheduleTaskReconciliation(),
         )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'mls_devices',
+          callback: (_) => _scheduleKeyExchangeReconciliation(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'mls_key_packages',
+          callback: (_) => _scheduleKeyExchangeReconciliation(),
+        )
         .subscribe();
     _realtimeChannel = channel;
   }
@@ -628,6 +673,10 @@ class ChatyBackendService extends ChangeNotifier {
 
   void _scheduleTaskReconciliation() {
     _pendingTaskRefresh = true;
+    _armRealtimeReconciliation();
+  }
+
+  void _scheduleKeyExchangeReconciliation() {
     _armRealtimeReconciliation();
   }
 
@@ -681,6 +730,10 @@ class ChatyBackendService extends ChangeNotifier {
             _messagesByChatId.containsKey(conversationId)) {
           await _loadMessages(conversationId);
         }
+      }
+      final currentUserId = _currentSession?.userId;
+      if (currentUserId != null) {
+        unawaited(_retryPendingSecureSends(currentUserId));
       }
       notifyListeners();
       eventBus.publish(
@@ -984,10 +1037,18 @@ class ChatyBackendService extends ChangeNotifier {
     try {
       return await _deliverEncryptedMessage(pendingSend, fallbackType: type);
     } catch (error) {
+      if (error is MlsStorageInitializationException &&
+          error.failure != MlsStorageInitializationFailure.databaseInUse) {
+        // A native compatibility or storage-availability failure cannot be
+        // repaired by the pending-send retry loop. Do not show a message as
+        // queued when this build is currently unable to encrypt it.
+        rethrow;
+      }
+
       // If error is due to MLS group setup or network / backend unavailability:
       // Enqueue to persistent store and insert an optimistic local message in sending / queued state.
       await _pendingSecureSends.put(me.id, pendingSend);
-      
+
       final optimisticMsg = ChatMessage(
         id: clientMessageId,
         conversationId: conversationId,
@@ -1015,23 +1076,18 @@ class ChatyBackendService extends ChangeNotifier {
 
       if (locator.isRegistered<ConnectionHealthService>()) {
         final pendingList = await _pendingSecureSends.read(me.id);
-        locator<ConnectionHealthService>().updateQueuedCount(pendingList.length);
+        locator<ConnectionHealthService>().updateQueuedCount(
+          pendingList.length,
+        );
       }
 
       if (_isMlsSetupPendingError(error)) {
         throw SecureSendPendingException(secureSetupPendingCode);
       }
 
-      // Check if network error (SocketException, Timeout, 5xx, or offline)
-      if (error is SocketException ||
-          error is TimeoutException ||
-          error.toString().contains('Failed to connect') ||
-          error.toString().contains('SocketException') ||
-          error.toString().contains('ClientException')) {
-        return optimisticMsg;
-      }
-
-      rethrow;
+      // Automatically kick off background retry
+      unawaited(_retryPendingSecureSends(me.id));
+      return optimisticMsg;
     }
   }
 
@@ -1039,8 +1095,18 @@ class ChatyBackendService extends ChangeNotifier {
   /// conversation's devices have not completed key registration.
   bool _isMlsSetupPendingError(Object error) {
     if (error is MlsMembershipPendingException) return true;
-    return error is MlsE2eeException &&
-        error.message.contains('MLS group is not initialized');
+    if (error is MlsE2eeException &&
+        (error.message.contains('MLS group is not initialized') ||
+         error.message.contains('every conversation member must register an MLS device') ||
+         error.message.contains('no key packages available'))) {
+      return true;
+    }
+    final errorStr = error.toString().toLowerCase();
+    return errorStr.contains('every conversation member must register an mls device') ||
+        errorStr.contains('must register an mls device') ||
+        errorStr.contains('mls group is not initialized') ||
+        errorStr.contains('no key packages available') ||
+        errorStr.contains('mls_membership_pending');
   }
 
   /// Encrypts and delivers [send], refreshing local state on success.
@@ -1048,7 +1114,31 @@ class ChatyBackendService extends ChangeNotifier {
     PendingSecureSend send, {
     MessageType? fallbackType,
   }) async {
-    final me = _currentUser;
+    var me = _currentUser;
+    if (me == null) {
+      final authUser = _client.auth.currentUser;
+      if (authUser != null) {
+        me = UserProfile(
+          id: authUser.id,
+          displayName:
+              authUser.userMetadata?['display_name']?.toString() ??
+              authUser.email?.split('@').first ??
+              'Chaty User',
+          username: authUser.userMetadata?['username']?.toString() ?? 'user',
+          avatarInitials: _initials(authUser.email ?? 'CU'),
+          avatarColorHex: '0xFF6366F1',
+          about: '',
+          presence: PresenceState.online,
+          lastSeenAt: DateTime.now(),
+          isVerified: false,
+          email: authUser.email ?? '',
+          phone: authUser.phone ?? '',
+          safetyNumber: '',
+        );
+        _currentUser = me;
+        _usersById[me.id] = me;
+      }
+    }
     if (me == null) throw Exception('Authentication required.');
     final mls = locator<MlsE2eeService>();
     final encrypted = await mls.encryptPayload(
@@ -1079,14 +1169,13 @@ class ChatyBackendService extends ChangeNotifier {
       _loadMessages(send.conversationId),
       _loadConversations(loadMembers: false),
     ]);
-    notifyListeners();
-
+    final UserProfile senderProfile = me;
     final result = _messagesByChatId[send.conversationId]!.firstWhere(
       (message) => message.id == messageId,
       orElse: () => ChatMessage(
         id: messageId,
         conversationId: send.conversationId,
-        senderId: me.id,
+        senderId: senderProfile.id,
         type: fallbackType ?? _messageTypeFromDatabase(send.type),
         text: send.text,
         attachment: send.attachment == null

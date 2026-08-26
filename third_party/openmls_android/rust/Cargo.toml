@@ -1,0 +1,86 @@
+[package]
+name = "openmls_frb"
+version = "2.0.1"
+edition = "2024"
+# 1.89 for `std::fs::File::try_lock` (the single-writer sidecar lock in
+# `encrypted_db.rs`). The alternative, `libc::flock`, is an `unsafe fn` and this
+# crate denies unsafe code outside the two modules that must have it.
+rust-version = "1.89"
+description = "Dart wrapper for OpenMLS — a Rust implementation of the Messaging Layer Security (MLS) protocol (RFC 9420)"
+repository = "https://github.com/djx-y-z/openmls_dart"
+license = "MIT"
+publish = false
+
+[lib]
+name = "openmls_frb"
+# rlib is required so the fuzz crate (rust/fuzz) can link against this crate.
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+flutter_rust_bridge = "=2.12.0"
+thiserror = "2.0"
+log = "0.4"
+zeroize = { version = "1.8", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+futures = "0.3"
+parking_lot = "0.12"
+openmls = { git = "https://github.com/openmls/openmls", tag = "openmls-v0.8.1", features = ["test-utils"] }
+openmls_rust_crypto = { git = "https://github.com/openmls/openmls", tag = "openmls-v0.8.1" }
+openmls_basic_credential = { git = "https://github.com/openmls/openmls", tag = "openmls-v0.8.1", features = ["test-utils"] }
+openmls_traits = { git = "https://github.com/openmls/openmls", tag = "openmls-v0.8.1" }
+# libcrux-based provider: only used for the X-Wing hybrid post-quantum KEM
+# (HpkeKemType::XWingKemDraft6); everything else stays on openmls_rust_crypto.
+openmls_libcrux_crypto = { git = "https://github.com/openmls/openmls", tag = "openmls-v0.8.1" }
+
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+rusqlite = { version = "0.34", features = ["bundled-sqlcipher-vendored-openssl"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+# Rust's std::fs::File locking API currently returns Unsupported on Android.
+# fs4 uses Android's flock implementation while preserving the same advisory
+# lock semantics used by std on the other Unix targets.
+fs4 = { version = "1.1", default-features = false, features = ["sync"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# OpenMLS requires `js` feature for WASM: enables fluvio_wasm_timer for time access
+# Cargo merges features from [dependencies] and [target.*.dependencies]
+openmls = { git = "https://github.com/openmls/openmls", tag = "openmls-v0.8.1", features = ["js"] }
+# Diamond dependency: some upstream crates use getrandom 0.2, some use 0.3
+# Both need to be configured for WASM to work correctly
+getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
+getrandom = { version = "0.3", features = ["wasm_js"] }
+# openmls_libcrux_crypto pulls getrandom 0.4 via rand 0.10 (hpke-rs-libcrux)
+getrandom_04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
+idb = "0.6"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = [
+    "console", "Window", "Performance",
+    "Crypto", "SubtleCrypto", "CryptoKey",
+    "AesGcmParams",
+] }
+
+[profile.release]
+lto = true
+opt-level = "z"
+strip = true
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-O4", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]
+
+# Turn silent integer wraparound into a deterministic panic — but ONLY for this
+# crate's own code. Applying overflow-checks tree-wide would change the release
+# arithmetic of audited upstream dependencies, some of which rely on wrapping.
+[profile.release.package.openmls_frb]
+overflow-checks = true
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(frb_expand)"] }
+# Hand-written code denies unsafe by default. The few modules that legitimately
+# need it opt out explicitly: the FRB-generated bridge (#[allow] in lib.rs),
+# snapshot_storage's interior-mutability shim, and encrypted_db's WASM
+# `unsafe impl Send + Sync` (both via module-level #![allow(unsafe_code)]).
+unsafe_code = "deny"

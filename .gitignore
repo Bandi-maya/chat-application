@@ -43,3 +43,15 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Rust build artifacts and third-party compiled targets
+**/target/
+**/target_android/
+third_party/**/target/
+third_party/**/target_android/
+
+# Docs and specifications
+specs/
+.claude/
+*.log
+
