@@ -1152,11 +1152,18 @@ class ChatyBackendService extends ChangeNotifier {
   /// without creating duplicate optimistic messages or re-enqueuing into store.
   Future<ChatMessage> retryPendingSecureMessage(
     PendingSecureSend item,
-  ) {
-    return _deliverEncryptedMessage(
-      item,
-      fallbackType: _messageTypeFromDatabase(item.type),
-    );
+  ) async {
+    try {
+      return await _deliverEncryptedMessage(
+        item,
+        fallbackType: _messageTypeFromDatabase(item.type),
+      );
+    } catch (error) {
+      if (_isMlsSetupPendingError(error)) {
+        throw SecureSendPendingException(secureSetupPendingCode);
+      }
+      rethrow;
+    }
   }
 
   /// Encrypts and delivers [send], refreshing local state on success.
@@ -1553,6 +1560,20 @@ class ChatyBackendService extends ChangeNotifier {
       _conversationsById[conversationId] = current.copyWith(draftText: draft);
       notifyListeners();
     }
+    _persistDraft(conversationId, draft);
+  }
+
+  /// Persists a draft to Supabase silently without notifying Flutter UI listeners.
+  /// Used during widget unmount/dispose to avoid triggering rebuilds while the tree is locked.
+  void persistDraftSilently(String conversationId, String draft) {
+    final current = _conversationsById[conversationId];
+    if (current != null) {
+      _conversationsById[conversationId] = current.copyWith(draftText: draft);
+    }
+    _persistDraft(conversationId, draft);
+  }
+
+  void _persistDraft(String conversationId, String draft) {
     unawaited(
       _client.rpc(
         'set_conversation_draft',

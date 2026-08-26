@@ -147,19 +147,20 @@ class MlsE2eeService extends ChangeNotifier {
   }
 
   /// Retries device registration and key package replenishment if MLS is not currently ready
-  /// or missing active enrollment.
+  /// or missing active server-side enrollment.
   Future<void> retryDeviceEnrollment() async {
     final user = _client.auth.currentUser;
     if (user == null) return;
     if (!isReady || _userId != user.id) {
       await initializeForCurrentSession();
-      return;
     }
-    try {
-      await _registerAndReplenishDevice();
-      notifyListeners();
-    } catch (e) {
-      debugPrint('Chaty MLS retryDeviceEnrollment failed: $e');
+    if (isReady && _userId == user.id) {
+      try {
+        await _registerAndReplenishDevice();
+        notifyListeners();
+      } catch (e) {
+        debugPrint('Chaty MLS retryDeviceEnrollment failed: $e');
+      }
     }
   }
 

@@ -232,7 +232,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       widget.dataStore.setTyping(widget.conversationId, false);
     if (_recording)
       unawaited(_realtime.setRecording(widget.conversationId, false));
-    widget.dataStore.setDraft(widget.conversationId, _textCtrl.text);
+    widget.dataStore.persistDraftSilently(
+      widget.conversationId,
+      _textCtrl.text,
+    );
     _scrollCtrl.removeListener(_handleScrollChanged);
     widget.dataStore.removeListener(_onDataStoreChanged);
     unawaited(_voice.dispose());

@@ -396,6 +396,9 @@ class ChatyDataStore extends ChangeNotifier {
   void setDraft(String conversationId, String draft) =>
       _backend.setDraft(conversationId, draft);
 
+  void persistDraftSilently(String conversationId, String draft) =>
+      _backend.persistDraftSilently(conversationId, draft);
+
   void createGroup({
     required String title,
     required List<String> memberIds,
