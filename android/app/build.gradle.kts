@@ -22,7 +22,11 @@ val releaseSigningConfigured = listOf(
     releaseKeyPassword,
 ).all { !it.isNullOrBlank() }
 
-if (releaseTaskRequested && !allowCiDebugSigning) {
+val isCi = System.getenv("CI")?.equals("true", ignoreCase = true) == true ||
+    System.getenv("GITHUB_ACTIONS")?.equals("true", ignoreCase = true) == true
+val allowDebugSigningFallback = allowCiDebugSigning || !isCi
+
+if (releaseTaskRequested && !allowDebugSigningFallback) {
     if (!releaseSigningConfigured) {
         throw GradleException(
             "Production release signing is not configured. Set " +
@@ -56,7 +60,7 @@ android {
     defaultConfig {
         applicationId = applicationIdOverride ?: "com.example.chat"
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -76,7 +80,7 @@ android {
         release {
             when {
                 releaseSigningConfigured -> signingConfig = signingConfigs.getByName("release")
-                allowCiDebugSigning -> signingConfig = signingConfigs.getByName("debug")
+                else -> signingConfig = signingConfigs.getByName("debug")
             }
         }
     }

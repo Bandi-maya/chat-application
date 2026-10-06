@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
@@ -12,6 +13,7 @@ import '../../domain/models/other_models.dart';
 import '../../domain/models/user_profile.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
+import '../../ui/core/persistence/preferences_storage.dart';
 import '../../ui/core/realtime/realtime_event_bus.dart';
 import '../../ui/core/validators/input_validators.dart';
 import 'connection_health_service.dart';
@@ -95,10 +97,12 @@ class ChatyBackendService extends ChangeNotifier {
   bool _pendingTaskRefresh = false;
   bool _isInitialized = false;
   bool _isHydrating = false;
+  bool _isDemoMode = false;
 
+  bool get isDemoMode => _isDemoMode;
   bool get isInitialized => _isInitialized;
   bool get isAuthenticated =>
-      _client.auth.currentSession != null && _currentUser != null;
+      _isDemoMode || (_client.auth.currentSession != null && _currentUser != null);
   UserProfile? get currentUser => _currentUser;
   AuthSession? get currentSession => _currentSession;
   List<UserProfile> get allUsers =>
@@ -131,6 +135,15 @@ class ChatyBackendService extends ChangeNotifier {
 
   Future<void> _initialize() async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final wasDemo = prefs.getBool('chaty_demo_mode_active') ?? false;
+      if (wasDemo && _client.auth.currentSession == null) {
+        await loginAsDemo(persist: false);
+        _isInitialized = true;
+        notifyListeners();
+        return;
+      }
+
       _authSubscription ??= _client.auth.onAuthStateChange.listen((
         AuthState state,
       ) {
@@ -147,6 +160,342 @@ class ChatyBackendService extends ChangeNotifier {
       _initializeFuture = null;
       rethrow;
     }
+  }
+
+  Future<UserProfile> loginAsDemo({bool persist = true}) async {
+    _isDemoMode = true;
+    const demoUserId = 'demo-user-id';
+
+    final demoUser = UserProfile(
+      id: demoUserId,
+      displayName: 'Demo User',
+      username: 'demouser',
+      avatarInitials: 'DU',
+      avatarColorHex: '0xFF6366F1',
+      about: 'Exploring Chaty in Demo Mode ✨',
+      presence: PresenceState.online,
+      lastSeenAt: DateTime.now(),
+      isVerified: true,
+      email: 'demo@chaty.app',
+      phone: '+1 (555) 019-2834',
+      safetyNumber: '48291 03928 19384 92837',
+    );
+    _currentUser = demoUser;
+    _currentSession = AuthSession(
+      userId: demoUserId,
+      token: 'demo-token',
+      expiresAt: DateTime.now().add(const Duration(days: 30)),
+      deviceId: 'demo-device',
+    );
+
+    final alex = UserProfile(
+      id: 'demo-user-alex',
+      displayName: 'Alex Rivera',
+      username: 'alexr',
+      avatarInitials: 'AR',
+      avatarColorHex: '0xFF3B82F6',
+      about: 'Design systems & Flutter enthusiast 🚀',
+      presence: PresenceState.online,
+      lastSeenAt: DateTime.now(),
+      isVerified: true,
+      email: 'alex@example.com',
+      phone: '+1 (555) 321-7654',
+      safetyNumber: '11223 33445 55667 77889',
+    );
+    final sarah = UserProfile(
+      id: 'demo-user-sarah',
+      displayName: 'Sarah Connor',
+      username: 'sarahc',
+      avatarInitials: 'SC',
+      avatarColorHex: '0xFF10B981',
+      about: 'Building private & secure chat systems 🔒',
+      presence: PresenceState.online,
+      lastSeenAt: DateTime.now().subtract(const Duration(minutes: 12)),
+      isVerified: true,
+      email: 'sarah@example.com',
+      phone: '+1 (555) 432-8765',
+      safetyNumber: '99887 77665 55443 33221',
+    );
+    final elena = UserProfile(
+      id: 'demo-user-elena',
+      displayName: 'Elena Rostova',
+      username: 'elena',
+      avatarInitials: 'ER',
+      avatarColorHex: '0xFFEC4899',
+      about: 'Coffee, books, and code ☕📚',
+      presence: PresenceState.away,
+      lastSeenAt: DateTime.now().subtract(const Duration(hours: 1)),
+      isVerified: false,
+      email: 'elena@example.com',
+      phone: '+1 (555) 543-9876',
+    );
+    final marcus = UserProfile(
+      id: 'demo-user-marcus',
+      displayName: 'Marcus Vance',
+      username: 'marcus',
+      avatarInitials: 'MV',
+      avatarColorHex: '0xFFF59E0B',
+      about: 'Sound on 🎧',
+      presence: PresenceState.offline,
+      lastSeenAt: DateTime.now().subtract(const Duration(days: 1)),
+      isVerified: false,
+      email: 'marcus@example.com',
+      phone: '+1 (555) 654-0987',
+    );
+
+    _usersById.clear();
+    _usersById[demoUser.id] = demoUser;
+    _usersById[alex.id] = alex;
+    _usersById[sarah.id] = sarah;
+    _usersById[elena.id] = elena;
+    _usersById[marcus.id] = marcus;
+
+    _conversationsById.clear();
+    _messagesByChatId.clear();
+
+    const alexChatId = 'demo-chat-alex';
+    const sarahChatId = 'demo-chat-sarah';
+    const groupChatId = 'demo-chat-group';
+    const elenaChatId = 'demo-chat-elena';
+
+    _conversationsById[alexChatId] = Conversation(
+      id: alexChatId,
+      type: ConversationType.direct,
+      title: alex.displayName,
+      participantIds: [demoUserId, alex.id],
+      avatarInitials: alex.avatarInitials,
+      avatarColorHex: alex.avatarColorHex,
+      lastMessageText: 'Everything in demo mode is interactive! Feel free to test out chats, tasks, themes, and settings.',
+      lastMessageTime: DateTime.now().subtract(const Duration(minutes: 5)),
+      lastMessageSenderId: alex.id,
+      unreadCount: 1,
+      isPinned: true,
+      encryptionStatus: EncryptionStatus.encrypted,
+    );
+
+    _conversationsById[sarahChatId] = Conversation(
+      id: sarahChatId,
+      type: ConversationType.direct,
+      title: sarah.displayName,
+      participantIds: [demoUserId, sarah.id],
+      avatarInitials: sarah.avatarInitials,
+      avatarColorHex: sarah.avatarColorHex,
+      lastMessageText: 'The fluid UI and glassmorphic widgets feel incredibly responsive.',
+      lastMessageTime: DateTime.now().subtract(const Duration(hours: 1)),
+      lastMessageSenderId: sarah.id,
+      unreadCount: 0,
+      isPinned: false,
+      encryptionStatus: EncryptionStatus.encrypted,
+    );
+
+    _conversationsById[groupChatId] = Conversation(
+      id: groupChatId,
+      type: ConversationType.group,
+      title: '🚀 Chaty Launch Crew',
+      participantIds: [demoUserId, alex.id, sarah.id, elena.id],
+      adminIds: [alex.id],
+      avatarInitials: 'LC',
+      avatarColorHex: '0xFF8B5CF6',
+      lastMessageText: 'Elena: Just uploaded the new branding icons to the shared folder.',
+      lastMessageTime: DateTime.now().subtract(const Duration(hours: 3)),
+      lastMessageSenderId: elena.id,
+      unreadCount: 2,
+      isPinned: false,
+      encryptionStatus: EncryptionStatus.encrypted,
+    );
+
+    _conversationsById[elenaChatId] = Conversation(
+      id: elenaChatId,
+      type: ConversationType.direct,
+      title: elena.displayName,
+      participantIds: [demoUserId, elena.id],
+      avatarInitials: elena.avatarInitials,
+      avatarColorHex: elena.avatarColorHex,
+      lastMessageText: 'See you at the design sync tomorrow!',
+      lastMessageTime: DateTime.now().subtract(const Duration(days: 1)),
+      lastMessageSenderId: demoUserId,
+      unreadCount: 0,
+      isPinned: false,
+      encryptionStatus: EncryptionStatus.encrypted,
+    );
+
+    _messagesByChatId[alexChatId] = [
+      ChatMessage(
+        id: 'msg-alex-1',
+        conversationId: alexChatId,
+        senderId: alex.id,
+        type: MessageType.text,
+        text: 'Hey Demo User! Welcome to Chaty 👋',
+        createdAt: DateTime.now().subtract(const Duration(minutes: 20)),
+        deliveryState: DeliveryState.read,
+      ),
+      ChatMessage(
+        id: 'msg-alex-2',
+        conversationId: alexChatId,
+        senderId: demoUserId,
+        type: MessageType.text,
+        text: 'Thanks Alex! Excited to test the features.',
+        createdAt: DateTime.now().subtract(const Duration(minutes: 15)),
+        deliveryState: DeliveryState.read,
+      ),
+      ChatMessage(
+        id: 'msg-alex-3',
+        conversationId: alexChatId,
+        senderId: alex.id,
+        type: MessageType.text,
+        text: 'Everything in demo mode is interactive! Feel free to test out chats, tasks, themes, and settings.',
+        createdAt: DateTime.now().subtract(const Duration(minutes: 5)),
+        deliveryState: DeliveryState.delivered,
+      ),
+    ];
+
+    _messagesByChatId[sarahChatId] = [
+      ChatMessage(
+        id: 'msg-sarah-1',
+        conversationId: sarahChatId,
+        senderId: sarah.id,
+        type: MessageType.text,
+        text: 'Security and privacy settings are fully customizable in Chaty.',
+        createdAt: DateTime.now().subtract(const Duration(hours: 2)),
+        deliveryState: DeliveryState.read,
+      ),
+      ChatMessage(
+        id: 'msg-sarah-2',
+        conversationId: sarahChatId,
+        senderId: sarah.id,
+        type: MessageType.text,
+        text: 'The fluid UI and glassmorphic widgets feel incredibly responsive.',
+        createdAt: DateTime.now().subtract(const Duration(hours: 1)),
+        deliveryState: DeliveryState.read,
+      ),
+    ];
+
+    _messagesByChatId[groupChatId] = [
+      ChatMessage(
+        id: 'msg-group-1',
+        conversationId: groupChatId,
+        senderId: alex.id,
+        type: MessageType.text,
+        text: 'Welcome everyone to the launch group!',
+        createdAt: DateTime.now().subtract(const Duration(hours: 5)),
+        deliveryState: DeliveryState.read,
+      ),
+      ChatMessage(
+        id: 'msg-group-2',
+        conversationId: groupChatId,
+        senderId: sarah.id,
+        type: MessageType.text,
+        text: 'All test flights and test cases are verified.',
+        createdAt: DateTime.now().subtract(const Duration(hours: 4)),
+        deliveryState: DeliveryState.read,
+      ),
+      ChatMessage(
+        id: 'msg-group-3',
+        conversationId: groupChatId,
+        senderId: elena.id,
+        type: MessageType.text,
+        text: 'Just uploaded the new branding icons to the shared folder.',
+        createdAt: DateTime.now().subtract(const Duration(hours: 3)),
+        deliveryState: DeliveryState.delivered,
+      ),
+    ];
+
+    _messagesByChatId[elenaChatId] = [
+      ChatMessage(
+        id: 'msg-elena-1',
+        conversationId: elenaChatId,
+        senderId: elena.id,
+        type: MessageType.text,
+        text: 'Are we still on for the design review meeting?',
+        createdAt: DateTime.now().subtract(const Duration(days: 1, hours: 2)),
+        deliveryState: DeliveryState.read,
+      ),
+      ChatMessage(
+        id: 'msg-elena-2',
+        conversationId: elenaChatId,
+        senderId: demoUserId,
+        type: MessageType.text,
+        text: 'See you at the design sync tomorrow!',
+        createdAt: DateTime.now().subtract(const Duration(days: 1)),
+        deliveryState: DeliveryState.read,
+      ),
+    ];
+
+    _tasks.clear();
+    _tasks.addAll([
+      ChatTask(
+        id: 'demo-task-1',
+        sourceConversationId: alexChatId,
+        title: 'Explore Chaty Design & Themes',
+        description: 'Try switching between dark, light, and GB themes in universal appearance settings.',
+        creatorId: alex.id,
+        assigneeIds: [demoUserId],
+        status: TaskStatus.inProgress,
+        priority: TaskPriority.high,
+        dueAt: DateTime.now().add(const Duration(days: 2)),
+        labels: ['UI/UX', 'Testing'],
+        createdAt: DateTime.now().subtract(const Duration(hours: 2)),
+        updatedAt: DateTime.now(),
+      ),
+      ChatTask(
+        id: 'demo-task-2',
+        sourceConversationId: sarahChatId,
+        title: 'Review App Lock & Security',
+        description: 'Test PIN, pattern, and biometric local lock protections in Security Center.',
+        creatorId: sarah.id,
+        assigneeIds: [demoUserId],
+        status: TaskStatus.completed,
+        priority: TaskPriority.medium,
+        dueAt: DateTime.now().subtract(const Duration(days: 1)),
+        labels: ['Security'],
+        createdAt: DateTime.now().subtract(const Duration(days: 2)),
+        updatedAt: DateTime.now().subtract(const Duration(days: 1)),
+      ),
+    ]);
+
+    _calls.clear();
+    _calls.add(
+      CallRecord(
+        id: 'demo-call-1',
+        callerId: alex.id,
+        participantIds: [alex.id, demoUserId],
+        type: CallType.voice,
+        direction: CallDirection.incoming,
+        timestamp: DateTime.now().subtract(const Duration(hours: 4)),
+        durationSeconds: 142,
+      ),
+    );
+
+    _stories.clear();
+    _stories.addAll([
+      UpdateStory(
+        id: 'demo-story-1',
+        userId: alex.id,
+        content: 'Building next-gen Flutter messaging apps 🚀',
+        timestamp: DateTime.now().subtract(const Duration(hours: 2)),
+        isViewed: false,
+      ),
+      UpdateStory(
+        id: 'demo-story-2',
+        userId: sarah.id,
+        content: 'Privacy and security first, always 🔒',
+        timestamp: DateTime.now().subtract(const Duration(hours: 6)),
+        isViewed: true,
+      ),
+    ]);
+
+    if (persist) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('chaty_demo_mode_active', true);
+        await LocalPreferencesStorage.setStoredUserId(demoUserId);
+      } catch (error) {
+        debugPrint('Failed to persist demo session flag: $error');
+      }
+    }
+
+    notifyListeners();
+    return demoUser;
   }
 
   Future<void> _handleSession(Session? session) async {
@@ -419,6 +768,10 @@ class ChatyBackendService extends ChangeNotifier {
   }
 
   Future<void> ensureConversationLoaded(String conversationId) async {
+    if (_isDemoMode) {
+      await markAsRead(conversationId);
+      return;
+    }
     if (!_conversationsById.containsKey(conversationId)) {
       await _loadConversations();
     }
@@ -966,6 +1319,15 @@ class ChatyBackendService extends ChangeNotifier {
   }) async {
     final trimmed = query.trim();
     if (trimmed.length < 2) return <UserProfile>[];
+    if (_isDemoMode) {
+      final normalized = trimmed.replaceFirst('@', '').toLowerCase();
+      final results = _usersById.values.where((user) {
+        if (!includeSelf && user.id == _currentUser?.id) return false;
+        return user.username.toLowerCase().contains(normalized) ||
+            user.displayName.toLowerCase().contains(normalized);
+      }).toList();
+      return results;
+    }
     final raw = await _client.rpc(
       'search_profiles',
       params: <String, dynamic>{'p_query': trimmed},
@@ -983,6 +1345,9 @@ class ChatyBackendService extends ChangeNotifier {
     UserProfile otherUser,
   ) async {
     if (_currentUser == null) throw Exception('Authentication required.');
+    if (_isDemoMode) {
+      return getOrCreateDirectConversation(otherUser);
+    }
     final raw = await _client.rpc(
       'create_direct_conversation',
       params: <String, dynamic>{'p_other_user_id': otherUser.id},
@@ -1006,6 +1371,26 @@ class ChatyBackendService extends ChangeNotifier {
           return conversation;
         }
       }
+      if (_isDemoMode) {
+        final newId = 'demo-direct-${otherUser.id}';
+        final newConv = Conversation(
+          id: newId,
+          type: ConversationType.direct,
+          title: otherUser.displayName,
+          participantIds: [me.id, otherUser.id],
+          avatarInitials: otherUser.avatarInitials,
+          avatarColorHex: otherUser.avatarColorHex,
+          lastMessageText: '',
+          lastMessageTime: DateTime.now(),
+          lastMessageSenderId: me.id,
+          encryptionStatus: EncryptionStatus.encrypted,
+        );
+        _conversationsById[newId] = newConv;
+        _messagesByChatId[newId] = <ChatMessage>[];
+        _usersById[otherUser.id] = otherUser;
+        notifyListeners();
+        return newConv;
+      }
     }
     throw StateError(
       'Conversation is not loaded. Use getOrCreateDirectConversationAsync().',
@@ -1018,6 +1403,36 @@ class ChatyBackendService extends ChangeNotifier {
     String? avatarInitials,
     String? avatarColorHex,
   }) async {
+    if (_isDemoMode && _currentUser != null) {
+      final newId = 'demo-group-${_uuid.v4()}';
+      final group = Conversation(
+        id: newId,
+        type: ConversationType.group,
+        title: title.trim(),
+        participantIds: [_currentUser!.id, ...memberUserIds],
+        adminIds: [_currentUser!.id],
+        avatarInitials: avatarInitials ?? _initials(title),
+        avatarColorHex: avatarColorHex ?? '0xFF8B5CF6',
+        lastMessageText: 'Group created',
+        lastMessageTime: DateTime.now(),
+        lastMessageSenderId: _currentUser!.id,
+        encryptionStatus: EncryptionStatus.encrypted,
+      );
+      _conversationsById[newId] = group;
+      _messagesByChatId[newId] = <ChatMessage>[
+        ChatMessage(
+          id: _uuid.v4(),
+          conversationId: newId,
+          senderId: _currentUser!.id,
+          type: MessageType.system,
+          text: '${_currentUser!.displayName} created group "$title"',
+          createdAt: DateTime.now(),
+          deliveryState: DeliveryState.read,
+        ),
+      ];
+      notifyListeners();
+      return group;
+    }
     final raw = await _client.rpc(
       'create_group_conversation',
       params: <String, dynamic>{
@@ -1053,6 +1468,51 @@ class ChatyBackendService extends ChangeNotifier {
     if (me == null) throw Exception('Authentication required.');
     if (!_conversationsById.containsKey(conversationId))
       throw Exception('Conversation not found.');
+
+    if (_isDemoMode) {
+      final effectiveClientMessageId = clientMessageId ?? _uuid.v4();
+      final metadata = <String, dynamic>{
+        if (replyToMessageId != null) 'reply_to_message_id': replyToMessageId,
+        if (replyToPreviewText != null)
+          'reply_to_preview_text': replyToPreviewText,
+        if (replyToSenderName != null) 'reply_to_sender_name': replyToSenderName,
+        if (linkedTaskId != null) 'linked_task_id': linkedTaskId,
+        ...?extraMetadata,
+      };
+      final demoMsg = ChatMessage(
+        id: effectiveClientMessageId,
+        conversationId: conversationId,
+        senderId: me.id,
+        type: type,
+        text: text.trim(),
+        attachment: attachment,
+        replyToMessageId: replyToMessageId,
+        replyToPreviewText: replyToPreviewText,
+        replyToSenderName: replyToSenderName,
+        linkedTaskId: linkedTaskId,
+        metadata: metadata,
+        createdAt: DateTime.now(),
+        deliveryState: DeliveryState.delivered,
+      );
+      final list = _messagesByChatId.putIfAbsent(
+        conversationId,
+        () => <ChatMessage>[],
+      );
+      list.add(demoMsg);
+      final conv = _conversationsById[conversationId];
+      if (conv != null) {
+        _conversationsById[conversationId] = conv.copyWith(
+          lastMessageText: text.trim().isNotEmpty
+              ? text.trim()
+              : (type == MessageType.image ? '📷 Photo' : 'Attachment'),
+          lastMessageTime: DateTime.now(),
+          lastMessageSenderId: me.id,
+        );
+      }
+      notifyListeners();
+      return demoMsg;
+    }
+
     if (!locator.isRegistered<MlsE2eeService>()) {
       throw StateError('Encrypted message transport is unavailable.');
     }
@@ -1376,6 +1836,7 @@ class ChatyBackendService extends ChangeNotifier {
     String messageId,
     String emoji,
   ) async {
+    if (_isDemoMode) return;
     try {
       await _client.rpc(
         'toggle_message_reaction',
@@ -1404,6 +1865,7 @@ class ChatyBackendService extends ChangeNotifier {
         notifyListeners();
       }
     }
+    if (_isDemoMode) return;
     try {
       await _client.rpc(
         'edit_chat_message',
@@ -1443,6 +1905,24 @@ class ChatyBackendService extends ChangeNotifier {
     String messageId,
     bool forEveryone,
   ) async {
+    if (_isDemoMode) {
+      final list = _messagesByChatId[conversationId];
+      if (list != null) {
+        if (forEveryone) {
+          final idx = list.indexWhere((m) => m.id == messageId);
+          if (idx != -1) {
+            list[idx] = list[idx].copyWith(
+              isDeletedForEveryone: true,
+              text: 'This message was deleted',
+            );
+          }
+        } else {
+          list.removeWhere((m) => m.id == messageId);
+        }
+        notifyListeners();
+      }
+      return;
+    }
     await _client.rpc(
       'delete_chat_message',
       params: <String, dynamic>{
@@ -1458,6 +1938,14 @@ class ChatyBackendService extends ChangeNotifier {
   }
 
   Future<void> markAsRead(String conversationId) async {
+    if (_isDemoMode) {
+      final current = _conversationsById[conversationId];
+      if (current != null && current.unreadCount != 0) {
+        _conversationsById[conversationId] = current.copyWith(unreadCount: 0);
+        notifyListeners();
+      }
+      return;
+    }
     if (_shouldSendReadReceipts(conversationId)) {
       await _client.rpc(
         'mark_conversation_read',
@@ -1501,6 +1989,7 @@ class ChatyBackendService extends ChangeNotifier {
       );
       notifyListeners();
     }
+    if (_isDemoMode) return;
     try {
       await _client.rpc(
         'mark_conversation_unread',
@@ -1515,6 +2004,7 @@ class ChatyBackendService extends ChangeNotifier {
     _conversationsById.remove(conversationId);
     _messagesByChatId.remove(conversationId);
     notifyListeners();
+    if (_isDemoMode) return;
     try {
       await _client.rpc(
         'delete_conversation',
@@ -1533,6 +2023,20 @@ class ChatyBackendService extends ChangeNotifier {
   }
 
   void setConversationState(String conversationId, String field, bool value) {
+    if (_isDemoMode) {
+      final current = _conversationsById[conversationId];
+      if (current != null) {
+        if (field == 'pinned') {
+          _conversationsById[conversationId] = current.copyWith(isPinned: value);
+        } else if (field == 'archived') {
+          _conversationsById[conversationId] = current.copyWith(isArchived: value);
+        } else if (field == 'muted') {
+          _conversationsById[conversationId] = current.copyWith(isMuted: value);
+        }
+        notifyListeners();
+      }
+      return;
+    }
     unawaited(_setConversationStateAsync(conversationId, field, value));
   }
 
@@ -1559,6 +2063,21 @@ class ChatyBackendService extends ChangeNotifier {
     String field,
     bool value,
   ) {
+    if (_isDemoMode) {
+      final list = _messagesByChatId[conversationId];
+      if (list != null) {
+        final idx = list.indexWhere((m) => m.id == messageId);
+        if (idx != -1) {
+          if (field == 'pinned') {
+            list[idx] = list[idx].copyWith(isPinned: value);
+          } else if (field == 'starred') {
+            list[idx] = list[idx].copyWith(isStarred: value);
+          }
+          notifyListeners();
+        }
+      }
+      return;
+    }
     unawaited(_setMessageStateAsync(conversationId, messageId, field, value));
   }
 
@@ -1600,6 +2119,7 @@ class ChatyBackendService extends ChangeNotifier {
   }
 
   void _persistDraft(String conversationId, String draft) {
+    if (_isDemoMode) return;
     unawaited(
       _client.rpc(
         'set_conversation_draft',
@@ -1621,6 +2141,25 @@ class ChatyBackendService extends ChangeNotifier {
     required DateTime dueAt,
     List<String> labels = const <String>[],
   }) async {
+    if (_isDemoMode && _currentUser != null) {
+      final newTask = ChatTask(
+        id: 'demo-task-${_uuid.v4()}',
+        sourceConversationId: sourceConversationId,
+        sourceMessageId: sourceMessageId,
+        title: title.trim(),
+        description: description.trim(),
+        creatorId: _currentUser!.id,
+        assigneeIds: assigneeIds,
+        priority: priority,
+        dueAt: dueAt,
+        labels: labels,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      _tasks.insert(0, newTask);
+      notifyListeners();
+      return newTask;
+    }
     final clientTaskId = _uuid.v4();
     final raw = await _client.rpc(
       'create_chat_task',
@@ -1660,6 +2199,7 @@ class ChatyBackendService extends ChangeNotifier {
       );
       notifyListeners();
     }
+    if (_isDemoMode) return;
     await _client.rpc(
       'update_task_status',
       params: <String, dynamic>{
@@ -1693,6 +2233,7 @@ class ChatyBackendService extends ChangeNotifier {
       );
       notifyListeners();
     }
+    if (_isDemoMode) return;
     await _client.rpc(
       'update_chat_task',
       params: <String, dynamic>{
@@ -1712,6 +2253,7 @@ class ChatyBackendService extends ChangeNotifier {
   Future<void> deleteTask(String taskId) async {
     _tasks.removeWhere((t) => t.id == taskId);
     notifyListeners();
+    if (_isDemoMode) return;
     try {
       await _client.from('tasks').delete().eq('id', taskId);
     } catch (e, stackTrace) {
@@ -1722,6 +2264,12 @@ class ChatyBackendService extends ChangeNotifier {
   }
 
   Future<void> updateCurrentUser(UserProfile updated) async {
+    if (_isDemoMode) {
+      _currentUser = updated;
+      _usersById[updated.id] = updated;
+      notifyListeners();
+      return;
+    }
     final authUser = _client.auth.currentUser;
     if (authUser == null || authUser.id != updated.id) {
       throw Exception('You can only update the signed-in profile.');
@@ -1749,6 +2297,14 @@ class ChatyBackendService extends ChangeNotifier {
   }
 
   Future<void> setPresence(PresenceState presence) async {
+    if (_isDemoMode) {
+      if (_currentUser != null) {
+        _currentUser = _currentUser!.copyWith(presence: presence);
+        _usersById[_currentUser!.id] = _currentUser!;
+        notifyListeners();
+      }
+      return;
+    }
     final authUser = _client.auth.currentUser;
     if (authUser == null) return;
     final privacy = _currentPrivacy();
@@ -1785,19 +2341,57 @@ class ChatyBackendService extends ChangeNotifier {
   }
 
   void addStory(String content) {
+    if (_isDemoMode && _currentUser != null) {
+      final story = UpdateStory(
+        id: 'demo-story-${_uuid.v4()}',
+        userId: _currentUser!.id,
+        content: content,
+        timestamp: DateTime.now(),
+        isViewed: false,
+      );
+      _stories.insert(0, story);
+      notifyListeners();
+      return;
+    }
     throw UnsupportedError(
       'Status publishing requires the production media/status service.',
     );
   }
 
-  void markStoryViewed(String storyId) {}
+  void markStoryViewed(String storyId) {
+    if (_isDemoMode) {
+      final idx = _stories.indexWhere((s) => s.id == storyId);
+      if (idx != -1) {
+        _stories[idx] = _stories[idx].copyWith(isViewed: true);
+        notifyListeners();
+      }
+      return;
+    }
+  }
 
   void logCall({
     required String receiverId,
     required CallType type,
     required CallDirection direction,
     required int durationSeconds,
-  }) {}
+  }) {
+    if (_isDemoMode) {
+      final currentUserId = _currentUser?.id ?? 'demo-user-id';
+      final record = CallRecord(
+        id: 'demo-call-${_uuid.v4()}',
+        callerId: direction == CallDirection.outgoing
+            ? currentUserId
+            : receiverId,
+        participantIds: [currentUserId, receiverId],
+        type: type,
+        direction: direction,
+        timestamp: DateTime.now(),
+        durationSeconds: durationSeconds,
+      );
+      addCall(record);
+      return;
+    }
+  }
 
   void revokeLinkedDevice(String deviceId) {
     _linkedDevices.removeWhere(
@@ -1807,6 +2401,17 @@ class ChatyBackendService extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    if (_isDemoMode) {
+      _isDemoMode = false;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('chaty_demo_mode_active');
+      } catch (e) {
+        debugPrint('Failed to clear demo mode flag: $e');
+      }
+      await _handleSession(null);
+      return;
+    }
     try {
       await setPresence(PresenceState.offline);
     } catch (e, stackTrace) {

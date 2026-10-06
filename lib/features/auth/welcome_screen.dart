@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../data/services/backend_service.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/app_icon_controller.dart';
+import '../../ui/core/persistence/preferences_storage.dart';
 import '../../ui/core/theme/theme_controller.dart';
 import '../../ui/core/widgets/app_brand_icon.dart';
+import '../chats/main_navigation_shell.dart';
 import 'login_screen.dart';
 import 'register_screen.dart';
 import 'widgets/auth_components.dart';
@@ -82,6 +85,43 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                 ),
                 theme: theme,
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final user = await locator<ChatyBackendService>().loginAsDemo();
+                  await LocalPreferencesStorage.setStoredUserId(user.id);
+                  if (!context.mounted) return;
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const MainNavigationShell(),
+                    ),
+                    (route) => false,
+                  );
+                },
+                icon: Icon(
+                  Icons.bolt_rounded,
+                  size: 20,
+                  color: theme.accentColor,
+                ),
+                label: Text(
+                  'Explore in Demo Mode',
+                  style: TextStyle(
+                    color: theme.primaryTextColor,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(50),
+                  side: BorderSide(
+                    color: theme.accentColor.withValues(alpha: 0.4),
+                    width: 1.4,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
               ),
               const SizedBox(height: 24),
             ],

@@ -41,16 +41,19 @@ class ChatySettingsSection extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 9),
-          Container(
+          Material(
+            color: scheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(20),
             clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: scheme.outlineVariant.withValues(alpha: .55),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: scheme.outlineVariant.withValues(alpha: .55),
+                ),
               ),
+              child: Column(children: _withDividers(context)),
             ),
-            child: Column(children: _withDividers(context)),
           ),
         ],
       ),

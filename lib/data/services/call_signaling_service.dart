@@ -274,6 +274,21 @@ class CallSignalingService extends ChangeNotifier {
     if (session == null || session.state.isTerminal) {
       return Future<void>.value();
     }
+    if (session.isDemo) {
+      _ringTimeoutTimer?.cancel();
+      _stopDurationTimer();
+      _currentSession = session.copyWith(
+        state: CallSessionState.ended,
+        endedAt: DateTime.now(),
+      );
+      notifyListeners();
+      Future.delayed(const Duration(milliseconds: 350), () {
+        _currentSession = null;
+        _callDurationSeconds = 0;
+        notifyListeners();
+      });
+      return Future<void>.value();
+    }
     if (_endingCallId == session.callId && _endCallFuture != null) {
       return _endCallFuture!;
     }
@@ -314,6 +329,84 @@ class CallSignalingService extends ChangeNotifier {
     }
   }
 
+  /// Starts an isolated demo call session that walks through
+  /// initiating -> ringing -> connected without needing external network signaling.
+  Future<void> startDemoCall({
+    required String remoteUserId,
+    required String remoteDisplayName,
+    String? remoteAvatarInitials,
+    String? remoteAvatarColorHex,
+    bool isVideo = false,
+  }) async {
+    _ringTimeoutTimer?.cancel();
+    _stopDurationTimer();
+    _callDurationSeconds = 0;
+
+    final callId = 'demo-${_uuid.v4()}';
+    _currentSession = ChatyCallSession(
+      callId: callId,
+      remoteUserId: remoteUserId,
+      remoteDisplayName: remoteDisplayName,
+      remoteAvatarInitials: remoteAvatarInitials,
+      remoteAvatarColorHex: remoteAvatarColorHex,
+      isVideo: isVideo,
+      isOutgoing: true,
+      state: CallSessionState.initiating,
+      startedAt: DateTime.now(),
+      audioRoute: isVideo ? AudioRouteType.speaker : AudioRouteType.earpiece,
+      isDemo: true,
+    );
+    notifyListeners();
+
+    // Transition from initiating (calling) to ringing after 1.2s
+    _ringTimeoutTimer = Timer(const Duration(milliseconds: 1200), () {
+      final s = _currentSession;
+      if (s == null || !s.isDemo || s.state.isTerminal) return;
+      _currentSession = s.copyWith(state: CallSessionState.ringing);
+      notifyListeners();
+
+      // Transition from ringing to connected after 1.8s
+      _ringTimeoutTimer = Timer(const Duration(milliseconds: 1800), () {
+        final current = _currentSession;
+        if (current == null || !current.isDemo || current.state.isTerminal) return;
+        _currentSession = current.copyWith(
+          state: CallSessionState.connected,
+          connectedAt: DateTime.now(),
+        );
+        _callDurationSeconds = 0;
+        _durationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+          _callDurationSeconds++;
+          notifyListeners();
+        });
+        notifyListeners();
+      });
+    });
+  }
+
+  void rejectDemoCall() {
+    final session = _currentSession;
+    if (session == null || !session.isDemo) return;
+    _ringTimeoutTimer?.cancel();
+    _stopDurationTimer();
+    _currentSession = session.copyWith(
+      state: CallSessionState.declined,
+      endedAt: DateTime.now(),
+    );
+    notifyListeners();
+  }
+
+  void failDemoCall() {
+    final session = _currentSession;
+    if (session == null || !session.isDemo) return;
+    _ringTimeoutTimer?.cancel();
+    _stopDurationTimer();
+    _currentSession = session.copyWith(
+      state: CallSessionState.failed,
+      endedAt: DateTime.now(),
+    );
+    notifyListeners();
+  }
+
   Future<void> sendCallReaction(String emoji) async {
     throw UnsupportedError(
       'Call reactions are not available in production yet.',
@@ -322,9 +415,15 @@ class CallSignalingService extends ChangeNotifier {
 
   void toggleMute() {
     final session = _currentSession;
-    final stream = _localStream;
-    if (session == null || stream == null) return;
+    if (session == null) return;
     final nextMuted = !session.isMuted;
+    if (session.isDemo) {
+      _currentSession = session.copyWith(isMuted: nextMuted);
+      notifyListeners();
+      return;
+    }
+    final stream = _localStream;
+    if (stream == null) return;
     for (final track in stream.getAudioTracks()) {
       track.enabled = !nextMuted;
     }
@@ -334,9 +433,15 @@ class CallSignalingService extends ChangeNotifier {
 
   void toggleCamera() {
     final session = _currentSession;
-    final stream = _localStream;
-    if (session == null || stream == null || !session.isVideo) return;
+    if (session == null || !session.isVideo) return;
     final nextCameraOff = !session.isCameraOff;
+    if (session.isDemo) {
+      _currentSession = session.copyWith(isCameraOff: nextCameraOff);
+      notifyListeners();
+      return;
+    }
+    final stream = _localStream;
+    if (stream == null) return;
     for (final track in stream.getVideoTracks()) {
       track.enabled = !nextCameraOff;
     }
@@ -439,6 +544,11 @@ class CallSignalingService extends ChangeNotifier {
   Future<void> setAudioRoute(AudioRouteType route) async {
     final session = _currentSession;
     if (session == null) return;
+    if (session.isDemo) {
+      _currentSession = session.copyWith(audioRoute: route);
+      notifyListeners();
+      return;
+    }
     if (route != AudioRouteType.speaker && route != AudioRouteType.earpiece) {
       throw UnsupportedError(
         'Select Bluetooth/headset through the system audio route.',

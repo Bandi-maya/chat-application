@@ -35,6 +35,9 @@ class ChatyPreferencesController extends ChangeNotifier {
   MessageAutomationPreferences _automation =
       const MessageAutomationPreferences();
   NavigationEffectPreferences _effects = const NavigationEffectPreferences();
+  UniversalPreferences _universal = const UniversalPreferences();
+  StatusPreferences _status = const StatusPreferences();
+  NotificationToastPreferences _toasts = const NotificationToastPreferences();
   Map<String, Object?> _gbFeatures = GbFeatureCatalog.defaults;
 
   final Set<String> _starredFavorites = <String>{};
@@ -73,6 +76,9 @@ class ChatyPreferencesController extends ChangeNotifier {
   NotificationPreferences get notification => _notification;
   MessageAutomationPreferences get automation => _automation;
   NavigationEffectPreferences get effects => _effects;
+  UniversalPreferences get universal => _universal;
+  StatusPreferences get status => _status;
+  NotificationToastPreferences get toasts => _toasts;
   Map<String, Object?> get gbFeatures =>
       Map<String, Object?>.unmodifiable(_gbFeatures);
   Set<String> get starredFavorites =>
@@ -277,6 +283,18 @@ class ChatyPreferencesController extends ChangeNotifier {
       PreferenceKeys.effects,
       (m) => _effects = NavigationEffectPreferences.fromMap(m),
     );
+    apply(
+      PreferenceKeys.universal,
+      (m) => _universal = UniversalPreferences.fromMap(m),
+    );
+    apply(
+      PreferenceKeys.status,
+      (m) => _status = StatusPreferences.fromMap(m),
+    );
+    apply(
+      PreferenceKeys.toasts,
+      (m) => _toasts = NotificationToastPreferences.fromMap(m),
+    );
 
     final gb = data[PreferenceKeys.gbFeatures];
     if (gb is Map) {
@@ -332,6 +350,9 @@ class ChatyPreferencesController extends ChangeNotifier {
     PreferenceKeys.notification: _notification.toMap(),
     PreferenceKeys.automation: _automation.toMap(),
     PreferenceKeys.effects: _effects.toMap(),
+    PreferenceKeys.universal: _universal.toMap(),
+    PreferenceKeys.status: _status.toMap(),
+    PreferenceKeys.toasts: _toasts.toMap(),
     PreferenceKeys.gbFeatures: _gbFeatures,
     PreferenceKeys.favorites: _starredFavorites.toList(growable: false),
   };
@@ -663,6 +684,42 @@ class ChatyPreferencesController extends ChangeNotifier {
   }) {
     _automation = newPrefs;
     if (logTitle != null) _logHistory('automation', logTitle, prevVal, newVal);
+    _persist();
+    notifyListeners();
+  }
+
+  void updateUniversal(
+    UniversalPreferences newPrefs, {
+    String? logTitle,
+    dynamic prevVal,
+    dynamic newVal,
+  }) {
+    _universal = newPrefs;
+    if (logTitle != null) _logHistory('universal', logTitle, prevVal, newVal);
+    _persist();
+    notifyListeners();
+  }
+
+  void updateStatus(
+    StatusPreferences newPrefs, {
+    String? logTitle,
+    dynamic prevVal,
+    dynamic newVal,
+  }) {
+    _status = newPrefs;
+    if (logTitle != null) _logHistory('status', logTitle, prevVal, newVal);
+    _persist();
+    notifyListeners();
+  }
+
+  void updateToasts(
+    NotificationToastPreferences newPrefs, {
+    String? logTitle,
+    dynamic prevVal,
+    dynamic newVal,
+  }) {
+    _toasts = newPrefs;
+    if (logTitle != null) _logHistory('toasts', logTitle, prevVal, newVal);
     _persist();
     notifyListeners();
   }

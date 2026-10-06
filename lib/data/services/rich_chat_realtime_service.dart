@@ -64,12 +64,141 @@ class RichChatRealtimeService extends ChangeNotifier {
   final Set<String> _trackedConversationIds = <String>{};
   final Set<String> _revokeAlerted = <String>{};
   final Map<String, String> _profileFingerprints = <String, String>{};
+
+  /// Message IDs for which we have already emitted an incoming notification.
+  /// Prevents duplicate toasts on reconnect or realtime stream replay.
+  final Set<String> _notifiedMessageIds = <String>{};
+  static const int _maxNotifiedIds = 512;
+
+  /// The conversation ID that the user is currently actively viewing.
+  /// Set this via [setActiveConversation] when entering/leaving a chat screen.
+  /// Notifications for this conversation are suppressed while it is active.
+  String? activeConversationId;
+
   bool _disposed = false;
   bool _initializing = false;
 
   String? get _currentUserId => _client.auth.currentUser?.id;
 
   bool get isConnected => _channel != null;
+
+  /// Call when the user enters a conversation screen.
+  /// Suppresses incoming message notifications for [conversationId] while active.
+  void setActiveConversation(String? conversationId) {
+    activeConversationId = conversationId;
+  }
+
+  /// Triggers an in-app toast notification for an incoming message.
+  ///
+  /// Rules:
+  /// - Only fires for messages from other users (not self).
+  /// - Suppressed when the user is actively viewing the same conversation.
+  /// - Suppressed when the conversation is muted.
+  /// - Suppressed when global notifications are disabled.
+  /// - Deduplicates: same message ID will not toast twice.
+  void _triggerIncomingMessageNotification({
+    required String messageId,
+    required String conversationId,
+    required String senderId,
+    required Map<String, dynamic> row,
+  }) {
+    // Guard: never notify for own messages.
+    if (senderId == _currentUserId) return;
+
+    // Guard: global notifications disabled.
+    if (!_preferences.notification.enableGlobalNotifications) return;
+
+    // Guard: user is actively viewing this conversation.
+    if (activeConversationId == conversationId) return;
+
+    // Guard: conversation is muted — check dataStore if available.
+    final conversation = _backend.conversations
+        .where((c) => c.id == conversationId)
+        .firstOrNull;
+    if (conversation?.isMuted == true) return;
+
+    // Guard: deduplication — don't notify for same message twice.
+    if (_notifiedMessageIds.contains(messageId)) return;
+    _notifiedMessageIds.add(messageId);
+    // Evict oldest IDs if the set grows too large.
+    if (_notifiedMessageIds.length > _maxNotifiedIds) {
+      _notifiedMessageIds.remove(_notifiedMessageIds.first);
+    }
+
+    // Resolve sender profile.
+    final profile = _backend.getUserById(senderId);
+    final senderName = profile?.displayName ?? 'New message';
+
+    // Build preview body respecting privacy setting.
+    final String previewBody;
+    if (!_preferences.notification.showMessagePreview) {
+      previewBody = 'New message';
+    } else {
+      final messageType = row['message_type']?.toString() ?? row['type']?.toString() ?? 'text';
+      final textContent = row['content']?.toString() ?? row['text']?.toString() ?? '';
+      previewBody = _buildMessagePreview(messageType, textContent);
+    }
+
+    // Choose icon by message type.
+    final messageType = row['message_type']?.toString() ?? row['type']?.toString() ?? 'text';
+    final icon = _iconForMessageType(messageType);
+    final color = _preferences.gbColor('incoming_message_toast_color') ??
+        const Color(0xFF6366F1);
+
+    _notifications.triggerEventNotification(
+      title: senderName,
+      body: previewBody,
+      icon: icon,
+      color: color,
+      userId: senderId,
+      avatarInitials: profile?.avatarInitials,
+      avatarColorHex: profile?.avatarColorHex,
+    );
+  }
+
+  static String _buildMessagePreview(String messageType, String text) {
+    switch (messageType) {
+      case 'image':
+        return '📷 Photo';
+      case 'video':
+        return '🎥 Video';
+      case 'audio':
+        return '🎤 Voice message';
+      case 'document':
+        return '📄 Document';
+      case 'location':
+        return '📍 Location';
+      case 'contact':
+        return '👤 Contact';
+      case 'task':
+        return '✅ Task';
+      default:
+        return text.isNotEmpty
+            ? (text.length > 80 ? '${text.substring(0, 80)}…' : text)
+            : 'New message';
+    }
+  }
+
+  static IconData _iconForMessageType(String messageType) {
+    switch (messageType) {
+      case 'image':
+        return Icons.image_rounded;
+      case 'video':
+        return Icons.videocam_rounded;
+      case 'audio':
+        return Icons.mic_rounded;
+      case 'document':
+        return Icons.attach_file_rounded;
+      case 'location':
+        return Icons.location_on_rounded;
+      case 'contact':
+        return Icons.person_rounded;
+      case 'task':
+        return Icons.check_circle_outline_rounded;
+      default:
+        return Icons.chat_bubble_rounded;
+    }
+  }
 
   PresenceState presenceFor(String userId) =>
       _presenceByUserId[userId] ?? PresenceState.offline;
@@ -459,6 +588,13 @@ class RichChatRealtimeService extends ChangeNotifier {
                 senderId != _currentUserId &&
                 conversationId.isNotEmpty) {
               unawaited(markConversationDelivered(conversationId));
+              // Trigger an in-app toast for the incoming message.
+              _triggerIncomingMessageNotification(
+                messageId: id,
+                conversationId: conversationId,
+                senderId: senderId,
+                row: Map<String, dynamic>.from(row),
+              );
             }
 
             if (!_trackedConversationIds.contains(conversationId)) return;

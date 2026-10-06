@@ -48,6 +48,9 @@ class PreferenceKeys {
   static const String notification = 'notification';
   static const String automation = 'automation';
   static const String effects = 'effects';
+  static const String universal = 'universal';
+  static const String status = 'status';
+  static const String toasts = 'toasts';
   static const String gbFeatures = 'gbFeatures';
   static const String favorites = 'favorites';
 
@@ -61,6 +64,9 @@ class PreferenceKeys {
     notification,
     automation,
     effects,
+    universal,
+    status,
+    toasts,
   ];
 
   // ---------------------------------------------------------------------------
