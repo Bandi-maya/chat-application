@@ -56,7 +56,7 @@ Chain verified per row: CONTROL → STATE → PERSIST (`toMap`/`fromMap`) → CO
 | Pattern invisible | Security Center | `app_lock_overlay` rendering | ✅ |
 | Pattern vibration | Security Center | `app_lock_overlay` haptics | ✅ |
 | Hide Notification Content when Locked | Security Center | toast body redaction under lock barrier | ✅ |
-| Locked conversations | chat-list selection + Security Center | `preferences_controller.isConversationLocked` → lock sheet on open | ✅ |
+| Locked conversations | chat-l![alt text](image.png)ist selection + Security Center | `preferences_controller.isConversationLocked` → lock sheet on open | ✅ |
 
 ## 3 · Home (`HomePreferences`, 16 fields)
 

@@ -64,10 +64,7 @@ class ProfileMediaService {
     required bool isAvatar,
     BuildContext? context,
   }) async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null || userId.isEmpty) {
-      throw Exception('Sign in to change your profile media.');
-    }
+    final userId = _client.auth.currentUser?.id ?? 'local_user';
 
     final picked = await _picker.pickImage(
       source: source == ProfileMediaSource.camera

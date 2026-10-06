@@ -54,7 +54,7 @@ class ChatyCallForegroundService {
   }
 
   Future<void> initialize() async {
-    if (_initialized || !Platform.isAndroid) return;
+    if (_initialized || kIsWeb || !Platform.isAndroid) return;
     FlutterForegroundTask.initCommunicationPort();
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
@@ -82,7 +82,7 @@ class ChatyCallForegroundService {
   }
 
   Future<void> sync(ChatyCallSession? session) async {
-    if (!Platform.isAndroid) return;
+    if (kIsWeb || !Platform.isAndroid) return;
     await initialize();
 
     if (!shouldRunFor(session)) {
@@ -142,7 +142,7 @@ class ChatyCallForegroundService {
   }
 
   Future<void> stop() async {
-    if (!Platform.isAndroid || !_initialized) return;
+    if (kIsWeb || !Platform.isAndroid || !_initialized) return;
     try {
       if (await FlutterForegroundTask.isRunningService) {
         await FlutterForegroundTask.stopService();

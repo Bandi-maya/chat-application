@@ -7,7 +7,7 @@ void main() {
         .map((variant) => variant.id)
         .toList();
     expect(ids.toSet().length, ids.length);
-    expect(ids.length, 6);
+    expect(ids.length, 7);
 
     for (final variant in LauncherIconVariant.values) {
       expect(LauncherIconVariantMetadata.fromId(variant.id), variant);
@@ -16,11 +16,11 @@ void main() {
   });
 
   test(
-    'unknown launcher icon preference safely falls back to warm default',
+    'unknown launcher icon preference safely falls back to bird default',
     () {
       expect(
         LauncherIconVariantMetadata.fromId('removed_future_icon'),
-        LauncherIconVariant.warm,
+        LauncherIconVariant.bird,
       );
       expect(
         LauncherIconVariantMetadata.fromId('original'),

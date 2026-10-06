@@ -133,6 +133,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   void initState() {
     super.initState();
     _realtime = locator<RichChatRealtimeService>();
+    _realtime.setActiveConversation(widget.conversationId);
     _relationships = locator<ContactRelationshipService>();
     _attachments = ChatAttachmentActions(
       conversationId: widget.conversationId,
@@ -226,6 +227,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   @override
   void dispose() {
+    if (_realtime.activeConversationId == widget.conversationId) {
+      _realtime.setActiveConversation(null);
+    }
     _typingIdleTimer?.cancel();
     _voiceTimer?.cancel();
     if (_typingPublished)
@@ -2137,71 +2141,181 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   // ---------------------------------------------------------------------------
   // Chat overflow menu (3-dots in the header): everything below is REAL.
   // ---------------------------------------------------------------------------
+  Widget _chatPopupMenuItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    bool isDestructive = false,
+  }) {
+    final theme = _theme;
+    final color = isDestructive ? theme.dangerColor : theme.primaryTextColor;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: color.withValues(alpha: isDestructive ? 1.0 : 0.8)),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _openChatMenu(
     BuildContext anchorContext,
     Conversation conversation,
     UserProfile? otherUser,
   ) {
+    HapticFeedback.lightImpact();
     final isDirect =
         conversation.type == ConversationType.direct && otherUser != null;
-    ChatyMenuSheet.show(
-      anchorContext,
-      title: conversation.title,
-      items: [
-        ChatyMenuItem(
-          icon: isDirect
-              ? Icons.person_outline_rounded
-              : Icons.groups_2_rounded,
-          label: isDirect ? 'View contact info' : 'View group info',
-          onTap: () {
-            if (isDirect) {
-              _openContactInfo(conversation, otherUser);
-            } else {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => GroupInfoScreen(
-                    theme: _theme,
-                    dataStore: widget.dataStore,
-                    conversationId: widget.conversationId,
+    final topOffset = MediaQuery.of(context).padding.top + kToolbarHeight - 6;
+    final theme = _theme;
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Dismiss',
+      barrierColor: Colors.black26,
+      transitionDuration: const Duration(milliseconds: 180),
+      pageBuilder: (ctx, anim1, anim2) {
+        return Stack(
+          children: [
+            Positioned(
+              top: topOffset,
+              right: 12,
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  width: 240,
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(ctx).size.height * 0.75,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.surfaceColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      width: 1.1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.4),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _chatPopupMenuItem(
+                            icon: isDirect
+                                ? Icons.person_outline_rounded
+                                : Icons.groups_2_rounded,
+                            title: isDirect ? 'View Contact Info' : 'View Group Info',
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              if (isDirect) {
+                                _openContactInfo(conversation, otherUser);
+                              } else {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => GroupInfoScreen(
+                                      theme: _theme,
+                                      dataStore: widget.dataStore,
+                                      conversationId: widget.conversationId,
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                          ),
+                          _chatPopupMenuItem(
+                            icon: Icons.search_rounded,
+                            title: 'Search in Chat',
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _toggleInChatSearch();
+                            },
+                          ),
+                          _chatPopupMenuItem(
+                            icon: Icons.wallpaper_rounded,
+                            title: 'Chat Wallpaper',
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _openWallpaperPicker();
+                            },
+                          ),
+                          _chatPopupMenuItem(
+                            icon: conversation.isMuted
+                                ? Icons.notifications_active_rounded
+                                : Icons.notifications_off_rounded,
+                            title: conversation.isMuted
+                                ? 'Unmute Notifications'
+                                : 'Mute Notifications',
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              widget.dataStore.toggleMuteConversation(conversation.id);
+                            },
+                          ),
+                          _chatPopupMenuItem(
+                            icon: Icons.delete_sweep_rounded,
+                            title: 'Clear Conversation',
+                            isDestructive: true,
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _clearConversation();
+                            },
+                          ),
+                          if (isDirect)
+                            _chatPopupMenuItem(
+                              icon: Icons.block_rounded,
+                              title: 'Block ',
+                              isDestructive: true,
+                              onTap: () {
+                                Navigator.pop(ctx);
+                                _blockContact(otherUser);
+                              },
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              );
-            }
-          },
-        ),
-        ChatyMenuItem(
-          icon: Icons.search_rounded,
-          label: 'Search conversation',
-          onTap: _toggleInChatSearch,
-        ),
-        ChatyMenuItem(
-          icon: Icons.wallpaper_rounded,
-          label: 'Chat wallpaper',
-          onTap: _openWallpaperPicker,
-        ),
-        ChatyMenuItem(
-          icon: conversation.isMuted
-              ? Icons.notifications_active_rounded
-              : Icons.notifications_off_rounded,
-          label: conversation.isMuted
-              ? 'Unmute notifications'
-              : 'Mute notifications',
-          onTap: () => widget.dataStore.toggleMuteConversation(conversation.id),
-        ),
-        ChatyMenuItem(
-          icon: Icons.delete_sweep_rounded,
-          label: 'Clear conversation',
-          destructive: true,
-          onTap: _clearConversation,
-        ),
-        if (isDirect)
-          ChatyMenuItem(
-            icon: Icons.block_rounded,
-            label: 'Block ${otherUser.displayName.split(' ').first}',
-            destructive: true,
-            onTap: () => _blockContact(otherUser),
+              ),
+            ),
+          ],
+        );
+      },
+      transitionBuilder: (ctx, anim, secondaryAnim, child) {
+        return FadeTransition(
+          opacity: anim,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.92, end: 1.0).animate(
+              CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
+            ),
+            alignment: Alignment.topRight,
+            child: child,
           ),
-      ],
+        );
+      },
     );
   }
 
@@ -2804,67 +2918,133 @@ class _ComposerState extends State<_Composer>
       children: [
         Row(
           children: [
-            ChatyComposerActionButton(
-              theme: theme,
-              semanticsLabel: 'Cancel recording',
-              tooltip: 'Cancel recording',
-              icon: Icons.delete_outline_rounded,
-              iconColor: theme.dangerColor,
-              onTap: widget.voiceBusy ? null : widget.onVoiceCancel,
-            ),
-            const SizedBox(width: 10),
-            FadeTransition(
-              opacity: reduceMotion
-                  ? const AlwaysStoppedAnimation<double>(1)
-                  : Tween<double>(begin: 1, end: 0.35).animate(_pulse),
-              child: Container(
-                width: 9,
-                height: 9,
-                decoration: BoxDecoration(
-                  color: theme.dangerColor,
-                  shape: BoxShape.circle,
+            // LEFT: Distinct rounded floating delete/cancel button
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(22),
+                onTap: widget.voiceBusy ? null : widget.onVoiceCancel,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: theme.dangerColor.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: theme.dangerColor.withValues(alpha: 0.28),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.delete_outline_rounded,
+                    color: theme.dangerColor,
+                    size: 22,
+                  ),
                 ),
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              _time,
-              style: TextStyle(
-                color: theme.primaryTextColor,
-                fontSize: 14.5,
-                fontWeight: FontWeight.w700,
-                fontFeatures: const [FontFeature.tabularFigures()],
+            // CENTER: Rounded recording/waveform region
+            Expanded(
+              child: Container(
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: theme.secondaryTextColor.withValues(alpha: 0.12),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    FadeTransition(
+                      opacity: reduceMotion
+                          ? const AlwaysStoppedAnimation<double>(1)
+                          : Tween<double>(begin: 1, end: 0.35).animate(_pulse),
+                      child: Container(
+                        width: 9,
+                        height: 9,
+                        decoration: BoxDecoration(
+                          color: theme.dangerColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _time,
+                      style: TextStyle(
+                        color: theme.primaryTextColor,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                    if (widget.recordLocked) ...[
+                      const SizedBox(width: 4),
+                      Icon(Icons.lock_rounded, size: 12, color: theme.successColor),
+                    ],
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: widget.amplitudeProvider != null
+                          ? ChatyVoiceLevelMeter(levels: _levels, theme: theme)
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
+                ),
               ),
             ),
-            if (widget.recordLocked) ...[
-              const SizedBox(width: 6),
-              Icon(Icons.lock_rounded, size: 13, color: theme.successColor),
-            ],
-            const SizedBox(width: 12),
-            if (widget.amplitudeProvider != null)
-              Expanded(
-                child: ChatyVoiceLevelMeter(levels: _levels, theme: theme),
-              )
-            else
-              const Spacer(),
-            const SizedBox(width: 10),
-            ChatyComposerActionButton(
-              theme: theme,
-              semanticsLabel: 'Send voice note',
-              tooltip: 'Send voice note',
-              icon: Icons.send_rounded,
-              fillColor: theme.accentColor,
-              iconColor: theme.onAccentColor,
-              busy: widget.voiceBusy,
-              onTap: widget.voiceBusy ? null : widget.onVoiceSend,
+            const SizedBox(width: 8),
+            // RIGHT: Distinct rounded send/recording action button
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(22),
+                onTap: widget.voiceBusy ? null : widget.onVoiceSend,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: theme.accentColor,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.accentColor.withValues(alpha: 0.35),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: widget.voiceBusy
+                        ? SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                theme.onAccentColor,
+                              ),
+                            ),
+                          )
+                        : Icon(
+                            Icons.send_rounded,
+                            color: theme.onAccentColor,
+                            size: 20,
+                          ),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
         const SizedBox(height: 5),
         Text(
           widget.recordLocked
-              ? 'Recording locked • tap send or delete'
-              : 'Tap send to finish • slide left to cancel',
+              ? 'Recording locked • Tap send or delete'
+              : 'Tap send to finish • Slide left to cancel',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(color: theme.secondaryTextColor, fontSize: 11),

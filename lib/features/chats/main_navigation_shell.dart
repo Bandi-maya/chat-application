@@ -8,15 +8,20 @@ import '../../ui/core/controllers/appearance_variant_controller.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/gb/gb_theme_overrides.dart';
 import '../calls/calls_screen.dart';
-import '../settings/settings_root_screen.dart';
 import '../tasks/tasks_screen.dart';
 import '../updates/updates_screen.dart';
 import 'chats_home_screen.dart';
+import 'new_chat_screen.dart';
 import 'linked_devices_qr_screen.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/templates/template_shell.dart';
+import '../../data/services/call_signaling_service.dart';
+import '../../data/services/status_service.dart';
+import '../calls/ongoing_call_screen.dart';
+import '../camera/camera_capture_screen.dart';
+import '../tasks/task_create_edit_modal.dart';
 
 class MainNavigationShell extends StatefulWidget {
   const MainNavigationShell({super.key});
@@ -163,18 +168,6 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             activeIcon: Icons.call_rounded,
             builder: (ctx) => CallsScreen(theme: theme, dataStore: dataStore),
           ),
-          _NavDestinationItem(
-            id: 'settings',
-            label: 'Settings',
-            icon: Icons.settings_outlined,
-            activeIcon: Icons.settings_rounded,
-            builder: (ctx) => SettingsRootScreen(
-              preferencesController: preferencesController,
-              themeController: themeController,
-              dataStore: dataStore,
-              notificationService: notificationService,
-            ),
-          ),
           if (!showDesktopIcon)
             _NavDestinationItem(
               id: 'desktop',
@@ -191,27 +184,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             ),
         ];
 
-        // Apply max 4 direct navigation items rule:
-        // <= 4: Display all directly
-        // > 4: Display first 3 + More as 4th item
-        final bool hasOverflow = allDestinations.length > 4;
-        final List<_NavDestinationItem> primaryDestinations = hasOverflow
-            ? allDestinations.take(3).toList()
-            : allDestinations;
-        final List<_NavDestinationItem> overflowDestinations = hasOverflow
-            ? allDestinations.skip(3).toList()
-            : const <_NavDestinationItem>[];
-
-        final List<_NavDestinationItem> navItems = [
-          ...primaryDestinations,
-          if (hasOverflow)
-            const _NavDestinationItem(
-              id: 'more',
-              label: 'More',
-              icon: Icons.more_horiz_rounded,
-              activeIcon: Icons.more_horiz_rounded,
-            ),
-        ];
+        // All navigation icons directly displayed in bottom nav (Settings and More removed)
+        final List<_NavDestinationItem> navItems = allDestinations;
 
         final List<Widget> screens = allDestinations
             .map((item) => item.builder(context))
@@ -227,10 +201,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           });
         }
 
-        // Active index in bottom navigation bar
-        final int bottomNavSelectedIndex = hasOverflow
-            ? (effectiveIndex < 3 ? effectiveIndex : 3)
-            : effectiveIndex;
+        final int bottomNavSelectedIndex = effectiveIndex;
 
         return PopScope(
           canPop: false,
@@ -341,19 +312,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 selectedIndex: bottomNavSelectedIndex,
                 onDestinationTap: (idx) {
                   ChatyHaptics.selection();
-                  if (hasOverflow && idx == 3) {
-                    _showMoreMenu(
-                      context,
-                      theme: theme,
-                      overflowDestinations: overflowDestinations,
-                      onSelect: (overflowIdx) {
-                        final realIndex = 3 + overflowIdx;
-                        _selectRootDestination(realIndex);
-                      },
-                    );
-                  } else {
-                    _selectRootDestination(idx);
-                  }
+                  _selectRootDestination(idx);
                 },
               );
             },
@@ -381,6 +340,14 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       initialIndex: selectedIndex,
       child: Scaffold(
         backgroundColor: theme.backgroundColor,
+        floatingActionButton: _buildContextualFab(
+          context: context,
+          theme: theme,
+          colors: colors,
+          accent: brandPrimary,
+          activeItem: navItems[selectedIndex],
+        ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         body: SafeArea(
           bottom: false,
           child: Column(
@@ -905,6 +872,14 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       extendBody: false,
       backgroundColor: bg,
       body: content,
+      floatingActionButton: _buildContextualFab(
+        context: context,
+        theme: theme,
+        colors: colors,
+        accent: accent,
+        activeItem: navItems[selectedIndex],
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: SafeArea(
         top: false,
         child: Padding(
@@ -955,159 +930,317 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     );
   }
 
-  void _showMoreMenu(
-    BuildContext context, {
+  Widget _buildContextualFab({
+    required BuildContext context,
     required dynamic theme,
-    required List<_NavDestinationItem> overflowDestinations,
-    required ValueChanged<int> onSelect,
+    required AppColors colors,
+    required Color accent,
+    required _NavDestinationItem activeItem,
   }) {
+    final (IconData icon, String tooltip, VoidCallback action) =
+        switch (activeItem.id) {
+      'chats' => (
+          Icons.chat_bubble_rounded,
+          'New conversation',
+          () {
+            HapticFeedback.lightImpact();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => NewChatScreen(
+                  theme: theme,
+                  dataStore: locator<ChatyDataStore>(),
+                  preferencesController:
+                      locator<ChatyPreferencesController>(),
+                ),
+              ),
+            );
+          },
+        ),
+      'groups' => (
+          Icons.group_add_rounded,
+          'New group',
+          () {
+            HapticFeedback.lightImpact();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => NewChatScreen(
+                  theme: theme,
+                  dataStore: locator<ChatyDataStore>(),
+                  preferencesController:
+                      locator<ChatyPreferencesController>(),
+                ),
+              ),
+            );
+          },
+        ),
+      'updates' => (
+          Icons.camera_alt_rounded,
+          'New status',
+          () async {
+            HapticFeedback.lightImpact();
+            final result = await ChatyCameraCaptureScreen.open(
+              context,
+              mode: ChatyCaptureMode.story,
+            );
+            if (result != null && context.mounted) {
+              try {
+                await StatusService().publishMediaFile(
+                  path: result.path,
+                  mediaType: 'image',
+                  text: result.caption,
+                  displayName: 'chaty_story.jpg',
+                );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Status posted successfully.')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
+              }
+            }
+          },
+        ),
+      'tasks' => (
+          Icons.add_task_rounded,
+          'Create task',
+          () {
+            HapticFeedback.lightImpact();
+            final conversations =
+                locator<ChatyDataStore>().conversations;
+            showModalBottomSheet(
+              context: context,
+              backgroundColor: Colors.transparent,
+              isScrollControlled: true,
+              builder: (ctx) => TaskCreateEditModal(
+                theme: theme,
+                dataStore: locator<ChatyDataStore>(),
+                sourceConversationId: conversations.isNotEmpty
+                    ? conversations.first.id
+                    : 'general',
+              ),
+            );
+          },
+        ),
+      'calls' => (
+          Icons.add_ic_call_rounded,
+          'New call',
+          () {
+            HapticFeedback.lightImpact();
+            _openNewCallPicker(context, theme);
+          },
+        ),
+      'desktop' => (
+          Icons.qr_code_scanner_rounded,
+          'Scan QR',
+          () {
+            HapticFeedback.lightImpact();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => LinkedDevicesQrScreen(
+                  dataStore: locator<ChatyDataStore>(),
+                  relationshipService: locator(),
+                  preferencesController:
+                      locator<ChatyPreferencesController>(),
+                  themeController: locator<ThemeController>(),
+                  devicesOnly: true,
+                ),
+              ),
+            );
+          },
+        ),
+      _ => (
+          Icons.chat_bubble_rounded,
+          'New message',
+          () {
+            HapticFeedback.lightImpact();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => NewChatScreen(
+                  theme: theme,
+                  dataStore: locator<ChatyDataStore>(),
+                  preferencesController:
+                      locator<ChatyPreferencesController>(),
+                ),
+              ),
+            );
+          },
+        ),
+    };
+
+    return FloatingActionButton(
+      heroTag: 'chaty_contextual_nav_fab',
+      tooltip: tooltip,
+      shape: const CircleBorder(),
+      elevation: 4.5,
+      backgroundColor: accent,
+      foregroundColor: colors.onPrimary,
+      onPressed: action,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        transitionBuilder: (child, anim) {
+          return ScaleTransition(
+            scale: anim,
+            child: RotationTransition(
+              turns: Tween<double>(begin: 0.85, end: 1.0).animate(anim),
+              child: child,
+            ),
+          );
+        },
+        child: Icon(
+          icon,
+          key: ValueKey<String>(activeItem.id),
+          size: 24,
+        ),
+      ),
+    );
+  }
+
+  void _openNewCallPicker(BuildContext context, dynamic theme) {
+    final dataStore = locator<ChatyDataStore>();
+    final contacts = dataStore.contacts;
     final colors = context.colors;
+
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Container(
-            margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            decoration: BoxDecoration(
-              color: colors.surfaceElevated,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: colors.borderSubtle, width: 0.8),
-              boxShadow: [
-                BoxShadow(
-                  color: colors.shadow,
-                  blurRadius: 28,
-                  offset: const Offset(0, 10),
-                ),
-              ],
+      builder: (ctx) => Container(
+        height: MediaQuery.of(ctx).size.height * 0.65,
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          border: Border.all(color: colors.borderSubtle, width: 0.8),
+        ),
+        child: Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(
+                color: colors.borderSubtle,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    margin: const EdgeInsets.only(top: 10, bottom: 4),
-                    decoration: BoxDecoration(
-                      color: colors.foregroundTertiary.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 12, 12),
+              child: Row(
+                children: [
+                  Text(
+                    'Select Contact to Call',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: colors.foreground,
                     ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 10, 16, 10),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: colors.primary.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          Icons.grid_view_rounded,
-                          color: colors.primary,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'More Destinations',
-                              style: TextStyle(
-                                color: colors.foreground,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            Text(
-                              'Quick access to extended views & settings',
-                              style: TextStyle(
-                                color: colors.foregroundSecondary,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded),
-                        iconSize: 20,
-                        color: colors.foregroundSecondary,
-                        onPressed: () => Navigator.of(sheetContext).pop(),
-                      ),
-                    ],
+                  const Spacer(),
+                  IconButton(
+                    icon: Icon(Icons.close_rounded, color: colors.foregroundSecondary),
+                    onPressed: () => Navigator.of(ctx).pop(),
                   ),
-                ),
-                Divider(color: colors.divider, height: 1),
-                Flexible(
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 8,
-                      horizontal: 8,
-                    ),
-                    itemCount: overflowDestinations.length,
-                    separatorBuilder: (_, index) => Divider(
-                      color: colors.divider.withValues(alpha: 0.5),
-                      height: 1,
-                      indent: 48,
-                    ),
-                    itemBuilder: (context, i) {
-                      final item = overflowDestinations[i];
-                      return ListTile(
-                        dense: true,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        leading: Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: colors.surfaceSecondary,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            item.icon,
-                            color: colors.primary,
-                            size: 20,
-                          ),
-                        ),
-                        title: Text(
-                          item.label,
-                          style: TextStyle(
-                            color: colors.foreground,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14.5,
-                          ),
-                        ),
-                        trailing: Icon(
-                          Icons.arrow_forward_ios_rounded,
-                          color: colors.foregroundTertiary,
-                          size: 14,
-                        ),
-                        onTap: () {
-                          Navigator.of(sheetContext).pop();
-                          onSelect(i);
-                        },
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
+            Divider(height: 1, color: colors.divider),
+            Expanded(
+              child: contacts.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No contacts available',
+                        style: TextStyle(color: colors.foregroundSecondary),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: contacts.length,
+                      itemBuilder: (ctx, i) {
+                        final contact = contacts[i];
+                        return ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                          leading: AppAvatar(
+                            initials: contact.displayName.isNotEmpty
+                                ? contact.displayName.substring(0, 1)
+                                : '?',
+                            colorHex: contact.avatarColorHex,
+                            size: 44,
+                          ),
+                          title: Text(
+                            contact.displayName,
+                            style: TextStyle(
+                              color: colors.foreground,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                            ),
+                          ),
+                          subtitle: Text(
+                            contact.about.isNotEmpty ? contact.about : contact.phone,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: colors.foregroundSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(Icons.call_rounded, color: colors.primary),
+                                tooltip: 'Voice Call',
+                                onPressed: () {
+                                  Navigator.of(ctx).pop();
+                                  locator<CallSignalingService>().initiateCall(
+                                    remoteUserId: contact.id,
+                                    remoteDisplayName: contact.displayName,
+                                    remoteAvatarInitials: contact.displayName.isNotEmpty
+                                        ? contact.displayName.substring(0, 1)
+                                        : '?',
+                                    isVideo: false,
+                                  );
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => OngoingCallScreen(theme: theme),
+                                    ),
+                                  );
+                                },
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.videocam_rounded, color: colors.primary),
+                                tooltip: 'Video Call',
+                                onPressed: () {
+                                  Navigator.of(ctx).pop();
+                                  locator<CallSignalingService>().initiateCall(
+                                    remoteUserId: contact.id,
+                                    remoteDisplayName: contact.displayName,
+                                    remoteAvatarInitials: contact.displayName.isNotEmpty
+                                        ? contact.displayName.substring(0, 1)
+                                        : '?',
+                                    isVideo: true,
+                                  );
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => OngoingCallScreen(theme: theme),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
+
 
   Widget _buildCustomNavItem({
     required _NavDestinationItem item,

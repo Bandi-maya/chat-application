@@ -22,6 +22,7 @@ import 'package:chat/data/services/call_foreground_service.dart';
 import 'package:chat/data/services/call_lifecycle_coordinator.dart';
 import 'package:chat/features/calls/call_presentation_controller.dart';
 import 'package:chat/features/camera/effects/effect_engine.dart';
+import 'package:chat/data/services/status_service.dart';
 
 final GetIt locator = GetIt.instance;
 
@@ -93,6 +94,7 @@ void setupLocator() {
       backendService: locator<ChatyBackendService>(),
     ),
   );
+  locator.registerLazySingleton<StatusService>(() => StatusService());
 
   locator.registerFactory<MessageAutomationService>(
     () => MessageAutomationService(

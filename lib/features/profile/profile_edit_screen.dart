@@ -1,15 +1,22 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/backend_service.dart';
 import '../../data/services/profile_media_service.dart';
+import '../../domain/models/user_profile.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../../ui/core/validators/input_validators.dart';
-import '../../ui/core/widgets/username_availability_field.dart';
-import 'profile_actions.dart';
 
-/// Dedicated single screen for editing the user profile.
+/// Dedicated full screen for editing user profile (Rule 21).
+/// Features:
+/// - Avatar update via camera/gallery
+/// - Banner photo update
+/// - Form validation for display name and username
+/// - Unsaved changes check on back navigation
+/// - Duplicate submission prevention
+/// - Immediate persistence and reactive store refresh
 class ProfileEditScreen extends StatefulWidget {
   final ChatyDataStore dataStore;
 
@@ -29,192 +36,446 @@ class ProfileEditScreen extends StatefulWidget {
 
 class _ProfileEditScreenState extends State<ProfileEditScreen> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _displayNameController;
-  late final TextEditingController _usernameController;
-  late final TextEditingController _aboutController;
-  final _backend = locator<ChatyBackendService>();
+  late final TextEditingController _displayNameCtrl;
+  late final TextEditingController _usernameCtrl;
+  late final TextEditingController _aboutCtrl;
 
-  bool _saving = false;
+  late final UserProfile _initialUser;
+  bool _isSaving = false;
   bool? _usernameAvailable = true;
+  String? _newAvatarUrl;
+  String? _newBannerUrl;
 
   @override
   void initState() {
     super.initState();
-    final user = widget.dataStore.currentUser;
-    _displayNameController = TextEditingController(text: user.displayName);
-    _usernameController = TextEditingController(text: user.username);
-    _aboutController = TextEditingController(text: user.about);
+    _initialUser = widget.dataStore.currentUser;
+    _displayNameCtrl = TextEditingController(text: _initialUser.displayName);
+    _usernameCtrl = TextEditingController(text: _initialUser.username);
+    _aboutCtrl = TextEditingController(text: _initialUser.about);
   }
 
   @override
   void dispose() {
-    _displayNameController.dispose();
-    _usernameController.dispose();
-    _aboutController.dispose();
+    _displayNameCtrl.dispose();
+    _usernameCtrl.dispose();
+    _aboutCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _save() async {
-    if (_saving || _formKey.currentState?.validate() != true) return;
-    final user = widget.dataStore.currentUser;
-    final normalized = ChatyValidators.normalizeUsername(
-      _usernameController.text,
+  ImageProvider _resolveImageProvider(String pathOrUrl) {
+    if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+      return NetworkImage(pathOrUrl);
+    }
+    return FileImage(File(pathOrUrl));
+  }
+
+  bool get _isDirty {
+    return _displayNameCtrl.text.trim() != _initialUser.displayName ||
+        _usernameCtrl.text.trim() != _initialUser.username ||
+        _aboutCtrl.text.trim() != _initialUser.about ||
+        _newAvatarUrl != null ||
+        _newBannerUrl != null;
+  }
+
+  Future<bool> _onWillPop() async {
+    if (!_isDirty || _isSaving) return true;
+    final discard = await ChatyConfirmDialog.show(
+      context,
+      title: 'Discard changes?',
+      message: 'You have unsaved changes that will be lost.',
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep Editing',
+      destructive: true,
     );
+    return discard == true;
+  }
+
+  Future<ProfileMediaSource?> _promptImageSource(String title) async {
+    return showModalBottomSheet<ProfileMediaSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => ChatyModal(
+        header: ChatyModalHeader(title: title),
+        content: ChatyModalContent(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ChatyActionRow(
+                icon: Icons.camera_alt_outlined,
+                title: 'Capture Image',
+                subtitle: 'Use camera to take a new photo',
+                onTap: () => Navigator.of(ctx).pop(ProfileMediaSource.camera),
+              ),
+              ChatyActionRow(
+                icon: Icons.photo_library_outlined,
+                title: 'Pick / Choose from Gallery',
+                subtitle: 'Select an image from device gallery',
+                onTap: () => Navigator.of(ctx).pop(ProfileMediaSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAvatar() async {
+    final source = await _promptImageSource('Change Profile Photo');
+    if (source == null || !mounted) return;
+    setState(() => _isSaving = true);
+    try {
+      final profileMedia = locator<ProfileMediaService>();
+      final url = await profileMedia.uploadAvatar(source: source, context: context);
+      if (mounted) {
+        setState(() {
+          _newAvatarUrl = url;
+          _isSaving = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not upload profile photo: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickBanner() async {
+    final source = await _promptImageSource('Change Banner Photo');
+    if (source == null || !mounted) return;
+    setState(() => _isSaving = true);
+    try {
+      final profileMedia = locator<ProfileMediaService>();
+      final url = await profileMedia.uploadBanner(source: source, context: context);
+      if (mounted) {
+        setState(() {
+          _newBannerUrl = url;
+          _isSaving = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not upload banner photo: $e')),
+        );
+      }
+    }
+  }
+
+  String _computeInitials(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return 'U';
+    final parts = trimmed.split(RegExp(r'\s+'));
+    if (parts.length >= 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return trimmed.substring(0, trimmed.length >= 2 ? 2 : 1).toUpperCase();
+  }
+
+  Future<void> _save() async {
+    if (_isSaving) return;
+    if (_formKey.currentState?.validate() != true) return;
+
+    final normalized = ChatyValidators.normalizeUsername(_usernameCtrl.text);
     final unchanged =
-        normalized == ChatyValidators.normalizeUsername(user.username);
+        normalized == ChatyValidators.normalizeUsername(_initialUser.username);
 
     if (!unchanged && _usernameAvailable != true) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Choose an available username before saving.'),
+          content: Text('Please select an available username before saving.'),
         ),
       );
       return;
     }
 
-    setState(() => _saving = true);
-    final displayName = _displayNameController.text.trim();
-    final about = _aboutController.text.trim();
-    final updated = user.copyWith(
-      displayName: displayName,
-      username: normalized,
-      about: about,
-      avatarInitials: chatyInitialsFor(displayName),
-    );
+    setState(() => _isSaving = true);
 
     try {
-      if (!unchanged && !await _backend.isUsernameAvailable(normalized)) {
+      final backend = locator<ChatyBackendService>();
+      if (!unchanged && !await backend.isUsernameAvailable(normalized)) {
         if (!mounted) return;
         setState(() {
-          _saving = false;
+          _isSaving = false;
           _usernameAvailable = false;
         });
         _formKey.currentState?.validate();
         return;
       }
 
+      final updated = _initialUser.copyWith(
+        displayName: _displayNameCtrl.text.trim(),
+        username: normalized,
+        about: _aboutCtrl.text.trim(),
+        avatarUrl: _newAvatarUrl ?? _initialUser.avatarUrl,
+        bannerUrl: _newBannerUrl ?? _initialUser.bannerUrl,
+        avatarInitials: _computeInitials(_displayNameCtrl.text.trim()),
+      );
+
       await widget.dataStore.updateUser(updated);
+
       if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile updated successfully.')),
+      );
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Profile updated.')));
     } catch (error) {
       if (!mounted) return;
-      setState(() => _saving = false);
+      setState(() => _isSaving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not update profile: $error')),
+        SnackBar(content: Text('Could not save profile: $error')),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final user = widget.dataStore.currentUser;
+    final activeAvatarUrl = _newAvatarUrl ?? user.avatarUrl;
+    final activeBannerUrl = _newBannerUrl ?? user.bannerUrl;
 
-    return Scaffold(
-      backgroundColor: colors.background,
-      appBar: AppBar(
-        backgroundColor: colors.surfaceElevated,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        leading: const ChatyBackButton(),
-        title: Text(
-          'Edit Profile',
-          style: TextStyle(
-            color: colors.foreground,
-            fontWeight: FontWeight.w700,
-            fontSize: 18,
+    return PopScope(
+      canPop: !_isDirty && !_isSaving,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final shouldPop = await _onWillPop();
+        if (shouldPop && context.mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          leading: const Padding(
+            padding: EdgeInsets.all(8.0),
+            child: ChatyBackButton(),
           ),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: TextButton(
-              onPressed: _saving ? null : _save,
-              child: _saving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(
-                      'Save',
-                      style: TextStyle(
-                        color: colors.primary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
+          title: const Text('Edit Profile'),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: _isSaving
+                  ? const Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2.2),
                       ),
+                    )
+                  : FilledButton.tonal(
+                      onPressed: _isSaving ? null : _save,
+                      child: const Text('Save'),
                     ),
             ),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-          child: Form(
-            key: _formKey,
+          ],
+        ),
+        body: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Center(
-                  child: _ProfilePhotoEditSection(
-                    user: user,
-                    dataStore: widget.dataStore,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Account Information',
-                  style: TextStyle(
-                    color: colors.foregroundSecondary,
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.4,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ChatyInput(
-                  controller: _displayNameController,
-                  enabled: !_saving,
-                  textInputAction: TextInputAction.next,
-                  validator: ChatyValidators.validateDisplayName,
-                  label: 'Display Name',
-                ),
-                const SizedBox(height: 16),
-                UsernameAvailabilityField(
-                  controller: _usernameController,
-                  backend: _backend,
-                  currentUsername: user.username,
-                  enabled: !_saving,
-                  onAvailabilityChanged: (value) {
-                    _usernameAvailable = value;
-                  },
-                  decoration: InputDecoration(
-                    labelText: 'Username',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                ChatyInput(
-                  controller: _aboutController,
-                  enabled: !_saving,
-                  maxLines: 4,
-                  validator: ChatyValidators.validateBio,
-                  label: 'About / Bio',
-                ),
-                const SizedBox(height: 28),
+                // Banner & Overlapping Avatar section (Rule 20)
                 SizedBox(
-                  width: double.infinity,
-                  child: ChatyPrimaryButton(
-                    text: _saving ? 'Saving...' : 'Save Changes',
-                    icon: Icons.check_rounded,
-                    isLoading: _saving,
-                    onPressed: _saving ? null : _save,
+                  height: 220,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      // Banner
+                      Container(
+                        height: 160,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest,
+                          image: activeBannerUrl != null && activeBannerUrl.isNotEmpty
+                              ? DecorationImage(
+                                  image: _resolveImageProvider(activeBannerUrl),
+                                  fit: BoxFit.cover,
+                                )
+                              : null,
+                          gradient: activeBannerUrl == null || activeBannerUrl.isEmpty
+                              ? LinearGradient(
+                                  colors: [
+                                    colorScheme.primaryContainer,
+                                    colorScheme.surfaceContainerHighest,
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                )
+                              : null,
+                        ),
+                        child: Align(
+                          alignment: Alignment.topRight,
+                          child: Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: IconButton.filledTonal(
+                              tooltip: 'Change banner photo',
+                              icon: const Icon(Icons.camera_alt_outlined, size: 20),
+                              onPressed: _pickBanner,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Avatar overlapping bottom-center edge
+                      Positioned(
+                        bottom: 10,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: Stack(
+                            children: [
+                              Container(
+                                width: 96,
+                                height: 96,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: colorScheme.surface,
+                                    width: 3.5,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.18),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: ClipOval(
+                                  child: activeAvatarUrl != null && activeAvatarUrl.isNotEmpty
+                                      ? (activeAvatarUrl.startsWith('http')
+                                          ? Image.network(
+                                              activeAvatarUrl,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (_, __, ___) =>
+                                                  _avatarFallback(user),
+                                            )
+                                          : Image.file(
+                                              File(activeAvatarUrl),
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (_, __, ___) =>
+                                                  _avatarFallback(user),
+                                            ))
+                                      : _avatarFallback(user),
+                                ),
+                              ),
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Container(
+                                  width: 34,
+                                  height: 34,
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.primary,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: colorScheme.surface,
+                                      width: 2.5,
+                                    ),
+                                  ),
+                                  child: IconButton(
+                                    padding: EdgeInsets.zero,
+                                    iconSize: 17,
+                                    color: colorScheme.onPrimary,
+                                    tooltip: 'Change avatar',
+                                    icon: const Icon(Icons.photo_camera_rounded),
+                                    onPressed: _pickAvatar,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Form Fields
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Display Name
+                      TextFormField(
+                        controller: _displayNameCtrl,
+                        maxLength: 50,
+                        decoration: const InputDecoration(
+                          labelText: 'Display Name',
+                          hintText: 'Enter your full name',
+                          prefixIcon: Icon(Icons.person_outline_rounded),
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          final val = value?.trim() ?? '';
+                          if (val.isEmpty) return 'Display name cannot be empty';
+                          if (val.length < 2) return 'Must be at least 2 characters';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Username
+                      TextFormField(
+                        controller: _usernameCtrl,
+                        maxLength: 30,
+                        decoration: InputDecoration(
+                          labelText: 'Username',
+                          hintText: 'Choose a unique username',
+                          prefixText: '@',
+                          prefixIcon: const Icon(Icons.alternate_email_rounded),
+                          border: const OutlineInputBorder(),
+                          errorText: _usernameAvailable == false
+                              ? 'This username is already taken'
+                              : null,
+                        ),
+                        validator: (value) {
+                          final val = value?.trim() ?? '';
+                          return ChatyValidators.validateUsername(val);
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      // About / Bio
+                      TextFormField(
+                        controller: _aboutCtrl,
+                        maxLines: 3,
+                        maxLength: 140,
+                        decoration: const InputDecoration(
+                          labelText: 'About / Status',
+                          hintText: 'Say something about yourself or current mood',
+                          prefixIcon: Icon(Icons.info_outline_rounded),
+                          border: OutlineInputBorder(),
+                          alignLabelWithHint: true,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Phone Number (read-only info)
+                      TextFormField(
+                        initialValue: user.phone.isNotEmpty
+                            ? user.phone
+                            : 'Not set',
+                        enabled: false,
+                        decoration: const InputDecoration(
+                          labelText: 'Phone Number',
+                          prefixIcon: Icon(Icons.phone_outlined),
+                          border: OutlineInputBorder(),
+                          helperText: 'Phone number is managed via Account settings',
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
                   ),
                 ),
               ],
@@ -224,107 +485,21 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       ),
     );
   }
-}
 
-class _ProfilePhotoEditSection extends StatefulWidget {
-  final dynamic user;
-  final ChatyDataStore dataStore;
-
-  const _ProfilePhotoEditSection({required this.user, required this.dataStore});
-
-  @override
-  State<_ProfilePhotoEditSection> createState() =>
-      _ProfilePhotoEditSectionState();
-}
-
-class _ProfilePhotoEditSectionState extends State<_ProfilePhotoEditSection> {
-  bool _uploading = false;
-
-  Future<void> _changePhoto(ProfileMediaSource source) async {
-    setState(() => _uploading = true);
-    try {
-      final url = await ProfileMediaService().uploadAvatar(
-        source: source,
-        context: context,
-      );
-      await widget.dataStore.updateUser(widget.user.copyWith(avatarUrl: url));
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Profile photo updated.')));
-    } catch (error) {
-      final message = error.toString();
-      if (message.contains('cancelled')) return;
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not update photo: $message')),
-      );
-    } finally {
-      if (mounted) setState(() => _uploading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final user = widget.user;
-
-    return Column(
-      children: [
-        Stack(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: colors.primary, width: 2.5),
-              ),
-              child: ChatyNetworkAvatar(
-                initials: user.avatarInitials,
-                colorHex: user.avatarColorHex,
-                url: user.avatarUrl,
-                size: 88,
-              ),
-            ),
-            if (_uploading)
-              Positioned.fill(
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.black45,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2.5,
-                    ),
-                  ),
-                ),
-              ),
-          ],
+  Widget _avatarFallback(UserProfile user) {
+    final theme = Theme.of(context);
+    return Container(
+      color: theme.colorScheme.primaryContainer,
+      child: Center(
+        child: Text(
+          user.avatarInitials.isNotEmpty ? user.avatarInitials : 'U',
+          style: TextStyle(
+            color: theme.colorScheme.onPrimaryContainer,
+            fontSize: 32,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        const SizedBox(height: 12),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextButton.icon(
-              onPressed: _uploading
-                  ? null
-                  : () => _changePhoto(ProfileMediaSource.camera),
-              icon: const Icon(Icons.photo_camera_rounded, size: 18),
-              label: const Text('Camera'),
-            ),
-            const SizedBox(width: 8),
-            TextButton.icon(
-              onPressed: _uploading
-                  ? null
-                  : () => _changePhoto(ProfileMediaSource.gallery),
-              icon: const Icon(Icons.photo_library_rounded, size: 18),
-              label: const Text('Gallery'),
-            ),
-          ],
-        ),
-      ],
+      ),
     );
   }
 }

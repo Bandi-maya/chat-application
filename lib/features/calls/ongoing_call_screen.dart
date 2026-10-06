@@ -489,7 +489,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                               : Icons.mic_rounded,
                           isActive: session.isMuted,
                           activeColor: colors.error,
-                          onTap: _callService.hasLocalMedia
+                          onTap: (_callService.hasLocalMedia || session.isDemo)
                               ? _callService.toggleMute
                               : null,
                         ),
@@ -503,7 +503,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                                 : Icons.videocam_rounded,
                             isActive: session.isCameraOff,
                             activeColor: colors.error,
-                            onTap: _callService.hasLocalMedia
+                            onTap: (_callService.hasLocalMedia || session.isDemo)
                                 ? _callService.toggleCamera
                                 : null,
                           ),
@@ -545,7 +545,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                           isActive:
                               session.audioRoute == AudioRouteType.speaker,
                           activeColor: colors.primary,
-                          onTap: _callService.hasLocalMedia
+                          onTap: (_callService.hasLocalMedia || session.isDemo)
                               ? () => unawaited(
                                   _callService.setAudioRoute(
                                     session.audioRoute == AudioRouteType.speaker

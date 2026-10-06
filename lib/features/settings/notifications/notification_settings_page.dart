@@ -7,6 +7,7 @@ import 'package:chat/ui/core/design_system/settings_primitives.dart';
 import 'package:chat/ui/core/design_system/design_system.dart'
     hide ChatySettingsSection;
 import 'package:chat/ui/core/design_system/color_picker.dart';
+import 'notification_toast_settings_screen.dart';
 
 class NotificationSettingsPage extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
@@ -121,6 +122,29 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                     text: 'Trigger Live Toast Preview',
                     icon: Icons.play_arrow_rounded,
                     onPressed: () => _previewToast(context),
+                  ),
+                  const SizedBox(height: ChatySpacing.sm),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: colors.primary,
+                      side: BorderSide(color: colors.primary.withValues(alpha: 0.5)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      minimumSize: const Size(double.infinity, 44),
+                    ),
+                    icon: const Icon(Icons.tune_rounded, size: 18),
+                    label: const Text(
+                      'Toast Notification Customizations',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => NotificationToastSettingsScreen(
+                            preferencesController: widget.preferencesController,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),

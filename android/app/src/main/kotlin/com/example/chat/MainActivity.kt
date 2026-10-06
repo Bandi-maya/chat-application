@@ -109,8 +109,8 @@ open class MainActivity : FlutterFragmentActivity() {
                 }
                 "resetLauncherIcon" -> {
                     try {
-                        launcherManager.setLauncherIcon("warm")
-                        result.success("warm")
+                        launcherManager.setLauncherIcon("bird")
+                        result.success("bird")
                     } catch (error: Exception) {
                         result.error("launcher_icon_reset_failed", error.message, null)
                     }
@@ -299,39 +299,73 @@ internal class LauncherIconManager(
             "fold" to "${context.packageName}.LauncherFold",
         )
 
-    fun isKnownAlias(alias: String): Boolean = launcherComponents.containsKey(alias)
+    // "bird" is the primary icon variant — all aliases disabled, MainActivity is launcher.
+    fun isKnownAlias(alias: String): Boolean = alias == "bird" || launcherComponents.containsKey(alias)
 
     fun getCurrentLauncherIcon(): String {
         val enabledAliases = launcherComponents.keys.filter(::isComponentEnabled)
+        if (enabledAliases.isEmpty()) {
+            // Primary (bird/MainActivity) is active — no alias enabled.
+            preferences.edit().putString(LAUNCHER_PREFERENCE_KEY, "bird").apply()
+            return "bird"
+        }
         if (enabledAliases.size == 1) {
             val alias = enabledAliases.first()
             preferences.edit().putString(LAUNCHER_PREFERENCE_KEY, alias).apply()
             return alias
         }
 
-        // Multiple or zero aliases enabled: recover canonical selection
+        // Multiple aliases enabled — abnormal state, recover to bird (primary).
         val preferred = selectedBundledAlias()
         setLauncherIcon(preferred)
         return preferred
     }
 
     fun setLauncherIcon(alias: String) {
-        val canonicalAlias = if (alias == "original") "warm" else alias
+        // Normalize legacy alias names.
+        val canonicalAlias = when (alias) {
+            "original" -> "warm"
+            else -> alias
+        }
         require(isKnownAlias(canonicalAlias)) { "Unknown launcher icon alias: $canonicalAlias" }
         val previous = selectedBundledAlias()
 
         try {
-            switchLauncherAlias(canonicalAlias)
+            if (canonicalAlias == "bird") {
+                // Bird = primary. Disable ALL aliases so MainActivity is the launcher.
+                disableAllAliases()
+            } else {
+                switchLauncherAlias(canonicalAlias)
+            }
             preferences.edit()
                 .putString(LAUNCHER_PREFERENCE_KEY, canonicalAlias)
                 .apply()
         } catch (error: Exception) {
-            // Rollback to previous on failure
-            runCatching { switchLauncherAlias(previous) }
+            // Rollback to previous on failure.
+            runCatching {
+                if (previous == "bird") disableAllAliases() else switchLauncherAlias(previous)
+            }
             preferences.edit()
                 .putString(LAUNCHER_PREFERENCE_KEY, previous)
                 .apply()
             throw error
+        }
+    }
+
+    private fun disableAllAliases() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val changes = launcherComponents.keys.map { candidate ->
+                PackageManager.ComponentEnabledSetting(
+                    componentFor(candidate),
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    PackageManager.DONT_KILL_APP,
+                )
+            }
+            packageManager.setComponentEnabledSettings(changes)
+        } else {
+            for (candidate in launcherComponents.keys) {
+                setComponent(candidate, PackageManager.COMPONENT_ENABLED_STATE_DISABLED)
+            }
         }
     }
 
@@ -374,9 +408,16 @@ internal class LauncherIconManager(
         val selected = selectedBundledAlias()
         val enabled = launcherComponents.keys.filter(::isComponentEnabled)
 
-        // If not exactly one matching alias is enabled, re-apply transaction
-        if (enabled.size != 1 || enabled.first() != selected) {
-            runCatching { switchLauncherAlias(selected) }
+        if (selected == "bird") {
+            // Primary icon selected: ensure all aliases are disabled.
+            if (enabled.isNotEmpty()) {
+                runCatching { disableAllAliases() }
+            }
+        } else {
+            // A specific alias should be the only enabled one.
+            if (enabled.size != 1 || enabled.first() != selected) {
+                runCatching { switchLauncherAlias(selected) }
+            }
         }
     }
 
@@ -395,8 +436,15 @@ internal class LauncherIconManager(
     }
 
     fun buildRestartIntent(): Intent {
+        val selected = selectedBundledAlias()
         return Intent(Intent.ACTION_MAIN).apply {
-            component = componentFor(selectedBundledAlias())
+            // When bird (primary) is selected, target MainActivity directly.
+            // Otherwise target the active alias component.
+            component = if (selected == "bird") {
+                ComponentName(context, "${context.packageName}.MainActivity")
+            } else {
+                componentFor(selected)
+            }
             addCategory(Intent.CATEGORY_LAUNCHER)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         }
@@ -407,9 +455,9 @@ internal class LauncherIconManager(
     }
 
     private fun selectedBundledAlias(): String {
-        val stored = preferences.getString(LAUNCHER_PREFERENCE_KEY, "warm")
+        val stored = preferences.getString(LAUNCHER_PREFERENCE_KEY, "bird")
         if (stored == "original") return "warm"
-        return stored?.takeIf(::isKnownAlias) ?: "warm"
+        return stored?.takeIf(::isKnownAlias) ?: "bird"
     }
 
     private fun componentFor(alias: String): ComponentName {
@@ -421,9 +469,10 @@ internal class LauncherIconManager(
         packageManager.getComponentEnabledSetting(componentFor(alias))
 
     private fun isComponentEnabled(alias: String): Boolean {
+        // Since LauncherWarm is now android:enabled="false" in the manifest,
+        // DEFAULT state means DISABLED. Only explicitly ENABLED state counts.
         val state = componentState(alias)
-        return state == PackageManager.COMPONENT_ENABLED_STATE_ENABLED ||
-            (state == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT && alias == "warm")
+        return state == PackageManager.COMPONENT_ENABLED_STATE_ENABLED
     }
 
     private fun setComponent(alias: String, state: Int) {

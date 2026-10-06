@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'custom_app_icon_processor.dart';
 
-enum LauncherIconVariant { warm, outline, obsidian, glass, signal, fold }
+enum LauncherIconVariant { bird, warm, outline, obsidian, glass, signal, fold }
 
 enum BrandIconSource { bundled, custom }
 
@@ -53,6 +53,8 @@ extension LauncherIconVariantMetadata on LauncherIconVariant {
 
   String get title {
     switch (this) {
+      case LauncherIconVariant.bird:
+        return 'Swift Flight';
       case LauncherIconVariant.warm:
         return 'Warm Signature';
       case LauncherIconVariant.outline:
@@ -70,6 +72,8 @@ extension LauncherIconVariantMetadata on LauncherIconVariant {
 
   String get subtitle {
     switch (this) {
+      case LauncherIconVariant.bird:
+        return 'Minimalist aerodynamic soaring bird silhouette';
       case LauncherIconVariant.warm:
         return 'Warm Neutral ivory field with soft-depth dimensional Chaty mark';
       case LauncherIconVariant.outline:
@@ -88,6 +92,7 @@ extension LauncherIconVariantMetadata on LauncherIconVariant {
   String get androidAlias => name;
 
   static LauncherIconVariant fromId(String? value) {
+    if (value == 'bird' || value == 'swift') return LauncherIconVariant.bird;
     if (value == 'original') return LauncherIconVariant.warm;
     if (value == 'minimal') return LauncherIconVariant.outline;
     if (value == 'midnight') return LauncherIconVariant.obsidian;
@@ -96,7 +101,7 @@ extension LauncherIconVariantMetadata on LauncherIconVariant {
     if (value == 'violet') return LauncherIconVariant.fold;
     return LauncherIconVariant.values.firstWhere(
       (variant) => variant.id == value,
-      orElse: () => LauncherIconVariant.warm,
+      orElse: () => LauncherIconVariant.bird,
     );
   }
 }
@@ -112,7 +117,7 @@ class AppIconController extends ChangeNotifier {
   static const String _activeCustomPresetPreferenceKey =
       'chaty_active_custom_icon_v2';
 
-  LauncherIconVariant _launcherIcon = LauncherIconVariant.warm;
+  LauncherIconVariant _launcherIcon = LauncherIconVariant.bird;
   BrandIconSource _brandIconSource = BrandIconSource.bundled;
   final List<CustomIconPreset> _customIconPresets = <CustomIconPreset>[];
   String? _activeCustomPresetId;
@@ -488,7 +493,7 @@ class AppIconController extends ChangeNotifier {
   }
 
   Future<void> resetLauncherIcon() async {
-    await applyLauncherIcon(LauncherIconVariant.warm);
+    await applyLauncherIcon(LauncherIconVariant.bird);
   }
 
   void clearError() {

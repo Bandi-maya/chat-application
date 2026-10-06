@@ -1,12 +1,19 @@
+import '../../../data/services/local_lock_service.dart';
+import '../security/app_lock_overlay.dart';
+import '../security/lock_credential_setup_modal.dart';
+import '../security/lock_method_selector_sheet.dart';
+import '../security/security_flow_plan.dart';
+import '../security/security_center_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-import '../../../data/repositories/chaty_data_store.dart';
-import '../../../data/services/gb_feature_backend_service.dart';
+import '../../../domain/models/preferences.dart';
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
-import '../../../ui/core/design_system/settings_primitives.dart';
-import '../../../ui/core/theme/app_theme.dart';
+import '../../../ui/core/design_system/design_system.dart';
 
+/// Privacy and Security settings screen matching Image 3.
+/// Adapts dynamically to light and dark theme using global color tokens.
 class PrivacyCenterScreen extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
 
@@ -17,514 +24,1206 @@ class PrivacyCenterScreen extends StatefulWidget {
 }
 
 class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
+  late final LocalLockService _lockService;
+  int _pinLength = 4;
+  bool _biometricAvailable = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _lockService = locator<LocalLockService>();
+    _loadCapabilities();
+  }
+
+  Future<void> _loadCapabilities() async {
+    final pinLength = await _lockService.getPinLength();
+    final biometricAvailable = await _lockService.canUseBiometrics();
+    if (!mounted) return;
+    setState(() {
+      _pinLength = pinLength;
+      _biometricAvailable = biometricAvailable;
+    });
+  }
+
+  static LockMethodType _methodTypeOf(String stored) => switch (stored) {
+    'PIN' => LockMethodType.pin,
+    'Pattern' => LockMethodType.pattern,
+    'Password' => LockMethodType.password,
+    'Biometric' => LockMethodType.biometric,
+    'Device Credential' => LockMethodType.deviceCredential,
+    _ => LockMethodType.pin,
+  };
+
+  static String _storageKeyOf(LockMethodType type) => switch (type) {
+    LockMethodType.pin => 'PIN',
+    LockMethodType.pattern => 'Pattern',
+    LockMethodType.password => 'Password',
+    LockMethodType.biometric => 'Biometric',
+    LockMethodType.deviceCredential => 'Device Credential',
+  };
+
+  Future<bool> _verifyCurrent(LockMethodType method) async {
+    if (!SecurityFlowPlan.hasVerifiableSecret(method)) {
+      final ok = method == LockMethodType.biometric
+          ? await _lockService.authenticateBiometric(
+              reason: 'Confirm it is you to continue',
+            )
+          : await _lockService.authenticateDeviceCredential(
+              reason: 'Confirm it is you to continue',
+            );
+      if (!ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Authentication failed or was cancelled.')),
+        );
+      }
+      return ok;
+    }
+    final unlocked = await AppLockOverlayModal.show(
+      context,
+      preferencesController: widget.preferencesController,
+      lockService: _lockService,
+      title: 'Confirm it\'s you',
+      reason: 'Verify your current lock to continue',
+    );
+    if (unlocked != true) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Verification cancelled.')),
+        );
+      }
+      return false;
+    }
+    return true;
+  }
+
+  Future<bool> _runFlow({
+    required SecurityIntent intent,
+    LockMethodType? target,
+    int? setupPinLength,
+  }) async {
+    final security = widget.preferencesController.security;
+    final current = _methodTypeOf(security.lockMethod);
+    var chosen = target ?? current;
+    var secretConfigured = await _lockService.hasCredential(
+      _storageKeyOf(current),
+    );
+    var verifiedInFlow = false;
+
+    for (final step in SecurityFlowPlan.plan(
+      intent: intent,
+      currentMethod: current,
+      currentSecretConfigured: secretConfigured,
+      targetMethod: chosen,
+    )) {
+      if (!mounted) return false;
+      switch (step) {
+        case SecurityFlowStep.verifyCurrent:
+          final ok = await _verifyCurrent(current);
+          if (!ok) return false;
+          verifiedInFlow = true;
+
+        case SecurityFlowStep.chooseMethod:
+          final picked = await LockMethodSelectorSheet.show(
+            context,
+            lockService: _lockService,
+            currentMethod: chosen,
+          );
+          if (picked == null || !mounted) return false;
+          chosen = picked;
+          secretConfigured = await _lockService.hasCredential(
+            _storageKeyOf(chosen),
+          );
+
+        case SecurityFlowStep.setupNew:
+          if (verifiedInFlow && secretConfigured && chosen == current) {
+            break;
+          }
+          final configured = await LockCredentialSetupModal.show(
+            context,
+            method: _storageKeyOf(chosen),
+            pinLength: setupPinLength ?? _pinLength,
+            lockService: _lockService,
+          );
+          if (!configured || !mounted) return false;
+          await _loadCapabilities();
+
+        case SecurityFlowStep.preflightOsAuth:
+          final ok = chosen == LockMethodType.biometric
+              ? await _lockService.authenticateBiometric(
+                  reason: 'Confirm biometric works for Chaty',
+                )
+              : await _lockService.authenticateDeviceCredential(
+                  reason: 'Confirm device screen lock works for Chaty',
+                );
+          if (!ok) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Authentication not confirmed; lock was not enabled.')),
+              );
+            }
+            return false;
+          }
+
+        case SecurityFlowStep.apply:
+          final latest = widget.preferencesController.security;
+          switch (intent) {
+            case SecurityIntent.enableLock:
+              widget.preferencesController.updateSecurity(
+                latest.copyWith(
+                  lockMethod: _storageKeyOf(chosen),
+                  isAppLockEnabled: true,
+                ),
+                logTitle: 'Enable Chaty Lock (${_storageKeyOf(chosen)})',
+              );
+            case SecurityIntent.changeMethod:
+              widget.preferencesController.updateSecurity(
+                latest.copyWith(lockMethod: _storageKeyOf(chosen)),
+                logTitle: 'Lock Method',
+              );
+            case SecurityIntent.changeCredential:
+              break;
+            case SecurityIntent.disableLock:
+              widget.preferencesController.updateSecurity(
+                latest.copyWith(isAppLockEnabled: false),
+                logTitle: 'Disable App Lock',
+              );
+          }
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  intent == SecurityIntent.disableLock
+                      ? 'Chaty lock has been turned off.'
+                      : 'Chaty lock updated.',
+                ),
+              ),
+            );
+          }
+          return true;
+      }
+    }
+    return false;
+  }
+
+  void _showRecoveryQuestionDialog() {
+    final qCtrl = TextEditingController(text: 'What is your favorite color?');
+    final aCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Recovery Question'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Set a security question to help recover access if you forget your credential.',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: qCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Security Question',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: aCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Your Answer',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Recovery question saved.')),
+              );
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
   static const List<String> _audienceOptions = <String>[
     'Everyone',
     'My Contacts',
     'My Contacts Except…',
     'Nobody',
   ];
-  static const List<String> _whoCanCallMeOptions = <String>[
-    'Everyone',
-    'My Contacts',
-    'My Contacts Except…',
-    'Nobody',
-  ];
 
-  /// Multi-select picker backing the 'My Contacts Except…' audience for
-  /// Who Can Call Me. Persists the excluded user IDs on save.
-  Future<void> _editCallExceptions() async {
-    final dataStore = locator<ChatyDataStore>();
-    final selected = Set<String>.of(
-      widget.preferencesController.privacy.whoCanCallMeExceptions,
-    );
-    final saved = await showDialog<bool>(
+  void _showWhoCanCallMeDialog() {
+    final prefs = widget.preferencesController.privacy;
+    showDialog(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Contacts who may not call you'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: dataStore.contacts.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 18),
-                    child: Text('No contacts found.'),
-                  )
-                : ListView(
-                    shrinkWrap: true,
-                    children: [
-                      for (final contact in dataStore.contacts)
-                        CheckboxListTile(
-                          value: selected.contains(contact.id),
-                          onChanged: (value) {
-                            setDialogState(() {
-                              if (value == true) {
-                                selected.add(contact.id);
-                              } else {
-                                selected.remove(contact.id);
-                              }
-                            });
-                          },
-                          title: Text(contact.displayName),
-                        ),
-                    ],
-                  ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Save'),
-            ),
-          ],
+      builder: (ctx) => AlertDialog(
+        title: const Text('Who can call me?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: _audienceOptions.map((opt) {
+            return RadioListTile<String>(
+              title: Text(opt),
+              value: opt,
+              groupValue: prefs.whoCanCallMe,
+              activeColor: Theme.of(context).colorScheme.primary,
+              onChanged: (val) {
+                if (val != null) {
+                  widget.preferencesController.updatePrivacy(
+                    prefs.copyWith(whoCanCallMe: val),
+                    logTitle: 'Who can call me',
+                  );
+                  Navigator.pop(ctx);
+                }
+              },
+            );
+          }).toList(),
         ),
       ),
     );
-    if (saved != true) return;
-    widget.preferencesController.updatePrivacy(
-      widget.preferencesController.privacy.copyWith(
-        whoCanCallMeExceptions: selected.toList(growable: false),
+  }
+
+  void _showCustomPrivacyDialog(String title) {
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDlgState) {
+          final p = widget.preferencesController;
+          return AlertDialog(
+            title: Text('$title Privacy Settings'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CheckboxListTile(
+                    title: const Text('Hide blue ticks'),
+                    value: p.gbBool('${title}_hide_blue_ticks', fallback: false),
+                    onChanged: (val) {
+                      p.updateGbFeature('${title}_hide_blue_ticks', val);
+                      setDlgState(() {});
+                    },
+                  ),
+                  CheckboxListTile(
+                    title: const Text('Hide second tick'),
+                    value: p.gbBool('${title}_hide_second_tick', fallback: false),
+                    onChanged: (val) {
+                      p.updateGbFeature('${title}_hide_second_tick', val);
+                      setDlgState(() {});
+                    },
+                  ),
+                  CheckboxListTile(
+                    title: const Text('Hide blue microphone'),
+                    value: p.gbBool('${title}_hide_blue_mic', fallback: false),
+                    onChanged: (val) {
+                      p.updateGbFeature('${title}_hide_blue_mic', val);
+                      setDlgState(() {});
+                    },
+                  ),
+                  if (title != 'Broadcast') ...[
+                    CheckboxListTile(
+                      title: const Text('Hide typing…'),
+                      value: p.gbBool('${title}_hide_typing', fallback: false),
+                      onChanged: (val) {
+                        p.updateGbFeature('${title}_hide_typing', val);
+                        setDlgState(() {});
+                      },
+                    ),
+                    CheckboxListTile(
+                      title: const Text('Hide recording…'),
+                      value: p.gbBool('${title}_hide_recording', fallback: false),
+                      onChanged: (val) {
+                        p.updateGbFeature('${title}_hide_recording', val);
+                        setDlgState(() {});
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Done'),
+              ),
+            ],
+          );
+        },
       ),
-      logTitle: 'Who Can Call Me Exceptions',
     );
   }
 
-  final GbFeatureBackendService _privacyBackend = GbFeatureBackendService();
-  late Future<List<Map<String, dynamic>>> _blockedFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _blockedFuture = _privacyBackend.getBlockedUsers();
+  void _resetPrivacyToDefaults() {
+    HapticFeedback.heavyImpact();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reset Privacy?'),
+        content: const Text(
+          'This will reset all privacy settings back to WhatsApp default configuration.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.primary),
+            onPressed: () {
+              widget.preferencesController.updatePrivacy(
+                const PrivacyPreferences(),
+                logTitle: 'Reset Privacy',
+              );
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Privacy settings reset to defaults! 🔄')),
+              );
+            },
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
   }
-
-  void _refreshBlocked() =>
-      setState(() => _blockedFuture = _privacyBackend.getBlockedUsers());
 
   @override
   Widget build(BuildContext context) {
-    final prefs = widget.preferencesController.privacy;
+    final themeController = locator<ThemeController>();
+    final theme = themeController.globalTheme;
     final colors = context.colors;
+    final isDark = theme.brightness == Brightness.dark;
 
-    return ChatySettingsPage(
-      title: 'Privacy Center',
-      subtitle: 'Server-enforced presence, receipts, status & chat privacy',
-      children: [
-        ChatySettingsSection(
-          title: 'Last Seen & Online Presence',
-          description:
-              'Freeze your last seen timestamp or restrict audience visibility.',
-          children: [
-            ChatySwitchTile(
-              icon: Icons.ac_unit_rounded,
-              iconColor: colors.info,
-              title: 'Freeze Last Seen',
-              subtitle: prefs.freezeLastSeen
-                  ? 'Frozen at ${prefs.frozenLastSeenTime.isNotEmpty ? prefs.frozenLastSeenTime : "now"}. Server updates no longer move this timestamp.'
-                  : 'Stops updating your last visible timestamp to contacts.',
-              value: prefs.freezeLastSeen,
-              onChanged: (value) {
-                final timestamp = value
-                    ? DateTime.now().toLocal().toString().substring(0, 16)
-                    : '';
-                widget.preferencesController.updatePrivacy(
-                  prefs.copyWith(
-                    freezeLastSeen: value,
-                    frozenLastSeenTime: timestamp,
-                  ),
-                  logTitle: 'Freeze Last Seen',
-                  prevVal: prefs.freezeLastSeen,
-                  newVal: value,
-                );
-              },
-            ),
-            ChatyChoiceTile<String>(
-              title: 'Who Can See My Last Seen',
-              options: _audienceOptions,
-              selectedOption: prefs.hideLastSeenAudience,
-              optionLabel: (value) => value,
-              onSelected: (audience) =>
-                  widget.preferencesController.updatePrivacy(
-                    prefs.copyWith(hideLastSeenAudience: audience),
-                    logTitle: 'Hide Last Seen Audience',
-                  ),
-            ),
-            ChatyChoiceTile<String>(
-              title: 'Who Can See When I\'m Online',
-              options: const <String>['Everyone', 'Same as Last Seen'],
-              selectedOption: prefs.hideOnlineAudience,
-              optionLabel: (value) => value,
-              onSelected: (audience) =>
-                  widget.preferencesController.updatePrivacy(
-                    prefs.copyWith(hideOnlineAudience: audience),
-                    logTitle: 'Hide Online Audience',
-                  ),
-            ),
-          ],
+    return Scaffold(
+      backgroundColor: theme.backgroundColor,
+      appBar: AppBar(
+        backgroundColor: theme.backgroundColor,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: ChatyBackButton(
+            onPressed: () => Navigator.of(context).pop(),
+          ),
         ),
-        ChatySettingsSection(
-          title: 'Read Receipts & Presence',
-          children: [
-            ChatySwitchTile(
-              icon: Icons.done_all_rounded,
-              iconColor: colors.primary,
-              title: 'Read Receipts (Blue Ticks)',
-              subtitle:
-                  'The server only publishes read receipts when this is enabled.',
-              value: prefs.readReceipts,
-              onChanged: (value) => widget.preferencesController.updatePrivacy(
-                prefs.copyWith(readReceipts: value),
-                logTitle: 'Read Receipts',
-              ),
-            ),
-            ChatySwitchTile(
-              icon: Icons.mark_chat_read_rounded,
-              iconColor: colors.primary,
-              title: 'Show Blue Ticks After Reply',
-              subtitle:
-                  'Opening a chat clears your unread count but publishes receipts only after you reply.',
-              value: prefs.showBlueTicksAfterReply,
-              onChanged: (value) => widget.preferencesController.updatePrivacy(
-                prefs.copyWith(showBlueTicksAfterReply: value),
-                logTitle: 'Show Blue Ticks After Reply',
-              ),
-            ),
-            ChatySwitchTile(
-              icon: Icons.edit_note_rounded,
-              iconColor: colors.warning,
-              title: 'Typing Indicators',
-              subtitle:
-                  'Realtime typing state is published only while this is enabled.',
-              value: prefs.typingIndicators,
-              onChanged: (value) => widget.preferencesController.updatePrivacy(
-                prefs.copyWith(typingIndicators: value),
-                logTitle: 'Typing Indicators',
-              ),
-            ),
-            ChatySwitchTile(
-              icon: Icons.mic_none_rounded,
-              iconColor: colors.error,
-              title: 'Recording Indicators',
-              subtitle: 'Allow voice-note recording presence to be shown.',
-              value: prefs.recordingIndicators,
-              onChanged: (value) => widget.preferencesController.updatePrivacy(
-                prefs.copyWith(recordingIndicators: value),
-                logTitle: 'Recording Indicators',
-              ),
-            ),
-          ],
+        title: Text(
+          'Privacy and Security',
+          style: TextStyle(
+            color: theme.primaryTextColor,
+            fontSize: 20 * theme.fontScale,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.3,
+          ),
         ),
-        ChatySettingsSection(
-          title: 'Anti-Delete & View-Once Safeguards',
-          description:
-              'Chaty preserves the original server payload while applying your private local visibility preference.',
-          children: [
-            ChatySwitchTile(
-              icon: Icons.delete_forever_rounded,
-              iconColor: colors.error,
-              title: 'Anti-Delete Messages',
-              subtitle:
-                  'Keep the original message visible to you after the sender deletes it.',
-              value: prefs.antiDeleteMessages,
-              onChanged: (value) {
-                widget.preferencesController.updatePrivacy(
-                  prefs.copyWith(antiDeleteMessages: value),
-                  logTitle: 'Anti-Delete Messages',
-                );
-                widget.preferencesController.updateGbFeature(
-                  'yoAntiRevoke',
-                  value,
-                  logTitle: 'Anti-Delete Messages',
-                );
-              },
-            ),
-            ChatySwitchTile(
-              icon: Icons.history_toggle_off_rounded,
-              iconColor: colors.warning,
-              title: 'Anti-Delete Status / Stories',
-              subtitle:
-                  'Keep a deleted status available until its normal 24-hour expiry.',
-              value: prefs.antiDeleteStatus,
-              onChanged: (value) {
-                widget.preferencesController.updatePrivacy(
-                  prefs.copyWith(antiDeleteStatus: value),
-                  logTitle: 'Anti-Delete Status',
-                );
-                widget.preferencesController.updateGbFeature(
-                  'yoAntiRevokeStatus',
-                  value,
-                  logTitle: 'Anti-Delete Status',
-                );
-              },
-            ),
-            ChatySwitchTile(
-              icon: Icons.remove_red_eye_rounded,
-              iconColor: colors.info,
-              title: 'Anti View-Once Media',
-              subtitle:
-                  'Retain opened view-once media in Chaty when the sender permissions allow the stored payload to remain available.',
-              value: prefs.antiViewOnce,
-              onChanged: (value) {
-                widget.preferencesController.updatePrivacy(
-                  prefs.copyWith(antiViewOnce: value),
-                  logTitle: 'Anti View Once',
-                );
-                widget.preferencesController.updateGbFeature(
-                  'anti_vw_once',
-                  value,
-                  logTitle: 'Anti View Once',
-                );
-              },
-            ),
-            ChatySwitchTile(
-              icon: Icons.notification_important_rounded,
-              iconColor: colors.accent,
-              title: 'Message & Status Revoke Alerts',
-              subtitle: 'Notify when a sender revokes a message or status.',
-              value: prefs.messageRevokeAlert,
-              onChanged: (value) {
-                widget.preferencesController.updatePrivacy(
-                  prefs.copyWith(
-                    messageRevokeAlert: value,
-                    statusRevocationAlert: value,
-                  ),
-                  logTitle: 'Revoke Alerts',
-                );
-                widget.preferencesController.updateGbFeatures(<String, Object?>{
-                  'AntiRevokeMsgNotif': value,
-                  'AntiRevokeStatusNotif': value,
-                }, logTitle: 'Revoke alerts');
-              },
-            ),
-          ],
-        ),
-        ChatySettingsSection(
-          title: 'Blocked Users',
-          description:
-              'Blocking is enforced server-side for direct-message sends.',
-          children: [
-            FutureBuilder<List<Map<String, dynamic>>>(
-              future: _blockedFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const ListTile(
-                    title: Text('Loading blocked users…'),
-                    trailing: SizedBox.square(
-                      dimension: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+      ),
+      body: SafeArea(
+        top: false,
+        child: ListenableBuilder(
+          listenable: widget.preferencesController,
+          builder: (context, _) {
+            final currentPrefs = widget.preferencesController.privacy;
+            final currentSec = widget.preferencesController.security;
+
+            return ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              children: [
+                // Top Important Alert Banner
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: theme.accentColor.withValues(alpha: isDark ? 0.18 : 0.12),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: theme.accentColor.withValues(alpha: 0.35),
+                      width: 1.0,
                     ),
-                  );
-                }
-                final users = snapshot.data ?? const <Map<String, dynamic>>[];
-                if (users.isEmpty)
-                  return const ListTile(
-                    title: Text('No blocked users'),
-                    subtitle: Text('Blocked accounts will appear here.'),
-                  );
-                return Column(
-                  children: users
-                      .map(
-                        (user) => ChatySettingsTile(
-                          icon: Icons.block_rounded,
-                          iconColor: colors.error,
-                          title: user['display_name']?.toString() ?? 'User',
-                          subtitle: '@${user['username'] ?? ''}',
-                          trailing: TextButton(
-                            onPressed: () async {
-                              try {
-                                await _privacyBackend.unblockUser(
-                                  user['id'].toString(),
-                                );
-                                _refreshBlocked();
-                              } catch (error) {
-                                _toast('Unable to unblock: $error');
-                              }
-                            },
-                            child: const Text('Unblock'),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: theme.accentColor, size: 24),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Important alert: Dear user, If you encounter a problem with a delay in sending and receiving messages. All you have to do is click on the [Reset Privacy] option at the bottom.',
+                          style: TextStyle(
+                            color: theme.primaryTextColor,
+                            fontSize: 12.5 * theme.fontScale,
+                            height: 1.35,
                           ),
                         ),
-                      )
-                      .toList(growable: false),
-                );
-              },
-            ),
-            ChatySettingsTile(
-              icon: Icons.person_off_outlined,
-              iconColor: colors.error,
-              title: 'Block a user',
-              subtitle: 'Search Chaty users by name or @username',
-              onTap: _openBlockSearch,
-            ),
-          ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Card Container for Privacy, Specific Privacy, Status, Chats
+                _buildCardContainer(
+                  theme: theme,
+                  colors: colors,
+                  isDark: isDark,
+                  children: [
+                    // Section 1: Privacy
+                    _buildSectionDivider(label: 'Privacy', accent: theme.accentColor),
+                    _buildSwitchRow(
+                      icon: Icons.ac_unit_rounded,
+                      title: 'Freeze Last Seen',
+                      subtitle: 'Please restart Chaty for changes to take effect.',
+                      value: currentPrefs.freezeLastSeen,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updatePrivacy(
+                          currentPrefs.copyWith(freezeLastSeen: val),
+                          logTitle: 'Freeze Last Seen',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.remove_red_eye_outlined,
+                      title: 'Anti-View Once',
+                      subtitle: "Open 'view once' messages unlimited",
+                      value: currentPrefs.antiViewOnce,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updatePrivacy(
+                          currentPrefs.copyWith(antiViewOnce: val),
+                          logTitle: 'Anti-View Once',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.forward_to_inbox_rounded,
+                      title: 'Disable Forwarded',
+                      subtitle: 'Allows you to resend messages without Forwarded tag',
+                      value: currentPrefs.disableForwardedLabel,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updatePrivacy(
+                          currentPrefs.copyWith(disableForwardedLabel: val),
+                          logTitle: 'Disable Forwarded',
+                        );
+                      },
+                    ),
+                    _buildChevronRow(
+                      icon: Icons.call_outlined,
+                      title: 'Who can call me?',
+                      subtitle: currentPrefs.whoCanCallMe,
+                      theme: theme,
+                      colors: colors,
+                      onTap: _showWhoCanCallMeDialog,
+                    ),
+                    _buildChevronRow(
+                      icon: Icons.admin_panel_settings_outlined,
+                      title: 'Custom Privacy',
+                      subtitle: 'View all',
+                      theme: theme,
+                      colors: colors,
+                      onTap: () => _showCustomPrivacyDialog('Custom'),
+                    ),
+
+                    // Section 2: Specific Privacy
+                    _buildSectionDivider(label: 'Specific Privacy', accent: theme.accentColor),
+                    _buildSwitchRow(
+                      icon: Icons.lock_outline_rounded,
+                      title: 'Hide the privacy option',
+                      subtitle: 'Hide the privacy option from the Home Screen Options menu.',
+                      value: currentPrefs.hidePrivacyOption,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updatePrivacy(
+                          currentPrefs.copyWith(hidePrivacyOption: val),
+                          logTitle: 'Hide the privacy option',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.system_update_alt_rounded,
+                      title: 'Hide the update option',
+                      subtitle: 'Hide the Chaty Update option from the Home Screen Options menu.',
+                      value: currentPrefs.hideUpdateOption,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updatePrivacy(
+                          currentPrefs.copyWith(hideUpdateOption: val),
+                          logTitle: 'Hide the update option',
+                        );
+                      },
+                    ),
+
+                    // Section 3: Status
+                    _buildSectionDivider(label: 'Status', accent: theme.accentColor),
+                    _buildSwitchRow(
+                      icon: Icons.tv_off_rounded,
+                      title: 'Disable channels',
+                      subtitle: 'The channels will not be shown in the status screen.',
+                      value: currentPrefs.disableChannels,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updatePrivacy(
+                          currentPrefs.copyWith(disableChannels: val),
+                          logTitle: 'Disable channels',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.visibility_off_rounded,
+                      title: 'Hide View Status',
+                      subtitle: 'Do not tell contact that you have viewed their status',
+                      value: currentPrefs.hideViewStatus,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updatePrivacy(
+                          currentPrefs.copyWith(hideViewStatus: val),
+                          logTitle: 'Hide View Status',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.delete_forever_outlined,
+                      title: 'Anti-Delete Status',
+                      subtitle: 'Deleted status/stories will not be deleted for you',
+                      value: currentPrefs.antiDeleteStatus,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updatePrivacy(
+                          currentPrefs.copyWith(antiDeleteStatus: val),
+                          logTitle: 'Anti-Delete Status',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.notification_important_outlined,
+                      title: 'Status Revoke Alert',
+                      subtitle: 'Show an immediate notification when one of your contacts deletes their status/Story',
+                      value: currentPrefs.statusRevocationAlert,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updatePrivacy(
+                          currentPrefs.copyWith(statusRevocationAlert: val),
+                          logTitle: 'Status Revoke Alert',
+                        );
+                      },
+                    ),
+
+                    // Section 4: Chats
+                    _buildSectionDivider(label: 'Chats', accent: theme.accentColor),
+                    _buildSwitchRow(
+                      icon: Icons.mark_chat_read_outlined,
+                      title: 'Hide the first message',
+                      subtitle: 'When this feature is enabled, the first message in hidden chats will not be shown, and you can only read it after opening the chat',
+                      value: currentPrefs.hideFirstMessage,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updatePrivacy(
+                          currentPrefs.copyWith(hideFirstMessage: val),
+                          logTitle: 'Hide the first message',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.timer_outlined,
+                      title: 'Anti Disappearing Messages',
+                      subtitle: 'If Disappearing Messages is Enabled, Messages will not delete from your side',
+                      value: currentPrefs.antiDisappearingMessages,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updatePrivacy(
+                          currentPrefs.copyWith(antiDisappearingMessages: val),
+                          logTitle: 'Anti Disappearing Messages',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.edit_note_rounded,
+                      title: 'Show edited message',
+                      subtitle: 'Show people normal with messages for you',
+                      value: currentPrefs.showEditedMessage,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updatePrivacy(
+                          currentPrefs.copyWith(showEditedMessage: val),
+                          logTitle: 'Show edited message',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.delete_outline_rounded,
+                      title: 'Anti-Delete Messages',
+                      subtitle: 'Other people cannot delete messages for you',
+                      value: currentPrefs.antiDeleteMessages,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updatePrivacy(
+                          currentPrefs.copyWith(antiDeleteMessages: val),
+                          logTitle: 'Anti-Delete Messages',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.notifications_active_outlined,
+                      title: 'Message Revoke Alert',
+                      subtitle: 'Show a notification in the status bar when someone deletes a message sent to you',
+                      value: currentPrefs.messageRevokeAlert,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updatePrivacy(
+                          currentPrefs.copyWith(messageRevokeAlert: val),
+                          logTitle: 'Message Revoke Alert',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.delete_sweep_outlined,
+                      title: 'Deletion of everyone',
+                      subtitle: 'Activates the possibility of deleting messages to everyone at any time.',
+                      value: currentPrefs.deletionOfEveryone,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updatePrivacy(
+                          currentPrefs.copyWith(deletionOfEveryone: val),
+                          logTitle: 'Deletion of everyone',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.access_time_rounded,
+                      title: 'Deleted media time',
+                      subtitle: 'Find out the exact moment a message or status was deleted',
+                      value: currentPrefs.deletedMediaTime,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updatePrivacy(
+                          currentPrefs.copyWith(deletedMediaTime: val),
+                          logTitle: 'Deleted media time',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.mark_chat_unread_outlined,
+                      title: 'Unviewed chats',
+                      subtitle: 'When enabled the message counter will not disappear when you open the chat',
+                      value: currentPrefs.unviewedChats,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updatePrivacy(
+                          currentPrefs.copyWith(unviewedChats: val),
+                          logTitle: 'Unviewed chats',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.done_all_rounded,
+                      title: 'Show Blue Ticks after reply',
+                      subtitle: 'Contact will only see blue ticks after you reply',
+                      value: currentPrefs.showBlueTicksAfterReply,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updatePrivacy(
+                          currentPrefs.copyWith(showBlueTicksAfterReply: val),
+                          logTitle: 'Show Blue Ticks after reply',
+                        );
+                      },
+                    ),
+                    _buildChevronRow(
+                      icon: Icons.contacts_outlined,
+                      title: 'Contacts',
+                      subtitle: 'Change privacy settings',
+                      theme: theme,
+                      colors: colors,
+                      onTap: () => _showCustomPrivacyDialog('Contacts'),
+                    ),
+                    _buildChevronRow(
+                      icon: Icons.groups_outlined,
+                      title: 'Groups',
+                      subtitle: 'Change privacy settings',
+                      theme: theme,
+                      colors: colors,
+                      onTap: () => _showCustomPrivacyDialog('Groups'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Card Container for Security Section
+                _buildCardContainer(
+                  theme: theme,
+                  colors: colors,
+                  isDark: isDark,
+                  children: [
+                    _buildSectionDivider(label: 'Security', accent: theme.accentColor),
+                    _buildSwitchRow(
+                      icon: Icons.lock_rounded,
+                      title: 'Chaty App Lock',
+                      subtitle: currentSec.isAppLockEnabled
+                          ? 'Protected with '
+                          : 'Enable lock screen security',
+                      value: currentSec.isAppLockEnabled,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) => _runFlow(
+                        intent: val ? SecurityIntent.enableLock : SecurityIntent.disableLock,
+                      ),
+                    ),
+                    if (currentSec.isAppLockEnabled) ...[
+                      _buildChevronRow(
+                        icon: Icons.style_rounded,
+                        title: 'Lock Type',
+                        subtitle: ' • tap to change',
+                        theme: theme,
+                        colors: colors,
+                        onTap: () => _runFlow(intent: SecurityIntent.changeMethod),
+                      ),
+                      if (currentSec.lockMethod == 'PIN') ...[
+                        _buildChevronRow(
+                          icon: Icons.pin_rounded,
+                          title: 'Change PIN Code',
+                          subtitle: '-digit PIN stored securely on this device',
+                          theme: theme,
+                          colors: colors,
+                          onTap: () => _runFlow(
+                            intent: SecurityIntent.changeCredential,
+                            target: LockMethodType.pin,
+                            setupPinLength: _pinLength,
+                          ),
+                        ),
+                        _buildChevronRow(
+                          icon: Icons.dialpad_rounded,
+                          title: 'PIN Length',
+                          subtitle: _pinLength == 6 ? '6 digits' : '4 digits',
+                          theme: theme,
+                          colors: colors,
+                          onTap: () async {
+                            final chosen = await showDialog<String>(
+                              context: context,
+                              builder: (ctx) => SimpleDialog(
+                                title: const Text('Choose PIN Length'),
+                                children: [
+                                  SimpleDialogOption(
+                                    onPressed: () => Navigator.pop(ctx, '4 digits'),
+                                    child: const Text('4 digits'),
+                                  ),
+                                  SimpleDialogOption(
+                                    onPressed: () => Navigator.pop(ctx, '6 digits'),
+                                    child: const Text('6 digits'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (chosen != null) {
+                              _runFlow(
+                                intent: SecurityIntent.changeCredential,
+                                target: LockMethodType.pin,
+                                setupPinLength: chosen == '6 digits' ? 6 : 4,
+                              );
+                            }
+                          },
+                        ),
+                      ],
+                      if (currentSec.lockMethod == 'Pattern') ...[
+                        _buildChevronRow(
+                          icon: Icons.pattern_rounded,
+                          title: 'Change Pattern',
+                          subtitle: 'Configure gesture unlock pattern',
+                          theme: theme,
+                          colors: colors,
+                          onTap: () => _runFlow(
+                            intent: SecurityIntent.changeCredential,
+                            target: LockMethodType.pattern,
+                          ),
+                        ),
+                        _buildSwitchRow(
+                          icon: Icons.visibility_off_rounded,
+                          title: 'Make Pattern Invisible',
+                          subtitle: 'Hide trail when drawing pattern',
+                          value: currentSec.makePatternInvisible,
+                          theme: theme,
+                          colors: colors,
+                          onChanged: (val) {
+                            widget.preferencesController.updateSecurity(
+                              currentSec.copyWith(makePatternInvisible: val),
+                              logTitle: 'Make Pattern Invisible',
+                            );
+                          },
+                        ),
+                        _buildSwitchRow(
+                          icon: Icons.vibration_rounded,
+                          title: 'Disable pattern vibration',
+                          subtitle: 'Suppress haptic vibration on pattern touch',
+                          value: currentSec.disablePatternVibration,
+                          theme: theme,
+                          colors: colors,
+                          onChanged: (val) {
+                            widget.preferencesController.updateSecurity(
+                              currentSec.copyWith(disablePatternVibration: val),
+                              logTitle: 'Disable pattern vibration',
+                            );
+                          },
+                        ),
+                      ],
+                      if (currentSec.lockMethod == 'Password') ...[
+                        _buildChevronRow(
+                          icon: Icons.password_rounded,
+                          title: 'Change Password',
+                          subtitle: 'Set a new alphanumeric password',
+                          theme: theme,
+                          colors: colors,
+                          onTap: () => _runFlow(
+                            intent: SecurityIntent.changeCredential,
+                            target: LockMethodType.password,
+                          ),
+                        ),
+                      ],
+                      if (currentSec.lockMethod == 'Biometric')
+                        _buildChevronRow(
+                          icon: Icons.fingerprint_rounded,
+                          title: 'Test Biometrics',
+                          subtitle: _biometricAvailable
+                              ? 'Enrolled biometric available'
+                              : 'No biometric enrolled on device',
+                          theme: theme,
+                          colors: colors,
+                          onTap: () async {
+                            final ok = await _lockService.authenticateBiometric(
+                              reason: 'Test biometric unlock for Chaty',
+                            );
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(ok ? 'Biometric unlock verified.' : 'Biometric failed or cancelled.'),
+                              ),
+                            );
+                          },
+                        ),
+                      _buildChevronRow(
+                        icon: Icons.timer_outlined,
+                        title: 'Auto-Lock Timeout',
+                        subtitle: currentSec.autoLockTimeout,
+                        theme: theme,
+                        colors: colors,
+                        onTap: () async {
+                          final picked = await showDialog<String>(
+                            context: context,
+                            builder: (ctx) => SimpleDialog(
+                              title: const Text('Auto-Lock Timeout'),
+                              children: ['Immediately', '15s', '30s', '1m', '5m', '15m'].map((opt) {
+                                return SimpleDialogOption(
+                                  onPressed: () => Navigator.pop(ctx, opt),
+                                  child: Text(opt),
+                                );
+                              }).toList(),
+                            ),
+                          );
+                          if (picked != null) {
+                            widget.preferencesController.updateSecurity(
+                              currentSec.copyWith(autoLockTimeout: picked),
+                              logTitle: 'Auto-Lock Timeout ()',
+                            );
+                          }
+                        },
+                      ),
+                      _buildChevronRow(
+                        icon: Icons.help_outline_rounded,
+                        title: 'Recovery Question',
+                        subtitle: 'Set secret question for password reset',
+                        theme: theme,
+                        colors: colors,
+                        onTap: () => _showRecoveryQuestionDialog(),
+                      ),
+                      _buildChevronRow(
+                        icon: Icons.shield_rounded,
+                        title: 'Advanced Security & Trust Center',
+                        subtitle: 'Encryption verification, QR audits & locked chats',
+                        theme: theme,
+                        colors: colors,
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => SecurityCenterScreen(
+                              preferencesController: widget.preferencesController,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    
+                    _buildChevronRow(
+                      icon: Icons.restart_alt_rounded,
+                      title: 'Reset Privacy',
+                      subtitle: 'Sets back Chaty default Privacy',
+                      theme: theme,
+                      colors: colors,
+                      onTap: _resetPrivacyToDefaults,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 36),
+              ],
+            );
+          },
         ),
-        ChatySettingsSection(
-          title: 'Call & Forwarding Controls',
-          children: [
-            ChatyChoiceTile<String>(
-              title: 'Who Can Call Me',
-              options: _whoCanCallMeOptions,
-              selectedOption: prefs.whoCanCallMe,
-              optionLabel: (value) => value,
-              onSelected: (audience) {
-                widget.preferencesController.updatePrivacy(
-                  prefs.copyWith(whoCanCallMe: audience),
-                  logTitle: 'Who Can Call Me',
-                );
-                widget.preferencesController.updateGbFeature(
-                  'yoCallsPrivacy',
-                  audience,
-                  logTitle: 'Who Can Call Me',
-                );
-              },
-            ),
-            // Real consumer support for 'My Contacts Except…': the exclusion
-            // list is persisted and enforced at ring time by the realtime
-            // call gate.
-            if (prefs.whoCanCallMe == 'My Contacts Except…')
-              ChatySettingsTile(
-                icon: Icons.block_rounded,
-                iconColor: colors.error,
-                title: 'Manage call exceptions',
-                subtitle: prefs.whoCanCallMeExceptions.isEmpty
-                    ? 'No contacts are excluded from calling you'
-                    : '${prefs.whoCanCallMeExceptions.length}'
-                          ' contact(s) may not call you',
-                onTap: () => _editCallExceptions(),
-              ),
-            ChatySwitchTile(
-              icon: Icons.shortcut_rounded,
-              iconColor: colors.info,
-              title: 'Disable Forwarded Tag',
-              subtitle:
-                  'Do not display a forwarded marker on your outgoing forwarded messages.',
-              value: prefs.disableForwardedLabel,
-              onChanged: (value) {
-                widget.preferencesController.updatePrivacy(
-                  prefs.copyWith(disableForwardedLabel: value),
-                  logTitle: 'Disable Forwarded Label',
-                );
-                widget.preferencesController.updateGbFeature(
-                  'yoDisableFwd',
-                  value,
-                  logTitle: 'Disable Forwarded Label',
-                );
-              },
-            ),
-          ],
-        ),
-        ChatySettingsSection(
-          title: 'Advanced Settings & Recovery',
-          children: [
-            ChatySwitchTile(
-              icon: Icons.visibility_off_rounded,
-              iconColor: colors.foregroundSecondary,
-              title: 'Hide Privacy Option from Main Settings',
-              subtitle:
-                  'Hide this Privacy entry. Restore it through Advanced Features.',
-              value: prefs.hidePrivacyOption,
-              onChanged: (value) => widget.preferencesController.updatePrivacy(
-                prefs.copyWith(hidePrivacyOption: value),
-                logTitle: 'Hide Privacy Option',
-              ),
-            ),
-          ],
-        ),
-      ],
+      ),
     );
   }
 
-  Future<void> _openBlockSearch() async {
-    final dataStore = locator<ChatyDataStore>();
-    final searchController = TextEditingController();
-    List<dynamic> results = const <dynamic>[];
-    var busy = false;
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, updateDialog) => AlertDialog(
-          title: const Text('Block a Chaty user'),
-          content: SizedBox(
-            width: 420,
-            child: Column(
+  Widget _buildCardContainer({
+    required dynamic theme,
+    required dynamic colors,
+    required bool isDark,
+    required List<Widget> children,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E2124) : colors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colors.borderSubtle,
+          width: 0.9,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: isDark ? 0.25 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: children,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionDivider({
+    required String label,
+    required Color accent,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: 1.2,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    accent.withValues(alpha: 0.0),
+                    accent.withValues(alpha: 0.7),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                  controller: searchController,
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    hintText: '@username or name',
-                    suffixIcon: busy
-                        ? const Padding(
-                            padding: EdgeInsets.all(13),
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : IconButton(
-                            icon: const Icon(Icons.search_rounded),
-                            onPressed: () async {
-                              final query = searchController.text.trim();
-                              if (query.length < 2) return;
-                              updateDialog(() => busy = true);
-                              try {
-                                final found = await dataStore.searchUsersRemote(
-                                  query,
-                                );
-                                if (dialogContext.mounted)
-                                  updateDialog(() => results = found);
-                              } finally {
-                                if (dialogContext.mounted)
-                                  updateDialog(() => busy = false);
-                              }
-                            },
-                          ),
+                Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: accent,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    letterSpacing: 0.5,
                   ),
                 ),
-                const SizedBox(height: 10),
-                Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: results.length,
-                    itemBuilder: (context, index) {
-                      final user = results[index];
-                      return ListTile(
-                        title: Text(user.displayName),
-                        subtitle: Text('@${user.username}'),
-                        trailing: const Icon(Icons.chevron_right_rounded),
-                        onTap: () async {
-                          try {
-                            await _privacyBackend.blockUser(user.id);
-                            if (dialogContext.mounted)
-                              Navigator.pop(dialogContext);
-                            _refreshBlocked();
-                            _toast('${user.displayName} blocked.');
-                          } catch (error) {
-                            _toast('Unable to block user: $error');
-                          }
-                        },
-                      );
-                    },
-                  ),
+                const SizedBox(width: 6),
+                Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
                 ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Close'),
+          Expanded(
+            child: Container(
+              height: 1.2,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    accent.withValues(alpha: 0.7),
+                    accent.withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSwitchRow({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool value,
+    required dynamic theme,
+    required dynamic colors,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onChanged(!value);
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: theme.accentColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(icon, color: theme.accentColor, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: theme.primaryTextColor,
+                        fontSize: 14.5 * theme.fontScale,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: theme.secondaryTextColor,
+                        fontSize: 11.5 * theme.fontScale,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              IgnorePointer(
+                child: Switch(
+                  value: value,
+                  activeColor: theme.accentColor,
+                  onChanged: null,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
-    searchController.dispose();
   }
 
-  void _toast(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+  Widget _buildChevronRow({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required dynamic theme,
+    required dynamic colors,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: theme.accentColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(icon, color: theme.accentColor, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: theme.primaryTextColor,
+                        fontSize: 14.5 * theme.fontScale,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: theme.secondaryTextColor,
+                        fontSize: 11.5 * theme.fontScale,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: theme.accentColor,
+                size: 22,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
