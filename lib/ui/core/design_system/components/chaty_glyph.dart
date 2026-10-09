@@ -87,9 +87,6 @@ const Map<ChatyGlyph, String> _chatyGlyphSvg = <ChatyGlyph, String>{
   <circle cx="9" cy="7" r="2" fill="currentColor" stroke="none"/>
   <circle cx="15" cy="12" r="2" fill="currentColor" stroke="none"/>
   <circle cx="8" cy="17" r="2" fill="currentColor" stroke="none"/>
-  <circle cx="9" cy="7" r=".7" fill="#000000" fill-opacity=".2" stroke="none"/>
-  <circle cx="15" cy="12" r=".7" fill="#000000" fill-opacity=".2" stroke="none"/>
-  <circle cx="8" cy="17" r=".7" fill="#000000" fill-opacity=".2" stroke="none"/>
 </svg>''',
   ChatyGlyph.chevronRight: r'''
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -392,7 +389,7 @@ class _ChatySvgGlyphPainter extends CustomPainter {
             ..style = PaintingStyle.stroke
             ..strokeWidth = element.strokeWidth == 0
                 ? defaultStrokeWidth
-                : element.strokeWidth
+                : element.strokeWidth * (defaultStrokeWidth / 1.8)
             ..strokeCap = StrokeCap.round
             ..strokeJoin = StrokeJoin.round
             ..isAntiAlias = true,
