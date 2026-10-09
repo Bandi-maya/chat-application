@@ -646,11 +646,13 @@ class GbSettingsScreen extends StatelessWidget {
     final result = <String, dynamic>{};
     for (final entry in input.entries) {
       final key = entry.key.toLowerCase();
-      if (key.contains('path') ||
-          key.contains('file') ||
+      if (key == 'path' ||
+          key.endsWith('_path') ||
+          key.endsWith('filepath') ||
+          key.contains('file_path') ||
           key.contains('mynameoverride') ||
           key == 'my_name' ||
-          key == 'customwallpaperimage') {
+          key.contains('customwallpaperimage')) {
         continue;
       }
       final value = entry.value;
@@ -791,6 +793,46 @@ class GbSettingsScreen extends StatelessWidget {
       final themeMap = optionalMap('theme');
       final templateMap = optionalMap('template');
 
+      const allowedGbAppearanceKeys = <String>{
+        'ModConTextColor', 'ModContactNameColor', 'HomeCounterBK',
+        'HomeCounterText', 'ModOnlineColor', 'ModlastseenColor',
+        'onlineDotchatColor', 'ModConColor', 'tabindicator',
+        'bubble_style', 'tick_style', 'text_size_pick', 'ConvoBack',
+        'ModChatRightBubble', 'ModChatBubbleText', 'date_right_color',
+        'ModChatLeftBubble', 'ModChatBubbleTextLeft', 'date_left_color',
+        'ModCallsBackground', 'ModCallsTextColor', 'ModCallsIconColors',
+        'ModChatColor', 'ModChatGStatusB', 'ModChatGStatusT',
+        'ModConPickColor', 'HomeBarText', 'ModConBackColor',
+        'list_bg_color', 'ModDarkConPickColor', 'ModDarkConPickColorNav',
+        'BGColor', 'home_stories_style', 'ui_home_styleV3',
+      };
+      if (gbMap.keys.any((key) => !allowedGbAppearanceKeys.contains(key))) {
+        throw const FormatException('Unknown appearance setting in profile.');
+      }
+      if (templateMap.isNotEmpty) {
+        final rawBase = templateMap['base'];
+        if (!ChatyTemplateId.values.any((template) => template.key == rawBase)) {
+          throw const FormatException('Unknown template profile.');
+        }
+        final rawOverrides = templateMap['overrides'];
+        if (rawOverrides != null && rawOverrides is! Map) {
+          throw const FormatException('Invalid component overrides.');
+        }
+        if (rawOverrides is Map) {
+          for (final entry in rawOverrides.entries) {
+            final componentKnown = TemplateComponentType.values.any(
+              (component) => component.name == entry.key,
+            );
+            final templateKnown = ChatyTemplateId.values.any(
+              (template) => template.key == entry.value,
+            );
+            if (!componentKnown || !templateKnown) {
+              throw const FormatException('Unknown component or template.');
+            }
+          }
+        }
+      }
+
       // Decode everything before mutating any live state, so malformed input
       // cannot leave the app half-restored.
       final nextHome = HomePreferences.fromMap(<String, dynamic>{
@@ -815,11 +857,6 @@ class GbSettingsScreen extends StatelessWidget {
       final nextTemplate = templateMap.isEmpty
           ? null
           : UserTemplateConfiguration.fromMap(templateMap);
-      if (nextTemplate != null &&
-          !ChatyTemplateId.values.contains(nextTemplate.baseTemplate)) {
-        throw const FormatException('Unknown template profile.');
-      }
-
       if (nextTemplate != null) {
         await locator<TemplateController>().applyConfiguration(
           nextTemplate,
@@ -850,22 +887,6 @@ class GbSettingsScreen extends StatelessWidget {
         );
       }
       if (gbMap.isNotEmpty) {
-        const allowed = <String>{
-          'ModConTextColor', 'ModContactNameColor', 'HomeCounterBK',
-          'HomeCounterText', 'ModOnlineColor', 'ModlastseenColor',
-          'onlineDotchatColor', 'ModConColor', 'tabindicator',
-          'bubble_style', 'tick_style', 'text_size_pick', 'ConvoBack',
-          'ModChatRightBubble', 'ModChatBubbleText', 'date_right_color',
-          'ModChatLeftBubble', 'ModChatBubbleTextLeft', 'date_left_color',
-          'ModCallsBackground', 'ModCallsTextColor', 'ModCallsIconColors',
-          'ModChatColor', 'ModChatGStatusB', 'ModChatGStatusT',
-          'ModConPickColor', 'HomeBarText', 'ModConBackColor',
-          'list_bg_color', 'ModDarkConPickColor', 'ModDarkConPickColorNav',
-          'BGColor', 'home_stories_style', 'ui_home_styleV3',
-        };
-        if (gbMap.keys.any((key) => !allowed.contains(key))) {
-          throw const FormatException('Unknown appearance setting in profile.');
-        }
         preferencesController.updateGbFeatures(
           Map<String, Object?>.from(gbMap),
           logTitle: 'Settings restore',
