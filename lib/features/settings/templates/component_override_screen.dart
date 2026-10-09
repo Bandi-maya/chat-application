@@ -43,18 +43,38 @@ class ComponentOverrideScreen extends StatelessWidget {
             actions: [
               if (isOverridden)
                 TextButton(
-                  onPressed: () {
-                    templateController.removeComponentOverride(
-                      component,
-                      appearanceController:
-                          locator<AppearanceVariantController>(),
-                      preferencesController:
-                          locator<ChatyPreferencesController>(),
-                      themeController: locator<ThemeController>(),
-                    );
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Reset ${component.title} to the base template.')),
-                    );
+                  onPressed: () async {
+                    try {
+                      await templateController.removeComponentOverride(
+                        component,
+                        appearanceController:
+                            locator<AppearanceVariantController>(),
+                        preferencesController:
+                            locator<ChatyPreferencesController>(),
+                        themeController: locator<ThemeController>(),
+                      );
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Reset ${component.title} to the base template.',
+                            ),
+                          ),
+                        );
+                    } catch (error) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              error.toString().replaceFirst('Bad state: ', ''),
+                            ),
+                          ),
+                        );
+                    }
                   },
                   child: const Text('Reset'),
                 ),
@@ -217,23 +237,45 @@ class ComponentOverrideScreen extends StatelessWidget {
                             ),
                             onPressed: isCurrentlyUsed
                                 ? null
-                                : () {
-                                    templateController.applyComponent(
-                                      component: component,
-                                      templateId: tmpl.id,
-                                      appearanceController:
-                                          locator<
-                                            AppearanceVariantController
-                                          >(),
-                                      preferencesController:
-                                          locator<ChatyPreferencesController>(),
-                                      themeController: locator<ThemeController>(),
-                                    );
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Applied ${tmpl.name} to ${component.title} only.'),
-                                      ),
-                                    );
+                                : () async {
+                                    try {
+                                      await templateController.applyComponent(
+                                        component: component,
+                                        templateId: tmpl.id,
+                                        appearanceController:
+                                            locator<
+                                              AppearanceVariantController
+                                            >(),
+                                        preferencesController:
+                                            locator<ChatyPreferencesController>(),
+                                        themeController:
+                                            locator<ThemeController>(),
+                                      );
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context)
+                                        ..hideCurrentSnackBar()
+                                        ..showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Applied ${tmpl.name} to ${component.title} only.',
+                                            ),
+                                          ),
+                                        );
+                                    } catch (error) {
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context)
+                                        ..hideCurrentSnackBar()
+                                        ..showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              error.toString().replaceFirst(
+                                                'Bad state: ',
+                                                '',
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                    }
                                   },
                             child: Text(
                               isCurrentlyUsed
