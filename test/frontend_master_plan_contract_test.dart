@@ -105,6 +105,4 @@ void main() {
     expect(source, contains('case TemplateComponentType.navigation:'));
     expect(source, contains('case TemplateComponentType.calls:'));
   });
-
-  );
 }
