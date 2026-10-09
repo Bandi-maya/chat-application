@@ -69,6 +69,13 @@ Future<void> main() async {
       themeController: locator<ThemeController>(),
     ),
   ]);
+  // Theme and template restore in parallel for cold-start performance. Reapply
+  // template-owned layout tokens after both are restored so a slower theme
+  // read cannot overwrite the saved template's bubble/navigation choice.
+  locator<TemplateController>().synchronizeThemeAndNavigation(
+    appearanceController: locator<AppearanceVariantController>(),
+    themeController: locator<ThemeController>(),
+  );
   runApp(const ChatyApp());
   WidgetsBinding.instance.addPostFrameCallback((_) {
     unawaited(_initializeDeferredPlatformServices());
