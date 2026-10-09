@@ -4,6 +4,7 @@ import '../controllers/appearance_variant_controller.dart';
 import '../controllers/preferences_controller.dart';
 import '../persistence/preferences_storage.dart';
 import '../theme/theme_controller.dart';
+import '../theme/theme_config.dart';
 import '../bubbles/bubble_style_id.dart';
 import '../ticks/delivery_icon_style.dart';
 import 'template_models.dart';
@@ -83,6 +84,7 @@ class TemplateController extends ChangeNotifier {
       appearanceController: appearanceController,
       preferencesController: preferencesController,
       themeController: themeController,
+      applyNavigation: true,
     );
   }
 
@@ -104,6 +106,7 @@ class TemplateController extends ChangeNotifier {
       preferencesController: preferencesController,
       themeController: themeController,
       applyTheme: true,
+      applyNavigation: true,
     );
   }
 
@@ -123,6 +126,7 @@ class TemplateController extends ChangeNotifier {
       preferencesController: preferencesController,
       themeController: themeController,
       applyTheme: component == TemplateComponentType.conversation,
+      applyNavigation: component == TemplateComponentType.navigation,
     );
   }
 
@@ -151,6 +155,7 @@ class TemplateController extends ChangeNotifier {
       preferencesController: preferencesController,
       themeController: themeController,
       applyTheme: true,
+      applyNavigation: true,
     );
   }
 
@@ -169,6 +174,7 @@ class TemplateController extends ChangeNotifier {
       preferencesController: preferencesController,
       themeController: themeController,
       applyTheme: component == TemplateComponentType.conversation,
+      applyNavigation: component == TemplateComponentType.navigation,
     );
   }
 
@@ -189,6 +195,7 @@ class TemplateController extends ChangeNotifier {
       preferencesController: preferencesController,
       themeController: themeController,
       applyTheme: true,
+      applyNavigation: true,
     );
   }
 
@@ -197,7 +204,20 @@ class TemplateController extends ChangeNotifier {
     ChatyPreferencesController? preferencesController,
     ThemeController? themeController,
     bool applyTheme = false,
+    bool applyNavigation = false,
   }) {
+    if (applyNavigation && themeController != null) {
+      final targetMode = switch (navigation.layout) {
+        NavigationLayoutType.flatTabs ||
+        NavigationLayoutType.floatingPill ||
+        NavigationLayoutType.centerActionDock => AppNavigationMode.bottomNav,
+        NavigationLayoutType.utilityBar => AppNavigationMode.compactRail,
+        NavigationLayoutType.identityBar => AppNavigationMode.topWhatsAppBar,
+      };
+      if (themeController.navigationMode != targetMode) {
+        themeController.setNavigationMode(targetMode);
+      }
+    }
     if (applyTheme && themeController != null) {
       final c = conversation;
       final current = themeController.globalTheme;
