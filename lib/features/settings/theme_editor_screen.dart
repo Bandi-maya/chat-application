@@ -69,7 +69,7 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Imported " successfully!'),
+          content: Text('Imported "${theme.name}" successfully.'),
           backgroundColor: context.colors.success,
         ),
       );
@@ -77,7 +77,11 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Import failed: ')));
+      ).showSnackBar(
+        const SnackBar(
+          content: Text('Import failed. Choose a valid Chaty theme JSON file.'),
+        ),
+      );
     }
   }
 
@@ -102,7 +106,9 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not generate theme from image: ')),
+        const SnackBar(
+          content: Text('Could not generate a theme from that image. Try another image.'),
+        ),
       );
     }
   }
