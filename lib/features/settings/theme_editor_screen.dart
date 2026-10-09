@@ -19,6 +19,51 @@ class ThemeEditorScreen extends StatefulWidget {
 }
 
 class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
+  static const List<({String name, Color accent, Color link, Color outgoing})>
+      _paletteOptions = [
+    (
+      name: 'Ocean Blue',
+      accent: Color(0xFF229ED9),
+      link: Color(0xFF60A5FA),
+      outgoing: Color(0xFF176B9A),
+    ),
+    (
+      name: 'Emerald',
+      accent: Color(0xFF10B981),
+      link: Color(0xFF34D399),
+      outgoing: Color(0xFF047857),
+    ),
+    (
+      name: 'Violet',
+      accent: Color(0xFF8B5CF6),
+      link: Color(0xFFA78BFA),
+      outgoing: Color(0xFF6D28D9),
+    ),
+    (
+      name: 'Sunset',
+      accent: Color(0xFFF43F5E),
+      link: Color(0xFFFB923C),
+      outgoing: Color(0xFFBE123C),
+    ),
+    (
+      name: 'Rose',
+      accent: Color(0xFFEC4899),
+      link: Color(0xFFF472B6),
+      outgoing: Color(0xFFBE185D),
+    ),
+    (
+      name: 'Amber',
+      accent: Color(0xFFF59E0B),
+      link: Color(0xFFFBBF24),
+      outgoing: Color(0xFFB45309),
+    ),
+    (
+      name: 'Monochrome',
+      accent: Color(0xFFFFFFFF),
+      link: Color(0xFFE4E4E7),
+      outgoing: Color(0xFF27272A),
+    ),
+  ];
   late ThemeConfig _current;
 
   @override
@@ -69,7 +114,7 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Imported " successfully!'),
+          content: Text('Imported "${theme.name}" successfully!'),
           backgroundColor: context.colors.success,
         ),
       );
@@ -102,7 +147,7 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not generate theme from image: ')),
+        SnackBar(content: Text('Could not generate theme from image: $e')),
       );
     }
   }
@@ -185,9 +230,83 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
               ),
             ),
 
+            // Named color combinations. These edit the draft palette and
+            // are applied across Chaty only when Save Theme is pressed.
+            ChatyGroupedSection(
+              title: 'Color Combinations',
+              description: 'Choose a coordinated accent, link and outgoing-bubble palette.',
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(ChatySpacing.md),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _paletteOptions.map((palette) {
+                      final selected =
+                          _current.accentColor == palette.accent &&
+                          _current.linkColor == palette.link &&
+                          _current.outgoingBubbleColor == palette.outgoing;
+                      return InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => setState(() {
+                          _current = _current.copyWith(
+                            accentColor: palette.accent,
+                            linkColor: palette.link,
+                            outgoingBubbleColor: palette.outgoing,
+                          );
+                        }),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? palette.accent.withValues(alpha: 0.12)
+                                : context.colors.surfaceSecondary,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: selected ? palette.accent : context.colors.border,
+                              width: selected ? 1.8 : 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 18,
+                                height: 18,
+                                decoration: BoxDecoration(
+                                  color: palette.accent,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: context.colors.border),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                palette.name,
+                                style: TextStyle(
+                                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                                  color: context.colors.foreground,
+                                ),
+                              ),
+                              if (selected) ...[
+                                const SizedBox(width: 6),
+                                Icon(Icons.check_circle_rounded, color: palette.accent, size: 17),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(growable: false),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: ChatySpacing.md),
+
             // Presets Header & Grid
             ChatyGroupedSection(
-              title: 'Theme Presets ()',
+              title: 'Theme Presets (${ThemePresets.all.length})',
               children: [
                 Padding(
                   padding: const EdgeInsets.all(ChatySpacing.md),
@@ -217,7 +336,6 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
                             isSelected: isSelected,
                             onTap: () {
                               setState(() => _current = preset);
-                              widget.themeController.updateThemeConfig(preset);
                             },
                           );
                         },
