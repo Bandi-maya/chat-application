@@ -1252,8 +1252,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                               );
                             },
                           ),
-                          if (homePrefs.showCameraIcon)
-                            _popupMenuItem(
+                          _popupMenuItem(
                               icon: Icons.camera_alt_rounded,
                               title: 'Camera Effects',
                               onTap: () {
@@ -1261,8 +1260,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                 _handleHomeOverflowAction('effects');
                               },
                             ),
-                          if (homePrefs.showDesktopIcon)
-                            _popupMenuItem(
+                          _popupMenuItem(
                               icon: Icons.qr_code_scanner_rounded,
                               title: 'QR / Scan',
                               onTap: () {
