@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   patch:
-    if: github.event.head_commit.message != 'fix: make MLS membership commits failure-atomic'
+    if: "${{ github.ref == 'refs/heads/production-hardening-2026-08-22' && github.event.head_commit.message != 'fix: make MLS membership commits failure-atomic' }}"
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
