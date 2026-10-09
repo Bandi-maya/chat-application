@@ -1171,15 +1171,10 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
   }
 
   void _openHomeThreeDotMenu({
-    required bool useOverflowSheet,
     required HomePreferences homePrefs,
     required ThemeConfig theme,
   }) {
     HapticFeedback.lightImpact();
-    if (useOverflowSheet) {
-      unawaited(_showHomeOverflowSheet(homePrefs, theme));
-      return;
-    }
     final topOffset = MediaQuery.of(context).padding.top + kToolbarHeight - 6;
     final colors = context.colors;
 
@@ -1257,6 +1252,24 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                               );
                             },
                           ),
+                          if (homePrefs.showCameraIcon)
+                            _popupMenuItem(
+                              icon: Icons.camera_alt_rounded,
+                              title: 'Camera Effects',
+                              onTap: () {
+                                Navigator.pop(ctx);
+                                _handleHomeOverflowAction('effects');
+                              },
+                            ),
+                          if (homePrefs.showDesktopIcon)
+                            _popupMenuItem(
+                              icon: Icons.qr_code_scanner_rounded,
+                              title: 'QR / Scan',
+                              onTap: () {
+                                Navigator.pop(ctx);
+                                _handleHomeOverflowAction('qr');
+                              },
+                            ),
                           _popupMenuItem(
                             icon: Icons.devices_rounded,
                             title: 'Linked Devices',
@@ -1266,11 +1279,43 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                             },
                           ),
                           _popupMenuItem(
+                            icon: Icons.palette_outlined,
+                            title: 'Themes & Colors',
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _handleHomeOverflowAction('themes');
+                            },
+                          ),
+                          _popupMenuItem(
+                            icon: Icons.dashboard_customize_rounded,
+                            title: 'Templates & Layouts',
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _handleHomeOverflowAction('templates');
+                            },
+                          ),
+                          _popupMenuItem(
                             icon: Icons.star_rounded,
                             title: 'Starred Messages',
                             onTap: () {
                               Navigator.pop(ctx);
                               _handleHomeOverflowAction('starred');
+                            },
+                          ),
+                          _popupMenuItem(
+                            icon: Icons.home_filled,
+                            title: 'Home & Navigation',
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _handleHomeOverflowAction('home');
+                            },
+                          ),
+                          _popupMenuItem(
+                            icon: Icons.swap_horiz_rounded,
+                            title: 'Navigation Destinations',
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _handleHomeOverflowAction('navigation');
                             },
                           ),
                           _popupMenuItem(
@@ -1369,7 +1414,6 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
   Widget _standardAppBar(ThemeConfig theme, HomePreferences homePrefs) {
     final availableWidth = MediaQuery.sizeOf(context).width;
     final compactHeader = availableWidth < 390;
-    final useOverflowSheet = availableWidth < 600;
     final headerStyle = locator<TemplateController>().home.headerStyle;
     final titleFontSize = switch (headerStyle) {
       HomeHeaderStyle.compact => 19.0,
@@ -1498,7 +1542,6 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               color: theme.primaryTextColor,
             ),
             onPressed: () => _openHomeThreeDotMenu(
-              useOverflowSheet: useOverflowSheet,
               homePrefs: homePrefs,
               theme: theme,
             ),
