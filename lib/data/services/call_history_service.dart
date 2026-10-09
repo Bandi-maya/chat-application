@@ -74,11 +74,6 @@ class CallHistoryService extends ChangeNotifier {
     notifyListeners();
   }
 
-  @visibleForTesting
-  static CallRecord? mapRowForTesting(
-    Map<String, dynamic> row,
-    String currentUserId,
-  ) => mapCallHistoryRow(row, currentUserId);
 
   @override
   void dispose() {
