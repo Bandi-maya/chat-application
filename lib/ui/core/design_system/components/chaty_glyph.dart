@@ -15,6 +15,16 @@ enum ChatyGlyph {
   chevronRight,
   more,
   tune,
+  search,
+  close,
+  exportProfile,
+  importProfile,
+  reset,
+  chatBubble,
+  person,
+  list,
+  updates,
+  calls,
 }
 
 class ChatyGlyphIcon extends StatelessWidget {
@@ -234,15 +244,93 @@ class _ChatyGlyphPainter extends CustomPainter {
         stroke(const <Offset>[Offset(3, 6), Offset(21, 6)]);
         stroke(const <Offset>[Offset(3, 12), Offset(21, 12)]);
         stroke(const <Offset>[Offset(3, 18), Offset(21, 18)]);
-        canvas.drawCircle(const Offset(8, 6), 1.8, Paint()
-          ..color = color
-          ..style = PaintingStyle.fill);
-        canvas.drawCircle(const Offset(15, 12), 1.8, Paint()
-          ..color = color
-          ..style = PaintingStyle.fill);
-        canvas.drawCircle(const Offset(10.5, 18), 1.8, Paint()
-          ..color = color
-          ..style = PaintingStyle.fill);
+        canvas.drawCircle(const Offset(8, 6), 1.8, solid);
+        canvas.drawCircle(const Offset(15, 12), 1.8, solid);
+        canvas.drawCircle(const Offset(10.5, 18), 1.8, solid);
+        break;
+      case ChatyGlyph.search:
+        canvas.drawCircle(const Offset(10.5, 10.5), 6.2, line);
+        stroke(const <Offset>[Offset(15, 15), Offset(20.5, 20.5)]);
+        break;
+      case ChatyGlyph.close:
+        stroke(const <Offset>[Offset(6, 6), Offset(18, 18)]);
+        stroke(const <Offset>[Offset(18, 6), Offset(6, 18)]);
+        break;
+      case ChatyGlyph.exportProfile:
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTRB(4, 10, 20, 21),
+            const Radius.circular(2),
+          ),
+          line,
+        );
+        stroke(const <Offset>[Offset(12, 16), Offset(12, 3)]);
+        stroke(const <Offset>[Offset(7.5, 7.5), Offset(12, 3), Offset(16.5, 7.5)]);
+        break;
+      case ChatyGlyph.importProfile:
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTRB(4, 10, 20, 21),
+            const Radius.circular(2),
+          ),
+          line,
+        );
+        stroke(const <Offset>[Offset(12, 3), Offset(12, 16)]);
+        stroke(const <Offset>[Offset(7.5, 11.5), Offset(12, 16), Offset(16.5, 11.5)]);
+        break;
+      case ChatyGlyph.reset:
+        final resetPath = Path()
+          ..moveTo(19, 8)
+          ..cubicTo(16.2, 3.5, 9.9, 2.7, 6, 6.5)
+          ..cubicTo(2.2, 10.2, 3.2, 16.7, 7.5, 19.2)
+          ..cubicTo(11.1, 21.4, 16.1, 20, 18.2, 17);
+        canvas.drawPath(resetPath, line);
+        stroke(const <Offset>[Offset(18.5, 4), Offset(19, 8), Offset(15, 8)]);
+        break;
+      case ChatyGlyph.chatBubble:
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTRB(3, 3.5, 21, 17),
+            const Radius.circular(4),
+          ),
+          line,
+        );
+        stroke(const <Offset>[Offset(7, 17), Offset(6, 21), Offset(12, 17)]);
+        stroke(const <Offset>[Offset(7, 8), Offset(17, 8)]);
+        stroke(const <Offset>[Offset(7, 12), Offset(14, 12)]);
+        break;
+      case ChatyGlyph.person:
+        canvas.drawCircle(const Offset(12, 7.5), 3.5, line);
+        final shoulders = Path()
+          ..moveTo(4, 20)
+          ..cubicTo(4.7, 15.8, 8, 13.8, 12, 13.8)
+          ..cubicTo(16, 13.8, 19.3, 15.8, 20, 20);
+        canvas.drawPath(shoulders, line);
+        break;
+      case ChatyGlyph.list:
+        for (final y in <double>[6, 12, 18]) {
+          canvas.drawCircle(Offset(4.5, y), 1.1, solid);
+          stroke(<Offset>[Offset(8, y), Offset(20, y)]);
+        }
+        break;
+      case ChatyGlyph.updates:
+        canvas.drawCircle(const Offset(12, 12), 8.3, line);
+        canvas.drawCircle(const Offset(12, 12), 5.8, line);
+        canvas.drawCircle(const Offset(18, 6), 2.0, solid);
+        break;
+      case ChatyGlyph.calls:
+        final handset = Path()
+          ..moveTo(7, 3.5)
+          ..lineTo(4.8, 5.7)
+          ..cubicTo(4.2, 6.4, 5.2, 10.8, 9.2, 14.8)
+          ..cubicTo(13.2, 18.8, 17.6, 19.8, 18.3, 19.2)
+          ..lineTo(20.5, 17)
+          ..lineTo(16.2, 13.8)
+          ..lineTo(13.9, 15.5)
+          ..cubicTo(11.8, 14.6, 9.4, 12.2, 8.5, 10.1)
+          ..lineTo(10.2, 7.8)
+          ..close();
+        canvas.drawPath(handset, line);
         break;
     }
     canvas.restore();
