@@ -27,6 +27,7 @@ import '../notifications/notification_permission_sheet.dart';
 import '../search/global_search_screen.dart';
 import '../camera/effects/widgets/effect_picker_sheet.dart';
 import 'chat_detail_screen.dart';
+import '../messages/starred_messages_screen.dart';
 import 'linked_devices_qr_screen.dart';
 import '../profile/profile_screen.dart';
 import '../settings/home/home_screen_settings_page.dart';
@@ -1095,6 +1096,14 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   ),
                 ),
                 const PopupMenuItem(
+                  value: 'starred',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const ChatyGlyphIcon(glyph: ChatyGlyph.exportProfile, size: 20),
+                    title: Text('Starred messages'),
+                  ),
+                ),
+                const PopupMenuItem(
                   value: 'home',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -1149,6 +1158,18 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         Navigator.of(context).push(
           MaterialPageRoute<void>(
             builder: (_) => const TemplatesSettingsScreen(),
+          ),
+        );
+        break;
+      case 'starred':
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => StarredMessagesScreen(
+              dataStore: widget.dataStore,
+              theme: widget.themeController.globalTheme,
+              preferencesController: widget.preferencesController,
+              themeController: widget.themeController,
+            ),
           ),
         );
         break;
@@ -1326,6 +1347,12 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                     icon: ChatyGlyph.templates,
                     title: 'Templates & layouts',
                     subtitle: 'Apply a complete look or mix individual components',
+                  ),
+                  actionTile(
+                    value: 'starred',
+                    icon: ChatyGlyph.exportProfile,
+                    title: 'Starred messages',
+                    subtitle: 'Find saved messages across your conversations',
                   ),
                   actionTile(
                     value: 'home',
