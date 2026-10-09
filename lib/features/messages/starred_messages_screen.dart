@@ -7,6 +7,7 @@ import '../../domain/models/chat_message.dart';
 import '../../domain/models/conversation.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/theme/app_theme.dart';
+import '../../ui/core/theme/theme_controller.dart';
 import '../chats/chat_detail_screen.dart';
 
 /// A live, account-scoped list of messages the signed-in user has starred.
