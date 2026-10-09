@@ -356,7 +356,7 @@ class _StarredMessagesScreenState extends State<StarredMessagesScreen> {
                                       ),
                                     ),
                                   ),
-                                  onTap: () => _openConversation(conversation),
+                                  onTap: () => _openConversation(conversation, messageId: message.id),
                                 ),
                               );
                             },
