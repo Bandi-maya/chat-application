@@ -22,10 +22,11 @@ void main() {
     });
 
     test('Canonical Settings Categories cover all 5 root groups', () {
+      // Profile editing now lives in the dedicated Profile section.
       expect(
         SettingsRegistry.clustersForCategory(
           SettingsCategory.account,
-        ).isNotEmpty,
+        ).isEmpty,
         isTrue,
       );
       expect(
