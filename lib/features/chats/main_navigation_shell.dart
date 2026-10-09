@@ -326,6 +326,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               if (navMode == AppNavigationMode.topWhatsAppBar) {
                 return _buildTopWhatsAppShell(
                   theme: theme,
+                  navigationTemplate: navigationTemplate,
                   screens: screens,
                   navItems: allDestinations,
                   selectedIndex: effectiveIndex,
@@ -362,6 +363,14 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   screens: screens,
                   navItems: allDestinations,
                   selectedIndex: effectiveIndex,
+                  onSelect: (idx) {
+                    if (idx >= 0 && idx < allDestinations.length) {
+                      _selectRootDestination(
+                        idx,
+                        destinationId: allDestinations[idx].id,
+                      );
+                    }
+                  },
                 );
               }
 
@@ -378,9 +387,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               // 5. STANDARD BOTTOM NAVIGATION / GESTURE TABS / ADAPTIVE RAIL
               final layoutMode = themeController.layoutMode;
               final useRail =
-                  navMode == AppNavigationMode.compactRail ||
-                  (navMode != AppNavigationMode.gestureTabs &&
-                      (layoutMode == UILayoutMode.tabletDesktop || autoRail));
+                  constraints.maxWidth >= 600 &&
+                  (navMode == AppNavigationMode.compactRail ||
+                      (navMode != AppNavigationMode.gestureTabs &&
+                          (layoutMode == UILayoutMode.tabletDesktop || autoRail)));
               Widget content = PageView(
                 controller: _pageController,
                 physics: navMode == AppNavigationMode.gestureTabs
@@ -466,6 +476,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   // ---------------------------------------------------------------------------
   Widget _buildTopWhatsAppShell({
     required dynamic theme,
+    required NavigationTemplate navigationTemplate,
     required List<Widget> screens,
     required List<_NavDestinationItem> navItems,
     required int selectedIndex,
@@ -484,6 +495,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           child: Column(
             children: [
               Container(
+                height: navigationTemplate.height.clamp(48.0, 88.0).toDouble(),
                 color: brandPrimary,
                 child: TabBar(
                   isScrollable: navItems.length > 4,
@@ -665,12 +677,13 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     required List<Widget> screens,
     required List<_NavDestinationItem> navItems,
     required int selectedIndex,
+    required ValueChanged<int> onSelect,
   }) {
     return _PerspectiveDrawerScaffold(
       theme: theme,
       selectedIndex: selectedIndex,
       navItems: navItems,
-      onSelect: _selectRootDestination,
+      onSelect: onSelect,
       child: IndexedStack(index: selectedIndex, children: screens),
     );
   }
@@ -906,6 +919,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     required dynamic theme,
     required Widget content,
     required AppearanceVariantController appearance,
+    required NavigationTemplate navigationTemplate,
+    required VoidCallback onCenterAction,
     required List<_NavDestinationItem> navItems,
     required int selectedIndex,
     required ValueChanged<int> onDestinationTap,
@@ -949,21 +964,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       _ => 8.0,
     };
 
-    final double barHeight = switch (styleName) {
-      'Floating Pill' => 64.0,
-      'Active Pill Chip' => 62.0,
-      'Top Indicator Line' => 60.0,
-      'Bottom Indicator Dot' => 60.0,
-      'Circle Accent Pop' => 64.0,
-      'Curved Notch Teardrop' => 62.0,
-      'Floating Dynamic Island' => 60.0,
-      'Raised Center Action' => 64.0,
-      'Segmented Glass Dock' => 62.0,
-      'Minimal Icon Dock' => 56.0,
-      'Classic Label Bar' => 62.0,
-      'Soft Square Tile' => 60.0,
-      _ => 60.0,
-    };
+    final double barHeight =
+        navigationTemplate.height.clamp(48.0, 88.0).toDouble();
 
     final double barRadius = switch (styleName) {
       'Floating Pill' => 32.0,
@@ -1034,29 +1036,131 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: List.generate(navItems.length, (i) {
-                  final item = navItems[i];
-                  final isSelected = selectedIndex == i;
-                  final isCenter =
-                      (navItems.length % 2 == 1) && (i == navItems.length ~/ 2);
-
-                  return _buildCustomNavItem(
-                    item: item,
-                    isSelected: isSelected,
-                    isCenter: isCenter,
-                    styleName: styleName,
-                    theme: theme,
-                    accent: accent,
-                    isDark: isDark,
-                    onTap: () => onDestinationTap(i),
-                  );
-                }),
+                children: _buildNavigationChildren(
+                  navigationTemplate: navigationTemplate,
+                  navItems: navItems,
+                  selectedIndex: selectedIndex,
+                  styleName: styleName,
+                  theme: theme,
+                  accent: accent,
+                  isDark: isDark,
+                  onDestinationTap: onDestinationTap,
+                  onCenterAction: onCenterAction,
+                ),
               ),
             ),
           ),
         ),
       ),
     );
+  }
+
+  List<Widget> _buildNavigationChildren({
+    required NavigationTemplate navigationTemplate,
+    required List<_NavDestinationItem> navItems,
+    required int selectedIndex,
+    required String styleName,
+    required dynamic theme,
+    required Color accent,
+    required bool isDark,
+    required ValueChanged<int> onDestinationTap,
+    required VoidCallback onCenterAction,
+  }) {
+    final children = <Widget>[];
+    final hasCenterAction =
+        navigationTemplate.hasCenterAction && navItems.length >= 3;
+    final centerSlot = hasCenterAction ? navItems.length ~/ 2 : -1;
+
+    for (var index = 0; index < navItems.length; index++) {
+      if (hasCenterAction && index == centerSlot) {
+        children.add(
+          Expanded(
+            child: Center(
+              child: Tooltip(
+                message: navigationTemplate.centerActionId == 'camera'
+                    ? 'Open camera effects'
+                    : 'Quick action',
+                child: Semantics(
+                  button: true,
+                  label: navigationTemplate.centerActionId == 'camera'
+                      ? 'Open camera effects'
+                      : 'Quick action',
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: onCenterAction,
+                      customBorder: const CircleBorder(),
+                      child: Ink(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: <Color>[
+                              accent,
+                              accent.withValues(alpha: 0.82),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                          boxShadow: <BoxShadow>[
+                            BoxShadow(
+                              color: accent.withValues(alpha: 0.30),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          navigationTemplate.centerActionIcon ??
+                              Icons.bolt_rounded,
+                          color: context.colors.onPrimary,
+                          size: 23,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+
+      final item = navItems[index];
+      final isSelected = selectedIndex == index;
+      final isCenter = !hasCenterAction &&
+          navItems.length.isOdd &&
+          index == navItems.length ~/ 2;
+      children.add(
+        _buildCustomNavItem(
+          item: item,
+          isSelected: isSelected,
+          isCenter: isCenter,
+          styleName: styleName,
+          theme: theme,
+          accent: accent,
+          isDark: isDark,
+          onTap: () => onDestinationTap(index),
+        ),
+      );
+    }
+
+    if (navigationTemplate.hasCenterAction && navItems.length < 3) {
+      children.add(
+        Expanded(
+          child: IconButton(
+            tooltip: 'Quick action',
+            onPressed: onCenterAction,
+            icon: Icon(
+              navigationTemplate.centerActionIcon ?? Icons.bolt_rounded,
+              color: accent,
+            ),
+          ),
+        ),
+      );
+    }
+    return children;
   }
 
   void _showMoreMenu(
