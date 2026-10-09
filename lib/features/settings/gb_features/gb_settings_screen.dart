@@ -647,7 +647,7 @@ class GbSettingsScreen extends StatelessWidget {
     for (final entry in input.entries) {
       final key = entry.key.toLowerCase();
       if (key == 'path' ||
-          key.endsWith('_path') ||
+          key.endsWith('path') ||
           key.endsWith('filepath') ||
           key.contains('file_path') ||
           key.contains('mynameoverride') ||
