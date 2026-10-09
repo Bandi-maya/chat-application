@@ -32,9 +32,79 @@ class TemplateController extends ChangeNotifier {
   }
 
   /// Resolves the concrete component definition for a specific component.
-  NavigationTemplate get navigation => ChatyTemplateRegistry.get(
-    resolveTemplateFor(TemplateComponentType.navigation),
-  ).navigation;
+  NavigationTemplate get navigation {
+    final base = ChatyTemplateRegistry.get(
+      resolveTemplateFor(TemplateComponentType.navigation),
+    ).navigation;
+    final primary = _config.navigationPrimaryDestinationIds;
+    final overflow = _config.navigationOverflowDestinationIds;
+    if (primary == null && overflow == null) return base;
+    return base.copyWith(
+      primaryDestinationIds: primary ?? base.primaryDestinationIds,
+      overflowDestinationIds: overflow ?? base.overflowDestinationIds,
+    );
+  }
+
+  bool get hasCustomNavigationDestinations =>
+      _config.hasNavigationDestinationOverride;
+
+  /// Persists user-ordered primary and overflow destinations. Every supported
+  /// destination must occur exactly once so a settings mistake cannot hide a
+  /// working screen.
+  Future<void> setNavigationDestinations({
+    required List<String> primaryDestinationIds,
+    required List<String> overflowDestinationIds,
+    AppearanceVariantController? appearanceController,
+    ThemeController? themeController,
+  }) async {
+    final primary = List<String>.of(primaryDestinationIds);
+    final overflow = List<String>.of(overflowDestinationIds);
+    final primarySet = primary.toSet();
+    final overflowSet = overflow.toSet();
+    if (primary.isEmpty || primary.length > 4 ||
+        primarySet.length != primary.length ||
+        overflowSet.length != overflow.length ||
+        primarySet.intersection(overflowSet).isNotEmpty ||
+        primary.any((id) => !ChatyNavigationDestinationIds.known.contains(id)) ||
+        overflow.any((id) => !ChatyNavigationDestinationIds.known.contains(id))) {
+      throw ArgumentError(
+        'Choose 1–4 unique primary destinations and move the rest into More.',
+      );
+    }
+    final assigned = <String>{...primary, ...overflow};
+    if (assigned.length != ChatyNavigationDestinationIds.all.length ||
+        !assigned.containsAll(ChatyNavigationDestinationIds.all)) {
+      throw ArgumentError(
+        'Every Chaty destination must remain available in navigation or More.',
+      );
+    }
+
+    _config = _config.copyWithNavigationDestinations(
+      primaryDestinationIds: primary,
+      overflowDestinationIds: overflow,
+    );
+    notifyListeners();
+    _persist();
+    _syncToRuntimeControllers(
+      appearanceController: appearanceController,
+      themeController: themeController,
+      applyNavigation: true,
+    );
+  }
+
+  Future<void> resetNavigationDestinations({
+    AppearanceVariantController? appearanceController,
+    ThemeController? themeController,
+  }) async {
+    _config = _config.withoutNavigationDestinationOverride();
+    notifyListeners();
+    _persist();
+    _syncToRuntimeControllers(
+      appearanceController: appearanceController,
+      themeController: themeController,
+      applyNavigation: true,
+    );
+  }
 
   HomeTemplate get home => ChatyTemplateRegistry.get(
     resolveTemplateFor(TemplateComponentType.home),
@@ -154,6 +224,10 @@ class TemplateController extends ChangeNotifier {
     _config = UserTemplateConfiguration(
       baseTemplate: configuration.baseTemplate,
       componentOverrides: normalizedOverrides,
+      navigationPrimaryDestinationIds:
+          configuration.navigationPrimaryDestinationIds,
+      navigationOverflowDestinationIds:
+          configuration.navigationOverflowDestinationIds,
     );
     notifyListeners();
     _persist();
