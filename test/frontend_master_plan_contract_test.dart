@@ -141,4 +141,25 @@ void main() {
     expect(chat, contains('_highlightedSearchMessageId = messageId'));
   });
 
+  test('template settings wait for persistence before showing success', () {
+    final component = File(
+      'lib/features/settings/templates/component_override_screen.dart',
+    ).readAsStringSync();
+    final templates = File(
+      'lib/features/settings/templates/templates_settings_screen.dart',
+    ).readAsStringSync();
+    final navigation = File(
+      'lib/features/settings/templates/navigation_destinations_settings_screen.dart',
+    ).readAsStringSync();
+
+    expect(component, contains('await templateController.applyComponent('));
+    expect(component, contains('await templateController.removeComponentOverride('));
+    expect(component, contains('catch (error)'));
+    expect(templates, contains('await controller.applyFullTemplate('));
+    expect(templates, contains('await controller.resetToDefaults('));
+    expect(templates, contains('catch (error)'));
+    expect(navigation, contains('await _controller.resetNavigationDestinations('));
+    expect(navigation, contains('catch (error)'));
+  });
+
 }
