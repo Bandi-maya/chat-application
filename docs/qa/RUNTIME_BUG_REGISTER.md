@@ -67,3 +67,20 @@ Copy this section for every reproducible issue.
 - Fix: Wire widths below 600 logical pixels to the existing scrollable overflow sheet, route the desktop Starred Messages item to the real screen, and remove the obsolete helper.
 - Regression coverage: The source inventory CI remains active; fresh Flutter analyze and UI interaction tests must confirm the change.
 - Status: Fixed-awaiting-retest. The first analyzer run was on an earlier commit and failed on these warnings; rerun on the latest head before marking verified.
+
+### UI-SETTINGS-001 — Advanced appearance controls had no runtime consumer
+
+- Severity: P2
+- Platform: Shared Flutter UI
+- Evidence: The runtime settings consumer audit reported ModCallsBackground, ModCallsIconColors, ModCallsTextColor, ModChatBubbleText, ModChatBubbleTextLeft, date_left_color, date_right_color, and text_size_pick as catalog-only settings.
+- Fix: MessageBubble now reads the current preference controller for outgoing/incoming text color, timestamp color, and message text size. OngoingCallScreen now reads the call background, text, and icon color settings and applies them to the call surfaces and controls.
+- Regression coverage: Runtime consumer audit plus Android Flutter analysis/full tests.
+- Status: Fixed-awaiting-retest on latest commit.
+
+### CI-INTEGRATION-001 — Phase-specific tests ran against a non-integrated feature branch
+
+- Severity: P2
+- Platform: CI
+- Evidence: The production gate tried to run encrypted-attachment, encrypted-outbox, account-purge, and phase-specific tests that are only copied in by the integration/phases-1-8 reconciliation step. That reconciliation is intentionally skipped for this feature branch, so the workflow failed with missing test files.
+- Fix: Gate those phase-specific test steps on the integration/phases-1-8 branch while keeping current-branch analysis, the full available Flutter test suite, migration checks, security checks, and APK build enabled for ordinary PRs.
+- Status: Fixed-awaiting-retest on latest CI run.
