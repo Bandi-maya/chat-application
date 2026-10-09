@@ -115,6 +115,31 @@ class TemplateController extends ChangeNotifier {
     );
   }
 
+  /// Replaces the active template profile after validating/importing a
+  /// complete configuration. Overrides equal to the base are normalized away.
+  Future<void> applyConfiguration(
+    UserTemplateConfiguration configuration, {
+    AppearanceVariantController? appearanceController,
+    ChatyPreferencesController? preferencesController,
+  }) async {
+    final normalizedOverrides =
+        <TemplateComponentType, ChatyTemplateId>{
+          for (final entry in configuration.componentOverrides.entries)
+            if (entry.value != configuration.baseTemplate)
+              entry.key: entry.value,
+        };
+    _config = UserTemplateConfiguration(
+      baseTemplate: configuration.baseTemplate,
+      componentOverrides: normalizedOverrides,
+    );
+    notifyListeners();
+    _persist();
+    _syncToRuntimeControllers(
+      appearanceController: appearanceController,
+      preferencesController: preferencesController,
+    );
+  }
+
   /// Removes an override for a single component, falling back to base template.
   Future<void> removeComponentOverride(
     TemplateComponentType component, {
