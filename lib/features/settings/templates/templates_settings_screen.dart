@@ -5,7 +5,6 @@ import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/appearance_variant_controller.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/design_system.dart';
-import '../../../ui/core/design_system/components/chaty_glyph.dart';
 import '../../../ui/core/templates/template_controller.dart';
 import '../../../ui/core/templates/template_models.dart';
 import '../../../ui/core/templates/template_registry.dart';
