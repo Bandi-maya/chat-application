@@ -37,6 +37,7 @@
 - Call signaling now bounds stalled connecting/reconnecting sessions with a timeout that uses the normal server-authoritative end-call RPC. Remote declined/ended/failed events now produce a local call-history record, with per-service call-ID de-duplication to avoid duplicate records when local hang-up and Realtime terminal events race.
 - Added an iOS macOS-runner verification job to the integrated release workflow for Flutter analysis/tests and an unsigned iOS build; this job still needs to execute on a workflow run before its result can be considered verified.
 - Ongoing call controls now honor the operating system's reduced-motion preference by removing slide transitions when animations are disabled; added a contract regression test.
+- Device-local call presentation settings now serialize writes, verify that SharedPreferences accepted each change, and publish the new value only after persistence succeeds. Added a concurrent-toggle regression test to ensure independent settings survive together.
 
 ### Correctness and security fixes
 - Message editing detects MLS-backed messages, encrypts the edited payload using the active MLS conversation state, and calls `edit_mls_message_v1` with the sender device, group, epoch and ciphertext.
@@ -48,7 +49,7 @@
 
 ### Tests added
 - Added template-controller tests for import normalization, live theme-token application, navigation-mode mapping, scoped component overrides, destination ordering persistence/reset, and invalid/duplicate destination rejection. Added vector-glyph widget coverage and UI contract tests for responsive overflow routing, template search and non-placeholder component previews.
-- Added a UI contract regression test requiring template apply/reset actions to await persistence and handle failures. Added a controller regression test for concurrent component edits retaining both overrides in persisted state. Added contract coverage for voice-note operation serialization/cleanup and call connection timeout/terminal history recording. Added a reduced-motion contract check for the ongoing-call UI.
+- Added a UI contract regression test requiring template apply/reset actions to await persistence and handle failures. Added a controller regression test for concurrent component edits retaining both overrides in persisted state. Added contract coverage for voice-note operation serialization/cleanup and call connection timeout/terminal history recording. Added a reduced-motion contract check for the ongoing-call UI. Added a concurrent call-presentation preference persistence test.
 
 ## Still outstanding — do not mark complete yet
 
