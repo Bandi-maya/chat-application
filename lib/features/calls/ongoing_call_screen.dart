@@ -254,7 +254,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
               fit: StackFit.expand,
               children: [
                 if (session.isVideo)
-                  _buildRemoteVideo(session, colors)
+                  _buildRemoteVideo(session)
                 else
                   _buildVoiceCallBackdrop(session, colors),
 
@@ -613,7 +613,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
     );
   }
 
-  Widget _buildRemoteVideo(ChatyCallSession session, AppColors colors) {
+  Widget _buildRemoteVideo(ChatyCallSession session) {
     if (!_renderersReady || _callService.remoteStream == null) {
       return Container(
         color: _callBackgroundColor(const Color(0xFF07090D)),
