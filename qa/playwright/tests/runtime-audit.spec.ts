@@ -50,16 +50,22 @@ async function snapshot(page: Page): Promise<ScreenSnapshot> {
       'button', 'a[href]', 'input', 'textarea', 'select',
       '[role="button"]', '[role="link"]', '[role="tab"]',
       '[role="menuitem"]', '[role="switch"]', '[role="checkbox"]',
-      '[role="radio"]', '[role="combobox"]', '[tabindex]:not([tabindex="-1"])',
+      '[role="radio"]', '[role="combobox"]', '[role="option"]', '[role="listbox"]',
+      '[role="menuitemcheckbox"]', '[role="menuitemradio"]', '[role="slider"]',
+      '[contenteditable="true"]', '[aria-haspopup]', 'summary',
+      '[tabindex]:not([tabindex="-1"])',
     ].join(',');
     const controls = Array.from(document.querySelectorAll(selector))
       .filter(isVisible)
       .map((element, index) => {
         const node = element as HTMLElement;
         const rect = node.getBoundingClientRect();
+        const labelledBy = (node.getAttribute('aria-labelledby') || '')
+          .split(/\\s+/).map((id) => document.getElementById(id)?.innerText || '')
+          .filter(Boolean).join(' ');
         const label = (
           node.getAttribute('aria-label') ||
-          node.getAttribute('aria-labelledby') ||
+          labelledBy ||
           node.getAttribute('title') ||
           node.innerText ||
           (node as HTMLInputElement).placeholder ||
@@ -229,5 +235,12 @@ test('audit the currently running Chaty screen in the existing Chrome session', 
   ].join('\n'));
 
   expect(snapshots.length, 'The audit should capture the current application screen').toBeGreaterThan(0);
+  const runtimeExceptions = issues.filter((issue) =>
+    issue.kind === 'page-error' || issue.kind === 'console-error'
+  );
+  expect(
+    runtimeExceptions,
+    'Unexpected browser console/page errors were observed; inspect the attached runtime-audit.json and screenshots.',
+  ).toEqual([]);
   await browser.close();
 });
