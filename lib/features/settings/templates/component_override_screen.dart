@@ -39,7 +39,7 @@ class ComponentOverrideScreen extends StatelessWidget {
               padding: EdgeInsets.all(8.0),
               child: ChatyBackButton(),
             ),
-            title: Text(' Templates'),
+            title: Text('${component.title} Template'),
             actions: [
               if (isOverridden)
                 TextButton(
@@ -52,7 +52,7 @@ class ComponentOverrideScreen extends StatelessWidget {
                           locator<ChatyPreferencesController>(),
                     );
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Reset  to base template ()')),
+                      SnackBar(content: Text('Reset ${component.title} to the base template.')),
                     );
                   },
                   child: const Text('Reset'),
@@ -226,14 +226,14 @@ class ComponentOverrideScreen extends StatelessWidget {
                                     );
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text('Applied  for  only'),
+                                        content: Text('Applied ${tmpl.name} to ${component.title} only.'),
                                       ),
                                     );
                                   },
                             child: Text(
                               isCurrentlyUsed
                                   ? 'Currently Active'
-                                  : 'Use This ',
+                                  : 'Use This Template',
                             ),
                           ),
                         ),
