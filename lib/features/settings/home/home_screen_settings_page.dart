@@ -4,6 +4,7 @@ import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/controllers/appearance_variant_controller.dart';
 import '../../../ui/core/theme/app_theme.dart';
 import '../../../injection/locator.dart';
+import '../templates/navigation_destinations_settings_screen.dart';
 
 class HomeScreenSettingsPage extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
@@ -255,13 +256,13 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                       optionLabel: (mode) => switch (mode) {
                         AppNavigationMode.bottomNav => 'Bottom Nav Bar',
                         AppNavigationMode.topWhatsAppBar =>
-                          'Top WhatsApp Bar (Image 1)',
+                          'Top Tabs',
                         AppNavigationMode.floatingIslandRail =>
-                          'Floating Island Rail (Image 2)',
+                          'Floating Rail',
                         AppNavigationMode.perspective3DDrawer =>
-                          '3D Perspective Drawer (Image 3)',
+                          'Perspective Drawer',
                         AppNavigationMode.modernSideMenu =>
-                          'Modern Side Menu (Image 4 & 5)',
+                          'Side Menu',
                         AppNavigationMode.gestureTabs => 'Gesture Tabs',
                         AppNavigationMode.compactRail => 'Compact Rail',
                       },
@@ -289,6 +290,18 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                   },
                 );
               },
+            ),
+            ChatySettingsTile(
+              icon: Icons.swap_horiz_rounded,
+              iconColor: colors.primary,
+              title: 'Customize navigation destinations',
+              subtitle:
+                  'Reorder primary tabs and choose what appears under More; every screen stays accessible.',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const NavigationDestinationsSettingsScreen(),
+                ),
+              ),
             ),
             ChatySwitchTile(
               icon: Icons.splitscreen_rounded,
