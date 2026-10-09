@@ -46,6 +46,7 @@ void main() {
       ).readAsStringSync();
       for (final export in <String>[
         'chaty_motion.dart',
+        'chaty_glyph.dart',
         'chaty_haptics.dart',
         'chaty_adaptive.dart',
         'component_state.dart',
@@ -60,5 +61,48 @@ void main() {
         );
       }
     },
+  test('home overflow uses adaptive presentation and a shared action handler', () {
+    final source = File(
+      'lib/features/chats/chats_home_screen.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('final useOverflowSheet = availableWidth < 600;'));
+    expect(source, contains('onSelected: _handleHomeOverflowAction'));
+    expect(source, contains('if (useOverflowSheet)'));
+    expect(source, contains('_handleHomeOverflowAction(value);'));
+    for (final route in <String>[
+      "case 'effects':",
+      "case 'qr':",
+      "case 'linked':",
+      "case 'themes':",
+      "case 'templates':",
+      "case 'home':",
+      "case 'navigation':",
+      "case 'settings':",
+    ]) {
+      expect(source, contains(route), reason: 'Missing overflow action $route');
+    }
+  });
+
+  test('template studio searches presets and independent component overrides', () {
+    final source = File(
+      'lib/features/settings/templates/templates_settings_screen.dart',
+    ).readAsStringSync();
+    expect(source, contains('Search templates and components'));
+    expect(source, contains('...matchingTemplates.map'));
+    expect(source, contains('...matchingComponents.map'));
+    expect(source, contains('No template or component found'));
+  });
+
+  test('component template previews do not display placeholder copy', () {
+    final source = File(
+      'lib/features/settings/templates/component_override_screen.dart',
+    ).readAsStringSync();
+    expect(source, isNot(contains("' configuration ()'")));
+    expect(source, isNot(contains("'Message ()...'")));
+    expect(source, contains('case TemplateComponentType.navigation:'));
+    expect(source, contains('case TemplateComponentType.calls:'));
+  });
+
   );
 }
