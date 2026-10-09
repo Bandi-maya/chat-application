@@ -284,5 +284,66 @@ void main() {
         equals(ChatyTemplateId.community),
       );
     });
+
+    test('Custom navigation destinations persist in order and can reset to template', () async {
+      await controller.applyFullTemplate(
+        ChatyTemplateId.community,
+      );
+      const primary = <String>[
+        ChatyNavigationDestinationIds.calls,
+        ChatyNavigationDestinationIds.chats,
+        ChatyNavigationDestinationIds.updates,
+      ];
+      const overflow = <String>[
+        ChatyNavigationDestinationIds.groups,
+        ChatyNavigationDestinationIds.tasks,
+        ChatyNavigationDestinationIds.settings,
+        ChatyNavigationDestinationIds.desktop,
+      ];
+
+      await controller.setNavigationDestinations(
+        primaryDestinationIds: primary,
+        overflowDestinationIds: overflow,
+      );
+      expect(controller.hasCustomNavigationDestinations, isTrue);
+      expect(controller.navigation.primaryDestinationIds, equals(primary));
+      expect(controller.navigation.overflowDestinationIds, equals(overflow));
+
+      final restored = UserTemplateConfiguration.fromMap(controller.config.toMap());
+      expect(restored.navigationPrimaryDestinationIds, equals(primary));
+      expect(restored.navigationOverflowDestinationIds, equals(overflow));
+
+      await controller.resetNavigationDestinations();
+      expect(controller.hasCustomNavigationDestinations, isFalse);
+      expect(
+        controller.navigation.primaryDestinationIds,
+        equals(ChatyTemplateRegistry.community.navigation.primaryDestinationIds),
+      );
+    });
+
+    test('Custom navigation rejects hiding or duplicating destinations', () async {
+      await expectLater(
+        controller.setNavigationDestinations(
+          primaryDestinationIds: const <String>['chats', 'chats'],
+          overflowDestinationIds: const <String>[
+            'groups',
+            'updates',
+            'tasks',
+            'calls',
+            'settings',
+            'desktop',
+          ],
+        ),
+        throwsArgumentError,
+      );
+
+      await expectLater(
+        controller.setNavigationDestinations(
+          primaryDestinationIds: const <String>['chats', 'updates'],
+          overflowDestinationIds: const <String>['calls', 'settings'],
+        ),
+        throwsArgumentError,
+      );
+    });
   });
 }
