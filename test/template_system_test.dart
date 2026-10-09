@@ -5,6 +5,7 @@ import 'package:chat/ui/core/templates/template_controller.dart';
 import 'package:chat/ui/core/theme/theme_controller.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   group('Chaty UI Template System Tests', () {
     late TemplateController controller;
 
