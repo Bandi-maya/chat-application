@@ -1,6 +1,6 @@
 # Chaty Android and iOS verification record
 
-**Current state: not yet executed in this session.** The repository's GitHub contents interface cannot attach to the user's local Chrome process or launch their local Android/iOS runtime. Record results only after the corresponding commands/device tests have actually run.
+**Automation added; runtime result pending.** The new workflow at .github/workflows/mobile-runtime-smoke.yml builds and launches Chaty on an Android emulator and iOS Simulator, captures a first-frame screenshot and runtime logs, and fails on detected crash/framework/layout signatures. Its latest run must complete before marking launch smoke verified. The GitHub repository connection still cannot attach to the user's local Chrome session or inspect their physical devices.
 
 ## Android
 
@@ -9,7 +9,7 @@
 | Flutter analyze | Command output and commit SHA | Not run here |
 | Full Flutter test suite | Test summary and commit SHA | Not run here |
 | Debug/release build | Build output, artifact checksum | Not run here |
-| Install and cold start | Device/emulator model, Android API, logs | Not run here |
+| Install and cold start | CI emulator model/API, logs, screenshot artifact | Pending mobile-runtime-smoke workflow |
 | Auth restore/logout/re-login | Test account and observed state, secrets redacted | Not run here |
 | Chat send/receive/edit/reactions/starred | Two controlled test users and verified outcomes | Not run here |
 | Voice note/media permissions | Permission state and logcat evidence | Not run here |
@@ -21,8 +21,8 @@
 
 | Check | Evidence | Result |
 |---|---|---|
-| iOS build | Build output and commit SHA | Not run here |
-| Simulator/device launch | Model, OS version, logs | Not run here |
+| iOS build | Build output and commit SHA | Pending mobile-runtime-smoke workflow |
+| Simulator/device launch | CI simulator model/OS, logs, screenshot artifact | Pending mobile-runtime-smoke workflow |
 | Auth restore/logout/re-login | Observed state, secrets redacted | Not run here |
 | Chat send/receive/edit/reactions/starred | Two controlled test users and verified outcomes | Not run here |
 | Camera/microphone/photo permissions | Permission state and native logs | Not run here |
