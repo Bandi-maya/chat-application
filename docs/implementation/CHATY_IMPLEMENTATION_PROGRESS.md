@@ -38,7 +38,7 @@
 ## Still outstanding — do not mark complete yet
 
 - Complete runtime screen-by-screen walkthrough of the supplied APK on a test device/emulator; APK resource names alone are not proof of runtime behavior.
-- Wire or retire the unused legacy facade methods `markStoryViewed` and `logCall`; `addStory` remains explicitly unsupported in the legacy backend facade. The current Updates screen uses `StatusService` directly, and calls use `CallSignalingService`/call history.
+- Continue consolidating the legacy status/call facades: `ChatyDataStore.addStory` and `markStoryViewed` now delegate to the production `StatusService`; the unused backend-level status/call methods now fail explicitly instead of silently succeeding. The visible Updates screen uses `StatusService`, and real calls use `CallSignalingService`/call history.
 - Audit and implement remaining template definition properties that do not yet have a verified runtime consumer (including status audio behavior and some structural layout variants).
 - Finish feature-parity slices for media, voice notes, privacy/devices and calls with real backend behavior; do not add inert controls or bypass MLS/RLS/security.
 - Run the full Flutter analyze/test suite, clean Supabase migration replay, Android ARM64 build/install verification, and iOS build/device checks. Record the actual run URLs and outcomes here after CI completes.
