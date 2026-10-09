@@ -1856,14 +1856,24 @@ class ChatyBackendService extends ChangeNotifier {
     );
   }
 
-  void markStoryViewed(String storyId) {}
+  @Deprecated('Use StatusService.markViewed through ChatyDataStore.')
+  void markStoryViewed(String storyId) {
+    throw UnsupportedError(
+      'Status viewing must be recorded through the production StatusService.',
+    );
+  }
 
+  @Deprecated('Real call history is recorded by CallSignalingService.')
   void logCall({
     required String receiverId,
     required CallType type,
     required CallDirection direction,
     required int durationSeconds,
-  }) {}
+  }) {
+    throw UnsupportedError(
+      'Call history is recorded by CallSignalingService after a real server call.',
+    );
+  }
 
   Future<void> revokeLinkedDevice(String deviceId) async {
     if (deviceId.trim().isEmpty) {
