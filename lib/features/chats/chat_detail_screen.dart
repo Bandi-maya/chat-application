@@ -2158,6 +2158,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           icon: isDirect
               ? Icons.person_outline_rounded
               : Icons.groups_2_rounded,
+          glyph: isDirect ? ChatyGlyph.person : ChatyGlyph.groups,
           label: isDirect ? 'View contact info' : 'View group info',
           onTap: () {
             if (isDirect) {
@@ -2177,11 +2178,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         ),
         ChatyMenuItem(
           icon: Icons.search_rounded,
+          glyph: ChatyGlyph.search,
           label: 'Search conversation',
           onTap: _toggleInChatSearch,
         ),
         ChatyMenuItem(
           icon: Icons.wallpaper_rounded,
+          glyph: ChatyGlyph.homeLayout,
           label: 'Chat wallpaper',
           onTap: _openWallpaperPicker,
         ),
@@ -2189,6 +2192,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           icon: conversation.isMuted
               ? Icons.notifications_active_rounded
               : Icons.notifications_off_rounded,
+          glyph: ChatyGlyph.tune,
           label: conversation.isMuted
               ? 'Unmute notifications'
               : 'Mute notifications',
@@ -2196,6 +2200,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         ),
         ChatyMenuItem(
           icon: Icons.delete_sweep_rounded,
+          glyph: ChatyGlyph.reset,
           label: 'Clear conversation',
           destructive: true,
           onTap: _clearConversation,
@@ -2203,6 +2208,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         if (isDirect)
           ChatyMenuItem(
             icon: Icons.block_rounded,
+            glyph: ChatyGlyph.close,
             label: 'Block ${otherUser.displayName.split(' ').first}',
             destructive: true,
             onTap: () => _blockContact(otherUser),
