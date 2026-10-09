@@ -395,7 +395,6 @@ class _ProfileHeader extends StatelessWidget {
       ),
     );
   }
-}
 
   Widget _buildCompactHeader(
     BuildContext context,
