@@ -15,6 +15,7 @@ import '../../core/emoji/widgets/animated_emoji_reaction.dart';
 import '../../data/services/chat_media_service.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/chat_task.dart';
+import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/theme/theme_config.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/bubbles/bubble_painter.dart';
@@ -26,6 +27,7 @@ class MessageBubble extends StatelessWidget {
   final ChatMessage message;
   final bool isMe;
   final ThemeConfig theme;
+  final ChatyPreferencesController? preferencesController;
   final String? senderName;
   final bool showGroupAvatar;
   final VoidCallback onLongPress;
@@ -64,6 +66,7 @@ class MessageBubble extends StatelessWidget {
     required this.message,
     required this.isMe,
     required this.theme,
+    this.preferencesController,
     this.senderName,
     this.showGroupAvatar = true,
     required this.onLongPress,
@@ -197,7 +200,24 @@ class MessageBubble extends StatelessWidget {
     final bubbleBg = isMe
         ? theme.outgoingBubbleColor
         : theme.incomingBubbleColor;
-    final textColor = isMe ? theme.outgoingTextColor : theme.incomingTextColor;
+    final configuredTextColor = preferencesController?.gbColor(
+      isMe ? 'ModChatBubbleText' : 'ModChatBubbleTextLeft',
+    );
+    final textColor =
+        configuredTextColor ??
+        (isMe ? theme.outgoingTextColor : theme.incomingTextColor);
+    final timestampColor =
+        preferencesController?.gbColor(
+          isMe ? 'date_right_color' : 'date_left_color',
+        ) ??
+        textColor.withValues(alpha: 0.65);
+    final messageTextSize = (preferencesController?.gbDouble(
+              'text_size_pick',
+              fallback: 15.0,
+            ) ??
+            15.0)
+        .clamp(10.0, 30.0)
+        .toDouble();
 
     if (emojiInfo.isEmojiOnly) {
       return RepaintBoundary(
@@ -216,14 +236,14 @@ class MessageBubble extends StatelessWidget {
                   ? AnimatedEmojiText(
                       text: message.text,
                       style: TextStyle(
-                        fontSize: emojiInfo.fontSize(14 * theme.fontScale),
+                        fontSize: emojiInfo.fontSize(messageTextSize * theme.fontScale),
                         height: 1.25,
                       ),
                     )
                   : Text(
                       message.text,
                       style: TextStyle(
-                        fontSize: emojiInfo.fontSize(14 * theme.fontScale),
+                        fontSize: emojiInfo.fontSize(messageTextSize * theme.fontScale),
                         height: 1.25,
                       ),
                     ),
@@ -969,7 +989,7 @@ class MessageBubble extends StatelessWidget {
 
                                             final textStyle = TextStyle(
                                               color: textColor,
-                                              fontSize: 14 * theme.fontScale,
+                                              fontSize: messageTextSize * theme.fontScale,
                                               height: 1.35,
                                             );
 
