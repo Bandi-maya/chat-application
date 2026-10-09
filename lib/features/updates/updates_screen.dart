@@ -589,7 +589,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
     final isMine = _isMyStatus(status);
     return Semantics(
       button: true,
-      label: 'Open ' + _statusTitle(status),
+      label: 'Open ${_statusTitle(status)}',
       child: InkWell(
         onTap: () => _openStatus(status),
         borderRadius: BorderRadius.circular(16),
@@ -1042,6 +1042,8 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
           const SliverToBoxAdapter(child: SizedBox(height: 80)),
         ],
       ),
+        );
+      },
     );
   }
 }
