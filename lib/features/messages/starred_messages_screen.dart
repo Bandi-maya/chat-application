@@ -97,11 +97,15 @@ class _StarredMessagesScreenState extends State<StarredMessagesScreen> {
     return results;
   }
 
-  void _openConversation(Conversation conversation) {
+  void _openConversation(
+    Conversation conversation, {
+    String? messageId,
+  }) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => ChatDetailScreen(
           conversationId: conversation.id,
+          initialMessageId: messageId,
           theme: widget.theme,
           dataStore: widget.dataStore,
           preferencesController: widget.preferencesController,
@@ -305,7 +309,7 @@ class _StarredMessagesScreenState extends State<StarredMessagesScreen> {
                                     tooltip: 'Message options',
                                     onSelected: (value) {
                                       if (value == 'open') {
-                                        _openConversation(conversation);
+                                        _openConversation(conversation, messageId: message.id);
                                       } else if (value == 'unstar') {
                                         widget.dataStore.toggleStarMessage(
                                           conversation.id,
