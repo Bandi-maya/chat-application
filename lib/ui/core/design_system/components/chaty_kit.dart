@@ -1,4 +1,6 @@
 import 'dart:io';
+
+import 'chaty_glyph.dart';
 import 'package:flutter/material.dart';
 import '../tokens/app_tokens.dart';
 import '../../theme/theme_extensions.dart';
@@ -217,12 +219,16 @@ typedef AppNoResultsState = ChatyNoResultsState;
 /// One row inside [ChatyMenuSheet].
 class ChatyMenuItem {
   final IconData icon;
+  /// Optional Chaty-owned SVG glyph. When present, it replaces the legacy
+  /// Material glyph visually while preserving the existing action contract.
+  final ChatyGlyph? glyph;
   final String label;
   final bool destructive;
   final VoidCallback onTap;
 
   const ChatyMenuItem({
     required this.icon,
+    this.glyph,
     required this.label,
     required this.onTap,
     this.destructive = false,
@@ -261,6 +267,13 @@ class ChatyMenuSheet {
         ContextMenuSection(
           items: items.map((item) {
             return ContextMenuItem(
+              iconWidget: item.glyph == null
+                  ? null
+                  : ChatyGlyphIcon(
+                      glyph: item.glyph!,
+                      size: 18,
+                      color: item.destructive ? danger : ink.withValues(alpha: 0.84),
+                    ),
               icon: item.icon,
               label: item.label,
               isDestructive: item.destructive,
