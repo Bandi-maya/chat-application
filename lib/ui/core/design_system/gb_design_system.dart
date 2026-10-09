@@ -1444,10 +1444,16 @@ class GbLiveHeaderPreview extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               if (!disableSearchBar)
-                IconButton(
-                  icon: const Icon(Icons.search_rounded, color: Colors.white, size: 21),
-                  onPressed: () {},
-                  visualDensity: VisualDensity.compact,
+                const SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Center(
+                    child: Icon(
+                      Icons.search_rounded,
+                      color: Colors.white,
+                      size: 21,
+                    ),
+                  ),
                 ),
               IconButton(
                 icon: const Icon(Icons.more_vert_rounded, color: Colors.white, size: 21),
