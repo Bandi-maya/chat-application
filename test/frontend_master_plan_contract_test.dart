@@ -141,6 +141,24 @@ void main() {
     expect(chat, contains('_highlightedSearchMessageId = messageId'));
   });
 
+  test('voice-note cancellation always restores chat UI state after errors', () {
+    final source = File(
+      'lib/features/chats/chat_detail_screen.dart',
+    ).readAsStringSync();
+    final start = source.indexOf('Future<void> _cancelVoice() async {');
+    final end = source.indexOf('void _handleVoiceDrag(', start);
+    expect(start, greaterThanOrEqualTo(0));
+    expect(end, greaterThan(start));
+    final cancelMethod = source.substring(start, end);
+
+    expect(cancelMethod, contains('try {'));
+    expect(cancelMethod, contains('await _voice.cancel();'));
+    expect(cancelMethod, contains('finally {'));
+    expect(cancelMethod, contains('await _realtime.setRecording(widget.conversationId, false);'));
+    expect(cancelMethod, contains('_recording = false;'));
+    expect(cancelMethod, contains('_voiceBusy = false;'));
+  });
+
   test('voice-note capture serializes actions and cleans up failed recordings', () {
     final source = File(
       'lib/data/services/voice_note_service.dart',
