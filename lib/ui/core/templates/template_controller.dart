@@ -73,7 +73,7 @@ class TemplateController extends ChangeNotifier {
         _config = UserTemplateConfiguration.fromMap(state);
       }
     } catch (e) {
-      debugPrint('TemplateController: failed to load state (), using defaults');
+      debugPrint('TemplateController: failed to load saved template state; using defaults.');
     }
     _syncToRuntimeControllers(
       appearanceController: appearanceController,
