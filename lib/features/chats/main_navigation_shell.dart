@@ -124,8 +124,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           _NavDestinationItem(
             id: 'chats',
             label: 'Chats',
-            icon: Icons.chat_bubble_outline_rounded,
-            activeIcon: Icons.chat_bubble_rounded,
+            icon: ChatyGlyph.chatBubble,
+            activeIcon: ChatyGlyph.chatBubble,
             builder: (ctx) => ChatsHomeScreen(
               theme: theme,
               dataStore: dataStore,
@@ -140,8 +140,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             _NavDestinationItem(
               id: 'groups',
               label: 'Groups',
-              icon: Icons.groups_outlined,
-              activeIcon: Icons.groups_rounded,
+              icon: ChatyGlyph.groups,
+              activeIcon: ChatyGlyph.groups,
               builder: (ctx) => ChatsHomeScreen(
                 theme: theme,
                 dataStore: dataStore,
@@ -155,8 +155,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           _NavDestinationItem(
             id: 'updates',
             label: 'Updates',
-            icon: Icons.update_outlined,
-            activeIcon: Icons.update_rounded,
+            icon: ChatyGlyph.updates,
+            activeIcon: ChatyGlyph.updates,
             builder: (ctx) => UpdatesScreen(
               theme: theme,
               dataStore: dataStore,
@@ -166,22 +166,22 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           _NavDestinationItem(
             id: 'tasks',
             label: 'Tasks',
-            icon: Icons.checklist_rtl_rounded,
-            activeIcon: Icons.checklist_rounded,
+            icon: ChatyGlyph.tasks,
+            activeIcon: ChatyGlyph.tasks,
             builder: (ctx) => TasksScreen(theme: theme, dataStore: dataStore),
           ),
           _NavDestinationItem(
             id: 'calls',
             label: 'Calls',
-            icon: Icons.call_outlined,
-            activeIcon: Icons.call_rounded,
+            icon: ChatyGlyph.calls,
+            activeIcon: ChatyGlyph.calls,
             builder: (ctx) => CallsScreen(theme: theme, dataStore: dataStore),
           ),
           _NavDestinationItem(
             id: 'settings',
             label: 'Settings',
-            icon: Icons.settings_outlined,
-            activeIcon: Icons.settings_rounded,
+            icon: ChatyGlyph.settings,
+            activeIcon: ChatyGlyph.settings,
             builder: (ctx) => SettingsRootScreen(
               preferencesController: preferencesController,
               themeController: themeController,
@@ -193,8 +193,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             _NavDestinationItem(
               id: 'desktop',
               label: 'Desktop',
-              icon: Icons.devices_rounded,
-              activeIcon: Icons.devices_rounded,
+              icon: ChatyGlyph.devices,
+              activeIcon: ChatyGlyph.devices,
               builder: (ctx) => LinkedDevicesQrScreen(
                 dataStore: dataStore,
                 relationshipService: locator(),
@@ -266,8 +266,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             const _NavDestinationItem(
               id: 'more',
               label: 'More',
-              icon: Icons.more_horiz_rounded,
-              activeIcon: Icons.more_horiz_rounded,
+              icon: ChatyGlyph.more,
+              activeIcon: ChatyGlyph.more,
             ),
         ];
 
@@ -906,8 +906,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               destinations: navItems
                   .map(
                     (item) => NavigationRailDestination(
-                      icon: Icon(item.icon),
-                      selectedIcon: Icon(item.activeIcon),
+                      icon: ChatyGlyphIcon(glyph: item.icon, size: compact ? 20 : 23),
+                      selectedIcon: ChatyGlyphIcon(glyph: item.activeIcon, size: compact ? 20 : 23),
                       label: Text(item.label),
                     ),
                   )
@@ -1405,8 +1405,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      isSelected ? item.activeIcon : item.icon,
+                    ChatyGlyphIcon(
+                      glyph: isSelected ? item.activeIcon : item.icon,
                       size: 20,
                       color: isSelected ? accent : unselectedFg,
                     ),
@@ -1441,8 +1441,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                       ),
                     ),
                   ),
-                  Icon(
-                    isSelected ? item.activeIcon : item.icon,
+                  ChatyGlyphIcon(
+                    glyph: isSelected ? item.activeIcon : item.icon,
                     size: 22,
                     color: isSelected ? accent : unselectedFg,
                   ),
@@ -1464,8 +1464,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               'Bottom Indicator Dot' => Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    isSelected ? item.activeIcon : item.icon,
+                  ChatyGlyphIcon(
+                    glyph: isSelected ? item.activeIcon : item.icon,
                     size: 22,
                     color: isSelected ? accent : unselectedFg,
                   ),
@@ -1527,8 +1527,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                       ),
                     ),
                   ),
-                  Icon(
-                    isSelected ? item.activeIcon : item.icon,
+                  ChatyGlyphIcon(
+                    glyph: isSelected ? item.activeIcon : item.icon,
                     size: 21,
                     color: isSelected ? accent : unselectedFg,
                   ),
@@ -1563,8 +1563,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      isSelected ? item.activeIcon : item.icon,
+                    ChatyGlyphIcon(
+                      glyph: isSelected ? item.activeIcon : item.icon,
                       size: 19,
                       color: isSelected
                           ? context.colors.onPrimary
@@ -1615,8 +1615,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     : Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            isSelected ? item.activeIcon : item.icon,
+                          ChatyGlyphIcon(
+                            glyph: isSelected ? item.activeIcon : item.icon,
                             size: 20,
                             color: isSelected ? accent : unselectedFg,
                           ),
@@ -1677,8 +1677,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 mainAxisAlignment: MainAxisAlignment.center,
 
                 children: [
-                  Icon(
-                    isSelected ? item.activeIcon : item.icon,
+                  ChatyGlyphIcon(
+                    glyph: isSelected ? item.activeIcon : item.icon,
                     size: 21,
                     color: isSelected ? accent : unselectedFg,
                   ),
@@ -1709,8 +1709,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      isSelected ? item.activeIcon : item.icon,
+                    ChatyGlyphIcon(
+                      glyph: isSelected ? item.activeIcon : item.icon,
                       size: 19,
                       color: isSelected ? accent : unselectedFg,
                     ),
@@ -1744,8 +1744,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      isSelected ? item.activeIcon : item.icon,
+                    ChatyGlyphIcon(
+                      glyph: isSelected ? item.activeIcon : item.icon,
                       size: 20,
                       color: isSelected ? accent : unselectedFg,
                     ),
@@ -1774,8 +1774,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 class _NavDestinationItem {
   final String id;
   final String label;
-  final IconData icon;
-  final IconData activeIcon;
+  final ChatyGlyph icon;
+  final ChatyGlyph activeIcon;
   final Widget Function(BuildContext) builder;
 
   const _NavDestinationItem({
