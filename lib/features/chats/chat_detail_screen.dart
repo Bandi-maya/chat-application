@@ -48,6 +48,7 @@ import '../../data/services/outgoing_message_queue_engine.dart';
 import '../../ui/core/connection/connection_health_indicator.dart';
 import '../../ui/core/connection/connection_detail_sheet.dart';
 import '../../ui/core/connection/global_connection_banner.dart';
+import '../settings/customization/customization_center_screen.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final ThemeConfig theme;
@@ -2261,6 +2262,22 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                             onTap: () {
                               Navigator.pop(ctx);
                               _openWallpaperPicker();
+                            },
+                          ),
+                          _chatPopupMenuItem(
+                            icon: Icons.palette_outlined,
+                            title: 'Chat Appearance',
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => CustomizationCenterScreen(
+                                    conversationId: widget.conversationId,
+                                    conversationTitle: conversation.title,
+                                  ),
+                                ),
+                              );
                             },
                           ),
                           _chatPopupMenuItem(
