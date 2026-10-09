@@ -588,11 +588,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       final messages = widget.dataStore.getMessages(widget.conversationId);
       final targetIndex = messages.indexWhere((item) => item.id == messageId);
       if (targetIndex < 0) {
-        if (attempt >= 2 && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('This message is no longer available.')),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This message is no longer available.')),
+        );
         return;
       }
 
@@ -603,15 +601,18 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       final targetContext = _messageItemKeys[messageId]?.currentContext;
       if (targetContext != null) {
         _searchHighlightTimer?.cancel();
-        setState(() => _highlightedSearchMessageId = messageId);
-        Scrollable.ensureVisible(
+        setState(() {
+          _highlightedSearchMessageId = messageId;
+          _initialPositionApplied = true;
+        });
+        unawaited(Scrollable.ensureVisible(
           targetContext,
           alignment: 0.35,
           duration: MediaQuery.of(context).disableAnimations
               ? Duration.zero
               : const Duration(milliseconds: 260),
           curve: Curves.easeOutCubic,
-        );
+        ));
         _searchHighlightTimer = Timer(const Duration(seconds: 3), () {
           if (mounted && _highlightedSearchMessageId == messageId) {
             setState(() => _highlightedSearchMessageId = null);
@@ -652,6 +653,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             : maxExtent * targetIndex / (messages.length - 1);
       }
       _scrollCtrl.jumpTo(estimate.clamp(0.0, maxExtent).toDouble());
+      if (!_initialPositionApplied) {
+        setState(() => _initialPositionApplied = true);
+      }
       if (attempt < 12) {
         _jumpToMessage(messageId, attempt: attempt + 1);
       } else if (mounted) {
