@@ -27,6 +27,7 @@ class CustomizationCenterScreen extends StatefulWidget {
 
 class _CustomizationCenterScreenState extends State<CustomizationCenterScreen>
     with SingleTickerProviderStateMixin {
+  String _selectedPreviewNav = 'chats';
   late final TabController _tabController;
   final TextEditingController _dummyComposerText = TextEditingController(text: 'Hey! Check out this new skin ✨');
   final FocusNode _dummyFocus = FocusNode();
@@ -185,14 +186,8 @@ class _CustomizationCenterScreenState extends State<CustomizationCenterScreen>
                   size: 36,
                 ),
                 actions: [
-                  IconButton(
-                    icon: const Icon(Icons.call_outlined, size: 20),
-                    onPressed: () {},
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.videocam_outlined, size: 22),
-                    onPressed: () {},
-                  ),
+                  const Icon(Icons.call_outlined, size: 20),
+                  const Icon(Icons.videocam_outlined, size: 22),
                 ],
               ),
             ),
@@ -280,32 +275,32 @@ class _CustomizationCenterScreenState extends State<CustomizationCenterScreen>
                   icon: Icons.chat_bubble_outline_rounded,
                   activeIcon: Icons.chat_bubble_rounded,
                   badgeCount: 2,
-                  isSelected: true,
-                  onTap: () {},
+                  isSelected: _selectedPreviewNav == 'chats',
+                  onTap: () => setState(() => _selectedPreviewNav = 'chats'),
                 ),
                 ChatyNavItemData(
                   id: 'updates',
                   label: 'Updates',
                   icon: Icons.update_outlined,
                   activeIcon: Icons.update_rounded,
-                  isSelected: false,
-                  onTap: () {},
+                  isSelected: _selectedPreviewNav == 'updates',
+                  onTap: () => setState(() => _selectedPreviewNav = 'updates'),
                 ),
                 ChatyNavItemData(
                   id: 'calls',
                   label: 'Calls',
                   icon: Icons.call_outlined,
                   activeIcon: Icons.call_rounded,
-                  isSelected: false,
-                  onTap: () {},
+                  isSelected: _selectedPreviewNav == 'calls',
+                  onTap: () => setState(() => _selectedPreviewNav = 'calls'),
                 ),
                 ChatyNavItemData(
                   id: 'settings',
                   label: 'Settings',
                   icon: Icons.settings_outlined,
                   activeIcon: Icons.settings_rounded,
-                  isSelected: false,
-                  onTap: () {},
+                  isSelected: _selectedPreviewNav == 'settings',
+                  onTap: () => setState(() => _selectedPreviewNav = 'settings'),
                 ),
               ],
             ),
