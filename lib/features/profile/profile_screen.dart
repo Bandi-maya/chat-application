@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/notification_service.dart';
 import '../../data/services/profile_media_service.dart';
+import '../../ui/core/templates/template_controller.dart';
+import '../../ui/core/templates/template_models.dart';
+import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 // ChatySettingsSection is duplicated between the barrel-exported
 // components/settings_components.dart and settings_primitives.dart; this
@@ -225,6 +228,17 @@ class _ProfileHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final profileTemplate = locator<TemplateController>().profile;
+    final bannerHeight = switch (profileTemplate.headerStyle) {
+      ProfileHeaderStyle.compactHeader => 128.0,
+      ProfileHeaderStyle.centeredIdentity => 160.0,
+      ProfileHeaderStyle.bannerWithAvatar => 180.0,
+    };
+    final avatarSize = switch (profileTemplate.headerStyle) {
+      ProfileHeaderStyle.compactHeader => 72.0,
+      ProfileHeaderStyle.centeredIdentity => 100.0,
+      ProfileHeaderStyle.bannerWithAvatar => 92.0,
+    };
     return Center(
       child: Column(
         children: [
@@ -235,7 +249,7 @@ class _ProfileHeader extends StatelessWidget {
             children: [
               Container(
                 margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                height: 180,
+                height: bannerHeight,
                 width: double.infinity,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
@@ -292,27 +306,39 @@ class _ProfileHeader extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
+                    shape: profileTemplate.avatarShape == 'circle'
+                        ? BoxShape.circle
+                        : BoxShape.rectangle,
+                    borderRadius: profileTemplate.avatarShape == 'circle'
+                        ? null
+                        : BorderRadius.circular(avatarSize * 0.25),
                     color: colors.background,
                   ),
                   child: ChatyNetworkAvatar(
                     initials: initials,
                     colorHex: colorHex,
                     url: avatarUrl,
-                    size: 92,
+                    size: avatarSize,
+                    shape: profileTemplate.avatarShape,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 52),
+          SizedBox(
+            height: profileTemplate.headerStyle == ProfileHeaderStyle.compactHeader
+                ? 34
+                : 52,
+          ),
           const SizedBox(height: 14),
           Text(
             displayName,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: colors.foreground,
-              fontSize: 24,
+              fontSize: profileTemplate.headerStyle == ProfileHeaderStyle.compactHeader
+                  ? 20
+                  : 24,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.4,
             ),
