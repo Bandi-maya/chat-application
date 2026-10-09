@@ -2636,6 +2636,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             message: message,
             isMe: isMine,
             theme: theme,
+            preferencesController: widget.preferencesController,
             showDeletedContent: showDeleted,
             retainViewOnce: retainViewOnce,
             viewOnceOpened: _openedViewOnceIds.contains(message.id),
