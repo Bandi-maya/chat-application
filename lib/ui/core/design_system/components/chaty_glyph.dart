@@ -259,7 +259,6 @@ class _ChatySvgGlyphPainter extends CustomPainter {
         'rect' => _rectPath(attributes),
         _ => Path(),
       };
-      if (path.getBounds().isEmpty) continue;
       final fill = (attributes['fill'] ?? 'currentColor') != 'none';
       final stroke = (attributes['stroke'] ?? 'none') != 'none';
       final strokeWidth =
