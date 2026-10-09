@@ -1,0 +1,10 @@
+export 'chaty_component_registry.dart';
+export 'chaty_component_spec.dart';
+export 'component_capabilities.dart';
+export 'component_scope.dart';
+export 'component_variant_resolver.dart';
+export 'customization_controller.dart';
+export 'customization_history.dart';
+export 'customization_migration.dart';
+export 'customization_snapshot.dart';
+export 'performance_profile.dart';

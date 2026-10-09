@@ -30,6 +30,7 @@ import 'security/security_center_screen.dart';
 import 'settings_search_delegate.dart';
 import 'templates/templates_settings_screen.dart';
 import 'theme_editor_screen.dart';
+import 'customization/customization_center_screen.dart';
 
 class SettingsRootScreen extends StatelessWidget {
   final ChatyPreferencesController preferencesController;
@@ -97,6 +98,7 @@ class SettingsRootScreen extends StatelessWidget {
         ),
       ),
       '/settings/themes' => ThemeEditorScreen(themeController: themeController),
+      '/settings/customization' => const CustomizationCenterScreen(),
       '/settings/templates' => const TemplatesSettingsScreen(),
       '/settings/app_icon' => AppIconSettingsScreen(
         appIconController: _appIconController,
@@ -382,6 +384,18 @@ class SettingsRootScreen extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 8, bottom: 32),
                 child: Column(
                   children: [
+                    // Customization Center
+                    _SettingsItemTile(
+                      icon: const Icon(Icons.palette_outlined, color: Color(0xFF22C55E), size: 24),
+                      title: 'Customization Center',
+                      subtitle: 'Visual dialects, headers, bubbles, ticks, composers & motion',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const CustomizationCenterScreen(),
+                        ),
+                      ),
+                    ),
+
                     // 1. Linked devices
                     _SettingsItemTile(
                       icon: const Icon(Icons.devices_rounded, color: Color(0xFF8696A0), size: 24),

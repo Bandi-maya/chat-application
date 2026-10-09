@@ -23,6 +23,7 @@ import 'package:chat/data/services/call_lifecycle_coordinator.dart';
 import 'package:chat/features/calls/call_presentation_controller.dart';
 import 'package:chat/features/camera/effects/effect_engine.dart';
 import 'package:chat/data/services/status_service.dart';
+import 'package:chat/ui/core/customization/customization_controller.dart';
 
 final GetIt locator = GetIt.instance;
 
@@ -49,6 +50,9 @@ void setupLocator() {
   );
   locator.registerLazySingleton<AppearanceVariantController>(
     () => AppearanceVariantController(),
+  );
+  locator.registerLazySingleton<CustomizationController>(
+    () => CustomizationController(),
   );
   locator.registerLazySingleton<TemplateController>(() => TemplateController());
   locator.registerLazySingleton<ChatyNotificationService>(

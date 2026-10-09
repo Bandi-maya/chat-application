@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../tokens/app_tokens.dart';
-
 /// Standard 10px border radius mandated by Chaty design specification.
 const double kChatyModalRadius = 10.0;
 const BorderRadius kChatyModalBorderRadius = BorderRadius.all(
