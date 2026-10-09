@@ -250,10 +250,16 @@ class _ProfileHeader extends StatelessWidget {
       ProfileHeaderStyle.bannerWithAvatar => 180.0,
     };
     final avatarSize = switch (profileTemplate.headerStyle) {
-      ProfileHeaderStyle.compactHeader => 72.0,
-      ProfileHeaderStyle.centeredIdentity => 100.0,
+      ProfileHeaderStyle.compactHeader => 64.0,
+      ProfileHeaderStyle.centeredIdentity => 96.0,
       ProfileHeaderStyle.bannerWithAvatar => 92.0,
     };
+    if (profileTemplate.headerStyle == ProfileHeaderStyle.compactHeader) {
+      return _buildCompactHeader(context, colors, avatarSize);
+    }
+    if (profileTemplate.headerStyle == ProfileHeaderStyle.centeredIdentity) {
+      return _buildCenteredIdentity(context, colors, avatarSize, bannerHeight);
+    }
     return Center(
       child: Column(
         children: [
@@ -388,6 +394,254 @@ class _ProfileHeader extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+  Widget _buildCompactHeader(
+    BuildContext context,
+    AppColors colors,
+    double avatarSize,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: profileTemplateAvatarRadius(
+                avatarSize,
+                locator<TemplateController>().profile.avatarShape,
+              ),
+              border: Border.all(color: colors.borderSubtle),
+            ),
+            child: ChatyNetworkAvatar(
+              initials: initials,
+              colorHex: colorHex,
+              url: avatarUrl,
+              size: avatarSize,
+              shape: locator<TemplateController>().profile.avatarShape,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          displayName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: colors.foreground,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            height: 1.08,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Change profile banner',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: onEditBanner,
+                        icon: Icon(
+                          Icons.wallpaper_outlined,
+                          size: 20,
+                          color: colors.foregroundSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '@$username',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colors.foregroundSecondary,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (about.isNotEmpty) ...[
+                    const SizedBox(height: 7),
+                    Text(
+                      about,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: colors.foregroundSecondary,
+                        fontSize: 12.5,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: _EditPill(onTap: onEdit),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCenteredIdentity(
+    BuildContext context,
+    AppColors colors,
+    double avatarSize,
+    double bannerHeight,
+  ) {
+    final profileTemplate = locator<TemplateController>().profile;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+        child: Column(
+          children: [
+            Stack(
+              children: [
+                _bannerSurface(colors, bannerHeight * 0.60),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: IconButton(
+                    tooltip: 'Change profile banner',
+                    style: IconButton.styleFrom(
+                      backgroundColor: colors.surface.withValues(alpha: 0.88),
+                      foregroundColor: colors.foreground,
+                    ),
+                    onPressed: onEditBanner,
+                    icon: const Icon(Icons.wallpaper_outlined),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: colors.background,
+                borderRadius: profileTemplateAvatarRadius(
+                  avatarSize + 8,
+                  profileTemplate.avatarShape,
+                ),
+                border: Border.all(color: colors.borderSubtle),
+              ),
+              child: ChatyNetworkAvatar(
+                initials: initials,
+                colorHex: colorHex,
+                url: avatarUrl,
+                size: avatarSize,
+                shape: profileTemplate.avatarShape,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              displayName,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: colors.foreground,
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.4,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              '@$username',
+              style: TextStyle(
+                color: colors.foregroundSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            if (about.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  about,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: colors.foregroundSecondary,
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _EditPill(onTap: onEdit),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: onEditBanner,
+                  icon: const Icon(Icons.wallpaper_outlined, size: 17),
+                  label: const Text('Banner'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _bannerSurface(AppColors colors, double height) {
+    final source = (bannerUrl ?? '').trim();
+    Widget image;
+    if (source.isEmpty) {
+      image = _BannerFallback(colors: colors);
+    } else if (source.startsWith('http://') || source.startsWith('https://')) {
+      image = Image.network(
+        source,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _BannerFallback(colors: colors),
+      );
+    } else {
+      image = Image.file(
+        File(source.replaceFirst('file://', '')),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _BannerFallback(colors: colors),
+      );
+    }
+    return Container(
+      height: height,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: colors.surfaceElevated,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.borderSubtle),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(17),
+        child: image,
+      ),
+    );
+  }
+
+  BorderRadius profileTemplateAvatarRadius(double size, String shape) {
+    return switch (shape) {
+      'squircle' => BorderRadius.circular(size * 0.32),
+      'roundedSquare' => BorderRadius.circular(size * 0.22),
+      _ => BorderRadius.circular(size / 2),
+    };
   }
 }
 
