@@ -259,7 +259,7 @@ class _ChatySvgGlyphPainter extends CustomPainter {
         'rect' => _rectPath(attributes),
         _ => Path(),
       };
-      if (path == Path()) continue;
+      if (path.getBounds().isEmpty) continue;
       final fill = (attributes['fill'] ?? 'currentColor') != 'none';
       final stroke = (attributes['stroke'] ?? 'none') != 'none';
       final strokeWidth =
@@ -342,9 +342,11 @@ class _ChatySvgGlyphPainter extends CustomPainter {
           path.moveTo(current.dx, current.dy);
           subpathStart = current;
           command = 'L';
+          break;
         case 'L':
           current = Offset(nextNumber(), nextNumber());
           path.lineTo(current.dx, current.dy);
+          break;
         case 'C':
           final control1 = Offset(nextNumber(), nextNumber());
           final control2 = Offset(nextNumber(), nextNumber());
@@ -358,6 +360,7 @@ class _ChatySvgGlyphPainter extends CustomPainter {
             end.dy,
           );
           current = end;
+          break;
         default:
           throw FormatException('Unsupported SVG path command: $command');
       }
