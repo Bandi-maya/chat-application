@@ -916,6 +916,7 @@ class _StatusAudioPlayerState extends State<_StatusAudioPlayer> {
   final AudioPlayer _player = AudioPlayer();
   StreamSubscription<Duration>? _positionSubscription;
   StreamSubscription<Duration?>? _durationSubscription;
+  StreamSubscription<PlayerState>? _playerStateSubscription;
   bool _loading = true;
   bool _failed = false;
   Duration _position = Duration.zero;
@@ -929,6 +930,14 @@ class _StatusAudioPlayerState extends State<_StatusAudioPlayer> {
     });
     _durationSubscription = _player.durationStream.listen((duration) {
       if (mounted) setState(() => _duration = duration ?? Duration.zero);
+    });
+    _playerStateSubscription = _player.playerStateStream.listen((state) {
+      if (!mounted) return;
+      setState(() {
+        if (state.processingState == ProcessingState.completed) {
+          _position = _duration;
+        }
+      });
     });
     unawaited(_loadSource());
   }
@@ -986,6 +995,7 @@ class _StatusAudioPlayerState extends State<_StatusAudioPlayer> {
   void dispose() {
     unawaited(_positionSubscription?.cancel());
     unawaited(_durationSubscription?.cancel());
+    unawaited(_playerStateSubscription?.cancel());
     unawaited(_player.dispose());
     super.dispose();
   }
