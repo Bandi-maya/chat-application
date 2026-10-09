@@ -1492,6 +1492,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
           },
         ),
       ),
+    ),
       if (chatListTemplate.showDivider)
           Padding(
             padding: const EdgeInsets.only(left: 76, right: 16),
