@@ -190,12 +190,24 @@ class ContactRelationshipService {
       throw StateError(
         'The current device cannot revoke itself from this screen.',
       );
-    await _client
+    final revoked = await _client
         .from('linked_devices')
         .update(<String, dynamic>{
           'revoked_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('user_id', _userId)
-        .eq('device_id', deviceId);
+        .eq('device_id', deviceId)
+        .isFilter('revoked_at', null)
+        .select('device_id')
+        .maybeSingle();
+
+    // Supabase/PostgREST updates can succeed with zero affected rows when RLS
+    // hides a row or the device was already removed. Never report revocation
+    // as successful unless this authenticated user's active device row changed.
+    if (revoked == null) {
+      throw StateError(
+        'This linked device is no longer active or cannot be revoked.',
+      );
+    }
   }
 }
