@@ -87,8 +87,11 @@ class _TemplatesSettingsScreenState extends State<TemplatesSettingsScreen> {
             ],
           ),
           body: SafeArea(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1040),
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
                 // 1. Current Template Overview Card
                 Container(
@@ -417,7 +420,9 @@ class _TemplatesSettingsScreenState extends State<TemplatesSettingsScreen> {
                       ],
                     ),
                   ),
-              ],
+                  ],
+                ),
+              ),
             ),
           ),
         );
