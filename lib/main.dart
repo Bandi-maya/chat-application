@@ -92,7 +92,6 @@ ThemeData _applyTypographyStyle(ThemeData base, String preset) {
     );
   }
   return base.copyWith(
-    fontFamily: family ?? base.fontFamily,
     textTheme: textTheme,
     primaryTextTheme: primaryTextTheme,
   );
