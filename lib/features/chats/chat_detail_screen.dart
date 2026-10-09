@@ -529,15 +529,32 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     if (!_recording || _voiceBusy) return;
     setState(() => _voiceBusy = true);
     _voiceTimer?.cancel();
-    await _voice.cancel();
-    await _realtime.setRecording(widget.conversationId, false);
-    if (mounted) {
-      setState(() {
-        _recording = false;
-        _recordLocked = false;
-        _voiceBusy = false;
-        _voiceSeconds = 0;
-      });
+    try {
+      await _voice.cancel();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Could not cancel voice note. ${error.toString().replaceFirst('Exception: ', '')}',
+            ),
+          ),
+        );
+      }
+    } finally {
+      try {
+        await _realtime.setRecording(widget.conversationId, false);
+      } catch (error) {
+        debugPrint('Chaty recording-indicator cleanup failed: $error');
+      }
+      if (mounted) {
+        setState(() {
+          _recording = false;
+          _recordLocked = false;
+          _voiceBusy = false;
+          _voiceSeconds = 0;
+        });
+      }
     }
   }
 
