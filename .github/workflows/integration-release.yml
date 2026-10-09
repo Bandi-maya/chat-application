@@ -168,8 +168,8 @@ jobs:
       - name: Build release-mode verification APK
         run: >-
           flutter build apk --release --no-pub
-          --dart-define=SUPABASE_URL=${SUPABASE_URL}
-          --dart-define=SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}
+          --dart-define="SUPABASE_URL=${SUPABASE_URL}"
+          --dart-define="SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}"
 
       - name: Verify release-mode APK
         shell: bash
@@ -245,8 +245,8 @@ jobs:
       - name: Build signed production APK
         run: >-
           flutter build apk --release --no-pub
-          --dart-define=SUPABASE_URL=${SUPABASE_URL}
-          --dart-define=SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}
+          --dart-define="SUPABASE_URL=${SUPABASE_URL}"
+          --dart-define="SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}"
 
       - name: Verify production APK signature and hash
         shell: bash
@@ -296,8 +296,8 @@ jobs:
       - name: Build iOS simulator/device app without signing
         run: >-
           flutter build ios --no-codesign --debug --no-pub
-          --dart-define=SUPABASE_URL=${SUPABASE_URL}
-          --dart-define=SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}
+          --dart-define="SUPABASE_URL=${SUPABASE_URL}"
+          --dart-define="SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}"
 
       - name: Verify generated iOS app bundle
         shell: bash
