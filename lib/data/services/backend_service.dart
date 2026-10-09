@@ -14,6 +14,7 @@ import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/realtime/realtime_event_bus.dart';
 import '../../ui/core/validators/input_validators.dart';
+import 'contact_relationship_service.dart';
 import 'connection_health_service.dart';
 import 'local_snapshot_cache_service.dart';
 import 'message_transport_compatibility_service.dart';
@@ -1842,7 +1843,17 @@ class ChatyBackendService extends ChangeNotifier {
     required int durationSeconds,
   }) {}
 
-  void revokeLinkedDevice(String deviceId) {
+  Future<void> revokeLinkedDevice(String deviceId) async {
+    if (deviceId.trim().isEmpty) {
+      throw ArgumentError.value(deviceId, 'deviceId', 'Device ID is required.');
+    }
+    if (!locator.isRegistered<ContactRelationshipService>()) {
+      throw StateError('Linked-device security service is unavailable.');
+    }
+
+    // Persist revocation first. The UI cache must never claim a device is
+    // revoked if the server rejected the operation.
+    await locator<ContactRelationshipService>().revokeDevice(deviceId);
     _linkedDevices.removeWhere(
       (device) => device.id == deviceId && !device.isCurrentDevice,
     );
