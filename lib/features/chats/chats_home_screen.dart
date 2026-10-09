@@ -17,6 +17,7 @@ import '../../ui/core/templates/template_controller.dart';
 import '../../ui/core/templates/template_models.dart';
 import '../../ui/core/design_system/settings_primitives.dart';
 import '../../ui/core/design_system/components/chaty_kit.dart';
+import '../../ui/core/design_system/components/chaty_glyph.dart';
 import '../../ui/core/design_system/components/app_components.dart';
 import '../../core/emoji/widgets/animated_emoji_text.dart';
 import '../../data/services/protected_resource_gate.dart';
@@ -966,14 +967,14 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               tooltip: 'Camera Effects',
               color: theme.primaryTextColor,
               onPressed: () => EffectPickerSheet.show(context),
-              icon: const Icon(Icons.camera_alt_outlined),
+              icon: const const ChatyGlyphIcon(glyph: ChatyGlyph.camera, size: 20),
             ),
           if (homePrefs.showDesktopIcon && !compactHeader)
             IconButton(
               tooltip: 'QR / Scan',
               color: theme.primaryTextColor,
               onPressed: () => _openQrScreen(initialIndex: 1),
-              icon: const Icon(Icons.qr_code_scanner_rounded),
+              icon: const const ChatyGlyphIcon(glyph: ChatyGlyph.qrScan, size: 20),
             ),
           if (homePrefs.showSearchBar &&
               headerStyle == HomeHeaderStyle.searchForward)
@@ -1036,14 +1037,15 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               tooltip: 'More options',
               color: theme.primaryTextColor,
               onPressed: () => _showHomeOverflowSheet(homePrefs, theme),
-              icon: const Icon(Icons.more_vert_rounded),
+              icon: const ChatyGlyphIcon(glyph: ChatyGlyph.more, size: 22),
             )
           else
             PopupMenuButton<String>(
               tooltip: 'More options',
-              icon: Icon(
-                Icons.more_vert_rounded,
+              icon: ChatyGlyphIcon(
+                glyph: ChatyGlyph.more,
                 color: theme.primaryTextColor,
+                size: 22,
               ),
               onSelected: _handleHomeOverflowAction,
               itemBuilder: (_) => <PopupMenuEntry<String>>[
@@ -1052,7 +1054,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                     value: 'effects',
                     child: ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.camera_alt_outlined),
+                      leading: const ChatyGlyphIcon(glyph: ChatyGlyph.camera, size: 20),
                       title: Text('Camera effects'),
                     ),
                   ),
@@ -1061,7 +1063,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                     value: 'qr',
                     child: ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.qr_code_scanner_rounded),
+                      leading: const ChatyGlyphIcon(glyph: ChatyGlyph.qrScan, size: 20),
                       title: Text('QR / Scan'),
                     ),
                   ),
@@ -1069,7 +1071,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   value: 'linked',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.devices_rounded),
+                    leading: const ChatyGlyphIcon(glyph: ChatyGlyph.devices, size: 20),
                     title: Text('Linked devices'),
                   ),
                 ),
@@ -1078,7 +1080,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   value: 'themes',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.palette_outlined),
+                    leading: const ChatyGlyphIcon(glyph: ChatyGlyph.palette, size: 20),
                     title: Text('Themes & colors'),
                   ),
                 ),
@@ -1086,7 +1088,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   value: 'templates',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.dashboard_customize_outlined),
+                    leading: const ChatyGlyphIcon(glyph: ChatyGlyph.templates, size: 20),
                     title: Text('Templates & layouts'),
                   ),
                 ),
@@ -1094,7 +1096,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   value: 'home',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.view_quilt_outlined),
+                    leading: const ChatyGlyphIcon(glyph: ChatyGlyph.homeLayout, size: 20),
                     title: Text('Home & navigation'),
                   ),
                 ),
@@ -1102,7 +1104,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   value: 'navigation',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.reorder_rounded),
+                    leading: const ChatyGlyphIcon(glyph: ChatyGlyph.navigation, size: 20),
                     title: Text('Navigation destinations'),
                   ),
                 ),
@@ -1110,7 +1112,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   value: 'settings',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.settings_outlined),
+                    leading: const ChatyGlyphIcon(glyph: ChatyGlyph.settings, size: 20),
                     title: Text('All settings'),
                   ),
                 ),
@@ -1214,7 +1216,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
 
         Widget actionTile({
           required String value,
-          required IconData icon,
+          required ChatyGlyph icon,
           required String title,
           String? subtitle,
         }) => ListTile(
@@ -1227,7 +1229,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               borderRadius: BorderRadius.circular(13),
             ),
             alignment: Alignment.center,
-            child: Icon(icon, color: theme.accentColor, size: 20),
+            child: ChatyGlyphIcon(glyph: icon, color: theme.accentColor, size: 20),
           ),
           title: Text(
             title,
@@ -1245,7 +1247,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: mutedColor, fontSize: 12),
                 ),
-          trailing: Icon(Icons.chevron_right_rounded, color: mutedColor),
+          trailing: ChatyGlyphIcon(glyph: ChatyGlyph.chevronRight, color: mutedColor, size: 18),
           onTap: () => Navigator.of(sheetContext).pop(value),
         );
 
@@ -1277,7 +1279,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                       ],
                     ),
                   ),
-                  Icon(Icons.tune_rounded, color: mutedColor, size: 21),
+                  ChatyGlyphIcon(glyph: ChatyGlyph.tune, color: mutedColor, size: 21),
                 ],
               ),
             ),
