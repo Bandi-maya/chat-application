@@ -161,6 +161,22 @@ class TemplateController extends ChangeNotifier {
     );
   }
 
+  /// Reapplies only template-owned theme/navigation tokens after other
+  /// startup controllers have restored their persisted state. This removes a
+  /// race between parallel theme/template initialization without touching
+  /// manual Home or Conversation preferences.
+  void synchronizeThemeAndNavigation({
+    required AppearanceVariantController appearanceController,
+    required ThemeController themeController,
+  }) {
+    _syncToRuntimeControllers(
+      appearanceController: appearanceController,
+      themeController: themeController,
+      applyTheme: true,
+      applyNavigation: true,
+    );
+  }
+
   /// Applies a full template across all components, resetting component overrides.
   Future<void> applyFullTemplate(
     ChatyTemplateId templateId, {
