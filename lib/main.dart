@@ -616,7 +616,6 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
                 callSession != null &&
                 callSession.isActive;
             final showIsland =
-                locator<TemplateController>().calls.enableFloatingIsland &&
                 presentation.isInAppIsland &&
                 callSession != null &&
                 callSession.isActive;
