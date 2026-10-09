@@ -79,7 +79,7 @@ class TemplateController extends ChangeNotifier {
     }
 
     return _commitConfiguration(
-      _config.copyWithNavigationDestinations(
+      (current) => current.copyWithNavigationDestinations(
         primaryDestinationIds: primary,
         overflowDestinationIds: overflow,
       ),
@@ -94,7 +94,7 @@ class TemplateController extends ChangeNotifier {
     ThemeController? themeController,
   }) async {
     return _commitConfiguration(
-      _config.withoutNavigationDestinationOverride(),
+      (current) => current.withoutNavigationDestinationOverride(),
       appearanceController: appearanceController,
       themeController: themeController,
       applyNavigation: true,
@@ -180,7 +180,7 @@ class TemplateController extends ChangeNotifier {
     ThemeController? themeController,
   }) async {
     return _commitConfiguration(
-      UserTemplateConfiguration(
+      (_) => UserTemplateConfiguration(
         baseTemplate: templateId,
         componentOverrides: const {},
       ),
@@ -203,7 +203,7 @@ class TemplateController extends ChangeNotifier {
     ThemeController? themeController,
   }) async {
     return _commitConfiguration(
-      _config.copyWithOverride(component, templateId),
+      (current) => current.copyWithOverride(component, templateId),
       appearanceController: appearanceController,
       preferencesController: preferencesController,
       themeController: themeController,
@@ -229,7 +229,7 @@ class TemplateController extends ChangeNotifier {
               entry.key: entry.value,
         };
     return _commitConfiguration(
-      UserTemplateConfiguration(
+      (_) => UserTemplateConfiguration(
         baseTemplate: configuration.baseTemplate,
         componentOverrides: normalizedOverrides,
         navigationPrimaryDestinationIds:
@@ -255,7 +255,7 @@ class TemplateController extends ChangeNotifier {
     ThemeController? themeController,
   }) async {
     return _commitConfiguration(
-      _config.removeOverride(component),
+      (current) => current.removeOverride(component),
       appearanceController: appearanceController,
       preferencesController: preferencesController,
       themeController: themeController,
@@ -273,7 +273,7 @@ class TemplateController extends ChangeNotifier {
     ThemeController? themeController,
   }) async {
     return _commitConfiguration(
-      const UserTemplateConfiguration(
+      (_) => const UserTemplateConfiguration(
         baseTemplate: ChatyTemplateId.messageFirst,
         componentOverrides: {},
       ),
@@ -380,7 +380,8 @@ class TemplateController extends ChangeNotifier {
   /// controllers. A failed preference write leaves the previously applied
   /// configuration active and is surfaced to the caller.
   Future<void> _commitConfiguration(
-    UserTemplateConfiguration next, {
+    UserTemplateConfiguration Function(UserTemplateConfiguration current)
+    buildNext, {
     AppearanceVariantController? appearanceController,
     ChatyPreferencesController? preferencesController,
     ThemeController? themeController,
@@ -390,6 +391,10 @@ class TemplateController extends ChangeNotifier {
     bool applyConversation = false,
   }) {
     final operation = _commitQueue.then((_) async {
+      // Build from the latest committed state *inside* the queue. Otherwise
+      // two fast, independent component edits can overwrite one another with
+      // candidates both derived from the same stale snapshot.
+      final next = buildNext(_config);
       final saved = await LocalPreferencesStorage.saveTemplateState(
         next.toMap(),
       );
