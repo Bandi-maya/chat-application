@@ -132,6 +132,8 @@ class TemplateController extends ChangeNotifier {
       themeController: themeController,
       applyTheme: component == TemplateComponentType.conversation,
       applyNavigation: component == TemplateComponentType.navigation,
+      applyHome: component == TemplateComponentType.home,
+      applyConversation: component == TemplateComponentType.conversation,
     );
   }
 
