@@ -372,8 +372,7 @@ class SettingsRootScreen extends StatelessWidget {
       ),
     );
   }
-
-
+}
 
 class _SettingsItemTile extends StatelessWidget {
   final Widget icon;
