@@ -45,7 +45,17 @@ void main() {
       );
       expect(
         SettingsRegistry.allSettings
-            .where((setting) => setting.id.startsWith('security_'))
+            .where((setting) => setting.canonicalRoute == '/settings/security'),
+        isEmpty,
+      );
+      expect(
+        SettingsRegistry.allSettings
+            .where(
+              (setting) =>
+                  setting.title.toLowerCase().contains('app lock') ||
+                  setting.title.toLowerCase().contains('pin') ||
+                  setting.title.toLowerCase().contains('biometric'),
+            )
             .every((setting) => setting.canonicalRoute == '/settings/privacy'),
         isTrue,
       );
