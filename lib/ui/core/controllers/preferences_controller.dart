@@ -501,7 +501,17 @@ class ChatyPreferencesController extends ChangeNotifier {
       return;
     }
     if (key == 'home_stories_style') {
-      _home = _home.copyWith(storiesStyle: text);
+      // The compatibility control exposes "Cards", while the runtime model
+      // uses the singular "Card" preset. Normalize legacy labels at the
+      // boundary so the selected option changes the real stories strip.
+      final normalizedStyle = switch (text.toLowerCase()) {
+        'cards' || 'card' => 'Card',
+        'squircle' => 'Squircle',
+        'compact' => 'Compact',
+        'minimal' => 'Minimal',
+        _ => 'Circular',
+      };
+      _home = _home.copyWith(storiesStyle: normalizedStyle);
       return;
     }
     if (key == 'enable_grp_separationV2') {
@@ -534,7 +544,22 @@ class ChatyPreferencesController extends ChangeNotifier {
       return;
     }
     if (key == 'ui_home_styleV3') {
-      _home = _home.copyWith(homeStyle: text);
+      // Normalize the human-facing GB labels to the app's canonical values.
+      // Keep Cards as its own preset; chats_home_screen renders it as distinct
+      // card rows rather than silently falling back to the default appearance.
+      final normalizedStyle = switch (text.toLowerCase()) {
+        'chaty' || 'default' || 'chaty default' => 'Chaty Default',
+        'classic' => 'Classic',
+        'compact' => 'Compact',
+        'cards' => 'Cards',
+        'minimal' => 'Minimal',
+        'stories first' || 'stories-first' => 'Stories First',
+        'expressive' => 'Expressive',
+        'productivity' => 'Productivity',
+        'tablet split view' => 'Tablet Split View',
+        _ => 'Chaty Default',
+      };
+      _home = _home.copyWith(homeStyle: normalizedStyle);
       return;
     }
     if (key == 'bubble_style') {
