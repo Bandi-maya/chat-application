@@ -41,9 +41,14 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([dataStore, preferencesController]),
+      listenable: Listenable.merge([
+        dataStore,
+        preferencesController,
+        locator<TemplateController>(),
+      ]),
       builder: (context, _) {
         final user = dataStore.currentUser;
+        final profileTemplate = locator<TemplateController>().profile;
         final nameOverride = preferencesController.home.myNameOverride;
         final displayName = nameOverride.isNotEmpty
             ? nameOverride
@@ -63,6 +68,16 @@ class ProfileScreen extends StatelessWidget {
               onEdit: () => ProfileEditScreen.open(context, dataStore),
               onEditBanner: () => _editBanner(context),
             ),
+            if (profileTemplate.showStatsGrid) ...[
+              const SizedBox(height: 8),
+              _ProfileStatsGrid(
+                chats: dataStore.conversations.length,
+                groups: dataStore.conversations
+                    .where((conversation) => conversation.type.name == 'group')
+                    .length,
+                contacts: dataStore.contacts.length,
+              ),
+            ],
             const SizedBox(height: 8),
             ChatySettingsSection(
               title: 'Account',
@@ -372,6 +387,67 @@ class _ProfileHeader extends StatelessWidget {
           const SizedBox(height: 20),
         ],
       ),
+    );
+  }
+}
+
+class _ProfileStatsGrid extends StatelessWidget {
+  final int chats;
+  final int groups;
+  final int contacts;
+
+  const _ProfileStatsGrid({
+    required this.chats,
+    required this.groups,
+    required this.contacts,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final stats = <(String, int, IconData)>[
+      ('Chats', chats, Icons.chat_bubble_outline_rounded),
+      ('Groups', groups, Icons.groups_outlined),
+      ('Contacts', contacts, Icons.people_outline_rounded),
+    ];
+    return Row(
+      children: [
+        for (final stat in stats)
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: colors.borderSubtle),
+              ),
+              child: Column(
+                children: [
+                  Icon(stat.$3, size: 17, color: colors.primary),
+                  const SizedBox(height: 5),
+                  Text(
+                    stat.$2.toString(),
+                    style: TextStyle(
+                      color: colors.foreground,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                    ),
+                  ),
+                  Text(
+                    stat.$1,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colors.foregroundSecondary,
+                      fontSize: 10.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
