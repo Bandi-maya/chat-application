@@ -1144,6 +1144,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     double density = 1.0,
   }) {
     final chatListTemplate = locator<TemplateController>().chatList;
+    final effectiveDensity = density * switch (chatListTemplate.density) {
+      ChatListDensity.compact => 0.92,
+      ChatListDensity.regular => 1.0,
+      ChatListDensity.comfortable => 1.08,
+    };
     final otherId = conversation.participantIds.firstWhere(
       (id) => id != widget.dataStore.currentUser.id,
       orElse: () => '',
@@ -1169,8 +1174,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     final locked = widget.preferencesController.isConversationLocked(
       conversation.id,
     );
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       child: Material(
         color: selected
             ? theme.accentColor.withValues(
@@ -1192,7 +1200,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               onTap: () => _handleConversationTap(conversation),
               onLongPress: handleLongPress,
               child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: chatListTemplate.itemHeight * density),
+                constraints: BoxConstraints(minHeight: chatListTemplate.itemHeight * effectiveDensity),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -1214,7 +1222,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                 : Color(
                                     int.parse(conversation.avatarColorHex!),
                                   ),
-                            size: 50 * density,
+                            size: 50 * effectiveDensity,
                             shape: chatListTemplate.avatarShape,
                           ),
                           if (selected)
@@ -1293,7 +1301,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                                 // WA-iOS row metrics: 16pt name.
                                                 fontSize:
                                                     16 *
-                                                    density *
+                                                    effectiveDensity *
                                                     theme.fontScale,
                                                 fontWeight:
                                                     conversation.unreadCount > 0
@@ -1344,7 +1352,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                                           FontWeight.w700,
                                                       fontSize:
                                                           13.5 *
-                                                          density *
+                                                          effectiveDensity *
                                                           theme.fontScale,
                                                     ),
                                                   ),
@@ -1391,7 +1399,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                                     : theme.secondaryTextColor,
                                                 fontSize:
                                                     13.5 *
-                                                    density *
+                                                    effectiveDensity *
                                                     theme.fontScale,
                                                 fontWeight:
                                                     activity?.isTyping ==
@@ -1483,7 +1491,17 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
             );
           },
         ),
-      ),
+        ),
+        if (chatListTemplate.showDivider)
+          Padding(
+            padding: const EdgeInsets.only(left: 76, right: 16),
+            child: Divider(
+              height: 1,
+              thickness: 0.5,
+              color: theme.cardColor.withValues(alpha: 0.55),
+            ),
+          ),
+      ],
     );
   }
 }
