@@ -27,6 +27,7 @@ class MessageBubble extends StatelessWidget {
   final bool isMe;
   final ThemeConfig theme;
   final String? senderName;
+  final bool showGroupAvatar;
   final VoidCallback onLongPress;
   final void Function(Rect bubbleRect)? onLongPressWithRect;
   final VoidCallback? onSwipeReply;
@@ -64,6 +65,7 @@ class MessageBubble extends StatelessWidget {
     required this.isMe,
     required this.theme,
     this.senderName,
+    this.showGroupAvatar = true,
     required this.onLongPress,
     this.onLongPressWithRect,
     this.onSwipeReply,
@@ -271,7 +273,7 @@ class MessageBubble extends StatelessWidget {
                 : MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              if (!isMe && senderName != null)
+              if (!isMe && senderName != null && showGroupAvatar)
                 Padding(
                   padding: const EdgeInsets.only(right: 8, bottom: 2),
                   child: AppAvatar(
