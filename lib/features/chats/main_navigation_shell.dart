@@ -17,6 +17,9 @@ import '../../injection/locator.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/templates/template_shell.dart';
+import '../../ui/core/templates/template_controller.dart';
+import '../../ui/core/templates/template_models.dart';
+import '../camera/effects/widgets/effect_picker_sheet.dart';
 
 class MainNavigationShell extends StatefulWidget {
   const MainNavigationShell({super.key});
@@ -27,6 +30,7 @@ class MainNavigationShell extends StatefulWidget {
 
 class _MainNavigationShellState extends State<MainNavigationShell> {
   int _currentIndex = 0;
+  String _currentDestinationId = 'chats';
   DateTime? _lastExitAttempt;
   late final PageController _pageController;
 
@@ -42,10 +46,16 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     super.dispose();
   }
 
-  void _selectRootDestination(int next) {
-    if (next == _currentIndex) return;
+  void _selectRootDestination(int next, {String? destinationId}) {
+    if (next == _currentIndex &&
+        (destinationId == null || destinationId == _currentDestinationId)) {
+      return;
+    }
     HapticFeedback.selectionClick();
-    setState(() => _currentIndex = next);
+    setState(() {
+      _currentIndex = next;
+      if (destinationId != null) _currentDestinationId = destinationId;
+    });
     if (_pageController.hasClients && _pageController.page?.round() != next) {
       _pageController.animateToPage(
         next,
@@ -57,7 +67,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
   Future<void> _handleRootBack() async {
     if (_currentIndex != 0) {
-      _selectRootDestination(0);
+      _selectRootDestination(0, destinationId: 'chats');
       return;
     }
     final now = DateTime.now();
@@ -87,12 +97,14 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     final preferencesController = locator<ChatyPreferencesController>();
     final appearanceController = locator<AppearanceVariantController>();
     final notificationService = locator<ChatyNotificationService>();
+    final templateController = locator<TemplateController>();
 
     return ListenableBuilder(
       listenable: Listenable.merge(<Listenable>[
         themeController,
         preferencesController,
         appearanceController,
+        templateController,
         dataStore,
       ]),
       builder: (context, _) {
@@ -106,7 +118,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         final showDesktopIcon = preferencesController.home.showDesktopIcon;
 
         // Base candidate destinations
-        final allDestinations = <_NavDestinationItem>[
+        final destinationCatalog = <_NavDestinationItem>[
           _NavDestinationItem(
             id: 'chats',
             label: 'Chats',
@@ -191,17 +203,61 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             ),
         ];
 
-        // Apply max 4 direct navigation items rule:
-        // <= 4: Display all directly
-        // > 4: Display first 3 + More as 4th item
-        final bool hasOverflow = allDestinations.length > 4;
-        final List<_NavDestinationItem> primaryDestinations = hasOverflow
-            ? allDestinations.take(3).toList()
-            : allDestinations;
-        final List<_NavDestinationItem> overflowDestinations = hasOverflow
-            ? allDestinations.skip(3).toList()
-            : const <_NavDestinationItem>[];
+        // Resolve the selected template's destination order without changing
+        // destination identity. Keeping a stable ID means applying a layout
+        // while Settings is open never sends the user to an unrelated screen.
+        final navigationTemplate = templateController.navigation;
+        final destinationById = <String, _NavDestinationItem>{
+          for (final item in destinationCatalog) item.id: item,
+        };
+        final orderedDestinations = <_NavDestinationItem>[];
+        final preferredDestinationIds = <String>[
+          ...navigationTemplate.primaryDestinationIds,
+          ...navigationTemplate.overflowDestinationIds,
+        ];
+        for (final id in preferredDestinationIds) {
+          final item = destinationById[id];
+          if (item != null &&
+              !orderedDestinations.any((existing) => existing.id == item.id)) {
+            orderedDestinations.add(item);
+          }
+        }
+        for (final item in destinationCatalog) {
+          if (!orderedDestinations.any((existing) => existing.id == item.id)) {
+            orderedDestinations.add(item);
+          }
+        }
+        final allDestinations = orderedDestinations;
 
+        final primaryDestinations = <_NavDestinationItem>[];
+        for (final id in navigationTemplate.primaryDestinationIds) {
+          final item = destinationById[id];
+          if (item != null &&
+              !primaryDestinations.any((existing) => existing.id == item.id)) {
+            primaryDestinations.add(item);
+          }
+        }
+        // A malformed or future template cannot leave navigation unusable.
+        if (primaryDestinations.isEmpty) {
+          primaryDestinations.addAll(allDestinations.take(3));
+        }
+        final primaryIds = primaryDestinations.map((item) => item.id).toSet();
+        final overflowDestinations = <_NavDestinationItem>[];
+        for (final id in navigationTemplate.overflowDestinationIds) {
+          final item = destinationById[id];
+          if (item != null &&
+              !primaryIds.contains(item.id) &&
+              !overflowDestinations.any((existing) => existing.id == item.id)) {
+            overflowDestinations.add(item);
+          }
+        }
+        for (final item in allDestinations) {
+          if (!primaryIds.contains(item.id) &&
+              !overflowDestinations.any((existing) => existing.id == item.id)) {
+            overflowDestinations.add(item);
+          }
+        }
+        final hasOverflow = overflowDestinations.isNotEmpty;
         final List<_NavDestinationItem> navItems = [
           ...primaryDestinations,
           if (hasOverflow)
@@ -217,20 +273,29 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             .map((item) => item.builder(context))
             .toList(growable: false);
 
-        final effectiveIndex = _currentIndex.clamp(
-          0,
-          allDestinations.length - 1,
+        final currentIndexFromId = allDestinations.indexWhere(
+          (item) => item.id == _currentDestinationId,
         );
-        if (effectiveIndex != _currentIndex) {
+        final effectiveIndex = currentIndexFromId < 0
+            ? 0
+            : currentIndexFromId;
+        if (effectiveIndex != _currentIndex || currentIndexFromId < 0) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) setState(() => _currentIndex = 0);
+            if (!mounted) return;
+            setState(() {
+              _currentIndex = effectiveIndex;
+              _currentDestinationId = allDestinations[effectiveIndex].id;
+            });
           });
         }
 
-        // Active index in bottom navigation bar
-        final int bottomNavSelectedIndex = hasOverflow
-            ? (effectiveIndex < 3 ? effectiveIndex : 3)
-            : effectiveIndex;
+        final currentDestinationId = allDestinations[effectiveIndex].id;
+        final selectedPrimaryIndex = primaryDestinations.indexWhere(
+          (item) => item.id == currentDestinationId,
+        );
+        final int bottomNavSelectedIndex = selectedPrimaryIndex >= 0
+            ? selectedPrimaryIndex
+            : primaryDestinations.length;
 
         return PopScope(
           canPop: false,
@@ -274,8 +339,13 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   content: PageView(
                     controller: _pageController,
                     onPageChanged: (idx) {
-                      if (_currentIndex != idx) {
-                        setState(() => _currentIndex = idx);
+                      if (idx >= 0 && idx < allDestinations.length &&
+                          (_currentIndex != idx ||
+                              _currentDestinationId != allDestinations[idx].id)) {
+                        setState(() {
+                          _currentIndex = idx;
+                          _currentDestinationId = allDestinations[idx].id;
+                        });
                       }
                     },
                     children: screens,
@@ -317,8 +387,13 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     ? const BouncingScrollPhysics()
                     : const PageScrollPhysics(),
                 onPageChanged: (idx) {
-                  if (_currentIndex != idx) {
-                    setState(() => _currentIndex = idx);
+                  if (idx >= 0 && idx < allDestinations.length &&
+                      (_currentIndex != idx ||
+                          _currentDestinationId != allDestinations[idx].id)) {
+                    setState(() {
+                      _currentIndex = idx;
+                      _currentDestinationId = allDestinations[idx].id;
+                    });
                   }
                 },
                 children: screens,
@@ -337,22 +412,45 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 theme: theme,
                 content: content,
                 appearance: appearanceController,
+                navigationTemplate: navigationTemplate,
+                onCenterAction: () => EffectPickerSheet.show(context),
                 navItems: navItems,
                 selectedIndex: bottomNavSelectedIndex,
                 onDestinationTap: (idx) {
                   ChatyHaptics.selection();
-                  if (hasOverflow && idx == 3) {
+                  if (hasOverflow && idx == primaryDestinations.length) {
                     _showMoreMenu(
                       context,
                       theme: theme,
                       overflowDestinations: overflowDestinations,
                       onSelect: (overflowIdx) {
-                        final realIndex = 3 + overflowIdx;
-                        _selectRootDestination(realIndex);
+                        if (overflowIdx < 0 ||
+                            overflowIdx >= overflowDestinations.length) {
+                          return;
+                        }
+                        final destination = overflowDestinations[overflowIdx];
+                        final realIndex = allDestinations.indexWhere(
+                          (item) => item.id == destination.id,
+                        );
+                        if (realIndex >= 0) {
+                          _selectRootDestination(
+                            realIndex,
+                            destinationId: destination.id,
+                          );
+                        }
                       },
                     );
-                  } else {
-                    _selectRootDestination(idx);
+                  } else if (idx >= 0 && idx < primaryDestinations.length) {
+                    final destination = primaryDestinations[idx];
+                    final realIndex = allDestinations.indexWhere(
+                      (item) => item.id == destination.id,
+                    );
+                    if (realIndex >= 0) {
+                      _selectRootDestination(
+                        realIndex,
+                        destinationId: destination.id,
+                      );
+                    }
                   }
                 },
               );
@@ -405,7 +503,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     fontSize: 14,
                   ),
                   tabs: navItems.map((item) => Tab(text: item.label)).toList(),
-                  onTap: _selectRootDestination,
+                  onTap: (idx) => _selectRootDestination(
+                    idx,
+                    destinationId: navItems[idx].id,
+                  ),
                 ),
               ),
               Expanded(
@@ -491,7 +592,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                             horizontal: 10,
                           ),
                           child: InkWell(
-                            onTap: () => _selectRootDestination(i),
+                            onTap: () => _selectRootDestination(
+                            i,
+                            destinationId: navItems[i].id,
+                          ),
                             borderRadius: BorderRadius.circular(16),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
@@ -676,7 +780,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                       ),
                       onTap: () {
                         Navigator.of(context).pop();
-                        _selectRootDestination(i);
+                        _selectRootDestination(i, destinationId: navItems[i].id);
                       },
                     );
                   },
