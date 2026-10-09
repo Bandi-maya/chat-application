@@ -11,7 +11,6 @@ import '../../ui/core/settings/settings_registry.dart';
 import '../../ui/core/theme/theme_controller.dart';
 import '../chats/linked_devices_qr_screen.dart';
 import '../profile/profile_actions.dart';
-import 'account/account_settings_screen.dart';
 import 'appearance/app_icon_settings_screen.dart';
 import 'appearance/universal_appearance_screen.dart';
 import 'calls/call_settings_screen.dart';
@@ -70,12 +69,6 @@ class SettingsRootScreen extends StatelessWidget {
 
   Widget _destinationForRoute(String route) {
     return switch (route) {
-      '/settings/account' => _reactive(
-        () => AccountSettingsScreen(
-          preferencesController: preferencesController,
-          dataStore: dataStore,
-        ),
-      ),
       '/settings/privacy' => _reactive(
         () => PrivacyCenterScreen(preferencesController: preferencesController),
       ),
@@ -136,10 +129,17 @@ class SettingsRootScreen extends StatelessWidget {
           notificationService: notificationService,
         ),
       ),
-      _ => _reactive(
-        () => AccountSettingsScreen(
-          preferencesController: preferencesController,
-          dataStore: dataStore,
+      _ => Scaffold(
+        backgroundColor: const Color(0xFF0C1014),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF0C1014),
+          title: const Text('Setting not found'),
+        ),
+        body: const Center(
+          child: Text(
+            'This setting is no longer available in this section.',
+            textAlign: TextAlign.center,
+          ),
         ),
       ),
     };
