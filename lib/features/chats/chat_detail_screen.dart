@@ -56,6 +56,8 @@ class ChatDetailScreen extends StatefulWidget {
   final ThemeConfig theme;
   final ChatyDataStore dataStore;
   final String conversationId;
+  /// Optional message to reveal after the conversation has loaded.
+  final String? initialMessageId;
   final ChatyPreferencesController preferencesController;
   final ThemeController? themeController;
 
@@ -64,6 +66,7 @@ class ChatDetailScreen extends StatefulWidget {
     required this.theme,
     required this.dataStore,
     required this.conversationId,
+    this.initialMessageId,
     required this.preferencesController,
     this.themeController,
   });
@@ -79,6 +82,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final Set<String> _openedViewOnceIds = <String>{};
   final TextEditingController _textCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
+  final Map<String, GlobalKey> _messageItemKeys = <String, GlobalKey>{};
+  final Map<String, int> _messageIndexById = <String, int>{};
+  bool _initialMessageJumpStarted = false;
   // --- WhatsApp/Telegram/Instagram scroll logic ---
   // True while the list is within [_nearBottomThreshold] of the newest
   // message. Drives the floating down-arrow button, the unseen-count badge,
@@ -155,7 +161,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     unawaited(_loadChatWallpaperOverride());
     _scrollCtrl.addListener(_handleScrollChanged);
     widget.dataStore.addListener(_onDataStoreChanged);
-    _scrollToBottom(animate: false);
+    if (widget.initialMessageId == null) _scrollToBottom(animate: false);
     _loadConversation();
   }
 
@@ -188,7 +194,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       await _refreshConnectionStatus();
       if (!mounted) return;
       setState(() => _loadingMessages = false);
-      _scrollToBottom(animate: false);
+      final targetMessageId = widget.initialMessageId;
+      if (targetMessageId != null) {
+        _initialMessageJumpStarted = true;
+        _jumpToMessage(targetMessageId);
+      } else {
+        _scrollToBottom(animate: false);
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -565,6 +577,93 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   int get _currentMessageCount =>
       widget.dataStore.getMessages(widget.conversationId).length;
+
+  /// Reveal an exact message without assuming a fixed bubble height.
+  ///
+  /// The first jump estimates the offset from the message's position in the
+  /// timeline. Subsequent frames use the closest laid-out message key to
+  /// correct the estimate until the target item is built and can be aligned
+  /// exactly. This keeps the timeline lazy and avoids a new scrolling package.
+  void _jumpToMessage(String messageId, {int attempt = 0}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollCtrl.hasClients) return;
+      final messages = widget.dataStore.getMessages(widget.conversationId);
+      final targetIndex = messages.indexWhere((item) => item.id == messageId);
+      if (targetIndex < 0) {
+        if (attempt >= 2 && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('This message is no longer available.')),
+          );
+        }
+        return;
+      }
+
+      for (var index = 0; index < messages.length; index++) {
+        _messageIndexById[messages[index].id] = index;
+      }
+
+      final targetContext = _messageItemKeys[messageId]?.currentContext;
+      if (targetContext != null) {
+        _searchHighlightTimer?.cancel();
+        setState(() => _highlightedSearchMessageId = messageId);
+        Scrollable.ensureVisible(
+          targetContext,
+          alignment: 0.35,
+          duration: MediaQuery.of(context).disableAnimations
+              ? Duration.zero
+              : const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic,
+        );
+        _searchHighlightTimer = Timer(const Duration(seconds: 3), () {
+          if (mounted && _highlightedSearchMessageId == messageId) {
+            setState(() => _highlightedSearchMessageId = null);
+          }
+        });
+        return;
+      }
+
+      final position = _scrollCtrl.position;
+      final maxExtent = position.maxScrollExtent;
+      final laidOut = _messageItemKeys.entries
+          .where((entry) => entry.value.currentContext != null)
+          .map((entry) => (
+                id: entry.key,
+                index: _messageIndexById[entry.key],
+                context: entry.value.currentContext!,
+              ))
+          .where((entry) => entry.index != null)
+          .toList(growable: false);
+
+      double estimate;
+      if (laidOut.isNotEmpty && messages.length > 1) {
+        laidOut.sort(
+          (a, b) => (a.index! - targetIndex).abs().compareTo(
+            (b.index! - targetIndex).abs(),
+          ),
+        );
+        final nearest = laidOut.first;
+        final renderObject = nearest.context.findRenderObject();
+        final viewport = RenderAbstractViewport.maybeOf(renderObject!);
+        final reveal = viewport?.getOffsetToReveal(renderObject, 0).offset;
+        final averageExtent = maxExtent / (messages.length - 1);
+        estimate = (reveal ?? position.pixels) +
+            (targetIndex - nearest.index!) * averageExtent;
+      } else {
+        estimate = messages.length <= 1
+            ? 0
+            : maxExtent * targetIndex / (messages.length - 1);
+      }
+      _scrollCtrl.jumpTo(estimate.clamp(0.0, maxExtent).toDouble());
+      if (attempt < 12) {
+        _jumpToMessage(messageId, attempt: attempt + 1);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not locate this message in the timeline.')),
+        );
+      }
+    });
+  }
+
 
   /// Scroll listener: tracks whether the newest message is on screen. This is
   /// what makes the down-arrow button appear/disappear and decides whether
@@ -2651,12 +2750,19 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     ),
                   ),
           );
-          if (!ChatAttachmentActions.isPollMessage(message)) return bubble;
-          return GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: () => _attachments.openPoll(context, message.id),
-            child: bubble,
+          _messageIndexById[message.id] = index;
+          final itemKey = _messageItemKeys.putIfAbsent(
+            message.id,
+            GlobalKey.new,
           );
+          final messageContent = !ChatAttachmentActions.isPollMessage(message)
+              ? bubble
+              : GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: () => _attachments.openPoll(context, message.id),
+                  child: bubble,
+                );
+          return KeyedSubtree(key: itemKey, child: messageContent);
         },
       ),
     );
