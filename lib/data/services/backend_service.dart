@@ -1393,39 +1393,82 @@ class ChatyBackendService extends ChangeNotifier {
     required String messageId,
     required String newText,
   }) async {
+    final text = newText.trim();
+    if (text.isEmpty) {
+      throw ArgumentError.value(newText, 'newText', 'Message cannot be empty.');
+    }
+
     final list = _messagesByChatId[conversationId];
-    if (list != null) {
-      final index = list.indexWhere((m) => m.id == messageId);
-      if (index != -1) {
-        list[index] = list[index].copyWith(
-          text: newText.trim(),
-          editedAt: DateTime.now(),
-        );
-        notifyListeners();
-      }
+    if (list == null) {
+      throw StateError('Conversation messages are not loaded.');
     }
+    final index = list.indexWhere((message) => message.id == messageId);
+    if (index < 0) {
+      throw StateError('Message is no longer available to edit.');
+    }
+
+    final original = list[index];
+    list[index] = original.copyWith(text: text, editedAt: DateTime.now());
+    notifyListeners();
+
     try {
-      await _client.rpc(
-        'edit_chat_message',
-        params: <String, dynamic>{
-          'p_message_id': messageId,
-          'p_text': newText.trim(),
-        },
-      );
-    } catch (e, stackTrace) {
-      debugPrint('Error editing message via RPC: $e\n$stackTrace');
-      try {
-        await _client
-            .from('messages')
-            .update(<String, dynamic>{
-              'text': newText.trim(),
-              'edited_at': DateTime.now().toUtc().toIso8601String(),
-            })
-            .eq('id', messageId);
-      } catch (e, stackTrace) {
-        debugPrint('Error editing message: $e\n$stackTrace');
+      // MLS messages must be re-encrypted at the current group epoch. Never
+      // write their plaintext body through the legacy RPC or table API.
+      final isMlsMessage =
+          original.metadata['mls_group_id'] != null ||
+          original.metadata['encryption_protocol'] ==
+              MlsE2eeService.protocolSuite;
+      if (isMlsMessage) {
+        if (!locator.isRegistered<MlsE2eeService>()) {
+          throw StateError('Secure messaging is not available on this device.');
+        }
+        final mls = locator<MlsE2eeService>();
+        final deviceId = mls.currentDeviceId;
+        if (!mls.isReady || deviceId == null) {
+          throw StateError('Secure messaging is still initializing.');
+        }
+        final appMetadata = Map<String, dynamic>.from(original.metadata)
+          ..remove('encrypted')
+          ..remove('mls_group_id')
+          ..remove('mls_epoch')
+          ..remove('encryption_protocol')
+          ..remove('decryption_failed');
+        final encrypted = await mls.encryptEditedPayload(
+          conversationId: conversationId,
+          payload: <String, dynamic>{
+            'type': _messageTypeToDatabase(original.type),
+            'text': text,
+            'metadata': appMetadata,
+          },
+        );
+        await _client.rpc(
+          'edit_mls_message_v1',
+          params: <String, dynamic>{
+            'p_message_id': messageId,
+            'p_sender_device_id': deviceId,
+            'p_group_id': encrypted.groupId,
+            'p_epoch': encrypted.epoch,
+            'p_ciphertext': encrypted.ciphertext,
+          },
+        );
+      } else {
+        await _client.rpc(
+          'edit_chat_message',
+          params: <String, dynamic>{
+            'p_message_id': messageId,
+            'p_text': text,
+          },
+        );
       }
+    } catch (_) {
+      // Keep optimistic UI honest: restore the exact prior message and let the
+      // caller display its existing error state. There is intentionally no
+      // direct-table plaintext fallback for failed edits.
+      list[index] = original;
+      notifyListeners();
+      rethrow;
     }
+
     await _loadMessages(conversationId);
     notifyListeners();
   }
@@ -1874,6 +1917,7 @@ class ChatyBackendService extends ChangeNotifier {
       id: row['id']?.toString() ?? '',
       conversationId: row['conversation_id']?.toString() ?? '',
       senderId: senderId,
+      metadata: metadata,
       type: _messageTypeFromDatabase(row['type']?.toString()),
       text: deletedAt == null
           ? (row['body']?.toString() ?? '')
