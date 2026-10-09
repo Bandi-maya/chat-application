@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:chat/ui/core/templates/template_models.dart';
 import 'package:chat/ui/core/templates/template_registry.dart';
 import 'package:chat/ui/core/templates/template_controller.dart';
+import 'package:chat/ui/core/persistence/preferences_storage.dart';
 import 'package:chat/ui/core/theme/theme_controller.dart';
 import 'package:chat/ui/core/theme/theme_config.dart';
 
@@ -319,6 +321,20 @@ void main() {
         controller.navigation.primaryDestinationIds,
         equals(ChatyTemplateRegistry.community.navigation.primaryDestinationIds),
       );
+    });
+
+    test('Applying a template awaits successful local persistence', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+
+      await controller.applyFullTemplate(ChatyTemplateId.community);
+
+      final persisted = await LocalPreferencesStorage.loadTemplateState();
+      expect(persisted, isNotEmpty);
+      expect(
+        UserTemplateConfiguration.fromMap(persisted).baseTemplate,
+        ChatyTemplateId.community,
+      );
+      expect(controller.baseTemplate, ChatyTemplateId.community);
     });
 
     test('Custom navigation rejects hiding or duplicating destinations', () async {
