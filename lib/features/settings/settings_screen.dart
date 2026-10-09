@@ -732,6 +732,26 @@ class SettingsScreen extends StatelessWidget {
                     },
                   ),
                   ChatySettingsTile(
+                    icon: Icons.star_outline_rounded,
+                    iconColor: colors.primary,
+                    title: 'Starred Messages',
+                    subtitle:
+                        'Search, open and remove saved messages across conversations',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => StarredMessagesScreen(
+                            dataStore: dataStore,
+                            theme: themeController.globalTheme,
+                            preferencesController: preferencesController,
+                            themeController: themeController,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  ChatySettingsTile(
                     icon: Icons.notifications_none_rounded,
                     iconColor: colors.warning,
                     title: 'Notification & Sound Studio',
