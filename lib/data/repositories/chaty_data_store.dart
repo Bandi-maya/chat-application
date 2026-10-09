@@ -14,6 +14,7 @@ import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../services/backend_service.dart';
 import '../services/gb_feature_backend_service.dart';
+import '../services/status_service.dart';
 
 /// Compatibility adapter used by the existing presentation layer.
 ///
@@ -515,8 +516,24 @@ class ChatyDataStore extends ChangeNotifier {
 
   Future<void> deleteTask(String taskId) => _backend.deleteTask(taskId);
 
-  void addStory(String content) => _backend.addStory(content);
-  void markStoryViewed(String storyId) => _backend.markStoryViewed(storyId);
+  Future<void> addStory(String content) async {
+    final statusService = StatusService(
+      preferences: locator<ChatyPreferencesController>(),
+    );
+    await statusService.publishText(content);
+  }
+
+  Future<void> markStoryViewed(String storyId) async {
+    final statusService = StatusService(
+      preferences: locator<ChatyPreferencesController>(),
+    );
+    final statuses = await statusService.watchActiveStatuses().first;
+    final status = statuses.where((item) => item.id == storyId).firstOrNull;
+    if (status == null) {
+      throw StateError('Status is no longer available.');
+    }
+    await statusService.markViewed(status);
+  }
 
   void logCall({
     required String receiverId,
