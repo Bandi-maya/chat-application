@@ -373,10 +373,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         final isOneUiStyle = homeStyle == ChatyHomeStyleCatalog.oneUi;
         final isTelegramStyle = homeStyle == ChatyHomeStyleCatalog.telegram;
         final isIosStyle = homeStyle == ChatyHomeStyleCatalog.ios;
+        final isOldUiStyle = homeStyle == ChatyHomeStyleCatalog.oldUi;
         final styleShowFilters =
             homeStyle != 'Classic' && homeStyle != 'Minimal';
         final styleShowSections =
-            homeStyle != 'Minimal' && !isTelegramStyle;
+            homeStyle != 'Minimal' && !isTelegramStyle && !isOldUiStyle;
         final styleAlwaysLabelSections = homeStyle == 'Classic';
         final styleStoriesFirst = homeStyle == 'Stories First';
         final styleStoriesHidden =
@@ -403,6 +404,8 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
             ? 0.94
             : isIosStyle
             ? 1.06
+            : isOldUiStyle
+            ? 0.94
             : 1.0;
         final styleSplitView = homeStyle == 'Tablet Split View';
         // Stories Style consumers: each value renders the strip differently.
@@ -1393,6 +1396,16 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
           clipBehavior: Clip.antiAlias,
           child: header,
         );
+      case ChatyHomeStyleCatalog.oldUi:
+        return Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF075E54),
+            border: Border(
+              bottom: BorderSide(color: Color(0xFF128C7E), width: 2),
+            ),
+          ),
+          child: header,
+        );
       default:
         return header;
     }
@@ -1640,8 +1653,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     final isTelegramStyle = homeStyle == ChatyHomeStyleCatalog.telegram;
     final isIosStyle = homeStyle == ChatyHomeStyleCatalog.ios;
     final isOneUiStyle = homeStyle == ChatyHomeStyleCatalog.oneUi;
+    final isOldUiStyle = homeStyle == ChatyHomeStyleCatalog.oldUi;
     final visualAccent = isTelegramStyle
         ? const Color(0xFF229ED9)
+        : isOldUiStyle
+        ? const Color(0xFF128C7E)
         : theme.accentColor;
     final tileRadius = isTelegramStyle
         ? 10.0
@@ -1649,6 +1665,8 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         ? 20.0
         : isOneUiStyle
         ? 22.0
+        : isOldUiStyle
+        ? 6.0
         : 16.0;
     final tileHeight = isTelegramStyle
         ? 64.0
@@ -1656,8 +1674,10 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         ? 76.0
         : isOneUiStyle
         ? 80.0
+        : isOldUiStyle
+        ? 66.0
         : 72.0;
-    final avatarSize = isIosStyle ? 52.0 : isTelegramStyle ? 48.0 : 50.0;
+    final avatarSize = isIosStyle ? 52.0 : isTelegramStyle ? 48.0 : isOldUiStyle ? 46.0 : 50.0;
     final otherId = conversation.participantIds.firstWhere(
       (id) => id != widget.dataStore.currentUser.id,
       orElse: () => '',
