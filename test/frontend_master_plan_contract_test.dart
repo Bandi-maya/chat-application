@@ -69,8 +69,10 @@ void main() {
     ).readAsStringSync();
 
     expect(source, contains('final useOverflowSheet = availableWidth < 600;'));
-    expect(source, contains('onSelected: _handleHomeOverflowAction'));
+    expect(source, contains('required bool useOverflowSheet'));
+    expect(source, contains('onPressed: () => _openHomeThreeDotMenu('));
     expect(source, contains('if (useOverflowSheet)'));
+    expect(source, contains('_showHomeOverflowSheet(homePrefs, theme)'));
     expect(source, contains('_handleHomeOverflowAction(value);'));
     for (final route in <String>[
       "case 'effects':",
@@ -112,7 +114,8 @@ void main() {
     expect(screen, contains("value: 'unstar'"));
     expect(screen, contains('toggleStarMessage'));
     expect(home, contains("case 'starred':"));
-    expect(home, contains("title: Text('Starred messages')"));
+    expect(home, contains('builder: (_) => StarredMessagesScreen('));
+    expect(screen, contains("title: const Text('Starred messages')"));
   });
 
   test('component template previews do not display placeholder copy', () {
