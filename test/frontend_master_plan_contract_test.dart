@@ -171,6 +171,8 @@ void main() {
     ).readAsStringSync();
 
     expect(source, contains('void _startConnectionTimeout(String callId)'));
+    expect(source, contains('final callId = _uuid.v4();\n    _callDurationSeconds = 0;'));
+    expect(source, contains('_callDurationSeconds = 0;\n      _currentSession = ChatyCallSession('));
     expect(source, contains("endCall(reason: 'connection_timeout')"));
     expect(source, contains('_connectionTimeoutTimer?.cancel();'));
     expect(source, contains('void _logCallRecordOnce('));
