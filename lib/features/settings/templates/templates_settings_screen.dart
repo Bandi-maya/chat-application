@@ -447,6 +447,7 @@ class TemplatesSettingsScreen extends StatelessWidget {
         configuration,
         appearanceController: locator<AppearanceVariantController>(),
         preferencesController: locator<ChatyPreferencesController>(),
+        themeController: locator<ThemeController>(),
       );
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
@@ -492,6 +493,7 @@ class TemplatesSettingsScreen extends StatelessWidget {
                 template.id,
                 appearanceController: locator<AppearanceVariantController>(),
                 preferencesController: locator<ChatyPreferencesController>(),
+                themeController: locator<ThemeController>(),
               );
               ScaffoldMessenger.of(
                 context,
@@ -523,6 +525,7 @@ class TemplatesSettingsScreen extends StatelessWidget {
               controller.resetToDefaults(
                 appearanceController: locator<AppearanceVariantController>(),
                 preferencesController: locator<ChatyPreferencesController>(),
+                themeController: locator<ThemeController>(),
               );
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Templates reset to default')),
