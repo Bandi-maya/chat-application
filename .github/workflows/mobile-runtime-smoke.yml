@@ -1,0 +1,123 @@
+name: Chaty Native Runtime Smoke
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - main
+      - feat/global-template-customization
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SUPABASE_URL: https://dntnxeanubswyswahdnj.supabase.co
+  SUPABASE_PUBLISHABLE_KEY: sb_publishable_gFpVYJctaDkRRgttvnUl-A_TKu81hFF
+
+jobs:
+  android-emulator-smoke:
+    name: Android emulator launch and first-frame smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Build debug APK
+        run: >-
+          flutter build apk --debug --no-pub
+          --dart-define=SUPABASE_URL=${SUPABASE_URL}
+          --dart-define=SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}
+
+      - name: Launch app and check first-frame runtime
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            set -euo pipefail
+            mkdir -p artifacts
+            adb logcat -c
+            adb install -r build/app/outputs/flutter-apk/app-debug.apk
+            adb shell am force-stop com.example.chat || true
+            adb shell am start -n com.example.chat/.MainActivity
+            sleep 20
+            adb shell pidof com.example.chat >/dev/null
+            adb shell screencap -p /sdcard/chaty-first-frame.png
+            adb pull /sdcard/chaty-first-frame.png artifacts/android-first-frame.png
+            adb logcat -d > artifacts/android-logcat.txt
+            if grep -E 'FATAL EXCEPTION|Unhandled Exception|FlutterError|A RenderFlex overflowed|Exception caught by rendering library' artifacts/android-logcat.txt; then
+              echo 'Android runtime smoke found a crash/framework/layout error.'
+              exit 1
+            fi
+
+      - name: Upload Android runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chaty-android-runtime-smoke
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+  ios-simulator-smoke:
+    name: iOS simulator launch and first-frame smoke
+    runs-on: macos-latest
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Build iOS simulator app without signing
+        run: >-
+          flutter build ios --simulator --debug --no-codesign --no-pub
+          --dart-define=SUPABASE_URL=${SUPABASE_URL}
+          --dart-define=SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}
+
+      - name: Launch app and capture simulator runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          DEVICE_ID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin); devices=[d for group in data["devices"].values() for d in group if d["isAvailable"] and d["name"].startswith("iPhone")]; print(devices[0]["udid"] if devices else "")')"
+          test -n "$DEVICE_ID"
+          xcrun simctl boot "$DEVICE_ID" || true
+          xcrun simctl bootstatus "$DEVICE_ID" -b
+          xcrun simctl install "$DEVICE_ID" build/ios/iphonesimulator/Runner.app
+          xcrun simctl launch "$DEVICE_ID" com.example.chat
+          sleep 20
+          xcrun simctl io "$DEVICE_ID" screenshot artifacts/ios-first-frame.png
+          xcrun simctl spawn "$DEVICE_ID" log show --last 2m --style compact --predicate 'process == "Runner" OR eventMessage CONTAINS[c] "Flutter"' > artifacts/ios-runtime.log
+          if grep -E 'Terminating app due to uncaught exception|Fatal error:|Unhandled Exception|FlutterError|A RenderFlex overflowed|Exception caught by rendering library' artifacts/ios-runtime.log; then
+            echo 'iOS runtime smoke found a crash/framework/layout error.'
+            exit 1
+          fi
+
+      - name: Upload iOS runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chaty-ios-runtime-smoke
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 14
