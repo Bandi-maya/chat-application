@@ -31,7 +31,7 @@ class _CustomizationCenterScreenState extends State<CustomizationCenterScreen>
   late final TabController _tabController;
   final TextEditingController _dummyComposerText = TextEditingController(text: 'Hey! Check out this new skin ✨');
   final FocusNode _dummyFocus = FocusNode();
-  String _previewOutgoingText = '${_previewOutgoingText}';
+  String _previewOutgoingText = 'Styling changes update here in real time!';
 
   final List<String> _categories = [
     'Navigation',
