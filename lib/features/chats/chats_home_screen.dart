@@ -1170,8 +1170,16 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     );
   }
 
-  void _openHomeThreeDotMenu() {
+  void _openHomeThreeDotMenu({
+    required bool useOverflowSheet,
+    required HomePreferences homePrefs,
+    required ThemeConfig theme,
+  }) {
     HapticFeedback.lightImpact();
+    if (useOverflowSheet) {
+      unawaited(_showHomeOverflowSheet(homePrefs, theme));
+      return;
+    }
     final topOffset = MediaQuery.of(context).padding.top + kToolbarHeight - 6;
     final colors = context.colors;
 
@@ -1262,9 +1270,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                             title: 'Starred Messages',
                             onTap: () {
                               Navigator.pop(ctx);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Starred messages')),
-                              );
+                              _handleHomeOverflowAction('starred');
                             },
                           ),
                           _popupMenuItem(
@@ -1491,7 +1497,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               Icons.more_vert_rounded,
               color: theme.primaryTextColor,
             ),
-            onPressed: _openHomeThreeDotMenu,
+            onPressed: () => _openHomeThreeDotMenu(
+              useOverflowSheet: useOverflowSheet,
+              homePrefs: homePrefs,
+              theme: theme,
+            ),
           ),
         ],
       ),
