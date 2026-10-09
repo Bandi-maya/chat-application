@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/contact_relationship_service.dart';
 import '../../data/services/notification_service.dart';
-import '../../domain/models/user_profile.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/app_icon_controller.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
@@ -24,9 +23,7 @@ import 'message_management/message_management_page.dart';
 import 'notifications/notification_settings_page.dart';
 import 'permissions/system_permissions_screen.dart';
 import 'privacy/privacy_center_screen.dart';
-import '../profile/profile_edit_screen.dart';
 import '../../data/services/chaty_share_service.dart';
-import 'security/security_center_screen.dart';
 import 'settings_search_delegate.dart';
 import 'templates/templates_settings_screen.dart';
 import 'theme_editor_screen.dart';
@@ -82,9 +79,10 @@ class SettingsRootScreen extends StatelessWidget {
       '/settings/privacy' => _reactive(
         () => PrivacyCenterScreen(preferencesController: preferencesController),
       ),
+      // App-lock and credential controls are part of the canonical
+      // Privacy & Security center. Keep legacy search routes pointed there.
       '/settings/security' => _reactive(
-        () =>
-            SecurityCenterScreen(preferencesController: preferencesController),
+        () => PrivacyCenterScreen(preferencesController: preferencesController),
       ),
       '/settings/conversation' => _reactive(
         () => ConversationSettingsPage(
@@ -147,9 +145,6 @@ class SettingsRootScreen extends StatelessWidget {
     };
   }
 
-  void _showEditProfile(BuildContext context) =>
-      ProfileEditScreen.open(context, dataStore);
-
   Future<void> _logout(BuildContext context) => confirmChatyLogout(context);
 
   void _openQrScreen(BuildContext context) {
@@ -204,10 +199,10 @@ class SettingsRootScreen extends StatelessWidget {
               ),
               SizedBox(height: 8),
               Text(
-                '• Local End-to-End Encryption:\nYour messages and calls are encrypted and stored safely on your device.\n\n'
-                '• No Remote Telemetry:\nChaty never tracks your browsing, locations, or personal data.\n\n'
-                '• Security & App Lock:\nLocal PIN, Pattern, and Biometric lock protect your messages completely offline.\n\n'
-                '• Full Data Ownership:\nYou can clear chat histories, media caches, and revoke device links at any time.',
+                '• Privacy controls:\nChaty provides controls for online presence, read receipts, calls, and message/status behavior where supported by the configured services.\n\n'
+                '• App lock:\nYou can configure a device-level app lock and supported authentication methods in Privacy & Security settings.\n\n'
+                '• Connected services:\nAccount data and messages may be processed by the backend services configured for this installation. Review those services’ privacy terms for complete data-handling details.\n\n'
+                '• Your controls:\nUse Linked devices to review connected sessions and Storage & Data to manage local media and cache where available.',
                 style: TextStyle(color: Color(0xFF8696A0), fontSize: 13, height: 1.4),
               ),
             ],
@@ -242,7 +237,7 @@ class SettingsRootScreen extends StatelessWidget {
           children: [
             Text('Chaty Messenger Pro', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             SizedBox(height: 4),
-            Text('Version 2.4.0 (Build 2026.10)', style: TextStyle(color: Color(0xFF8696A0), fontSize: 12)),
+            Text('Version 1.0.0+1', style: TextStyle(color: Color(0xFF8696A0), fontSize: 12)),
             SizedBox(height: 12),
             Text(
               'A modern, privacy-first messaging platform with advanced personalization, rich customization, and offline security.',
@@ -263,13 +258,6 @@ class SettingsRootScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = dataStore.currentUser;
-    final homePrefs = preferencesController.home;
-    final displayName = homePrefs.myNameOverride.isNotEmpty
-        ? homePrefs.myNameOverride
-        : (user.displayName.isNotEmpty ? user.displayName : 'Bandi Maya');
-    final handle = user.username.isNotEmpty ? '@${user.username}' : '@bandi_maya';
-
     return ListenableBuilder(
       listenable: Listenable.merge([preferencesController, dataStore]),
       builder: (context, _) => Scaffold(
@@ -310,70 +298,6 @@ class SettingsRootScreen extends StatelessWidget {
         body: SingleChildScrollView(
           child: Column(
             children: [
-              // Profile Header Card
-              InkWell(
-                onTap: () => _showEditProfile(context),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0xFF223038),
-                          border: Border.all(color: const Color(0xFF1E282E), width: 2),
-                        ),
-                        child: ClipOval(
-                          child: user.avatarUrl != null && user.avatarUrl!.isNotEmpty
-                              ? Image.network(
-                                  user.avatarUrl!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => _avatarFallback(user),
-                                )
-                              : _avatarFallback(user),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              displayName,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              user.about.isNotEmpty ? user.about : handle,
-                              style: const TextStyle(
-                                color: Color(0xFF8696A0),
-                                fontSize: 13.5,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        color: Color(0xFF8696A0),
-                        size: 24,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const Divider(height: 1, color: Color(0xFF1E282E)),
-              const SizedBox(height: 8),
-
               // Settings Container Card: Only displaying the 5 requested items
               Container(
                 width: double.infinity,
@@ -449,22 +373,7 @@ class SettingsRootScreen extends StatelessWidget {
     );
   }
 
-  Widget _avatarFallback(UserProfile user) {
-    return Container(
-      color: const Color(0xFF223038),
-      child: Center(
-        child: Text(
-          user.avatarInitials.isNotEmpty ? user.avatarInitials : 'BM',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 28,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-    );
-  }
-}
+
 
 class _SettingsItemTile extends StatelessWidget {
   final Widget icon;
