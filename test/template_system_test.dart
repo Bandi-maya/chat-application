@@ -324,6 +324,39 @@ void main() {
       );
     });
 
+    test('Concurrent component edits preserve both overrides', () async {
+      await Future.wait<void>(<Future<void>>[
+        controller.applyComponent(
+          component: TemplateComponentType.navigation,
+          templateId: ChatyTemplateId.cameraFirst,
+        ),
+        controller.applyComponent(
+          component: TemplateComponentType.composer,
+          templateId: ChatyTemplateId.visualSocial,
+        ),
+      ]);
+
+      expect(
+        controller.resolveTemplateFor(TemplateComponentType.navigation),
+        ChatyTemplateId.cameraFirst,
+      );
+      expect(
+        controller.resolveTemplateFor(TemplateComponentType.composer),
+        ChatyTemplateId.visualSocial,
+      );
+
+      final persisted = await LocalPreferencesStorage.loadTemplateState();
+      final restored = UserTemplateConfiguration.fromMap(persisted);
+      expect(
+        restored.resolveFor(TemplateComponentType.navigation),
+        ChatyTemplateId.cameraFirst,
+      );
+      expect(
+        restored.resolveFor(TemplateComponentType.composer),
+        ChatyTemplateId.visualSocial,
+      );
+    });
+
     test('Applying a template awaits successful local persistence', () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
 
