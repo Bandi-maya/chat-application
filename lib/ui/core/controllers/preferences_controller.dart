@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../data/services/local_lock_service.dart';
 import '../../../domain/models/preferences.dart';
 import '../gb/gb_feature_catalog.dart';
+import 'home_preset_normalizer.dart';
 import '../persistence/preference_keys.dart';
 import '../persistence/preferences_migrator.dart';
 import '../persistence/preferences_storage.dart';
@@ -501,17 +502,9 @@ class ChatyPreferencesController extends ChangeNotifier {
       return;
     }
     if (key == 'home_stories_style') {
-      // The compatibility control exposes "Cards", while the runtime model
-      // uses the singular "Card" preset. Normalize legacy labels at the
-      // boundary so the selected option changes the real stories strip.
-      final normalizedStyle = switch (text.toLowerCase()) {
-        'cards' || 'card' => 'Card',
-        'squircle' => 'Squircle',
-        'compact' => 'Compact',
-        'minimal' => 'Minimal',
-        _ => 'Circular',
-      };
-      _home = _home.copyWith(storiesStyle: normalizedStyle);
+      _home = _home.copyWith(
+        storiesStyle: HomePresetNormalizer.storiesStyle(text),
+      );
       return;
     }
     if (key == 'enable_grp_separationV2') {
@@ -544,22 +537,7 @@ class ChatyPreferencesController extends ChangeNotifier {
       return;
     }
     if (key == 'ui_home_styleV3') {
-      // Normalize the human-facing GB labels to the app's canonical values.
-      // Keep Cards as its own preset; chats_home_screen renders it as distinct
-      // card rows rather than silently falling back to the default appearance.
-      final normalizedStyle = switch (text.toLowerCase()) {
-        'chaty' || 'default' || 'chaty default' => 'Chaty Default',
-        'classic' => 'Classic',
-        'compact' => 'Compact',
-        'cards' => 'Cards',
-        'minimal' => 'Minimal',
-        'stories first' || 'stories-first' => 'Stories First',
-        'expressive' => 'Expressive',
-        'productivity' => 'Productivity',
-        'tablet split view' => 'Tablet Split View',
-        _ => 'Chaty Default',
-      };
-      _home = _home.copyWith(homeStyle: normalizedStyle);
+      _home = _home.copyWith(homeStyle: HomePresetNormalizer.homeStyle(text));
       return;
     }
     if (key == 'bubble_style') {
