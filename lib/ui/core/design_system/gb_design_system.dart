@@ -1022,6 +1022,11 @@ class GbLiveHeaderPreview extends StatelessWidget {
     final isOneUi = resolvedHomeStyle == ChatyHomeStyleCatalog.oneUi;
     final isTelegram = resolvedHomeStyle == ChatyHomeStyleCatalog.telegram;
     final isIos = resolvedHomeStyle == ChatyHomeStyleCatalog.ios;
+    final isMinimal = resolvedHomeStyle == 'Minimal';
+    final isCompact = resolvedHomeStyle == 'Compact';
+    final isStoriesFirst = resolvedHomeStyle == 'Stories First';
+    final isTabletSplit = resolvedHomeStyle == 'Tablet Split View';
+    final isProductivity = resolvedHomeStyle == 'Productivity';
     final isStock =
         homeStyle == 'WhatsApp UI Stock' || resolvedHomeStyle == 'Classic';
     final isBubbles =
@@ -1091,6 +1096,59 @@ class GbLiveHeaderPreview extends StatelessWidget {
             _buildTelegramHeader(title)
           else if (isIos)
             _buildIosHeader(title)
+          else if (isMinimal)
+            _buildStructuralHeader(
+              title,
+              eyebrow: 'MINIMAL',
+              accent: const Color(0xFF94A3B8),
+              titleSize: 19,
+              verticalPadding: 8,
+              radius: 6,
+              showSearch: false,
+            )
+          else if (isCompact)
+            _buildStructuralHeader(
+              title,
+              eyebrow: 'COMPACT INBOX',
+              accent: const Color(0xFF22C55E),
+              titleSize: 18,
+              verticalPadding: 7,
+              radius: 10,
+              showSearch: true,
+            )
+          else if (isStoriesFirst)
+            _buildStructuralHeader(
+              title,
+              eyebrow: 'STORIES FIRST',
+              accent: const Color(0xFFEC4899),
+              titleSize: 22,
+              verticalPadding: 11,
+              radius: 18,
+              showSearch: true,
+              showStories: true,
+            )
+          else if (isTabletSplit)
+            _buildStructuralHeader(
+              title,
+              eyebrow: 'TABLET WORKSPACE',
+              accent: const Color(0xFF60A5FA),
+              titleSize: 22,
+              verticalPadding: 12,
+              radius: 14,
+              showSearch: true,
+              tabletSplit: true,
+            )
+          else if (isProductivity)
+            _buildStructuralHeader(
+              title,
+              eyebrow: 'PRODUCTIVITY',
+              accent: const Color(0xFFF59E0B),
+              titleSize: 20,
+              verticalPadding: 9,
+              radius: 12,
+              showSearch: true,
+              unreadBadge: true,
+            )
           else if (isStock)
             _buildStockHeader(title)
           else if (isBubbles)
@@ -1110,6 +1168,36 @@ class GbLiveHeaderPreview extends StatelessWidget {
             _buildTelegramBottomBar()
           else if (isIos)
             _buildIosBottomBar()
+          else if (isMinimal)
+            _buildStructuralBottomBar(
+              accent: const Color(0xFF94A3B8),
+              showLabels: false,
+              compact: true,
+            )
+          else if (isCompact)
+            _buildStructuralBottomBar(
+              accent: const Color(0xFF22C55E),
+              showLabels: true,
+              compact: true,
+            )
+          else if (isStoriesFirst)
+            _buildStructuralBottomBar(
+              accent: const Color(0xFFEC4899),
+              showLabels: true,
+              showPill: true,
+            )
+          else if (isTabletSplit)
+            _buildStructuralBottomBar(
+              accent: const Color(0xFF60A5FA),
+              showLabels: true,
+              showPill: false,
+            )
+          else if (isProductivity)
+            _buildStructuralBottomBar(
+              accent: const Color(0xFFF59E0B),
+              showLabels: true,
+              showPill: true,
+            )
           else if (isStock)
             _buildStockBottomBar()
           else if (isBubbles)
@@ -1118,6 +1206,224 @@ class GbLiveHeaderPreview extends StatelessWidget {
             _buildOldUiBottomBar()
           else
             _buildBasicBottomBar(),
+        ],
+      ),
+    );
+  }
+
+  /// Shared renderer for the remaining named home presets. Each option has
+  /// distinct geometry and visual affordances while keeping the preview frame.
+  Widget _buildStructuralHeader(
+    String title, {
+    required String eyebrow,
+    required Color accent,
+    required double titleSize,
+    required double verticalPadding,
+    required double radius,
+    bool showSearch = false,
+    bool showStories = false,
+    bool tabletSplit = false,
+    bool unreadBadge = false,
+  }) {
+    final titleBlock = Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            eyebrow,
+            style: TextStyle(
+              color: accent,
+              fontSize: 9,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.1,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: titleSize,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.4,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        tabletSplit ? 8 : 14,
+        verticalPadding,
+        10,
+        showStories ? 12 : verticalPadding,
+      ),
+      decoration: BoxDecoration(
+        color: tabletSplit
+            ? const Color(0xFF101D2B)
+            : const Color(0xFF11171C),
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(
+          color: accent.withValues(alpha: 0.30),
+          width: tabletSplit ? 1.3 : 0.8,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (tabletSplit) ...[
+                Container(
+                  width: 3,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: accent,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+                const SizedBox(width: 10),
+              ],
+              titleBlock,
+              if (unreadBadge)
+                Container(
+                  margin: const EdgeInsets.only(left: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.17),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: accent.withValues(alpha: 0.7)),
+                  ),
+                  child: Text(
+                    '7 unread',
+                    style: TextStyle(
+                      color: accent,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              if (showSearch)
+                Icon(Icons.search_rounded, color: accent, size: 20),
+              const SizedBox(width: 8),
+              Icon(Icons.more_horiz_rounded, color: accent, size: 21),
+            ],
+          ),
+          if (!disableStatusUnderName && statusText.isNotEmpty && !showStories)
+            Padding(
+              padding: EdgeInsets.only(
+                left: tabletSplit ? 13 : 0,
+                top: 5,
+              ),
+              child: Text(
+                statusText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF8696A0),
+                  fontSize: 10.5,
+                ),
+              ),
+            ),
+          if (showStories) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 48,
+              child: Row(
+                children: [
+                  _buildPreviewStory('Your story', accent, isOwn: true),
+                  const SizedBox(width: 12),
+                  _buildPreviewStory('Maya', const Color(0xFFEC4899)),
+                  const SizedBox(width: 12),
+                  _buildPreviewStory('Arjun', const Color(0xFF60A5FA)),
+                  const SizedBox(width: 12),
+                  _buildPreviewStory('Priya', const Color(0xFF22C55E)),
+                ],
+              ),
+            ),
+          ],
+          if (tabletSplit) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Container(
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Container(
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreviewStory(String label, Color accent, {bool isOwn = false}) {
+    return Expanded(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: accent, width: 1.8),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: accent.withValues(alpha: 0.15),
+              ),
+              child: Icon(
+                isOwn ? Icons.add_rounded : Icons.person_rounded,
+                color: accent,
+                size: 15,
+              ),
+            ),
+          ),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFFD1D7DB),
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -1576,6 +1882,72 @@ class GbLiveHeaderPreview extends StatelessWidget {
           const Icon(Icons.checklist_rounded, color: Color(0xFF8696A0), size: 20),
           const Icon(Icons.call_outlined, color: Color(0xFF8696A0), size: 20),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStructuralBottomBar({
+    required Color accent,
+    required bool showLabels,
+    bool compact = false,
+    bool showPill = false,
+  }) {
+    const icons = <IconData>[
+      Icons.chat_bubble_rounded,
+      Icons.auto_awesome_mosaic_outlined,
+      Icons.checklist_rounded,
+      Icons.call_outlined,
+    ];
+    const labels = <String>['Chats', 'Updates', 'Tasks', 'Calls'];
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 10 : 16,
+        vertical: compact ? 6 : 9,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFF11171C),
+        border: Border(
+          top: BorderSide(
+            color: accent.withValues(alpha: 0.32),
+            width: showPill ? 1.2 : 0.7,
+          ),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: List<Widget>.generate(icons.length, (index) {
+          final selected = index == 0;
+          final iconColor = selected ? accent : const Color(0xFF8696A0);
+          Widget item = Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icons[index], color: iconColor, size: compact ? 17 : 20),
+              if (showLabels) ...[
+                const SizedBox(height: 2),
+                Text(
+                  labels[index],
+                  style: TextStyle(
+                    color: iconColor,
+                    fontSize: compact ? 8 : 9.5,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                  ),
+                ),
+              ],
+            ],
+          );
+          if (selected && showPill) {
+            item = Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: accent.withValues(alpha: 0.75)),
+              ),
+              child: item,
+            );
+          }
+          return item;
+        }),
       ),
     );
   }
