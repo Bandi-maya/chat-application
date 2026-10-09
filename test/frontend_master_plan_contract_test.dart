@@ -166,7 +166,7 @@ void main() {
 
     expect(source, contains('bool _busy = false;'));
     expect(source, contains('if (_recording || _busy) return;'));
-    expect(source, contains('if (!_recording || _busy) return false;'));
+    expect(source, contains('if (_disposed || !_recording || _busy) return false;'));
     expect(source, contains('final cleanupPath = recordedPath ?? stagedPath;'));
     expect(source, contains('if (_busy) return;'));
     expect(source, contains('Future<void> _dispose() async'));
