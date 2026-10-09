@@ -2793,7 +2793,7 @@ class _ComposerState extends State<_Composer>
       child: SafeArea(
         top: false,
         child: widget.recording
-            ? _buildRecordingBar(theme, reduceMotion)
+            ? _buildRecordingBar(theme, reduceMotion, composerTemplate)
             : _buildInputRow(theme, composerTemplate),
       ),
     );
@@ -2801,7 +2801,11 @@ class _ComposerState extends State<_Composer>
 
   // --- Recording ------------------------------------------------------------
 
-  Widget _buildRecordingBar(ThemeConfig theme, bool reduceMotion) {
+  Widget _buildRecordingBar(
+    ThemeConfig theme,
+    bool reduceMotion,
+    ComposerTemplate template,
+  ) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -2839,7 +2843,7 @@ class _ComposerState extends State<_Composer>
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
-            if (widget.recordLocked) ...[
+            if (widget.recordLocked && template.showVoiceLock) ...[
               const SizedBox(width: 6),
               Icon(Icons.lock_rounded, size: 13, color: theme.successColor),
             ],
@@ -2879,26 +2883,34 @@ class _ComposerState extends State<_Composer>
   // --- Text input -----------------------------------------------------------
 
   Widget _buildInputRow(ThemeConfig theme, ComposerTemplate template) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        ChatyComposerActionButton(
-          theme: theme,
-          semanticsLabel: 'Attach',
-          tooltip: 'Attach',
-          icon: Icons.add_circle_outline_rounded,
-          iconColor: theme.accentColor,
-          onTap: widget.onAttach,
-        ),
-        if (template.showCameraShortcut)
-          ChatyComposerActionButton(
+    final attachAction = ChatyComposerActionButton(
+      theme: theme,
+      semanticsLabel: 'Attach',
+      tooltip: 'Attach',
+      icon: Icons.add_circle_outline_rounded,
+      iconColor: theme.accentColor,
+      onTap: widget.onAttach,
+    );
+    final cameraAction = template.showCameraShortcut
+        ? ChatyComposerActionButton(
             theme: theme,
             semanticsLabel: 'Camera',
             tooltip: 'Camera',
             icon: Icons.photo_camera_rounded,
             iconColor: theme.accentColor,
             onTap: widget.onCameraTap,
-          ),
+          )
+        : null;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (template.actionPlacement == ComposerActionPlacement.split) ...[
+          if (cameraAction != null) cameraAction,
+          attachAction,
+        ] else ...[
+          attachAction,
+          if (cameraAction != null) cameraAction,
+        ],
         Expanded(
           child: TextField(
             controller: widget.controller,
@@ -2939,29 +2951,37 @@ class _ComposerState extends State<_Composer>
           valueListenable: widget.controller,
           builder: (context, value, _) {
             final hasText = value.text.trim().isNotEmpty;
-            if (hasText) {
-              return ChatyComposerActionButton(
-                theme: theme,
-                semanticsLabel: 'Send message',
-                tooltip: 'Send',
-                icon: Icons.send_rounded,
-                fillColor: theme.accentColor,
-                iconColor: theme.onAccentColor,
-                emphasized: true,
-                onTap: widget.onSend,
-              );
-            }
-            return ChatyComposerActionButton(
-              theme: theme,
-              icon: Icons.mic_rounded,
-              fillColor: theme.accentColor,
-              iconColor: theme.onAccentColor,
-              semanticsLabel:
-                  'Voice note. Tap to start locked recording, or hold to record and slide.',
-              onTap: widget.onVoiceTap,
-              onLongPressStart: (_) => widget.onVoiceHoldStart(),
-              onLongPressMoveUpdate: widget.onVoiceMove,
-              onLongPressEnd: (_) => widget.onVoiceHoldEnd(),
+            return AnimatedSwitcher(
+              duration: template.enableSendMorph
+                  ? const Duration(milliseconds: 180)
+                  : Duration.zero,
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              child: hasText
+                  ? ChatyComposerActionButton(
+                      key: const ValueKey<String>('send-action'),
+                      theme: theme,
+                      semanticsLabel: 'Send message',
+                      tooltip: 'Send',
+                      icon: Icons.send_rounded,
+                      fillColor: theme.accentColor,
+                      iconColor: theme.onAccentColor,
+                      emphasized: true,
+                      onTap: widget.onSend,
+                    )
+                  : ChatyComposerActionButton(
+                      key: const ValueKey<String>('voice-action'),
+                      theme: theme,
+                      icon: Icons.mic_rounded,
+                      fillColor: theme.accentColor,
+                      iconColor: theme.onAccentColor,
+                      semanticsLabel:
+                          'Voice note. Tap to start locked recording, or hold to record and slide.',
+                      onTap: widget.onVoiceTap,
+                      onLongPressStart: (_) => widget.onVoiceHoldStart(),
+                      onLongPressMoveUpdate: widget.onVoiceMove,
+                      onLongPressEnd: (_) => widget.onVoiceHoldEnd(),
+                    ),
             );
           },
         ),
