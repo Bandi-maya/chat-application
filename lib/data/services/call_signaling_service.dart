@@ -137,6 +137,7 @@ class CallSignalingService extends ChangeNotifier {
     }
 
     final callId = _uuid.v4();
+    _callDurationSeconds = 0;
     _currentSession = ChatyCallSession(
       callId: callId,
       remoteUserId: remoteUserId,
@@ -681,6 +682,7 @@ class CallSignalingService extends ChangeNotifier {
         callerId,
         row['conversation_id']?.toString() ?? '',
       );
+      _callDurationSeconds = 0;
       _currentSession = ChatyCallSession(
         callId: callId,
         remoteUserId: callerId,
