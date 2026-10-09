@@ -11,48 +11,6 @@ class SettingsRegistry {
     // -------------------------------------------------------------------------
     // 1. Account & Profile
     // -------------------------------------------------------------------------
-    SettingsCluster(
-      id: 'cluster_account',
-      title: 'Profile & Account',
-      description: 'Display name, username, bio, and account credentials',
-      category: SettingsCategory.account,
-      settings: [
-        SettingDefinition<String>(
-          id: 'account_display_name',
-          title: 'Display Name',
-          description: 'Your visible full name shown across conversations',
-          category: SettingsCategory.account,
-          subcategory: 'Profile Details',
-          controlType: SettingControlType.action,
-          icon: Icons.badge_outlined,
-          searchKeywords: ['name', 'display name', 'nickname', 'profile name'],
-          canonicalRoute: '/settings/account',
-        ),
-        SettingDefinition<String>(
-          id: 'account_username',
-          title: 'Username',
-          description: 'Unique @handle used to find and message you',
-          category: SettingsCategory.account,
-          subcategory: 'Profile Details',
-          controlType: SettingControlType.action,
-          icon: Icons.alternate_email_rounded,
-          searchKeywords: ['username', 'handle', 'tag', 'id'],
-          canonicalRoute: '/settings/account',
-        ),
-        SettingDefinition<String>(
-          id: 'account_bio',
-          title: 'About / Status Bio',
-          description: 'Brief text bio displayed on your profile card',
-          category: SettingsCategory.account,
-          subcategory: 'Profile Details',
-          controlType: SettingControlType.action,
-          icon: Icons.info_outline_rounded,
-          searchKeywords: ['bio', 'status message', 'about', 'tagline'],
-          canonicalRoute: '/settings/account',
-        ),
-      ],
-    ),
-
     // -------------------------------------------------------------------------
     // 2. Privacy
     // -------------------------------------------------------------------------
@@ -193,13 +151,13 @@ class SettingsRegistry {
       id: 'cluster_security_lock',
       title: 'App Lock & Biometrics',
       description: 'Hardware biometric, PIN, Pattern & Password protection',
-      category: SettingsCategory.security,
+      category: SettingsCategory.privacy,
       settings: [
         SettingDefinition<bool>(
           id: 'security_app_lock_enabled',
           title: 'App Lock',
           description: 'Require authentication when opening Chaty',
-          category: SettingsCategory.security,
+          category: SettingsCategory.privacy,
           subcategory: 'Authentication',
           controlType: SettingControlType.toggle,
           icon: Icons.lock_outline_rounded,
@@ -210,7 +168,7 @@ class SettingsRegistry {
             'lock chaty',
             'security lock',
           ],
-          canonicalRoute: '/settings/security',
+          canonicalRoute: '/settings/privacy',
           defaultValue: false,
         ),
         SettingDefinition<String>(
@@ -218,7 +176,7 @@ class SettingsRegistry {
           title: 'Lock Method',
           description:
               'Choose Biometric, PIN, Pattern, Password, or Device Credential',
-          category: SettingsCategory.security,
+          category: SettingsCategory.privacy,
           subcategory: 'Authentication',
           controlType: SettingControlType.singleChoice,
           icon: Icons.fingerprint_rounded,
@@ -230,14 +188,14 @@ class SettingsRegistry {
             'pattern',
             'password',
           ],
-          canonicalRoute: '/settings/security',
+          canonicalRoute: '/settings/privacy',
           defaultValue: 'PIN',
         ),
         SettingDefinition<String>(
           id: 'security_autolock_timeout',
           title: 'Auto-Lock Timeout',
           description: 'Time elapsed before Chaty requires unlock again',
-          category: SettingsCategory.security,
+          category: SettingsCategory.privacy,
           subcategory: 'Authentication',
           controlType: SettingControlType.singleChoice,
           icon: Icons.timer_outlined,
@@ -247,7 +205,7 @@ class SettingsRegistry {
             'lock delay',
             'lock immediately',
           ],
-          canonicalRoute: '/settings/security',
+          canonicalRoute: '/settings/privacy',
           defaultValue: '1m',
         ),
       ],
@@ -256,14 +214,14 @@ class SettingsRegistry {
       id: 'cluster_security_chats',
       title: 'Hidden & Locked Chats',
       description: 'Manage secluded chat conversations with stealth lock',
-      category: SettingsCategory.security,
+      category: SettingsCategory.privacy,
       settings: [
         SettingDefinition<bool>(
           id: 'security_hide_locked_chats',
           title: 'Hide Locked Chats from List',
           description:
               'Remove locked conversations completely from the main chat list',
-          category: SettingsCategory.security,
+          category: SettingsCategory.privacy,
           subcategory: 'Chat Protection',
           controlType: SettingControlType.toggle,
           icon: Icons.visibility_off_rounded,
@@ -273,7 +231,7 @@ class SettingsRegistry {
             'stealth mode',
             'locked chats',
           ],
-          canonicalRoute: '/settings/security',
+          canonicalRoute: '/settings/privacy',
           defaultValue: false,
         ),
         SettingDefinition<bool>(
@@ -281,7 +239,7 @@ class SettingsRegistry {
           title: 'Protect From Screenshots',
           description:
               'Block screen capture and recents preview across the app',
-          category: SettingsCategory.security,
+          category: SettingsCategory.privacy,
           subcategory: 'Protection',
           controlType: SettingControlType.toggle,
           icon: Icons.screenshot_outlined,
@@ -291,7 +249,7 @@ class SettingsRegistry {
             'screen protection',
             'block screenshot',
           ],
-          canonicalRoute: '/settings/security',
+          canonicalRoute: '/settings/privacy',
           defaultValue: false,
         ),
       ],
@@ -870,7 +828,7 @@ class SettingsRegistry {
     final Set<String> ids = <String>{};
     for (final setting in allSettings) {
       if (ids.contains(setting.id)) {
-        throw AssertionError('Duplicate setting ID found: ');
+        throw AssertionError('Duplicate setting ID found: ${setting.id}');
       }
       ids.add(setting.id);
     }

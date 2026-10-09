@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../settings/home_style_catalog.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/theme_extensions.dart';
@@ -1016,11 +1017,21 @@ class GbLiveHeaderPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final title = setMyName && displayName.isNotEmpty ? displayName : 'Chaty';
-    final isOneUi = homeStyle == 'ONE UI';
-    final isIos = homeStyle == 'IOS STYLE';
-    final isStock = homeStyle == 'WhatsApp UI Stock';
-    final isBubbles = homeStyle == 'BUBBLES TAB STYLE';
-    final isOldUi = homeStyle == 'WhatsApp OLD UI';
+    final resolvedHomeStyle =
+        ChatyHomeStyleCatalog.structuralStyle(homeStyle);
+    final isOneUi = resolvedHomeStyle == ChatyHomeStyleCatalog.oneUi;
+    final isTelegram = resolvedHomeStyle == ChatyHomeStyleCatalog.telegram;
+    final isIos = resolvedHomeStyle == ChatyHomeStyleCatalog.ios;
+    final isMinimal = resolvedHomeStyle == 'Minimal';
+    final isCompact = resolvedHomeStyle == 'Compact';
+    final isStoriesFirst = resolvedHomeStyle == 'Stories First';
+    final isTabletSplit = resolvedHomeStyle == 'Tablet Split View';
+    final isProductivity = resolvedHomeStyle == 'Productivity';
+    final isStock =
+        homeStyle == 'WhatsApp UI Stock' || resolvedHomeStyle == 'Classic';
+    final isBubbles =
+        homeStyle == 'BUBBLES TAB STYLE' || resolvedHomeStyle == 'Expressive';
+    final isOldUi = homeStyle.toLowerCase() == 'whatsapp old ui';
 
     return Container(
       width: double.infinity,
@@ -1057,7 +1068,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'LIVE PREVIEW • $homeStyle',
+                  'LIVE PREVIEW • ${ChatyHomeStyleCatalog.displayName(homeStyle)}',
                   style: const TextStyle(
                     color: GbColors.activeGreen,
                     fontSize: 11,
@@ -1081,8 +1092,63 @@ class GbLiveHeaderPreview extends StatelessWidget {
           // 1. TOP HEADER BASED ON STYLE
           if (isOneUi)
             _buildOneUiHeader(title)
+          else if (isTelegram)
+            _buildTelegramHeader(title)
           else if (isIos)
             _buildIosHeader(title)
+          else if (isMinimal)
+            _buildStructuralHeader(
+              title,
+              eyebrow: 'MINIMAL',
+              accent: const Color(0xFF94A3B8),
+              titleSize: 19,
+              verticalPadding: 8,
+              radius: 6,
+              showSearch: false,
+            )
+          else if (isCompact)
+            _buildStructuralHeader(
+              title,
+              eyebrow: 'COMPACT INBOX',
+              accent: const Color(0xFF22C55E),
+              titleSize: 18,
+              verticalPadding: 7,
+              radius: 10,
+              showSearch: true,
+            )
+          else if (isStoriesFirst)
+            _buildStructuralHeader(
+              title,
+              eyebrow: 'STORIES FIRST',
+              accent: const Color(0xFFEC4899),
+              titleSize: 22,
+              verticalPadding: 11,
+              radius: 18,
+              showSearch: true,
+              showStories: true,
+            )
+          else if (isTabletSplit)
+            _buildStructuralHeader(
+              title,
+              eyebrow: 'TABLET WORKSPACE',
+              accent: const Color(0xFF60A5FA),
+              titleSize: 22,
+              verticalPadding: 12,
+              radius: 14,
+              showSearch: true,
+              tabletSplit: true,
+            )
+          else if (isProductivity)
+            _buildStructuralHeader(
+              title,
+              eyebrow: 'PRODUCTIVITY',
+              accent: const Color(0xFFF59E0B),
+              titleSize: 20,
+              verticalPadding: 9,
+              radius: 12,
+              showSearch: true,
+              unreadBadge: true,
+            )
           else if (isStock)
             _buildStockHeader(title)
           else if (isBubbles)
@@ -1092,14 +1158,49 @@ class GbLiveHeaderPreview extends StatelessWidget {
           else
             _buildBasicHeader(title),
 
-          // 2. LIVE SAMPLE CHAT ROW (Tyler Durden)
-          _buildSampleChatRow(),
+          // 2. The tablet layout gets a real split-pane preview.
+          if (isTabletSplit)
+            _buildTabletSplitPreview()
+          else
+            _buildSampleChatRow(),
 
           // 3. LIVE BOTTOM BAR PREVIEW BASED ON STYLE
           if (isOneUi)
             _buildOneUiBottomBar()
+          else if (isTelegram)
+            _buildTelegramBottomBar()
           else if (isIos)
             _buildIosBottomBar()
+          else if (isMinimal)
+            _buildStructuralBottomBar(
+              accent: const Color(0xFF94A3B8),
+              showLabels: false,
+              compact: true,
+            )
+          else if (isCompact)
+            _buildStructuralBottomBar(
+              accent: const Color(0xFF22C55E),
+              showLabels: true,
+              compact: true,
+            )
+          else if (isStoriesFirst)
+            _buildStructuralBottomBar(
+              accent: const Color(0xFFEC4899),
+              showLabels: true,
+              showPill: true,
+            )
+          else if (isTabletSplit)
+            _buildStructuralBottomBar(
+              accent: const Color(0xFF60A5FA),
+              showLabels: true,
+              showPill: false,
+            )
+          else if (isProductivity)
+            _buildStructuralBottomBar(
+              accent: const Color(0xFFF59E0B),
+              showLabels: true,
+              showPill: true,
+            )
           else if (isStock)
             _buildStockBottomBar()
           else if (isBubbles)
@@ -1108,6 +1209,224 @@ class GbLiveHeaderPreview extends StatelessWidget {
             _buildOldUiBottomBar()
           else
             _buildBasicBottomBar(),
+        ],
+      ),
+    );
+  }
+
+  /// Shared renderer for the remaining named home presets. Each option has
+  /// distinct geometry and visual affordances while keeping the preview frame.
+  Widget _buildStructuralHeader(
+    String title, {
+    required String eyebrow,
+    required Color accent,
+    required double titleSize,
+    required double verticalPadding,
+    required double radius,
+    bool showSearch = false,
+    bool showStories = false,
+    bool tabletSplit = false,
+    bool unreadBadge = false,
+  }) {
+    final titleBlock = Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            eyebrow,
+            style: TextStyle(
+              color: accent,
+              fontSize: 9,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.1,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: titleSize,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.4,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        tabletSplit ? 8 : 14,
+        verticalPadding,
+        10,
+        showStories ? 12 : verticalPadding,
+      ),
+      decoration: BoxDecoration(
+        color: tabletSplit
+            ? const Color(0xFF101D2B)
+            : const Color(0xFF11171C),
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(
+          color: accent.withValues(alpha: 0.30),
+          width: tabletSplit ? 1.3 : 0.8,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (tabletSplit) ...[
+                Container(
+                  width: 3,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: accent,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+                const SizedBox(width: 10),
+              ],
+              titleBlock,
+              if (unreadBadge)
+                Container(
+                  margin: const EdgeInsets.only(left: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.17),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: accent.withValues(alpha: 0.7)),
+                  ),
+                  child: Text(
+                    '7 unread',
+                    style: TextStyle(
+                      color: accent,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              if (showSearch)
+                Icon(Icons.search_rounded, color: accent, size: 20),
+              const SizedBox(width: 8),
+              Icon(Icons.more_horiz_rounded, color: accent, size: 21),
+            ],
+          ),
+          if (!disableStatusUnderName && statusText.isNotEmpty && !showStories)
+            Padding(
+              padding: EdgeInsets.only(
+                left: tabletSplit ? 13 : 0,
+                top: 5,
+              ),
+              child: Text(
+                statusText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF8696A0),
+                  fontSize: 10.5,
+                ),
+              ),
+            ),
+          if (showStories) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 48,
+              child: Row(
+                children: [
+                  _buildPreviewStory('Your story', accent, isOwn: true),
+                  const SizedBox(width: 12),
+                  _buildPreviewStory('Maya', const Color(0xFFEC4899)),
+                  const SizedBox(width: 12),
+                  _buildPreviewStory('Arjun', const Color(0xFF60A5FA)),
+                  const SizedBox(width: 12),
+                  _buildPreviewStory('Priya', const Color(0xFF22C55E)),
+                ],
+              ),
+            ),
+          ],
+          if (tabletSplit) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Container(
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Container(
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreviewStory(String label, Color accent, {bool isOwn = false}) {
+    return Expanded(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: accent, width: 1.8),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: accent.withValues(alpha: 0.15),
+              ),
+              child: Icon(
+                isOwn ? Icons.add_rounded : Icons.person_rounded,
+                color: accent,
+                size: 15,
+              ),
+            ),
+          ),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFFD1D7DB),
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -1125,10 +1444,16 @@ class GbLiveHeaderPreview extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               if (!disableSearchBar)
-                IconButton(
-                  icon: const Icon(Icons.search_rounded, color: Colors.white, size: 21),
-                  onPressed: () {},
-                  visualDensity: VisualDensity.compact,
+                const SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Center(
+                    child: Icon(
+                      Icons.search_rounded,
+                      color: Colors.white,
+                      size: 21,
+                    ),
+                  ),
                 ),
               IconButton(
                 icon: const Icon(Icons.more_vert_rounded, color: Colors.white, size: 21),
@@ -1177,6 +1502,61 @@ class GbLiveHeaderPreview extends StatelessWidget {
               const SizedBox(width: 8),
               _buildPillTab('Calls'),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Telegram Style Header ---
+  Widget _buildTelegramHeader(String title) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 12, 12),
+      color: const Color(0xFF17212B),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.menu_rounded, color: Color(0xFF229ED9), size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 21,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              if (!disableSearchBar)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 6),
+                  child: Icon(Icons.search_rounded, color: Color(0xFFB7C9D8), size: 21),
+                ),
+              IconButton(
+                icon: const Icon(Icons.more_vert_rounded, color: Color(0xFFB7C9D8), size: 20),
+                onPressed: onThreeDotsClick,
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 31,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF242F3D),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.search_rounded, color: Color(0xFF8095A8), size: 16),
+                SizedBox(width: 8),
+                Text('Search chats', style: TextStyle(color: Color(0xFF8095A8), fontSize: 11.5)),
+              ],
+            ),
           ),
         ],
       ),
@@ -1417,6 +1797,97 @@ class GbLiveHeaderPreview extends StatelessWidget {
   }
 
   // --- Sample Tyler Durden Chat Row ---
+  Widget _buildTabletSplitPreview() {
+    const accent = Color(0xFF60A5FA);
+    return Container(
+      height: 86,
+      color: const Color(0xFF0D1723),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 4,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.inbox_rounded, color: accent, size: 13),
+                    SizedBox(width: 5),
+                    Text(
+                      'Inbox',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  height: 5,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.62),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Container(
+                  height: 5,
+                  width: 72,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.22),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(width: 1, height: 62, color: accent.withValues(alpha: 0.28)),
+          const SizedBox(width: 10),
+          const Expanded(
+            flex: 6,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.forum_rounded, color: accent, size: 13),
+                    SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        'Conversation',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 7),
+                Text(
+                  'Messages stay open beside your chat list.',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: Color(0xFF9FB2C6), fontSize: 9.5),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSampleChatRow() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1510,6 +1981,92 @@ class GbLiveHeaderPreview extends StatelessWidget {
           const Icon(Icons.update_rounded, color: Color(0xFF8696A0), size: 20),
           const Icon(Icons.checklist_rounded, color: Color(0xFF8696A0), size: 20),
           const Icon(Icons.call_outlined, color: Color(0xFF8696A0), size: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStructuralBottomBar({
+    required Color accent,
+    required bool showLabels,
+    bool compact = false,
+    bool showPill = false,
+  }) {
+    const icons = <IconData>[
+      Icons.chat_bubble_rounded,
+      Icons.auto_awesome_mosaic_outlined,
+      Icons.checklist_rounded,
+      Icons.call_outlined,
+    ];
+    const labels = <String>['Chats', 'Updates', 'Tasks', 'Calls'];
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 10 : 16,
+        vertical: compact ? 6 : 9,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFF11171C),
+        border: Border(
+          top: BorderSide(
+            color: accent.withValues(alpha: 0.32),
+            width: showPill ? 1.2 : 0.7,
+          ),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: List<Widget>.generate(icons.length, (index) {
+          final selected = index == 0;
+          final iconColor = selected ? accent : const Color(0xFF8696A0);
+          Widget item = Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icons[index], color: iconColor, size: compact ? 17 : 20),
+              if (showLabels) ...[
+                const SizedBox(height: 2),
+                Text(
+                  labels[index],
+                  style: TextStyle(
+                    color: iconColor,
+                    fontSize: compact ? 8 : 9.5,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                  ),
+                ),
+              ],
+            ],
+          );
+          if (selected && showPill) {
+            item = Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: accent.withValues(alpha: 0.75)),
+              ),
+              child: item,
+            );
+          }
+          return item;
+        }),
+      ),
+    );
+  }
+
+  // --- Bottom Bar: Telegram Style ---
+  Widget _buildTelegramBottomBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
+      decoration: const BoxDecoration(
+        color: Color(0xFF17212B),
+        border: Border(top: BorderSide(color: Color(0xFF27394B), width: 0.8)),
+      ),
+      child: const Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _TelegramTab(icon: Icons.chat_bubble_rounded, label: 'Chats', selected: true),
+          _TelegramTab(icon: Icons.contacts_outlined, label: 'Contacts'),
+          _TelegramTab(icon: Icons.call_outlined, label: 'Calls'),
+          _TelegramTab(icon: Icons.settings_outlined, label: 'Settings'),
         ],
       ),
     );
@@ -1742,6 +2299,31 @@ class GbLiveHeaderPreview extends StatelessWidget {
               ),
           ],
         ),
+        const SizedBox(height: 3),
+        Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
+}
+
+class _TelegramTab extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+
+  const _TelegramTab({
+    required this.icon,
+    required this.label,
+    this.selected = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? const Color(0xFF229ED9) : const Color(0xFF8095A8);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: color, size: 19),
         const SizedBox(height: 3),
         Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600)),
       ],

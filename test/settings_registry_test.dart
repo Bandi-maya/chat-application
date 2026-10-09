@@ -22,10 +22,11 @@ void main() {
     });
 
     test('Canonical Settings Categories cover all 5 root groups', () {
+      // Profile editing now lives in the dedicated Profile section.
       expect(
         SettingsRegistry.clustersForCategory(
           SettingsCategory.account,
-        ).isNotEmpty,
+        ).isEmpty,
         isTrue,
       );
       expect(
@@ -34,10 +35,28 @@ void main() {
         ).isNotEmpty,
         isTrue,
       );
+      // App-lock controls are intentionally grouped into the single
+      // Privacy & Security center to avoid duplicate customization paths.
       expect(
         SettingsRegistry.clustersForCategory(
           SettingsCategory.security,
-        ).isNotEmpty,
+        ).isEmpty,
+        isTrue,
+      );
+      expect(
+        SettingsRegistry.allSettings
+            .where((setting) => setting.canonicalRoute == '/settings/security'),
+        isEmpty,
+      );
+      expect(
+        SettingsRegistry.allSettings
+            .where(
+              (setting) =>
+                  setting.title.toLowerCase().contains('app lock') ||
+                  setting.title.toLowerCase().contains('pin') ||
+                  setting.title.toLowerCase().contains('biometric'),
+            )
+            .every((setting) => setting.canonicalRoute == '/settings/privacy'),
         isTrue,
       );
       expect(
