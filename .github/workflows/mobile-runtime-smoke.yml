@@ -38,8 +38,8 @@ jobs:
       - name: Build debug APK
         run: >-
           flutter build apk --debug --no-pub
-          --dart-define=SUPABASE_URL=${SUPABASE_URL}
-          --dart-define=SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}
+          --dart-define="SUPABASE_URL=${SUPABASE_URL}"
+          --dart-define="SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}"
 
       - name: Launch app and check first-frame runtime
         uses: reactivecircus/android-emulator-runner@v2
@@ -91,8 +91,8 @@ jobs:
       - name: Build iOS simulator app without signing
         run: >-
           flutter build ios --simulator --debug --no-codesign --no-pub
-          --dart-define=SUPABASE_URL=${SUPABASE_URL}
-          --dart-define=SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}
+          --dart-define="SUPABASE_URL=${SUPABASE_URL}"
+          --dart-define="SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}"
 
       - name: Launch app and capture simulator runtime
         shell: bash
