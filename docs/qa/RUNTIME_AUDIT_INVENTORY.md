@@ -44,3 +44,17 @@ The current source should be used to enumerate the actual routes and screens; do
 - Do not trigger external messages, calls, uploads, invitations, destructive actions, or account changes without a dedicated test account and explicit safe test data.
 - A visible click is not a passing assertion; verify the resulting UI state and, where applicable, backend state.
 - Never record credentials, session cookies, access tokens, message plaintext, or private key material in reports.
+
+## Latest completed source/automation audit
+
+- Workflow: [Chaty Runtime Audit Inventory](https://github.com/Bandi-maya/chat-application/actions/runs/37955040175)
+- Commit tested: b5090432aaf0a76e678c3e6b1f86cc0c50bbe217
+- Dart files scanned: 256
+- Candidate screen/component files: 102
+- Route-constructor references: 85
+- GitHub Actions workflow lint: passed
+- Playwright TypeScript type-check: passed
+- Playwright test discovery: passed
+- Source inventory generation and artifact upload: passed
+
+These are source and harness checks only. The report does not establish runtime coverage of all routes or prove Android/iOS feature parity. The latest commit's native runtime smoke and Flutter regression jobs are tracked separately in GitHub Actions.
