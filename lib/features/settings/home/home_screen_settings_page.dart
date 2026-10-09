@@ -45,10 +45,16 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final home = widget.preferencesController.home;
-    final colors = context.colors;
-
-    return ChatySettingsPage(
+    return ListenableBuilder(
+      listenable: Listenable.merge(<Listenable>[
+        widget.preferencesController,
+        locator<ThemeController>(),
+        locator<AppearanceVariantController>(),
+      ]),
+      builder: (context, _) {
+        final home = widget.preferencesController.home;
+        final colors = context.colors;
+        return ChatySettingsPage(
       title: 'Home Screen Customization',
       subtitle: 'Styles, Stories Strip, Tabs, Header & Ghost Mode',
       children: [
@@ -442,6 +448,8 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
           ],
         ),
       ],
+        );
+      },
     );
   }
 }
