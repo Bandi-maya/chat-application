@@ -628,17 +628,35 @@ class _TemplatesSettingsScreenState extends State<TemplatesSettingsScreen> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(ctx).pop();
-              controller.applyFullTemplate(
-                template.id,
-                appearanceController: locator<AppearanceVariantController>(),
-                preferencesController: locator<ChatyPreferencesController>(),
-                themeController: locator<ThemeController>(),
-              );
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text('Applied ${template.name} template.')));
+              try {
+                await controller.applyFullTemplate(
+                  template.id,
+                  appearanceController: locator<AppearanceVariantController>(),
+                  preferencesController: locator<ChatyPreferencesController>(),
+                  themeController: locator<ThemeController>(),
+                );
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(
+                    SnackBar(
+                      content: Text('Applied ${template.name} template.'),
+                    ),
+                  );
+              } catch (error) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        error.toString().replaceFirst('Bad state: ', ''),
+                      ),
+                    ),
+                  );
+              }
             },
             child: const Text('Apply'),
           ),
@@ -661,16 +679,34 @@ class _TemplatesSettingsScreenState extends State<TemplatesSettingsScreen> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(ctx).pop();
-              controller.resetToDefaults(
-                appearanceController: locator<AppearanceVariantController>(),
-                preferencesController: locator<ChatyPreferencesController>(),
-                themeController: locator<ThemeController>(),
-              );
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Templates reset to default')),
-              );
+              try {
+                await controller.resetToDefaults(
+                  appearanceController: locator<AppearanceVariantController>(),
+                  preferencesController: locator<ChatyPreferencesController>(),
+                  themeController: locator<ThemeController>(),
+                );
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(
+                    const SnackBar(
+                      content: Text('Templates reset to default'),
+                    ),
+                  );
+              } catch (error) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        error.toString().replaceFirst('Bad state: ', ''),
+                      ),
+                    ),
+                  );
+              }
             },
             child: const Text('Reset'),
           ),
