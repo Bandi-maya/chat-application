@@ -61,6 +61,8 @@ void main() {
         );
       }
     },
+  );
+
   test('home overflow uses adaptive presentation and a shared action handler', () {
     final source = File(
       'lib/features/chats/chats_home_screen.dart',
