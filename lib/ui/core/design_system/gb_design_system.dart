@@ -1954,7 +1954,6 @@ class GbLiveHeaderPreview extends StatelessWidget {
 
   // --- Bottom Bar: Telegram Style ---
   Widget _buildTelegramBottomBar() {
-    const blue = Color(0xFF229ED9);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
       decoration: const BoxDecoration(
