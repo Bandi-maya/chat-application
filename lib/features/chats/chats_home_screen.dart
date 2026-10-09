@@ -13,6 +13,7 @@ import '../../data/services/rich_chat_realtime_service.dart';
 import '../../domain/models/conversation.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
+import '../../ui/core/templates/template_controller.dart';
 import '../../ui/core/design_system/settings_primitives.dart';
 import '../../ui/core/design_system/components/chaty_kit.dart';
 import '../../ui/core/design_system/components/app_components.dart';
@@ -1142,6 +1143,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     ThemeConfig theme, {
     double density = 1.0,
   }) {
+    final chatListTemplate = locator<TemplateController>().chatList;
     final otherId = conversation.participantIds.firstWhere(
       (id) => id != widget.dataStore.currentUser.id,
       orElse: () => '',
@@ -1190,7 +1192,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               onTap: () => _handleConversationTap(conversation),
               onLongPress: handleLongPress,
               child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: 72 * density),
+                constraints: BoxConstraints(minHeight: chatListTemplate.itemHeight * density),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -1213,8 +1215,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                     int.parse(conversation.avatarColorHex!),
                                   ),
                             size: 50 * density,
-                            shape:
-                                widget.preferencesController.home.avatarShape,
+                            shape: chatListTemplate.avatarShape,
                           ),
                           if (selected)
                             Positioned.fill(
@@ -1232,7 +1233,8 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                 ),
                               ),
                             )
-                          else if (online &&
+                          else if (chatListTemplate.showPresenceBadge &&
+                              online &&
                               widget.preferencesController.gbBool(
                                 'onlineDotchat',
                                 fallback: true,
