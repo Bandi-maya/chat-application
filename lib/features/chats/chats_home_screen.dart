@@ -28,6 +28,10 @@ import '../camera/effects/widgets/effect_picker_sheet.dart';
 import 'chat_detail_screen.dart';
 import 'linked_devices_qr_screen.dart';
 import '../profile/profile_screen.dart';
+import '../settings/home/home_screen_settings_page.dart';
+import '../settings/theme_editor_screen.dart';
+import '../settings/templates/templates_settings_screen.dart';
+import '../settings/settings_root_screen.dart';
 import 'locked_chats_screen.dart';
 import 'new_chat_screen.dart';
 import '../../ui/core/connection/connection_health_indicator.dart';
@@ -899,6 +903,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
   }
 
   Widget _standardAppBar(ThemeConfig theme, HomePreferences homePrefs) {
+    final compactHeader = MediaQuery.sizeOf(context).width < 390;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 4, 6),
       child: Row(
@@ -936,14 +941,14 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               ],
             ),
           ),
-          if (homePrefs.showCameraIcon)
+          if (homePrefs.showCameraIcon && !compactHeader)
             IconButton(
               tooltip: 'Camera Effects',
               color: theme.primaryTextColor,
               onPressed: () => EffectPickerSheet.show(context),
               icon: const Icon(Icons.camera_alt_outlined),
             ),
-          if (homePrefs.showDesktopIcon)
+          if (homePrefs.showDesktopIcon && !compactHeader)
             IconButton(
               tooltip: 'QR / Scan',
               color: theme.primaryTextColor,
@@ -993,31 +998,124 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   : Icons.dark_mode_rounded,
             ),
           ),
-          if (homePrefs.showDesktopIcon)
-            PopupMenuButton<String>(
-              tooltip: 'More',
-              icon: Icon(
-                Icons.more_vert_rounded,
-                color: theme.primaryTextColor,
-              ),
-              onSelected: (value) {
-                switch (value) {
-                  case 'linked':
-                    _openLinkedDevices();
-                    break;
-                }
-              },
-              itemBuilder: (_) => const [
-                PopupMenuItem(
-                  value: 'linked',
+          PopupMenuButton<String>(
+            tooltip: 'More options',
+            icon: Icon(
+              Icons.more_vert_rounded,
+              color: theme.primaryTextColor,
+            ),
+            onSelected: (value) {
+              switch (value) {
+                case 'effects':
+                  EffectPickerSheet.show(context);
+                  break;
+                case 'qr':
+                  _openQrScreen(initialIndex: 1);
+                  break;
+                case 'linked':
+                  _openLinkedDevices();
+                  break;
+                case 'themes':
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => ThemeEditorScreen(
+                        themeController: widget.themeController,
+                      ),
+                    ),
+                  );
+                  break;
+                case 'templates':
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const TemplatesSettingsScreen(),
+                    ),
+                  );
+                  break;
+                case 'home':
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => HomeScreenSettingsPage(
+                        preferencesController: widget.preferencesController,
+                      ),
+                    ),
+                  );
+                  break;
+                case 'settings':
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => SettingsRootScreen(
+                        preferencesController: widget.preferencesController,
+                        themeController: widget.themeController,
+                        dataStore: widget.dataStore,
+                        notificationService: widget.notificationService,
+                      ),
+                    ),
+                  );
+                  break;
+              }
+            },
+            itemBuilder: (_) => <PopupMenuEntry<String>>[
+              if (homePrefs.showCameraIcon)
+                const PopupMenuItem(
+                  value: 'effects',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.devices_rounded),
-                    title: Text('Linked devices'),
+                    leading: Icon(Icons.camera_alt_outlined),
+                    title: Text('Camera effects'),
                   ),
                 ),
-              ],
-            ),
+              if (homePrefs.showDesktopIcon)
+                const PopupMenuItem(
+                  value: 'qr',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.qr_code_scanner_rounded),
+                    title: Text('QR / Scan'),
+                  ),
+                ),
+              const PopupMenuItem(
+                value: 'linked',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.devices_rounded),
+                  title: Text('Linked devices'),
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'themes',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.palette_outlined),
+                  title: Text('Themes & colors'),
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'templates',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.dashboard_customize_outlined),
+                  title: Text('Templates & layouts'),
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'home',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.view_quilt_outlined),
+                  title: Text('Home & navigation'),
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'settings',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.settings_outlined),
+                  title: Text('All settings'),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
