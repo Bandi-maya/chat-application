@@ -304,7 +304,7 @@ class _CustomizationCenterScreenState extends State<CustomizationCenterScreen>
                         children: [
                           Flexible(
                             child: Text(
-                              'Styling changes update here in real time!',
+                              _previewOutgoingText,
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
