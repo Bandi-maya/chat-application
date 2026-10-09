@@ -1,0 +1,14 @@
+{
+  "name": "chaty-runtime-audit",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Attach to an existing Chrome session and inventory Chaty runtime UI/errors.",
+  "scripts": {
+    "audit": "playwright test --config=playwright.config.ts",
+    "audit:headed": "playwright test --config=playwright.config.ts --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "typescript": "^5.9.3"
+  }
+}
