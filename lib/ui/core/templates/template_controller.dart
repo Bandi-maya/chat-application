@@ -3,6 +3,9 @@ import 'package:flutter/foundation.dart';
 import '../controllers/appearance_variant_controller.dart';
 import '../controllers/preferences_controller.dart';
 import '../persistence/preferences_storage.dart';
+import '../theme/theme_controller.dart';
+import '../bubbles/bubble_style_id.dart';
+import '../ticks/delivery_icon_style.dart';
 import 'template_models.dart';
 import 'template_registry.dart';
 
@@ -64,6 +67,7 @@ class TemplateController extends ChangeNotifier {
   Future<void> init({
     AppearanceVariantController? appearanceController,
     ChatyPreferencesController? preferencesController,
+    ThemeController? themeController,
   }) async {
     if (_initialized) return;
     _initialized = true;
@@ -78,6 +82,7 @@ class TemplateController extends ChangeNotifier {
     _syncToRuntimeControllers(
       appearanceController: appearanceController,
       preferencesController: preferencesController,
+      themeController: themeController,
     );
   }
 
@@ -86,6 +91,7 @@ class TemplateController extends ChangeNotifier {
     ChatyTemplateId templateId, {
     AppearanceVariantController? appearanceController,
     ChatyPreferencesController? preferencesController,
+    ThemeController? themeController,
   }) async {
     _config = UserTemplateConfiguration(
       baseTemplate: templateId,
@@ -96,6 +102,8 @@ class TemplateController extends ChangeNotifier {
     _syncToRuntimeControllers(
       appearanceController: appearanceController,
       preferencesController: preferencesController,
+      themeController: themeController,
+      applyTheme: true,
     );
   }
 
@@ -105,6 +113,7 @@ class TemplateController extends ChangeNotifier {
     required ChatyTemplateId templateId,
     AppearanceVariantController? appearanceController,
     ChatyPreferencesController? preferencesController,
+    ThemeController? themeController,
   }) async {
     _config = _config.copyWithOverride(component, templateId);
     notifyListeners();
@@ -112,6 +121,8 @@ class TemplateController extends ChangeNotifier {
     _syncToRuntimeControllers(
       appearanceController: appearanceController,
       preferencesController: preferencesController,
+      themeController: themeController,
+      applyTheme: component == TemplateComponentType.conversation,
     );
   }
 
@@ -121,6 +132,7 @@ class TemplateController extends ChangeNotifier {
     UserTemplateConfiguration configuration, {
     AppearanceVariantController? appearanceController,
     ChatyPreferencesController? preferencesController,
+    ThemeController? themeController,
   }) async {
     final normalizedOverrides =
         <TemplateComponentType, ChatyTemplateId>{
@@ -137,6 +149,8 @@ class TemplateController extends ChangeNotifier {
     _syncToRuntimeControllers(
       appearanceController: appearanceController,
       preferencesController: preferencesController,
+      themeController: themeController,
+      applyTheme: true,
     );
   }
 
@@ -145,6 +159,7 @@ class TemplateController extends ChangeNotifier {
     TemplateComponentType component, {
     AppearanceVariantController? appearanceController,
     ChatyPreferencesController? preferencesController,
+    ThemeController? themeController,
   }) async {
     _config = _config.removeOverride(component);
     notifyListeners();
@@ -152,6 +167,8 @@ class TemplateController extends ChangeNotifier {
     _syncToRuntimeControllers(
       appearanceController: appearanceController,
       preferencesController: preferencesController,
+      themeController: themeController,
+      applyTheme: component == TemplateComponentType.conversation,
     );
   }
 
@@ -159,6 +176,7 @@ class TemplateController extends ChangeNotifier {
   Future<void> resetToDefaults({
     AppearanceVariantController? appearanceController,
     ChatyPreferencesController? preferencesController,
+    ThemeController? themeController,
   }) async {
     _config = const UserTemplateConfiguration(
       baseTemplate: ChatyTemplateId.messageFirst,
@@ -169,13 +187,33 @@ class TemplateController extends ChangeNotifier {
     _syncToRuntimeControllers(
       appearanceController: appearanceController,
       preferencesController: preferencesController,
+      themeController: themeController,
+      applyTheme: true,
     );
   }
 
   void _syncToRuntimeControllers({
     AppearanceVariantController? appearanceController,
     ChatyPreferencesController? preferencesController,
+    ThemeController? themeController,
+    bool applyTheme = false,
   }) {
+    if (applyTheme && themeController != null) {
+      final c = conversation;
+      final current = themeController.globalTheme;
+      final next = current.copyWith(
+        bubbleStyle: BubbleStyleIdExtension.fromString(c.bubbleStyle),
+        deliveryTickStyle: DeliveryIconStyleExtension.fromString(c.tickStyle),
+        tickStyle: c.tickStyle,
+        cornerRadius: c.bubbleCornerRadius,
+      );
+      if (next.bubbleStyle != current.bubbleStyle ||
+          next.deliveryTickStyle != current.deliveryTickStyle ||
+          next.tickStyle != current.tickStyle ||
+          next.cornerRadius != current.cornerRadius) {
+        themeController.updateThemeConfig(next);
+      }
+    }
     // 1. Sync Navigation bottom bar style
     if (appearanceController != null) {
       final targetBarStyle = navigation.bottomBarStyleName;
