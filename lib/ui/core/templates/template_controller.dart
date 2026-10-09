@@ -84,7 +84,10 @@ class TemplateController extends ChangeNotifier {
       appearanceController: appearanceController,
       preferencesController: preferencesController,
       themeController: themeController,
+      applyTheme: true,
       applyNavigation: true,
+      applyHome: true,
+      applyConversation: true,
     );
   }
 
@@ -107,6 +110,8 @@ class TemplateController extends ChangeNotifier {
       themeController: themeController,
       applyTheme: true,
       applyNavigation: true,
+      applyHome: true,
+      applyConversation: true,
     );
   }
 
@@ -156,6 +161,8 @@ class TemplateController extends ChangeNotifier {
       themeController: themeController,
       applyTheme: true,
       applyNavigation: true,
+      applyHome: true,
+      applyConversation: true,
     );
   }
 
@@ -175,6 +182,8 @@ class TemplateController extends ChangeNotifier {
       themeController: themeController,
       applyTheme: component == TemplateComponentType.conversation,
       applyNavigation: component == TemplateComponentType.navigation,
+      applyHome: component == TemplateComponentType.home,
+      applyConversation: component == TemplateComponentType.conversation,
     );
   }
 
@@ -196,6 +205,8 @@ class TemplateController extends ChangeNotifier {
       themeController: themeController,
       applyTheme: true,
       applyNavigation: true,
+      applyHome: true,
+      applyConversation: true,
     );
   }
 
@@ -205,6 +216,8 @@ class TemplateController extends ChangeNotifier {
     ThemeController? themeController,
     bool applyTheme = false,
     bool applyNavigation = false,
+    bool applyHome = false,
+    bool applyConversation = false,
   }) {
     if (applyNavigation && themeController != null) {
       final targetMode = switch (navigation.layout) {
@@ -235,18 +248,18 @@ class TemplateController extends ChangeNotifier {
       }
     }
     // 1. Sync Navigation bottom bar style
-    if (appearanceController != null) {
+    if (applyNavigation && appearanceController != null) {
       final targetBarStyle = navigation.bottomBarStyleName;
       if (appearanceController.bottomBarStyle != targetBarStyle) {
         appearanceController.setBottomBarStyle(targetBarStyle);
       }
     }
 
-    // 2. Sync Home and Conversation models in PreferencesController
-    if (preferencesController != null) {
+    // Sync each preference group only when the relevant template was changed.
+    // This prevents a composer-only override from clobbering manual Home or
+    // Conversation preferences.
+    if (preferencesController != null && applyHome) {
       final h = home;
-      final c = conversation;
-
       final currentHome = preferencesController.home;
       if (currentHome.homeStyle != h.homeStylePreset ||
           currentHome.enableStoriesStrip != h.showStoriesStrip ||
@@ -262,7 +275,10 @@ class TemplateController extends ChangeNotifier {
           logTitle: 'Template Home Sync',
         );
       }
+    }
 
+    if (preferencesController != null && applyConversation) {
+      final c = conversation;
       final currentConv = preferencesController.conversation;
       if (currentConv.bubbleStyle != c.bubbleStyle ||
           currentConv.tickStyle != c.tickStyle ||
