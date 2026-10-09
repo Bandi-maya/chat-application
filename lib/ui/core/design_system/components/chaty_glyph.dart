@@ -91,7 +91,6 @@ class _ChatyGlyphPainter extends CustomPainter {
     }
 
     switch (glyph) {
-        break;
       case ChatyGlyph.camera:
         canvas.drawRRect(
           RRect.fromRectAndRadius(
