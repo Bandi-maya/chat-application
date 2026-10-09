@@ -193,7 +193,7 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
 
             // Presets Header & Grid
             ChatyGroupedSection(
-              title: 'Theme Presets ()',
+              title: 'Theme Presets (${ThemePresets.all.length})',
               children: [
                 Padding(
                   padding: const EdgeInsets.all(ChatySpacing.md),
