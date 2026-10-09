@@ -255,5 +255,34 @@ void main() {
         equals(AppNavigationMode.bottomNav),
       );
     });
+
+    test('Component override does not mutate unrelated navigation or bubble theme', () async {
+      final themeController = ThemeController();
+      await controller.applyFullTemplate(
+        ChatyTemplateId.community,
+        themeController: themeController,
+      );
+      final originalCornerRadius = themeController.globalTheme.cornerRadius;
+
+      await controller.applyComponent(
+        component: TemplateComponentType.composer,
+        templateId: ChatyTemplateId.cameraFirst,
+        themeController: themeController,
+      );
+
+      expect(
+        themeController.navigationMode,
+        equals(AppNavigationMode.topWhatsAppBar),
+      );
+      expect(themeController.globalTheme.cornerRadius, originalCornerRadius);
+      expect(
+        controller.resolveTemplateFor(TemplateComponentType.composer),
+        equals(ChatyTemplateId.cameraFirst),
+      );
+      expect(
+        controller.resolveTemplateFor(TemplateComponentType.navigation),
+        equals(ChatyTemplateId.community),
+      );
+    });
   });
 }
