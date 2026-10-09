@@ -35,6 +35,27 @@ void main() {
     expect(restored.value.lowDataUsageEnabled, isTrue);
   });
 
+  test('concurrent preference changes preserve every persisted value', () async {
+    final store = CallPresentationPreferencesStore();
+    await store.initialize();
+
+    await Future.wait<void>(<Future<void>>[
+      store.setDynamicIslandEnabled(false),
+      store.setPictureInPictureEnabled(false),
+      store.setLowDataUsageEnabled(true),
+    ]);
+
+    expect(store.value.dynamicIslandEnabled, isFalse);
+    expect(store.value.pictureInPictureEnabled, isFalse);
+    expect(store.value.lowDataUsageEnabled, isTrue);
+
+    final restored = CallPresentationPreferencesStore();
+    await restored.initialize();
+    expect(restored.value.dynamicIslandEnabled, isFalse);
+    expect(restored.value.pictureInPictureEnabled, isFalse);
+    expect(restored.value.lowDataUsageEnabled, isTrue);
+  });
+
   test('notifies listeners only when a value changes', () async {
     final store = CallPresentationPreferencesStore();
     await store.initialize();
