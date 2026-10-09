@@ -11,48 +11,6 @@ class SettingsRegistry {
     // -------------------------------------------------------------------------
     // 1. Account & Profile
     // -------------------------------------------------------------------------
-    SettingsCluster(
-      id: 'cluster_account',
-      title: 'Profile & Account',
-      description: 'Display name, username, bio, and account credentials',
-      category: SettingsCategory.account,
-      settings: [
-        SettingDefinition<String>(
-          id: 'account_display_name',
-          title: 'Display Name',
-          description: 'Your visible full name shown across conversations',
-          category: SettingsCategory.account,
-          subcategory: 'Profile Details',
-          controlType: SettingControlType.action,
-          icon: Icons.badge_outlined,
-          searchKeywords: ['name', 'display name', 'nickname', 'profile name'],
-          canonicalRoute: '/settings/account',
-        ),
-        SettingDefinition<String>(
-          id: 'account_username',
-          title: 'Username',
-          description: 'Unique @handle used to find and message you',
-          category: SettingsCategory.account,
-          subcategory: 'Profile Details',
-          controlType: SettingControlType.action,
-          icon: Icons.alternate_email_rounded,
-          searchKeywords: ['username', 'handle', 'tag', 'id'],
-          canonicalRoute: '/settings/account',
-        ),
-        SettingDefinition<String>(
-          id: 'account_bio',
-          title: 'About / Status Bio',
-          description: 'Brief text bio displayed on your profile card',
-          category: SettingsCategory.account,
-          subcategory: 'Profile Details',
-          controlType: SettingControlType.action,
-          icon: Icons.info_outline_rounded,
-          searchKeywords: ['bio', 'status message', 'about', 'tagline'],
-          canonicalRoute: '/settings/account',
-        ),
-      ],
-    ),
-
     // -------------------------------------------------------------------------
     // 2. Privacy
     // -------------------------------------------------------------------------
