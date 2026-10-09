@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/appearance_variant_controller.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
@@ -39,6 +41,16 @@ class TemplatesSettingsScreen extends StatelessWidget {
             ),
             title: const Text('Templates'),
             actions: [
+              IconButton(
+                tooltip: 'Export template profile',
+                icon: const Icon(Icons.file_download_outlined),
+                onPressed: () => _exportConfiguration(context, templateController),
+              ),
+              IconButton(
+                tooltip: 'Import template profile',
+                icon: const Icon(Icons.file_upload_outlined),
+                onPressed: () => _importConfiguration(context, templateController),
+              ),
               if (overridesCount > 0 ||
                   config.baseTemplate != ChatyTemplateId.messageFirst)
                 IconButton(
@@ -318,6 +330,142 @@ class TemplatesSettingsScreen extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<void> _exportConfiguration(
+    BuildContext context,
+    TemplateController controller,
+  ) async {
+    final payload = jsonEncode(<String, dynamic>{
+      'kind': 'chaty_template_profile',
+      'schemaVersion': 1,
+      'configuration': controller.config.toMap(),
+    });
+    await Clipboard.setData(ClipboardData(text: payload));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Template profile copied. It contains appearance settings only.'),
+        ),
+      );
+  }
+
+  Future<void> _importConfiguration(
+    BuildContext context,
+    TemplateController controller,
+  ) async {
+    final input = TextEditingController();
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Import template profile'),
+        content: SizedBox(
+          width: 520,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Paste a Chaty template profile JSON. Only template and component style choices are imported; chats, account data, credentials and keys are never included.',
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: input,
+                minLines: 4,
+                maxLines: 8,
+                decoration: const InputDecoration(
+                  hintText: 'Paste template profile JSON',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () async {
+                    final clipboard = await Clipboard.getData('text/plain');
+                    if (clipboard?.text != null) input.text = clipboard!.text!;
+                  },
+                  icon: const Icon(Icons.content_paste_rounded),
+                  label: const Text('Paste clipboard'),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Validate & Import'),
+          ),
+        ],
+      ),
+    );
+
+    if (accepted != true) {
+      input.dispose();
+      return;
+    }
+
+    try {
+      final decoded = jsonDecode(input.text);
+      if (decoded is! Map ||
+          decoded['kind'] != 'chaty_template_profile' ||
+          decoded['schemaVersion'] != 1 ||
+          decoded['configuration'] is! Map) {
+        throw const FormatException('Unsupported template profile format.');
+      }
+      final raw = Map<String, dynamic>.from(decoded['configuration'] as Map);
+      final baseKey = raw['base'];
+      if (!ChatyTemplateId.values.any((template) => template.key == baseKey)) {
+        throw const FormatException('Unknown base template.');
+      }
+      final rawOverrides = raw['overrides'];
+      if (rawOverrides != null && rawOverrides is! Map) {
+        throw const FormatException('Invalid component overrides.');
+      }
+      if (rawOverrides is Map) {
+        for (final entry in rawOverrides.entries) {
+          final knownComponent = TemplateComponentType.values.any(
+            (component) => component.name == entry.key,
+          );
+          final knownTemplate = ChatyTemplateId.values.any(
+            (template) => template.key == entry.value,
+          );
+          if (!knownComponent || !knownTemplate) {
+            throw const FormatException('Unknown component or template.');
+          }
+        }
+      }
+      final configuration = UserTemplateConfiguration.fromMap(raw);
+      await controller.applyConfiguration(
+        configuration,
+        appearanceController: locator<AppearanceVariantController>(),
+        preferencesController: locator<ChatyPreferencesController>(),
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Template profile imported.')),
+        );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Import failed. Check the template JSON and try again.'),
+          ),
+        );
+    } finally {
+      input.dispose();
+    }
   }
 
   void _applyFullTemplate(
