@@ -204,6 +204,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
     return ListenableBuilder(
       listenable: _callService,
@@ -363,7 +364,9 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                   ),
 
                 AnimatedPositioned(
-                  duration: const Duration(milliseconds: 220),
+                  duration: reduceMotion
+                      ? Duration.zero
+                      : const Duration(milliseconds: 220),
                   top: _controlsVisible ? 0 : -110,
                   left: 0,
                   right: 0,
@@ -459,7 +462,9 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                 ),
 
                 AnimatedPositioned(
-                  duration: const Duration(milliseconds: 220),
+                  duration: reduceMotion
+                      ? Duration.zero
+                      : const Duration(milliseconds: 220),
                   bottom: _controlsVisible ? 0 : -150,
                   left: 0,
                   right: 0,
