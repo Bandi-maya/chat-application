@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../controllers/appearance_variant_controller.dart';
 import '../controllers/preferences_controller.dart';
