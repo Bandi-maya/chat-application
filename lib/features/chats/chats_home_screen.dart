@@ -392,14 +392,15 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         final styleStoriesFirst = homeStyle == 'Stories First';
         final styleStoriesHidden =
             homeStyle == 'Compact' || homeStyle == 'Minimal';
+        final styleCardRows = homeStyle == 'Cards';
         final styleStoriesHeight = styleStoriesFirst
             ? 112.0
-            : homeStyle == 'Expressive'
+            : homeStyle == 'Expressive' || styleCardRows
             ? 96.0
             : 82.0;
         final styleStoriesAvatar = styleStoriesFirst
             ? 64.0
-            : homeStyle == 'Expressive'
+            : homeStyle == 'Expressive' || styleCardRows
             ? 56.0
             : 48.0;
         final styleTileDensity = homeStyle == 'Compact'
@@ -1741,6 +1742,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     double density = 1.0,
   }) {
     final chatListTemplate = locator<TemplateController>().chatList;
+    final cardRows = widget.preferencesController.home.homeStyle == 'Cards';
     final effectiveDensity = density * switch (chatListTemplate.density) {
       ChatListDensity.compact => 0.92,
       ChatListDensity.regular => 1.0,
@@ -1781,10 +1783,10 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
             ? theme.accentColor.withValues(
                 alpha: theme.brightness == Brightness.dark ? 0.16 : 0.10,
               )
-            : conversation.isPinned
+            : conversation.isPinned || cardRows
             ? theme.cardColor
             : Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(cardRows ? 18 : 16),
         child: Builder(
           builder: (tileContext) {
             void handleLongPress() {
