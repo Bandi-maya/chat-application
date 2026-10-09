@@ -473,6 +473,301 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
     );
   }
 
+  Widget _buildStatusSliver(List<StatusRecord> statuses, AppColors colors) {
+    final template = locator<TemplateController>().updates;
+    const padding = EdgeInsets.symmetric(
+      horizontal: ChatySpacing.base,
+      vertical: ChatySpacing.xs,
+    );
+
+    return switch (template.layoutMode) {
+      UpdatesLayoutMode.circularRail => SliverPadding(
+        padding: padding,
+        sliver: SliverToBoxAdapter(
+          child: SizedBox(
+            height: 132,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              itemCount: statuses.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (context, index) =>
+                  _buildCircularStatusCard(statuses[index], colors),
+            ),
+          ),
+        ),
+      ),
+      UpdatesLayoutMode.gridTiles => SliverPadding(
+        padding: padding,
+        sliver: SliverToBoxAdapter(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth >= 840
+                  ? 4
+                  : constraints.maxWidth >= 540
+                  ? 3
+                  : constraints.maxWidth >= 340
+                  ? 2
+                  : 1;
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: statuses.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  mainAxisExtent: columns == 1 ? 112 : 174,
+                ),
+                itemBuilder: (context, index) =>
+                    _buildStatusGridCard(statuses[index], colors),
+              );
+            },
+          ),
+        ),
+      ),
+      UpdatesLayoutMode.squircleCards => SliverPadding(
+        padding: padding,
+        sliver: SliverToBoxAdapter(
+          child: Column(
+            children: [
+              for (final status in statuses) ...[
+                _buildSquircleStatusCard(status, colors),
+                const SizedBox(height: 9),
+              ],
+            ],
+          ),
+        ),
+      ),
+      UpdatesLayoutMode.minimalList => SliverPadding(
+        padding: padding,
+        sliver: SliverToBoxAdapter(
+          child: ChatyGroupedSection(
+            children: [
+              for (final status in statuses)
+                _buildMinimalStatusTile(status, colors),
+            ],
+          ),
+        ),
+      ),
+    };
+  }
+
+  bool _isMyStatus(StatusRecord status) =>
+      status.userId == widget.dataStore.currentUser.id;
+
+  String _statusTitle(StatusRecord status) {
+    if (_isMyStatus(status)) return 'My Status';
+    return widget.dataStore.getUser(status.userId)?.displayName ?? 'Contact';
+  }
+
+  String _statusSubtitle(StatusRecord status) {
+    if (status.text.isNotEmpty) return status.text;
+    return status.mediaName ?? status.mediaType;
+  }
+
+  Widget _statusAvatar(StatusRecord status, {required double size}) {
+    final isMine = _isMyStatus(status);
+    final user = isMine ? null : widget.dataStore.getUser(status.userId);
+    return AppAvatar(
+      initials: isMine
+          ? widget.dataStore.currentUser.avatarInitials
+          : user?.avatarInitials ?? 'U',
+      colorHex: isMine
+          ? widget.dataStore.currentUser.avatarColorHex
+          : user?.avatarColorHex ?? '0xFF6366F1',
+      size: size,
+    );
+  }
+
+  Widget _buildCircularStatusCard(StatusRecord status, AppColors colors) {
+    final isMine = _isMyStatus(status);
+    return Semantics(
+      button: true,
+      label: 'Open ' + _statusTitle(status),
+      child: InkWell(
+        onTap: () => _openStatus(status),
+        borderRadius: BorderRadius.circular(16),
+        child: SizedBox(
+          width: 98,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: isMine
+                        ? [colors.primary, colors.primary.withValues(alpha: 0.35)]
+                        : [colors.primary, colors.info],
+                  ),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: colors.background,
+                    shape: BoxShape.circle,
+                  ),
+                  child: _statusAvatar(status, size: 54),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _statusTitle(status),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: colors.foreground,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _relativeTime(status.createdAt),
+                style: ChatyTypography.caption(colors.foregroundTertiary),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusGridCard(StatusRecord status, AppColors colors) {
+    final template = locator<TemplateController>().updates;
+    return Material(
+      elevation: template.cardElevation,
+      color: colors.surface,
+      borderRadius: BorderRadius.circular(18),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _openStatus(status),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _statusAvatar(status, size: 42),
+                  const Spacer(),
+                  Icon(
+                    status.hasMedia
+                        ? Icons.play_circle_outline_rounded
+                        : Icons.text_snippet_outlined,
+                    color: colors.primary,
+                    size: 19,
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Text(
+                _statusTitle(status),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: colors.foreground,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                _statusSubtitle(status),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: ChatyTypography.caption(colors.foregroundSecondary),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _relativeTime(status.createdAt),
+                style: ChatyTypography.caption(colors.foregroundTertiary),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSquircleStatusCard(StatusRecord status, AppColors colors) {
+    final template = locator<TemplateController>().updates;
+    return Material(
+      elevation: template.cardElevation,
+      color: colors.surface,
+      borderRadius: BorderRadius.circular(18),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _openStatus(status),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: colors.primary, width: 1.5),
+                ),
+                child: _statusAvatar(status, size: 44),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _statusTitle(status),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: ChatyTypography.title(colors.foreground),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      _statusSubtitle(status),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: ChatyTypography.caption(colors.foregroundSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _relativeTime(status.createdAt),
+                style: ChatyTypography.caption(colors.foregroundTertiary),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMinimalStatusTile(StatusRecord status, AppColors colors) {
+    return ChatyListTile(
+      leading: _statusAvatar(status, size: 34),
+      title: Text(
+        _statusTitle(status),
+        style: ChatyTypography.title(colors.foreground),
+      ),
+      subtitle: Text(
+        _statusSubtitle(status),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: ChatyTypography.caption(colors.foregroundSecondary),
+      ),
+      trailing: Text(
+        _relativeTime(status.createdAt),
+        style: ChatyTypography.caption(colors.foregroundTertiary),
+      ),
+      onTap: () => _openStatus(status),
+    );
+  }
+
   Widget _statusContent(
     StatusRecord status,
     String? signedUrl,
@@ -734,109 +1029,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                   ),
                 );
               }
-              return SliverPadding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: ChatySpacing.base,
-                  vertical: ChatySpacing.xs,
-                ),
-                sliver: SliverToBoxAdapter(
-                  child: ChatyGroupedSection(
-                    children: [
-                      for (int i = 0; i < statuses.length; i++) ...[
-                        Builder(
-                          builder: (context) {
-                            final status = statuses[i];
-                            final updatesTemplate = locator<TemplateController>().updates;
-                            final user = widget.dataStore.getUser(
-                              status.userId,
-                            );
-                            final isMine =
-                                status.userId ==
-                                widget.dataStore.currentUser.id;
-
-                            return Material(
-                              elevation: updatesTemplate.cardElevation,
-                              color: Colors.transparent,
-                              borderRadius: BorderRadius.circular(14),
-                              clipBehavior: Clip.antiAlias,
-                              child: ChatyListTile(
-                              leading: Container(
-                                padding: const EdgeInsets.all(2),
-                                decoration: BoxDecoration(
-                                  shape: updatesTemplate.layoutMode ==
-                                          UpdatesLayoutMode.circularRail
-                                      ? BoxShape.circle
-                                      : BoxShape.rectangle,
-                                  borderRadius: updatesTemplate.layoutMode ==
-                                          UpdatesLayoutMode.circularRail
-                                      ? null
-                                      : BorderRadius.circular(
-                                          updatesTemplate.layoutMode ==
-                                                  UpdatesLayoutMode.minimalList
-                                              ? 10
-                                              : 16,
-                                        ),
-                                  border: Border.all(
-                                    color: colors.primary,
-                                    width: updatesTemplate.layoutMode ==
-                                            UpdatesLayoutMode.minimalList
-                                        ? 1
-                                        : 2,
-                                  ),
-                                ),
-                                child: AppAvatar(
-                                  initials: isMine
-                                      ? widget
-                                            .dataStore
-                                            .currentUser
-                                            .avatarInitials
-                                      : user?.avatarInitials ?? 'U',
-                                  colorHex: isMine
-                                      ? widget
-                                            .dataStore
-                                            .currentUser
-                                            .avatarColorHex
-                                      : user?.avatarColorHex ?? '0xFF6366F1',
-                                  size: switch (updatesTemplate.layoutMode) {
-                                    UpdatesLayoutMode.minimalList => 34,
-                                    UpdatesLayoutMode.squircleCards => 46,
-                                    UpdatesLayoutMode.gridTiles => 44,
-                                    UpdatesLayoutMode.circularRail => 40,
-                                  },
-                                ),
-                              ),
-                              title: Text(
-                                isMine
-                                    ? 'My Status'
-                                    : user?.displayName ?? 'Contact',
-                                style: ChatyTypography.title(colors.foreground),
-                              ),
-                              subtitle: Text(
-                                status.text.isNotEmpty
-                                    ? status.text
-                                    : status.mediaName ?? status.mediaType,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: ChatyTypography.caption(
-                                  colors.foregroundSecondary,
-                                ),
-                              ),
-                              trailing: Text(
-                                _relativeTime(status.createdAt),
-                                style: ChatyTypography.caption(
-                                  colors.foregroundTertiary,
-                                ),
-                              ),
-                              onTap: () => _openStatus(status),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              );
+              return _buildStatusSliver(statuses, colors);
             },
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 80)),
