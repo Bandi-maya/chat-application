@@ -31,6 +31,7 @@ class _CustomizationCenterScreenState extends State<CustomizationCenterScreen>
   late final TabController _tabController;
   final TextEditingController _dummyComposerText = TextEditingController(text: 'Hey! Check out this new skin ✨');
   final FocusNode _dummyFocus = FocusNode();
+  String _previewOutgoingText = '${_previewOutgoingText}';
 
   final List<String> _categories = [
     'Navigation',
@@ -46,10 +47,12 @@ class _CustomizationCenterScreenState extends State<CustomizationCenterScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: _categories.length, vsync: this);
+    _dummyComposerText.addListener(_onPreviewComposerChanged);
   }
 
   @override
   void dispose() {
+    _dummyComposerText.removeListener(_onPreviewComposerChanged);
     _tabController.dispose();
     _dummyComposerText.dispose();
     _dummyFocus.dispose();
@@ -149,6 +152,75 @@ class _CustomizationCenterScreenState extends State<CustomizationCenterScreen>
         );
       },
     );
+  }
+
+  void _onPreviewComposerChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _handlePreviewSend() {
+    final text = _dummyComposerText.text.trim();
+    if (text.isEmpty) {
+      _showPreviewFeedback('Type a preview message first.');
+      return;
+    }
+    setState(() => _previewOutgoingText = text);
+    _dummyComposerText.clear();
+    _dummyFocus.unfocus();
+    _showPreviewFeedback('Preview message updated.');
+  }
+
+  void _insertPreviewEmoji() {
+    final current = _dummyComposerText.text;
+    final updated = '$current😀';
+    _dummyComposerText.value = TextEditingValue(
+      text: updated,
+      selection: TextSelection.collapsed(offset: updated.length),
+    );
+    _dummyFocus.requestFocus();
+  }
+
+  void _showPreviewFeedback(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+  }
+
+  Future<void> _showPreviewChoices(String title, List<String> choices) async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 16, 12),
+              child: Text(
+                title,
+                style: Theme.of(sheetContext).textTheme.titleMedium,
+              ),
+            ),
+            ...choices.map(
+              (choice) => ListTile(
+                leading: const Icon(Icons.attach_file_rounded),
+                title: Text(choice),
+                onTap: () => Navigator.of(sheetContext).pop(choice),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (selected != null) {
+      _showPreviewFeedback('$selected selected (preview only).');
+    }
   }
 
   Widget _buildLivePreviewCard(BuildContext context, CustomizationSnapshot snapshot) {
@@ -256,12 +328,19 @@ class _CustomizationCenterScreenState extends State<CustomizationCenterScreen>
               data: ChatyComposerData(
                 textController: _dummyComposerText,
                 focusNode: _dummyFocus,
-                hasText: true,
-                onSend: () {},
-                onMicPress: () {},
-                onAttach: () {},
-                onCamera: () {},
-                onEmojiToggle: () {},
+                hasText: _dummyComposerText.text.trim().isNotEmpty,
+                onSend: _handlePreviewSend,
+                onMicPress: () => _showPreviewFeedback(
+                  'Voice recording is not started in this visual preview.',
+                ),
+                onAttach: () => _showPreviewChoices(
+                  'Attachment preview',
+                  const <String>['Photo or video', 'Document', 'Location', 'Contact'],
+                ),
+                onCamera: () => _showPreviewFeedback(
+                  'Camera actions are demonstrated in this customization preview only.',
+                ),
+                onEmojiToggle: _insertPreviewEmoji,
               ),
             ),
 
