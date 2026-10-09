@@ -87,7 +87,7 @@ class TemplatesSettingsScreen extends StatelessWidget {
                           const Spacer(),
                           if (overridesCount > 0)
                             Text(
-                              '${overridesCount} override${overridesCount == 1 ? '' : 's'} active',
+                              '$overridesCount override${overridesCount == 1 ? '' : 's'} active',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
