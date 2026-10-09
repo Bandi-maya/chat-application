@@ -1486,7 +1486,7 @@ class ChatyBackendService extends ChangeNotifier {
     } catch (_) {
       // Keep optimistic UI honest: restore the exact prior message and let the
       // caller display its existing error state. There is intentionally no
-      // direct-table plaintext fallback for failed edits.
+      // direct table write of unencrypted message text is never used for failed edits.
       list[index] = original;
       notifyListeners();
       rethrow;
