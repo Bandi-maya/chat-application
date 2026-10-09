@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:chat/ui/core/templates/template_models.dart';
 import 'package:chat/ui/core/templates/template_registry.dart';
 import 'package:chat/ui/core/templates/template_controller.dart';
+import 'package:chat/ui/core/theme/theme_controller.dart';
 
 void main() {
   group('Chaty UI Template System Tests', () {
@@ -205,6 +206,20 @@ void main() {
       expect(
         controller.resolveTemplateFor(TemplateComponentType.composer),
         equals(ChatyTemplateId.cameraFirst),
+      );
+    });
+
+    test('Applying a template updates the live conversation theme tokens', () async {
+      final themeController = ThemeController();
+
+      await controller.applyFullTemplate(
+        ChatyTemplateId.cameraFirst,
+        themeController: themeController,
+      );
+
+      expect(
+        themeController.globalTheme.cornerRadius,
+        equals(ChatyTemplateRegistry.cameraFirst.conversation.bubbleCornerRadius),
       );
     });
   });
