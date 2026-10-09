@@ -26,6 +26,25 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: qa/playwright/package.json
+
+      - name: Install Playwright audit dependencies
+        working-directory: qa/playwright
+        run: npm install
+
+      - name: Type-check Playwright audit
+        working-directory: qa/playwright
+        run: npx tsc --noEmit
+
+      - name: Validate Playwright test discovery
+        working-directory: qa/playwright
+        run: npx playwright test --config=playwright.config.ts --list
+
       - name: Generate source inventory
         run: python3 tools/qa/generate_screen_inventory.py --output artifacts/source-screen-inventory.md
 
