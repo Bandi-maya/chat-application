@@ -11,6 +11,7 @@ import '../../features/camera/effects/effect_registry.dart';
 import '../settings/calls/call_presentation_preferences.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/design_system/design_system.dart';
+import '../../ui/core/templates/template_controller.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import 'call_presentation_controller.dart';
 
@@ -814,7 +815,9 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
               color: isActive
                   ? activeColor.withValues(alpha: 0.28)
                   : Colors.white.withValues(alpha: 0.16),
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(
+                locator<TemplateController>().calls.controlBarCornerRadius,
+              ),
               border: Border.all(
                 color: isActive
                     ? activeColor
