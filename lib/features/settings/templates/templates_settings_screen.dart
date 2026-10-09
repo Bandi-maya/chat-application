@@ -442,6 +442,38 @@ class TemplatesSettingsScreen extends StatelessWidget {
           }
         }
       }
+
+      final rawPrimary = raw['navPrimary'];
+      final rawOverflow = raw['navOverflow'];
+      if ((rawPrimary == null) != (rawOverflow == null)) {
+        throw const FormatException('Both primary and overflow destinations are required.');
+      }
+      if (rawPrimary != null) {
+        if (rawPrimary is! List || rawOverflow is! List) {
+          throw const FormatException('Invalid navigation destination lists.');
+        }
+        final primary = rawPrimary.whereType<String>().toList();
+        final overflow = rawOverflow.whereType<String>().toList();
+        final primarySet = primary.toSet();
+        final overflowSet = overflow.toSet();
+        final assigned = <String>{...primary, ...overflow};
+        if (primary.length != rawPrimary.length ||
+            overflow.length != rawOverflow.length ||
+            primary.isEmpty ||
+            primary.length > 4 ||
+            primarySet.length != primary.length ||
+            overflowSet.length != overflow.length ||
+            primarySet.intersection(overflowSet).isNotEmpty ||
+            primary.any((id) => !ChatyNavigationDestinationIds.known.contains(id)) ||
+            overflow.any((id) => !ChatyNavigationDestinationIds.known.contains(id)) ||
+            assigned.length != ChatyNavigationDestinationIds.all.length ||
+            !assigned.containsAll(ChatyNavigationDestinationIds.all)) {
+          throw const FormatException(
+            'Navigation profile must assign every supported destination exactly once.',
+          );
+        }
+      }
+
       final configuration = UserTemplateConfiguration.fromMap(raw);
       await controller.applyConfiguration(
         configuration,
