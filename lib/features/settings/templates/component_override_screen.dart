@@ -61,8 +61,11 @@ class ComponentOverrideScreen extends StatelessWidget {
             ],
           ),
           body: SafeArea(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1040),
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
                 Container(
                   padding: const EdgeInsets.all(14),
@@ -243,7 +246,9 @@ class ComponentOverrideScreen extends StatelessWidget {
                     ),
                   );
                 }),
-              ],
+                  ],
+                ),
+              ),
             ),
           ),
         );
