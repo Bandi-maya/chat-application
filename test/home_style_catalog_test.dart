@@ -36,15 +36,23 @@ void main() {
       );
       expect(
         ChatyHomeStyleCatalog.displayName('BUBBLES TAB STYLE'),
-        'Bubbles Tab Style',
+        'Expressive',
       );
       expect(
-        ChatyHomeStyleCatalog.structuralStyle('WhatsApp UI Stock'),
+        ChatyHomeStyleCatalog.displayName('BASIC TAB STYLE'),
+        'Minimal',
+      );
+      expect(
+        ChatyHomeStyleCatalog.displayName('WhatsApp UI Stock'),
         'Classic',
       );
       expect(
         ChatyHomeStyleCatalog.structuralStyle('WhatsApp OLD UI'),
-        ChatyHomeStyleCatalog.defaultStyle,
+        ChatyHomeStyleCatalog.oldUi,
+      );
+      expect(
+        ChatyHomeStyleCatalog.options.toSet().length,
+        ChatyHomeStyleCatalog.options.length,
       );
     });
 
