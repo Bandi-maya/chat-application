@@ -25,6 +25,8 @@ enum ChatyGlyph {
   list,
   updates,
   calls,
+  groups,
+  tasks,
 }
 
 class ChatyGlyphIcon extends StatelessWidget {
@@ -331,6 +333,36 @@ class _ChatyGlyphPainter extends CustomPainter {
           ..lineTo(10.2, 7.8)
           ..close();
         canvas.drawPath(handset, line);
+        break;
+      case ChatyGlyph.groups:
+        canvas.drawCircle(const Offset(9, 8), 3.1, line);
+        canvas.drawCircle(const Offset(17, 9), 2.4, line);
+        final primaryShoulders = Path()
+          ..moveTo(3.5, 20)
+          ..cubicTo(4.2, 15.8, 6.4, 13.7, 9.2, 13.7)
+          ..cubicTo(12.2, 13.7, 14.1, 15.8, 14.8, 20);
+        canvas.drawPath(primaryShoulders, line);
+        final secondaryShoulders = Path()
+          ..moveTo(14, 15)
+          ..cubicTo(16.9, 14.2, 19.6, 16, 20.4, 19);
+        canvas.drawPath(secondaryShoulders, line);
+        break;
+      case ChatyGlyph.tasks:
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTRB(4, 3, 20, 21),
+            const Radius.circular(2.5),
+          ),
+          line,
+        );
+        for (final y in <double>[7, 12, 17]) {
+          stroke(<Offset>[
+            Offset(6, y),
+            Offset(7, y + 1),
+            Offset(8.7, y - 1),
+          ]);
+          stroke(<Offset>[Offset(11, y), Offset(17.5, y)]);
+        }
         break;
     }
     canvas.restore();
