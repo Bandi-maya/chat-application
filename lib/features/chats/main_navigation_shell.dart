@@ -624,8 +624,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(16),
                               ),
-                              child: Icon(
-                                isSel ? item.activeIcon : item.icon,
+                              child: ChatyGlyphIcon(glyph: isSel ? item.activeIcon : item.icon,
                                 size: 20,
                                 color: isSel
                                     ? colors.onPrimary
@@ -782,8 +781,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                       selectedTileColor: theme.accentColor.withValues(
                         alpha: 0.16,
                       ),
-                      leading: Icon(
-                        isSel ? item.activeIcon : item.icon,
+                      leading: ChatyGlyphIcon(glyph: isSel ? item.activeIcon : item.icon,
                         color: isSel
                             ? theme.accentColor
                             : colors.foregroundSecondary,
@@ -1323,8 +1321,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                             color: colors.surfaceSecondary,
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Icon(
-                            item.icon,
+                          child: ChatyGlyphIcon(glyph: item.icon,
                             color: colors.primary,
                             size: 20,
                           ),
@@ -1503,8 +1500,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                           ]
                         : null,
                   ),
-                  child: Icon(
-                    isSelected ? item.activeIcon : item.icon,
+                  child: ChatyGlyphIcon(glyph: isSelected ? item.activeIcon : item.icon,
                     size: 20,
                     color: isSelected ? context.colors.onPrimary : unselectedFg,
                   ),
@@ -1606,8 +1602,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                             ),
                           ],
                         ),
-                        child: Icon(
-                          item.activeIcon,
+                        child: ChatyGlyphIcon(glyph: item.activeIcon,
                           size: 24,
                           color: context.colors.onPrimary,
                         ),
@@ -1654,8 +1649,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                         )
                       : null,
                 ),
-                child: Icon(
-                  isSelected ? item.activeIcon : item.icon,
+                child: ChatyGlyphIcon(glyph: isSelected ? item.activeIcon : item.icon,
                   size: 21,
                   color: isSelected ? accent : unselectedFg,
                 ),
@@ -1665,8 +1659,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               'Minimal Icon Dock' => AnimatedScale(
                 scale: isSelected ? 1.15 : 1.0,
                 duration: const Duration(milliseconds: 180),
-                child: Icon(
-                  isSelected ? item.activeIcon : item.icon,
+                child: ChatyGlyphIcon(glyph: isSelected ? item.activeIcon : item.icon,
                   size: 22,
                   color: isSelected ? accent : unselectedFg,
                 ),
@@ -1892,8 +1885,7 @@ class _PerspectiveDrawerScaffoldState extends State<_PerspectiveDrawerScaffold>
                                 selectedTileColor: colors.primary.withValues(
                                   alpha: 0.15,
                                 ),
-                                leading: Icon(
-                                  isSel ? item.activeIcon : item.icon,
+                                leading: ChatyGlyphIcon(glyph: isSel ? item.activeIcon : item.icon,
                                   color: isSel
                                       ? colors.primary
                                       : colors.foregroundSecondary,
