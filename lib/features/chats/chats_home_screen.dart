@@ -917,7 +917,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
   }
 
   Widget _standardAppBar(ThemeConfig theme, HomePreferences homePrefs) {
-    final compactHeader = MediaQuery.sizeOf(context).width < 390;
+    final availableWidth = MediaQuery.sizeOf(context).width;
+    final compactHeader = availableWidth < 390;
+    final useOverflowSheet = availableWidth < 600;
     final headerStyle = locator<TemplateController>().home.headerStyle;
     final titleFontSize = switch (headerStyle) {
       HomeHeaderStyle.compact => 19.0,
@@ -1032,7 +1034,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   : Icons.dark_mode_rounded,
             ),
           ),
-          if (compactHeader)
+          if (useOverflowSheet)
             IconButton(
               tooltip: 'More options',
               color: theme.primaryTextColor,
