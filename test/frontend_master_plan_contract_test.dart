@@ -63,7 +63,7 @@ void main() {
     },
   );
 
-  test('home overflow restores the floating modal and shared action handler', () {
+  test('home overflow restores the floating modal and all legacy actions', () {
     final source = File(
       'lib/features/chats/chats_home_screen.dart',
     ).readAsStringSync();
@@ -74,7 +74,33 @@ void main() {
     expect(source, contains('title: \'Starred Messages\''));
     expect(source, contains('title: \'Themes & Colors\''));
     expect(source, contains('title: \'Templates & Layouts\''));
-    expect(source, contains('_handleHomeOverflowAction(value);'));
+    for (final option in <String>[
+      "title: 'Chaty Settings'",
+      "title: 'New Group'",
+      "title: 'Camera Effects'",
+      "title: 'QR / Scan'",
+      "title: 'Linked Devices'",
+      "title: 'Themes & Colors'",
+      "title: 'Templates & Layouts'",
+      "title: 'Starred Messages'",
+      "title: 'Home & Navigation'",
+      "title: 'Navigation Destinations'",
+      "title: 'Message Scheduler'",
+      "title: 'Auto Reply'",
+      "title: 'Message a Number'",
+      "title: 'Mark All as Read'",
+      "title: 'Share Chaty'",
+      "title: 'Settings'",
+    ]) {
+      expect(source, contains(option), reason: 'Missing overflow option $option');
+    }
+    expect(source, contains("_handleHomeOverflowAction('starred')"));
+    expect(source, contains("_handleHomeOverflowAction('themes')"));
+    expect(source, contains("_handleHomeOverflowAction('templates')"));
+    expect(source, contains("_handleHomeOverflowAction('home')"));
+    expect(source, contains("_handleHomeOverflowAction('navigation')"));
+    expect(source, contains('_openLinkedDevices();'));
+    expect(source, contains('_openSettingsScreen();'));
     expect(source, isNot(contains('useOverflowSheet')));
     expect(source, isNot(contains('_showHomeOverflowSheet')));
     for (final route in <String>[
