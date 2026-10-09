@@ -101,6 +101,39 @@ enum TemplateComponentType {
 // Component Specifications
 // -----------------------------------------------------------------------------
 
+/// Stable IDs for real destinations that can be configured into the primary
+/// navigation or the overflow menu. Unknown IDs are never rendered.
+class ChatyNavigationDestinationIds {
+  const ChatyNavigationDestinationIds._();
+
+  static const chats = 'chats';
+  static const groups = 'groups';
+  static const updates = 'updates';
+  static const tasks = 'tasks';
+  static const calls = 'calls';
+  static const settings = 'settings';
+  static const desktop = 'desktop';
+
+  static const List<String> all = <String>[
+    chats,
+    groups,
+    updates,
+    tasks,
+    calls,
+    settings,
+    desktop,
+  ];
+  static const Set<String> known = <String>{
+    chats,
+    groups,
+    updates,
+    tasks,
+    calls,
+    settings,
+    desktop,
+  };
+}
+
 enum NavigationLayoutType {
   flatTabs,
   floatingPill,
@@ -129,6 +162,30 @@ class NavigationTemplate {
     this.centerActionIcon,
     required this.bottomBarStyleName,
   });
+
+  NavigationTemplate copyWith({
+    NavigationLayoutType? layout,
+    List<String>? primaryDestinationIds,
+    List<String>? overflowDestinationIds,
+    double? height,
+    bool? hasCenterAction,
+    String? centerActionId,
+    IconData? centerActionIcon,
+    String? bottomBarStyleName,
+  }) {
+    return NavigationTemplate(
+      layout: layout ?? this.layout,
+      primaryDestinationIds:
+          primaryDestinationIds ?? this.primaryDestinationIds,
+      overflowDestinationIds:
+          overflowDestinationIds ?? this.overflowDestinationIds,
+      height: height ?? this.height,
+      hasCenterAction: hasCenterAction ?? this.hasCenterAction,
+      centerActionId: centerActionId ?? this.centerActionId,
+      centerActionIcon: centerActionIcon ?? this.centerActionIcon,
+      bottomBarStyleName: bottomBarStyleName ?? this.bottomBarStyleName,
+    );
+  }
 }
 
 enum HomeHeaderStyle { compact, prominentIdentity, searchForward, storiesFirst }
@@ -277,9 +334,16 @@ class UserTemplateConfiguration {
   final ChatyTemplateId baseTemplate;
   final Map<TemplateComponentType, ChatyTemplateId> componentOverrides;
 
+  /// Null means follow the active template's ordering. When set, the pair is
+  /// persisted together and all supported destinations remain reachable.
+  final List<String>? navigationPrimaryDestinationIds;
+  final List<String>? navigationOverflowDestinationIds;
+
   const UserTemplateConfiguration({
     this.baseTemplate = ChatyTemplateId.messageFirst,
     this.componentOverrides = const {},
+    this.navigationPrimaryDestinationIds,
+    this.navigationOverflowDestinationIds,
   });
 
   ChatyTemplateId resolveFor(TemplateComponentType component) {
@@ -289,6 +353,10 @@ class UserTemplateConfiguration {
   bool isOverridden(TemplateComponentType component) {
     return componentOverrides.containsKey(component);
   }
+
+  bool get hasNavigationDestinationOverride =>
+      navigationPrimaryDestinationIds != null ||
+      navigationOverflowDestinationIds != null;
 
   UserTemplateConfiguration copyWithOverride(
     TemplateComponentType component,
@@ -305,6 +373,8 @@ class UserTemplateConfiguration {
     return UserTemplateConfiguration(
       baseTemplate: baseTemplate,
       componentOverrides: next,
+      navigationPrimaryDestinationIds: navigationPrimaryDestinationIds,
+      navigationOverflowDestinationIds: navigationOverflowDestinationIds,
     );
   }
 
@@ -316,13 +386,40 @@ class UserTemplateConfiguration {
     return UserTemplateConfiguration(
       baseTemplate: baseTemplate,
       componentOverrides: next,
+      navigationPrimaryDestinationIds: navigationPrimaryDestinationIds,
+      navigationOverflowDestinationIds: navigationOverflowDestinationIds,
     );
   }
 
-  Map<String, dynamic> toMap() => {
+  UserTemplateConfiguration copyWithNavigationDestinations({
+    required List<String> primaryDestinationIds,
+    required List<String> overflowDestinationIds,
+  }) {
+    return UserTemplateConfiguration(
+      baseTemplate: baseTemplate,
+      componentOverrides: componentOverrides,
+      navigationPrimaryDestinationIds:
+          List<String>.unmodifiable(primaryDestinationIds),
+      navigationOverflowDestinationIds:
+          List<String>.unmodifiable(overflowDestinationIds),
+    );
+  }
+
+  UserTemplateConfiguration withoutNavigationDestinationOverride() {
+    return UserTemplateConfiguration(
+      baseTemplate: baseTemplate,
+      componentOverrides: componentOverrides,
+    );
+  }
+
+  Map<String, dynamic> toMap() => <String, dynamic>{
     'version': 1,
     'base': baseTemplate.key,
     'overrides': componentOverrides.map((k, v) => MapEntry(k.name, v.key)),
+    if (navigationPrimaryDestinationIds != null)
+      'navPrimary': navigationPrimaryDestinationIds,
+    if (navigationOverflowDestinationIds != null)
+      'navOverflow': navigationOverflowDestinationIds,
   };
 
   factory UserTemplateConfiguration.fromMap(Map<String, dynamic>? map) {
@@ -338,9 +435,27 @@ class UserTemplateConfiguration {
         overrides[comp] = ChatyTemplateId.fromKey(entry.value as String?);
       }
     }
+
+    List<String>? decodeDestinationIds(Object? raw) {
+      if (raw is! List) return null;
+      final seen = <String>{};
+      final ids = <String>[];
+      for (final item in raw) {
+        if (item is! String ||
+            !ChatyNavigationDestinationIds.known.contains(item) ||
+            !seen.add(item)) {
+          continue;
+        }
+        ids.add(item);
+      }
+      return ids.isEmpty ? null : List<String>.unmodifiable(ids);
+    }
+
     return UserTemplateConfiguration(
       baseTemplate: base,
       componentOverrides: overrides,
+      navigationPrimaryDestinationIds: decodeDestinationIds(map['navPrimary']),
+      navigationOverflowDestinationIds: decodeDestinationIds(map['navOverflow']),
     );
   }
 }
