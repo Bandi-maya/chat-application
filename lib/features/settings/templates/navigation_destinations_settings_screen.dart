@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/appearance_variant_controller.dart';
 import '../../../ui/core/design_system/design_system.dart';
-import '../../../ui/core/theme/app_theme.dart';
-import '../../../ui/core/theme/theme_controller.dart';
 import '../../../ui/core/templates/template_controller.dart';
 import '../../../ui/core/templates/template_models.dart';
 
@@ -298,7 +296,7 @@ class _NavigationDestinationsSettingsScreenState
                   ),
                   if (isPrimary)
                     Text(
-                      ids.length.toString() + '/4',
+                      '${ids.length}/4',
                       style: theme.textTheme.labelLarge?.copyWith(
                         color: colors.primary,
                         fontWeight: FontWeight.w800,
