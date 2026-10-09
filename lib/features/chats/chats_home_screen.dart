@@ -1365,8 +1365,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                                           .secondaryTextColor,
                                                       fontSize:
                                                           13.5 *
-                                                          density *
-                                                          theme.fontScale,
+                                                          effectiveDensity * theme.fontScale,
                                                     ),
                                                   ),
                                                 ],
