@@ -746,7 +746,12 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                                 status.userId ==
                                 widget.dataStore.currentUser.id;
 
-                            return ChatyListTile(
+                            return Material(
+                              elevation: updatesTemplate.cardElevation,
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(14),
+                              clipBehavior: Clip.antiAlias,
+                              child: ChatyListTile(
                               leading: Container(
                                 padding: const EdgeInsets.all(2),
                                 decoration: BoxDecoration(
@@ -815,6 +820,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                                 ),
                               ),
                               onTap: () => _openStatus(status),
+                              ),
                             );
                           },
                         ),
