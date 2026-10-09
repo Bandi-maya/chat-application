@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
-import '../../../ui/core/design_system/settings_primitives.dart';
-import '../../../ui/core/controllers/preferences_controller.dart';
-import '../../../ui/core/controllers/appearance_variant_controller.dart';
-import '../../../ui/core/theme/app_theme.dart';
-import '../../../injection/locator.dart';
-import '../templates/navigation_destinations_settings_screen.dart';
+import 'package:flutter/services.dart';
 
+import '../../../injection/locator.dart';
+import '../../../ui/core/controllers/preferences_controller.dart';
+import '../../../ui/core/design_system/design_system.dart';
+import 'header_settings_screen.dart';
+import 'home_rows_settings_screen.dart';
+import 'home_fab_settings_screen.dart';
+import 'status_settings_screen.dart';
+
+/// Home Screen Settings matching Image 4.
+/// Grouped in clean modern cards without hardcoded green borders, using global theme colors.
 class HomeScreenSettingsPage extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
 
@@ -19,450 +24,422 @@ class HomeScreenSettingsPage extends StatefulWidget {
 }
 
 class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
-  static const List<String> _homeStyles = [
-    'Chaty Default',
-    'Classic',
-    'Compact',
-    'Expressive',
-    'Minimal',
-    'Stories First',
-    'Productivity',
-    'Tablet Split View',
-  ];
-
-  static const List<String> _storiesStyles = [
-    'Circular',
-    'Squircle',
-    'Card',
-    'Minimal',
-    'Compact',
-  ];
-
-  static const List<String> _avatarShapes = [
-    'circle',
-    'squircle',
-    'roundedSquare',
-  ];
+  void _openSubScreen(String title, Widget child) {
+    HapticFeedback.selectionClick();
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => child),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: Listenable.merge(<Listenable>[
-        widget.preferencesController,
-        locator<ThemeController>(),
-        locator<AppearanceVariantController>(),
-      ]),
-      builder: (context, _) {
-        final home = widget.preferencesController.home;
-        final colors = context.colors;
-        return ChatySettingsPage(
-      title: 'Home Screen Customization',
-      subtitle: 'Styles, Stories Strip, Tabs, Header & Ghost Mode',
-      children: [
-        // Live Preview Card at Top
-        ChatyPreviewCard(
-          title: 'Live Home Layout Preview',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Current Style: ${home.homeStyle} • Stories: ${home.enableStoriesStrip ? "Visible" : "Hidden"} • Avatar: ${home.avatarShape}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: colors.foregroundSecondary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colors.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: colors.borderSubtle),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    final themeController = locator<ThemeController>();
+    final theme = themeController.globalTheme;
+    final colors = context.colors;
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Scaffold(
+      backgroundColor: theme.backgroundColor,
+      appBar: AppBar(
+        backgroundColor: theme.backgroundColor,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: ChatyBackButton(
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ),
+        title: Text(
+          'Home Screen',
+          style: TextStyle(
+            color: theme.primaryTextColor,
+            fontSize: 20 * theme.fontScale,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.3,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        top: false,
+        child: ListenableBuilder(
+          listenable: widget.preferencesController,
+          builder: (context, _) {
+            final homePrefs = widget.preferencesController.home;
+
+            return ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              children: [
+                // Card 1: Sub-screens (Header, Rows, Floating Action Button, Status)
+                _buildCardContainer(
+                  theme: theme,
+                  colors: colors,
+                  isDark: isDark,
                   children: [
-                    Row(
-                      children: [
-                        ChatyAvatar(
-                          initials: 'AR',
-                          color: colors.primary,
-                          size: 36,
-                          shape: home.avatarShape,
+                    _buildSubpageRow(
+                      icon: Icons.view_headline_rounded,
+                      title: 'Header',
+                      theme: theme,
+                      colors: colors,
+                      onTap: () => _openSubScreen(
+                        'Header',
+                        HeaderSettingsScreen(
+                          preferencesController: widget.preferencesController,
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            home.myNameOverride.isNotEmpty
-                                ? home.myNameOverride
-                                : 'Alex Rivera',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: colors.foreground,
-                            ),
-                          ),
-                        ),
-                        if (home.ghostMode)
-                          Icon(
-                            Icons.visibility_off_rounded,
-                            size: 18,
-                            color: colors.accent,
-                          ),
-                      ],
-                    ),
-                    if (home.enableStoriesStrip) ...[
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: LinearGradient(
-                                colors: [colors.accent, colors.primary],
-                              ),
-                            ),
-                            child: ChatyAvatar(
-                              initials: 'ER',
-                              color: colors.accent,
-                              size: 28,
-                              shape: home.avatarShape,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: LinearGradient(
-                                colors: [colors.primary, colors.info],
-                              ),
-                            ),
-                            child: ChatyAvatar(
-                              initials: 'DC',
-                              color: colors.success,
-                              size: 28,
-                              shape: home.avatarShape,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: LinearGradient(
-                                colors: [colors.warning, colors.accent],
-                              ),
-                            ),
-                            child: ChatyAvatar(
-                              initials: 'ML',
-                              color: colors.warning,
-                              size: 28,
-                              shape: home.avatarShape,
-                            ),
-                          ),
-                        ],
                       ),
-                    ],
+                    ),
+                    _buildDivider(colors),
+                    _buildSubpageRow(
+                      icon: Icons.view_agenda_outlined,
+                      title: 'Rows',
+                      theme: theme,
+                      colors: colors,
+                      onTap: () => _openSubScreen(
+                        'Rows',
+                        HomeRowsSettingsScreen(
+                          preferencesController: widget.preferencesController,
+                        ),
+                      ),
+                    ),
+                    _buildDivider(colors),
+                    _buildSubpageRow(
+                      icon: Icons.add_circle_outline_rounded,
+                      title: 'Floating Action Button',
+                      theme: theme,
+                      colors: colors,
+                      onTap: () => _openSubScreen(
+                        'Floating Action Button',
+                        HomeFabSettingsScreen(
+                          preferencesController: widget.preferencesController,
+                        ),
+                      ),
+                    ),
+                    _buildDivider(colors),
+                    _buildSubpageRow(
+                      icon: Icons.account_circle_outlined,
+                      title: 'Status',
+                      theme: theme,
+                      colors: colors,
+                      onTap: () => _openSubScreen(
+                        'Status',
+                        StatusSettingsScreen(
+                          preferencesController: widget.preferencesController,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
+                const SizedBox(height: 16),
+
+                // Card 2: Mods & Forward Settings
+                _buildCardContainer(
+                  theme: theme,
+                  colors: colors,
+                  isDark: isDark,
+                  children: [
+                    _buildSectionDivider(label: 'Mods', accent: theme.accentColor),
+                    _buildSwitchRow(
+                      icon: Icons.horizontal_rule_rounded,
+                      title: 'Hide Chats Divider',
+                      subtitle: 'Removes grey line between chats in Main Screen',
+                      value: homePrefs.hideChatsDivider,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updateHome(
+                          homePrefs.copyWith(hideChatsDivider: val),
+                          logTitle: 'Hide Chats Divider',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.person_off_outlined,
+                      title: 'Hide unsaved numbers',
+                      subtitle: 'If contact number not saved then it ll set default contact name',
+                      value: homePrefs.hideUnsavedNumbers,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updateHome(
+                          homePrefs.copyWith(hideUnsavedNumbers: val),
+                          logTitle: 'Hide unsaved numbers',
+                        );
+                      },
+                    ),
+                    _buildSectionDivider(label: 'Forward Settings', accent: theme.accentColor),
+                    _buildSwitchRow(
+                      icon: Icons.person_search_outlined,
+                      title: 'Frequently contacted',
+                      subtitle: 'Hide Frequently contacted from Forward section',
+                      value: homePrefs.hideFrequentlyContacted,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updateHome(
+                          homePrefs.copyWith(hideFrequentlyContacted: val),
+                          logTitle: 'Hide Frequently contacted',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.group_outlined,
+                      title: 'Other contacts',
+                      subtitle: 'Hide Other contacts from Forward section',
+                      value: homePrefs.hideOtherContacts,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updateHome(
+                          homePrefs.copyWith(hideOtherContacts: val),
+                          logTitle: 'Hide Other contacts',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      title: 'Recent chats',
+                      subtitle: 'Hide Recent chats from Forward section',
+                      value: homePrefs.hideRecentChats,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updateHome(
+                          homePrefs.copyWith(hideRecentChats: val),
+                          logTitle: 'Hide Recent chats',
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+                const SizedBox(height: 32),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardContainer({
+    required dynamic theme,
+    required dynamic colors,
+    required bool isDark,
+    required List<Widget> children,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E2124) : colors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colors.borderSubtle,
+          width: 0.9,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: isDark ? 0.25 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: children,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDivider(dynamic colors) {
+    return Divider(
+      height: 1,
+      thickness: 0.8,
+      indent: 64,
+      endIndent: 16,
+      color: colors.borderSubtle.withValues(alpha: 0.4),
+    );
+  }
+
+  Widget _buildSectionDivider({
+    required String label,
+    required Color accent,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: 1.2,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    accent.withValues(alpha: 0.0),
+                    accent.withValues(alpha: 0.7),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: accent,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Container(
+              height: 1.2,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    accent.withValues(alpha: 0.7),
+                    accent.withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubpageRow({
+    required IconData icon,
+    required String title,
+    required dynamic theme,
+    required dynamic colors,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: theme.accentColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: theme.accentColor, size: 21),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: theme.primaryTextColor,
+                    fontSize: 15.5 * theme.fontScale,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: theme.accentColor,
+                size: 22,
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
 
-        // Home UI Style
-        ChatySettingsSection(
-          title: 'Home UI Style Preset',
-          description: 'Dynamically restructures the main home screen layout.',
-          children: [
-            ChatyChoiceTile<String>(
-              title: 'Home Style',
-              options: _homeStyles,
-              selectedOption: home.homeStyle,
-              optionLabel: (s) => s,
-              onSelected: (style) {
-                widget.preferencesController.updateHome(
-                  home.copyWith(homeStyle: style),
-                  logTitle: 'Home UI Style',
-                );
-              },
+  Widget _buildSwitchRow({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool value,
+    required dynamic theme,
+    required dynamic colors,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: theme.accentColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(11),
             ),
-          ],
-        ),
-
-        // Instagram-Like Stories Strip
-        ChatySettingsSection(
-          title: 'Instagram-Like Stories Bar',
-          description:
-              'Horizontal story avatars positioned above the conversation list.',
-          children: [
-            ChatySwitchTile(
-              icon: Icons.history_edu_rounded,
-              iconColor: colors.accent,
-              title: 'Enable Stories Strip',
-              subtitle: 'Show horizontal story avatars on home screen',
-              value: home.enableStoriesStrip,
-              onChanged: (val) {
-                widget.preferencesController.updateHome(
-                  home.copyWith(enableStoriesStrip: val),
-                  logTitle: 'Stories Strip',
-                );
-              },
-            ),
-            if (home.enableStoriesStrip)
-              ChatyChoiceTile<String>(
-                title: 'Stories Avatar Shape',
-                options: _storiesStyles,
-                selectedOption: home.storiesStyle,
-                optionLabel: (s) => s,
-                onSelected: (style) {
-                  widget.preferencesController.updateHome(
-                    home.copyWith(storiesStyle: style),
-                    logTitle: 'Stories Style',
-                  );
-                },
-              ),
-          ],
-        ),
-
-        // Chat / Group Organization
-        ChatySettingsSection(
-          title: 'Navigation & Tab Organization',
-          children: [
-            ListenableBuilder(
-              listenable: locator<ThemeController>(),
-              builder: (context, _) {
-                final themeCtrl = locator<ThemeController>();
-                final currentMode = themeCtrl.navigationMode;
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ChatyChoiceTile<AppNavigationMode>(
-                      title: 'Navigation Layout Architecture',
-                      subtitle:
-                          'Choose the navigation structure for this device; layout adapts to available width.',
-                      options: const [
-                        AppNavigationMode.bottomNav,
-                        AppNavigationMode.topWhatsAppBar,
-                        AppNavigationMode.floatingIslandRail,
-                        AppNavigationMode.perspective3DDrawer,
-                        AppNavigationMode.modernSideMenu,
-                        AppNavigationMode.gestureTabs,
-                        AppNavigationMode.compactRail,
-                      ],
-                      selectedOption: currentMode,
-                      optionLabel: (mode) => switch (mode) {
-                        AppNavigationMode.bottomNav => 'Bottom Nav Bar',
-                        AppNavigationMode.topWhatsAppBar =>
-                          'Top Tabs',
-                        AppNavigationMode.floatingIslandRail =>
-                          'Floating Rail',
-                        AppNavigationMode.perspective3DDrawer =>
-                          'Perspective Drawer',
-                        AppNavigationMode.modernSideMenu =>
-                          'Side Menu',
-                        AppNavigationMode.gestureTabs => 'Gesture Tabs',
-                        AppNavigationMode.compactRail => 'Compact Rail',
-                      },
-                      onSelected: (mode) {
-                        themeCtrl.setNavigationMode(mode);
-                      },
-                    ),
-                  ],
-                );
-              },
-            ),
-            ListenableBuilder(
-              listenable: locator<AppearanceVariantController>(),
-              builder: (context, _) {
-                final appearance = locator<AppearanceVariantController>();
-                return ChatyChoiceTile<String>(
-                  title: 'Bottom Navigation Bar Style',
-                  subtitle:
-                      'Select from 12 custom animated navigation designs (for Bottom Nav Bar)',
-                  options: AppearanceVariantController.bottomBarStyles,
-                  selectedOption: appearance.bottomBarStyle,
-                  optionLabel: (s) => s,
-                  onSelected: (style) {
-                    appearance.setBottomBarStyle(style);
-                  },
-                );
-              },
-            ),
-            ChatySettingsTile(
-              icon: Icons.swap_horiz_rounded,
-              iconColor: colors.primary,
-              title: 'Customize navigation destinations',
-              subtitle:
-                  'Reorder primary tabs and choose what appears under More; every screen stays accessible.',
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const NavigationDestinationsSettingsScreen(),
-                ),
-              ),
-            ),
-            ChatySwitchTile(
-              icon: Icons.splitscreen_rounded,
-              iconColor: colors.primary,
-              title: 'Separate Chats & Groups',
-              subtitle:
-                  'Reorganize navigation into Direct Messages & Groups tabs',
-              value: home.separateChatsAndGroups,
-              onChanged: (val) {
-                widget.preferencesController.updateHome(
-                  home.copyWith(separateChatsAndGroups: val),
-                  logTitle: 'Separate Chats & Groups',
-                );
-              },
-            ),
-            ChatySwitchTile(
-              icon: Icons.search_rounded,
-              title: 'Show Top Search Bar',
-              subtitle: 'Display interactive search bar on home header',
-              value: home.showSearchBar,
-              onChanged: (val) {
-                widget.preferencesController.updateHome(
-                  home.copyWith(showSearchBar: val),
-                  logTitle: 'Show Search Bar',
-                );
-              },
-            ),
-            ChatySwitchTile(
-              icon: Icons.camera_alt_rounded,
-              title: 'Show Camera Action Icon',
-              subtitle: 'Quick camera launch button on header',
-              value: home.showCameraIcon,
-              onChanged: (val) {
-                widget.preferencesController.updateHome(
-                  home.copyWith(showCameraIcon: val),
-                  logTitle: 'Show Camera Icon',
-                );
-              },
-            ),
-            ChatySwitchTile(
-              icon: Icons.devices_rounded,
-              title: 'Show Desktop Icon',
-              subtitle:
-                  'Display Desktop/Linked Devices shortcut in the top header. When disabled, Desktop is accessible via bottom navigation / More.',
-              value: home.showDesktopIcon,
-              onChanged: (val) {
-                widget.preferencesController.updateHome(
-                  home.copyWith(showDesktopIcon: val),
-                  logTitle: 'Show Desktop Shortcut in Header',
-                );
-              },
-            ),
-          ],
-        ),
-
-        // User Identity Customization
-        ChatySettingsSection(
-          title: 'Header Identity & Avatars',
-          children: [
-            ChatySettingsTile(
-              icon: Icons.badge_rounded,
-              title: 'Display Name Override',
-              subtitle: 'Current: "${home.myNameOverride}"',
-              onTap: () {
-                final ctrl = TextEditingController(text: home.myNameOverride);
-                showDialog(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Set My Display Name'),
-                    content: TextField(
-                      controller: ctrl,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(ctx).pop(),
-                        child: const Text('Cancel'),
-                      ),
-                      ElevatedButton(
-                        onPressed: () {
-                          if (ctrl.text.isNotEmpty) {
-                            widget.preferencesController.updateHome(
-                              home.copyWith(myNameOverride: ctrl.text.trim()),
-                              logTitle: 'Set My Name',
-                            );
-                            Navigator.of(ctx).pop();
-                          }
-                        },
-                        child: const Text('Save'),
-                      ),
-                    ],
+            child: Icon(icon, color: theme.accentColor, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: theme.primaryTextColor,
+                    fontSize: 14.5 * theme.fontScale,
+                    fontWeight: FontWeight.w600,
                   ),
-                );
-              },
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: theme.secondaryTextColor,
+                    fontSize: 11.5 * theme.fontScale,
+                  ),
+                ),
+              ],
             ),
-            ChatyChoiceTile<String>(
-              title: 'Avatar Shape',
-              options: _avatarShapes,
-              selectedOption: home.avatarShape,
-              optionLabel: (s) => s[0].toUpperCase() + s.substring(1),
-              onSelected: (shape) {
-                widget.preferencesController.updateHome(
-                  home.copyWith(avatarShape: shape),
-                  logTitle: 'Avatar Shape',
-                );
-              },
-            ),
-          ],
-        ),
-
-        // Ghost Mode & Special Toggles
-        ChatySettingsSection(
-          title: 'Privacy Bundles & Modes',
-          children: [
-            ChatySwitchTile(
-              icon: Icons.shield_moon_rounded,
-              iconColor: colors.accent,
-              title: 'Ghost Mode',
-              subtitle: home.ghostMode
-                  ? 'Active: Hidden last seen, hidden online, disabled read receipts & typing indicators.'
-                  : 'Activate total stealth privacy bundle with one tap.',
-              value: home.ghostMode,
-              onChanged: (val) {
-                final priv = widget.preferencesController.privacy;
-                widget.preferencesController.updateHome(
-                  home.copyWith(ghostMode: val),
-                  logTitle: 'Ghost Mode',
-                );
-                if (val) {
-                  widget.preferencesController.updatePrivacy(
-                    priv.copyWith(
-                      freezeLastSeen: true,
-                      readReceipts: false,
-                      typingIndicators: false,
-                      hideLastSeenAudience: 'Nobody',
-                    ),
-                  );
-                }
-              },
-            ),
-            ChatySwitchTile(
-              icon: Icons.airplanemode_active_rounded,
-              iconColor: colors.warning,
-              title: 'Airplane Mode Simulator',
-              subtitle:
-                  'Pauses simulated incoming messages and network state transitions',
-              value: home.airplaneModeSimulator,
-              onChanged: (val) {
-                widget.preferencesController.updateHome(
-                  home.copyWith(airplaneModeSimulator: val),
-                  logTitle: 'Airplane Mode',
-                );
-              },
-            ),
-          ],
-        ),
-      ],
-        );
-      },
+          ),
+          const SizedBox(width: 8),
+          Switch(
+            value: value,
+            activeColor: theme.accentColor,
+            onChanged: (newVal) {
+              HapticFeedback.selectionClick();
+              onChanged(newVal);
+            },
+          ),
+        ],
+      ),
     );
   }
 }

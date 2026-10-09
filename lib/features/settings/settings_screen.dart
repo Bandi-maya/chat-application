@@ -9,6 +9,8 @@ import 'privacy/privacy_center_screen.dart';
 import 'security/security_center_screen.dart';
 import 'theme_editor_screen.dart';
 import 'templates/templates_settings_screen.dart';
+import 'pro_pricing_screen.dart';
+import 'universal/universal_screen.dart';
 import 'appearance/universal_appearance_screen.dart';
 import 'home/home_screen_settings_page.dart';
 import 'conversation/conversation_settings_page.dart';
@@ -376,9 +378,6 @@ class SettingsScreen extends StatelessWidget {
     final colors = context.colors;
     final user = dataStore.currentUser;
 
-    final cardBg = colors.surface;
-    final borderCol = colors.border;
-
     return Scaffold(
       backgroundColor: theme.backgroundColor,
       body: SafeArea(
@@ -387,31 +386,24 @@ class SettingsScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Top Header Bar (Back button if pushed, "My Profile", Search/More)
+              // 1. Top Header Bar (Back, Search, QR scanner, Edit)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  if (Navigator.of(context).canPop()) ...[
-                    const ChatyBackButton(),
-                    const SizedBox(width: 8),
-                  ],
-                  Expanded(
-                    child: Text(
-                      'My Profile & Settings',
-                      style: TextStyle(
-                        color: theme.primaryTextColor,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
+                  IconButton(
+                    icon: Icon(Icons.arrow_back_rounded, color: theme.primaryTextColor, size: 22),
+                    onPressed: () {
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      }
+                    },
                   ),
                   Row(
                     children: [
                       IconButton(
                         icon: Icon(
                           Icons.search_rounded,
-                          color: theme.secondaryTextColor,
+                          color: theme.primaryTextColor,
                           size: 22,
                         ),
                         onPressed: () {
@@ -423,136 +415,249 @@ class SettingsScreen extends StatelessWidget {
                           );
                         },
                       ),
-                      Builder(
-                        builder: (btnCtx) => IconButton(
-                          icon: Icon(
-                            Icons.more_vert_rounded,
-                            color: theme.secondaryTextColor,
-                            size: 22,
-                          ),
-                          onPressed: () => _showResetOptions(btnCtx),
+                      IconButton(
+                        icon: Icon(
+                          Icons.qr_code_scanner_rounded,
+                          color: theme.primaryTextColor,
+                          size: 22,
                         ),
+                        onPressed: () => _showExportDialog(context),
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.edit_outlined,
+                          color: theme.primaryTextColor,
+                          size: 22,
+                        ),
+                        onPressed: () => _showEditProfileDialog(context),
                       ),
                     ],
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
 
-              // 2. User Profile Card
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: borderCol, width: 1.1),
-                  boxShadow: [
-                    BoxShadow(
-                      color: colors.shadow,
-                      blurRadius: 18,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Row(
+              // 2. User Hero Profile with "Current mood" pill and Dropdown Chevron (Image 1)
+              Center(
+                child: Column(
                   children: [
+                    // Mood Bubble Pill
                     Container(
-                      width: 56,
-                      height: 56,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                       decoration: BoxDecoration(
-                        shape: BoxShape.circle,
                         color: colors.surfaceSecondary,
-                        border: Border.all(color: colors.border, width: 1.5),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: colors.borderSubtle),
                       ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        user.avatarInitials.isNotEmpty
-                            ? user.avatarInitials
-                            : 'CU',
-                        style: TextStyle(
-                          color: theme.primaryTextColor,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Row(
-                            children: [
-                              Text(
-                                user.displayName.isNotEmpty
-                                    ? user.displayName
-                                    : 'User',
-                                style: TextStyle(
-                                  color: theme.primaryTextColor,
-                                  fontSize: 16.5,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: colors.success.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  'PRO',
-                                  style: TextStyle(
-                                    color: colors.success,
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 3),
+                          Icon(Icons.mood_rounded, color: theme.accentColor, size: 16),
+                          const SizedBox(width: 6),
                           Text(
-                            user.email.isNotEmpty
-                                ? user.email
-                                : '${user.username}@chaty.app',
+                            user.about.isNotEmpty ? user.about : 'Current mood',
                             style: TextStyle(
-                              color: theme.secondaryTextColor,
+                              color: theme.primaryTextColor,
                               fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
                             ),
-                            overflow: TextOverflow.ellipsis,
                           ),
-                          if (user.about.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              user.about,
-                              style: TextStyle(
-                                color: theme.secondaryTextColor.withValues(
-                                  alpha: 0.8,
-                                ),
-                                fontSize: 11.5,
-                                fontStyle: FontStyle.italic,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
                         ],
                       ),
                     ),
-                    IconButton(
-                      icon: Icon(
-                        Icons.edit_outlined,
-                        color: theme.secondaryTextColor,
-                        size: 20,
+                    const SizedBox(height: 10),
+
+                    // Avatar Circle
+                    Container(
+                      width: 86,
+                      height: 86,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: theme.accentColor, width: 2.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: theme.accentColor.withValues(alpha: 0.25),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                      onPressed: () => _showEditProfileDialog(context),
+                      child: CircleAvatar(
+                        radius: 40,
+                        backgroundColor: colors.surfaceSecondary,
+                        child: Text(
+                          user.avatarInitials.isNotEmpty ? user.avatarInitials : 'BM',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: theme.primaryTextColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Name + Dropdown
+                    GestureDetector(
+                      onTap: () => _showEditProfileDialog(context),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            user.displayName.isNotEmpty ? user.displayName : 'Bandi Maya',
+                            style: TextStyle(
+                              color: theme.primaryTextColor,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: theme.secondaryTextColor,
+                            size: 22,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+
+                    // Username Handle
+                    Text(
+                      '@${user.username.isNotEmpty ? user.username : 'bandi_maya'}',
+                      style: TextStyle(
+                        color: theme.secondaryTextColor,
+                        fontSize: 13.5,
+                      ),
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 24),
+
+
+
+              // 3. Image 1 Primary Sections Card
+              ChatySettingsCard(
+                children: [
+                  ChatySettingsTile(
+                    icon: Icons.currency_rupee_rounded,
+                    iconColor: colors.primary,
+                    title: 'Payments',
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Chaty Secure UPI & Card Payments')),
+                      );
+                    },
+                  ),
+                  ChatySettingsTile(
+                    icon: Icons.diamond_outlined,
+                    iconColor: Colors.amber,
+                    title: 'Subscriptions',
+                    subtitle: 'Explore premium benefits',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ProPricingScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  ChatySettingsTile(
+                    icon: Icons.devices_rounded,
+                    iconColor: colors.info,
+                    title: 'Linked devices',
+                    subtitle: 'Use WhatsApp on other devices',
+                    onTap: () => _showExportDialog(context),
+                  ),
+                  ChatySettingsTile(
+                    icon: Icons.vpn_key_outlined,
+                    iconColor: colors.success,
+                    title: 'Account',
+                    subtitle: 'Security notifications, change number',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SecurityCenterScreen(
+                            preferencesController: preferencesController,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  ChatySettingsTile(
+                    icon: Icons.lock_outline_rounded,
+                    iconColor: colors.primary,
+                    title: 'Privacy',
+                    subtitle: 'Blocked accounts, disappearing messages',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PrivacyCenterScreen(
+                            preferencesController: preferencesController,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  ChatySettingsTile(
+                    icon: Icons.photo_library_outlined,
+                    iconColor: colors.accent,
+                    title: 'Lists',
+                    subtitle: 'Manage people and groups',
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Lists: Manage people and contact groups')),
+                      );
+                    },
+                  ),
+                  ChatySettingsTile(
+                    icon: Icons.chat_bubble_outline_rounded,
+                    iconColor: colors.success,
+                    title: 'Chats',
+                    subtitle: 'Chat history, backup',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ConversationSettingsPage(
+                            preferencesController: preferencesController,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  ChatySettingsTile(
+                    icon: Icons.palette_outlined,
+                    iconColor: colors.warning,
+                    title: 'Appearance',
+                    subtitle: 'Chat theme, app icon, app theme',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => UniversalScreen(
+                            preferencesController: preferencesController,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  ChatySettingsTile(
+                    icon: Icons.cast_rounded,
+                    iconColor: colors.primary,
+                    title: 'Broadcasts',
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Broadcast list messaging')),
+                      );
+                    },
+                  ),
+                ],
               ),
               const SizedBox(height: 18),
 

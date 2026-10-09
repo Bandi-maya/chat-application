@@ -1,33 +1,36 @@
 import 'package:flutter/material.dart';
 
 import '../../data/repositories/chaty_data_store.dart';
+import '../../data/services/contact_relationship_service.dart';
 import '../../data/services/notification_service.dart';
 import '../../domain/models/user_profile.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/app_icon_controller.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
-import '../../ui/core/design_system/settings_primitives.dart';
-import '../../ui/core/theme/theme_controller.dart';
-import '../../ui/core/widgets/app_avatar.dart';
+import '../../ui/core/design_system/gb_design_system.dart';
 import '../../ui/core/settings/settings_registry.dart';
+import '../../ui/core/theme/theme_controller.dart';
+import '../chats/linked_devices_qr_screen.dart';
+import '../profile/profile_actions.dart';
 import 'account/account_settings_screen.dart';
 import 'appearance/app_icon_settings_screen.dart';
 import 'appearance/universal_appearance_screen.dart';
 import 'calls/call_settings_screen.dart';
-import 'templates/templates_settings_screen.dart';
-import '../../ui/core/templates/template_controller.dart';
-import '../profile/profile_actions.dart';
 import 'conversation/conversation_settings_page.dart';
 import 'effects/navigation_effects_page.dart';
-import 'home/home_screen_settings_page.dart';
+import 'home/header_settings_screen.dart';
 import 'media/storage_and_media_settings_screen.dart';
 import 'message_management/message_management_page.dart';
 import 'notifications/notification_settings_page.dart';
 import 'permissions/system_permissions_screen.dart';
 import 'privacy/privacy_center_screen.dart';
+import '../profile/profile_edit_screen.dart';
+import '../../data/services/chaty_share_service.dart';
 import 'security/security_center_screen.dart';
 import 'settings_search_delegate.dart';
+import 'templates/templates_settings_screen.dart';
 import 'theme_editor_screen.dart';
+import 'customization/customization_center_screen.dart';
 
 class SettingsRootScreen extends StatelessWidget {
   final ChatyPreferencesController preferencesController;
@@ -52,17 +55,6 @@ class SettingsRootScreen extends StatelessWidget {
     );
   }
 
-  void _push(
-    BuildContext context,
-    Widget Function() builder, {
-    bool listenToPreferences = true,
-  }) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => listenToPreferences ? _reactive(builder) : builder(),
-      ),
-    );
-  }
 
   /// Builds search results based on the centralized [SettingsRegistry].
   List<SettingsSearchResult> _searchIndex() {
@@ -106,6 +98,7 @@ class SettingsRootScreen extends StatelessWidget {
         ),
       ),
       '/settings/themes' => ThemeEditorScreen(themeController: themeController),
+      '/settings/customization' => const CustomizationCenterScreen(),
       '/settings/templates' => const TemplatesSettingsScreen(),
       '/settings/app_icon' => AppIconSettingsScreen(
         appIconController: _appIconController,
@@ -116,8 +109,9 @@ class SettingsRootScreen extends StatelessWidget {
         ),
       ),
       '/settings/home' => _reactive(
-        () => HomeScreenSettingsPage(
+        () => HeaderSettingsScreen(
           preferencesController: preferencesController,
+          dataStore: dataStore,
         ),
       ),
       '/settings/notifications' => _reactive(
@@ -153,261 +147,383 @@ class SettingsRootScreen extends StatelessWidget {
     };
   }
 
-  Future<void> _showEditProfile(BuildContext context) =>
-      showChatyProfileEditor(context, dataStore);
+  void _showEditProfile(BuildContext context) =>
+      ProfileEditScreen.open(context, dataStore);
 
   Future<void> _logout(BuildContext context) => confirmChatyLogout(context);
+
+  void _openQrScreen(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => LinkedDevicesQrScreen(
+          dataStore: dataStore,
+          relationshipService: locator<ContactRelationshipService>(),
+          preferencesController: preferencesController,
+          themeController: themeController,
+          qrOnly: true,
+        ),
+      ),
+    );
+  }
+
+  void _openLinkedDevices(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => LinkedDevicesQrScreen(
+          dataStore: dataStore,
+          relationshipService: locator<ContactRelationshipService>(),
+          preferencesController: preferencesController,
+          themeController: themeController,
+          devicesOnly: true,
+        ),
+      ),
+    );
+  }
+
+
+  void _showPrivacyPolicy(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E282E),
+        title: const Row(
+          children: [
+            Icon(Icons.shield_outlined, color: GbColors.activeGreen),
+            SizedBox(width: 8),
+            Text('Privacy Policy', style: TextStyle(color: Colors.white, fontSize: 18)),
+          ],
+        ),
+        content: const SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Your Privacy is Our Priority',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              SizedBox(height: 8),
+              Text(
+                '• Local End-to-End Encryption:\nYour messages and calls are encrypted and stored safely on your device.\n\n'
+                '• No Remote Telemetry:\nChaty never tracks your browsing, locations, or personal data.\n\n'
+                '• Security & App Lock:\nLocal PIN, Pattern, and Biometric lock protect your messages completely offline.\n\n'
+                '• Full Data Ownership:\nYou can clear chat histories, media caches, and revoke device links at any time.',
+                style: TextStyle(color: Color(0xFF8696A0), fontSize: 13, height: 1.4),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: GbColors.activeGreen),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('I Understand', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAboutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E282E),
+        title: const Row(
+          children: [
+            Icon(Icons.info_outline_rounded, color: GbColors.activeGreen),
+            SizedBox(width: 8),
+            Text('About Chaty', style: TextStyle(color: Colors.white, fontSize: 18)),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Chaty Messenger Pro', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            SizedBox(height: 4),
+            Text('Version 2.4.0 (Build 2026.10)', style: TextStyle(color: Color(0xFF8696A0), fontSize: 12)),
+            SizedBox(height: 12),
+            Text(
+              'A modern, privacy-first messaging platform with advanced personalization, rich customization, and offline security.',
+              style: TextStyle(color: Color(0xFFD1D7DB), fontSize: 13, height: 1.3),
+            ),
+          ],
+        ),
+        actions: [
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: GbColors.activeGreen),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final user = dataStore.currentUser;
-    final appIconController = _appIconController;
+    final homePrefs = preferencesController.home;
+    final displayName = homePrefs.myNameOverride.isNotEmpty
+        ? homePrefs.myNameOverride
+        : (user.displayName.isNotEmpty ? user.displayName : 'Bandi Maya');
+    final handle = user.username.isNotEmpty ? '@${user.username}' : '@bandi_maya';
 
     return ListenableBuilder(
-      listenable: Listenable.merge([appIconController, preferencesController]),
-      builder: (context, _) => ChatySettingsPage(
-        title: 'Settings',
-        subtitle: 'Account, privacy, appearance & app configuration',
-        trailingHeaderWidget: IconButton(
-          tooltip: 'Search settings',
-          onPressed: () => showSearch(
-            context: context,
-            delegate: SettingsSearchDelegate(allSettings: _searchIndex()),
+      listenable: Listenable.merge([preferencesController, dataStore]),
+      builder: (context, _) => Scaffold(
+        backgroundColor: const Color(0xFF0C1014),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF0C1014),
+          elevation: 0,
+          title: const Text(
+            'Settings',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+            ),
           ),
-          icon: const Icon(Icons.search_rounded),
+          leading: Navigator.of(context).canPop()
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+                  onPressed: () => Navigator.of(context).pop(),
+                )
+              : null,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.search_rounded, color: Colors.white, size: 24),
+              tooltip: 'Search settings',
+              onPressed: () => showSearch(
+                context: context,
+                delegate: SettingsSearchDelegate(allSettings: _searchIndex()),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 25),
+              tooltip: 'QR code',
+              onPressed: () => _openQrScreen(context),
+            ),
+          ],
         ),
-        children: [
-          _ProfileCard(user: user, onEdit: () => _showEditProfile(context)),
-          const SizedBox(height: 8),
-
-          // -------------------------------------------------------------------
-          // 1. ACCOUNT
-          // -------------------------------------------------------------------
-          ChatySettingsSection(
-            title: 'Account',
+        body: SingleChildScrollView(
+          child: Column(
             children: [
-              ChatySettingsTile(
-                icon: Icons.person_outline_rounded,
-                title: 'Account & Profile',
-                subtitle: 'Display name, username, bio & credentials',
-                onTap: () => _push(
-                  context,
-                  () => AccountSettingsScreen(
-                    preferencesController: preferencesController,
-                    dataStore: dataStore,
+              // Profile Header Card
+              InkWell(
+                onTap: () => _showEditProfile(context),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFF223038),
+                          border: Border.all(color: const Color(0xFF1E282E), width: 2),
+                        ),
+                        child: ClipOval(
+                          child: user.avatarUrl != null && user.avatarUrl!.isNotEmpty
+                              ? Image.network(
+                                  user.avatarUrl!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => _avatarFallback(user),
+                                )
+                              : _avatarFallback(user),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              displayName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              user.about.isNotEmpty ? user.about : handle,
+                              style: const TextStyle(
+                                color: Color(0xFF8696A0),
+                                fontSize: 13.5,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: Color(0xFF8696A0),
+                        size: 24,
+                      ),
+                    ],
                   ),
                 ),
               ),
-              ChatySettingsTile(
-                icon: Icons.visibility_off_outlined,
-                title: 'Privacy',
-                subtitle: 'Last seen, online presence, receipts & anti-delete',
-                onTap: () => _push(
-                  context,
-                  () => PrivacyCenterScreen(
-                    preferencesController: preferencesController,
-                  ),
-                ),
-              ),
-              ChatySettingsTile(
-                icon: Icons.lock_outline_rounded,
-                title: 'Security & Lock',
-                subtitle: 'App lock, biometric, PIN & hidden chats',
-                onTap: () => _push(
-                  context,
-                  () => SecurityCenterScreen(
-                    preferencesController: preferencesController,
-                  ),
-                ),
-              ),
-            ],
-          ),
 
-          // -------------------------------------------------------------------
-          // 2. EXPERIENCE
-          // -------------------------------------------------------------------
-          ChatySettingsSection(
-            title: 'Experience',
-            children: [
-              ChatySettingsTile(
-                icon: Icons.chat_bubble_outline_rounded,
-                title: 'Chats',
-                subtitle: 'Bubbles, ticks, swipe actions & animated emoji',
-                onTap: () => _push(
-                  context,
-                  () => ConversationSettingsPage(
-                    preferencesController: preferencesController,
-                  ),
-                ),
-              ),
-              ChatySettingsTile(
-                icon: Icons.palette_outlined,
-                title: 'Appearance & Themes',
-                subtitle: 'Theme presets, custom palette & typography',
-                onTap: () => _push(
-                  context,
-                  () => ThemeEditorScreen(themeController: themeController),
-                  listenToPreferences: false,
-                ),
-              ),
-              ListenableBuilder(
-                listenable: locator<TemplateController>(),
-                builder: (context, _) {
-                  final templateCtrl = locator<TemplateController>();
-                  final activeTemplate = templateCtrl.baseTemplate.displayName;
-                  final overrideCount = templateCtrl.componentOverrides.length;
-                  final subtitle = overrideCount > 0
-                      ? ' •  component overrides'
-                      : activeTemplate;
+              const Divider(height: 1, color: Color(0xFF1E282E)),
+              const SizedBox(height: 8),
 
-                  return ChatySettingsTile(
-                    icon: Icons.dashboard_customize_rounded,
-                    title: 'Templates',
-                    subtitle: subtitle,
-                    badgeText: 'NEW',
-                    badgeColor: Theme.of(context).colorScheme.primary,
-                    onTap: () => _push(
-                      context,
-                      () => const TemplatesSettingsScreen(),
-                      listenToPreferences: false,
+              // Settings Container Card: Only displaying the 5 requested items
+              Container(
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF11161B),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                padding: const EdgeInsets.only(top: 8, bottom: 32),
+                child: Column(
+                  children: [
+                    // Customization Center
+                    _SettingsItemTile(
+                      icon: const Icon(Icons.palette_outlined, color: Color(0xFF22C55E), size: 24),
+                      title: 'Customization Center',
+                      subtitle: 'Visual dialects, headers, bubbles, ticks, composers & motion',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const CustomizationCenterScreen(),
+                        ),
+                      ),
                     ),
-                  );
-                },
-              ),
-              ChatySettingsTile(
-                icon: Icons.apps_rounded,
-                title: 'App Icon',
-                subtitle: 'Launcher icon & custom brand artwork',
-                onTap: () => _push(
-                  context,
-                  () => AppIconSettingsScreen(
-                    appIconController: appIconController,
-                  ),
-                  listenToPreferences: false,
-                ),
-              ),
-              ChatySettingsTile(
-                icon: Icons.home_outlined,
-                title: 'Home & Navigation',
-                subtitle: 'Layout mode, stories strip & group separation',
-                onTap: () => _push(
-                  context,
-                  () => HomeScreenSettingsPage(
-                    preferencesController: preferencesController,
-                  ),
-                ),
-              ),
-            ],
-          ),
 
-          // -------------------------------------------------------------------
-          // 3. COMMUNICATION
-          // -------------------------------------------------------------------
-          ChatySettingsSection(
-            title: 'Communication',
-            children: [
-              ChatySettingsTile(
-                icon: Icons.notifications_outlined,
-                title: 'Notifications',
-                subtitle: 'Toast alerts, preview, sounds & presence alerts',
-                onTap: () => _push(
-                  context,
-                  () => NotificationSettingsPage(
-                    preferencesController: preferencesController,
-                    notificationService: notificationService,
-                  ),
-                ),
-              ),
-              ChatySettingsTile(
-                icon: Icons.call_outlined,
-                title: 'Calls',
-                subtitle: 'Who can call you, audio quality & call island',
-                onTap: () => _push(
-                  context,
-                  () => CallSettingsScreen(
-                    preferencesController: preferencesController,
-                  ),
-                ),
-              ),
-            ],
-          ),
+                    // 1. Linked devices
+                    _SettingsItemTile(
+                      icon: const Icon(Icons.devices_rounded, color: Color(0xFF8696A0), size: 24),
+                      title: 'Linked devices',
+                      subtitle: 'Use Chaty on other devices',
+                      onTap: () => _openLinkedDevices(context),
+                    ),
 
-          // -------------------------------------------------------------------
-          // 4. MEDIA & DATA
-          // -------------------------------------------------------------------
-          ChatySettingsSection(
-            title: 'Media & Data',
-            children: [
-              ChatySettingsTile(
-                icon: Icons.storage_rounded,
-                title: 'Storage & Data',
-                subtitle: 'HD media sending, upload thresholds & cache cleaner',
-                onTap: () => _push(
-                  context,
-                  () => StorageAndMediaSettingsScreen(
-                    preferencesController: preferencesController,
-                  ),
-                ),
-              ),
-            ],
-          ),
+                    // 2. Share Chaty
+                    _SettingsItemTile(
+                      icon: const Icon(Icons.share_rounded, color: Color(0xFF8696A0), size: 24),
+                      title: 'Share Chaty',
+                      subtitle: 'Invite friends and family to join Chaty',
+                      onTap: () => ChatyShareService.shareApp(context),
+                    ),
 
-          // -------------------------------------------------------------------
-          // 5. SYSTEM & AUTOMATION
-          // -------------------------------------------------------------------
-          ChatySettingsSection(
-            title: 'System & Automation',
-            children: [
-              ChatySettingsTile(
-                icon: Icons.schedule_send_rounded,
-                title: 'Message Automation',
-                subtitle: 'Auto-reply rules & scheduled messaging',
-                onTap: () => _push(
-                  context,
-                  () => MessageManagementPage(
-                    preferencesController: preferencesController,
-                    dataStore: dataStore,
-                  ),
+                    // 3. Privacy policy
+                    _SettingsItemTile(
+                      icon: const Icon(Icons.shield_outlined, color: Color(0xFF8696A0), size: 24),
+                      title: 'Privacy policy',
+                      subtitle: 'Read our security and data privacy policy',
+                      onTap: () => _showPrivacyPolicy(context),
+                    ),
+
+                    // 4. About
+                    _SettingsItemTile(
+                      icon: const Icon(Icons.info_outline_rounded, color: Color(0xFF8696A0), size: 24),
+                      title: 'About',
+                      subtitle: 'App version, build and information',
+                      onTap: () => _showAboutDialog(context),
+                    ),
+
+                    const SizedBox(height: 12),
+                    const Divider(height: 1, color: Color(0xFF1E282E), indent: 20, endIndent: 20),
+                    const SizedBox(height: 12),
+
+                    // 5. Log out
+                    _SettingsItemTile(
+                      icon: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 24),
+                      title: 'Log out',
+                      subtitle: 'Sign out of your session on this device',
+                      onTap: () => _logout(context),
+                    ),
+                  ],
                 ),
-              ),
-              ChatySettingsTile(
-                icon: Icons.animation_rounded,
-                title: 'Interactive Effects',
-                subtitle: 'Touch particle animations & falling emoji effects',
-                onTap: () => _push(
-                  context,
-                  () => NavigationEffectsPage(
-                    preferencesController: preferencesController,
-                  ),
-                ),
-              ),
-              ChatySettingsTile(
-                icon: Icons.admin_panel_settings_outlined,
-                title: 'System Permissions',
-                subtitle: 'Hardware, notifications, storage & OS rights',
-                onTap: () => _push(
-                  context,
-                  () => SystemPermissionsScreen(
-                    preferencesController: preferencesController,
-                    notificationService: notificationService,
-                  ),
-                ),
-              ),
-              const ChatySettingsTile(
-                icon: Icons.info_outline_rounded,
-                title: 'About Chaty',
-                subtitle: 'Private customizable messaging • Version 1.0.0',
-              ),
-              ChatySettingsTile(
-                icon: Icons.logout_rounded,
-                iconColor: Theme.of(context).colorScheme.error,
-                title: 'Log Out',
-                subtitle: 'Sign out of your session on this device',
-                onTap: () => _logout(context),
               ),
             ],
           ),
-        ],
+        ),
+      ),
+    );
+  }
+
+  Widget _avatarFallback(UserProfile user) {
+    return Container(
+      color: const Color(0xFF223038),
+      child: Center(
+        child: Text(
+          user.avatarInitials.isNotEmpty ? user.avatarInitials : 'BM',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 28,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsItemTile extends StatelessWidget {
+  final Widget icon;
+  final String title;
+  final String? subtitle;
+  final VoidCallback? onTap;
+
+  const _SettingsItemTile({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 32,
+              height: 32,
+              child: Center(child: icon),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: -0.1,
+                    ),
+                  ),
+                  if (subtitle != null && subtitle!.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle!,
+                      style: const TextStyle(
+                        color: Color(0xFF8696A0),
+                        fontSize: 13,
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -431,82 +547,3 @@ class _PreferencesReactiveRoute extends StatelessWidget {
   }
 }
 
-class _ProfileCard extends StatelessWidget {
-  final UserProfile user;
-  final VoidCallback onEdit;
-
-  const _ProfileCard({required this.user, required this.onEdit});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final initials = user.avatarInitials;
-
-    return InkWell(
-      onTap: onEdit,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: theme.cardColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: theme.dividerColor.withValues(alpha: 0.12),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            AppAvatar(
-              initials: initials,
-              colorHex: user.avatarColorHex,
-              size: 56,
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    user.displayName.isNotEmpty
-                        ? user.displayName
-                        : 'Set Display Name',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '@',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: theme.textTheme.bodyMedium?.color?.withValues(
-                        alpha: 0.7,
-                      ),
-                    ),
-                  ),
-                  if (user.about.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      user.about,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: theme.textTheme.bodyMedium?.color?.withValues(
-                          alpha: 0.55,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const Icon(Icons.edit_outlined, size: 20),
-          ],
-        ),
-      ),
-    );
-  }
-}

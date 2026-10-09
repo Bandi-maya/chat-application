@@ -26,9 +26,14 @@ void main() {
   });
 
   test('bubble and tick selectors require explicit apply', () {
-    final source = File(
-      'lib/features/settings/conversation/conversation_settings_page.dart',
-    ).readAsStringSync();
+    final bubbleScreen = File(
+      'lib/features/settings/conversation/conversation_bubble_and_ticks_screen.dart',
+    );
+    final source = bubbleScreen.existsSync()
+        ? bubbleScreen.readAsStringSync()
+        : File(
+            'lib/features/settings/conversation/conversation_settings_page.dart',
+          ).readAsStringSync();
     expect(
       RegExp('showApplyButton: true').allMatches(source).length,
       greaterThanOrEqualTo(2),

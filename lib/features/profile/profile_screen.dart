@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../../data/repositories/chaty_data_store.dart';
@@ -8,9 +9,6 @@ import '../../ui/core/templates/template_controller.dart';
 import '../../ui/core/templates/template_models.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
-// ChatySettingsSection is duplicated between the barrel-exported
-// components/settings_components.dart and settings_primitives.dart; this
-// screen is written against the primitives variant.
 import '../../ui/core/design_system/design_system.dart'
     hide ChatySettingsSection;
 import '../../ui/core/design_system/settings_primitives.dart';
@@ -20,10 +18,8 @@ import '../settings/settings_root_screen.dart';
 import 'profile_actions.dart';
 import 'profile_edit_screen.dart';
 
-/// Root "Profile" destination (bottom navigation). Settings now lives ONE
-/// level deeper: Profile → Settings → existing Settings system. Everything
-/// shown here is real account data from the backend-backed data store —
-/// no mock profile information.
+/// Root "Profile" destination (bottom navigation).
+/// Renders the enhanced GB WhatsApp profile & settings dashboard.
 class ProfileScreen extends StatelessWidget {
   final ChatyPreferencesController preferencesController;
   final ThemeController themeController;

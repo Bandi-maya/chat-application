@@ -8,10 +8,10 @@ import '../../ui/core/controllers/appearance_variant_controller.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/gb/gb_theme_overrides.dart';
 import '../calls/calls_screen.dart';
-import '../settings/settings_root_screen.dart';
 import '../tasks/tasks_screen.dart';
 import '../updates/updates_screen.dart';
 import 'chats_home_screen.dart';
+import 'new_chat_screen.dart';
 import 'linked_devices_qr_screen.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/design_system/design_system.dart';
@@ -22,6 +22,9 @@ import '../../ui/core/templates/template_models.dart';
 import '../camera/effects/widgets/effect_picker_sheet.dart';
 import '../camera/camera_capture_screen.dart';
 import '../../data/services/status_service.dart';
+import '../../data/services/call_signaling_service.dart';
+import '../settings/settings_root_screen.dart';
+import '../tasks/task_create_edit_modal.dart';
 
 class MainNavigationShell extends StatefulWidget {
   const MainNavigationShell({super.key});
@@ -467,6 +470,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                         destinationId: destination.id,
                       );
                     }
+                  } else if (idx >= 0 && idx < allDestinations.length) {
+                    _selectRootDestination(idx);
                   }
                 },
               );
@@ -496,6 +501,14 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       initialIndex: selectedIndex,
       child: Scaffold(
         backgroundColor: theme.backgroundColor,
+        floatingActionButton: _buildContextualFab(
+          context: context,
+          theme: theme,
+          colors: colors,
+          accent: brandPrimary,
+          activeItem: navItems[selectedIndex],
+        ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         body: SafeArea(
           bottom: false,
           child: Column(
@@ -1015,6 +1028,14 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       extendBody: false,
       backgroundColor: bg,
       body: content,
+      floatingActionButton: _buildContextualFab(
+        context: context,
+        theme: theme,
+        colors: colors,
+        accent: accent,
+        activeItem: navItems[selectedIndex],
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: SafeArea(
         top: false,
         child: Padding(
@@ -1355,6 +1376,318 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       },
     );
   }
+
+  Widget _buildContextualFab({
+    required BuildContext context,
+    required dynamic theme,
+    required AppColors colors,
+    required Color accent,
+    required _NavDestinationItem activeItem,
+  }) {
+    final (IconData icon, String tooltip, VoidCallback action) =
+        switch (activeItem.id) {
+      'chats' => (
+          Icons.chat_bubble_rounded,
+          'New conversation',
+          () {
+            HapticFeedback.lightImpact();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => NewChatScreen(
+                  theme: theme,
+                  dataStore: locator<ChatyDataStore>(),
+                  preferencesController:
+                      locator<ChatyPreferencesController>(),
+                ),
+              ),
+            );
+          },
+        ),
+      'groups' => (
+          Icons.group_add_rounded,
+          'New group',
+          () {
+            HapticFeedback.lightImpact();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => NewChatScreen(
+                  theme: theme,
+                  dataStore: locator<ChatyDataStore>(),
+                  preferencesController:
+                      locator<ChatyPreferencesController>(),
+                ),
+              ),
+            );
+          },
+        ),
+      'updates' => (
+          Icons.camera_alt_rounded,
+          'New status',
+          () async {
+            HapticFeedback.lightImpact();
+            final result = await ChatyCameraCaptureScreen.open(
+              context,
+              mode: ChatyCaptureMode.story,
+            );
+            if (result != null && context.mounted) {
+              try {
+                await StatusService().publishMediaFile(
+                  path: result.path,
+                  mediaType: 'image',
+                  text: result.caption,
+                  displayName: 'chaty_story.jpg',
+                );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Status posted successfully.')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
+              }
+            }
+          },
+        ),
+      'tasks' => (
+          Icons.add_task_rounded,
+          'Create task',
+          () {
+            HapticFeedback.lightImpact();
+            final conversations =
+                locator<ChatyDataStore>().conversations;
+            showModalBottomSheet(
+              context: context,
+              backgroundColor: Colors.transparent,
+              isScrollControlled: true,
+              builder: (ctx) => TaskCreateEditModal(
+                theme: theme,
+                dataStore: locator<ChatyDataStore>(),
+                sourceConversationId: conversations.isNotEmpty
+                    ? conversations.first.id
+                    : 'general',
+              ),
+            );
+          },
+        ),
+      'calls' => (
+          Icons.add_ic_call_rounded,
+          'New call',
+          () {
+            HapticFeedback.lightImpact();
+            _openNewCallPicker(context, theme);
+          },
+        ),
+      'desktop' => (
+          Icons.qr_code_scanner_rounded,
+          'Scan QR',
+          () {
+            HapticFeedback.lightImpact();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => LinkedDevicesQrScreen(
+                  dataStore: locator<ChatyDataStore>(),
+                  relationshipService: locator(),
+                  preferencesController:
+                      locator<ChatyPreferencesController>(),
+                  themeController: locator<ThemeController>(),
+                  devicesOnly: true,
+                ),
+              ),
+            );
+          },
+        ),
+      _ => (
+          Icons.chat_bubble_rounded,
+          'New message',
+          () {
+            HapticFeedback.lightImpact();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => NewChatScreen(
+                  theme: theme,
+                  dataStore: locator<ChatyDataStore>(),
+                  preferencesController:
+                      locator<ChatyPreferencesController>(),
+                ),
+              ),
+            );
+          },
+        ),
+    };
+
+    return FloatingActionButton(
+      heroTag: 'chaty_contextual_nav_fab',
+      tooltip: tooltip,
+      shape: const CircleBorder(),
+      elevation: 4.5,
+      backgroundColor: accent,
+      foregroundColor: colors.onPrimary,
+      onPressed: action,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        transitionBuilder: (child, anim) {
+          return ScaleTransition(
+            scale: anim,
+            child: RotationTransition(
+              turns: Tween<double>(begin: 0.85, end: 1.0).animate(anim),
+              child: child,
+            ),
+          );
+        },
+        child: Icon(
+          icon,
+          key: ValueKey<String>(activeItem.id),
+          size: 24,
+        ),
+      ),
+    );
+  }
+
+  void _openNewCallPicker(BuildContext context, dynamic theme) {
+    final dataStore = locator<ChatyDataStore>();
+    final contacts = dataStore.contacts;
+    final colors = context.colors;
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        height: MediaQuery.of(ctx).size.height * 0.65,
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          border: Border.all(color: colors.borderSubtle, width: 0.8),
+        ),
+        child: Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(
+                color: colors.borderSubtle,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 12, 12),
+              child: Row(
+                children: [
+                  Text(
+                    'Select Contact to Call',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: colors.foreground,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: Icon(Icons.close_rounded, color: colors.foregroundSecondary),
+                    onPressed: () => Navigator.of(ctx).pop(),
+                  ),
+                ],
+              ),
+            ),
+            Divider(height: 1, color: colors.divider),
+            Expanded(
+              child: contacts.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No contacts available',
+                        style: TextStyle(color: colors.foregroundSecondary),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: contacts.length,
+                      itemBuilder: (ctx, i) {
+                        final contact = contacts[i];
+                        return ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                          leading: AppAvatar(
+                            initials: contact.displayName.isNotEmpty
+                                ? contact.displayName.substring(0, 1)
+                                : '?',
+                            colorHex: contact.avatarColorHex,
+                            size: 44,
+                          ),
+                          title: Text(
+                            contact.displayName,
+                            style: TextStyle(
+                              color: colors.foreground,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                            ),
+                          ),
+                          subtitle: Text(
+                            contact.about.isNotEmpty ? contact.about : contact.phone,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: colors.foregroundSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(Icons.call_rounded, color: colors.primary),
+                                tooltip: 'Voice Call',
+                                onPressed: () {
+                                  Navigator.of(ctx).pop();
+                                  locator<CallSignalingService>().initiateCall(
+                                    remoteUserId: contact.id,
+                                    remoteDisplayName: contact.displayName,
+                                    remoteAvatarInitials: contact.displayName.isNotEmpty
+                                        ? contact.displayName.substring(0, 1)
+                                        : '?',
+                                    isVideo: false,
+                                  );
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => OngoingCallScreen(theme: theme),
+                                    ),
+                                  );
+                                },
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.videocam_rounded, color: colors.primary),
+                                tooltip: 'Video Call',
+                                onPressed: () {
+                                  Navigator.of(ctx).pop();
+                                  locator<CallSignalingService>().initiateCall(
+                                    remoteUserId: contact.id,
+                                    remoteDisplayName: contact.displayName,
+                                    remoteAvatarInitials: contact.displayName.isNotEmpty
+                                        ? contact.displayName.substring(0, 1)
+                                        : '?',
+                                    isVideo: true,
+                                  );
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => OngoingCallScreen(theme: theme),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
 
   Widget _buildCustomNavItem({
     required _NavDestinationItem item,

@@ -16,11 +16,18 @@ class UsernameLoginService {
   final SupabaseClient _client;
   final ChatyBackendService _backend;
 
+  Future<UserProfile> loginAsDemo() async {
+    return _backend.loginAsDemo();
+  }
+
   Future<UserProfile> login({
     required String identifier,
     required String password,
   }) async {
     final value = identifier.trim();
+    if (value.toLowerCase().startsWith('demo')) {
+      return loginAsDemo();
+    }
     if (value.contains('@')) {
       return _backend.login(identifier: value, password: password);
     }

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../controllers/app_icon_controller.dart';
+import 'flying_bird_icon.dart';
 
 enum ChatyBrandIconVariant { outline, filled }
 
@@ -169,6 +170,17 @@ class LauncherIconPreview extends StatelessWidget {
 
   static _LauncherStyle _compositionFor(LauncherIconVariant variant) {
     switch (variant) {
+      case LauncherIconVariant.bird:
+        return const _LauncherStyle(
+          bgColor: Color(0xFFFFFFFF),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFFFFFFF), Color(0xFFF3F4F6)],
+          ),
+          glyphColor: Color(0xFF111827),
+          accentColor: Color(0xFF1F2937),
+        );
       case LauncherIconVariant.warm:
         return const _LauncherStyle(
           bgColor: Color(0xFFF4EFE6),
@@ -268,6 +280,10 @@ class _LauncherCompositionPainter extends CustomPainter {
     final h = size.height;
 
     switch (variant) {
+      case LauncherIconVariant.bird:
+        final birdPainter = FlyingBirdPainter(color: iconColor);
+        birdPainter.paint(canvas, size);
+
       case LauncherIconVariant.warm:
         // 01 Warm Signature: Exact 3D-embossed warm balloon with metallic segmented rim
         // Drop shadow

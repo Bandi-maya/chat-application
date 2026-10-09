@@ -1,20 +1,17 @@
-import 'dart:io';
-
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:flutter/services.dart';
 
-import '../../../ui/core/design_system/settings_primitives.dart';
-import '../../../ui/core/design_system/components/adaptive_selection_panel.dart';
+import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
-import '../../../ui/core/theme/app_theme.dart';
-import '../../../ui/core/bubbles/bubble_style_id.dart';
-import '../../../ui/core/bubbles/bubble_style_registry.dart';
-import '../../../ui/core/bubbles/bubble_painter.dart';
-import '../../../ui/core/ticks/delivery_icon_style.dart';
-import '../../../ui/core/ticks/delivery_status_icon.dart';
-import '../../../domain/models/chat_message.dart';
+import '../../../ui/core/design_system/design_system.dart';
+import '../../../ui/core/design_system/gb_design_system.dart';
+import 'conversation_action_bar_screen.dart';
+import 'conversation_bubble_and_ticks_screen.dart';
+import 'conversation_entry_style_screen.dart';
+import 'conversation_more_options_screen.dart';
 
+/// Conversation Screen Settings matching Image 5.
+/// Grouped in clean modern cards without hardcoded green borders, using global theme colors.
 class ConversationSettingsPage extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
 
@@ -29,447 +26,815 @@ class ConversationSettingsPage extends StatefulWidget {
 }
 
 class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
-  /// Real CONTROL side for wallpaperType 'Image': picks an image via
-  /// file_picker and copies it into the app documents directory so it
-  /// survives cache cleanup, then persists the path for the consumer.
-  Future<void> _pickWallpaperImage() async {
-    try {
-      final picked = await FilePicker.pickFile(type: FileType.image);
-      final sourcePath = picked?.path;
-      if (sourcePath == null || sourcePath.isEmpty) return;
-      final docs = await getApplicationDocumentsDirectory();
-      var ext = sourcePath.contains('.')
-          ? sourcePath.split('.').last.toLowerCase()
-          : 'png';
-      if (!RegExp(r'^[a-z0-9]{2,5}$').hasMatch(ext)) ext = 'png';
-      final target = File(
-        '${docs.path}/chaty_wallpaper_${DateTime.now().millisecondsSinceEpoch}.$ext',
-      );
-      await File(sourcePath).copy(target.path);
-      if (!mounted) return;
-      widget.preferencesController.updateConversation(
-        widget.preferencesController.conversation.copyWith(
-          wallpaperType: 'Image',
-          wallpaperPath: target.path,
-        ),
-        logTitle: 'Wallpaper Image',
-      );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not import that image.')),
-      );
-    }
+  void _openSubScreen(Widget child) {
+    HapticFeedback.selectionClick();
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => child),
+    );
   }
 
-  static const List<String> _reactionEmojis = [
-    '❤️',
-    '👍',
-    '🔥',
-    '😂',
-    '😮',
-    '🙏',
-  ];
-
-  static const List<String> _wallpaperTypes = [
-    'Pattern',
-    'Solid',
-    'Gradient',
-    'Image',
-    'ProfileBlur',
-  ];
-
-  static const List<double> _playbackSpeeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
-
-  Future<void> _showBubbleStylePicker(
-    BuildContext context,
-    String currentStyle,
-  ) async {
-    final activeId = BubbleStyleIdExtension.fromString(currentStyle);
-    final theme = Theme.of(context);
-
-    final selected = await AdaptiveSelectionPanel.show<BubbleStyleId>(
-      context: context,
-      title: 'Bubble Style Geometry',
-      subtitle: 'Choose from 48 discrete bubble contours',
-      selectedValue: activeId,
-      showApplyButton: true,
-      preferCenteredDialog: true,
-      options: BubbleStyleId.values.map((styleId) {
-        return SelectionOptionItem<BubbleStyleId>(
-          value: styleId,
-          title: styleId.displayName,
-          subtitle: 'Custom shape geometry',
-          preview: SizedBox(
-            width: 60,
-            height: 32,
-            child: CustomPaint(
-              painter: BubblePainter(
-                styleId: styleId,
-                isMe: true,
-                fillColor: theme.colorScheme.primary,
-                strokeColor: theme.colorScheme.primary.withValues(alpha: 0.3),
-                accentColor: theme.colorScheme.primary,
-              ),
-            ),
-          ),
-        );
-      }).toList(),
+  void _showColorPicker(String title, int currentColor, ValueChanged<int> onColorChanged) {
+    GbColorPickerModal.show(
+      context,
+      title: title,
+      currentColor: Color(currentColor),
+      onColorChanged: (c) => onColorChanged(c.value),
     );
-
-    if (selected != null) {
-      widget.preferencesController.updateConversation(
-        widget.preferencesController.conversation.copyWith(
-          bubbleStyle: selected.displayName,
-        ),
-        logTitle: 'Bubble Style',
-      );
-    }
-  }
-
-  Future<void> _showTickStylePicker(
-    BuildContext context,
-    String currentTick,
-  ) async {
-    final activeStyle = DeliveryIconStyleExtension.fromString(currentTick);
-    final theme = Theme.of(context);
-
-    final selected = await AdaptiveSelectionPanel.show<DeliveryIconStyle>(
-      context: context,
-      title: 'Delivery Tick Style',
-      subtitle: 'Choose from 16 custom vector delivery ticks',
-      selectedValue: activeStyle,
-      showApplyButton: true,
-      preferCenteredDialog: true,
-      options: DeliveryIconStyle.values.map((tickStyle) {
-        return SelectionOptionItem<DeliveryIconStyle>(
-          value: tickStyle,
-          title: tickStyle.displayName,
-          subtitle: 'Vector status glyph',
-          preview: DeliveryStatusIcon(
-            style: tickStyle,
-            state: DeliveryState.read,
-            unreadColor: theme.colorScheme.onSurfaceVariant.withValues(
-              alpha: 0.7,
-            ),
-            readColor: theme.colorScheme.primary,
-            size: 18,
-          ),
-        );
-      }).toList(),
-    );
-
-    if (selected != null) {
-      widget.preferencesController.updateConversation(
-        widget.preferencesController.conversation.copyWith(
-          tickStyle: selected.displayName,
-        ),
-        logTitle: 'Tick Style',
-      );
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final conv = widget.preferencesController.conversation;
-    final activeBubbleId = BubbleStyleIdExtension.fromString(conv.bubbleStyle);
-    final activeTickStyle = DeliveryIconStyleExtension.fromString(
-      conv.tickStyle,
-    );
+    final themeController = locator<ThemeController>();
+    final theme = themeController.globalTheme;
+    final colors = context.colors;
+    final isDark = theme.brightness == Brightness.dark;
 
-    return ChatySettingsPage(
-      title: 'Conversation Screen Settings',
-      subtitle: 'Bubbles, Ticks, Action Bar, Wallpaper & Sidebar',
-      children: [
-        // Live Preview Card at Top
-        ChatyPreviewCard(
-          title: 'Live Conversation Bubble Preview',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Bubble: ${conv.bubbleStyle} • Ticks: ${conv.tickStyle} • Wallpaper: ${conv.wallpaperType}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).textTheme.bodySmall?.color,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: context.colors.surface,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
+    return Scaffold(
+      backgroundColor: theme.backgroundColor,
+      appBar: AppBar(
+        backgroundColor: theme.backgroundColor,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: ChatyBackButton(
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ),
+        title: Text(
+          'Conversation Screen',
+          style: TextStyle(
+            color: theme.primaryTextColor,
+            fontSize: 20 * theme.fontScale,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.3,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        top: false,
+        child: ListenableBuilder(
+          listenable: widget.preferencesController,
+          builder: (context, _) {
+            final convPrefs = widget.preferencesController.conversation;
+
+            return ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              children: [
+                // Card 1: Top Navigation Subpages
+                _buildCardContainer(
+                  theme: theme,
+                  colors: colors,
+                  isDark: isDark,
                   children: [
-                    // Incoming Bubble Preview
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Container(
-                        margin: BubbleStyleRegistry.getGeometry(
-                          activeBubbleId,
-                        ).bubbleMargin,
-                        child: CustomPaint(
-                          painter: BubblePainter(
-                            styleId: activeBubbleId,
-                            isMe: false,
-                            fillColor: context.colors.surfaceSecondary,
-                            strokeColor: context.colors.primary.withValues(
-                              alpha: 0.4,
-                            ),
-                            accentColor: context.colors.primary,
-                          ),
-                          child: Padding(
-                            padding: BubbleStyleRegistry.getGeometry(
-                              activeBubbleId,
-                            ).contentPadding,
-                            child: Text(
-                              'Incoming message preview',
-                              style: TextStyle(
-                                color: context.colors.onSurface,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
+                    _buildSubpageRow(
+                      icon: Icons.table_chart_outlined,
+                      title: 'Action Bar',
+                      theme: theme,
+                      colors: colors,
+                      onTap: () => _openSubScreen(
+                        ConversationActionBarScreen(
+                          preferencesController: widget.preferencesController,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    // Outgoing Bubble Preview with Selected Tick Style
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Container(
-                        margin: BubbleStyleRegistry.getGeometry(
-                          activeBubbleId,
-                        ).bubbleMargin,
-                        child: CustomPaint(
-                          painter: BubblePainter(
-                            styleId: activeBubbleId,
-                            isMe: true,
-                            fillColor: context.colors.primary,
-                            strokeColor: context.colors.primary.withValues(
-                              alpha: 0.4,
-                            ),
-                            accentColor: context.colors.primary,
-                          ),
-                          child: Padding(
-                            padding: BubbleStyleRegistry.getGeometry(
-                              activeBubbleId,
-                            ).contentPadding,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'Outgoing reply!',
-                                  style: TextStyle(
-                                    color: context.colors.onPrimary,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                DeliveryStatusIcon(
-                                  style: activeTickStyle,
-                                  state: DeliveryState.read,
-                                  unreadColor: context.colors.onPrimary
-                                      .withValues(alpha: 0.7),
-                                  readColor: Colors.white,
-                                  size: 16,
-                                ),
-                              ],
-                            ),
-                          ),
+                    _buildDivider(colors),
+                    _buildSubpageRow(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      title: 'Bubble And Ticks',
+                      theme: theme,
+                      colors: colors,
+                      onTap: () => _openSubScreen(
+                        ConversationBubbleAndTicksScreen(
+                          preferencesController: widget.preferencesController,
+                        ),
+                      ),
+                    ),
+                    _buildDivider(colors),
+                    _buildSubpageRow(
+                      icon: Icons.edit_note_rounded,
+                      title: 'Conversation Entry style',
+                      theme: theme,
+                      colors: colors,
+                      onTap: () => _openSubScreen(
+                        ConversationEntryStyleScreen(
+                          preferencesController: widget.preferencesController,
+                        ),
+                      ),
+                    ),
+                    _buildDivider(colors),
+                    _buildSubpageRow(
+                      icon: Icons.more_horiz_rounded,
+                      title: 'More options',
+                      theme: theme,
+                      colors: colors,
+                      onTap: () => _openSubScreen(
+                        ConversationMoreOptionsScreen(
+                          preferencesController: widget.preferencesController,
                         ),
                       ),
                     ),
                   ],
                 ),
+                const SizedBox(height: 16),
+
+                // Card 2: Mods, Groups, Quick Replies, Options, Translate, Wallpaper, Voice Notes
+                _buildCardContainer(
+                  theme: theme,
+                  colors: colors,
+                  isDark: isDark,
+                  children: [
+                    // Section: Mods
+                    _buildSectionDivider(label: 'Mods', accent: theme.accentColor),
+                    _buildSwitchRow(
+                      icon: Icons.link_rounded,
+                      title: 'Switch direct contact link.',
+                      subtitle: "Currently direct contact links are creating with the 'https://api.whatsapp.com/' prefix",
+                      value: convPrefs.switchDirectContactLink,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updateConversation(
+                          convPrefs.copyWith(switchDirectContactLink: val),
+                          logTitle: 'Switch direct contact link',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.sticky_note_2_outlined,
+                      title: 'Confirm before sending a Sticker',
+                      subtitle: 'Ask for confirmation before sending a sticker to chat',
+                      value: convPrefs.confirmBeforeSendingSticker,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updateConversation(
+                          convPrefs.copyWith(confirmBeforeSendingSticker: val),
+                          logTitle: 'Confirm sticker',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.attachment_rounded,
+                      title: 'New Attachment Picker UI',
+                      subtitle: 'Use modern bottom sheet attachment picker',
+                      value: convPrefs.newAttachmentPickerUi,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updateConversation(
+                          convPrefs.copyWith(newAttachmentPickerUi: val),
+                          logTitle: 'Attachment picker',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.copy_rounded,
+                      title: 'Hide date and name',
+                      subtitle: 'Hide the date and the name when copying 2 messages or more',
+                      value: convPrefs.hideDateAndName,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updateConversation(
+                          convPrefs.copyWith(hideDateAndName: val),
+                          logTitle: 'Hide date and name on copy',
+                        );
+                      },
+                    ),
+
+                    // Section: Groups
+                    _buildSectionDivider(label: 'Groups', accent: theme.accentColor),
+                    _buildSwitchRow(
+                      icon: Icons.admin_panel_settings_outlined,
+                      title: 'Hide icon next to admin name',
+                      subtitle: 'Hide the icon next to the admin name in groups',
+                      value: convPrefs.hideAdminNameIcon,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updateConversation(
+                          convPrefs.copyWith(hideAdminNameIcon: val),
+                          logTitle: 'Hide admin icon',
+                        );
+                      },
+                    ),
+                    _buildChevronRow(
+                      icon: Icons.verified_user_outlined,
+                      title: 'Group admin icon',
+                      subtitle: 'Change admin icon in groups',
+                      theme: theme,
+                      colors: colors,
+                      onTap: () {},
+                    ),
+
+                    // Section: Quick Replies
+                    _buildSectionDivider(label: 'Quick Replies', accent: theme.accentColor),
+                    _buildSwitchRow(
+                      icon: Icons.view_sidebar_outlined,
+                      title: 'Quick Contact Sidebar',
+                      subtitle: convPrefs.enableQuickContactSidebar ? 'Enabled' : 'Disabled',
+                      value: convPrefs.enableQuickContactSidebar,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updateConversation(
+                          convPrefs.copyWith(enableQuickContactSidebar: val),
+                          logTitle: 'Quick Contact Sidebar',
+                        );
+                      },
+                    ),
+                    _buildChevronRow(
+                      icon: Icons.align_vertical_top_rounded,
+                      title: 'Quick Contact Sidebar Position',
+                      subtitle: convPrefs.quickContactSidebarPosition,
+                      theme: theme,
+                      colors: colors,
+                      onTap: () {
+                        final next = convPrefs.quickContactSidebarPosition == 'Top' ? 'Bottom' : 'Top';
+                        widget.preferencesController.updateConversation(
+                          convPrefs.copyWith(quickContactSidebarPosition: next),
+                        );
+                      },
+                    ),
+                    _buildColorRow(
+                      icon: Icons.format_color_fill_rounded,
+                      title: 'Quick Contact Background',
+                      colorValue: convPrefs.quickContactBgColor,
+                      theme: theme,
+                      colors: colors,
+                      onTap: () => _showColorPicker(
+                        'Quick Contact Background',
+                        convPrefs.quickContactBgColor,
+                        (c) => widget.preferencesController.updateConversation(
+                          convPrefs.copyWith(quickContactBgColor: c),
+                        ),
+                      ),
+                    ),
+                    _buildColorRow(
+                      icon: Icons.color_lens_outlined,
+                      title: 'Quick Contact Text Color',
+                      colorValue: convPrefs.quickContactTextColor,
+                      theme: theme,
+                      colors: colors,
+                      onTap: () => _showColorPicker(
+                        'Quick Contact Text Color',
+                        convPrefs.quickContactTextColor,
+                        (c) => widget.preferencesController.updateConversation(
+                          convPrefs.copyWith(quickContactTextColor: c),
+                        ),
+                      ),
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.add_circle_outline_rounded,
+                      title: 'Hide Chat FAB',
+                      subtitle: 'Hide the plus button on the top right of the chat screen',
+                      value: convPrefs.hideChatFab,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updateConversation(
+                          convPrefs.copyWith(hideChatFab: val),
+                          logTitle: 'Hide Chat FAB',
+                        );
+                      },
+                    ),
+
+                    // Section: Options Click on Hours
+                    _buildSectionDivider(label: 'Options Click on Hours', accent: theme.accentColor),
+                    _buildSwitchRow(
+                      icon: Icons.menu_open_rounded,
+                      title: 'iOS style pop-up menu',
+                      subtitle: 'Show the new iOS style popup menu in chats',
+                      value: convPrefs.iosStylePopupMenu,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updateConversation(
+                          convPrefs.copyWith(iosStylePopupMenu: val),
+                          logTitle: 'iOS style pop-up menu',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      title: 'Disable More Options Dialog from Bubble',
+                      subtitle: 'You can disable more options dialog from chat bubble',
+                      value: convPrefs.disableMoreOptionsFromBubble,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updateConversation(
+                          convPrefs.copyWith(disableMoreOptionsFromBubble: val),
+                          logTitle: 'Disable bubble options dialog',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.touch_app_outlined,
+                      title: 'Disable Double Tap Reaction',
+                      subtitle: 'Suppress emoji reaction on double tapping a message',
+                      value: convPrefs.disableDoubleTapReaction,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updateConversation(
+                          convPrefs.copyWith(disableDoubleTapReaction: val),
+                          logTitle: 'Disable double tap reaction',
+                        );
+                      },
+                    ),
+
+                    // Section: Translate Option Settings
+                    _buildSectionDivider(label: 'Translate Option Settings', accent: theme.accentColor),
+                    _buildChevronRow(
+                      icon: Icons.translate_rounded,
+                      title: 'Translate Option Settings',
+                      subtitle: 'Choose how the translated text works. Server / In-outside apps',
+                      theme: theme,
+                      colors: colors,
+                      onTap: () {},
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.g_translate_rounded,
+                      title: 'Hide Message Translation Icon',
+                      subtitle: 'Dont show message translation icon in conversation entry',
+                      value: convPrefs.hideMessageTranslationIcon,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updateConversation(
+                          convPrefs.copyWith(hideMessageTranslationIcon: val),
+                          logTitle: 'Hide message translation icon',
+                        );
+                      },
+                    ),
+
+                    // Section: Wallpaper
+                    _buildSectionDivider(label: 'Wallpaper', accent: theme.accentColor),
+                    _buildSwitchRow(
+                      icon: Icons.wallpaper_rounded,
+                      title: 'Custom Wallpaper per contact',
+                      subtitle: 'Allows you to set custom wallpaper for each person/conversation',
+                      value: convPrefs.customWallpaperPerContact,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updateConversation(
+                          convPrefs.copyWith(customWallpaperPerContact: val),
+                          logTitle: 'Custom wallpaper per contact',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.portrait_rounded,
+                      title: 'Profile Pic Wallpaper',
+                      subtitle: 'Set profile pic as wallpaper if exists',
+                      value: convPrefs.profilePicWallpaper,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updateConversation(
+                          convPrefs.copyWith(profilePicWallpaper: val),
+                          logTitle: 'Profile Pic Wallpaper',
+                        );
+                      },
+                    ),
+
+                    // Section: Voice Notes/Audio Mods
+                    _buildSectionDivider(label: 'Voice Notes/Audio Mods', accent: theme.accentColor),
+                    _buildSwitchRow(
+                      icon: Icons.sensors_rounded,
+                      title: 'Enable Proximity Sensor',
+                      subtitle: 'Enabled by default. Disable to turn it off.',
+                      value: convPrefs.enableProximitySensor,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updateConversation(
+                          convPrefs.copyWith(enableProximitySensor: val),
+                          logTitle: 'Enable Proximity Sensor',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.volume_up_outlined,
+                      title: 'Disable Output Switching',
+                      subtitle: 'Prevents speaker/earpiece switching while playing',
+                      value: convPrefs.disableOutputSwitching,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updateConversation(
+                          convPrefs.copyWith(disableOutputSwitching: val),
+                          logTitle: 'Disable Output Switching',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.play_arrow_outlined,
+                      title: 'Play Voice Notes',
+                      subtitle: 'Disables continuous playback of voice notes',
+                      value: convPrefs.playVoiceNotes,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updateConversation(
+                          convPrefs.copyWith(playVoiceNotes: val),
+                          logTitle: 'Play Voice Notes',
+                        );
+                      },
+                    ),
+                    _buildSwitchRow(
+                      icon: Icons.forward_rounded,
+                      title: 'Forward as voice note',
+                      subtitle: 'If enabled, audio messages will be forwarded as voice notes',
+                      value: convPrefs.forwardAsVoiceNote,
+                      theme: theme,
+                      colors: colors,
+                      onChanged: (val) {
+                        widget.preferencesController.updateConversation(
+                          convPrefs.copyWith(forwardAsVoiceNote: val),
+                          logTitle: 'Forward as voice note',
+                        );
+                      },
+                    ),
+                    _buildChevronRow(
+                      icon: Icons.notifications_none_rounded,
+                      title: 'Incoming message ringtone',
+                      subtitle: "Change the 'Incoming message' sound in chat",
+                      theme: theme,
+                      colors: colors,
+                      onTap: () {},
+                    ),
+                    _buildChevronRow(
+                      icon: Icons.notification_important_outlined,
+                      title: 'Send message ringtone',
+                      subtitle: "Change the 'Send message' sound in chat",
+                      theme: theme,
+                      colors: colors,
+                      onTap: () {},
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+                const SizedBox(height: 32),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardContainer({
+    required dynamic theme,
+    required dynamic colors,
+    required bool isDark,
+    required List<Widget> children,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E2124) : colors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colors.borderSubtle,
+          width: 0.9,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: isDark ? 0.25 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: children,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDivider(dynamic colors) {
+    return Divider(
+      height: 1,
+      thickness: 0.8,
+      indent: 64,
+      endIndent: 16,
+      color: colors.borderSubtle.withValues(alpha: 0.4),
+    );
+  }
+
+  Widget _buildSectionDivider({
+    required String label,
+    required Color accent,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: 1.2,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    accent.withValues(alpha: 0.0),
+                    accent.withValues(alpha: 0.7),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: accent,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Container(
+              height: 1.2,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    accent.withValues(alpha: 0.7),
+                    accent.withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubpageRow({
+    required IconData icon,
+    required String title,
+    required dynamic theme,
+    required dynamic colors,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: theme.accentColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: theme.accentColor, size: 21),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: theme.primaryTextColor,
+                    fontSize: 15.5 * theme.fontScale,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: theme.accentColor,
+                size: 22,
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
 
-        // Discrete Bubbles and Ticks Section
-        ChatySettingsSection(
-          title: 'Bubbles & Ticks',
-          description:
-              'Choose from 48 discrete bubble contours and 16 custom vector delivery ticks.',
-          children: [
-            ListTile(
-              leading: const Icon(Icons.chat_bubble_outline_rounded),
-              title: const Text('Bubble Style'),
-              subtitle: Text(conv.bubbleStyle),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => _showBubbleStylePicker(context, conv.bubbleStyle),
-            ),
-            ListTile(
-              leading: const Icon(Icons.done_all_rounded),
-              title: const Text('Delivery Tick Style'),
-              subtitle: Text(conv.tickStyle),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => _showTickStylePicker(context, conv.tickStyle),
-            ),
-          ],
-        ),
-
-        // Quick Contact Sidebar
-        ChatySettingsSection(
-          title: 'Quick Contact Sidebar',
-          description:
-              'Docked sidebar panel for rapid contact navigation in chat.',
-          children: [
-            ChatySwitchTile(
-              icon: Icons.dock_rounded,
-              iconColor: context.colors.primary,
-              title: 'Enable Quick Contact Sidebar',
-              subtitle:
-                  'Show quick contact switcher panel inside active conversations',
-              value: conv.enableQuickContactSidebar,
-              onChanged: (val) {
-                widget.preferencesController.updateConversation(
-                  conv.copyWith(enableQuickContactSidebar: val),
-                  logTitle: 'Quick Contact Sidebar',
-                );
-              },
-            ),
-            if (conv.enableQuickContactSidebar) ...[
-              ChatyChoiceTile<String>(
-                title: 'Sidebar Position',
-                requireApply: true,
-                options: const ['Left', 'Right'],
-                selectedOption: conv.sidebarPosition,
-                optionLabel: (s) => s,
-                onSelected: (pos) {
-                  widget.preferencesController.updateConversation(
-                    conv.copyWith(sidebarPosition: pos),
-                    logTitle: 'Sidebar Position',
-                  );
-                },
-              ),
-              ChatySliderTile(
-                icon: Icons.opacity_rounded,
-                title: 'Sidebar Opacity',
-                value: conv.sidebarOpacity,
-                min: 0.3,
-                max: 1.0,
-                divisions: 14,
-                valueFormatter: (v) => '${(v * 100).toInt()}%',
-                onChanged: (v) {
-                  widget.preferencesController.updateConversation(
-                    conv.copyWith(sidebarOpacity: v),
-                    logTitle: 'Sidebar Opacity',
-                  );
-                },
-              ),
-            ],
-          ],
-        ),
-
-        // Interaction & Reactions
-        ChatySettingsSection(
-          title: 'Reactions & Interaction Menus',
-          children: [
-            ChatySwitchTile(
-              icon: Icons.auto_awesome_rounded,
-              iconColor: context.colors.primary,
-              title: 'Animated Emojis',
-              subtitle:
-                  'Play vector animations for emojis and reactions throughout chats',
-              value: conv.enableAnimatedEmojis,
-              onChanged: (val) {
-                widget.preferencesController.updateConversation(
-                  conv.copyWith(enableAnimatedEmojis: val),
-                  logTitle: 'Animated Emojis',
-                );
-              },
-            ),
-            ChatySwitchTile(
-              icon: Icons.touch_app_rounded,
-              iconColor: context.colors.accent,
-              title: 'iOS-Style Context Popup Menu',
-              subtitle:
-                  'Use modern iOS-style floating menu on message long-press',
-              value: conv.iosStylePopupMenu,
-              onChanged: (val) {
-                widget.preferencesController.updateConversation(
-                  conv.copyWith(iosStylePopupMenu: val),
-                  logTitle: 'iOS Popup Menu',
-                );
-              },
-            ),
-            ChatyChoiceTile<String>(
-              title: 'Double-Tap Reaction Emoji',
-              requireApply: true,
-              options: _reactionEmojis,
-              selectedOption: conv.doubleTapReactionEmoji,
-              optionLabel: (s) => s,
-              onSelected: (emoji) {
-                widget.preferencesController.updateConversation(
-                  conv.copyWith(doubleTapReactionEmoji: emoji),
-                  logTitle: 'Double Tap Reaction',
-                );
-              },
-            ),
-          ],
-        ),
-
-        // Conversation Wallpaper
-        ChatySettingsSection(
-          title: 'Wallpaper & Audio Playback',
-          children: [
-            ChatyChoiceTile<String>(
-              title: 'Background Wallpaper',
-              requireApply: true,
-              options: _wallpaperTypes,
-              selectedOption: conv.wallpaperType,
-              optionLabel: (s) => s,
-              onSelected: (wp) {
-                widget.preferencesController.updateConversation(
-                  conv.copyWith(wallpaperType: wp),
-                  logTitle: 'Wallpaper Type',
-                );
-              },
-            ),
-            if (conv.wallpaperType == 'Image') ...[
-              ChatySettingsTile(
-                icon: Icons.image_rounded,
-                iconColor: context.colors.primary,
-                title: 'Choose background image',
-                subtitle: conv.wallpaperPath.isEmpty
-                    ? 'No image selected yet'
-                    : 'Custom image imported',
-                onTap: () => _pickWallpaperImage(),
-              ),
-              if (conv.wallpaperPath.isNotEmpty)
-                ChatySettingsTile(
-                  icon: Icons.delete_sweep_rounded,
-                  iconColor: context.colors.error,
-                  title: 'Remove custom image',
-                  subtitle: 'Fall back to the themed gradient background',
-                  onTap: () {
-                    widget.preferencesController.updateConversation(
-                      conv.copyWith(wallpaperPath: ''),
-                      logTitle: 'Wallpaper Image Removed',
-                    );
-                  },
+  Widget _buildSwitchRow({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool value,
+    required dynamic theme,
+    required dynamic colors,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onChanged(!value);
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: theme.accentColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(11),
                 ),
+                child: Icon(icon, color: theme.accentColor, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: theme.primaryTextColor,
+                        fontSize: 14.5 * theme.fontScale,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: theme.secondaryTextColor,
+                        fontSize: 11.5 * theme.fontScale,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              IgnorePointer(
+                child: Switch(
+                  value: value,
+                  activeColor: theme.accentColor,
+                  onChanged: null,
+                ),
+              ),
             ],
-            ChatyChoiceTile<double>(
-              title: 'Voice Note Speed',
-              requireApply: true,
-              options: _playbackSpeeds,
-              selectedOption: conv.voicePlaybackSpeed,
-              optionLabel: (v) => '${v}x',
-              onSelected: (speed) {
-                widget.preferencesController.updateConversation(
-                  conv.copyWith(voicePlaybackSpeed: speed),
-                  logTitle: 'Voice Speed',
-                );
-              },
-            ),
-          ],
+          ),
         ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildChevronRow({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required dynamic theme,
+    required dynamic colors,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: theme.accentColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(icon, color: theme.accentColor, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: theme.primaryTextColor,
+                        fontSize: 14.5 * theme.fontScale,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: theme.secondaryTextColor,
+                        fontSize: 11.5 * theme.fontScale,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: theme.accentColor,
+                size: 22,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildColorRow({
+    required IconData icon,
+    required String title,
+    required int colorValue,
+    required dynamic theme,
+    required dynamic colors,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: theme.accentColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(icon, color: theme.accentColor, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: theme.primaryTextColor,
+                    fontSize: 14.5 * theme.fontScale,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: Color(colorValue),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: colors.borderSubtle, width: 1.5),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
