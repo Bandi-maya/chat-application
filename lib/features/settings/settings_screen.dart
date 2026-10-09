@@ -14,6 +14,7 @@ import 'home/home_screen_settings_page.dart';
 import 'conversation/conversation_settings_page.dart';
 import 'notifications/notification_settings_page.dart';
 import 'message_management/message_management_page.dart';
+import '../messages/starred_messages_screen.dart';
 import 'effects/navigation_effects_page.dart';
 import 'permissions/system_permissions_screen.dart';
 import '../auth/welcome_screen.dart';
@@ -94,6 +95,18 @@ class SettingsScreen extends StatelessWidget {
             'Apply app-wide templates and independently customize navigation, home, chat list, bubbles, composer, updates, profile and calls',
         icon: Icons.dashboard_customize_rounded,
         destination: const TemplatesSettingsScreen(),
+      ),
+      SettingsSearchResult(
+        title: 'Starred Messages',
+        category: 'Messages',
+        description: 'Search, open and remove saved messages across conversations',
+        icon: Icons.star_outline_rounded,
+        destination: StarredMessagesScreen(
+          dataStore: dataStore,
+          theme: themeController.globalTheme,
+          preferencesController: preferencesController,
+          themeController: themeController,
+        ),
       ),
       SettingsSearchResult(
         title: 'Home UI Style',
