@@ -155,9 +155,9 @@ class _AppearanceOverview extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _ChipBadge(label: 'Type: '),
-              _ChipBadge(label: 'In: '),
-              _ChipBadge(label: 'Out: '),
+              _ChipBadge(label: 'Type: ${controller.typographyStyle}'),
+              _ChipBadge(label: 'In: ${controller.entryAnimation}'),
+              _ChipBadge(label: 'Out: ${controller.exitAnimation}'),
             ],
           ),
         ],
