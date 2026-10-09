@@ -967,14 +967,14 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               tooltip: 'Camera Effects',
               color: theme.primaryTextColor,
               onPressed: () => EffectPickerSheet.show(context),
-              icon: const const ChatyGlyphIcon(glyph: ChatyGlyph.camera, size: 20),
+              icon: const ChatyGlyphIcon(glyph: ChatyGlyph.camera, size: 20),
             ),
           if (homePrefs.showDesktopIcon && !compactHeader)
             IconButton(
               tooltip: 'QR / Scan',
               color: theme.primaryTextColor,
               onPressed: () => _openQrScreen(initialIndex: 1),
-              icon: const const ChatyGlyphIcon(glyph: ChatyGlyph.qrScan, size: 20),
+              icon: const ChatyGlyphIcon(glyph: ChatyGlyph.qrScan, size: 20),
             ),
           if (homePrefs.showSearchBar &&
               headerStyle == HomeHeaderStyle.searchForward)
@@ -1292,7 +1292,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                     sectionLabel('Create'),
                     actionTile(
                       value: 'effects',
-                      icon: Icons.camera_alt_outlined,
+                      icon: ChatyGlyph.camera,
                       title: 'Camera effects',
                       subtitle: 'Choose a capture look',
                     ),
@@ -1300,7 +1300,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   if (homePrefs.showDesktopIcon) ...[
                     actionTile(
                       value: 'qr',
-                      icon: Icons.qr_code_scanner_rounded,
+                      icon: ChatyGlyph.qrScan,
                       title: 'QR / Scan',
                       subtitle: 'Scan or manage a device link',
                     ),
@@ -1308,39 +1308,39 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   sectionLabel('Devices'),
                   actionTile(
                     value: 'linked',
-                    icon: Icons.devices_rounded,
+                    icon: ChatyGlyph.devices,
                     title: 'Linked devices',
                     subtitle: 'Review connected devices',
                   ),
                   sectionLabel('Appearance'),
                   actionTile(
                     value: 'themes',
-                    icon: Icons.palette_outlined,
+                    icon: ChatyGlyph.palette,
                     title: 'Themes & colors',
                     subtitle: 'Color palette, typography and bubble appearance',
                   ),
                   actionTile(
                     value: 'templates',
-                    icon: Icons.dashboard_customize_outlined,
+                    icon: ChatyGlyph.templates,
                     title: 'Templates & layouts',
                     subtitle: 'Apply a complete look or mix individual components',
                   ),
                   actionTile(
                     value: 'home',
-                    icon: Icons.view_quilt_outlined,
+                    icon: ChatyGlyph.homeLayout,
                     title: 'Home & navigation',
                     subtitle: 'Header, stories, navigation architecture and motion',
                   ),
                   actionTile(
                     value: 'navigation',
-                    icon: Icons.reorder_rounded,
+                    icon: ChatyGlyph.navigation,
                     title: 'Navigation destinations',
                     subtitle: 'Choose primary tabs and organize the More menu',
                   ),
                   sectionLabel('System'),
                   actionTile(
                     value: 'settings',
-                    icon: Icons.settings_outlined,
+                    icon: ChatyGlyph.settings,
                     title: 'All settings',
                     subtitle: 'Privacy, security, notifications and account',
                   ),
