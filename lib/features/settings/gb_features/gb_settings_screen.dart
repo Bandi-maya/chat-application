@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../domain/models/preferences.dart';
@@ -114,7 +116,7 @@ class GbSettingsScreen extends StatelessWidget {
                   iconBgColor: colors.primary.withValues(alpha: 0.12),
                   iconColor: theme.accentColor,
                   title: 'Download Apps New',
-                  subtitle: 'Instagram • TikTok • Twitter • Telegram',
+                  subtitle: 'Open official Google Play listings',
                   onTap: () => _showDownloadAppsSheet(context, theme, colors),
                 ),
               ],
@@ -334,7 +336,7 @@ class GbSettingsScreen extends StatelessWidget {
                   iconBgColor: colors.primary.withValues(alpha: 0.14),
                   iconColor: theme.accentColor,
                   title: 'Backup and restore',
-                  subtitle: 'GBWA Data Backup • GBWA Data Recovery',
+                  subtitle: 'Export and restore Chaty settings safely',
                   onTap: () => _showBackupRestoreSheet(context, theme, colors),
                 ),
                 _buildDivider(colors),
@@ -345,7 +347,7 @@ class GbSettingsScreen extends StatelessWidget {
                   iconBgColor: colors.warning.withValues(alpha: 0.14),
                   iconColor: colors.warning,
                   title: 'Waste cleaning',
-                  subtitle: 'Clear Cache • Increase Memory Space',
+                  subtitle: 'Remove expired generated image cache files',
                   onTap: () => _showWasteCleaningSheet(context, theme, colors),
                 ),
                 _buildDivider(colors),
@@ -355,8 +357,8 @@ class GbSettingsScreen extends StatelessWidget {
                   icon: Icons.widgets_rounded,
                   iconBgColor: colors.info.withValues(alpha: 0.14),
                   iconColor: colors.info,
-                  title: 'GBWA Widget',
-                  subtitle: 'Design Shortcut • Widget',
+                  title: 'Home shortcuts',
+                  subtitle: 'Configure in-app home layout and shortcuts',
                   onTap: () => _showWidgetSettingsSheet(context, theme, colors),
                 ),
               ],
@@ -376,7 +378,7 @@ class GbSettingsScreen extends StatelessWidget {
                   iconBgColor: colors.primary.withValues(alpha: 0.14),
                   iconColor: theme.accentColor,
                   title: 'Updates',
-                  subtitle: 'Check for a new update • Changelog',
+                  subtitle: 'Open Chaty release notes and versions',
                   onTap: () => _showUpdatesDialog(context, theme, colors),
                 ),
                 _buildDivider(colors),
@@ -558,7 +560,7 @@ class GbSettingsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'Download Apps New',
+                'Get Official Apps',
                 style: TextStyle(
                   color: theme.primaryTextColor,
                   fontSize: 18 * theme.fontScale,
@@ -567,17 +569,33 @@ class GbSettingsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Direct social suite integrations with verified builds.',
+                'Open the official app listings in Google Play. Chaty does not distribute modified third-party apps.',
                 style: TextStyle(
                   color: theme.secondaryTextColor,
                   fontSize: 13 * theme.fontScale,
                 ),
               ),
               const SizedBox(height: 18),
-              _appDownloadTile('Instagram Pro', 'Photos, Reels, Direct DMs', Icons.camera_alt_rounded, colors.primary, ctx),
-              _appDownloadTile('TikTok Plus', 'Short videos without watermark', Icons.music_note_rounded, colors.info, ctx),
-              _appDownloadTile('Twitter / X Mod', 'Download media, ad-free feed', Icons.alternate_email_rounded, colors.secondary, ctx),
-              _appDownloadTile('Telegram Elite', 'Unlimited channels and cloud', Icons.send_rounded, Colors.lightBlue, ctx),
+              _appDownloadTile(
+                'Instagram', 'Photos, Reels and Direct messages',
+                Icons.camera_alt_rounded, colors.primary, ctx, context,
+                'https://play.google.com/store/apps/details?id=com.instagram.android',
+              ),
+              _appDownloadTile(
+                'TikTok', 'Short-form videos and creators',
+                Icons.music_note_rounded, colors.info, ctx, context,
+                'https://play.google.com/store/apps/details?id=com.zhiliaoapp.musically',
+              ),
+              _appDownloadTile(
+                'X', 'Posts, conversations and media',
+                Icons.alternate_email_rounded, colors.secondary, ctx, context,
+                'https://play.google.com/store/apps/details?id=com.twitter.android',
+              ),
+              _appDownloadTile(
+                'Telegram', 'Messaging, channels and cloud chats',
+                Icons.send_rounded, Colors.lightBlue, ctx, context,
+                'https://play.google.com/store/apps/details?id=org.telegram.messenger',
+              ),
             ],
           ),
         ),
@@ -585,7 +603,15 @@ class GbSettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _appDownloadTile(String name, String desc, IconData icon, Color color, BuildContext ctx) {
+  Widget _appDownloadTile(
+    String name,
+    String desc,
+    IconData icon,
+    Color color,
+    BuildContext sheetContext,
+    BuildContext pageContext,
+    String url,
+  ) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Container(
@@ -600,13 +626,18 @@ class GbSettingsScreen extends StatelessWidget {
       title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
       subtitle: Text(desc, style: const TextStyle(fontSize: 12)),
       trailing: FilledButton.tonal(
-        onPressed: () {
-          Navigator.pop(ctx);
-          ScaffoldMessenger.of(ctx).showSnackBar(
-            SnackBar(content: Text('Downloading $name package...')),
+        onPressed: () async {
+          Navigator.of(sheetContext).pop();
+          final opened = await launchUrl(
+            Uri.parse(url),
+            mode: LaunchMode.externalApplication,
+          );
+          if (!pageContext.mounted || opened) return;
+          ScaffoldMessenger.of(pageContext).showSnackBar(
+            SnackBar(content: Text('Could not open the official $name listing.')),
           );
         },
-        child: const Text('Get'),
+        child: const Text('Open'),
       ),
     );
   }
@@ -919,13 +950,69 @@ class GbSettingsScreen extends StatelessWidget {
     );
   }
 
+  Future<({int count, int bytes})> _scanExpiredCompressedImages() async {
+    final temp = await getTemporaryDirectory();
+    if (!await temp.exists()) return (count: 0, bytes: 0);
+    final cutoff = DateTime.now().subtract(const Duration(hours: 24));
+    final generatedImage = RegExp(r'^chaty_[0-9a-fA-F-]{36}\\.jpg$');
+    var count = 0;
+    var bytes = 0;
+    await for (final entity in temp.list(followLinks: false)) {
+      if (entity is! File ||
+          !generatedImage.hasMatch(entity.uri.pathSegments.last)) {
+        continue;
+      }
+      try {
+        final stat = await entity.stat();
+        if (!stat.modified.isBefore(cutoff)) continue;
+        count++;
+        bytes += await entity.length();
+      } catch (_) {
+        // Cache entries can disappear while another operation is finishing.
+      }
+    }
+    return (count: count, bytes: bytes);
+  }
+
+  Future<({int count, int bytes})> _cleanExpiredCompressedImages() async {
+    final temp = await getTemporaryDirectory();
+    if (!await temp.exists()) return (count: 0, bytes: 0);
+    final cutoff = DateTime.now().subtract(const Duration(hours: 24));
+    final generatedImage = RegExp(r'^chaty_[0-9a-fA-F-]{36}\\.jpg$');
+    var count = 0;
+    var bytes = 0;
+    await for (final entity in temp.list(followLinks: false)) {
+      if (entity is! File ||
+          !generatedImage.hasMatch(entity.uri.pathSegments.last)) {
+        continue;
+      }
+      try {
+        final stat = await entity.stat();
+        if (!stat.modified.isBefore(cutoff)) continue;
+        final length = await entity.length();
+        await entity.delete();
+        count++;
+        bytes += length;
+      } catch (_) {
+        // Leave any file that is locked or otherwise unavailable.
+      }
+    }
+    return (count: count, bytes: bytes);
+  }
+
+  String _formatCacheSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
+  }
+
   void _showWasteCleaningSheet(
     BuildContext context,
     ThemeConfig theme,
     AppColors colors,
   ) {
     HapticFeedback.lightImpact();
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       backgroundColor: theme.surfaceColor,
       shape: const RoundedRectangleBorder(
@@ -939,53 +1026,101 @@ class GbSettingsScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Waste Cleaning & Memory Space',
+                'Expired Cache Cleanup',
                 style: TextStyle(
                   color: theme.primaryTextColor,
                   fontSize: 18 * theme.fontScale,
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: colors.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.cleaning_services_rounded, color: theme.accentColor, size: 28),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text('Recoverable Cache', style: TextStyle(fontWeight: FontWeight.bold)),
-                          Text('Cached thumbnails & logs: 248.6 MB', style: TextStyle(fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+              const SizedBox(height: 10),
+              Text(
+                'Only Chaty-generated compressed image copies older than 24 hours are eligible. Voice notes, recent uploads, unsent staged media, chat attachments and profile images are preserved.',
+                style: TextStyle(color: theme.secondaryTextColor, fontSize: 13),
               ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: theme.accentColor,
-                    foregroundColor: colors.onPrimary,
-                  ),
-                  icon: const Icon(Icons.delete_sweep_rounded),
-                  label: const Text('Clean All Waste Cache (248.6 MB)'),
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Cleared 248.6 MB of cache successfully! 🚀')),
+              const SizedBox(height: 16),
+              FutureBuilder<({int count, int bytes})>(
+                future: _scanExpiredCompressedImages(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const Padding(
+                      padding: EdgeInsets.all(18),
+                      child: Center(child: CircularProgressIndicator()),
                     );
-                  },
-                ),
+                  }
+                  if (snapshot.hasError) {
+                    return Text(
+                      'Cache information is unavailable on this device.',
+                      style: TextStyle(color: theme.secondaryTextColor),
+                    );
+                  }
+                  final stats = snapshot.data ?? (count: 0, bytes: 0);
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: colors.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.cleaning_services_rounded,
+                                color: theme.accentColor, size: 28),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Expired image cache',
+                                      style: TextStyle(fontWeight: FontWeight.bold)),
+                                  Text(
+                                    '${stats.count} file(s) • ${_formatCacheSize(stats.bytes)}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: theme.secondaryTextColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: theme.accentColor,
+                            foregroundColor: colors.onPrimary,
+                          ),
+                          icon: const Icon(Icons.delete_sweep_rounded),
+                          label: Text(
+                            stats.count == 0
+                                ? 'No expired cache to clean'
+                                : 'Clean ${stats.count} expired file(s)',
+                          ),
+                          onPressed: stats.count == 0
+                              ? null
+                              : () async {
+                                  Navigator.of(ctx).pop();
+                                  final removed = await _cleanExpiredCompressedImages();
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Removed ${removed.count} expired file(s), ${_formatCacheSize(removed.bytes)}.',
+                                      ),
+                                    ),
+                                  );
+                                },
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ],
           ),
@@ -999,7 +1134,7 @@ class GbSettingsScreen extends StatelessWidget {
     ThemeConfig theme,
     AppColors colors,
   ) {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       backgroundColor: theme.surfaceColor,
       shape: const RoundedRectangleBorder(
@@ -1013,7 +1148,7 @@ class GbSettingsScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'GBWA Widget Settings',
+                'Home shortcuts',
                 style: TextStyle(
                   color: theme.primaryTextColor,
                   fontSize: 18 * theme.fontScale,
@@ -1021,21 +1156,27 @@ class GbSettingsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              const Text('Configure home screen widget appearance and shortcuts:'),
-              const SizedBox(height: 16),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                activeColor: theme.accentColor,
-                title: const Text('Show Unread Chats Count'),
-                value: true,
-                onChanged: (val) {},
+              Text(
+                'Chaty applies home layout and shortcut settings inside the app. Native Android/iOS launcher widgets are not registered in this build, so this screen does not show switches that cannot take effect.',
+                style: TextStyle(color: theme.secondaryTextColor, fontSize: 13),
               ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                activeColor: theme.accentColor,
-                title: const Text('Show Status Stories Shortcut'),
-                value: true,
-                onChanged: (val) {},
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  icon: const Icon(Icons.home_customize_rounded),
+                  label: const Text('Customize in-app home'),
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => HomeScreenSettingsPage(
+                          preferencesController: preferencesController,
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
             ],
           ),
@@ -1044,22 +1185,28 @@ class GbSettingsScreen extends StatelessWidget {
     );
   }
 
-  void _showUpdatesDialog(BuildContext context, ThemeConfig theme, AppColors colors) {
-    showDialog(
+  void _showUpdatesDialog(
+    BuildContext context,
+    ThemeConfig theme,
+    AppColors colors,
+  ) {
+    showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: theme.surfaceColor,
-        title: const Text('GBWhatsApp Updates'),
+        title: const Text('Chaty Updates'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: const [
-            Text('Current Version: v19.50 (Latest)', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text('Installed version: 1.0.0+1',
+                style: TextStyle(fontWeight: FontWeight.bold)),
             SizedBox(height: 10),
-            Text('• Anti-ban protection v4.2 enhanced'),
-            Text('• 144Hz high refresh rate animations'),
-            Text('• Freeze last seen and anti-delete safeguards'),
-            Text('• Custom icons and themes support'),
+            Text('• Global templates and component-specific appearance'),
+            Text('• Settings backup and restore for visual preferences'),
+            Text('• Runtime fixes and compatibility improvements'),
+            SizedBox(height: 8),
+            Text('Check the project release page for published release notes and newer builds.'),
           ],
         ),
         actions: [
@@ -1069,13 +1216,18 @@ class GbSettingsScreen extends StatelessWidget {
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: theme.accentColor),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
+              final opened = await launchUrl(
+                Uri.parse('https://github.com/Bandi-maya/chat-application/releases'),
+                mode: LaunchMode.externalApplication,
+              );
+              if (!context.mounted || opened) return;
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('You are on the latest version v19.50! ✨')),
+                const SnackBar(content: Text('Could not open Chaty release notes.')),
               );
             },
-            child: const Text('Check for Updates'),
+            child: const Text('View Release Notes'),
           ),
         ],
       ),
