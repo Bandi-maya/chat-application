@@ -325,6 +325,8 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         widget.dataStore,
         _realtime,
         widget.preferencesController,
+        widget.themeController,
+        locator<TemplateController>(),
       ]),
       builder: (context, _) {
         final theme = widget.themeController.globalTheme;
@@ -894,16 +896,33 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
   // bar carries the account identity; once the large title collapses away the
   // page name takes over in the bar instead of duplicating it underneath.
   String get _compactBarTitle {
-    final fallback = widget.dataStore.currentUser.displayName.isNotEmpty
-        ? widget.dataStore.currentUser.displayName
-        : 'Chaty';
+    final user = widget.dataStore.currentUser;
+    final fallback = user.displayName.isNotEmpty ? user.displayName : 'Chaty';
+    final headerStyle = locator<TemplateController>().home.headerStyle;
     final largeTitleShown = _effectiveTitleCollapse < 0.5;
-    if (widget.pageTitle != null && largeTitleShown) return fallback;
-    return widget.pageTitle ?? fallback;
+
+    switch (headerStyle) {
+      case HomeHeaderStyle.prominentIdentity:
+        return fallback;
+      case HomeHeaderStyle.compact:
+        return widget.pageTitle ?? fallback;
+      case HomeHeaderStyle.searchForward:
+        return widget.pageTitle ?? 'Search chats';
+      case HomeHeaderStyle.storiesFirst:
+        if (widget.pageTitle != null && largeTitleShown) return fallback;
+        return widget.pageTitle ?? fallback;
+    }
   }
 
   Widget _standardAppBar(ThemeConfig theme, HomePreferences homePrefs) {
     final compactHeader = MediaQuery.sizeOf(context).width < 390;
+    final headerStyle = locator<TemplateController>().home.headerStyle;
+    final titleFontSize = switch (headerStyle) {
+      HomeHeaderStyle.compact => 19.0,
+      HomeHeaderStyle.prominentIdentity => 24.0,
+      HomeHeaderStyle.searchForward => 19.0,
+      HomeHeaderStyle.storiesFirst => 22.0,
+    };
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 4, 6),
       child: Row(
@@ -919,7 +938,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: theme.primaryTextColor,
-                      fontSize: 22 * theme.fontScale,
+                      fontSize: titleFontSize * theme.fontScale,
                       fontWeight: FontWeight.w800,
                       letterSpacing: -0.4,
                     ),
@@ -955,11 +974,24 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               onPressed: () => _openQrScreen(initialIndex: 1),
               icon: const Icon(Icons.qr_code_scanner_rounded),
             ),
-          if (homePrefs.showSearchBar)
+          if (homePrefs.showSearchBar &&
+              headerStyle == HomeHeaderStyle.searchForward)
             IconButton(
               tooltip: _isSearchOpen ? 'Close search' : 'Search chats',
               color: theme.primaryTextColor,
               onPressed: _toggleSearch,
+              onLongPress: () => _openGlobalSearch(theme),
+              icon: Icon(
+                _isSearchOpen ? Icons.close_rounded : Icons.search_rounded,
+              ),
+            ),
+          if (homePrefs.showSearchBar &&
+              headerStyle != HomeHeaderStyle.searchForward)
+            IconButton(
+              tooltip: _isSearchOpen ? 'Close search' : 'Search chats',
+              color: theme.primaryTextColor,
+              onPressed: _toggleSearch,
+              onLongPress: () => _openGlobalSearch(theme),
               icon: Icon(
                 _isSearchOpen ? Icons.close_rounded : Icons.search_rounded,
               ),
