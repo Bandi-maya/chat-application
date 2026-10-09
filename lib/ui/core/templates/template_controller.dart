@@ -390,7 +390,12 @@ class TemplateController extends ChangeNotifier {
     bool applyConversation = false,
   }) {
     final operation = _commitQueue.then((_) async {
-      await LocalPreferencesStorage.saveTemplateState(next.toMap());
+      final saved = await LocalPreferencesStorage.saveTemplateState(
+        next.toMap(),
+      );
+      if (!saved) {
+        throw StateError('Unable to persist the Chaty template configuration.');
+      }
       _config = next;
       notifyListeners();
       _syncToRuntimeControllers(
