@@ -1158,8 +1158,11 @@ class GbLiveHeaderPreview extends StatelessWidget {
           else
             _buildBasicHeader(title),
 
-          // 2. LIVE SAMPLE CHAT ROW (Tyler Durden)
-          _buildSampleChatRow(),
+          // 2. The tablet layout gets a real split-pane preview.
+          if (isTabletSplit)
+            _buildTabletSplitPreview()
+          else
+            _buildSampleChatRow(),
 
           // 3. LIVE BOTTOM BAR PREVIEW BASED ON STYLE
           if (isOneUi)
@@ -1788,6 +1791,97 @@ class GbLiveHeaderPreview extends StatelessWidget {
   }
 
   // --- Sample Tyler Durden Chat Row ---
+  Widget _buildTabletSplitPreview() {
+    const accent = Color(0xFF60A5FA);
+    return Container(
+      height: 86,
+      color: const Color(0xFF0D1723),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 4,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.inbox_rounded, color: accent, size: 13),
+                    SizedBox(width: 5),
+                    Text(
+                      'Inbox',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  height: 5,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.62),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Container(
+                  height: 5,
+                  width: 72,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.22),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(width: 1, height: 62, color: accent.withValues(alpha: 0.28)),
+          const SizedBox(width: 10),
+          const Expanded(
+            flex: 6,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.forum_rounded, color: accent, size: 13),
+                    SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        'Conversation',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 7),
+                Text(
+                  'Messages stay open beside your chat list.',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: Color(0xFF9FB2C6), fontSize: 9.5),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSampleChatRow() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
