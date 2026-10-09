@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
@@ -18,6 +19,24 @@ class VoiceNoteService {
   String? _path;
   bool _recording = false;
   bool _busy = false;
+  bool _disposed = false;
+  Completer<void>? _busyCompleter;
+  Future<void>? _disposeFuture;
+
+  Completer<void> _enterBusy() {
+    _busy = true;
+    final completer = Completer<void>();
+    _busyCompleter = completer;
+    return completer;
+  }
+
+  void _leaveBusy(Completer<void> operation) {
+    _busy = false;
+    if (identical(_busyCompleter, operation)) {
+      _busyCompleter = null;
+      operation.complete();
+    }
+  }
 
   bool get isRecording => _recording;
   Duration get elapsed => _startedAt == null
@@ -39,8 +58,9 @@ class VoiceNoteService {
   }
 
   Future<void> start() async {
+    if (_disposed) throw StateError('Voice-note service has been disposed.');
     if (_recording || _busy) return;
-    _busy = true;
+    final operation = _enterBusy();
     String? stagingPath;
     try {
       if (!await _recorder.hasPermission()) {
@@ -68,13 +88,13 @@ class VoiceNoteService {
       if (stagingPath != null) await _deleteQuietly(stagingPath);
       rethrow;
     } finally {
-      _busy = false;
+      _leaveBusy(operation);
     }
   }
 
   Future<bool> stopAndSend() async {
-    if (!_recording || _busy) return false;
-    _busy = true;
+    if (_disposed || !_recording || _busy) return false;
+    final operation = _enterBusy();
     final started = _startedAt;
     final stagedPath = _path;
     String? recordedPath;
@@ -106,14 +126,14 @@ class VoiceNoteService {
       _path = null;
       final cleanupPath = recordedPath ?? stagedPath;
       if (cleanupPath != null) await _deleteQuietly(cleanupPath);
-      _busy = false;
+      _leaveBusy(operation);
     }
   }
 
   Future<void> cancel() async {
     if (_busy) return;
     if (!_recording && _path == null) return;
-    _busy = true;
+    final operation = _enterBusy();
     var path = _path;
     try {
       if (_recording) path = await _recorder.stop() ?? path;
@@ -122,12 +142,18 @@ class VoiceNoteService {
       _startedAt = null;
       _path = null;
       if (path != null) await _deleteQuietly(path);
-      _busy = false;
+      _leaveBusy(operation);
     }
   }
 
-  Future<void> dispose() async {
-    if (_recording) await cancel();
+  Future<void> dispose() => _disposeFuture ??= _dispose();
+
+  Future<void> _dispose() async {
+    _disposed = true;
+    // Wait for native start/stop to finish before disposing the recorder.
+    final pendingOperation = _busyCompleter;
+    if (pendingOperation != null) await pendingOperation.future;
+    if (_recording || _path != null) await cancel();
     await _recorder.dispose();
   }
 
