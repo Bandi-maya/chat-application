@@ -26,7 +26,7 @@ import '../search/global_search_screen.dart';
 import '../camera/effects/widgets/effect_picker_sheet.dart';
 import 'chat_detail_screen.dart';
 import 'linked_devices_qr_screen.dart';
-import '../profile/profile_screen.dart';
+import '../profile/profile_edit_screen.dart';
 import 'locked_chats_screen.dart';
 import 'new_chat_screen.dart';
 import '../../ui/core/connection/connection_health_indicator.dart';
@@ -111,16 +111,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
   /// Opens the Profile destination from the header avatar (nested push, so
   /// it correctly receives the global chevron).
   void _openProfileFromHeader() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ProfileScreen(
-          preferencesController: widget.preferencesController,
-          themeController: widget.themeController,
-          dataStore: widget.dataStore,
-          notificationService: widget.notificationService,
-        ),
-      ),
-    );
+    // The home avatar opens the dedicated Profile section. Settings remains
+    // focused on app-level controls and does not duplicate profile details.
+    ProfileEditScreen.open(context, widget.dataStore);
   }
 
   void _toggleSearch() {
