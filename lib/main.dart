@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:chat/data/services/backend_service.dart';
+import 'package:chat/data/services/auth_bootstrap_policy.dart';
 import 'package:chat/data/services/call_signaling_service.dart';
 import 'package:chat/data/services/notification_service.dart';
 import 'package:chat/data/services/contact_relationship_service.dart';
@@ -134,6 +135,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   bool _postLoginAppLockPromptScheduled = false;
   bool _postLoginAppLockPromptShown = false;
   DateTime? _backgroundedAt;
+  Object? _backendBootstrapError;
 
   @override
   void initState() {
@@ -156,11 +158,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     _preferencesController = locator<ChatyPreferencesController>();
     _appearanceController = locator<AppearanceVariantController>();
     _backend = locator<ChatyBackendService>();
-    unawaited(
-      _backend.initialize().catchError((Object error, StackTrace stackTrace) {
-        debugPrint('Chaty backend bootstrap failed: $error\n$stackTrace');
-      }),
-    );
+    unawaited(_initializeBackend());
     _callService = locator<CallSignalingService>();
     unawaited(
       _callService.initialize().catchError((
@@ -185,6 +183,18 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
         .listen(_handleAuthUiEvent);
     if (Supabase.instance.client.auth.currentSession != null) {
       unawaited(_registerCurrentDevice());
+    }
+  }
+
+  Future<void> _initializeBackend() async {
+    try {
+      await _backend.initialize();
+      if (!mounted) return;
+      setState(() => _backendBootstrapError = null);
+    } catch (error, stackTrace) {
+      debugPrint('Chaty backend bootstrap failed: $error\n$stackTrace');
+      if (!mounted) return;
+      setState(() => _backendBootstrapError = error);
     }
   }
 
@@ -709,12 +719,88 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
               ],
             );
           },
-          home: (_backend.isAuthenticated ||
-                  Supabase.instance.client.auth.currentSession != null)
-              ? const MainNavigationShell()
-              : const WelcomeScreen(),
+          home: switch (resolveAuthBootstrapDestination(
+            isInitialized: _backend.isInitialized,
+            isAuthenticated: _backend.isAuthenticated,
+          )) {
+            AuthBootstrapDestination.loading => _AuthBootstrapScreen(
+              error: _backendBootstrapError,
+              onRetry: () => unawaited(_initializeBackend()),
+            ),
+            AuthBootstrapDestination.authenticated => const MainNavigationShell(),
+            AuthBootstrapDestination.unauthenticated => const WelcomeScreen(),
+          },
         );
       },
+    );
+  }
+}
+
+class _AuthBootstrapScreen extends StatelessWidget {
+  final Object? error;
+  final VoidCallback onRetry;
+
+  const _AuthBootstrapScreen({
+    required this.error,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasError = error != null;
+    final colors = Theme.of(context).colorScheme;
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (hasError)
+                    Icon(
+                      Icons.cloud_off_rounded,
+                      size: 44,
+                      color: colors.error,
+                    )
+                  else
+                    const SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: CircularProgressIndicator(strokeWidth: 3),
+                    ),
+                  const SizedBox(height: 20),
+                  Text(
+                    hasError ? 'Unable to restore Chaty' : 'Restoring your session',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    hasError
+                        ? 'Check your connection and try again. Your saved session has not been discarded.'
+                        : 'Preparing your secure workspace…',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                  if (hasError) ...[
+                    const SizedBox(height: 20),
+                    FilledButton.icon(
+                      onPressed: onRetry,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Retry'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
