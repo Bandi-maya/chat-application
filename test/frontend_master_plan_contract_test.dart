@@ -141,6 +141,20 @@ void main() {
     expect(chat, contains('_highlightedSearchMessageId = messageId'));
   });
 
+  test('call signaling bounds stalled connections and records remote terminal calls once', () {
+    final source = File(
+      'lib/data/services/call_signaling_service.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('void _startConnectionTimeout(String callId)'));
+    expect(source, contains("endCall(reason: 'connection_timeout')"));
+    expect(source, contains('_connectionTimeoutTimer?.cancel();'));
+    expect(source, contains('void _logCallRecordOnce('));
+    expect(source, contains('if (!_loggedCallIds.add(session.callId)) return;'));
+    expect(source, contains("if (status == 'ended' || status == 'failed')"));
+    expect(source, contains('_logCallRecordOnce(\n        terminalSession'));
+  });
+
   test('template settings wait for persistence before showing success', () {
     final component = File(
       'lib/features/settings/templates/component_override_screen.dart',
