@@ -176,6 +176,91 @@ class SettingsRootScreen extends StatelessWidget {
   }
 
 
+  void _showHowToUseChaty(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E282E),
+        title: const Row(
+          children: [
+            Icon(Icons.help_outline_rounded, color: GbColors.activeGreen),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'How to use Chaty',
+                style: TextStyle(color: Colors.white, fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: const SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Chats',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Open a conversation to send messages, share media, react with emojis, and use chat actions.',
+                style: TextStyle(color: Color(0xFFD1D7DB), height: 1.35),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'Profile',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Tap your avatar on the home screen to edit your display name, username, bio, and profile photos.',
+                style: TextStyle(color: Color(0xFFD1D7DB), height: 1.35),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'Appearance & customization',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Use Home UI Style for One UI, Telegram, iOS and other layouts. The Theme & Design Studio has named color palettes and presets; tap Save Theme to apply a draft palette.',
+                style: TextStyle(color: Color(0xFFD1D7DB), height: 1.35),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'Reminders and scheduled messages',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Open Settings search and search for Message Management to schedule messages, manage auto-replies and edit quick replies. Scheduled messages require the configured server connection.',
+                style: TextStyle(color: Color(0xFFD1D7DB), height: 1.35),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'Privacy & Security',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Search for Privacy or open the Privacy Center to change presence/read-receipt controls and configure the supported app-lock method.',
+                style: TextStyle(color: Color(0xFFD1D7DB), height: 1.35),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: GbColors.activeGreen),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Got it', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showPrivacyPolicy(BuildContext context) {
     showDialog(
       context: context,
@@ -240,7 +325,7 @@ class SettingsRootScreen extends StatelessWidget {
             Text('Version 1.0.0+1', style: TextStyle(color: Color(0xFF8696A0), fontSize: 12)),
             SizedBox(height: 12),
             Text(
-              'A modern, privacy-first messaging platform with advanced personalization, rich customization, and offline security.',
+              'A messaging app with flexible layouts, rich personalization, and optional device-level app lock.',
               style: TextStyle(color: Color(0xFFD1D7DB), fontSize: 13, height: 1.3),
             ),
           ],
@@ -334,6 +419,14 @@ class SettingsRootScreen extends StatelessWidget {
                       title: 'Share Chaty',
                       subtitle: 'Invite friends and family to join Chaty',
                       onTap: () => ChatyShareService.shareApp(context),
+                    ),
+
+                    // Quick-start guidance stays in the same Settings list style.
+                    _SettingsItemTile(
+                      icon: const Icon(Icons.help_outline_rounded, color: Color(0xFF8696A0), size: 24),
+                      title: 'How to use Chaty',
+                      subtitle: 'Chats, profile, themes, reminders and privacy',
+                      onTap: () => _showHowToUseChaty(context),
                     ),
 
                     // 3. Privacy policy
