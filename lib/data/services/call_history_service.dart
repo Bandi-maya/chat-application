@@ -46,7 +46,7 @@ class CallHistoryService extends ChangeNotifier {
             if (_userId != userId) return;
             final next = <CallRecord>[];
             for (final row in rows) {
-              final record = _mapRow(row, userId);
+              final record = mapCallHistoryRow(row, userId);
               if (record != null) next.add(record);
             }
             _records = List<CallRecord>.unmodifiable(next);
@@ -74,57 +74,67 @@ class CallHistoryService extends ChangeNotifier {
     notifyListeners();
   }
 
-  CallRecord? _mapRow(Map<String, dynamic> row, String currentUserId) {
-    final callerId = row['caller_id']?.toString() ?? '';
-    final calleeId = row['callee_id']?.toString() ?? '';
-    if (callerId.isEmpty || calleeId.isEmpty) return null;
-    if (callerId != currentUserId && calleeId != currentUserId) return null;
-
-    final status = row['status']?.toString() ?? '';
-    const terminal = <String>{'ended', 'declined', 'busy', 'missed', 'failed'};
-    if (!terminal.contains(status)) return null;
-
-    final startedAt =
-        DateTime.tryParse(row['started_at']?.toString() ?? '')?.toLocal() ??
-        DateTime.now();
-    final connectedAt = DateTime.tryParse(
-      row['connected_at']?.toString() ?? '',
-    )?.toLocal();
-    final endedAt = DateTime.tryParse(
-      row['ended_at']?.toString() ?? '',
-    )?.toLocal();
-    final durationSeconds = connectedAt != null && endedAt != null
-        ? endedAt.difference(connectedAt).inSeconds.clamp(0, 86400)
-        : 0;
-
-    final outgoing = callerId == currentUserId;
-    final missedInbound =
-        !outgoing &&
-        (status == 'missed' ||
-            status == 'busy' ||
-            (connectedAt == null && status != 'ended'));
-
-    return CallRecord(
-      id: row['id']?.toString() ?? '',
-      callerId: callerId,
-      participantIds: <String>[callerId, calleeId],
-      type: row['kind']?.toString() == 'video'
-          ? CallType.video
-          : CallType.voice,
-      direction: outgoing
-          ? CallDirection.outgoing
-          : missedInbound
-          ? CallDirection.missed
-          : CallDirection.incoming,
-      timestamp: startedAt,
-      durationSeconds: durationSeconds,
-      isEncrypted: true,
-    );
-  }
+  @visibleForTesting
+  static CallRecord? mapRowForTesting(
+    Map<String, dynamic> row,
+    String currentUserId,
+  ) => mapCallHistoryRow(row, currentUserId);
 
   @override
   void dispose() {
     unawaited(_subscription?.cancel());
     super.dispose();
   }
+}
+
+
+/// Pure call-history row mapping shared with focused regression tests.
+@visibleForTesting
+CallRecord? mapCallHistoryRow(
+  Map<String, dynamic> row,
+  String currentUserId,
+) {
+  final callerId = row['caller_id']?.toString() ?? '';
+  final calleeId = row['callee_id']?.toString() ?? '';
+  if (callerId.isEmpty || calleeId.isEmpty) return null;
+  if (callerId != currentUserId && calleeId != currentUserId) return null;
+
+  final status = row['status']?.toString() ?? '';
+  const terminal = <String>{'ended', 'declined', 'busy', 'missed', 'failed'};
+  if (!terminal.contains(status)) return null;
+
+  final startedAt =
+      DateTime.tryParse(row['started_at']?.toString() ?? '')?.toLocal() ??
+      DateTime.now();
+  final connectedAt = DateTime.tryParse(
+    row['connected_at']?.toString() ?? '',
+  )?.toLocal();
+  final endedAt = DateTime.tryParse(
+    row['ended_at']?.toString() ?? '',
+  )?.toLocal();
+  final durationSeconds = connectedAt != null && endedAt != null
+      ? endedAt.difference(connectedAt).inSeconds.clamp(0, 86400)
+      : 0;
+
+  final outgoing = callerId == currentUserId;
+  // Any inbound call that never connected is missed, even if its terminal
+  // server state is ended rather than declined, busy, missed, or failed.
+  final missedInbound = !outgoing && connectedAt == null;
+
+  return CallRecord(
+    id: row['id']?.toString() ?? '',
+    callerId: callerId,
+    participantIds: <String>[callerId, calleeId],
+    type: row['kind']?.toString() == 'video'
+        ? CallType.video
+        : CallType.voice,
+    direction: outgoing
+        ? CallDirection.outgoing
+        : missedInbound
+        ? CallDirection.missed
+        : CallDirection.incoming,
+    timestamp: startedAt,
+    durationSeconds: durationSeconds,
+    isEncrypted: true,
+  );
 }
