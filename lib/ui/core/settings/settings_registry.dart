@@ -828,7 +828,7 @@ class SettingsRegistry {
     final Set<String> ids = <String>{};
     for (final setting in allSettings) {
       if (ids.contains(setting.id)) {
-        throw AssertionError('Duplicate setting ID found: ');
+        throw AssertionError('Duplicate setting ID found: ${setting.id}');
       }
       ids.add(setting.id);
     }
