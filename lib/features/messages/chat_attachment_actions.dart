@@ -83,15 +83,19 @@ class ChatAttachmentActions {
 
   Future<void> shareMedia(BuildContext context, String type) async {
     try {
+      final imageLimit = preferencesController
+          .gbDouble('Img_share_limit', fallback: 30)
+          .clamp(1, 100)
+          .round();
       final multiple =
-          (type == 'image' &&
-              preferencesController.gbBool('Img_share_limit')) ||
+          (type == 'image' && imageLimit > 1) ||
           (type == 'document' &&
               preferencesController.gbBool('key_more_docs_send'));
       if (multiple) {
         final items = await _media.pickAndUploadMultiple(
           conversationId: conversationId,
           type: type,
+          maxFiles: type == 'image' ? imageLimit : 30,
         );
         for (final attachment in items) {
           await dataStore.sendMessage(
