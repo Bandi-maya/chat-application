@@ -187,6 +187,9 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   }
 
   Future<void> _initializeBackend() async {
+    if (mounted && _backendBootstrapError != null) {
+      setState(() => _backendBootstrapError = null);
+    }
     try {
       await _backend.initialize();
       if (!mounted) return;
