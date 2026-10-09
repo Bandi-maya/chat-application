@@ -134,7 +134,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               pageTitle: separateGroups ? 'Chats' : null,
             ),
           ),
-          if (separateGroups)
+          if (separateGroups || templateController.hasCustomNavigationDestinations)
             _NavDestinationItem(
               id: 'groups',
               label: 'Groups',
@@ -187,7 +187,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               notificationService: notificationService,
             ),
           ),
-          if (!showDesktopIcon)
+          if (!showDesktopIcon || templateController.hasCustomNavigationDestinations)
             _NavDestinationItem(
               id: 'desktop',
               label: 'Desktop',
