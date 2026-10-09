@@ -122,7 +122,7 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Import failed: ')));
+      ).showSnackBar(SnackBar(content: Text('Import failed: $e')));
     }
   }
 
