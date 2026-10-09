@@ -1097,8 +1097,6 @@ class _ComposerAction extends StatelessWidget {
           ),
         ),
       ),
-        );
-      },
     );
   }
 }
