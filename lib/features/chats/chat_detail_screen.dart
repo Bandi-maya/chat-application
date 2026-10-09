@@ -27,6 +27,7 @@ import '../../ui/core/templates/template_models.dart';
 import '../../ui/core/design_system/settings_primitives.dart';
 import '../../ui/core/design_system/chaty_haptics.dart';
 import '../../ui/core/design_system/components/chaty_kit.dart';
+import '../../ui/core/design_system/components/chaty_glyph.dart';
 import '../../ui/core/design_system/components/app_components.dart';
 import '../../ui/core/design_system/components/composer_components.dart';
 import '../../ui/core/gb/gb_theme_overrides.dart';
@@ -1662,9 +1663,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 Builder(
                   builder: (btnCtx) => IconButton(
                     tooltip: 'Chat options',
-                    icon: Icon(
-                      Icons.more_vert_rounded,
+                    icon: ChatyGlyphIcon(
+                      glyph: ChatyGlyph.more,
                       color: theme.primaryTextColor,
+                      size: 22,
                     ),
                     onPressed: () =>
                         _openChatMenu(btnCtx, conversation, otherUser),
