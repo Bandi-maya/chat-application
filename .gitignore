@@ -57,3 +57,8 @@ specs/
 
 *.md 
 !/README.md 
+# QA automation outputs and dependencies
+node_modules/
+**/node_modules/
+artifacts/
+qa/playwright/reports/
