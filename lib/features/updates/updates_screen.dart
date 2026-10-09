@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/repositories/chaty_data_store.dart';
@@ -498,6 +499,13 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
         ),
       );
     }
+    if (status.mediaType == 'audio' &&
+        locator<TemplateController>().updates.enableStatusAudio) {
+      return _StatusAudioPlayer(
+        url: signedUrl,
+        name: status.mediaName ?? 'Audio update',
+      );
+    }
     if (status.mediaType == 'image') {
       return InteractiveViewer(
         child: ClipRRect(
@@ -894,6 +902,203 @@ class _ComposerAction extends StatelessWidget {
 /// Real "Viewed by" list for one of my statuses. Data comes exclusively
 /// from the owner-exposed rows of status_view_events — counts are never
 /// fabricated and hidden visits are filtered server-side by RLS.
+class _StatusAudioPlayer extends StatefulWidget {
+  final String url;
+  final String name;
+
+  const _StatusAudioPlayer({required this.url, required this.name});
+
+  @override
+  State<_StatusAudioPlayer> createState() => _StatusAudioPlayerState();
+}
+
+class _StatusAudioPlayerState extends State<_StatusAudioPlayer> {
+  final AudioPlayer _player = AudioPlayer();
+  StreamSubscription<Duration>? _positionSubscription;
+  StreamSubscription<Duration?>? _durationSubscription;
+  bool _loading = true;
+  bool _failed = false;
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _positionSubscription = _player.positionStream.listen((position) {
+      if (mounted) setState(() => _position = position);
+    });
+    _durationSubscription = _player.durationStream.listen((duration) {
+      if (mounted) setState(() => _duration = duration ?? Duration.zero);
+    });
+    unawaited(_loadSource());
+  }
+
+  @override
+  void didUpdateWidget(covariant _StatusAudioPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) unawaited(_loadSource());
+  }
+
+  Future<void> _loadSource() async {
+    if (mounted) setState(() {
+      _loading = true;
+      _failed = false;
+      _position = Duration.zero;
+      _duration = Duration.zero;
+    });
+    try {
+      await _player.stop();
+      await _player.setUrl(widget.url);
+      if (mounted) setState(() => _loading = false);
+    } catch (_) {
+      if (mounted) setState(() {
+        _loading = false;
+        _failed = true;
+      });
+    }
+  }
+
+  Future<void> _togglePlayback() async {
+    if (_loading || _failed) return;
+    try {
+      if (_player.playing) {
+        await _player.pause();
+      } else {
+        if (_duration > Duration.zero &&
+            _position >= _duration - const Duration(milliseconds: 250)) {
+          await _player.seek(Duration.zero);
+        }
+        unawaited(_player.play());
+      }
+      if (mounted) setState(() {});
+    } catch (_) {
+      if (mounted) setState(() => _failed = true);
+    }
+  }
+
+  String _timeLabel(Duration value) {
+    final minutes = value.inMinutes.toString().padLeft(2, '0');
+    final seconds = (value.inSeconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
+  @override
+  void dispose() {
+    unawaited(_positionSubscription?.cancel());
+    unawaited(_durationSubscription?.cancel());
+    unawaited(_player.dispose());
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final totalMilliseconds = _duration.inMilliseconds;
+    final max = totalMilliseconds > 0 ? totalMilliseconds.toDouble() : 1.0;
+    final value = _position.inMilliseconds.clamp(0, totalMilliseconds).toDouble();
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 360),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: colors.borderSubtle),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 62,
+              height: 62,
+              decoration: BoxDecoration(
+                color: colors.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(19),
+              ),
+              child: Icon(
+                Icons.graphic_eq_rounded,
+                color: colors.primary,
+                size: 30,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              widget.name,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: ChatyTypography.title(colors.foreground),
+            ),
+            const SizedBox(height: 10),
+            if (_failed)
+              Column(
+                children: [
+                  Text(
+                    'Audio could not be played in Chaty.',
+                    textAlign: TextAlign.center,
+                    style: ChatyTypography.caption(colors.error),
+                  ),
+                  TextButton.icon(
+                    onPressed: _loadSource,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Retry'),
+                  ),
+                ],
+              )
+            else ...[
+              Slider(
+                value: value.clamp(0.0, max),
+                max: max,
+                onChanged: _loading || totalMilliseconds == 0
+                    ? null
+                    : (milliseconds) => _player.seek(
+                        Duration(milliseconds: milliseconds.round()),
+                      ),
+              ),
+              Row(
+                children: [
+                  Text(
+                    _timeLabel(_position),
+                    style: ChatyTypography.caption(colors.foregroundSecondary),
+                  ),
+                  const Spacer(),
+                  Text(
+                    _timeLabel(_duration),
+                    style: ChatyTypography.caption(colors.foregroundSecondary),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              FilledButton(
+                onPressed: _loading ? null : _togglePlayback,
+                style: FilledButton.styleFrom(
+                  shape: const StadiumBorder(),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+                child: _loading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(_player.playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                          const SizedBox(width: 8),
+                          Text(_player.playing ? 'Pause audio' : 'Play audio'),
+                        ],
+                      ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _StatusViewersSheet extends StatefulWidget {
   final String statusId;
   final StatusService statusService;
