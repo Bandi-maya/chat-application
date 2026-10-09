@@ -141,6 +141,30 @@ void main() {
     expect(chat, contains('_highlightedSearchMessageId = messageId'));
   });
 
+  test('voice-note capture serializes actions and cleans up failed recordings', () {
+    final source = File(
+      'lib/data/services/voice_note_service.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('bool _busy = false;'));
+    expect(source, contains('if (_recording || _busy) return;'));
+    expect(source, contains('if (!_recording || _busy) return false;'));
+    expect(source, contains('final cleanupPath = recordedPath ?? stagedPath;'));
+    expect(source, contains('if (_busy) return;'));
+    expect(source, contains('Future<void> _dispose() async'));
+    expect(source, contains('final pendingOperation = _busyCompleter;'));
+  });
+
+  test('ongoing call controls respect system reduced-motion settings', () {
+    final source = File(
+      'lib/features/calls/ongoing_call_screen.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('final reduceMotion = MediaQuery.disableAnimationsOf(context);'));
+    expect(source, contains('duration: reduceMotion'));
+    expect(source, contains('? Duration.zero'));
+  });
+
   test('call signaling bounds stalled connections and records remote terminal calls once', () {
     final source = File(
       'lib/data/services/call_signaling_service.dart',
