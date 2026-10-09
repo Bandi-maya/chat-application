@@ -25,8 +25,10 @@ class CallSignalingService extends ChangeNotifier {
 
   ChatyCallSession? _currentSession;
   Timer? _ringTimeoutTimer;
+  Timer? _connectionTimeoutTimer;
   Timer? _durationTimer;
   int _callDurationSeconds = 0;
+  final Set<String> _loggedCallIds = <String>{};
   Future<void>? _endCallFuture;
   String? _endingCallId;
 
@@ -240,6 +242,7 @@ class CallSignalingService extends ChangeNotifier {
         },
       );
       _currentSession = session.copyWith(state: CallSessionState.connecting);
+      _startConnectionTimeout(session.callId);
       notifyListeners();
     } catch (error) {
       await _failCurrentCall(error);
@@ -259,7 +262,8 @@ class CallSignalingService extends ChangeNotifier {
         params: <String, dynamic>{'p_call_id': session.callId},
       );
     } finally {
-      _logCallRecord(CallDirection.missed, 0);
+      _connectionTimeoutTimer?.cancel();
+      _logCallRecordOnce(session, CallDirection.missed, 0);
       _currentSession = session.copyWith(
         state: CallSessionState.declined,
         endedAt: DateTime.now(),
@@ -291,6 +295,7 @@ class CallSignalingService extends ChangeNotifier {
 
   Future<void> _endCallSession(ChatyCallSession session) async {
     _ringTimeoutTimer?.cancel();
+    _connectionTimeoutTimer?.cancel();
     _stopDurationTimer();
     final duration = _callDurationSeconds;
     try {
@@ -304,7 +309,7 @@ class CallSignalingService extends ChangeNotifier {
       final direction = session.isOutgoing
           ? CallDirection.outgoing
           : (duration > 0 ? CallDirection.incoming : CallDirection.missed);
-      _logCallRecord(direction, duration);
+      _logCallRecordOnce(session, direction, duration);
       _currentSession = session.copyWith(
         state: CallSessionState.ended,
         endedAt: DateTime.now(),
@@ -711,6 +716,7 @@ class CallSignalingService extends ChangeNotifier {
         _currentSession = _currentSession?.copyWith(
           state: CallSessionState.connecting,
         );
+        _startConnectionTimeout(callId);
         await _flushRemoteCandidates();
         notifyListeners();
       }
@@ -719,8 +725,18 @@ class CallSignalingService extends ChangeNotifier {
 
     if (status == 'declined') {
       _ringTimeoutTimer?.cancel();
+      _connectionTimeoutTimer?.cancel();
       _stopDurationTimer();
-      _currentSession = _currentSession?.copyWith(
+      final terminalSession = _currentSession!;
+      final duration = _callDurationSeconds;
+      _logCallRecordOnce(
+        terminalSession,
+        terminalSession.isOutgoing
+            ? CallDirection.outgoing
+            : (duration > 0 ? CallDirection.incoming : CallDirection.missed),
+        duration,
+      );
+      _currentSession = terminalSession.copyWith(
         state: CallSessionState.declined,
         endedAt: DateTime.now(),
       );
@@ -731,8 +747,18 @@ class CallSignalingService extends ChangeNotifier {
 
     if (status == 'ended' || status == 'failed') {
       _ringTimeoutTimer?.cancel();
+      _connectionTimeoutTimer?.cancel();
       _stopDurationTimer();
-      _currentSession = _currentSession?.copyWith(
+      final terminalSession = _currentSession!;
+      final duration = _callDurationSeconds;
+      _logCallRecordOnce(
+        terminalSession,
+        terminalSession.isOutgoing
+            ? CallDirection.outgoing
+            : (duration > 0 ? CallDirection.incoming : CallDirection.missed),
+        duration,
+      );
+      _currentSession = terminalSession.copyWith(
         state: status == 'failed'
             ? CallSessionState.failed
             : CallSessionState.ended,
@@ -843,6 +869,7 @@ class CallSignalingService extends ChangeNotifier {
     switch (state) {
       case RTCPeerConnectionState.RTCPeerConnectionStateConnected:
         _ringTimeoutTimer?.cancel();
+        _connectionTimeoutTimer?.cancel();
         _currentSession = session.copyWith(
           state: CallSessionState.connected,
           connectedAt: DateTime.now(),
@@ -851,10 +878,12 @@ class CallSignalingService extends ChangeNotifier {
         notifyListeners();
         break;
       case RTCPeerConnectionState.RTCPeerConnectionStateDisconnected:
-        if (session.state == CallSessionState.connected) {
+        if (session.state == CallSessionState.connected ||
+            session.state == CallSessionState.reconnecting) {
           _currentSession = session.copyWith(
             state: CallSessionState.reconnecting,
           );
+          _startConnectionTimeout(session.callId);
           notifyListeners();
         }
         break;
@@ -873,7 +902,17 @@ class CallSignalingService extends ChangeNotifier {
     final session = _currentSession;
     if (session == null || session.state == CallSessionState.failed) return;
     _ringTimeoutTimer?.cancel();
+    _connectionTimeoutTimer?.cancel();
     _stopDurationTimer();
+    _logCallRecordOnce(
+      session,
+      session.isOutgoing
+          ? CallDirection.outgoing
+          : (_callDurationSeconds > 0
+                ? CallDirection.incoming
+                : CallDirection.missed),
+      _callDurationSeconds,
+    );
     _currentSession = session.copyWith(
       state: CallSessionState.failed,
       endedAt: DateTime.now(),
@@ -904,6 +943,21 @@ class CallSignalingService extends ChangeNotifier {
     _markTransportFailed(error.toString());
   }
 
+  void _startConnectionTimeout(String callId) {
+    _connectionTimeoutTimer?.cancel();
+    _connectionTimeoutTimer = Timer(const Duration(seconds: 25), () {
+      final session = _currentSession;
+      if (session == null ||
+          session.callId != callId ||
+          (session.state != CallSessionState.connecting &&
+              session.state != CallSessionState.reconnecting)) {
+        return;
+      }
+      // Use the normal terminal RPC path so the server remains authoritative.
+      unawaited(endCall(reason: 'connection_timeout'));
+    });
+  }
+
   void _startDurationTimer() {
     if (_durationTimer != null) return;
     _callDurationSeconds = 0;
@@ -918,9 +972,12 @@ class CallSignalingService extends ChangeNotifier {
     _durationTimer = null;
   }
 
-  void _logCallRecord(CallDirection direction, int durationSec) {
-    final session = _currentSession;
-    if (session == null) return;
+  void _logCallRecordOnce(
+    ChatyCallSession session,
+    CallDirection direction,
+    int durationSec,
+  ) {
+    if (!_loggedCallIds.add(session.callId)) return;
     final myId = _client.auth.currentUser?.id ?? '';
     dataStore.addCallRecord(
       CallRecord(
@@ -984,6 +1041,7 @@ class CallSignalingService extends ChangeNotifier {
 
   Future<void> _resetForSignedOutSession() async {
     _ringTimeoutTimer?.cancel();
+    _connectionTimeoutTimer?.cancel();
     _stopDurationTimer();
     await _disposeMediaTransport();
     await _removeDatabaseChannels();
@@ -994,6 +1052,7 @@ class CallSignalingService extends ChangeNotifier {
   @override
   void dispose() {
     _ringTimeoutTimer?.cancel();
+    _connectionTimeoutTimer?.cancel();
     _stopDurationTimer();
     unawaited(_authSubscription?.cancel());
     unawaited(_disposeMediaTransport());
