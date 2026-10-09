@@ -45,11 +45,11 @@ class ChatMediaService {
   Future<List<MessageAttachment>> pickAndUploadMultiple({
     required String conversationId,
     required String type,
+    int? maxFiles,
   }) async {
-    final limit = _preferences
-        .gbDouble('Img_share_limit', fallback: 30)
-        .clamp(1, 100)
-        .round();
+    final limit = (maxFiles ??
+            _preferences.gbDouble('Img_share_limit', fallback: 30).round())
+        .clamp(1, 100);
     final picked = await FilePicker.pickFiles(
       type: _pickerType(type),
       allowMultiple: true,
