@@ -2264,41 +2264,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Chat overflow menu (3-dots in the header): everything below is REAL.
-  // ---------------------------------------------------------------------------
-  Widget _chatPopupMenuItem({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    bool isDestructive = false,
-  }) {
-    final theme = _theme;
-    final color = isDestructive ? theme.dangerColor : theme.primaryTextColor;
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: color.withValues(alpha: isDestructive ? 1.0 : 0.8)),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
+  // Chat overflow actions are rendered by the shared ChatyMenuSheet.
   void _openChatMenu(
     BuildContext anchorContext,
     Conversation conversation,
