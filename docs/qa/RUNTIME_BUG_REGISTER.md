@@ -44,3 +44,15 @@ Copy this section for every reproducible issue.
 3. Do not mark fixed until the same reproduction steps pass and a regression test is added where feasible.
 4. Do not suppress errors or add fake-success fallbacks to make the audit green.
 5. Keep credentials, tokens, cookies, message plaintext, and encryption material out of the report.
+
+## Known issue from repository audit
+
+### AUTH-BOOTSTRAP-001 — Authenticated shell selected before backend hydration
+
+- Severity: P1
+- Platform: Shared Flutter application startup
+- Screen and route: Root MaterialApp home
+- Root cause: The root route previously treated a non-null Supabase current session as sufficient to render MainNavigationShell before ChatyBackendService.initialize() completed profile/session hydration.
+- Fix: Root route now uses an explicit AuthBootstrapDestination policy and shows a loading/retry surface until backend initialization completes. Raw backend error details are logged locally but not shown to the user.
+- Regression test: test/auth_bootstrap_policy_test.dart covers initialized/uninitialized and authenticated/unauthenticated combinations.
+- Status: Fixed-awaiting-retest. Latest Android CI must pass before marking verified; cold-start/session restoration still requires runtime testing on Android and iOS.
