@@ -235,7 +235,7 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                     ChatyChoiceTile<AppNavigationMode>(
                       title: 'Navigation Layout Architecture',
                       subtitle:
-                          'Switch between the 5 primary navigation layouts (Top Bar, Island Rail, 3D Drawer, Side Menu, Bottom Bar)',
+                          'Choose the navigation structure for this device; layout adapts to available width.',
                       options: const [
                         AppNavigationMode.bottomNav,
                         AppNavigationMode.topWhatsAppBar,
@@ -243,6 +243,7 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                         AppNavigationMode.perspective3DDrawer,
                         AppNavigationMode.modernSideMenu,
                         AppNavigationMode.gestureTabs,
+                        AppNavigationMode.compactRail,
                       ],
                       selectedOption: currentMode,
                       optionLabel: (mode) => switch (mode) {
