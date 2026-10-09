@@ -49,6 +49,7 @@ class CallPresentationPreferencesStore extends ChangeNotifier {
   SharedPreferences? _preferences;
   CallPresentationPreferences _value = const CallPresentationPreferences();
   Future<void>? _initialization;
+  Future<void> _writeQueue = Future<void>.value();
 
   CallPresentationPreferences get value => _value;
   bool get isInitialized => _preferences != null;
@@ -68,27 +69,60 @@ class CallPresentationPreferencesStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setDynamicIslandEnabled(bool enabled) async {
-    await initialize();
-    if (_value.dynamicIslandEnabled == enabled) return;
-    _value = _value.copyWith(dynamicIslandEnabled: enabled);
-    notifyListeners();
-    await _preferences!.setBool(_dynamicIslandKey, enabled);
+  Future<void> setDynamicIslandEnabled(bool enabled) {
+    return _setBool(
+      key: _dynamicIslandKey,
+      enabled: enabled,
+      read: (value) => value.dynamicIslandEnabled,
+      update: (value, next) => value.copyWith(dynamicIslandEnabled: next),
+    );
   }
 
-  Future<void> setPictureInPictureEnabled(bool enabled) async {
-    await initialize();
-    if (_value.pictureInPictureEnabled == enabled) return;
-    _value = _value.copyWith(pictureInPictureEnabled: enabled);
-    notifyListeners();
-    await _preferences!.setBool(_pictureInPictureKey, enabled);
+  Future<void> setPictureInPictureEnabled(bool enabled) {
+    return _setBool(
+      key: _pictureInPictureKey,
+      enabled: enabled,
+      read: (value) => value.pictureInPictureEnabled,
+      update: (value, next) => value.copyWith(pictureInPictureEnabled: next),
+    );
   }
 
-  Future<void> setLowDataUsageEnabled(bool enabled) async {
+  Future<void> setLowDataUsageEnabled(bool enabled) {
+    return _setBool(
+      key: _lowDataUsageKey,
+      enabled: enabled,
+      read: (value) => value.lowDataUsageEnabled,
+      update: (value, next) => value.copyWith(lowDataUsageEnabled: next),
+    );
+  }
+
+  Future<void> _setBool({
+    required String key,
+    required bool enabled,
+    required bool Function(CallPresentationPreferences value) read,
+    required CallPresentationPreferences Function(
+      CallPresentationPreferences value,
+      bool next,
+    ) update,
+  }) async {
     await initialize();
-    if (_value.lowDataUsageEnabled == enabled) return;
-    _value = _value.copyWith(lowDataUsageEnabled: enabled);
-    notifyListeners();
-    await _preferences!.setBool(_lowDataUsageKey, enabled);
+    final operation = _writeQueue.then((_) async {
+      if (read(_value) == enabled) return;
+      final saved = await _preferences!.setBool(key, enabled);
+      if (!saved) {
+        throw StateError('Unable to save this call presentation preference.');
+      }
+      // Publish only after storage succeeds. Build from the latest state so
+      // simultaneous changes to different preferences cannot clobber each other.
+      _value = update(_value, enabled);
+      notifyListeners();
+    });
+    // Keep the queue usable after a failed write while returning the original
+    // failure to the caller so the UI can report it.
+    _writeQueue = operation.then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stackTrace) {},
+    );
+    return operation;
   }
 }
