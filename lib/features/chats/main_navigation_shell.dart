@@ -20,6 +20,8 @@ import '../../ui/core/templates/template_shell.dart';
 import '../../ui/core/templates/template_controller.dart';
 import '../../ui/core/templates/template_models.dart';
 import '../camera/effects/widgets/effect_picker_sheet.dart';
+import '../camera/camera_capture_screen.dart';
+import '../../data/services/status_service.dart';
 
 class MainNavigationShell extends StatefulWidget {
   const MainNavigationShell({super.key});
@@ -427,7 +429,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 content: content,
                 appearance: appearanceController,
                 navigationTemplate: navigationTemplate,
-                onCenterAction: () => EffectPickerSheet.show(context),
+                onCenterAction: () => _handleNavigationCenterAction(navigationTemplate),
                 navItems: navItems,
                 selectedIndex: bottomNavSelectedIndex,
                 onDestinationTap: (idx) {
@@ -1165,6 +1167,42 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       );
     }
     return children;
+  }
+
+  Future<void> _handleNavigationCenterAction(
+    NavigationTemplate template,
+  ) async {
+    if (template.centerActionId != 'camera') {
+      EffectPickerSheet.show(context);
+      return;
+    }
+
+    final result = await ChatyCameraCaptureScreen.open(
+      context,
+      mode: ChatyCaptureMode.story,
+    );
+    if (result == null || !mounted) return;
+    try {
+      await StatusService(
+        preferences: locator<ChatyPreferencesController>(),
+      ).publishMediaFile(
+        path: result.path,
+        mediaType: 'image',
+        text: result.caption,
+        displayName: 'chaty_story.jpg',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Status posted.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    }
   }
 
   void _showMoreMenu(
