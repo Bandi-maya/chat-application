@@ -18,6 +18,7 @@ Use the GBWhatsApp APK strictly as a user-facing reference for feature categorie
 10. [Security and privacy requirements](CHATY_SECURITY_PRIVACY_REQUIREMENTS.md)
 11. [Migration, rollout and recovery](CHATY_MIGRATION_ROLLOUT.md)
 12. [Implementation report template](CHATY_IMPLEMENTATION_REPORT_TEMPLATE.md)
+13. [Current implementation progress and remaining gaps](CHATY_IMPLEMENTATION_PROGRESS.md)
 
 ## Non-negotiable engineering rules
 - Read the actual current source before editing; do not assume file names or contracts from documentation alone.
