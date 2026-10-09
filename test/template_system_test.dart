@@ -13,6 +13,7 @@ void main() {
     late TemplateController controller;
 
     setUp(() {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
       controller = TemplateController();
     });
 
