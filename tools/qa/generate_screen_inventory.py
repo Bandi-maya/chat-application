@@ -31,7 +31,7 @@ INTERACTION_PATTERNS = {
     "Navigator.push": re.compile(r"\bNavigator(?:\.of\([^)]*\))?\.push(?:Replacement)?\s*\("),
 }
 ROUTE_CONSTRUCTOR = re.compile(
-    r"\b(?:MaterialPageRoute|CupertinoPageRoute|PageRouteBuilder)\s*<[^>]*>?"
+    r"\b(?:MaterialPageRoute|CupertinoPageRoute|PageRouteBuilder)\s*(?:<[^>]*>)?"
     r"\s*\([^;]{0,1200}?\bbuilder\s*:\s*\([^)]*\)\s*=>\s*([A-Z]\w*)\s*\(",
     re.S,
 )
