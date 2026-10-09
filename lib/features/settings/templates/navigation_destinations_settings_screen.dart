@@ -133,19 +133,34 @@ class _NavigationDestinationsSettingsScreenState
   }
 
   Future<void> _reset() async {
-    await _controller.resetNavigationDestinations(
-      appearanceController: locator<AppearanceVariantController>(),
-      themeController: locator<ThemeController>(),
-    );
-    if (!mounted) return;
-    setState(_loadCurrentConfiguration);
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(
-          content: Text('Destination order reset to the active template.'),
-        ),
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      await _controller.resetNavigationDestinations(
+        appearanceController: locator<AppearanceVariantController>(),
+        themeController: locator<ThemeController>(),
       );
+      if (!mounted) return;
+      setState(_loadCurrentConfiguration);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Destination order reset to the active template.'),
+          ),
+        );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(error.toString().replaceFirst('Bad state: ', '')),
+          ),
+        );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
