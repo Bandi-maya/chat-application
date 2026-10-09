@@ -56,3 +56,14 @@ Copy this section for every reproducible issue.
 - Fix: Root route now uses an explicit AuthBootstrapDestination policy and shows a loading/retry surface until backend initialization completes. Raw backend error details are logged locally but not shown to the user.
 - Regression test: test/auth_bootstrap_policy_test.dart covers initialized/uninitialized and authenticated/unauthenticated combinations.
 - Status: Fixed-awaiting-retest. Latest Android CI must pass before marking verified; cold-start/session restoration still requires runtime testing on Android and iOS.
+
+### ANALYZER-001 — Unused legacy menu helpers and disconnected responsive overflow sheet
+
+- Severity: P2
+- Platform: Shared Flutter UI
+- Files: lib/features/chats/chat_detail_screen.dart, lib/features/chats/chats_home_screen.dart
+- Evidence: The Android verification workflow's Dart analyzer reported an unused chat popup helper, an unused responsive overflow flag, and an unused home overflow sheet.
+- Root cause: The home overflow sheet had been implemented but not connected to the three-dot menu; the desktop popup's Starred Messages item only displayed a snackbar. A legacy chat menu helper was no longer used after migration to ChatyMenuSheet.
+- Fix: Wire widths below 600 logical pixels to the existing scrollable overflow sheet, route the desktop Starred Messages item to the real screen, and remove the obsolete helper.
+- Regression coverage: The source inventory CI remains active; fresh Flutter analyze and UI interaction tests must confirm the change.
+- Status: Fixed-awaiting-retest. The first analyzer run was on an earlier commit and failed on these warnings; rerun on the latest head before marking verified.
