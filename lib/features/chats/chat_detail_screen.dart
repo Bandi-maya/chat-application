@@ -1251,6 +1251,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         widget.dataStore,
         _realtime,
         widget.preferencesController,
+        locator<TemplateController>(),
+        if (widget.themeController != null) widget.themeController!,
       ]),
       builder: (context, _) => _buildChat(context),
     );
