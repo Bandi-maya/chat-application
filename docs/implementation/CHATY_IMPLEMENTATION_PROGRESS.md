@@ -24,6 +24,8 @@
 - Navigation template order, primary/overflow placement, configured height and center quick action are connected to the runtime shell. Manual destination order persists, validates unique IDs, and cannot hide a screen.
 - The Chats overflow menu is always available. Compact phone widths now open a grouped safe-area-aware quick-access sheet; wider screens keep the anchored popup. Both use the same action handler for camera effects, linked devices, themes, templates, Home & Navigation, Navigation destinations and all settings.
 - Added the UI reference research catalog with a curated 76-reference landscape, consolidated unique UX patterns, and documented platform/accessibility/performance acceptance criteria. The sources were studied for patterns only; no new component library was installed.
+- Template Studio now filters templates and component overrides from a single search field, shows an explicit no-results state, and is constrained to a readable maximum width on large screens. Individual component pages use previews based on the selected template's real navigation IDs, composer placement, bubble/tick style, chat-row density, Updates layout, profile header and call-control settings rather than placeholder labels.
+- Added dependency-free original vector glyphs for the home overflow menu, Template Studio controls and primary navigation; the same glyph set is widget-tested at multiple sizes. The rest of the app still uses existing icons and the broader app-wide SVG-source/icon/motion pass remains outstanding.
 - Profile screen now renders structurally distinct compact, centered-identity and banner-with-avatar layouts. Avatar shape and the stats-grid toggle work; displayed counts come from the local data store (chats, groups and contacts).
 - Call controls consume the configured control corner radius. `enableFloatingIsland` gates the island, with the existing global call capsule retained as the safe fallback so active-call controls remain available.
 - Appearance preview chips display the actual selected typography and entry/exit motion values rather than empty labels.
@@ -37,7 +39,7 @@
 - Linked-device revocation now persists through `ContactRelationshipService.revokeDevice` before removing the device from the local cache.
 
 ### Tests added
-- Added template-controller tests for import normalization, live theme-token application, navigation-mode mapping, scoped component overrides, destination ordering persistence/reset, and invalid/duplicate destination rejection.
+- Added template-controller tests for import normalization, live theme-token application, navigation-mode mapping, scoped component overrides, destination ordering persistence/reset, and invalid/duplicate destination rejection. Added vector-glyph widget coverage and UI contract tests for responsive overflow routing, template search and non-placeholder component previews.
 
 ## Still outstanding — do not mark complete yet
 
