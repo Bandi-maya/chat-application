@@ -1057,7 +1057,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                     value: 'effects',
                     child: ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: const ChatyGlyphIcon(glyph: ChatyGlyph.camera, size: 20),
+                      leading: ChatyGlyphIcon(glyph: ChatyGlyph.camera, size: 20),
                       title: Text('Camera effects'),
                     ),
                   ),
@@ -1066,7 +1066,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                     value: 'qr',
                     child: ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: const ChatyGlyphIcon(glyph: ChatyGlyph.qrScan, size: 20),
+                      leading: ChatyGlyphIcon(glyph: ChatyGlyph.qrScan, size: 20),
                       title: Text('QR / Scan'),
                     ),
                   ),
@@ -1074,7 +1074,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   value: 'linked',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const ChatyGlyphIcon(glyph: ChatyGlyph.devices, size: 20),
+                    leading: ChatyGlyphIcon(glyph: ChatyGlyph.devices, size: 20),
                     title: Text('Linked devices'),
                   ),
                 ),
@@ -1083,7 +1083,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   value: 'themes',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const ChatyGlyphIcon(glyph: ChatyGlyph.palette, size: 20),
+                    leading: ChatyGlyphIcon(glyph: ChatyGlyph.palette, size: 20),
                     title: Text('Themes & colors'),
                   ),
                 ),
@@ -1091,7 +1091,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   value: 'templates',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const ChatyGlyphIcon(glyph: ChatyGlyph.templates, size: 20),
+                    leading: ChatyGlyphIcon(glyph: ChatyGlyph.templates, size: 20),
                     title: Text('Templates & layouts'),
                   ),
                 ),
@@ -1099,7 +1099,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   value: 'starred',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const ChatyGlyphIcon(glyph: ChatyGlyph.exportProfile, size: 20),
+                    leading: ChatyGlyphIcon(glyph: ChatyGlyph.exportProfile, size: 20),
                     title: Text('Starred messages'),
                   ),
                 ),
@@ -1107,7 +1107,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   value: 'home',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const ChatyGlyphIcon(glyph: ChatyGlyph.homeLayout, size: 20),
+                    leading: ChatyGlyphIcon(glyph: ChatyGlyph.homeLayout, size: 20),
                     title: Text('Home & navigation'),
                   ),
                 ),
@@ -1115,7 +1115,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   value: 'navigation',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const ChatyGlyphIcon(glyph: ChatyGlyph.navigation, size: 20),
+                    leading: ChatyGlyphIcon(glyph: ChatyGlyph.navigation, size: 20),
                     title: Text('Navigation destinations'),
                   ),
                 ),
@@ -1123,7 +1123,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   value: 'settings',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const ChatyGlyphIcon(glyph: ChatyGlyph.settings, size: 20),
+                    leading: ChatyGlyphIcon(glyph: ChatyGlyph.settings, size: 20),
                     title: Text('All settings'),
                   ),
                 ),
