@@ -78,6 +78,7 @@ void main() {
       "case 'linked':",
       "case 'themes':",
       "case 'templates':",
+      "case 'starred':",
       "case 'home':",
       "case 'navigation':",
       "case 'settings':",
@@ -94,6 +95,24 @@ void main() {
     expect(source, contains('...matchingTemplates.map'));
     expect(source, contains('...matchingComponents.map'));
     expect(source, contains('No template or component found'));
+  });
+
+  test('starred messages screen reads saved state and offers open/unstar actions', () {
+    final screen = File(
+      'lib/features/messages/starred_messages_screen.dart',
+    ).readAsStringSync();
+    final home = File(
+      'lib/features/chats/chats_home_screen.dart',
+    ).readAsStringSync();
+
+    expect(screen, contains('widget.dataStore.conversations'));
+    expect(screen, contains('message.isStarred'));
+    expect(screen, contains('ensureConversationLoaded'));
+    expect(screen, contains("value: 'open'"));
+    expect(screen, contains("value: 'unstar'"));
+    expect(screen, contains('toggleStarMessage'));
+    expect(home, contains("case 'starred':"));
+    expect(home, contains("title: Text('Starred messages')"));
   });
 
   test('component template previews do not display placeholder copy', () {
