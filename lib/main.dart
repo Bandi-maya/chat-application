@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:chat/data/repositories/chaty_data_store.dart';
 import 'package:chat/data/services/backend_service.dart';
 import 'package:chat/data/services/call_signaling_service.dart';
 import 'package:chat/data/services/notification_service.dart';
@@ -177,14 +176,11 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     _notificationService = locator<ChatyNotificationService>();
     _relationshipService = locator<ContactRelationshipService>();
     _preferencesController.addListener(_handleSecurityPreferenceChanged);
-    _statusService = StatusService();
+    _statusService = locator<StatusService>();
     if (Supabase.instance.client.auth.currentSession != null) {
       _statusService.startRevocationWatch();
     }
-    _automationService = MessageAutomationService(
-      preferencesController: _preferencesController,
-      dataStore: locator<ChatyDataStore>(),
-    );
+    _automationService = locator<MessageAutomationService>();
     _authUiSubscription = Supabase.instance.client.auth.onAuthStateChange
         .listen(_handleAuthUiEvent);
     if (Supabase.instance.client.auth.currentSession != null) {
@@ -713,7 +709,8 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
               ],
             );
           },
-          home: Supabase.instance.client.auth.currentSession != null
+          home: (_backend.isAuthenticated ||
+                  Supabase.instance.client.auth.currentSession != null)
               ? const MainNavigationShell()
               : const WelcomeScreen(),
         );

@@ -2,6 +2,7 @@ import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../emoji_registry.dart';
+import '../services/emoji_recent_cache.dart';
 import 'animated_emoji_view.dart';
 import '../models/parsed_emoji_span.dart';
 
@@ -48,6 +49,9 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
     _tabController = TabController(length: 2, vsync: this);
     _filteredAnimated = ChatyEmojiRegistry.entries;
     _searchCtrl.addListener(_onSearchChanged);
+    EmojiRecentCache.instance.initialize().then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   void _onSearchChanged() {
@@ -137,7 +141,8 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
   }
 
   Widget _buildAnimatedTab(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Column(
       children: [
@@ -170,6 +175,66 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
             ),
           ),
         ),
+        if (_searchQuery.isEmpty && EmojiRecentCache.instance.items.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+            child: Row(
+              children: [
+                Icon(Icons.history_rounded, size: 16, color: colorScheme.primary),
+                const SizedBox(width: 6),
+                Text(
+                  'Recently Used',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 48,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              itemCount: EmojiRecentCache.instance.items.length,
+              itemBuilder: (context, idx) {
+                final recent = EmojiRecentCache.instance.items[idx];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  child: Tooltip(
+                    message: recent.label,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () async {
+                        HapticFeedback.lightImpact();
+                        await EmojiRecentCache.instance.recordUsage(
+                          recent.unicode,
+                          label: recent.label,
+                        );
+                        if (context.mounted) Navigator.of(context).pop(recent.unicode);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Center(
+                          child: Text(
+                            recent.unicode,
+                            style: const TextStyle(fontSize: 22),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 4),
+        ],
         Expanded(
           child: _filteredAnimated.isEmpty
               ? Center(
@@ -203,9 +268,13 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
                           ),
                           borderRadius: BorderRadius.circular(14),
                           child: InkWell(
-                            onTap: () {
+                            onTap: () async {
                               HapticFeedback.lightImpact();
-                              Navigator.of(context).pop(unicode);
+                              await EmojiRecentCache.instance.recordUsage(
+                                unicode,
+                                label: entry.label,
+                              );
+                              if (context.mounted) Navigator.of(context).pop(unicode);
                             },
                             borderRadius: BorderRadius.circular(14),
                             child: Semantics(
@@ -264,9 +333,10 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
     return Container(
       color: surfaceColor,
       child: EmojiPicker(
-        onEmojiSelected: (category, emoji) {
+        onEmojiSelected: (category, emoji) async {
           HapticFeedback.selectionClick();
-          Navigator.of(context).pop(emoji.emoji);
+          await EmojiRecentCache.instance.recordUsage(emoji.emoji, label: emoji.name);
+          if (context.mounted) Navigator.of(context).pop(emoji.emoji);
         },
         config: Config(
           height: height - 110,

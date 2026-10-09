@@ -22,6 +22,13 @@ class PrivacyPreferences {
   final bool antiDeleteMessages;
   final bool messageRevokeAlert;
   final bool showBlueTicksAfterReply;
+  final bool hideUpdateOption;
+  final bool disableChannels;
+  final bool hideFirstMessage;
+  final bool antiDisappearingMessages;
+  final bool deletionOfEveryone;
+  final bool deletedMediaTime;
+  final bool unviewedChats;
 
   const PrivacyPreferences({
     this.freezeLastSeen = false,
@@ -43,6 +50,13 @@ class PrivacyPreferences {
     this.antiDeleteMessages = true,
     this.messageRevokeAlert = true,
     this.showBlueTicksAfterReply = false,
+    this.hideUpdateOption = false,
+    this.disableChannels = false,
+    this.hideFirstMessage = false,
+    this.antiDisappearingMessages = true,
+    this.deletionOfEveryone = true,
+    this.deletedMediaTime = false,
+    this.unviewedChats = false,
   });
 
   PrivacyPreferences copyWith({
@@ -65,6 +79,13 @@ class PrivacyPreferences {
     bool? antiDeleteMessages,
     bool? messageRevokeAlert,
     bool? showBlueTicksAfterReply,
+    bool? hideUpdateOption,
+    bool? disableChannels,
+    bool? hideFirstMessage,
+    bool? antiDisappearingMessages,
+    bool? deletionOfEveryone,
+    bool? deletedMediaTime,
+    bool? unviewedChats,
   }) {
     return PrivacyPreferences(
       freezeLastSeen: freezeLastSeen ?? this.freezeLastSeen,
@@ -90,6 +111,14 @@ class PrivacyPreferences {
       messageRevokeAlert: messageRevokeAlert ?? this.messageRevokeAlert,
       showBlueTicksAfterReply:
           showBlueTicksAfterReply ?? this.showBlueTicksAfterReply,
+      hideUpdateOption: hideUpdateOption ?? this.hideUpdateOption,
+      disableChannels: disableChannels ?? this.disableChannels,
+      hideFirstMessage: hideFirstMessage ?? this.hideFirstMessage,
+      antiDisappearingMessages:
+          antiDisappearingMessages ?? this.antiDisappearingMessages,
+      deletionOfEveryone: deletionOfEveryone ?? this.deletionOfEveryone,
+      deletedMediaTime: deletedMediaTime ?? this.deletedMediaTime,
+      unviewedChats: unviewedChats ?? this.unviewedChats,
     );
   }
 
@@ -113,6 +142,13 @@ class PrivacyPreferences {
     'antiDeleteMessages': antiDeleteMessages,
     'messageRevokeAlert': messageRevokeAlert,
     'showBlueTicksAfterReply': showBlueTicksAfterReply,
+    'hideUpdateOption': hideUpdateOption,
+    'disableChannels': disableChannels,
+    'hideFirstMessage': hideFirstMessage,
+    'antiDisappearingMessages': antiDisappearingMessages,
+    'deletionOfEveryone': deletionOfEveryone,
+    'deletedMediaTime': deletedMediaTime,
+    'unviewedChats': unviewedChats,
   };
 
   factory PrivacyPreferences.fromMap(Map<String, dynamic> map) =>
@@ -140,6 +176,13 @@ class PrivacyPreferences {
         antiDeleteMessages: map['antiDeleteMessages'] ?? true,
         messageRevokeAlert: map['messageRevokeAlert'] ?? true,
         showBlueTicksAfterReply: map['showBlueTicksAfterReply'] ?? false,
+        hideUpdateOption: map['hideUpdateOption'] ?? false,
+        disableChannels: map['disableChannels'] ?? false,
+        hideFirstMessage: map['hideFirstMessage'] ?? false,
+        antiDisappearingMessages: map['antiDisappearingMessages'] ?? true,
+        deletionOfEveryone: map['deletionOfEveryone'] ?? true,
+        deletedMediaTime: map['deletedMediaTime'] ?? false,
+        unviewedChats: map['unviewedChats'] ?? false,
       );
 }
 
@@ -261,19 +304,61 @@ class SecurityPreferences {
 
 /// Home Screen Customization Model
 class HomePreferences {
-  final String
-  homeStyle; // 'Chaty Default', 'Classic', 'Compact', 'Expressive', 'Minimal', 'Stories First', 'Productivity', 'Tablet Split View'
+  final String homeStyle;
   final bool enableStoriesStrip;
-  final String
-  storiesStyle; // 'Circular', 'Squircle', 'Card', 'Minimal', 'Compact'
+  final String storiesStyle;
   final bool separateChatsAndGroups;
   final String myNameOverride;
-  final String avatarShape; // 'circle', 'squircle', 'roundedSquare'
+  final String avatarShape;
   final bool ghostMode;
   final bool airplaneModeSimulator;
   final bool showSearchBar;
   final bool showCameraIcon;
   final bool showDesktopIcon;
+
+  final bool carouselView;
+  final bool setMyName;
+  final bool disableStatusUnderName;
+  final bool hideChatSortList;
+  final bool disableSearchBar;
+  final bool themesEnabled;
+  final bool showIconAddAccount;
+  final bool hideChatsDivider;
+  final bool hideUnsavedNumbers;
+  final bool hideFrequentlyContacted;
+  final bool hideOtherContacts;
+  final bool hideRecentChats;
+
+  // New Image 3 Rows properties
+  final double screenTextSize;
+  final int? rowTextColor;
+  final int? rowContactNameColor;
+  final int? unreadCounterColor;
+  final int? unreadCounterTextColor;
+  final int? contactOnlineColor;
+  final int? lastSeenColor;
+  final int? mentionIndicatorBgColor;
+  final int? mentionIconColor;
+  final bool hideArchivedChats;
+  final bool archiveChatsOnTop;
+  final bool disableContactOnlineLastSeen;
+  final bool disableOnlineDot;
+  final int? onlineDotColor;
+  final bool elapsedTime;
+
+  // New Image 3 FAB properties
+  final bool hideFab;
+  final int? fabNormalColor;
+  final int? fabPressedColor;
+  final int? fabIconsColor;
+  final bool showMetaAiIcon;
+  final bool hideNewMessageFab;
+  final bool hideLastSeenFab;
+  final bool hideCutEditFab;
+  final bool hidePluginsList;
+  final bool hideGbwaSettingsFab;
+  final String pagerTransition3d;
+  final String tabBubbleStyle;
 
   const HomePreferences({
     this.homeStyle = 'Chaty Default',
@@ -287,9 +372,50 @@ class HomePreferences {
     this.showSearchBar = true,
     this.showCameraIcon = false,
     this.showDesktopIcon = true,
+    this.carouselView = false,
+    this.setMyName = true,
+    this.disableStatusUnderName = false,
+    this.hideChatSortList = false,
+    this.disableSearchBar = false,
+    this.themesEnabled = true,
+    this.showIconAddAccount = false,
+    this.hideChatsDivider = false,
+    this.hideUnsavedNumbers = false,
+    this.hideFrequentlyContacted = false,
+    this.hideOtherContacts = false,
+    this.hideRecentChats = false,
+    this.screenTextSize = 17.0,
+    this.rowTextColor,
+    this.rowContactNameColor,
+    this.unreadCounterColor,
+    this.unreadCounterTextColor,
+    this.contactOnlineColor,
+    this.lastSeenColor,
+    this.mentionIndicatorBgColor,
+    this.mentionIconColor,
+    this.hideArchivedChats = false,
+    this.archiveChatsOnTop = true,
+    this.disableContactOnlineLastSeen = false,
+    this.disableOnlineDot = false,
+    this.onlineDotColor,
+    this.elapsedTime = false,
+    this.hideFab = false,
+    this.fabNormalColor,
+    this.fabPressedColor,
+    this.fabIconsColor,
+    this.showMetaAiIcon = true,
+    this.hideNewMessageFab = false,
+    this.hideLastSeenFab = false,
+    this.hideCutEditFab = false,
+    this.hidePluginsList = false,
+    this.hideGbwaSettingsFab = false,
+    this.pagerTransition3d = 'Cube 3D',
+    this.tabBubbleStyle = 'Capsule Pill',
   });
 
   HomePreferences copyWith({
+    String? pagerTransition3d,
+    String? tabBubbleStyle,
     String? homeStyle,
     bool? enableStoriesStrip,
     String? storiesStyle,
@@ -301,6 +427,46 @@ class HomePreferences {
     bool? showSearchBar,
     bool? showCameraIcon,
     bool? showDesktopIcon,
+    bool? carouselView,
+    bool? setMyName,
+    bool? disableStatusUnderName,
+    bool? hideChatSortList,
+    bool? disableSearchBar,
+    bool? themesEnabled,
+    bool? showIconAddAccount,
+    bool? hideChatsDivider,
+    bool? hideUnsavedNumbers,
+    bool? hideFrequentlyContacted,
+    bool? hideOtherContacts,
+    bool? hideRecentChats,
+    double? screenTextSize,
+    int? rowTextColor,
+    int? textColor,
+    int? rowContactNameColor,
+    int? contactNameColor,
+    int? unreadCounterColor,
+    int? unreadCounterTextColor,
+    int? contactOnlineColor,
+    int? lastSeenColor,
+    int? mentionIndicatorBgColor,
+    int? mentionIconColor,
+    bool? hideArchivedChats,
+    bool? archiveChatsOnTop,
+    bool? disableContactOnlineLastSeen,
+    bool? disableOnlineDot,
+    int? onlineDotColor,
+    bool? elapsedTime,
+    bool? hideFab,
+    int? fabNormalColor,
+    int? fabPressedColor,
+    int? fabIconsColor,
+    bool? showMetaAiIcon,
+    bool? hideNewMessageFab,
+    bool? hideLastSeenFab,
+    bool? hideCutEditFab,
+    bool? hideCutterFab,
+    bool? hidePluginsList,
+    bool? hideGbwaSettingsFab,
   }) {
     return HomePreferences(
       homeStyle: homeStyle ?? this.homeStyle,
@@ -316,8 +482,59 @@ class HomePreferences {
       showSearchBar: showSearchBar ?? this.showSearchBar,
       showCameraIcon: showCameraIcon ?? this.showCameraIcon,
       showDesktopIcon: showDesktopIcon ?? this.showDesktopIcon,
+      carouselView: carouselView ?? this.carouselView,
+      setMyName: setMyName ?? this.setMyName,
+      disableStatusUnderName:
+          disableStatusUnderName ?? this.disableStatusUnderName,
+      hideChatSortList: hideChatSortList ?? this.hideChatSortList,
+      disableSearchBar: disableSearchBar ?? this.disableSearchBar,
+      themesEnabled: themesEnabled ?? this.themesEnabled,
+      showIconAddAccount: showIconAddAccount ?? this.showIconAddAccount,
+      hideChatsDivider: hideChatsDivider ?? this.hideChatsDivider,
+      hideUnsavedNumbers: hideUnsavedNumbers ?? this.hideUnsavedNumbers,
+      hideFrequentlyContacted:
+          hideFrequentlyContacted ?? this.hideFrequentlyContacted,
+      hideOtherContacts: hideOtherContacts ?? this.hideOtherContacts,
+      hideRecentChats: hideRecentChats ?? this.hideRecentChats,
+      screenTextSize: screenTextSize ?? this.screenTextSize,
+      rowTextColor: textColor ?? rowTextColor ?? this.rowTextColor,
+      rowContactNameColor:
+          contactNameColor ?? rowContactNameColor ?? this.rowContactNameColor,
+      unreadCounterColor: unreadCounterColor ?? this.unreadCounterColor,
+      unreadCounterTextColor:
+          unreadCounterTextColor ?? this.unreadCounterTextColor,
+      contactOnlineColor: contactOnlineColor ?? this.contactOnlineColor,
+      lastSeenColor: lastSeenColor ?? this.lastSeenColor,
+      mentionIndicatorBgColor:
+          mentionIndicatorBgColor ?? this.mentionIndicatorBgColor,
+      mentionIconColor: mentionIconColor ?? this.mentionIconColor,
+      hideArchivedChats: hideArchivedChats ?? this.hideArchivedChats,
+      archiveChatsOnTop: archiveChatsOnTop ?? this.archiveChatsOnTop,
+      disableContactOnlineLastSeen:
+          disableContactOnlineLastSeen ?? this.disableContactOnlineLastSeen,
+      disableOnlineDot: disableOnlineDot ?? this.disableOnlineDot,
+      onlineDotColor: onlineDotColor ?? this.onlineDotColor,
+      elapsedTime: elapsedTime ?? this.elapsedTime,
+      hideFab: hideFab ?? this.hideFab,
+      fabNormalColor: fabNormalColor ?? this.fabNormalColor,
+      fabPressedColor: fabPressedColor ?? this.fabPressedColor,
+      fabIconsColor: fabIconsColor ?? this.fabIconsColor,
+      showMetaAiIcon: showMetaAiIcon ?? this.showMetaAiIcon,
+      hideNewMessageFab: hideNewMessageFab ?? this.hideNewMessageFab,
+      hideLastSeenFab: hideLastSeenFab ?? this.hideLastSeenFab,
+      hideCutEditFab:
+          hideCutterFab ?? hideCutEditFab ?? this.hideCutEditFab,
+      hidePluginsList: hidePluginsList ?? this.hidePluginsList,
+      hideGbwaSettingsFab: hideGbwaSettingsFab ?? this.hideGbwaSettingsFab,
+      pagerTransition3d: pagerTransition3d ?? this.pagerTransition3d,
+      tabBubbleStyle: tabBubbleStyle ?? this.tabBubbleStyle,
     );
   }
+
+  // Aliases for compatibility
+  int? get textColor => rowTextColor;
+  int? get contactNameColor => rowContactNameColor;
+  bool get hideCutterFab => hideCutEditFab;
 
   Map<String, dynamic> toMap() => {
     'homeStyle': homeStyle,
@@ -331,6 +548,45 @@ class HomePreferences {
     'showSearchBar': showSearchBar,
     'showCameraIcon': showCameraIcon,
     'showDesktopIcon': showDesktopIcon,
+    'carouselView': carouselView,
+    'setMyName': setMyName,
+    'disableStatusUnderName': disableStatusUnderName,
+    'hideChatSortList': hideChatSortList,
+    'disableSearchBar': disableSearchBar,
+    'themesEnabled': themesEnabled,
+    'showIconAddAccount': showIconAddAccount,
+    'hideChatsDivider': hideChatsDivider,
+    'hideUnsavedNumbers': hideUnsavedNumbers,
+    'hideFrequentlyContacted': hideFrequentlyContacted,
+    'hideOtherContacts': hideOtherContacts,
+    'hideRecentChats': hideRecentChats,
+    'screenTextSize': screenTextSize,
+    'rowTextColor': rowTextColor,
+    'rowContactNameColor': rowContactNameColor,
+    'unreadCounterColor': unreadCounterColor,
+    'unreadCounterTextColor': unreadCounterTextColor,
+    'contactOnlineColor': contactOnlineColor,
+    'lastSeenColor': lastSeenColor,
+    'mentionIndicatorBgColor': mentionIndicatorBgColor,
+    'mentionIconColor': mentionIconColor,
+    'hideArchivedChats': hideArchivedChats,
+    'archiveChatsOnTop': archiveChatsOnTop,
+    'disableContactOnlineLastSeen': disableContactOnlineLastSeen,
+    'disableOnlineDot': disableOnlineDot,
+    'onlineDotColor': onlineDotColor,
+    'elapsedTime': elapsedTime,
+    'hideFab': hideFab,
+    'fabNormalColor': fabNormalColor,
+    'fabPressedColor': fabPressedColor,
+    'fabIconsColor': fabIconsColor,
+    'showMetaAiIcon': showMetaAiIcon,
+    'hideNewMessageFab': hideNewMessageFab,
+    'hideLastSeenFab': hideLastSeenFab,
+    'hideCutEditFab': hideCutEditFab,
+    'hidePluginsList': hidePluginsList,
+    'hideGbwaSettingsFab': hideGbwaSettingsFab,
+    'pagerTransition3d': pagerTransition3d,
+    'tabBubbleStyle': tabBubbleStyle,
   };
 
   factory HomePreferences.fromMap(Map<String, dynamic> map) => HomePreferences(
@@ -345,26 +601,131 @@ class HomePreferences {
     showSearchBar: map['showSearchBar'] ?? true,
     showCameraIcon: map['showCameraIcon'] ?? false,
     showDesktopIcon: map['showDesktopIcon'] ?? true,
+    carouselView: map['carouselView'] ?? false,
+    setMyName: map['setMyName'] ?? true,
+    disableStatusUnderName: map['disableStatusUnderName'] ?? false,
+    hideChatSortList: map['hideChatSortList'] ?? false,
+    disableSearchBar: map['disableSearchBar'] ?? false,
+    themesEnabled: map['themesEnabled'] ?? true,
+    showIconAddAccount: map['showIconAddAccount'] ?? false,
+    hideChatsDivider: map['hideChatsDivider'] ?? false,
+    hideUnsavedNumbers: map['hideUnsavedNumbers'] ?? false,
+    hideFrequentlyContacted: map['hideFrequentlyContacted'] ?? false,
+    hideOtherContacts: map['hideOtherContacts'] ?? false,
+    hideRecentChats: map['hideRecentChats'] ?? false,
+    screenTextSize: (map['screenTextSize'] as num?)?.toDouble() ?? 17.0,
+    rowTextColor: map['rowTextColor'] as int?,
+    rowContactNameColor: map['rowContactNameColor'] as int?,
+    unreadCounterColor: map['unreadCounterColor'] as int?,
+    unreadCounterTextColor: map['unreadCounterTextColor'] as int?,
+    contactOnlineColor: map['contactOnlineColor'] as int?,
+    lastSeenColor: map['lastSeenColor'] as int?,
+    mentionIndicatorBgColor: map['mentionIndicatorBgColor'] as int?,
+    mentionIconColor: map['mentionIconColor'] as int?,
+    hideArchivedChats: map['hideArchivedChats'] ?? false,
+    archiveChatsOnTop: map['archiveChatsOnTop'] ?? true,
+    disableContactOnlineLastSeen:
+        map['disableContactOnlineLastSeen'] ?? false,
+    disableOnlineDot: map['disableOnlineDot'] ?? false,
+    onlineDotColor: map['onlineDotColor'] as int?,
+    elapsedTime: map['elapsedTime'] ?? false,
+    hideFab: map['hideFab'] ?? false,
+    fabNormalColor: map['fabNormalColor'] as int?,
+    fabPressedColor: map['fabPressedColor'] as int?,
+    fabIconsColor: map['fabIconsColor'] as int?,
+    showMetaAiIcon: map['showMetaAiIcon'] ?? true,
+    hideNewMessageFab: map['hideNewMessageFab'] ?? false,
+    hideLastSeenFab: map['hideLastSeenFab'] ?? false,
+    hideCutEditFab: map['hideCutEditFab'] ?? false,
+    hidePluginsList: map['hidePluginsList'] ?? false,
+    hideGbwaSettingsFab: map['hideGbwaSettingsFab'] ?? false,
+    pagerTransition3d: map['pagerTransition3d'] ?? 'Cube 3D',
+    tabBubbleStyle: map['tabBubbleStyle'] ?? 'Capsule Pill',
   );
 }
 
 /// Conversation Screen Customization Model
 class ConversationPreferences {
-  final String
-  bubbleStyle; // 48 discrete styles (e.g. 'Stock', 'RC iOS 11', '3D', etc.)
-  final String
-  tickStyle; // 16 discrete styles (e.g. 'RC iOS 11', 'Sticker', 'Green Tick', etc.)
+  final String bubbleStyle;
+  final String tickStyle;
   final bool enableQuickContactSidebar;
-  final String sidebarPosition; // 'Left', 'Right'
+  final String sidebarPosition;
   final double sidebarOpacity;
   final bool iosStylePopupMenu;
   final String doubleTapReactionEmoji;
-  final String
-  wallpaperType; // 'Solid', 'Gradient', 'Pattern', 'Image', 'ProfileBlur'
+  final String wallpaperType;
   final double voicePlaybackSpeed;
-  final String
-  wallpaperPath; // '' = none; local copy of a user-picked background image
+  final String wallpaperPath;
   final bool enableAnimatedEmojis;
+  final bool switchDirectContactLink;
+  final bool confirmBeforeSendingSticker;
+  final bool newAttachmentPickerUi;
+  final bool hideDateAndName;
+  final bool hideAdminNameIcon;
+  final String groupAdminIcon;
+  final String quickContactSidebarPosition;
+  final int quickContactBgColor;
+  final int quickContactTextColor;
+  final bool hideChatFab;
+  final bool disableMoreOptionsFromBubble;
+  final bool disableDoubleTapReaction;
+  final String translateOptionSettings;
+  final bool hideMessageTranslationIcon;
+  final bool customWallpaperPerContact;
+  final bool profilePicWallpaper;
+  final bool enableProximitySensor;
+  final bool disableOutputSwitching;
+  final bool playVoiceNotes;
+  final bool forwardAsVoiceNote;
+  final String incomingMessageRingtone;
+  final String sendMessageRingtone;
+
+  // New Image 4 Action Bar properties
+  final int? actionBarColor;
+  final bool hideProfilePicture;
+  final bool hideContactName;
+  final bool hideCallButton;
+  final bool disableContactStatus;
+  final int? contactStatusBgColor;
+  final int? contactStatusTextColor;
+
+  // New Image 4 Bubble & Ticks properties
+  final double messageTextSize;
+  final int? convBackgroundColor;
+  final int? rightBubbleColor;
+  final int? rightChatBubbleTextColor;
+  final int? rightBubbleTimeColor;
+  final int? leftBubbleColor;
+  final int? leftChatBubbleTextColor;
+  final int? leftBubbleTimeColor;
+  final int? deletedMessageIconColor;
+  final int? quotedDividerColor;
+  final int? quotedNameColor;
+  final int? quotedMessageColor;
+  final int? quotedBackgroundColor;
+  final bool makeTextSelectable;
+  final bool removeReadMore;
+
+  // New Image 4 Conversation Entry Style properties
+  final String entryStyle;
+  final int? uiEntryBackgroundColor;
+  final int? uiButtonsColor;
+  final int? emojiButtonColor;
+  final int? sendButtonColor;
+  final int? micSendBgCircleColor;
+  final int? textEntryBackgroundColor;
+  final int? textEntryColor;
+
+  // New Image 4 More Options properties
+  final int? emojiHeaderColor;
+  final int? emojiHeaderIconsColor;
+  final int? emojiPickerBgColor;
+  final int? hyperlinksColor;
+  final int? infoBalloonsTextColor;
+  final int? infoBalloonsBgColor;
+  final int? groupParticipantNameColor;
+  final int? voiceNotePlayingBarColor;
+  final int? voiceNotePlayButtonColor;
 
   const ConversationPreferences({
     this.bubbleStyle = 'Stock',
@@ -378,9 +739,69 @@ class ConversationPreferences {
     this.voicePlaybackSpeed = 1.0,
     this.wallpaperPath = '',
     this.enableAnimatedEmojis = true,
+    this.switchDirectContactLink = false,
+    this.confirmBeforeSendingSticker = true,
+    this.newAttachmentPickerUi = false,
+    this.hideDateAndName = true,
+    this.hideAdminNameIcon = false,
+    this.groupAdminIcon = 'Default',
+    this.quickContactSidebarPosition = 'Top',
+    this.quickContactBgColor = 0xFF000000,
+    this.quickContactTextColor = 0xFF000000,
+    this.hideChatFab = true,
+    this.disableMoreOptionsFromBubble = false,
+    this.disableDoubleTapReaction = false,
+    this.translateOptionSettings = 'Server',
+    this.hideMessageTranslationIcon = false,
+    this.customWallpaperPerContact = false,
+    this.profilePicWallpaper = false,
+    this.enableProximitySensor = true,
+    this.disableOutputSwitching = false,
+    this.playVoiceNotes = false,
+    this.forwardAsVoiceNote = false,
+    this.incomingMessageRingtone = 'Default',
+    this.sendMessageRingtone = 'Default',
+    this.actionBarColor,
+    this.hideProfilePicture = false,
+    this.hideContactName = false,
+    this.hideCallButton = false,
+    this.disableContactStatus = false,
+    this.contactStatusBgColor,
+    this.contactStatusTextColor,
+    this.messageTextSize = 16.0,
+    this.convBackgroundColor,
+    this.rightBubbleColor,
+    this.rightChatBubbleTextColor,
+    this.rightBubbleTimeColor,
+    this.leftBubbleColor,
+    this.leftChatBubbleTextColor,
+    this.leftBubbleTimeColor,
+    this.deletedMessageIconColor,
+    this.quotedDividerColor,
+    this.quotedNameColor,
+    this.quotedMessageColor,
+    this.quotedBackgroundColor,
+    this.makeTextSelectable = true,
+    this.removeReadMore = false,
+    this.entryStyle = 'Stock',
+    this.uiEntryBackgroundColor,
+    this.uiButtonsColor,
+    this.emojiButtonColor,
+    this.sendButtonColor,
+    this.micSendBgCircleColor,
+    this.textEntryBackgroundColor,
+    this.textEntryColor,
+    this.emojiHeaderColor,
+    this.emojiHeaderIconsColor,
+    this.emojiPickerBgColor,
+    this.hyperlinksColor,
+    this.infoBalloonsTextColor,
+    this.infoBalloonsBgColor,
+    this.groupParticipantNameColor,
+    this.voiceNotePlayingBarColor,
+    this.voiceNotePlayButtonColor,
   });
 
-  // Backward compatibility alias for bubbleShape
   String get bubbleShape => bubbleStyle;
   double get bubbleRadius => 16.0;
 
@@ -397,6 +818,79 @@ class ConversationPreferences {
     double? voicePlaybackSpeed,
     String? wallpaperPath,
     bool? enableAnimatedEmojis,
+    bool? switchDirectContactLink,
+    bool? confirmBeforeSendingSticker,
+    bool? newAttachmentPickerUi,
+    bool? hideDateAndName,
+    bool? hideAdminNameIcon,
+    String? groupAdminIcon,
+    String? quickContactSidebarPosition,
+    int? quickContactBgColor,
+    int? quickContactTextColor,
+    bool? hideChatFab,
+    bool? disableMoreOptionsFromBubble,
+    bool? disableDoubleTapReaction,
+    String? translateOptionSettings,
+    bool? hideMessageTranslationIcon,
+    bool? customWallpaperPerContact,
+    bool? profilePicWallpaper,
+    bool? enableProximitySensor,
+    bool? disableOutputSwitching,
+    bool? playVoiceNotes,
+    bool? forwardAsVoiceNote,
+    String? incomingMessageRingtone,
+    String? sendMessageRingtone,
+    int? actionBarColor,
+    bool? hideProfilePicture,
+    bool? hideContactName,
+    bool? hideCallButton,
+    bool? disableContactStatus,
+    int? contactStatusBgColor,
+    int? contactStatusBackgroundColor,
+    int? contactStatusTextColor,
+    double? messageTextSize,
+    int? convBackgroundColor,
+    int? conversationBackgroundColor,
+    int? rightBubbleColor,
+    int? rightChatBubbleTextColor,
+    int? rightBubbleTimeColor,
+    int? leftBubbleColor,
+    int? leftChatBubbleTextColor,
+    int? leftBubbleTimeColor,
+    int? deletedMessageIconColor,
+    int? quotedDividerColor,
+    int? quotedNameColor,
+    int? quotedMessageColor,
+    int? quotedBackgroundColor,
+    bool? makeTextSelectable,
+    bool? removeReadMore,
+    String? entryStyle,
+    int? uiEntryBackgroundColor,
+    int? entryUiBackgroundColor,
+    int? uiButtonsColor,
+    int? entryUiButtonsColor,
+    int? emojiButtonColor,
+    int? entryEmojiButtonColor,
+    int? sendButtonColor,
+    int? entrySendButtonColor,
+    int? micSendBgCircleColor,
+    int? entryMicSendBackgroundCircle,
+    int? textEntryBackgroundColor,
+    int? entryTextBackground,
+    int? textEntryColor,
+    int? entryTextColor,
+    int? emojiHeaderColor,
+    int? emojiHeaderIconsColor,
+    int? emojiPickerBgColor,
+    int? hyperlinksColor,
+    int? infoBalloonsTextColor,
+    int? infoBalloonsBgColor,
+    int? infoBalloonsBackgroundColor,
+    int? groupParticipantNameColor,
+    int? voiceNotePlayingBarColor,
+    int? voiceNotePlayingBar,
+    int? voiceNotePlayButtonColor,
+    int? voiceNotePlayButton,
   }) {
     return ConversationPreferences(
       bubbleStyle: bubbleStyle ?? bubbleShape ?? this.bubbleStyle,
@@ -412,8 +906,134 @@ class ConversationPreferences {
       voicePlaybackSpeed: voicePlaybackSpeed ?? this.voicePlaybackSpeed,
       wallpaperPath: wallpaperPath ?? this.wallpaperPath,
       enableAnimatedEmojis: enableAnimatedEmojis ?? this.enableAnimatedEmojis,
+      switchDirectContactLink:
+          switchDirectContactLink ?? this.switchDirectContactLink,
+      confirmBeforeSendingSticker:
+          confirmBeforeSendingSticker ?? this.confirmBeforeSendingSticker,
+      newAttachmentPickerUi:
+          newAttachmentPickerUi ?? this.newAttachmentPickerUi,
+      hideDateAndName: hideDateAndName ?? this.hideDateAndName,
+      hideAdminNameIcon: hideAdminNameIcon ?? this.hideAdminNameIcon,
+      groupAdminIcon: groupAdminIcon ?? this.groupAdminIcon,
+      quickContactSidebarPosition:
+          quickContactSidebarPosition ?? this.quickContactSidebarPosition,
+      quickContactBgColor: quickContactBgColor ?? this.quickContactBgColor,
+      quickContactTextColor:
+          quickContactTextColor ?? this.quickContactTextColor,
+      hideChatFab: hideChatFab ?? this.hideChatFab,
+      disableMoreOptionsFromBubble:
+          disableMoreOptionsFromBubble ?? this.disableMoreOptionsFromBubble,
+      disableDoubleTapReaction:
+          disableDoubleTapReaction ?? this.disableDoubleTapReaction,
+      translateOptionSettings:
+          translateOptionSettings ?? this.translateOptionSettings,
+      hideMessageTranslationIcon:
+          hideMessageTranslationIcon ?? this.hideMessageTranslationIcon,
+      customWallpaperPerContact:
+          customWallpaperPerContact ?? this.customWallpaperPerContact,
+      profilePicWallpaper: profilePicWallpaper ?? this.profilePicWallpaper,
+      enableProximitySensor:
+          enableProximitySensor ?? this.enableProximitySensor,
+      disableOutputSwitching:
+          disableOutputSwitching ?? this.disableOutputSwitching,
+      playVoiceNotes: playVoiceNotes ?? this.playVoiceNotes,
+      forwardAsVoiceNote: forwardAsVoiceNote ?? this.forwardAsVoiceNote,
+      incomingMessageRingtone:
+          incomingMessageRingtone ?? this.incomingMessageRingtone,
+      sendMessageRingtone: sendMessageRingtone ?? this.sendMessageRingtone,
+      actionBarColor: actionBarColor ?? this.actionBarColor,
+      hideProfilePicture: hideProfilePicture ?? this.hideProfilePicture,
+      hideContactName: hideContactName ?? this.hideContactName,
+      hideCallButton: hideCallButton ?? this.hideCallButton,
+      disableContactStatus:
+          disableContactStatus ?? this.disableContactStatus,
+      contactStatusBgColor:
+          contactStatusBackgroundColor ??
+          contactStatusBgColor ??
+          this.contactStatusBgColor,
+      contactStatusTextColor:
+          contactStatusTextColor ?? this.contactStatusTextColor,
+      messageTextSize: messageTextSize ?? this.messageTextSize,
+      convBackgroundColor:
+          conversationBackgroundColor ??
+          convBackgroundColor ??
+          this.convBackgroundColor,
+      rightBubbleColor: rightBubbleColor ?? this.rightBubbleColor,
+      rightChatBubbleTextColor:
+          rightChatBubbleTextColor ?? this.rightChatBubbleTextColor,
+      rightBubbleTimeColor:
+          rightBubbleTimeColor ?? this.rightBubbleTimeColor,
+      leftBubbleColor: leftBubbleColor ?? this.leftBubbleColor,
+      leftChatBubbleTextColor:
+          leftChatBubbleTextColor ?? this.leftChatBubbleTextColor,
+      leftBubbleTimeColor: leftBubbleTimeColor ?? this.leftBubbleTimeColor,
+      deletedMessageIconColor:
+          deletedMessageIconColor ?? this.deletedMessageIconColor,
+      quotedDividerColor: quotedDividerColor ?? this.quotedDividerColor,
+      quotedNameColor: quotedNameColor ?? this.quotedNameColor,
+      quotedMessageColor: quotedMessageColor ?? this.quotedMessageColor,
+      quotedBackgroundColor:
+          quotedBackgroundColor ?? this.quotedBackgroundColor,
+      makeTextSelectable: makeTextSelectable ?? this.makeTextSelectable,
+      removeReadMore: removeReadMore ?? this.removeReadMore,
+      entryStyle: entryStyle ?? this.entryStyle,
+      uiEntryBackgroundColor:
+          entryUiBackgroundColor ??
+          uiEntryBackgroundColor ??
+          this.uiEntryBackgroundColor,
+      uiButtonsColor:
+          entryUiButtonsColor ?? uiButtonsColor ?? this.uiButtonsColor,
+      emojiButtonColor:
+          entryEmojiButtonColor ?? emojiButtonColor ?? this.emojiButtonColor,
+      sendButtonColor:
+          entrySendButtonColor ?? sendButtonColor ?? this.sendButtonColor,
+      micSendBgCircleColor:
+          entryMicSendBackgroundCircle ??
+          micSendBgCircleColor ??
+          this.micSendBgCircleColor,
+      textEntryBackgroundColor:
+          entryTextBackground ??
+          textEntryBackgroundColor ??
+          this.textEntryBackgroundColor,
+      textEntryColor:
+          entryTextColor ?? textEntryColor ?? this.textEntryColor,
+      emojiHeaderColor: emojiHeaderColor ?? this.emojiHeaderColor,
+      emojiHeaderIconsColor:
+          emojiHeaderIconsColor ?? this.emojiHeaderIconsColor,
+      emojiPickerBgColor: emojiPickerBgColor ?? this.emojiPickerBgColor,
+      hyperlinksColor: hyperlinksColor ?? this.hyperlinksColor,
+      infoBalloonsTextColor:
+          infoBalloonsTextColor ?? this.infoBalloonsTextColor,
+      infoBalloonsBgColor:
+          infoBalloonsBackgroundColor ??
+          infoBalloonsBgColor ??
+          this.infoBalloonsBgColor,
+      groupParticipantNameColor:
+          groupParticipantNameColor ?? this.groupParticipantNameColor,
+      voiceNotePlayingBarColor:
+          voiceNotePlayingBar ??
+          voiceNotePlayingBarColor ??
+          this.voiceNotePlayingBarColor,
+      voiceNotePlayButtonColor:
+          voiceNotePlayButton ??
+          voiceNotePlayButtonColor ??
+          this.voiceNotePlayButtonColor,
     );
   }
+
+  // Aliases for compatibility
+  int? get infoBalloonsBackgroundColor => infoBalloonsBgColor;
+  int? get voiceNotePlayingBar => voiceNotePlayingBarColor;
+  int? get voiceNotePlayButton => voiceNotePlayButtonColor;
+  int? get entryUiBackgroundColor => uiEntryBackgroundColor;
+  int? get entryUiButtonsColor => uiButtonsColor;
+  int? get entryEmojiButtonColor => emojiButtonColor;
+  int? get entrySendButtonColor => sendButtonColor;
+  int? get entryMicSendBackgroundCircle => micSendBgCircleColor;
+  int? get entryTextBackground => textEntryBackgroundColor;
+  int? get entryTextColor => textEntryColor;
+  int? get conversationBackgroundColor => convBackgroundColor;
+  int? get contactStatusBackgroundColor => contactStatusBgColor;
 
   Map<String, dynamic> toMap() => {
     'bubbleStyle': bubbleStyle,
@@ -427,6 +1047,67 @@ class ConversationPreferences {
     'voicePlaybackSpeed': voicePlaybackSpeed,
     'wallpaperPath': wallpaperPath,
     'enableAnimatedEmojis': enableAnimatedEmojis,
+    'switchDirectContactLink': switchDirectContactLink,
+    'confirmBeforeSendingSticker': confirmBeforeSendingSticker,
+    'newAttachmentPickerUi': newAttachmentPickerUi,
+    'hideDateAndName': hideDateAndName,
+    'hideAdminNameIcon': hideAdminNameIcon,
+    'groupAdminIcon': groupAdminIcon,
+    'quickContactSidebarPosition': quickContactSidebarPosition,
+    'quickContactBgColor': quickContactBgColor,
+    'quickContactTextColor': quickContactTextColor,
+    'hideChatFab': hideChatFab,
+    'disableMoreOptionsFromBubble': disableMoreOptionsFromBubble,
+    'disableDoubleTapReaction': disableDoubleTapReaction,
+    'translateOptionSettings': translateOptionSettings,
+    'hideMessageTranslationIcon': hideMessageTranslationIcon,
+    'customWallpaperPerContact': customWallpaperPerContact,
+    'profilePicWallpaper': profilePicWallpaper,
+    'enableProximitySensor': enableProximitySensor,
+    'disableOutputSwitching': disableOutputSwitching,
+    'playVoiceNotes': playVoiceNotes,
+    'forwardAsVoiceNote': forwardAsVoiceNote,
+    'incomingMessageRingtone': incomingMessageRingtone,
+    'sendMessageRingtone': sendMessageRingtone,
+    'actionBarColor': actionBarColor,
+    'hideProfilePicture': hideProfilePicture,
+    'hideContactName': hideContactName,
+    'hideCallButton': hideCallButton,
+    'disableContactStatus': disableContactStatus,
+    'contactStatusBgColor': contactStatusBgColor,
+    'contactStatusTextColor': contactStatusTextColor,
+    'messageTextSize': messageTextSize,
+    'convBackgroundColor': convBackgroundColor,
+    'rightBubbleColor': rightBubbleColor,
+    'rightChatBubbleTextColor': rightChatBubbleTextColor,
+    'rightBubbleTimeColor': rightBubbleTimeColor,
+    'leftBubbleColor': leftBubbleColor,
+    'leftChatBubbleTextColor': leftChatBubbleTextColor,
+    'leftBubbleTimeColor': leftBubbleTimeColor,
+    'deletedMessageIconColor': deletedMessageIconColor,
+    'quotedDividerColor': quotedDividerColor,
+    'quotedNameColor': quotedNameColor,
+    'quotedMessageColor': quotedMessageColor,
+    'quotedBackgroundColor': quotedBackgroundColor,
+    'makeTextSelectable': makeTextSelectable,
+    'removeReadMore': removeReadMore,
+    'entryStyle': entryStyle,
+    'uiEntryBackgroundColor': uiEntryBackgroundColor,
+    'uiButtonsColor': uiButtonsColor,
+    'emojiButtonColor': emojiButtonColor,
+    'sendButtonColor': sendButtonColor,
+    'micSendBgCircleColor': micSendBgCircleColor,
+    'textEntryBackgroundColor': textEntryBackgroundColor,
+    'textEntryColor': textEntryColor,
+    'emojiHeaderColor': emojiHeaderColor,
+    'emojiHeaderIconsColor': emojiHeaderIconsColor,
+    'emojiPickerBgColor': emojiPickerBgColor,
+    'hyperlinksColor': hyperlinksColor,
+    'infoBalloonsTextColor': infoBalloonsTextColor,
+    'infoBalloonsBgColor': infoBalloonsBgColor,
+    'groupParticipantNameColor': groupParticipantNameColor,
+    'voiceNotePlayingBarColor': voiceNotePlayingBarColor,
+    'voiceNotePlayButtonColor': voiceNotePlayButtonColor,
   };
 
   factory ConversationPreferences.fromMap(Map<String, dynamic> map) =>
@@ -443,6 +1124,75 @@ class ConversationPreferences {
             (map['voicePlaybackSpeed'] as num?)?.toDouble() ?? 1.0,
         wallpaperPath: map['wallpaperPath'] as String? ?? '',
         enableAnimatedEmojis: map['enableAnimatedEmojis'] ?? true,
+        switchDirectContactLink: map['switchDirectContactLink'] ?? false,
+        confirmBeforeSendingSticker:
+            map['confirmBeforeSendingSticker'] ?? true,
+        newAttachmentPickerUi: map['newAttachmentPickerUi'] ?? false,
+        hideDateAndName: map['hideDateAndName'] ?? true,
+        hideAdminNameIcon: map['hideAdminNameIcon'] ?? false,
+        groupAdminIcon: map['groupAdminIcon'] ?? 'Default',
+        quickContactSidebarPosition:
+            map['quickContactSidebarPosition'] ?? 'Top',
+        quickContactBgColor: map['quickContactBgColor'] ?? 0xFF000000,
+        quickContactTextColor: map['quickContactTextColor'] ?? 0xFF000000,
+        hideChatFab: map['hideChatFab'] ?? true,
+        disableMoreOptionsFromBubble:
+            map['disableMoreOptionsFromBubble'] ?? false,
+        disableDoubleTapReaction: map['disableDoubleTapReaction'] ?? false,
+        translateOptionSettings:
+            map['translateOptionSettings'] ?? 'Server',
+        hideMessageTranslationIcon:
+            map['hideMessageTranslationIcon'] ?? false,
+        customWallpaperPerContact:
+            map['customWallpaperPerContact'] ?? false,
+        profilePicWallpaper: map['profilePicWallpaper'] ?? false,
+        enableProximitySensor: map['enableProximitySensor'] ?? true,
+        disableOutputSwitching: map['disableOutputSwitching'] ?? false,
+        playVoiceNotes: map['playVoiceNotes'] ?? false,
+        forwardAsVoiceNote: map['forwardAsVoiceNote'] ?? false,
+        incomingMessageRingtone:
+            map['incomingMessageRingtone'] ?? 'Default',
+        sendMessageRingtone: map['sendMessageRingtone'] ?? 'Default',
+        actionBarColor: map['actionBarColor'] as int?,
+        hideProfilePicture: map['hideProfilePicture'] ?? false,
+        hideContactName: map['hideContactName'] ?? false,
+        hideCallButton: map['hideCallButton'] ?? false,
+        disableContactStatus: map['disableContactStatus'] ?? false,
+        contactStatusBgColor: map['contactStatusBgColor'] as int?,
+        contactStatusTextColor: map['contactStatusTextColor'] as int?,
+        messageTextSize:
+            (map['messageTextSize'] as num?)?.toDouble() ?? 16.0,
+        convBackgroundColor: map['convBackgroundColor'] as int?,
+        rightBubbleColor: map['rightBubbleColor'] as int?,
+        rightChatBubbleTextColor: map['rightChatBubbleTextColor'] as int?,
+        rightBubbleTimeColor: map['rightBubbleTimeColor'] as int?,
+        leftBubbleColor: map['leftBubbleColor'] as int?,
+        leftChatBubbleTextColor: map['leftChatBubbleTextColor'] as int?,
+        leftBubbleTimeColor: map['leftBubbleTimeColor'] as int?,
+        deletedMessageIconColor: map['deletedMessageIconColor'] as int?,
+        quotedDividerColor: map['quotedDividerColor'] as int?,
+        quotedNameColor: map['quotedNameColor'] as int?,
+        quotedMessageColor: map['quotedMessageColor'] as int?,
+        quotedBackgroundColor: map['quotedBackgroundColor'] as int?,
+        makeTextSelectable: map['makeTextSelectable'] ?? true,
+        removeReadMore: map['removeReadMore'] ?? false,
+        entryStyle: map['entryStyle'] ?? 'Stock',
+        uiEntryBackgroundColor: map['uiEntryBackgroundColor'] as int?,
+        uiButtonsColor: map['uiButtonsColor'] as int?,
+        emojiButtonColor: map['emojiButtonColor'] as int?,
+        sendButtonColor: map['sendButtonColor'] as int?,
+        micSendBgCircleColor: map['micSendBgCircleColor'] as int?,
+        textEntryBackgroundColor: map['textEntryBackgroundColor'] as int?,
+        textEntryColor: map['textEntryColor'] as int?,
+        emojiHeaderColor: map['emojiHeaderColor'] as int?,
+        emojiHeaderIconsColor: map['emojiHeaderIconsColor'] as int?,
+        emojiPickerBgColor: map['emojiPickerBgColor'] as int?,
+        hyperlinksColor: map['hyperlinksColor'] as int?,
+        infoBalloonsTextColor: map['infoBalloonsTextColor'] as int?,
+        infoBalloonsBgColor: map['infoBalloonsBgColor'] as int?,
+        groupParticipantNameColor: map['groupParticipantNameColor'] as int?,
+        voiceNotePlayingBarColor: map['voiceNotePlayingBarColor'] as int?,
+        voiceNotePlayButtonColor: map['voiceNotePlayButtonColor'] as int?,
       );
 }
 
@@ -759,5 +1509,767 @@ class NavigationEffectPreferences {
         enableFallingParticles: map['enableFallingParticles'] ?? false,
         fallingParticleObject: map['fallingParticleObject'] ?? 'Stars',
         fallingParticleScope: map['fallingParticleScope'] ?? 'Home only',
+      );
+}
+
+/// Universal Preferences Model (Image 2)
+class UniversalPreferences {
+  final int? universalColor;
+  final int? universalActionBarTextColor;
+  final int? backgroundColor;
+  final int? listBackgroundColor;
+  final int? statusBarColor;
+  final int? navigationBarColor;
+
+  final String launcherIcon;
+  final String emojiVariant;
+  final String notificationIcon;
+  final String fontStyle;
+  final bool loadFontEnabled;
+  bool get loadFontCustom => loadFontEnabled;
+
+  final bool hidePhotosFromGallery;
+  bool get hideMediaPhotos => hidePhotosFromGallery;
+
+  final bool hideVideosFromGallery;
+  bool get hideMediaVideos => hideVideosFromGallery;
+
+  final bool hideGifsFromGallery;
+  bool get hideMediaGifs => hideGifsFromGallery;
+
+  final String translateOptionSettings;
+  String get translateOption => translateOptionSettings;
+
+  final String defaultTranslationLanguage;
+  String get translationLanguage => defaultTranslationLanguage;
+
+  final bool conversationCards;
+  final bool disableHeadsUpNotification;
+  final bool disableBadgeCounter;
+  final bool disableAudioPlayingNotification;
+  final bool increaseForwardLimit;
+
+  final bool disableSwipeToExitConversation;
+  bool get disableSwipeToExit => disableSwipeToExitConversation;
+
+  final bool enableAlwaysOnline;
+
+  final String tenorGiphyGifProvider;
+  String get gifProvider => tenorGiphyGifProvider;
+
+  final double sendImagesInFullResolutionMb;
+  int get sendImagesFullResolutionMb => sendImagesInFullResolutionMb.round();
+
+  const UniversalPreferences({
+    this.universalColor,
+    this.universalActionBarTextColor,
+    this.backgroundColor,
+    this.listBackgroundColor,
+    this.statusBarColor,
+    this.navigationBarColor,
+    this.launcherIcon = 'Classic',
+    this.emojiVariant = 'WhatsApp',
+    this.notificationIcon = 'White',
+    this.fontStyle = 'Default',
+    this.loadFontEnabled = false,
+    this.hidePhotosFromGallery = false,
+    this.hideVideosFromGallery = false,
+    this.hideGifsFromGallery = false,
+    this.translateOptionSettings = 'Server + No outside apps',
+    this.defaultTranslationLanguage = 'Show All',
+    this.conversationCards = true,
+    this.disableHeadsUpNotification = false,
+    this.disableBadgeCounter = false,
+    this.disableAudioPlayingNotification = false,
+    this.increaseForwardLimit = false,
+    this.disableSwipeToExitConversation = false,
+    this.enableAlwaysOnline = true,
+    this.tenorGiphyGifProvider = 'Tenor',
+    this.sendImagesInFullResolutionMb = 1.0,
+  });
+
+  UniversalPreferences copyWith({
+    int? universalColor,
+    int? universalActionBarTextColor,
+    int? backgroundColor,
+    int? listBackgroundColor,
+    int? statusBarColor,
+    int? navigationBarColor,
+    String? launcherIcon,
+    String? emojiVariant,
+    String? notificationIcon,
+    String? fontStyle,
+    bool? loadFontEnabled,
+    bool? loadFontCustom,
+    bool? hidePhotosFromGallery,
+    bool? hideMediaPhotos,
+    bool? hideVideosFromGallery,
+    bool? hideMediaVideos,
+    bool? hideGifsFromGallery,
+    bool? hideMediaGifs,
+    String? translateOptionSettings,
+    String? translateOption,
+    String? defaultTranslationLanguage,
+    String? translationLanguage,
+    bool? conversationCards,
+    bool? disableHeadsUpNotification,
+    bool? disableBadgeCounter,
+    bool? disableAudioPlayingNotification,
+    bool? increaseForwardLimit,
+    bool? disableSwipeToExitConversation,
+    bool? disableSwipeToExit,
+    bool? enableAlwaysOnline,
+    String? tenorGiphyGifProvider,
+    String? gifProvider,
+    double? sendImagesInFullResolutionMb,
+    int? sendImagesFullResolutionMb,
+  }) {
+    return UniversalPreferences(
+      universalColor: universalColor ?? this.universalColor,
+      universalActionBarTextColor:
+          universalActionBarTextColor ?? this.universalActionBarTextColor,
+      backgroundColor: backgroundColor ?? this.backgroundColor,
+      listBackgroundColor: listBackgroundColor ?? this.listBackgroundColor,
+      statusBarColor: statusBarColor ?? this.statusBarColor,
+      navigationBarColor: navigationBarColor ?? this.navigationBarColor,
+      launcherIcon: launcherIcon ?? this.launcherIcon,
+      emojiVariant: emojiVariant ?? this.emojiVariant,
+      notificationIcon: notificationIcon ?? this.notificationIcon,
+      fontStyle: fontStyle ?? this.fontStyle,
+      loadFontEnabled:
+          loadFontCustom ?? loadFontEnabled ?? this.loadFontEnabled,
+      hidePhotosFromGallery:
+          hideMediaPhotos ?? hidePhotosFromGallery ?? this.hidePhotosFromGallery,
+      hideVideosFromGallery:
+          hideMediaVideos ?? hideVideosFromGallery ?? this.hideVideosFromGallery,
+      hideGifsFromGallery:
+          hideMediaGifs ?? hideGifsFromGallery ?? this.hideGifsFromGallery,
+      translateOptionSettings:
+          translateOption ?? translateOptionSettings ?? this.translateOptionSettings,
+      defaultTranslationLanguage:
+          translationLanguage ?? defaultTranslationLanguage ?? this.defaultTranslationLanguage,
+      conversationCards: conversationCards ?? this.conversationCards,
+      disableHeadsUpNotification:
+          disableHeadsUpNotification ?? this.disableHeadsUpNotification,
+      disableBadgeCounter: disableBadgeCounter ?? this.disableBadgeCounter,
+      disableAudioPlayingNotification:
+          disableAudioPlayingNotification ?? this.disableAudioPlayingNotification,
+      increaseForwardLimit: increaseForwardLimit ?? this.increaseForwardLimit,
+      disableSwipeToExitConversation:
+          disableSwipeToExit ?? disableSwipeToExitConversation ?? this.disableSwipeToExitConversation,
+      enableAlwaysOnline: enableAlwaysOnline ?? this.enableAlwaysOnline,
+      tenorGiphyGifProvider:
+          gifProvider ?? tenorGiphyGifProvider ?? this.tenorGiphyGifProvider,
+      sendImagesInFullResolutionMb: sendImagesFullResolutionMb?.toDouble() ??
+          sendImagesInFullResolutionMb ??
+          this.sendImagesInFullResolutionMb,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+    'universalColor': universalColor,
+    'universalActionBarTextColor': universalActionBarTextColor,
+    'backgroundColor': backgroundColor,
+    'listBackgroundColor': listBackgroundColor,
+    'statusBarColor': statusBarColor,
+    'navigationBarColor': navigationBarColor,
+    'launcherIcon': launcherIcon,
+    'emojiVariant': emojiVariant,
+    'notificationIcon': notificationIcon,
+    'fontStyle': fontStyle,
+    'loadFontEnabled': loadFontEnabled,
+    'hidePhotosFromGallery': hidePhotosFromGallery,
+    'hideVideosFromGallery': hideVideosFromGallery,
+    'hideGifsFromGallery': hideGifsFromGallery,
+    'translateOptionSettings': translateOptionSettings,
+    'defaultTranslationLanguage': defaultTranslationLanguage,
+    'conversationCards': conversationCards,
+    'disableHeadsUpNotification': disableHeadsUpNotification,
+    'disableBadgeCounter': disableBadgeCounter,
+    'disableAudioPlayingNotification': disableAudioPlayingNotification,
+    'increaseForwardLimit': increaseForwardLimit,
+    'disableSwipeToExitConversation': disableSwipeToExitConversation,
+    'enableAlwaysOnline': enableAlwaysOnline,
+    'tenorGiphyGifProvider': tenorGiphyGifProvider,
+    'sendImagesInFullResolutionMb': sendImagesInFullResolutionMb,
+  };
+
+  factory UniversalPreferences.fromMap(Map<String, dynamic> map) =>
+      UniversalPreferences(
+        universalColor: map['universalColor'] as int?,
+        universalActionBarTextColor:
+            map['universalActionBarTextColor'] as int?,
+        backgroundColor: map['backgroundColor'] as int?,
+        listBackgroundColor: map['listBackgroundColor'] as int?,
+        statusBarColor: map['statusBarColor'] as int?,
+        navigationBarColor: map['navigationBarColor'] as int?,
+        launcherIcon: map['launcherIcon'] ?? 'Classic',
+        emojiVariant: map['emojiVariant'] ?? 'WhatsApp',
+        notificationIcon: map['notificationIcon'] ?? 'White',
+        fontStyle: map['fontStyle'] ?? 'Default',
+        loadFontEnabled: map['loadFontEnabled'] ?? false,
+        hidePhotosFromGallery: map['hidePhotosFromGallery'] ?? false,
+        hideVideosFromGallery: map['hideVideosFromGallery'] ?? false,
+        hideGifsFromGallery: map['hideGifsFromGallery'] ?? false,
+        translateOptionSettings:
+            map['translateOptionSettings'] ?? 'Server + No outside apps',
+        defaultTranslationLanguage:
+            map['defaultTranslationLanguage'] ?? 'Show All',
+        conversationCards: map['conversationCards'] ?? true,
+        disableHeadsUpNotification:
+            map['disableHeadsUpNotification'] ?? false,
+        disableBadgeCounter: map['disableBadgeCounter'] ?? false,
+        disableAudioPlayingNotification:
+            map['disableAudioPlayingNotification'] ?? false,
+        increaseForwardLimit: map['increaseForwardLimit'] ?? false,
+        disableSwipeToExitConversation:
+            map['disableSwipeToExitConversation'] ?? false,
+        enableAlwaysOnline: map['enableAlwaysOnline'] ?? true,
+        tenorGiphyGifProvider: map['tenorGiphyGifProvider'] ?? 'Tenor',
+        sendImagesInFullResolutionMb:
+            (map['sendImagesInFullResolutionMb'] as num?)?.toDouble() ?? 1.0,
+      );
+}
+
+/// Status Screen Customization Model (Image 3)
+class StatusPreferences {
+  final bool enableInstagramStories;
+  final bool carouselView;
+  final String storiesStyle;
+  final String activateNewStatusStyle;
+  final String statusReactionEmoji;
+  final int? recentUpdatesBarColor;
+  final int? recentUpdatesTextColor;
+  final int? contactNameColor;
+  final int? statusSeenColor;
+  final int? statusUnSeenColor;
+  final int? counterBackgroundColor;
+  final int? counterTextColor;
+  final bool statusAroundProfile;
+  final bool saveAndMarkSeenOptions;
+  final bool changePhotoProfileStatusPreview;
+  final bool startStoriesDirectlyWithSound;
+  final bool confirmBeforeSendingStatus;
+  final bool fiveMinuteStatus;
+
+  const StatusPreferences({
+    this.enableInstagramStories = false,
+    this.carouselView = false,
+    this.storiesStyle = 'Instagram',
+    this.activateNewStatusStyle = 'Old Status with Thumbnail',
+    this.statusReactionEmoji = '💚',
+    this.recentUpdatesBarColor,
+    this.recentUpdatesTextColor,
+    this.contactNameColor,
+    this.statusSeenColor,
+    this.statusUnSeenColor,
+    this.counterBackgroundColor,
+    this.counterTextColor,
+    this.statusAroundProfile = false,
+    this.saveAndMarkSeenOptions = false,
+    this.changePhotoProfileStatusPreview = false,
+    this.startStoriesDirectlyWithSound = false,
+    this.confirmBeforeSendingStatus = true,
+    this.fiveMinuteStatus = false,
+  });
+
+  StatusPreferences copyWith({
+    bool? enableInstagramStories,
+    bool? carouselView,
+    String? storiesStyle,
+    String? activateNewStatusStyle,
+    String? statusReactionEmoji,
+    int? recentUpdatesBarColor,
+    int? recentUpdatesTextColor,
+    int? contactNameColor,
+    int? statusSeenColor,
+    int? statusUnSeenColor,
+    int? statusUnseenColor,
+    int? counterBackgroundColor,
+    int? counterTextColor,
+    bool? statusAroundProfile,
+    bool? saveAndMarkSeenOptions,
+    bool? changePhotoProfileStatusPreview,
+    bool? startStoriesDirectlyWithSound,
+    bool? startStoriesWithSound,
+    bool? confirmBeforeSendingStatus,
+    bool? fiveMinuteStatus,
+  }) {
+    return StatusPreferences(
+      enableInstagramStories:
+          enableInstagramStories ?? this.enableInstagramStories,
+      carouselView: carouselView ?? this.carouselView,
+      storiesStyle: storiesStyle ?? this.storiesStyle,
+      activateNewStatusStyle:
+          activateNewStatusStyle ?? this.activateNewStatusStyle,
+      statusReactionEmoji: statusReactionEmoji ?? this.statusReactionEmoji,
+      recentUpdatesBarColor:
+          recentUpdatesBarColor ?? this.recentUpdatesBarColor,
+      recentUpdatesTextColor:
+          recentUpdatesTextColor ?? this.recentUpdatesTextColor,
+      contactNameColor: contactNameColor ?? this.contactNameColor,
+      statusSeenColor: statusSeenColor ?? this.statusSeenColor,
+      statusUnSeenColor:
+          statusUnseenColor ?? statusUnSeenColor ?? this.statusUnSeenColor,
+      counterBackgroundColor:
+          counterBackgroundColor ?? this.counterBackgroundColor,
+      counterTextColor: counterTextColor ?? this.counterTextColor,
+      statusAroundProfile: statusAroundProfile ?? this.statusAroundProfile,
+      saveAndMarkSeenOptions:
+          saveAndMarkSeenOptions ?? this.saveAndMarkSeenOptions,
+      changePhotoProfileStatusPreview:
+          changePhotoProfileStatusPreview ?? this.changePhotoProfileStatusPreview,
+      startStoriesDirectlyWithSound:
+          startStoriesWithSound ??
+          startStoriesDirectlyWithSound ??
+          this.startStoriesDirectlyWithSound,
+      confirmBeforeSendingStatus:
+          confirmBeforeSendingStatus ?? this.confirmBeforeSendingStatus,
+      fiveMinuteStatus: fiveMinuteStatus ?? this.fiveMinuteStatus,
+    );
+  }
+
+  // Aliases for compatibility
+  int? get statusUnseenColor => statusUnSeenColor;
+  bool get startStoriesWithSound => startStoriesDirectlyWithSound;
+
+  Map<String, dynamic> toMap() => {
+    'enableInstagramStories': enableInstagramStories,
+    'carouselView': carouselView,
+    'storiesStyle': storiesStyle,
+    'activateNewStatusStyle': activateNewStatusStyle,
+    'statusReactionEmoji': statusReactionEmoji,
+    'recentUpdatesBarColor': recentUpdatesBarColor,
+    'recentUpdatesTextColor': recentUpdatesTextColor,
+    'contactNameColor': contactNameColor,
+    'statusSeenColor': statusSeenColor,
+    'statusUnSeenColor': statusUnSeenColor,
+    'counterBackgroundColor': counterBackgroundColor,
+    'counterTextColor': counterTextColor,
+    'statusAroundProfile': statusAroundProfile,
+    'saveAndMarkSeenOptions': saveAndMarkSeenOptions,
+    'changePhotoProfileStatusPreview': changePhotoProfileStatusPreview,
+    'startStoriesDirectlyWithSound': startStoriesDirectlyWithSound,
+    'confirmBeforeSendingStatus': confirmBeforeSendingStatus,
+    'fiveMinuteStatus': fiveMinuteStatus,
+  };
+
+  factory StatusPreferences.fromMap(Map<String, dynamic> map) =>
+      StatusPreferences(
+        enableInstagramStories: map['enableInstagramStories'] ?? false,
+        carouselView: map['carouselView'] ?? false,
+        storiesStyle: map['storiesStyle'] ?? 'Instagram',
+        activateNewStatusStyle:
+            map['activateNewStatusStyle'] ?? 'Old Status with Thumbnail',
+        statusReactionEmoji: map['statusReactionEmoji'] ?? '💚',
+        recentUpdatesBarColor: map['recentUpdatesBarColor'] as int?,
+        recentUpdatesTextColor: map['recentUpdatesTextColor'] as int?,
+        contactNameColor: map['contactNameColor'] as int?,
+        statusSeenColor: map['statusSeenColor'] as int?,
+        statusUnSeenColor:
+            (map['statusUnSeenColor'] ?? map['statusUnseenColor']) as int?,
+        counterBackgroundColor: map['counterBackgroundColor'] as int?,
+        counterTextColor: map['counterTextColor'] as int?,
+        statusAroundProfile: map['statusAroundProfile'] ?? false,
+        saveAndMarkSeenOptions: map['saveAndMarkSeenOptions'] ?? false,
+        changePhotoProfileStatusPreview:
+            map['changePhotoProfileStatusPreview'] ?? false,
+        startStoriesDirectlyWithSound:
+            map['startStoriesDirectlyWithSound'] ??
+            map['startStoriesWithSound'] ??
+            false,
+        confirmBeforeSendingStatus:
+            map['confirmBeforeSendingStatus'] ?? true,
+        fiveMinuteStatus: map['fiveMinuteStatus'] ?? false,
+      );
+}
+
+/// Notification Toast Customization Model (Image 4)
+class NotificationToastPreferences {
+  final bool onlineToastEnabled;
+  final bool onlineToastInNotificationBar;
+  final bool onlineToastWithProfilePicture;
+  final bool onlineToastElevation;
+  final double onlineToastRadius;
+  final String onlineToastRingtone;
+  final String onlineToastPosition;
+  final int? onlineToastBgColor;
+  final int? onlineToastTextColor;
+
+  final bool storyToastEnabled;
+  final bool storyToastInNotificationBar;
+  final bool storyToastWithProfilePicture;
+  final bool storyToastElevation;
+  final double storyToastRadius;
+  final String storyToastRingtone;
+  final String storyToastPosition;
+  final int? storyToastBgColor;
+  final int? storyToastTextColor;
+
+  final bool profileToastEnabled;
+  final bool profileToastInNotificationBar;
+  final bool profileToastWithProfilePicture;
+  final bool profileToastElevation;
+  final double profileToastRadius;
+  final String profileToastRingtone;
+  final String profileToastPosition;
+  final int? profileToastBgColor;
+  final int? profileToastTextColor;
+
+  final bool typingToastEnabled;
+  final bool typingToastInNotificationBar;
+  final bool typingToastWithProfilePicture;
+  final bool typingToastElevation;
+  final double typingToastRadius;
+  final String typingToastRingtone;
+  final String typingToastPosition;
+  final int? typingToastBgColor;
+  final int? typingToastTextColor;
+
+  bool get onlineToast => onlineToastEnabled;
+  bool get onlineWithProfilePic => onlineToastWithProfilePicture;
+  bool get onlineElevation => onlineToastElevation;
+  double get onlineRadius => onlineToastRadius;
+  String get onlinePosition => onlineToastPosition;
+  int? get onlineBgColor => onlineToastBgColor;
+  int? get onlineTextColor => onlineToastTextColor;
+  bool get disableContactOnlineToast => !onlineToastEnabled;
+  String get onlineRingtone => onlineToastRingtone;
+  bool get onlineInNotificationBar => onlineToastInNotificationBar;
+
+  bool get storyToast => storyToastEnabled;
+  bool get viewedStoryToast => storyToastEnabled;
+  bool get storyInNotificationBar => storyToastInNotificationBar;
+  bool get storyWithProfilePic => storyToastWithProfilePicture;
+  bool get storyElevation => storyToastElevation;
+  double get storyRadius => storyToastRadius;
+  String get storyPosition => storyToastPosition;
+  int? get storyBgColor => storyToastBgColor;
+  int? get storyTextColor => storyToastTextColor;
+  String get storyRingtone => storyToastRingtone;
+
+  bool get profileToast => profileToastEnabled;
+  bool get profileWithProfilePic => profileToastWithProfilePicture;
+  bool get profileElevation => profileToastElevation;
+  double get profileRadius => profileToastRadius;
+  String get profilePosition => profileToastPosition;
+  int? get profileBgColor => profileToastBgColor;
+  int? get profileTextColor => profileToastTextColor;
+  bool get profileInNotificationBar => profileToastInNotificationBar;
+  String get profileRingtone => profileToastRingtone;
+
+  bool get typingToast => typingToastEnabled;
+  bool get typingWithProfilePic => typingToastWithProfilePicture;
+  bool get typingElevation => typingToastElevation;
+  double get typingRadius => typingToastRadius;
+  String get typingPosition => typingToastPosition;
+  int? get typingBgColor => typingToastBgColor;
+  int? get typingTextColor => typingToastTextColor;
+  bool get typingInNotificationBar => typingToastInNotificationBar;
+  String get typingRingtone => typingToastRingtone;
+
+  const NotificationToastPreferences({
+    this.onlineToastEnabled = true,
+    this.onlineToastInNotificationBar = false,
+    this.onlineToastWithProfilePicture = true,
+    this.onlineToastElevation = true,
+    this.onlineToastRadius = 8.0,
+    this.onlineToastRingtone = 'Default',
+    this.onlineToastPosition = 'Top of the screen',
+    this.onlineToastBgColor,
+    this.onlineToastTextColor,
+    this.storyToastEnabled = false,
+    this.storyToastInNotificationBar = false,
+    this.storyToastWithProfilePicture = true,
+    this.storyToastElevation = true,
+    this.storyToastRadius = 8.0,
+    this.storyToastRingtone = 'Default',
+    this.storyToastPosition = 'Top of the screen',
+    this.storyToastBgColor,
+    this.storyToastTextColor,
+    this.profileToastEnabled = false,
+    this.profileToastInNotificationBar = false,
+    this.profileToastWithProfilePicture = true,
+    this.profileToastElevation = true,
+    this.profileToastRadius = 8.0,
+    this.profileToastRingtone = 'Default',
+    this.profileToastPosition = 'Top of the screen',
+    this.profileToastBgColor,
+    this.profileToastTextColor,
+    this.typingToastEnabled = true,
+    this.typingToastInNotificationBar = false,
+    this.typingToastWithProfilePicture = true,
+    this.typingToastElevation = true,
+    this.typingToastRadius = 8.0,
+    this.typingToastRingtone = 'Default',
+    this.typingToastPosition = 'Top of the screen',
+    this.typingToastBgColor,
+    this.typingToastTextColor,
+  });
+
+  NotificationToastPreferences copyWith({
+    bool? onlineToastEnabled,
+    bool? onlineToast,
+    bool? disableContactOnlineToast,
+    bool? onlineToastInNotificationBar,
+    bool? onlineInNotificationBar,
+    bool? onlineToastWithProfilePicture,
+    bool? onlineWithProfilePic,
+    bool? onlineToastElevation,
+    bool? onlineElevation,
+    double? onlineToastRadius,
+    double? onlineRadius,
+    String? onlineToastRingtone,
+    String? onlineRingtone,
+    String? onlineToastPosition,
+    String? onlinePosition,
+    int? onlineToastBgColor,
+    int? onlineBgColor,
+    int? onlineToastTextColor,
+    int? onlineTextColor,
+    bool? storyToastEnabled,
+    bool? storyToast,
+    bool? viewedStoryToast,
+    bool? storyToastInNotificationBar,
+    bool? storyInNotificationBar,
+    bool? storyToastWithProfilePicture,
+    bool? storyWithProfilePic,
+    bool? storyToastElevation,
+    bool? storyElevation,
+    double? storyToastRadius,
+    double? storyRadius,
+    String? storyToastRingtone,
+    String? storyRingtone,
+    String? storyToastPosition,
+    String? storyPosition,
+    int? storyToastBgColor,
+    int? storyBgColor,
+    int? storyToastTextColor,
+    int? storyTextColor,
+    bool? profileToastEnabled,
+    bool? profileToast,
+    bool? profileToastInNotificationBar,
+    bool? profileInNotificationBar,
+    bool? profileToastWithProfilePicture,
+    bool? profileWithProfilePic,
+    bool? profileToastElevation,
+    bool? profileElevation,
+    double? profileToastRadius,
+    double? profileRadius,
+    String? profileToastRingtone,
+    String? profileRingtone,
+    String? profileToastPosition,
+    String? profilePosition,
+    int? profileToastBgColor,
+    int? profileBgColor,
+    int? profileToastTextColor,
+    int? profileTextColor,
+    bool? typingToastEnabled,
+    bool? typingToast,
+    bool? typingToastInNotificationBar,
+    bool? typingInNotificationBar,
+    bool? typingToastWithProfilePicture,
+    bool? typingWithProfilePic,
+    bool? typingToastElevation,
+    bool? typingElevation,
+    double? typingToastRadius,
+    double? typingRadius,
+    String? typingToastRingtone,
+    String? typingRingtone,
+    String? typingToastPosition,
+    String? typingPosition,
+    int? typingToastBgColor,
+    int? typingBgColor,
+    int? typingToastTextColor,
+    int? typingTextColor,
+  }) {
+    return NotificationToastPreferences(
+      onlineToastEnabled: (disableContactOnlineToast != null
+              ? !disableContactOnlineToast
+              : null) ??
+          onlineToast ??
+          onlineToastEnabled ??
+          this.onlineToastEnabled,
+      onlineToastInNotificationBar: onlineInNotificationBar ??
+          onlineToastInNotificationBar ??
+          this.onlineToastInNotificationBar,
+      onlineToastWithProfilePicture: onlineWithProfilePic ??
+          onlineToastWithProfilePicture ??
+          this.onlineToastWithProfilePicture,
+      onlineToastElevation:
+          onlineElevation ?? onlineToastElevation ?? this.onlineToastElevation,
+      onlineToastRadius:
+          onlineRadius ?? onlineToastRadius ?? this.onlineToastRadius,
+      onlineToastRingtone: onlineRingtone ??
+          onlineToastRingtone ??
+          this.onlineToastRingtone,
+      onlineToastPosition:
+          onlinePosition ?? onlineToastPosition ?? this.onlineToastPosition,
+      onlineToastBgColor:
+          onlineBgColor ?? onlineToastBgColor ?? this.onlineToastBgColor,
+      onlineToastTextColor:
+          onlineTextColor ?? onlineToastTextColor ?? this.onlineToastTextColor,
+      storyToastEnabled: viewedStoryToast ??
+          storyToast ??
+          storyToastEnabled ??
+          this.storyToastEnabled,
+      storyToastInNotificationBar: storyInNotificationBar ??
+          storyToastInNotificationBar ??
+          this.storyToastInNotificationBar,
+      storyToastWithProfilePicture: storyWithProfilePic ??
+          storyToastWithProfilePicture ??
+          this.storyToastWithProfilePicture,
+      storyToastElevation:
+          storyElevation ?? storyToastElevation ?? this.storyToastElevation,
+      storyToastRadius:
+          storyRadius ?? storyToastRadius ?? this.storyToastRadius,
+      storyToastRingtone: storyRingtone ??
+          storyToastRingtone ??
+          this.storyToastRingtone,
+      storyToastPosition:
+          storyPosition ?? storyToastPosition ?? this.storyToastPosition,
+      storyToastBgColor:
+          storyBgColor ?? storyToastBgColor ?? this.storyToastBgColor,
+      storyToastTextColor:
+          storyTextColor ?? storyToastTextColor ?? this.storyToastTextColor,
+      profileToastEnabled:
+          profileToast ?? profileToastEnabled ?? this.profileToastEnabled,
+      profileToastInNotificationBar: profileInNotificationBar ??
+          profileToastInNotificationBar ??
+          this.profileToastInNotificationBar,
+      profileToastWithProfilePicture: profileWithProfilePic ??
+          profileToastWithProfilePicture ??
+          this.profileToastWithProfilePicture,
+      profileToastElevation: profileElevation ??
+          profileToastElevation ??
+          this.profileToastElevation,
+      profileToastRadius:
+          profileRadius ?? profileToastRadius ?? this.profileToastRadius,
+      profileToastRingtone: profileRingtone ??
+          profileToastRingtone ??
+          this.profileToastRingtone,
+      profileToastPosition:
+          profilePosition ?? profileToastPosition ?? this.profileToastPosition,
+      profileToastBgColor:
+          profileBgColor ?? profileToastBgColor ?? this.profileToastBgColor,
+      profileToastTextColor: profileTextColor ??
+          profileToastTextColor ??
+          this.profileToastTextColor,
+      typingToastEnabled:
+          typingToast ?? typingToastEnabled ?? this.typingToastEnabled,
+      typingToastInNotificationBar: typingInNotificationBar ??
+          typingToastInNotificationBar ??
+          this.typingToastInNotificationBar,
+      typingToastWithProfilePicture: typingWithProfilePic ??
+          typingToastWithProfilePicture ??
+          this.typingToastWithProfilePicture,
+      typingToastElevation:
+          typingElevation ?? typingToastElevation ?? this.typingToastElevation,
+      typingToastRadius:
+          typingRadius ?? typingToastRadius ?? this.typingToastRadius,
+      typingToastRingtone: typingRingtone ??
+          typingToastRingtone ??
+          this.typingToastRingtone,
+      typingToastPosition:
+          typingPosition ?? typingToastPosition ?? this.typingToastPosition,
+      typingToastBgColor:
+          typingBgColor ?? typingToastBgColor ?? this.typingToastBgColor,
+      typingToastTextColor:
+          typingTextColor ?? typingToastTextColor ?? this.typingToastTextColor,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+    'onlineToastEnabled': onlineToastEnabled,
+    'onlineToastInNotificationBar': onlineToastInNotificationBar,
+    'onlineToastWithProfilePicture': onlineToastWithProfilePicture,
+    'onlineToastElevation': onlineToastElevation,
+    'onlineToastRadius': onlineToastRadius,
+    'onlineToastRingtone': onlineToastRingtone,
+    'onlineToastPosition': onlineToastPosition,
+    'onlineToastBgColor': onlineToastBgColor,
+    'onlineToastTextColor': onlineToastTextColor,
+    'storyToastEnabled': storyToastEnabled,
+    'storyToastInNotificationBar': storyToastInNotificationBar,
+    'storyToastWithProfilePicture': storyToastWithProfilePicture,
+    'storyToastElevation': storyToastElevation,
+    'storyToastRadius': storyToastRadius,
+    'storyToastRingtone': storyToastRingtone,
+    'storyToastPosition': storyToastPosition,
+    'storyToastBgColor': storyToastBgColor,
+    'storyToastTextColor': storyToastTextColor,
+    'profileToastEnabled': profileToastEnabled,
+    'profileToastInNotificationBar': profileToastInNotificationBar,
+    'profileToastWithProfilePicture': profileToastWithProfilePicture,
+    'profileToastElevation': profileToastElevation,
+    'profileToastRadius': profileToastRadius,
+    'profileToastRingtone': profileToastRingtone,
+    'profileToastPosition': profileToastPosition,
+    'profileToastBgColor': profileToastBgColor,
+    'profileToastTextColor': profileToastTextColor,
+    'typingToastEnabled': typingToastEnabled,
+    'typingToastInNotificationBar': typingToastInNotificationBar,
+    'typingToastWithProfilePicture': typingToastWithProfilePicture,
+    'typingToastElevation': typingToastElevation,
+    'typingToastRadius': typingToastRadius,
+    'typingToastRingtone': typingToastRingtone,
+    'typingToastPosition': typingToastPosition,
+    'typingToastBgColor': typingToastBgColor,
+    'typingToastTextColor': typingToastTextColor,
+  };
+
+  factory NotificationToastPreferences.fromMap(Map<String, dynamic> map) =>
+      NotificationToastPreferences(
+        onlineToastEnabled: map['onlineToastEnabled'] ?? true,
+        onlineToastInNotificationBar:
+            map['onlineToastInNotificationBar'] ?? false,
+        onlineToastWithProfilePicture:
+            map['onlineToastWithProfilePicture'] ?? true,
+        onlineToastElevation: map['onlineToastElevation'] ?? true,
+        onlineToastRadius:
+            (map['onlineToastRadius'] as num?)?.toDouble() ?? 8.0,
+        onlineToastRingtone: map['onlineToastRingtone'] ?? 'Default',
+        onlineToastPosition:
+            map['onlineToastPosition'] ?? 'Top of the screen',
+        onlineToastBgColor: map['onlineToastBgColor'] as int?,
+        onlineToastTextColor: map['onlineToastTextColor'] as int?,
+        storyToastEnabled: map['storyToastEnabled'] ?? false,
+        storyToastInNotificationBar:
+            map['storyToastInNotificationBar'] ?? false,
+        storyToastWithProfilePicture:
+            map['storyToastWithProfilePicture'] ?? true,
+        storyToastElevation: map['storyToastElevation'] ?? true,
+        storyToastRadius:
+            (map['storyToastRadius'] as num?)?.toDouble() ?? 8.0,
+        storyToastRingtone: map['storyToastRingtone'] ?? 'Default',
+        storyToastPosition: map['storyToastPosition'] ?? 'Top of the screen',
+        storyToastBgColor: map['storyToastBgColor'] as int?,
+        storyToastTextColor: map['storyToastTextColor'] as int?,
+        profileToastEnabled: map['profileToastEnabled'] ?? false,
+        profileToastInNotificationBar:
+            map['profileToastInNotificationBar'] ?? false,
+        profileToastWithProfilePicture:
+            map['profileToastWithProfilePicture'] ?? true,
+        profileToastElevation: map['profileToastElevation'] ?? true,
+        profileToastRadius:
+            (map['profileToastRadius'] as num?)?.toDouble() ?? 8.0,
+        profileToastRingtone: map['profileToastRingtone'] ?? 'Default',
+        profileToastPosition:
+            map['profileToastPosition'] ?? 'Top of the screen',
+        profileToastBgColor: map['profileToastBgColor'] as int?,
+        profileToastTextColor: map['profileToastTextColor'] as int?,
+        typingToastEnabled: map['typingToastEnabled'] ?? true,
+        typingToastInNotificationBar:
+            map['typingToastInNotificationBar'] ?? false,
+        typingToastWithProfilePicture:
+            map['typingToastWithProfilePicture'] ?? true,
+        typingToastElevation: map['typingToastElevation'] ?? true,
+        typingToastRadius:
+            (map['typingToastRadius'] as num?)?.toDouble() ?? 8.0,
+        typingToastRingtone: map['typingToastRingtone'] ?? 'Default',
+        typingToastPosition:
+            map['typingToastPosition'] ?? 'Top of the screen',
+        typingToastBgColor: map['typingToastBgColor'] as int?,
+        typingToastTextColor: map['typingToastTextColor'] as int?,
       );
 }

@@ -52,6 +52,7 @@ import '../../data/services/outgoing_message_queue_engine.dart';
 import '../../ui/core/connection/connection_health_indicator.dart';
 import '../../ui/core/connection/connection_detail_sheet.dart';
 import '../../ui/core/connection/global_connection_banner.dart';
+import '../settings/customization/customization_center_screen.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final ThemeConfig theme;
@@ -142,6 +143,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   void initState() {
     super.initState();
     _realtime = locator<RichChatRealtimeService>();
+    _realtime.setActiveConversation(widget.conversationId);
     _relationships = locator<ContactRelationshipService>();
     _attachments = ChatAttachmentActions(
       conversationId: widget.conversationId,
@@ -240,6 +242,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   @override
   void dispose() {
+    if (_realtime.activeConversationId == widget.conversationId) {
+      _realtime.setActiveConversation(null);
+    }
     _typingIdleTimer?.cancel();
     _voiceTimer?.cancel();
     if (_typingPublished)
@@ -2262,11 +2267,44 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   // ---------------------------------------------------------------------------
   // Chat overflow menu (3-dots in the header): everything below is REAL.
   // ---------------------------------------------------------------------------
+  Widget _chatPopupMenuItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    bool isDestructive = false,
+  }) {
+    final theme = _theme;
+    final color = isDestructive ? theme.dangerColor : theme.primaryTextColor;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: color.withValues(alpha: isDestructive ? 1.0 : 0.8)),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _openChatMenu(
     BuildContext anchorContext,
     Conversation conversation,
     UserProfile? otherUser,
   ) {
+    HapticFeedback.lightImpact();
     final isDirect =
         conversation.type == ConversationType.direct && otherUser != null;
     ChatyMenuSheet.show(
@@ -2306,6 +2344,22 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           glyph: ChatyGlyph.homeLayout,
           label: 'Chat wallpaper',
           onTap: _openWallpaperPicker,
+        ),
+        ChatyMenuItem(
+          icon: Icons.palette_outlined,
+          glyph: ChatyGlyph.palette,
+          label: 'Chat appearance',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CustomizationCenterScreen(
+                  conversationId: widget.conversationId,
+                  conversationTitle: conversation.title,
+                ),
+              ),
+            );
+          },
         ),
         ChatyMenuItem(
           icon: conversation.isMuted
@@ -2950,67 +3004,137 @@ class _ComposerState extends State<_Composer>
       children: [
         Row(
           children: [
-            ChatyComposerActionButton(
-              theme: theme,
-              semanticsLabel: 'Cancel recording',
-              tooltip: 'Cancel recording',
-              icon: Icons.delete_outline_rounded,
-              iconColor: theme.dangerColor,
-              onTap: widget.voiceBusy ? null : widget.onVoiceCancel,
-            ),
-            const SizedBox(width: 10),
-            FadeTransition(
-              opacity: reduceMotion
-                  ? const AlwaysStoppedAnimation<double>(1)
-                  : Tween<double>(begin: 1, end: 0.35).animate(_pulse),
-              child: Container(
-                width: 9,
-                height: 9,
-                decoration: BoxDecoration(
-                  color: theme.dangerColor,
-                  shape: BoxShape.circle,
+            // LEFT: Distinct rounded floating delete/cancel button
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(22),
+                onTap: widget.voiceBusy ? null : widget.onVoiceCancel,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: theme.dangerColor.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: theme.dangerColor.withValues(alpha: 0.28),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.delete_outline_rounded,
+                    color: theme.dangerColor,
+                    size: 22,
+                  ),
                 ),
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              _time,
-              style: TextStyle(
-                color: theme.primaryTextColor,
-                fontSize: 14.5,
-                fontWeight: FontWeight.w700,
-                fontFeatures: const [FontFeature.tabularFigures()],
+            // CENTER: Rounded recording/waveform region
+            Expanded(
+              child: Container(
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: theme.secondaryTextColor.withValues(alpha: 0.12),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    FadeTransition(
+                      opacity: reduceMotion
+                          ? const AlwaysStoppedAnimation<double>(1)
+                          : Tween<double>(begin: 1, end: 0.35).animate(_pulse),
+                      child: Container(
+                        width: 9,
+                        height: 9,
+                        decoration: BoxDecoration(
+                          color: theme.dangerColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _time,
+                      style: TextStyle(
+                        color: theme.primaryTextColor,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                    if (widget.recordLocked) ...[
+                      const SizedBox(width: 4),
+                      Icon(Icons.lock_rounded, size: 12, color: theme.successColor),
+                    ],
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: widget.amplitudeProvider != null
+                          ? ChatyVoiceLevelMeter(levels: _levels, theme: theme)
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
+                ),
               ),
             ),
             if (widget.recordLocked && template.showVoiceLock) ...[
-              const SizedBox(width: 6),
-              Icon(Icons.lock_rounded, size: 13, color: theme.successColor),
+              const SizedBox(width: 4),
+              Icon(Icons.lock_rounded, size: 12, color: theme.successColor),
             ],
-            const SizedBox(width: 12),
-            if (widget.amplitudeProvider != null)
-              Expanded(
-                child: ChatyVoiceLevelMeter(levels: _levels, theme: theme),
-              )
-            else
-              const Spacer(),
-            const SizedBox(width: 10),
-            ChatyComposerActionButton(
-              theme: theme,
-              semanticsLabel: 'Send voice note',
-              tooltip: 'Send voice note',
-              icon: Icons.send_rounded,
-              fillColor: theme.accentColor,
-              iconColor: theme.onAccentColor,
-              busy: widget.voiceBusy,
-              onTap: widget.voiceBusy ? null : widget.onVoiceSend,
+            const SizedBox(width: 8),
+            // RIGHT: Distinct rounded send/recording action button
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(22),
+                onTap: widget.voiceBusy ? null : widget.onVoiceSend,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: theme.accentColor,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.accentColor.withValues(alpha: 0.35),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: widget.voiceBusy
+                        ? SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                theme.onAccentColor,
+                              ),
+                            ),
+                          )
+                        : Icon(
+                            Icons.send_rounded,
+                            color: theme.onAccentColor,
+                            size: 20,
+                          ),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
         const SizedBox(height: 5),
         Text(
           widget.recordLocked
-              ? 'Recording locked • tap send or delete'
-              : 'Tap send to finish • slide left to cancel',
+              ? 'Recording locked • Tap send or delete'
+              : 'Tap send to finish • Slide left to cancel',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(color: theme.secondaryTextColor, fontSize: 11),

@@ -41,6 +41,12 @@ import '../../ui/core/connection/connection_health_indicator.dart';
 import '../../ui/core/connection/connection_detail_sheet.dart';
 import '../../ui/core/connection/global_connection_banner.dart';
 import '../../data/services/connection_health_service.dart';
+import '../../ui/core/design_system/components/chaty_modal.dart';
+import '../../data/services/chaty_share_service.dart';
+import '../settings/message_management/message_management_page.dart';
+import '../settings/privacy/privacy_center_screen.dart';
+import '../settings/security/app_lock_overlay.dart';
+import '../settings/gb_features/gb_settings_screen.dart';
 
 class ChatsHomeScreen extends StatefulWidget {
   final ThemeConfig theme;
@@ -315,6 +321,47 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
           preferencesController: widget.preferencesController,
           themeController: widget.themeController,
           devicesOnly: true,
+        ),
+      ),
+    );
+  }
+
+  void _promptMessageNumber() {
+    final textCtrl = TextEditingController();
+    ChatyModal.show(
+      context: context,
+      header: const ChatyModalHeader(
+        title: 'Message a number',
+        subtitle: 'Start a direct chat without saving contact',
+      ),
+      content: ChatyModalContent(
+        child: TextField(
+          controller: textCtrl,
+          keyboardType: TextInputType.phone,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Phone number',
+            hintText: 'Include country code (+1...)',
+            prefixIcon: Icon(Icons.phone_rounded),
+          ),
+        ),
+      ),
+      footer: ChatyModalFooter(
+        secondaryAction: TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        primaryAction: FilledButton(
+          onPressed: () {
+            final number = textCtrl.text.trim();
+            Navigator.pop(context);
+            if (number.isNotEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Starting chat with $number...')),
+              );
+            }
+          },
+          child: const Text('Chat'),
         ),
       ),
     );
@@ -730,29 +777,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                 ],
               ),
             ),
-            floatingActionButton: _isSelectionMode
-                ? null
-                : FloatingActionButton(
-                    tooltip: widget.forcedType == ConversationType.group
-                        ? 'Create group'
-                        : 'New chat',
-                    backgroundColor: theme.accentColor,
-                    foregroundColor: theme.onAccentColor,
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => NewChatScreen(
-                          theme: theme,
-                          dataStore: widget.dataStore,
-                          preferencesController: widget.preferencesController,
-                        ),
-                      ),
-                    ),
-                    child: Icon(
-                      widget.forcedType == ConversationType.group
-                          ? Icons.group_add_rounded
-                          : Icons.edit_rounded,
-                    ),
-                  ),
+            floatingActionButton: null,
           ),
         );
       },
@@ -917,6 +942,424 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     }
   }
 
+  void _openSecuritySettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PrivacyCenterScreen(
+          preferencesController: widget.preferencesController,
+        ),
+      ),
+    );
+  }
+
+  void _openSettingsScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SettingsRootScreen(
+          preferencesController: widget.preferencesController,
+          themeController: widget.themeController,
+          dataStore: widget.dataStore,
+          notificationService: widget.notificationService,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleTopLeftIdentityTap() async {
+    HapticFeedback.selectionClick();
+    final lockService = locator<LocalLockService>();
+    final secPrefs = widget.preferencesController.security;
+    final method = secPrefs.lockMethod;
+    final hasCred = await lockService.hasCredential(method);
+    final hasLockedConversations = secPrefs.lockedConversationIds.isNotEmpty;
+
+    // Rule 08: If Locked Chats is configured (credentials or locked chats exist)
+    if (hasCred || hasLockedConversations) {
+      if (!mounted) return;
+      final authorized = await AppLockOverlayModal.show(
+        context,
+        preferencesController: widget.preferencesController,
+        lockService: lockService,
+        title: 'Locked Chats',
+        reason: 'Authenticate to access your locked conversations',
+      );
+      if (authorized == true && mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => LockedChatsScreen(
+              dataStore: widget.dataStore,
+              preferencesController: widget.preferencesController,
+              themeController: widget.themeController,
+            ),
+          ),
+        );
+      }
+    } else {
+      // Locked chats is NOT configured: show clear guided state
+      if (!mounted) return;
+      ChatyModal.show(
+        context: context,
+        header: const ChatyModalHeader(
+          title: 'Locked Chats',
+          subtitle: 'Secure conversations with biometric, PIN, or password',
+        ),
+        content: ChatyModalContent(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.lock_outline_rounded,
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Lock individual chats and keep them hidden from the main list.',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'How to set up Locked Chats:',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13.5,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              _buildSetupStep(
+                number: '1',
+                title: 'Set up your Security Credential',
+                description:
+                    'Choose a PIN, Pattern, or Password in Privacy & Security settings.',
+              ),
+              const SizedBox(height: 8),
+              _buildSetupStep(
+                number: '2',
+                title: 'Lock conversations',
+                description:
+                    'Select any chat in your list and choose "Lock chat".',
+              ),
+              const SizedBox(height: 8),
+              _buildSetupStep(
+                number: '3',
+                title: 'Open your vault anytime',
+                description:
+                    'Tap your name or the Chaty header at the top-left to authenticate and view locked chats.',
+              ),
+            ],
+          ),
+        ),
+        footer: ChatyModalFooter(
+          secondaryAction: TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+          primaryAction: FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _openSecuritySettings();
+            },
+            child: const Text('Configure Security'),
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildSetupStep({
+    required String number,
+    required String title,
+    required String description,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 22,
+          height: 22,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: colorScheme.primary.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            number,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: colorScheme.primary,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                description,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _popupMenuItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    final theme = widget.theme;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: theme.primaryTextColor.withValues(alpha: 0.8)),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  color: theme.primaryTextColor,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openHomeThreeDotMenu() {
+    HapticFeedback.lightImpact();
+    final topOffset = MediaQuery.of(context).padding.top + kToolbarHeight - 6;
+    final colors = context.colors;
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Dismiss',
+      barrierColor: Colors.black26,
+      transitionDuration: const Duration(milliseconds: 180),
+      pageBuilder: (ctx, anim1, anim2) {
+        return Stack(
+          children: [
+            Positioned(
+              top: topOffset,
+              right: 12,
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  width: 250,
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(ctx).size.height * 0.75,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceElevated,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: colors.borderSubtle,
+                      width: 1.1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _popupMenuItem(
+                            icon: Icons.tune_rounded,
+                            title: 'Chaty Settings',
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => GbSettingsScreen(
+                                    preferencesController: widget.preferencesController,
+                                    themeController: widget.themeController,
+                                    dataStore: widget.dataStore,
+                                    notificationService: widget.notificationService,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          _popupMenuItem(
+                            icon: Icons.group_add_rounded,
+                            title: 'New Group',
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => NewChatScreen(
+                                    theme: widget.theme,
+                                    dataStore: widget.dataStore,
+                                    preferencesController: widget.preferencesController,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          _popupMenuItem(
+                            icon: Icons.devices_rounded,
+                            title: 'Linked Devices',
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _openLinkedDevices();
+                            },
+                          ),
+                          _popupMenuItem(
+                            icon: Icons.star_rounded,
+                            title: 'Starred Messages',
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Starred messages')),
+                              );
+                            },
+                          ),
+                          _popupMenuItem(
+                            icon: Icons.schedule_send_rounded,
+                            title: 'Message Scheduler',
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => MessageManagementPage(
+                                    preferencesController: widget.preferencesController,
+                                    dataStore: widget.dataStore,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          _popupMenuItem(
+                            icon: Icons.reply_rounded,
+                            title: 'Auto Reply',
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => MessageManagementPage(
+                                    preferencesController: widget.preferencesController,
+                                    dataStore: widget.dataStore,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          _popupMenuItem(
+                            icon: Icons.dialpad_rounded,
+                            title: 'Message a Number',
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _promptMessageNumber();
+                            },
+                          ),
+                          _popupMenuItem(
+                            icon: Icons.done_all_rounded,
+                            title: 'Mark All as Read',
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              for (final c in widget.dataStore.conversations) {
+                                widget.dataStore.markAsRead(c.id);
+                              }
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Marked all chats as read')),
+                              );
+                            },
+                          ),
+                          _popupMenuItem(
+                            icon: Icons.share_rounded,
+                            title: 'Share Chaty',
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              ChatyShareService.shareApp(context);
+                            },
+                          ),
+                          const Divider(height: 8, indent: 12, endIndent: 12),
+                          _popupMenuItem(
+                            icon: Icons.settings_rounded,
+                            title: 'Settings',
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _openSettingsScreen();
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+      transitionBuilder: (ctx, anim, secondaryAnim, child) {
+        return FadeTransition(
+          opacity: anim,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.92, end: 1.0).animate(
+              CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
+            ),
+            alignment: Alignment.topRight,
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
   Widget _standardAppBar(ThemeConfig theme, HomePreferences homePrefs) {
     final availableWidth = MediaQuery.sizeOf(context).width;
     final compactHeader = availableWidth < 390;
@@ -937,15 +1380,22 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Flexible(
-                  child: Text(
-                    _compactBarTitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: theme.primaryTextColor,
-                      fontSize: titleFontSize * theme.fontScale,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.4,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: _handleTopLeftIdentityTap,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      child: Text(
+                        _compactBarTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: theme.primaryTextColor,
+                          fontSize: titleFontSize * theme.fontScale,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -1035,100 +1485,14 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   : Icons.dark_mode_rounded,
             ),
           ),
-          if (useOverflowSheet)
-            IconButton(
-              tooltip: 'More options',
+          IconButton(
+            tooltip: 'More options',
+            icon: Icon(
+              Icons.more_vert_rounded,
               color: theme.primaryTextColor,
-              onPressed: () => _showHomeOverflowSheet(homePrefs, theme),
-              icon: const ChatyGlyphIcon(glyph: ChatyGlyph.more, size: 22),
-            )
-          else
-            PopupMenuButton<String>(
-              tooltip: 'More options',
-              icon: ChatyGlyphIcon(
-                glyph: ChatyGlyph.more,
-                color: theme.primaryTextColor,
-                size: 22,
-              ),
-              onSelected: _handleHomeOverflowAction,
-              itemBuilder: (_) => <PopupMenuEntry<String>>[
-                if (homePrefs.showCameraIcon)
-                  const PopupMenuItem(
-                    value: 'effects',
-                    child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: ChatyGlyphIcon(glyph: ChatyGlyph.camera, size: 20),
-                      title: Text('Camera effects'),
-                    ),
-                  ),
-                if (homePrefs.showDesktopIcon)
-                  const PopupMenuItem(
-                    value: 'qr',
-                    child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: ChatyGlyphIcon(glyph: ChatyGlyph.qrScan, size: 20),
-                      title: Text('QR / Scan'),
-                    ),
-                  ),
-                const PopupMenuItem(
-                  value: 'linked',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: ChatyGlyphIcon(glyph: ChatyGlyph.devices, size: 20),
-                    title: Text('Linked devices'),
-                  ),
-                ),
-                const PopupMenuDivider(),
-                const PopupMenuItem(
-                  value: 'themes',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: ChatyGlyphIcon(glyph: ChatyGlyph.palette, size: 20),
-                    title: Text('Themes & colors'),
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'templates',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: ChatyGlyphIcon(glyph: ChatyGlyph.templates, size: 20),
-                    title: Text('Templates & layouts'),
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'starred',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: ChatyGlyphIcon(glyph: ChatyGlyph.exportProfile, size: 20),
-                    title: Text('Starred messages'),
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'home',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: ChatyGlyphIcon(glyph: ChatyGlyph.homeLayout, size: 20),
-                    title: Text('Home & navigation'),
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'navigation',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: ChatyGlyphIcon(glyph: ChatyGlyph.navigation, size: 20),
-                    title: Text('Navigation destinations'),
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'settings',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: ChatyGlyphIcon(glyph: ChatyGlyph.settings, size: 20),
-                    title: Text('All settings'),
-                  ),
-                ),
-              ],
             ),
+            onPressed: _openHomeThreeDotMenu,
+          ),
         ],
       ),
     );

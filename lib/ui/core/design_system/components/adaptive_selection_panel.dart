@@ -58,7 +58,7 @@ class AdaptiveSelectionPanel<T> extends StatefulWidget {
     required List<SelectionOptionItem<T>> options,
     Widget? headerPreview,
     bool showApplyButton = true,
-    bool preferCenteredDialog = false,
+    bool preferCenteredDialog = true,
   }) {
     final media = MediaQuery.of(context);
     final isTablet = media.size.width >= 600;
@@ -358,38 +358,11 @@ class SelectionOptionTile<T> extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               child: Row(
                 children: [
-                  // Radio Indicator
-                  AnimatedContainer(
-                    duration: motionDuration,
-                    width: 22,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isSelected ? colors.primary : Colors.transparent,
-                      border: Border.all(
-                        color: isSelected
-                            ? colors.primary
-                            : colors.foregroundSecondary.withValues(alpha: 0.5),
-                        width: 2,
-                      ),
-                    ),
-                    child: isSelected
-                        ? Center(
-                            child: Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: colors.onPrimary,
-                              ),
-                            ),
-                          )
-                        : null,
-                  ),
-                  const SizedBox(width: 14),
-
-                  // Leading Icon if provided
-                  if (option.leadingIcon != null) ...[
+                  // Left side: Preview widget or Leading Icon
+                  if (option.preview != null) ...[
+                    option.preview!,
+                    const SizedBox(width: 12),
+                  ] else if (option.leadingIcon != null) ...[
                     Icon(
                       option.leadingIcon,
                       size: 20,
@@ -459,11 +432,36 @@ class SelectionOptionTile<T> extends StatelessWidget {
                     ),
                   ),
 
-                  // Trailing Preview Widget if present
-                  if (option.preview != null) ...[
-                    const SizedBox(width: 10),
-                    option.preview!,
-                  ],
+                  const SizedBox(width: 12),
+
+                  // Radio Indicator floating at the far right
+                  AnimatedContainer(
+                    duration: motionDuration,
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isSelected ? colors.primary : Colors.transparent,
+                      border: Border.all(
+                        color: isSelected
+                            ? colors.primary
+                            : colors.foregroundSecondary.withValues(alpha: 0.5),
+                        width: 2,
+                      ),
+                    ),
+                    child: isSelected
+                        ? Center(
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: colors.onPrimary,
+                              ),
+                            ),
+                          )
+                        : null,
+                  ),
                 ],
               ),
             ),
