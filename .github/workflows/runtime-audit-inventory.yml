@@ -39,7 +39,7 @@ jobs:
 
       - name: Type-check Playwright audit
         working-directory: qa/playwright
-        run: npx tsc --noEmit
+        run: npx tsc -p tsconfig.json --noEmit
 
       - name: Validate Playwright test discovery
         working-directory: qa/playwright
