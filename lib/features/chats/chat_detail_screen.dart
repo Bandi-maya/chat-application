@@ -2515,6 +2515,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             senderName: conversation.type == ConversationType.group && !isMine
                 ? _senderName(message.senderId)
                 : null,
+            showGroupAvatar: locator<TemplateController>()
+                .conversation
+                .showAvatarInGroup,
             onLongPress: () => _onMessageLongPress(message),
             onLongPressWithRect: (rect) =>
                 _onMessageLongPressWithRect(message, rect),
