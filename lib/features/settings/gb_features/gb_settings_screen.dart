@@ -1,5 +1,16 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../../domain/models/preferences.dart';
+import '../../../injection/locator.dart';
+import '../../../ui/core/controllers/appearance_variant_controller.dart';
+import '../../../ui/core/templates/template_controller.dart';
+import '../../../ui/core/templates/template_models.dart';
+import '../../../ui/core/theme/theme_config.dart';
+import '../../../ui/core/theme/theme_controller.dart';
 
 import '../../../data/repositories/chaty_data_store.dart';
 import '../../../data/services/notification_service.dart';
@@ -600,13 +611,266 @@ class GbSettingsScreen extends StatelessWidget {
     );
   }
 
+  Map<String, dynamic> _safeSettingsMap(Map<String, dynamic> input) {
+    // Device paths and display-name overrides belong to this device/account
+    // and should not leak into a portable settings profile.
+    final result = <String, dynamic>{};
+    for (final entry in input.entries) {
+      final key = entry.key.toLowerCase();
+      if (key.contains('path') ||
+          key.contains('file') ||
+          key.contains('mynameoverride') ||
+          key == 'my_name' ||
+          key == 'customwallpaperimage') {
+        continue;
+      }
+      final value = entry.value;
+      if (value is Map) {
+        result[entry.key] = _safeSettingsMap(Map<String, dynamic>.from(value));
+      } else if (value is List) {
+        result[entry.key] = List<dynamic>.from(value);
+      } else {
+        result[entry.key] = value;
+      }
+    }
+    return result;
+  }
+
+  Future<void> _copySettingsBackup(
+    BuildContext context,
+    ThemeConfig theme,
+  ) async {
+    const portableGbKeys = <String>{
+      'ModConTextColor', 'ModContactNameColor', 'HomeCounterBK',
+      'HomeCounterText', 'ModOnlineColor', 'ModlastseenColor',
+      'onlineDotchatColor', 'ModConColor', 'tabindicator',
+      'bubble_style', 'tick_style', 'text_size_pick', 'ConvoBack',
+      'ModChatRightBubble', 'ModChatBubbleText', 'date_right_color',
+      'ModChatLeftBubble', 'ModChatBubbleTextLeft', 'date_left_color',
+      'ModCallsBackground', 'ModCallsTextColor', 'ModCallsIconColors',
+      'ModChatColor', 'ModChatGStatusB', 'ModChatGStatusT',
+      'ModConPickColor', 'HomeBarText', 'ModConBackColor',
+      'list_bg_color', 'ModDarkConPickColor', 'ModDarkConPickColorNav',
+      'BGColor', 'home_stories_style', 'ui_home_styleV3',
+    };
+    final templateController = locator<TemplateController>();
+    final portableGb = <String, Object?>{
+      for (final key in portableGbKeys)
+        if (preferencesController.gbFeatures.containsKey(key))
+          key: preferencesController.gbFeatures[key],
+    };
+    final payload = jsonEncode(<String, dynamic>{
+      'kind': 'chaty_settings_profile',
+      'schemaVersion': 1,
+      'home': _safeSettingsMap(preferencesController.home.toMap()),
+      'conversation': _safeSettingsMap(preferencesController.conversation.toMap()),
+      'universal': _safeSettingsMap(preferencesController.universal.toMap()),
+      'effects': _safeSettingsMap(preferencesController.effects.toMap()),
+      'gbAppearance': portableGb,
+      'theme': themeController.globalTheme.toMap(),
+      'template': templateController.config.toMap(),
+    });
+    await Clipboard.setData(ClipboardData(text: payload));
+    if (!context.mounted) return;
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Settings backup copied. Chats, messages, account data and security secrets are not included.'),
+        ),
+      );
+  }
+
+  Future<void> _restoreSettingsBackup(
+    BuildContext context,
+  ) async {
+    final clipboard = await Clipboard.getData('text/plain');
+    final input = TextEditingController(text: clipboard?.text ?? '');
+    final raw = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Restore settings'),
+        content: SizedBox(
+          width: 520,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Paste a Chaty settings profile JSON. It restores appearance and layout preferences only; chats, accounts, security secrets, and encryption keys are never imported.',
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: input,
+                minLines: 4,
+                maxLines: 8,
+                decoration: const InputDecoration(
+                  hintText: 'Paste settings backup JSON',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () async {
+                    final data = await Clipboard.getData('text/plain');
+                    if (data?.text != null) input.text = data!.text!;
+                  },
+                  icon: const Icon(Icons.content_paste_rounded),
+                  label: const Text('Paste clipboard'),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(input.text),
+            child: const Text('Validate & Restore'),
+          ),
+        ],
+      ),
+    );
+    input.dispose();
+    if (!context.mounted || raw == null || raw.trim().isEmpty) return;
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map ||
+          decoded['kind'] != 'chaty_settings_profile' ||
+          decoded['schemaVersion'] != 1) {
+        throw const FormatException('Unsupported Chaty settings profile.');
+      }
+
+      Map<String, dynamic> optionalMap(String key) {
+        final value = decoded[key];
+        if (value == null) return <String, dynamic>{};
+        if (value is! Map) throw FormatException('Invalid $key settings.');
+        return Map<String, dynamic>.from(value);
+      }
+
+      final homeMap = optionalMap('home');
+      final conversationMap = optionalMap('conversation');
+      final universalMap = optionalMap('universal');
+      final effectsMap = optionalMap('effects');
+      final gbMap = optionalMap('gbAppearance');
+      final themeMap = optionalMap('theme');
+      final templateMap = optionalMap('template');
+
+      // Decode everything before mutating any live state, so malformed input
+      // cannot leave the app half-restored.
+      final nextHome = HomePreferences.fromMap(<String, dynamic>{
+        ...preferencesController.home.toMap(),
+        ...homeMap,
+      });
+      final nextConversation = ConversationPreferences.fromMap(<String, dynamic>{
+        ...preferencesController.conversation.toMap(),
+        ...conversationMap,
+      });
+      final nextUniversal = UniversalPreferences.fromMap(<String, dynamic>{
+        ...preferencesController.universal.toMap(),
+        ...universalMap,
+      });
+      final nextEffects = NavigationEffectPreferences.fromMap(<String, dynamic>{
+        ...preferencesController.effects.toMap(),
+        ...effectsMap,
+      });
+      final nextTheme = themeMap.isEmpty
+          ? null
+          : ThemeConfig.fromMap(themeMap);
+      final nextTemplate = templateMap.isEmpty
+          ? null
+          : UserTemplateConfiguration.fromMap(templateMap);
+      if (nextTemplate != null &&
+          !ChatyTemplateId.values.contains(nextTemplate.baseTemplate)) {
+        throw const FormatException('Unknown template profile.');
+      }
+
+      if (nextTemplate != null) {
+        await locator<TemplateController>().applyConfiguration(
+          nextTemplate,
+          appearanceController: locator<AppearanceVariantController>(),
+          preferencesController: preferencesController,
+          themeController: themeController,
+        );
+      }
+      if (homeMap.isNotEmpty) {
+        preferencesController.updateHome(nextHome, logTitle: 'Settings restore');
+      }
+      if (conversationMap.isNotEmpty) {
+        preferencesController.updateConversation(
+          nextConversation,
+          logTitle: 'Settings restore',
+        );
+      }
+      if (universalMap.isNotEmpty) {
+        preferencesController.updateUniversal(
+          nextUniversal,
+          logTitle: 'Settings restore',
+        );
+      }
+      if (effectsMap.isNotEmpty) {
+        preferencesController.updateEffects(
+          nextEffects,
+          logTitle: 'Settings restore',
+        );
+      }
+      if (gbMap.isNotEmpty) {
+        const allowed = <String>{
+          'ModConTextColor', 'ModContactNameColor', 'HomeCounterBK',
+          'HomeCounterText', 'ModOnlineColor', 'ModlastseenColor',
+          'onlineDotchatColor', 'ModConColor', 'tabindicator',
+          'bubble_style', 'tick_style', 'text_size_pick', 'ConvoBack',
+          'ModChatRightBubble', 'ModChatBubbleText', 'date_right_color',
+          'ModChatLeftBubble', 'ModChatBubbleTextLeft', 'date_left_color',
+          'ModCallsBackground', 'ModCallsTextColor', 'ModCallsIconColors',
+          'ModChatColor', 'ModChatGStatusB', 'ModChatGStatusT',
+          'ModConPickColor', 'HomeBarText', 'ModConBackColor',
+          'list_bg_color', 'ModDarkConPickColor', 'ModDarkConPickColorNav',
+          'BGColor', 'home_stories_style', 'ui_home_styleV3',
+        };
+        if (gbMap.keys.any((key) => !allowed.contains(key))) {
+          throw const FormatException('Unknown appearance setting in profile.');
+        }
+        preferencesController.updateGbFeatures(
+          Map<String, Object?>.from(gbMap),
+          logTitle: 'Settings restore',
+        );
+      }
+      if (nextTheme != null) {
+        themeController.updateThemeConfig(nextTheme);
+      }
+
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Settings profile restored.')),
+        );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Restore failed. The profile is invalid or from an unsupported version.'),
+          ),
+        );
+    }
+  }
+
   void _showBackupRestoreSheet(
     BuildContext context,
     ThemeConfig theme,
     AppColors colors,
   ) {
     HapticFeedback.lightImpact();
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       backgroundColor: theme.surfaceColor,
       shape: const RoundedRectangleBorder(
@@ -620,7 +884,7 @@ class GbSettingsScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'GBWA Data Backup & Recovery',
+                'Chaty Settings Backup & Restore',
                 style: TextStyle(
                   color: theme.primaryTextColor,
                   fontSize: 18 * theme.fontScale,
@@ -629,30 +893,23 @@ class GbSettingsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                'Create a full local snapshot of encrypted chats, media indexes, themes, and configuration.',
+                'Export or restore themes, templates, home layout, conversation appearance and supported visual preferences. Chats, media, account information and security secrets are not included.',
                 style: TextStyle(color: theme.secondaryTextColor, fontSize: 13),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               ListTile(
-                leading: Icon(Icons.backup_rounded, color: theme.accentColor),
-                title: const Text('Back up GBWhatsApp Data'),
-                subtitle: const Text('Save encrypted archive to local storage'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('GBWA Backup created successfully! 📦')),
-                  );
-                },
+                leading: Icon(Icons.content_copy_rounded, color: theme.accentColor),
+                title: const Text('Copy settings backup'),
+                subtitle: const Text('Copy a portable JSON settings profile'),
+                onTap: () => _copySettingsBackup(context, theme),
               ),
               ListTile(
                 leading: Icon(Icons.restore_rounded, color: colors.warning),
-                title: const Text('Restore Data'),
-                subtitle: const Text('Recover chats and media from previous backup'),
+                title: const Text('Restore settings'),
+                subtitle: const Text('Paste a previously copied settings profile'),
                 onTap: () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('GBWA Backup restored successfully! ✅')),
-                  );
+                  Navigator.of(ctx).pop();
+                  _restoreSettingsBackup(context);
                 },
               ),
             ],
