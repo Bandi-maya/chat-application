@@ -268,3 +268,40 @@ jobs:
             Chaty-production.apk.sha256
           if-no-files-found: error
           retention-days: 30
+
+  verify-ios:
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout Chaty source
+        uses: actions/checkout@v6
+
+      - name: Set up Flutter stable
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve Flutter dependencies
+        run: flutter pub get
+
+      - name: Analyze Dart source
+        run: flutter analyze --no-fatal-infos
+
+      - name: Run Flutter regression tests
+        run: flutter test
+
+      - name: Build iOS simulator/device app without signing
+        run: >-
+          flutter build ios --no-codesign --debug --no-pub
+          --dart-define=SUPABASE_URL=${SUPABASE_URL}
+          --dart-define=SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}
+
+      - name: Verify generated iOS app bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d build/ios/iphoneos/Runner.app
+          test -s build/ios/iphoneos/Runner.app/Info.plist
+
