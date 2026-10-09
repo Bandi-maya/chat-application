@@ -118,6 +118,22 @@ void main() {
     }
   });
 
+  test('image selection count controls multi-select and its maximum independently', () {
+    final attachmentSource = File(
+      'lib/features/messages/chat_attachment_actions.dart',
+    ).readAsStringSync();
+    final mediaSource = File(
+      'lib/data/services/chat_media_service.dart',
+    ).readAsStringSync();
+
+    expect(attachmentSource, contains("gbDouble('Img_share_limit', fallback: 30)"));
+    expect(attachmentSource, contains("type == 'image' && imageLimit > 1"));
+    expect(attachmentSource, contains("maxFiles: type == 'image' ? imageLimit : 30"));
+    expect(mediaSource, contains('int? maxFiles'));
+    expect(mediaSource, contains('picked.length > limit'));
+    expect(attachmentSource, contains("gbBool('key_more_docs_send')"));
+  });
+
   test('template studio searches presets and independent component overrides', () {
     final source = File(
       'lib/features/settings/templates/templates_settings_screen.dart',
