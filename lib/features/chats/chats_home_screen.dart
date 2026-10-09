@@ -1125,10 +1125,13 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     switch (value) {
       case 'effects':
         EffectPickerSheet.show(context);
+        break;
       case 'qr':
         _openQrScreen(initialIndex: 1);
+        break;
       case 'linked':
         _openLinkedDevices();
+        break;
       case 'themes':
         Navigator.of(context).push(
           MaterialPageRoute<void>(
@@ -1137,12 +1140,14 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
             ),
           ),
         );
+        break;
       case 'templates':
         Navigator.of(context).push(
           MaterialPageRoute<void>(
             builder: (_) => const TemplatesSettingsScreen(),
           ),
         );
+        break;
       case 'home':
         Navigator.of(context).push(
           MaterialPageRoute<void>(
@@ -1151,12 +1156,14 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
             ),
           ),
         );
+        break;
       case 'navigation':
         Navigator.of(context).push(
           MaterialPageRoute<void>(
             builder: (_) => const NavigationDestinationsSettingsScreen(),
           ),
         );
+        break;
       case 'settings':
         Navigator.of(context).push(
           MaterialPageRoute<void>(
@@ -1168,6 +1175,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
             ),
           ),
         );
+        break;
     }
   }
 
