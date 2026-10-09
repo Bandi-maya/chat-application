@@ -23,6 +23,7 @@ import '../../injection/locator.dart';
 import '../../ui/core/commands/chat_command_parser.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/templates/template_controller.dart';
+import '../../ui/core/templates/template_models.dart';
 import '../../ui/core/design_system/settings_primitives.dart';
 import '../../ui/core/design_system/chaty_haptics.dart';
 import '../../ui/core/design_system/components/chaty_kit.dart';
