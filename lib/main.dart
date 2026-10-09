@@ -385,6 +385,15 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
         return null;
     }
     if (OngoingCallScreen.presentedInstances.value > 0) return null;
+    final presentation = locator<CallPresentationController>();
+    final islandEnabled = locator<TemplateController>().calls.enableFloatingIsland;
+    // Dedicated in-app surfaces own these states when enabled. If the selected
+    // template hides the island, keep the global capsule as the safe fallback
+    // so active calls always retain tap-to-open and hang-up controls.
+    if (presentation.isInAppVideoPip ||
+        (presentation.isInAppIsland && islandEnabled)) {
+      return null;
+    }
     return ChatyCallActivityCapsule(
       contactName: session.remoteDisplayName,
       status: _minimizedCallStatus(session),
@@ -616,6 +625,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
                 callSession != null &&
                 callSession.isActive;
             final showIsland =
+                locator<TemplateController>().calls.enableFloatingIsland &&
                 presentation.isInAppIsland &&
                 callSession != null &&
                 callSession.isActive;
