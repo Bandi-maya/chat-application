@@ -63,17 +63,20 @@ void main() {
     },
   );
 
-  test('home overflow uses adaptive presentation and a shared action handler', () {
+  test('home overflow restores the floating modal and shared action handler', () {
     final source = File(
       'lib/features/chats/chats_home_screen.dart',
     ).readAsStringSync();
 
-    expect(source, contains('final useOverflowSheet = availableWidth < 600;'));
-    expect(source, contains('required bool useOverflowSheet'));
+    expect(source, contains('void _openHomeThreeDotMenu({'));
+    expect(source, contains('showGeneralDialog('));
     expect(source, contains('onPressed: () => _openHomeThreeDotMenu('));
-    expect(source, contains('if (useOverflowSheet)'));
-    expect(source, contains('_showHomeOverflowSheet(homePrefs, theme)'));
+    expect(source, contains('title: \'Starred Messages\''));
+    expect(source, contains('title: \'Themes & Colors\''));
+    expect(source, contains('title: \'Templates & Layouts\''));
     expect(source, contains('_handleHomeOverflowAction(value);'));
+    expect(source, isNot(contains('useOverflowSheet')));
+    expect(source, isNot(contains('_showHomeOverflowSheet')));
     for (final route in <String>[
       "case 'effects':",
       "case 'qr':",
