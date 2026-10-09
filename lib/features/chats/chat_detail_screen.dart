@@ -2882,6 +2882,99 @@ class _ComposerState extends State<_Composer>
 
   // --- Text input -----------------------------------------------------------
 
+  Widget _buildPowerRow(
+    ThemeConfig theme,
+    ComposerTemplate template,
+    Widget attachAction,
+    Widget? cameraAction,
+  ) {
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            attachAction,
+            if (cameraAction != null) cameraAction,
+            IconButton(
+              tooltip: 'Emoji',
+              onPressed: widget.onEmoji,
+              icon: Icon(
+                Icons.emoji_emotions_outlined,
+                color: theme.secondaryTextColor,
+              ),
+            ),
+            const Spacer(),
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: widget.controller,
+              builder: (context, value, _) {
+                final hasText = value.text.trim().isNotEmpty;
+                return AnimatedSwitcher(
+                  duration: template.enableSendMorph && !reduceMotion
+                      ? const Duration(milliseconds: 180)
+                      : Duration.zero,
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  child: hasText
+                      ? ChatyComposerActionButton(
+                          key: const ValueKey<String>('power-send-action'),
+                          theme: theme,
+                          semanticsLabel: 'Send message',
+                          tooltip: 'Send',
+                          icon: Icons.send_rounded,
+                          fillColor: theme.accentColor,
+                          iconColor: theme.onAccentColor,
+                          emphasized: true,
+                          onTap: widget.onSend,
+                        )
+                      : ChatyComposerActionButton(
+                          key: const ValueKey<String>('power-voice-action'),
+                          theme: theme,
+                          icon: Icons.mic_rounded,
+                          fillColor: theme.accentColor,
+                          iconColor: theme.onAccentColor,
+                          semanticsLabel:
+                              'Voice note. Tap to start locked recording, or hold to record and slide.',
+                          onTap: widget.onVoiceTap,
+                          onLongPressStart: (_) => widget.onVoiceHoldStart(),
+                          onLongPressMoveUpdate: widget.onVoiceMove,
+                          onLongPressEnd: (_) => widget.onVoiceHoldEnd(),
+                        ),
+                );
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        TextField(
+          controller: widget.controller,
+          minLines: 1,
+          maxLines: 5,
+          onChanged: widget.onChanged,
+          style: TextStyle(
+            color: theme.primaryTextColor,
+            fontSize: 14 * theme.fontScale,
+          ),
+          decoration: InputDecoration(
+            hintText: 'Message…  /task or #reply',
+            hintStyle: TextStyle(color: theme.secondaryTextColor),
+            filled: true,
+            fillColor: theme.cardColor,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(template.cornerRadius),
+              borderSide: BorderSide.none,
+            ),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 11,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildInputRow(ThemeConfig theme, ComposerTemplate template) {
     final attachAction = ChatyComposerActionButton(
       theme: theme,
@@ -2901,6 +2994,11 @@ class _ComposerState extends State<_Composer>
             onTap: widget.onCameraTap,
           )
         : null;
+
+    if (template.actionPlacement == ComposerActionPlacement.powerRow) {
+      return _buildPowerRow(theme, template, attachAction, cameraAction);
+    }
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
