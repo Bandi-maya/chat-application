@@ -519,8 +519,13 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                   mainAxisSpacing: 10,
                   mainAxisExtent: columns == 1 ? 112 : 174,
                 ),
-                itemBuilder: (context, index) =>
-                    _buildStatusGridCard(statuses[index], colors),
+                itemBuilder: (context, index) {
+                  final status = statuses[index];
+                  if (columns == 1) {
+                    return _buildSquircleStatusCard(status, colors);
+                  }
+                  return _buildStatusGridCard(status, colors);
+                },
               );
             },
           ),
