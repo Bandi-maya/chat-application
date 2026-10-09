@@ -224,6 +224,7 @@ class ComponentOverrideScreen extends StatelessWidget {
                                           >(),
                                       preferencesController:
                                           locator<ChatyPreferencesController>(),
+                                      themeController: locator<ThemeController>(),
                                     );
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
