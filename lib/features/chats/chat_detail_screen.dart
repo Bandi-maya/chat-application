@@ -22,6 +22,7 @@ import '../../features/tasks/task_detail_screen.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/commands/chat_command_parser.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
+import '../../ui/core/templates/template_controller.dart';
 import '../../ui/core/design_system/settings_primitives.dart';
 import '../../ui/core/design_system/chaty_haptics.dart';
 import '../../ui/core/design_system/components/chaty_kit.dart';
@@ -2781,6 +2782,7 @@ class _ComposerState extends State<_Composer>
   Widget build(BuildContext context) {
     final theme = widget.theme;
     final reduceMotion = MediaQuery.of(context).disableAnimations;
+    final composerTemplate = locator<TemplateController>().composer;
     return Container(
       padding: const EdgeInsets.fromLTRB(6, 8, 8, 8),
       decoration: BoxDecoration(
@@ -2791,7 +2793,7 @@ class _ComposerState extends State<_Composer>
         top: false,
         child: widget.recording
             ? _buildRecordingBar(theme, reduceMotion)
-            : _buildInputRow(theme),
+            : _buildInputRow(theme, composerTemplate),
       ),
     );
   }
@@ -2875,7 +2877,7 @@ class _ComposerState extends State<_Composer>
 
   // --- Text input -----------------------------------------------------------
 
-  Widget _buildInputRow(ThemeConfig theme) {
+  Widget _buildInputRow(ThemeConfig theme, ComposerTemplate template) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -2887,14 +2889,15 @@ class _ComposerState extends State<_Composer>
           iconColor: theme.accentColor,
           onTap: widget.onAttach,
         ),
-        ChatyComposerActionButton(
-          theme: theme,
-          semanticsLabel: 'Camera',
-          tooltip: 'Camera',
-          icon: Icons.photo_camera_rounded,
-          iconColor: theme.accentColor,
-          onTap: widget.onCameraTap,
-        ),
+        if (template.showCameraShortcut)
+          ChatyComposerActionButton(
+            theme: theme,
+            semanticsLabel: 'Camera',
+            tooltip: 'Camera',
+            icon: Icons.photo_camera_rounded,
+            iconColor: theme.accentColor,
+            onTap: widget.onCameraTap,
+          ),
         Expanded(
           child: TextField(
             controller: widget.controller,
@@ -2919,7 +2922,7 @@ class _ComposerState extends State<_Composer>
                 ),
               ),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(template.cornerRadius),
                 borderSide: BorderSide.none,
               ),
               isDense: true,
