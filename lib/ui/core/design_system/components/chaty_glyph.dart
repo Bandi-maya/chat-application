@@ -91,6 +91,7 @@ class _ChatyGlyphPainter extends CustomPainter {
     }
 
     switch (glyph) {
+        break;
       case ChatyGlyph.camera:
         canvas.drawRRect(
           RRect.fromRectAndRadius(
@@ -107,6 +108,7 @@ class _ChatyGlyphPainter extends CustomPainter {
         ]);
         canvas.drawCircle(const Offset(12, 13.5), 3.1, line);
         canvas.drawCircle(const Offset(17.6, 10), 0.8, solid);
+        break;
       case ChatyGlyph.qrScan:
         stroke(const <Offset>[
           Offset(4, 9),
@@ -133,6 +135,7 @@ class _ChatyGlyphPainter extends CustomPainter {
         canvas.drawRect(const Rect.fromLTWH(7, 13, 4, 4), line);
         canvas.drawRect(const Rect.fromLTWH(13, 13, 2, 2), line);
         canvas.drawCircle(const Offset(17.5, 17.5), 0.9, solid);
+        break;
       case ChatyGlyph.devices:
         canvas.drawRRect(
           RRect.fromRectAndRadius(
@@ -151,6 +154,7 @@ class _ChatyGlyphPainter extends CustomPainter {
           line,
         );
         stroke(const <Offset>[Offset(3.5, 10), Offset(5.1, 10)]);
+        break;
       case ChatyGlyph.palette:
         final path = Path()
           ..moveTo(12, 3.2)
@@ -168,6 +172,7 @@ class _ChatyGlyphPainter extends CustomPainter {
         canvas.drawCircle(const Offset(11.5, 7.4), 1.05, solid);
         canvas.drawCircle(const Offset(16, 8.3), 1.05, solid);
         canvas.drawCircle(const Offset(8.8, 14.2), 1.05, solid);
+        break;
       case ChatyGlyph.templates:
         canvas.drawRRect(
           RRect.fromRectAndRadius(
@@ -181,6 +186,7 @@ class _ChatyGlyphPainter extends CustomPainter {
         stroke(const <Offset>[Offset(14.8, 9.5), Offset(14.8, 20.2)]);
         stroke(const <Offset>[Offset(5.5, 6.1), Offset(7, 6.1)]);
         stroke(const <Offset>[Offset(10.8, 6.1), Offset(12.3, 6.1)]);
+        break;
       case ChatyGlyph.homeLayout:
         canvas.drawRRect(
           RRect.fromRectAndRadius(
@@ -193,6 +199,7 @@ class _ChatyGlyphPainter extends CustomPainter {
         stroke(const <Offset>[Offset(9.2, 9), Offset(20.4, 9)]);
         stroke(const <Offset>[Offset(9.2, 14), Offset(20.4, 14)]);
         canvas.drawCircle(const Offset(5.9, 7), 0.75, solid);
+        break;
       case ChatyGlyph.navigation:
         canvas.drawCircle(const Offset(5, 6), 1.1, solid);
         canvas.drawCircle(const Offset(5, 12), 1.1, solid);
@@ -200,6 +207,7 @@ class _ChatyGlyphPainter extends CustomPainter {
         stroke(const <Offset>[Offset(9, 6), Offset(20, 6)]);
         stroke(const <Offset>[Offset(9, 12), Offset(20, 12)]);
         stroke(const <Offset>[Offset(9, 18), Offset(20, 18)]);
+        break;
       case ChatyGlyph.settings:
         stroke(const <Offset>[Offset(4, 7), Offset(20, 7)]);
         stroke(const <Offset>[Offset(4, 12), Offset(20, 12)]);
@@ -210,16 +218,19 @@ class _ChatyGlyphPainter extends CustomPainter {
         canvas.drawCircle(const Offset(9, 7), 0.7, Paint()..color = color.withValues(alpha: 0.2));
         canvas.drawCircle(const Offset(15, 12), 0.7, Paint()..color = color.withValues(alpha: 0.2));
         canvas.drawCircle(const Offset(8, 17), 0.7, Paint()..color = color.withValues(alpha: 0.2));
+        break;
       case ChatyGlyph.chevronRight:
         stroke(const <Offset>[
           Offset(9, 4),
           Offset(17, 12),
           Offset(9, 20),
         ]);
+        break;
       case ChatyGlyph.more:
         canvas.drawCircle(const Offset(5.2, 12), 1.45, solid);
         canvas.drawCircle(const Offset(12, 12), 1.45, solid);
         canvas.drawCircle(const Offset(18.8, 12), 1.45, solid);
+        break;
       case ChatyGlyph.tune:
         stroke(const <Offset>[Offset(3, 6), Offset(21, 6)]);
         stroke(const <Offset>[Offset(3, 12), Offset(21, 12)]);
@@ -233,6 +244,7 @@ class _ChatyGlyphPainter extends CustomPainter {
         canvas.drawCircle(const Offset(10.5, 18), 1.8, Paint()
           ..color = color
           ..style = PaintingStyle.fill);
+        break;
     }
     canvas.restore();
   }
