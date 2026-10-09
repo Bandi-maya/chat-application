@@ -22,7 +22,8 @@
 - Updates now renders distinct circular rail, responsive grid tiles, squircle cards, and minimal-list layouts; the audio template option plays audio updates in-app using the app's existing audio dependency.
 - Home & Navigation settings now exposes all navigation modes, including Compact Rail, and stays reactive when settings change.
 - Navigation template order, primary/overflow placement, configured height and center quick action are connected to the runtime shell. Manual destination order persists, validates unique IDs, and cannot hide a screen.
-- The Chats overflow menu is always available and links to camera effects, linked devices, themes, templates, Home & Navigation, and all settings; compact widths keep camera/scan shortcuts in that menu.
+- The Chats overflow menu is always available. Compact phone widths now open a grouped safe-area-aware quick-access sheet; wider screens keep the anchored popup. Both use the same action handler for camera effects, linked devices, themes, templates, Home & Navigation, Navigation destinations and all settings.
+- Added the UI reference research catalog with a curated 76-reference landscape, consolidated unique UX patterns, and documented platform/accessibility/performance acceptance criteria. The sources were studied for patterns only; no new component library was installed.
 - Profile screen now renders structurally distinct compact, centered-identity and banner-with-avatar layouts. Avatar shape and the stats-grid toggle work; displayed counts come from the local data store (chats, groups and contacts).
 - Call controls consume the configured control corner radius. `enableFloatingIsland` gates the island, with the existing global call capsule retained as the safe fallback so active-call controls remain available.
 - Appearance preview chips display the actual selected typography and entry/exit motion values rather than empty labels.
