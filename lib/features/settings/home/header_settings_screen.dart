@@ -3,6 +3,7 @@ import '../../../data/repositories/chaty_data_store.dart';
 import '../../../domain/models/preferences.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/gb_design_system.dart';
+import '../../../ui/core/settings/home_style_catalog.dart';
 
 /// Header Settings Screen with pinned Live Preview at top matching Image 2 & 3.
 /// Changes to settings update the live preview above lively and in real time.
@@ -21,14 +22,7 @@ class HeaderSettingsScreen extends StatefulWidget {
 }
 
 class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
-  static const List<String> _homeUiStyles = [
-    'ONE UI',
-    'WhatsApp UI Stock',
-    'IOS STYLE',
-    'BUBBLES TAB STYLE',
-    'BASIC TAB STYLE',
-    'WhatsApp OLD UI',
-  ];
+  static const List<String> _homeUiStyles = ChatyHomeStyleCatalog.options;
 
   static const List<String> _storiesStyles = [
     'Instagram',
@@ -141,22 +135,18 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                             size: 21,
                           ),
                           title: 'Home UI Style',
-                          subtitle: home.homeStyle.isNotEmpty
-                              ? home.homeStyle
-                              : 'WhatsApp OLD UI',
+                          subtitle: ChatyHomeStyleCatalog.displayName(home.homeStyle),
                           showChevron: true,
                           onTap: () async {
                             final chosen = await GbRadioSelectionDialog.show(
                               context: context,
                               title: 'Home UI Style',
                               options: _homeUiStyles,
-                              selectedOption: home.homeStyle.isNotEmpty
-                                  ? home.homeStyle
-                                  : 'WhatsApp OLD UI',
+                              selectedOption: ChatyHomeStyleCatalog.displayName(home.homeStyle),
                             );
                             if (chosen != null && mounted) {
                               _updateHome(
-                                home.copyWith(homeStyle: chosen),
+                                home.copyWith(homeStyle: ChatyHomeStyleCatalog.storedValue(chosen)),
                                 logTitle: 'Home UI Style',
                               );
                             }
