@@ -66,6 +66,7 @@ Future<void> main() async {
     locator<TemplateController>().init(
       appearanceController: locator<AppearanceVariantController>(),
       preferencesController: locator<ChatyPreferencesController>(),
+      themeController: locator<ThemeController>(),
     ),
   ]);
   runApp(const ChatyApp());
