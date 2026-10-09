@@ -34,10 +34,18 @@ void main() {
         ).isNotEmpty,
         isTrue,
       );
+      // App-lock controls are intentionally grouped into the single
+      // Privacy & Security center to avoid duplicate customization paths.
       expect(
         SettingsRegistry.clustersForCategory(
           SettingsCategory.security,
-        ).isNotEmpty,
+        ).isEmpty,
+        isTrue,
+      );
+      expect(
+        SettingsRegistry.allSettings
+            .where((setting) => setting.id.startsWith('security_'))
+            .every((setting) => setting.canonicalRoute == '/settings/privacy'),
         isTrue,
       );
       expect(
