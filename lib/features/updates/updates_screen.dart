@@ -862,9 +862,11 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-
-    return ChatyScaffold(
+    return ListenableBuilder(
+      listenable: locator<TemplateController>(),
+      builder: (context, _) {
+        final colors = context.colors;
+        return ChatyScaffold(
       safeAreaTop: true,
       safeAreaBottom: false,
       body: CustomScrollView(
@@ -1093,6 +1095,8 @@ class _ComposerAction extends StatelessWidget {
           ),
         ),
       ),
+        );
+      },
     );
   }
 }
