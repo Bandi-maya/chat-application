@@ -3,6 +3,7 @@ import 'package:chat/ui/core/templates/template_models.dart';
 import 'package:chat/ui/core/templates/template_registry.dart';
 import 'package:chat/ui/core/templates/template_controller.dart';
 import 'package:chat/ui/core/theme/theme_controller.dart';
+import 'package:chat/ui/core/theme/theme_config.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -221,6 +222,37 @@ void main() {
       expect(
         themeController.globalTheme.cornerRadius,
         equals(ChatyTemplateRegistry.cameraFirst.conversation.bubbleCornerRadius),
+      );
+    });
+
+    test('Navigation templates select matching runtime navigation modes', () async {
+      final themeController = ThemeController();
+
+      await controller.applyFullTemplate(
+        ChatyTemplateId.powerChat,
+        themeController: themeController,
+      );
+      expect(
+        themeController.navigationMode,
+        equals(AppNavigationMode.compactRail),
+      );
+
+      await controller.applyFullTemplate(
+        ChatyTemplateId.community,
+        themeController: themeController,
+      );
+      expect(
+        themeController.navigationMode,
+        equals(AppNavigationMode.topWhatsAppBar),
+      );
+
+      await controller.applyFullTemplate(
+        ChatyTemplateId.cameraFirst,
+        themeController: themeController,
+      );
+      expect(
+        themeController.navigationMode,
+        equals(AppNavigationMode.bottomNav),
       );
     });
   });
