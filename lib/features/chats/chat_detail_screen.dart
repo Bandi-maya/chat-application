@@ -84,7 +84,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final ScrollController _scrollCtrl = ScrollController();
   final Map<String, GlobalKey> _messageItemKeys = <String, GlobalKey>{};
   final Map<String, int> _messageIndexById = <String, int>{};
-  bool _initialMessageJumpStarted = false;
   // --- WhatsApp/Telegram/Instagram scroll logic ---
   // True while the list is within [_nearBottomThreshold] of the newest
   // message. Drives the floating down-arrow button, the unseen-count badge,
@@ -196,7 +195,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       setState(() => _loadingMessages = false);
       final targetMessageId = widget.initialMessageId;
       if (targetMessageId != null) {
-        _initialMessageJumpStarted = true;
         _jumpToMessage(targetMessageId);
       } else {
         _scrollToBottom(animate: false);
