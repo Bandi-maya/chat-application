@@ -32,6 +32,7 @@
 - Appearance preview chips display the actual selected typography and entry/exit motion values rather than empty labels.
 - Template/component confirmation copy now names the selected template/component.
 - Template Studio apply/reset actions now await the persisted controller operation before displaying success. Persistence failures are surfaced to the user instead of producing false-success snackbars; navigation destination reset follows the same pattern and prevents overlapping reset/save operations.
+- Template commits now derive each candidate from the latest committed configuration inside the serialized persistence queue, preventing two rapid independent component edits from overwriting one another. Added a concurrent-override regression test that checks both live and persisted state.
 
 ### Correctness and security fixes
 - Message editing detects MLS-backed messages, encrypts the edited payload using the active MLS conversation state, and calls `edit_mls_message_v1` with the sender device, group, epoch and ciphertext.
@@ -43,7 +44,7 @@
 
 ### Tests added
 - Added template-controller tests for import normalization, live theme-token application, navigation-mode mapping, scoped component overrides, destination ordering persistence/reset, and invalid/duplicate destination rejection. Added vector-glyph widget coverage and UI contract tests for responsive overflow routing, template search and non-placeholder component previews.
-- Added a UI contract regression test requiring template apply/reset actions to await persistence and handle failures.
+- Added a UI contract regression test requiring template apply/reset actions to await persistence and handle failures. Added a controller regression test for concurrent component edits retaining both overrides in persisted state.
 
 ## Still outstanding — do not mark complete yet
 
