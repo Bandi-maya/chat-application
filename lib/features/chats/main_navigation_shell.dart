@@ -286,6 +286,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               _currentIndex = effectiveIndex;
               _currentDestinationId = allDestinations[effectiveIndex].id;
             });
+            if (_pageController.hasClients &&
+                _pageController.page?.round() != effectiveIndex) {
+              _pageController.jumpToPage(effectiveIndex);
+            }
           });
         }
 
