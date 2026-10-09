@@ -35,6 +35,21 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
+      - name: Provision OpenMLS native asset tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tool
+          cat > tool/openmls_ci_probe.dart <<'DART'
+          import 'package:openmls/openmls.dart';
+          Future<void> main() async {
+            await Openmls.init();
+            Openmls.cleanup();
+          }
+          DART
+          dart run tool/openmls_ci_probe.dart
+          rm -f tool/openmls_ci_probe.dart
+
       - name: Build debug APK
         run: >-
           flutter build apk --debug --no-pub
@@ -87,6 +102,21 @@ jobs:
 
       - name: Resolve dependencies
         run: flutter pub get
+
+      - name: Provision OpenMLS native asset tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tool
+          cat > tool/openmls_ci_probe.dart <<'DART'
+          import 'package:openmls/openmls.dart';
+          Future<void> main() async {
+            await Openmls.init();
+            Openmls.cleanup();
+          }
+          DART
+          dart run tool/openmls_ci_probe.dart
+          rm -f tool/openmls_ci_probe.dart
 
       - name: Build iOS simulator app without signing
         run: >-
