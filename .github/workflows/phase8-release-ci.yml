@@ -54,8 +54,8 @@ jobs:
       - name: Build release-mode verification APK
         run: >-
           flutter build apk --release --no-pub
-          --dart-define=SUPABASE_URL=${SUPABASE_URL}
-          --dart-define=SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}
+          --dart-define="SUPABASE_URL=${SUPABASE_URL}"
+          --dart-define="SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}"
       - name: Verify release-mode APK
         shell: bash
         run: |
@@ -137,11 +137,11 @@ jobs:
       - name: Build signed production APK
         run: >-
           flutter build apk --release --no-pub
-          --dart-define=SUPABASE_URL=${SUPABASE_URL}
-          --dart-define=SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}
-          --dart-define=CHATY_TURN_URL=${CHATY_TURN_URL}
-          --dart-define=CHATY_TURN_USERNAME=${CHATY_TURN_USERNAME}
-          --dart-define=CHATY_TURN_CREDENTIAL=${CHATY_TURN_CREDENTIAL}
+          --dart-define="SUPABASE_URL=${SUPABASE_URL}"
+          --dart-define="SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}"
+          --dart-define="CHATY_TURN_URL=${CHATY_TURN_URL}"
+          --dart-define="CHATY_TURN_USERNAME=${CHATY_TURN_USERNAME}"
+          --dart-define="CHATY_TURN_CREDENTIAL=${CHATY_TURN_CREDENTIAL}"
       - name: Verify production APK signature and hash
         shell: bash
         run: |
