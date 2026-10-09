@@ -12,8 +12,22 @@ import 'component_override_screen.dart';
 import 'template_preview_widget.dart';
 
 /// Top-level Settings screen for managing structural UI Templates & component-level overrides.
-class TemplatesSettingsScreen extends StatelessWidget {
+class TemplatesSettingsScreen extends StatefulWidget {
   const TemplatesSettingsScreen({super.key});
+
+  @override
+  State<TemplatesSettingsScreen> createState() => _TemplatesSettingsScreenState();
+}
+
+class _TemplatesSettingsScreenState extends State<TemplatesSettingsScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,6 +41,18 @@ class TemplatesSettingsScreen extends StatelessWidget {
         final config = templateController.config;
         final baseTmpl = ChatyTemplateRegistry.get(config.baseTemplate);
         final overridesCount = config.componentOverrides.length;
+        final query = _query;
+        final matchingTemplates = ChatyTemplateRegistry.list.where((template) {
+          if (query.isEmpty) return true;
+          return template.name.toLowerCase().contains(query) ||
+              template.subtitle.toLowerCase().contains(query) ||
+              template.description.toLowerCase().contains(query);
+        }).toList(growable: false);
+        final matchingComponents = TemplateComponentType.values.where((component) {
+          if (query.isEmpty) return true;
+          return component.title.toLowerCase().contains(query) ||
+              component.description.toLowerCase().contains(query);
+        }).toList(growable: false);
 
         return Scaffold(
           backgroundColor: colors.background,
@@ -133,6 +159,44 @@ class TemplatesSettingsScreen extends StatelessWidget {
                   ),
                 ),
 
+                const SizedBox(height: 16),
+
+                TextField(
+                  controller: _searchController,
+                  onChanged: (value) {
+                    setState(() => _query = value.trim().toLowerCase());
+                  },
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                    hintText: 'Search templates and components',
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    suffixIcon: _query.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Clear search',
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _query = '');
+                            },
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                    filled: true,
+                    fillColor: colors.surfaceSecondary,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: colors.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: colors.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: colors.primary, width: 1.4),
+                    ),
+                  ),
+                ),
+
                 const SizedBox(height: 24),
 
                 // 2. Explore All 6 Full Templates
@@ -152,7 +216,7 @@ class TemplatesSettingsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
 
-                ...ChatyTemplateRegistry.list.map((tmpl) {
+                ...matchingTemplates.map((tmpl) {
                   final isBase = config.baseTemplate == tmpl.id;
 
                   return Container(
@@ -257,7 +321,7 @@ class TemplatesSettingsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
-                ...TemplateComponentType.values.map((component) {
+                ...matchingComponents.map((component) {
                   final effectiveId = templateController.resolveTemplateFor(
                     component,
                   );
@@ -324,6 +388,35 @@ class TemplatesSettingsScreen extends StatelessWidget {
                     ),
                   );
                 }),
+                if (_query.isNotEmpty &&
+                    matchingTemplates.isEmpty &&
+                    matchingComponents.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 32),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.search_off_rounded,
+                          size: 34,
+                          color: colors.foregroundSecondary,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'No template or component found',
+                          style: TextStyle(
+                            color: colors.foreground,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Try a template name such as Visual Social or search for composer, chat list, profile or calls.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: colors.foregroundSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),
