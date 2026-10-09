@@ -11,8 +11,6 @@ import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/appearance_variant_controller.dart';
 import '../../../ui/core/templates/template_controller.dart';
 import '../../../ui/core/templates/template_models.dart';
-import '../../../ui/core/theme/theme_config.dart';
-import '../../../ui/core/theme/theme_controller.dart';
 
 import '../../../data/repositories/chaty_data_store.dart';
 import '../../../data/services/notification_service.dart';
@@ -1164,7 +1162,7 @@ class GbSettingsScreen extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  icon: const Icon(Icons.home_customize_rounded),
+                  icon: const Icon(Icons.dashboard_customize_rounded),
                   label: const Text('Customize in-app home'),
                   onPressed: () {
                     Navigator.of(ctx).pop();
