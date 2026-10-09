@@ -1399,16 +1399,38 @@ class ChatyBackendService extends ChangeNotifier {
       throw ArgumentError.value(newText, 'newText', 'Message cannot be empty.');
     }
 
-    final list = _messagesByChatId[conversationId];
+    var list = _messagesByChatId[conversationId];
     if (list == null) {
       throw StateError('Conversation messages are not loaded.');
     }
-    final index = list.indexWhere((message) => message.id == messageId);
+    var index = list.indexWhere((message) => message.id == messageId);
     if (index < 0) {
       throw StateError('Message is no longer available to edit.');
     }
 
+    // Old encrypted snapshots predate metadata persistence. Rehydrate the
+    // authoritative server row before choosing a transport so an offline
+    // cache can never make an MLS message look like a legacy plaintext row.
+    if (list[index].metadata.isEmpty) {
+      await _loadMessages(conversationId);
+      list = _messagesByChatId[conversationId];
+      if (list == null) {
+        throw StateError('Conversation messages could not be refreshed.');
+      }
+      index = list.indexWhere((message) => message.id == messageId);
+      if (index < 0) {
+        throw StateError('Message is no longer available to edit.');
+      }
+    }
+
     final original = list[index];
+    if (original.isDeletedForEveryone ||
+        original.metadata['decryption_failed'] == true) {
+      throw StateError('This message cannot be edited.');
+    }
+    if (original.type != MessageType.text) {
+      throw ArgumentError('Only text messages can be edited.');
+    }
     list[index] = original.copyWith(text: text, editedAt: DateTime.now());
     notifyListeners();
 
