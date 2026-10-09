@@ -50,6 +50,7 @@ class ComponentOverrideScreen extends StatelessWidget {
                           locator<AppearanceVariantController>(),
                       preferencesController:
                           locator<ChatyPreferencesController>(),
+                      themeController: locator<ThemeController>(),
                     );
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Reset ${component.title} to the base template.')),
