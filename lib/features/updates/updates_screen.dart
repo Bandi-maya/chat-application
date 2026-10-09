@@ -6,7 +6,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/status_service.dart';
 import '../camera/camera_capture_screen.dart';
+import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
+import '../../ui/core/templates/template_controller.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/design_system/design_system.dart';
 import 'status_view_session.dart';
@@ -735,6 +737,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                         Builder(
                           builder: (context) {
                             final status = statuses[i];
+                            final updatesTemplate = locator<TemplateController>().updates;
                             final user = widget.dataStore.getUser(
                               status.userId,
                             );
@@ -746,10 +749,25 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                               leading: Container(
                                 padding: const EdgeInsets.all(2),
                                 decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
+                                  shape: updatesTemplate.layoutMode ==
+                                          UpdatesLayoutMode.circularRail
+                                      ? BoxShape.circle
+                                      : BoxShape.rectangle,
+                                  borderRadius: updatesTemplate.layoutMode ==
+                                          UpdatesLayoutMode.circularRail
+                                      ? null
+                                      : BorderRadius.circular(
+                                          updatesTemplate.layoutMode ==
+                                                  UpdatesLayoutMode.minimalList
+                                              ? 10
+                                              : 16,
+                                        ),
                                   border: Border.all(
                                     color: colors.primary,
-                                    width: 2.0,
+                                    width: updatesTemplate.layoutMode ==
+                                            UpdatesLayoutMode.minimalList
+                                        ? 1
+                                        : 2,
                                   ),
                                 ),
                                 child: AppAvatar(
@@ -765,7 +783,12 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                                             .currentUser
                                             .avatarColorHex
                                       : user?.avatarColorHex ?? '0xFF6366F1',
-                                  size: 40,
+                                  size: switch (updatesTemplate.layoutMode) {
+                                    UpdatesLayoutMode.minimalList => 34,
+                                    UpdatesLayoutMode.squircleCards => 46,
+                                    UpdatesLayoutMode.gridTiles => 44,
+                                    UpdatesLayoutMode.circularRail => 40,
+                                  },
                                 ),
                               ),
                               title: Text(
