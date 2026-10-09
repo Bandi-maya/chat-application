@@ -655,54 +655,68 @@ class ChatyNetworkAvatar extends StatelessWidget {
   final String? url;
   final double size;
 
+  /// 'circle' | 'squircle' | 'roundedSquare'
+  final String shape;
+
   const ChatyNetworkAvatar({
     super.key,
     required this.initials,
     this.colorHex,
     this.url,
     required this.size,
+    this.shape = 'circle',
   });
+
+  BorderRadius get _radius => switch (shape) {
+    'squircle' => BorderRadius.circular(size * 0.35),
+    'roundedSquare' => BorderRadius.circular(size * 0.22),
+    _ => BorderRadius.circular(size / 2),
+  };
 
   @override
   Widget build(BuildContext context) {
     final hasPhoto = url != null && url!.isNotEmpty;
+    final parsed = _parseColor(colorHex, fallback: const Color(0xFF6366F1));
     if (!hasPhoto) {
       return ChatyAvatarCore(
         initials: initials,
-        color: _parseColor(colorHex, fallback: const Color(0xFF6366F1)),
+        color: parsed,
         size: size,
+        shape: shape,
       );
     }
-    final parsed = _parseColor(colorHex, fallback: const Color(0xFF6366F1));
+
     final cleanUrl = url!;
     final isLocalFile =
         !cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://');
-
-    return ClipOval(
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: isLocalFile
-            ? Image.file(
-                File(cleanUrl.replaceFirst('file://', '')),
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => ChatyAvatarCore(
-                  initials: initials,
-                  color: parsed,
-                  size: size,
-                ),
-              )
-            : Image.network(
-                cleanUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => ChatyAvatarCore(
-                  initials: initials,
-                  color: parsed,
-                  size: size,
-                ),
+    final image = SizedBox(
+      width: size,
+      height: size,
+      child: isLocalFile
+          ? Image.file(
+              File(cleanUrl.replaceFirst('file://', '')),
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => ChatyAvatarCore(
+                initials: initials,
+                color: parsed,
+                size: size,
+                shape: shape,
               ),
-      ),
+            )
+          : Image.network(
+              cleanUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => ChatyAvatarCore(
+                initials: initials,
+                color: parsed,
+                size: size,
+                shape: shape,
+              ),
+            ),
     );
+
+    if (shape == 'circle') return ClipOval(child: image);
+    return ClipRRect(borderRadius: _radius, child: image);
   }
 
   static Color _parseColor(String? hex, {required Color fallback}) {
