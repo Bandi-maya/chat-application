@@ -17,6 +17,7 @@ class VoiceNoteService {
   DateTime? _startedAt;
   String? _path;
   bool _recording = false;
+  bool _busy = false;
 
   bool get isRecording => _recording;
   Duration get elapsed => _startedAt == null
@@ -38,44 +39,53 @@ class VoiceNoteService {
   }
 
   Future<void> start() async {
-    if (_recording) return;
-    if (!await _recorder.hasPermission())
-      throw Exception('Microphone permission is required.');
-    final directory = await getTemporaryDirectory();
-    final path =
-        '${directory.path}/chaty_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
-    await _recorder.start(
-      const RecordConfig(
-        encoder: AudioEncoder.aacLc,
-        bitRate: 96000,
-        sampleRate: 44100,
-        numChannels: 1,
-        autoGain: true,
-        echoCancel: true,
-        noiseSuppress: true,
-      ),
-      path: path,
-    );
-    _path = path;
-    _startedAt = DateTime.now();
-    _recording = true;
+    if (_recording || _busy) return;
+    _busy = true;
+    String? stagingPath;
+    try {
+      if (!await _recorder.hasPermission()) {
+        throw Exception('Microphone permission is required.');
+      }
+      final directory = await getTemporaryDirectory();
+      stagingPath =
+          '${directory.path}/chaty_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      await _recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          bitRate: 96000,
+          sampleRate: 44100,
+          numChannels: 1,
+          autoGain: true,
+          echoCancel: true,
+          noiseSuppress: true,
+        ),
+        path: stagingPath,
+      );
+      _path = stagingPath;
+      _startedAt = DateTime.now();
+      _recording = true;
+    } catch (_) {
+      if (stagingPath != null) await _deleteQuietly(stagingPath);
+      rethrow;
+    } finally {
+      _busy = false;
+    }
   }
 
   Future<bool> stopAndSend() async {
-    if (!_recording) return false;
+    if (!_recording || _busy) return false;
+    _busy = true;
     final started = _startedAt;
-    final recordedPath = await _recorder.stop() ?? _path;
-    _recording = false;
-    _startedAt = null;
-    _path = null;
-    if (recordedPath == null || recordedPath.isEmpty || started == null)
-      return false;
-    final seconds = DateTime.now().difference(started).inSeconds;
-    if (seconds < 1) {
-      await _deleteQuietly(recordedPath);
-      return false;
-    }
+    final stagedPath = _path;
+    String? recordedPath;
     try {
+      recordedPath = await _recorder.stop() ?? stagedPath;
+      if (recordedPath == null || recordedPath.isEmpty || started == null) {
+        return false;
+      }
+      final seconds = DateTime.now().difference(started).inSeconds;
+      if (seconds < 1) return false;
+
       final attachment = await _media.uploadFile(
         conversationId: conversationId,
         type: 'audio',
@@ -91,16 +101,29 @@ class VoiceNoteService {
       );
       return true;
     } finally {
-      await _deleteQuietly(recordedPath);
+      _recording = false;
+      _startedAt = null;
+      _path = null;
+      final cleanupPath = recordedPath ?? stagedPath;
+      if (cleanupPath != null) await _deleteQuietly(cleanupPath);
+      _busy = false;
     }
   }
 
   Future<void> cancel() async {
-    final path = _recording ? await _recorder.stop() : _path;
-    _recording = false;
-    _startedAt = null;
-    _path = null;
-    if (path != null) await _deleteQuietly(path);
+    if (_busy) return;
+    if (!_recording && _path == null) return;
+    _busy = true;
+    var path = _path;
+    try {
+      if (_recording) path = await _recorder.stop() ?? path;
+    } finally {
+      _recording = false;
+      _startedAt = null;
+      _path = null;
+      if (path != null) await _deleteQuietly(path);
+      _busy = false;
+    }
   }
 
   Future<void> dispose() async {
