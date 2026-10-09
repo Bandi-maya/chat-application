@@ -124,4 +124,21 @@ void main() {
     expect(source, contains('case TemplateComponentType.navigation:'));
     expect(source, contains('case TemplateComponentType.calls:'));
   });
+  test('starred messages open the exact message and reveal its timeline item', () {
+    final starred = File(
+      'lib/features/messages/starred_messages_screen.dart',
+    ).readAsStringSync();
+    final chat = File(
+      'lib/features/chats/chat_detail_screen.dart',
+    ).readAsStringSync();
+
+    expect(starred, contains('initialMessageId: messageId'));
+    expect(starred, contains('_openConversation(conversation, messageId: message.id)'));
+    expect(chat, contains('final String? initialMessageId;'));
+    expect(chat, contains('void _jumpToMessage(String messageId'));
+    expect(chat, contains('Scrollable.ensureVisible('));
+    expect(chat, contains('_messageItemKeys'));
+    expect(chat, contains('_highlightedSearchMessageId = messageId'));
+  });
+
 }
