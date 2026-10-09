@@ -13,6 +13,7 @@ permissions:
 env:
   SUPABASE_URL: https://dntnxeanubswyswahdnj.supabase.co
   SUPABASE_PUBLISHABLE_KEY: sb_publishable_gFpVYJctaDkRRgttvnUl-A_TKu81hFF
+  HAS_SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN != '' }}
 
 jobs:
   verify-integration:
@@ -158,7 +159,7 @@ jobs:
         run: bash tools/check_no_production_mocks.sh
 
       - name: Harden and verify hosted Auth when management credential is available
-        if: ${{ secrets.SUPABASE_ACCESS_TOKEN != '' }}
+        if: env.HAS_SUPABASE_ACCESS_TOKEN == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: dntnxeanubswyswahdnj
