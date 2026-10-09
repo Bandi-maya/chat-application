@@ -5,6 +5,7 @@ import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/appearance_variant_controller.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/design_system.dart';
+import '../../../ui/core/design_system/components/chaty_glyph.dart';
 import '../../../ui/core/templates/template_controller.dart';
 import '../../../ui/core/templates/template_models.dart';
 import '../../../ui/core/templates/template_registry.dart';
@@ -20,6 +21,17 @@ class TemplatesSettingsScreen extends StatefulWidget {
 }
 
 class _TemplatesSettingsScreenState extends State<TemplatesSettingsScreen> {
+  ChatyGlyph _glyphForComponent(TemplateComponentType component) =>
+      switch (component) {
+        TemplateComponentType.navigation => ChatyGlyph.navigation,
+        TemplateComponentType.home => ChatyGlyph.homeLayout,
+        TemplateComponentType.chatList => ChatyGlyph.list,
+        TemplateComponentType.conversation => ChatyGlyph.chatBubble,
+        TemplateComponentType.composer => ChatyGlyph.tune,
+        TemplateComponentType.updates => ChatyGlyph.updates,
+        TemplateComponentType.profile => ChatyGlyph.person,
+        TemplateComponentType.calls => ChatyGlyph.calls,
+      };
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
 
@@ -69,19 +81,19 @@ class _TemplatesSettingsScreenState extends State<TemplatesSettingsScreen> {
             actions: [
               IconButton(
                 tooltip: 'Export template profile',
-                icon: const Icon(Icons.file_download_outlined),
+                icon: ChatyGlyphIcon(glyph: ChatyGlyph.exportProfile, color: colors.foreground, size: 20),
                 onPressed: () => _exportConfiguration(context, templateController),
               ),
               IconButton(
                 tooltip: 'Import template profile',
-                icon: const Icon(Icons.file_upload_outlined),
+                icon: ChatyGlyphIcon(glyph: ChatyGlyph.importProfile, color: colors.foreground, size: 20),
                 onPressed: () => _importConfiguration(context, templateController),
               ),
               if (overridesCount > 0 ||
                   config.baseTemplate != ChatyTemplateId.messageFirst)
                 IconButton(
                   tooltip: 'Reset All Templates',
-                  icon: const Icon(Icons.restart_alt_rounded),
+                  icon: ChatyGlyphIcon(glyph: ChatyGlyph.reset, color: colors.foreground, size: 20),
                   onPressed: () => _confirmReset(context, templateController),
                 ),
             ],
@@ -172,7 +184,7 @@ class _TemplatesSettingsScreenState extends State<TemplatesSettingsScreen> {
                   textInputAction: TextInputAction.search,
                   decoration: InputDecoration(
                     hintText: 'Search templates and components',
-                    prefixIcon: const Icon(Icons.search_rounded),
+                    prefixIcon: ChatyGlyphIcon(glyph: ChatyGlyph.search, color: colors.foregroundSecondary, size: 20),
                     suffixIcon: _query.isEmpty
                         ? null
                         : IconButton(
@@ -181,7 +193,7 @@ class _TemplatesSettingsScreenState extends State<TemplatesSettingsScreen> {
                               _searchController.clear();
                               setState(() => _query = '');
                             },
-                            icon: const Icon(Icons.close_rounded),
+                            icon: ChatyGlyphIcon(glyph: ChatyGlyph.close, color: colors.foregroundSecondary, size: 18),
                           ),
                     filled: true,
                     fillColor: colors.surfaceSecondary,
@@ -350,8 +362,8 @@ class _TemplatesSettingsScreenState extends State<TemplatesSettingsScreen> {
                           color: colors.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Icon(
-                          component.icon,
+                        child: ChatyGlyphIcon(
+                          glyph: _glyphForComponent(component),
                           color: colors.primary,
                           size: 20,
                         ),
