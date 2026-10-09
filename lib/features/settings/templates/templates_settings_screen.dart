@@ -87,7 +87,7 @@ class TemplatesSettingsScreen extends StatelessWidget {
                           const Spacer(),
                           if (overridesCount > 0)
                             Text(
-                              ' override active',
+                              '${overridesCount} override${overridesCount == 1 ? '' : 's'} active',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
@@ -328,9 +328,9 @@ class TemplatesSettingsScreen extends StatelessWidget {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Apply  Layout?'),
+        title: Text('Apply ${template.name} Layout?'),
         content: Text(
-          'This will apply the  structural layout across all components.\n\nYour account data, chats, privacy, security, and colors are not affected.',
+          'This will apply the ${template.name} structural layout across all components.\n\nYour account data, chats, privacy, app-lock settings, and theme colors are not affected.',
         ),
         actions: [
           TextButton(
@@ -347,7 +347,7 @@ class TemplatesSettingsScreen extends StatelessWidget {
               );
               ScaffoldMessenger.of(
                 context,
-              ).showSnackBar(SnackBar(content: Text('Applied full  template')));
+              ).showSnackBar(SnackBar(content: Text('Applied full ${template.name} template')));
             },
             child: const Text('Apply'),
           ),
