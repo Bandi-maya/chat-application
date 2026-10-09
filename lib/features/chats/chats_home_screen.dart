@@ -13,6 +13,7 @@ import '../../data/services/rich_chat_realtime_service.dart';
 import '../../domain/models/conversation.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
+import '../../ui/core/settings/home_style_catalog.dart';
 import '../../ui/core/design_system/settings_primitives.dart';
 import '../../ui/core/design_system/components/chaty_kit.dart';
 import '../../ui/core/design_system/components/app_components.dart';
@@ -374,10 +375,15 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         // Home Style consumers: each variant maps to REAL structural
         // differences below (filters, sections, stories strip geometry,
         // tile density, unread grouping, split view).
-        final homeStyle = homePrefs.homeStyle;
+        final storedHomeStyle = homePrefs.homeStyle;
+        final homeStyle = ChatyHomeStyleCatalog.structuralStyle(storedHomeStyle);
+        final isOneUiStyle = homeStyle == ChatyHomeStyleCatalog.oneUi;
+        final isTelegramStyle = homeStyle == ChatyHomeStyleCatalog.telegram;
+        final isIosStyle = homeStyle == ChatyHomeStyleCatalog.ios;
         final styleShowFilters =
             homeStyle != 'Classic' && homeStyle != 'Minimal';
-        final styleShowSections = homeStyle != 'Minimal';
+        final styleShowSections =
+            homeStyle != 'Minimal' && !isTelegramStyle;
         final styleAlwaysLabelSections = homeStyle == 'Classic';
         final styleStoriesFirst = homeStyle == 'Stories First';
         final styleStoriesHidden =
@@ -386,16 +392,24 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
             ? 112.0
             : homeStyle == 'Expressive'
             ? 96.0
+            : isTelegramStyle
+            ? 88.0
             : 82.0;
         final styleStoriesAvatar = styleStoriesFirst
             ? 64.0
             : homeStyle == 'Expressive'
             ? 56.0
+            : isOneUiStyle || isIosStyle
+            ? 52.0
             : 48.0;
         final styleTileDensity = homeStyle == 'Compact'
             ? 0.88
-            : homeStyle == 'Expressive'
+            : homeStyle == 'Expressive' || isOneUiStyle
             ? 1.12
+            : isTelegramStyle
+            ? 0.94
+            : isIosStyle
+            ? 1.06
             : 1.0;
         final styleSplitView = homeStyle == 'Tablet Split View';
         // Stories Style consumers: each value renders the strip differently.
@@ -505,7 +519,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   const GlobalConnectionBanner(),
                   _isSelectionMode
                       ? _selectionAppBar(theme, conversations)
-                      : _standardAppBar(theme, homePrefs),
+                      : _homeStyleAppBar(theme, homePrefs, homeStyle),
                   // P4: iOS collapsing LARGE title. Shrinks away as the list
                   // scrolls; the compact bar title fades in to replace it.
                   if (!_isSelectionMode && widget.pageTitle != null)
@@ -1340,6 +1354,57 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     );
   }
 
+  Widget _homeStyleAppBar(
+    ThemeConfig theme,
+    HomePreferences homePrefs,
+    String homeStyle,
+  ) {
+    final header = _standardAppBar(theme, homePrefs);
+
+    switch (homeStyle) {
+      case ChatyHomeStyleCatalog.oneUi:
+        return Container(
+          margin: const EdgeInsets.fromLTRB(8, 6, 8, 0),
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            borderRadius: const BorderRadius.vertical(
+              bottom: Radius.circular(22),
+            ),
+            border: Border.all(
+              color: theme.surfaceColor.withValues(alpha: 0.45),
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: header,
+        );
+      case ChatyHomeStyleCatalog.telegram:
+        return Container(
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            border: const Border(
+              bottom: BorderSide(color: Color(0xFF229ED9), width: 2),
+            ),
+          ),
+          child: header,
+        );
+      case ChatyHomeStyleCatalog.ios:
+        return Container(
+          margin: const EdgeInsets.fromLTRB(10, 4, 10, 4),
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: theme.surfaceColor.withValues(alpha: 0.75),
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: header,
+        );
+      default:
+        return header;
+    }
+  }
+
   Widget _standardAppBar(ThemeConfig theme, HomePreferences homePrefs) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 4, 6),
@@ -1576,6 +1641,30 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     ThemeConfig theme, {
     double density = 1.0,
   }) {
+    final homeStyle = ChatyHomeStyleCatalog.structuralStyle(
+      widget.preferencesController.home.homeStyle,
+    );
+    final isTelegramStyle = homeStyle == ChatyHomeStyleCatalog.telegram;
+    final isIosStyle = homeStyle == ChatyHomeStyleCatalog.ios;
+    final isOneUiStyle = homeStyle == ChatyHomeStyleCatalog.oneUi;
+    final visualAccent = isTelegramStyle
+        ? const Color(0xFF229ED9)
+        : visualAccent;
+    final tileRadius = isTelegramStyle
+        ? 10.0
+        : isIosStyle
+        ? 20.0
+        : isOneUiStyle
+        ? 22.0
+        : 16.0;
+    final tileHeight = isTelegramStyle
+        ? 64.0
+        : isIosStyle
+        ? 76.0
+        : isOneUiStyle
+        ? 80.0
+        : 72.0;
+    final avatarSize = isIosStyle ? 52.0 : isTelegramStyle ? 48.0 : 50.0;
     final otherId = conversation.participantIds.firstWhere(
       (id) => id != widget.dataStore.currentUser.id,
       orElse: () => '',
@@ -1605,13 +1694,13 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       child: Material(
         color: selected
-            ? theme.accentColor.withValues(
+            ? visualAccent.withValues(
                 alpha: theme.brightness == Brightness.dark ? 0.16 : 0.10,
               )
             : conversation.isPinned
             ? theme.cardColor
             : Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(tileRadius),
         child: Builder(
           builder: (tileContext) {
             void handleLongPress() {
@@ -1620,11 +1709,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
             }
 
             return InkWell(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(tileRadius),
               onTap: () => _handleConversationTap(conversation),
               onLongPress: handleLongPress,
               child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: 72 * density),
+                constraints: BoxConstraints(minHeight: tileHeight * density),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -1642,11 +1731,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                     .toString()
                                     .toUpperCase(),
                             color: conversation.avatarColorHex == null
-                                ? theme.accentColor
+                                ? visualAccent
                                 : Color(
                                     int.parse(conversation.avatarColorHex!),
                                   ),
-                            size: 50 * density,
+                            size: avatarSize * density,
                             shape:
                                 widget.preferencesController.home.avatarShape,
                           ),
@@ -1654,7 +1743,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                             Positioned.fill(
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: theme.accentColor.withValues(
+                                  color: visualAccent.withValues(
                                     alpha: 0.86,
                                   ),
                                   shape: BoxShape.circle,
@@ -1711,7 +1800,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                             Icon(
                                               Icons.lock_rounded,
                                               size: 14,
-                                              color: theme.accentColor,
+                                              color: visualAccent,
                                             ),
                                             const SizedBox(width: 4),
                                           ],
@@ -1744,7 +1833,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                       ),
                                       highlight: conversation.unreadCount > 0,
                                       color: theme.secondaryTextColor,
-                                      highlightColor: theme.accentColor,
+                                      highlightColor: visualAccent,
                                     ),
                                   ],
                                 ),
@@ -1756,7 +1845,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                         style: theme.deliveryTickStyle,
                                         state: lastMine.deliveryState,
                                         unreadColor: theme.secondaryTextColor,
-                                        readColor: theme.accentColor,
+                                        readColor: visualAccent,
                                         size: 13,
                                       ),
                                       const SizedBox(width: 4),
@@ -1894,7 +1983,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                         color:
                                             widget.preferencesController
                                                 .gbColor('HomeCounterBK') ??
-                                            theme.accentColor,
+                                            visualAccent,
                                         textColor:
                                             widget.preferencesController
                                                 .gbColor('HomeCounterText') ??
