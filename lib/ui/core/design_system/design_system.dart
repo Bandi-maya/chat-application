@@ -1,6 +1,7 @@
 export 'tokens/app_tokens.dart';
 export 'components/app_components.dart';
 export 'components/chaty_kit.dart';
+export 'components/chaty_glyph.dart';
 export 'components/signature_components.dart';
 export 'components/call_activity_capsule.dart';
 export 'components/global_activity_host.dart';
