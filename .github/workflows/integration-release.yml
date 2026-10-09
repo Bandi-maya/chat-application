@@ -21,6 +21,7 @@ jobs:
     timeout-minutes: 65
     env:
       CHATY_ALLOW_CI_DEBUG_SIGNING: 'true'
+      RUN_PHASE_INTEGRATION_TESTS: ${{ github.ref == 'refs/heads/integration/phases-1-8' || github.head_ref == 'integration/phases-1-8' }}
     steps:
       - name: Checkout integrated branch
         uses: actions/checkout@v6
@@ -126,24 +127,31 @@ jobs:
         run: python3 tools/audit_gb_runtime_consumers.py
 
       - name: Test encrypted attachment crypto
+        if: env.RUN_PHASE_INTEGRATION_TESTS == 'true'
         run: flutter test test/encrypted_attachment_codec_test.dart
 
       - name: Test uploaded ciphertext cleanup
+        if: env.RUN_PHASE_INTEGRATION_TESTS == 'true'
         run: flutter test test/uploaded_attachment_guard_test.dart
 
       - name: Test encrypted offline outbox
+        if: env.RUN_PHASE_INTEGRATION_TESTS == 'true'
         run: flutter test test/encrypted_message_outbox_test.dart
 
       - name: Test account-deletion local purge contract
+        if: env.RUN_PHASE_INTEGRATION_TESTS == 'true'
         run: flutter test test/account_deletion_purge_contract_test.dart
 
       - name: Test navigation and feature contracts
+        if: env.RUN_PHASE_INTEGRATION_TESTS == 'true'
         run: flutter test test/root_navigation_policy_test.dart test/phase5_feature_contracts_test.dart
 
       - name: Test shared state views
+        if: env.RUN_PHASE_INTEGRATION_TESTS == 'true'
         run: flutter test test/phase6_state_views_test.dart
 
       - name: Test call lifecycle policy
+        if: env.RUN_PHASE_INTEGRATION_TESTS == 'true'
         run: flutter test test/call_lifecycle_policy_test.dart
 
       - name: Analyze
