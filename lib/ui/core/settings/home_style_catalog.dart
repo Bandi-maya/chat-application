@@ -9,6 +9,7 @@ class ChatyHomeStyleCatalog {
   static const String oneUi = 'ONE UI';
   static const String telegram = 'TELEGRAM STYLE';
   static const String ios = 'IOS STYLE';
+  static const String oldUi = 'WHATSAPP OLD UI';
 
   /// User-facing labels. Keep these human-readable; do not expose storage keys.
   static const List<String> options = <String>[
@@ -16,17 +17,14 @@ class ChatyHomeStyleCatalog {
     'One UI',
     'Telegram',
     'iOS',
-    'WhatsApp UI Stock',
-    'Bubbles Tab Style',
-    'Basic Tab Style',
-    'WhatsApp Old UI',
     'Classic',
     'Minimal',
-    'Stories First',
     'Compact',
+    'Stories First',
     'Expressive',
     'Tablet Split View',
     'Productivity',
+    'WhatsApp Old UI',
   ];
 
   /// Convert stored legacy names into the label shown in the picker.
@@ -41,13 +39,13 @@ class ChatyHomeStyleCatalog {
       case 'ios style':
         return 'iOS';
       case 'bubbles tab style':
-        return 'Bubbles Tab Style';
+        return 'Expressive';
       case 'basic tab style':
-        return 'Basic Tab Style';
+        return 'Minimal';
       case 'whatsapp old ui':
         return 'WhatsApp Old UI';
       case 'whatsapp ui stock':
-        return 'WhatsApp UI Stock';
+        return 'Classic';
       case 'chaty default':
       case '':
         return defaultStyle;
@@ -101,6 +99,7 @@ class ChatyHomeStyleCatalog {
       case 'basic tab style':
         return 'Minimal';
       case 'whatsapp old ui':
+        return oldUi;
       case '':
       case 'chaty default':
         return defaultStyle;
