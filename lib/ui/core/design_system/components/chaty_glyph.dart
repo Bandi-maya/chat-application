@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
-/// Original lightweight vector glyphs used for Chaty's high-frequency controls.
-/// Drawn from paths/primitives in the app code; no external icon package or
-/// font glyph dependency is required. The parent control owns semantics/tooltips.
+/// Chaty's original glyph inventory. Each definition below is SVG markup owned
+/// by this project and rendered by the tiny path/shape renderer in this file.
+/// This avoids icon fonts, external icon packages, network assets, and startup
+/// asset loading. Controls that use these glyphs should still supply their own
+/// tooltip/semantic label.
 enum ChatyGlyph {
   camera,
   qrScan,
@@ -29,6 +31,147 @@ enum ChatyGlyph {
   tasks,
 }
 
+const Map<ChatyGlyph, String> _chatyGlyphSvg = <ChatyGlyph, String>{
+  ChatyGlyph.camera: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <rect x="3.5" y="7.5" width="17" height="12" rx="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/>
+  <path d="M 8 7.5 L 9.7 4.8 L 14.5 4.8 L 16.2 7.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+  <circle cx="12" cy="13.5" r="3.1" fill="none" stroke="currentColor" stroke-width="1.8"/>
+  <circle cx="17.6" cy="10" r=".8" fill="currentColor" stroke="none"/>
+</svg>''',
+  ChatyGlyph.qrScan: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <path d="M 9 4 L 4 4 L 4 9 M 15 4 L 20 4 L 20 9 M 20 15 L 20 20 L 15 20 M 9 20 L 4 20 L 4 15" fill="none" stroke="currentColor" stroke-width="1.8"/>
+  <rect x="7" y="7" width="4" height="4" fill="none" stroke="currentColor" stroke-width="1.6"/>
+  <rect x="13" y="7" width="4" height="4" fill="none" stroke="currentColor" stroke-width="1.6"/>
+  <rect x="7" y="13" width="4" height="4" fill="none" stroke="currentColor" stroke-width="1.6"/>
+  <path d="M 13 13 L 15 13 L 15 15 L 13 15 Z M 17 16 L 18.8 16 L 18.8 18.8 L 16 18.8 L 16 17" fill="currentColor" stroke="none"/>
+</svg>''',
+  ChatyGlyph.devices: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <rect x="7" y="2.7" width="10.2" height="18.6" rx="2.1" fill="none" stroke="currentColor" stroke-width="1.8"/>
+  <path d="M 9.5 5.5 L 14.7 5.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+  <circle cx="12.1" cy="18.5" r=".75" fill="currentColor" stroke="none"/>
+  <rect x="2.4" y="8" width="3.8" height="8.5" rx="1" fill="none" stroke="currentColor" stroke-width="1.6"/>
+  <path d="M 3.5 10 L 5.1 10" fill="none" stroke="currentColor" stroke-width="1.4"/>
+</svg>''',
+  ChatyGlyph.palette: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <path d="M 12 3.2 C 6.9 3.2 3.1 6.8 3.1 11.4 C 3.1 16.3 7.1 20.8 12.1 20.8 C 13.8 20.8 14.9 19.9 14.9 18.5 C 14.9 17.5 14.3 16.9 14.3 16 C 14.3 14.8 15.2 14 16.5 14 L 18.4 14 C 20.1 14 20.9 12.6 20.9 10.8 C 20.9 6.3 16.8 3.2 12 3.2 Z" fill="none" stroke="currentColor" stroke-width="1.7"/>
+  <circle cx="7.5" cy="10" r="1.05" fill="currentColor" stroke="none"/>
+  <circle cx="11.5" cy="7.4" r="1.05" fill="currentColor" stroke="none"/>
+  <circle cx="16" cy="8.3" r="1.05" fill="currentColor" stroke="none"/>
+  <circle cx="8.8" cy="14.2" r="1.05" fill="currentColor" stroke="none"/>
+</svg>''',
+  ChatyGlyph.templates: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <rect x="3.2" y="3.2" width="17.6" height="17.6" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+  <path d="M 3.8 9 L 20.2 9 M 9 9.5 L 9 20.2 M 14.8 9.5 L 14.8 20.2 M 5.5 6.1 L 7 6.1 M 10.8 6.1 L 12.3 6.1" fill="none" stroke="currentColor" stroke-width="1.6"/>
+</svg>''',
+  ChatyGlyph.homeLayout: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <rect x="3.1" y="3.5" width="17.8" height="17" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+  <path d="M 8.6 3.8 L 8.6 20.2 M 9.2 9 L 20.4 9 M 9.2 14 L 20.4 14" fill="none" stroke="currentColor" stroke-width="1.6"/>
+  <circle cx="5.9" cy="7" r=".75" fill="currentColor" stroke="none"/>
+</svg>''',
+  ChatyGlyph.navigation: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <circle cx="5" cy="6" r="1.1" fill="currentColor" stroke="none"/>
+  <circle cx="5" cy="12" r="1.1" fill="currentColor" stroke="none"/>
+  <circle cx="5" cy="18" r="1.1" fill="currentColor" stroke="none"/>
+  <path d="M 9 6 L 20 6 M 9 12 L 20 12 M 9 18 L 20 18" fill="none" stroke="currentColor" stroke-width="1.8"/>
+</svg>''',
+  ChatyGlyph.settings: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <path d="M 4 7 L 20 7 M 4 12 L 20 12 M 4 17 L 20 17" fill="none" stroke="currentColor" stroke-width="1.7"/>
+  <circle cx="9" cy="7" r="2" fill="currentColor" stroke="none"/>
+  <circle cx="15" cy="12" r="2" fill="currentColor" stroke="none"/>
+  <circle cx="8" cy="17" r="2" fill="currentColor" stroke="none"/>
+  <circle cx="9" cy="7" r=".7" fill="#000000" fill-opacity=".2" stroke="none"/>
+  <circle cx="15" cy="12" r=".7" fill="#000000" fill-opacity=".2" stroke="none"/>
+  <circle cx="8" cy="17" r=".7" fill="#000000" fill-opacity=".2" stroke="none"/>
+</svg>''',
+  ChatyGlyph.chevronRight: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <path d="M 9 4 L 17 12 L 9 20" fill="none" stroke="currentColor" stroke-width="1.9"/>
+</svg>''',
+  ChatyGlyph.more: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <circle cx="5.2" cy="12" r="1.45" fill="currentColor" stroke="none"/>
+  <circle cx="12" cy="12" r="1.45" fill="currentColor" stroke="none"/>
+  <circle cx="18.8" cy="12" r="1.45" fill="currentColor" stroke="none"/>
+</svg>''',
+  ChatyGlyph.tune: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <path d="M 3 6 L 21 6 M 3 12 L 21 12 M 3 18 L 21 18" fill="none" stroke="currentColor" stroke-width="1.7"/>
+  <circle cx="8" cy="6" r="1.8" fill="currentColor" stroke="none"/>
+  <circle cx="15" cy="12" r="1.8" fill="currentColor" stroke="none"/>
+  <circle cx="10.5" cy="18" r="1.8" fill="currentColor" stroke="none"/>
+</svg>''',
+  ChatyGlyph.search: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <circle cx="10.5" cy="10.5" r="6.2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+  <path d="M 15 15 L 20.5 20.5" fill="none" stroke="currentColor" stroke-width="1.9"/>
+</svg>''',
+  ChatyGlyph.close: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <path d="M 6 6 L 18 18 M 18 6 L 6 18" fill="none" stroke="currentColor" stroke-width="1.9"/>
+</svg>''',
+  ChatyGlyph.exportProfile: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <rect x="4" y="10" width="16" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+  <path d="M 12 16 L 12 3 M 7.5 7.5 L 12 3 L 16.5 7.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+</svg>''',
+  ChatyGlyph.importProfile: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <rect x="4" y="10" width="16" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+  <path d="M 12 3 L 12 16 M 7.5 11.5 L 12 16 L 16.5 11.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+</svg>''',
+  ChatyGlyph.reset: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <path d="M 19 8 C 16.2 3.5 9.9 2.7 6 6.5 C 2.2 10.2 3.2 16.7 7.5 19.2 C 11.1 21.4 16.1 20 18.2 17" fill="none" stroke="currentColor" stroke-width="1.8"/>
+  <path d="M 18.5 4 L 19 8 L 15 8" fill="none" stroke="currentColor" stroke-width="1.8"/>
+</svg>''',
+  ChatyGlyph.chatBubble: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <rect x="3" y="3.5" width="18" height="13.5" rx="4" fill="none" stroke="currentColor" stroke-width="1.8"/>
+  <path d="M 7 17 L 6 21 L 12 17 M 7 8 L 17 8 M 7 12 L 14 12" fill="none" stroke="currentColor" stroke-width="1.6"/>
+</svg>''',
+  ChatyGlyph.person: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <circle cx="12" cy="7.5" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+  <path d="M 4 20 C 4.7 15.8 8 13.8 12 13.8 C 16 13.8 19.3 15.8 20 20" fill="none" stroke="currentColor" stroke-width="1.8"/>
+</svg>''',
+  ChatyGlyph.list: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <circle cx="4.5" cy="6" r="1.1" fill="currentColor" stroke="none"/>
+  <circle cx="4.5" cy="12" r="1.1" fill="currentColor" stroke="none"/>
+  <circle cx="4.5" cy="18" r="1.1" fill="currentColor" stroke="none"/>
+  <path d="M 8 6 L 20 6 M 8 12 L 20 12 M 8 18 L 20 18" fill="none" stroke="currentColor" stroke-width="1.8"/>
+</svg>''',
+  ChatyGlyph.updates: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <circle cx="12" cy="12" r="8.3" fill="none" stroke="currentColor" stroke-width="1.8"/>
+  <circle cx="12" cy="12" r="5.8" fill="none" stroke="currentColor" stroke-width="1.5"/>
+  <circle cx="18" cy="6" r="2" fill="currentColor" stroke="none"/>
+</svg>''',
+  ChatyGlyph.calls: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <path d="M 7 3.5 L 4.8 5.7 C 4.2 6.4 5.2 10.8 9.2 14.8 C 13.2 18.8 17.6 19.8 18.3 19.2 L 20.5 17 L 16.2 13.8 L 13.9 15.5 C 11.8 14.6 9.4 12.2 8.5 10.1 L 10.2 7.8 Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
+</svg>''',
+  ChatyGlyph.groups: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <circle cx="9" cy="8" r="3.1" fill="none" stroke="currentColor" stroke-width="1.7"/>
+  <circle cx="17" cy="9" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/>
+  <path d="M 3.5 20 C 4.2 15.8 6.4 13.7 9.2 13.7 C 12.2 13.7 14.1 15.8 14.8 20 M 14 15 C 16.9 14.2 19.6 16 20.4 19" fill="none" stroke="currentColor" stroke-width="1.7"/>
+</svg>''',
+  ChatyGlyph.tasks: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <rect x="4" y="3" width="16" height="18" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+  <path d="M 6 7 L 7 8 L 8.7 6 M 11 7 L 17.5 7 M 6 12 L 7 13 L 8.7 11 M 11 12 L 17.5 12 M 6 17 L 7 18 L 8.7 16 M 11 17 L 17.5 17" fill="none" stroke="currentColor" stroke-width="1.6"/>
+</svg>''',
+};
+
 class ChatyGlyphIcon extends StatelessWidget {
   const ChatyGlyphIcon({
     super.key,
@@ -49,328 +192,217 @@ class ChatyGlyphIcon extends StatelessWidget {
     return SizedBox.square(
       dimension: size,
       child: CustomPaint(
-        painter: _ChatyGlyphPainter(
+        painter: _ChatySvgGlyphPainter(
           glyph: glyph,
           color: resolvedColor,
-          strokeWidth: strokeWidth,
+          defaultStrokeWidth: strokeWidth,
         ),
       ),
     );
   }
 }
 
-class _ChatyGlyphPainter extends CustomPainter {
-  const _ChatyGlyphPainter({
+class _SvgVectorElement {
+  const _SvgVectorElement({
+    required this.path,
+    required this.fill,
+    required this.stroke,
+    required this.strokeWidth,
+  });
+
+  final Path path;
+  final bool fill;
+  final bool stroke;
+  final double strokeWidth;
+}
+
+class _ChatySvgGlyphPainter extends CustomPainter {
+  const _ChatySvgGlyphPainter({
     required this.glyph,
     required this.color,
-    required this.strokeWidth,
+    required this.defaultStrokeWidth,
   });
 
   final ChatyGlyph glyph;
   final Color color;
-  final double strokeWidth;
+  final double defaultStrokeWidth;
+
+  static final Map<ChatyGlyph, List<_SvgVectorElement>> _cache =
+      <ChatyGlyph, List<_SvgVectorElement>>{};
+
+  static final RegExp _shapeRegex = RegExp(
+    r'<(path|circle|rect)\b([^>]*)/?>',
+    caseSensitive: false,
+  );
+  static final RegExp _attributeRegex = RegExp(
+    r'([a-zA-Z-]+)="([^"]*)"',
+  );
+  static final RegExp _tokenRegex = RegExp(
+    r'[A-Za-z]|[-+]?(?:\d*\.)?\d+(?:[eE][-+]?\d+)?',
+  );
+
+  List<_SvgVectorElement> _elementsFor(ChatyGlyph value) =>
+      _cache.putIfAbsent(value, () => _parseSvg(_chatyGlyphSvg[value]!));
+
+  List<_SvgVectorElement> _parseSvg(String svg) {
+    final elements = <_SvgVectorElement>[];
+    for (final match in _shapeRegex.allMatches(svg)) {
+      final tag = match.group(1)!.toLowerCase();
+      final rawAttributes = match.group(2)!;
+      final attributes = <String, String>{
+        for (final attribute in _attributeRegex.allMatches(rawAttributes))
+          attribute.group(1)!: attribute.group(2)!,
+      };
+      final path = switch (tag) {
+        'path' => _parsePath(attributes['d'] ?? ''),
+        'circle' => _circlePath(attributes),
+        'rect' => _rectPath(attributes),
+        _ => Path(),
+      };
+      if (path == Path()) continue;
+      final fill = (attributes['fill'] ?? 'currentColor') != 'none';
+      final stroke = (attributes['stroke'] ?? 'none') != 'none';
+      final strokeWidth =
+          double.tryParse(attributes['stroke-width'] ?? '') ??
+          defaultStrokeWidth;
+      elements.add(
+        _SvgVectorElement(
+          path: path,
+          fill: fill,
+          stroke: stroke,
+          strokeWidth: strokeWidth,
+        ),
+      );
+    }
+    return elements;
+  }
+
+  Path _circlePath(Map<String, String> attributes) {
+    final cx = double.tryParse(attributes['cx'] ?? '') ?? 0;
+    final cy = double.tryParse(attributes['cy'] ?? '') ?? 0;
+    final radius = double.tryParse(attributes['r'] ?? '') ?? 0;
+    return Path()..addOval(
+      Rect.fromCircle(center: Offset(cx, cy), radius: radius),
+    );
+  }
+
+  Path _rectPath(Map<String, String> attributes) {
+    final x = double.tryParse(attributes['x'] ?? '') ?? 0;
+    final y = double.tryParse(attributes['y'] ?? '') ?? 0;
+    final width = double.tryParse(attributes['width'] ?? '') ?? 0;
+    final height = double.tryParse(attributes['height'] ?? '') ?? 0;
+    final radius = double.tryParse(attributes['rx'] ?? '') ?? 0;
+    final rect = Rect.fromLTWH(x, y, width, height);
+    if (radius <= 0) return Path()..addRect(rect);
+    return Path()
+      ..addRRect(RRect.fromRectAndRadius(rect, Radius.circular(radius)));
+  }
+
+  Path _parsePath(String data) {
+    final tokens = _tokenRegex
+        .allMatches(data)
+        .map((match) => match.group(0)!)
+        .toList(growable: false);
+    final path = Path();
+    var index = 0;
+    var command = '';
+    var current = Offset.zero;
+    var subpathStart = Offset.zero;
+
+    double nextNumber() {
+      if (index >= tokens.length) {
+        throw const FormatException('SVG path ended before a coordinate pair.');
+      }
+      final value = double.tryParse(tokens[index]);
+      if (value == null) {
+        throw FormatException('Expected SVG coordinate, got ${tokens[index]}');
+      }
+      index++;
+      return value;
+    }
+
+    while (index < tokens.length) {
+      final token = tokens[index];
+      if (RegExp(r'^[A-Za-z]$').hasMatch(token)) {
+        command = token;
+        index++;
+        if (command == 'Z' || command == 'z') {
+          path.close();
+          current = subpathStart;
+          command = '';
+          continue;
+        }
+      }
+      if (command.isEmpty) {
+        throw const FormatException('SVG path data has no command.');
+      }
+      switch (command) {
+        case 'M':
+          current = Offset(nextNumber(), nextNumber());
+          path.moveTo(current.dx, current.dy);
+          subpathStart = current;
+          command = 'L';
+        case 'L':
+          current = Offset(nextNumber(), nextNumber());
+          path.lineTo(current.dx, current.dy);
+        case 'C':
+          final control1 = Offset(nextNumber(), nextNumber());
+          final control2 = Offset(nextNumber(), nextNumber());
+          final end = Offset(nextNumber(), nextNumber());
+          path.cubicTo(
+            control1.dx,
+            control1.dy,
+            control2.dx,
+            control2.dy,
+            end.dx,
+            end.dy,
+          );
+          current = end;
+        default:
+          throw FormatException('Unsupported SVG path command: $command');
+      }
+    }
+    return path;
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
+    final sx = size.width / 24;
+    final sy = size.height / 24;
     canvas.save();
-    canvas.scale(size.width / 24, size.height / 24);
-    final line = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..isAntiAlias = true;
-    final solid = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill
-      ..isAntiAlias = true;
-
-    void stroke(Iterable<Offset> points, {bool close = false}) {
-      final path = Path();
-      var first = true;
-      for (final point in points) {
-        if (first) {
-          path.moveTo(point.dx, point.dy);
-          first = false;
-        } else {
-          path.lineTo(point.dx, point.dy);
-        }
+    canvas.scale(sx, sy);
+    for (final element in _elementsFor(glyph)) {
+      if (element.fill) {
+        canvas.drawPath(
+          element.path,
+          Paint()
+            ..color = color
+            ..style = PaintingStyle.fill
+            ..isAntiAlias = true,
+            );
       }
-      if (close) path.close();
-      canvas.drawPath(path, line);
-    }
-
-    switch (glyph) {
-      case ChatyGlyph.camera:
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            const Rect.fromLTRB(3.5, 7.5, 20.5, 19.5),
-            const Radius.circular(2.6),
-          ),
-          line,
+      if (element.stroke) {
+        canvas.drawPath(
+          element.path,
+          Paint()
+            ..color = color
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = element.strokeWidth == 0
+                ? defaultStrokeWidth
+                : element.strokeWidth
+            ..strokeCap = StrokeCap.round
+            ..strokeJoin = StrokeJoin.round
+            ..isAntiAlias = true,
         );
-        stroke(const <Offset>[
-          Offset(8, 7.5),
-          Offset(9.7, 4.8),
-          Offset(14.5, 4.8),
-          Offset(16.2, 7.5),
-        ]);
-        canvas.drawCircle(const Offset(12, 13.5), 3.1, line);
-        canvas.drawCircle(const Offset(17.6, 10), 0.8, solid);
-        break;
-      case ChatyGlyph.qrScan:
-        stroke(const <Offset>[
-          Offset(4, 9),
-          Offset(4, 4),
-          Offset(9, 4),
-        ]);
-        stroke(const <Offset>[
-          Offset(15, 4),
-          Offset(20, 4),
-          Offset(20, 9),
-        ]);
-        stroke(const <Offset>[
-          Offset(20, 15),
-          Offset(20, 20),
-          Offset(15, 20),
-        ]);
-        stroke(const <Offset>[
-          Offset(9, 20),
-          Offset(4, 20),
-          Offset(4, 15),
-        ]);
-        canvas.drawRect(const Rect.fromLTWH(7, 7, 4, 4), line);
-        canvas.drawRect(const Rect.fromLTWH(13, 7, 4, 4), line);
-        canvas.drawRect(const Rect.fromLTWH(7, 13, 4, 4), line);
-        canvas.drawRect(const Rect.fromLTWH(13, 13, 2, 2), line);
-        canvas.drawCircle(const Offset(17.5, 17.5), 0.9, solid);
-        break;
-      case ChatyGlyph.devices:
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            const Rect.fromLTRB(7, 2.7, 17.2, 21.3),
-            const Radius.circular(2.1),
-          ),
-          line,
-        );
-        stroke(const <Offset>[Offset(9.5, 5.5), Offset(14.7, 5.5)]);
-        canvas.drawCircle(const Offset(12.1, 18.5), 0.75, solid);
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            const Rect.fromLTRB(2.4, 8, 6.2, 16.5),
-            const Radius.circular(1),
-          ),
-          line,
-        );
-        stroke(const <Offset>[Offset(3.5, 10), Offset(5.1, 10)]);
-        break;
-      case ChatyGlyph.palette:
-        final path = Path()
-          ..moveTo(12, 3.2)
-          ..cubicTo(6.9, 3.2, 3.1, 6.8, 3.1, 11.4)
-          ..cubicTo(3.1, 16.3, 7.1, 20.8, 12.1, 20.8)
-          ..cubicTo(13.8, 20.8, 14.9, 19.9, 14.9, 18.5)
-          ..cubicTo(14.9, 17.5, 14.3, 16.9, 14.3, 16)
-          ..cubicTo(14.3, 14.8, 15.2, 14, 16.5, 14)
-          ..lineTo(18.4, 14)
-          ..cubicTo(20.1, 14, 20.9, 12.6, 20.9, 10.8)
-          ..cubicTo(20.9, 6.3, 16.8, 3.2, 12, 3.2)
-          ..close();
-        canvas.drawPath(path, line);
-        canvas.drawCircle(const Offset(7.5, 10), 1.05, solid);
-        canvas.drawCircle(const Offset(11.5, 7.4), 1.05, solid);
-        canvas.drawCircle(const Offset(16, 8.3), 1.05, solid);
-        canvas.drawCircle(const Offset(8.8, 14.2), 1.05, solid);
-        break;
-      case ChatyGlyph.templates:
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            const Rect.fromLTRB(3.2, 3.2, 20.8, 20.8),
-            const Radius.circular(2.5),
-          ),
-          line,
-        );
-        stroke(const <Offset>[Offset(3.8, 9), Offset(20.2, 9)]);
-        stroke(const <Offset>[Offset(9, 9.5), Offset(9, 20.2)]);
-        stroke(const <Offset>[Offset(14.8, 9.5), Offset(14.8, 20.2)]);
-        stroke(const <Offset>[Offset(5.5, 6.1), Offset(7, 6.1)]);
-        stroke(const <Offset>[Offset(10.8, 6.1), Offset(12.3, 6.1)]);
-        break;
-      case ChatyGlyph.homeLayout:
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            const Rect.fromLTRB(3.1, 3.5, 20.9, 20.5),
-            const Radius.circular(2.5),
-          ),
-          line,
-        );
-        stroke(const <Offset>[Offset(8.6, 3.8), Offset(8.6, 20.2)]);
-        stroke(const <Offset>[Offset(9.2, 9), Offset(20.4, 9)]);
-        stroke(const <Offset>[Offset(9.2, 14), Offset(20.4, 14)]);
-        canvas.drawCircle(const Offset(5.9, 7), 0.75, solid);
-        break;
-      case ChatyGlyph.navigation:
-        canvas.drawCircle(const Offset(5, 6), 1.1, solid);
-        canvas.drawCircle(const Offset(5, 12), 1.1, solid);
-        canvas.drawCircle(const Offset(5, 18), 1.1, solid);
-        stroke(const <Offset>[Offset(9, 6), Offset(20, 6)]);
-        stroke(const <Offset>[Offset(9, 12), Offset(20, 12)]);
-        stroke(const <Offset>[Offset(9, 18), Offset(20, 18)]);
-        break;
-      case ChatyGlyph.settings:
-        stroke(const <Offset>[Offset(4, 7), Offset(20, 7)]);
-        stroke(const <Offset>[Offset(4, 12), Offset(20, 12)]);
-        stroke(const <Offset>[Offset(4, 17), Offset(20, 17)]);
-        canvas.drawCircle(const Offset(9, 7), 2, solid);
-        canvas.drawCircle(const Offset(15, 12), 2, solid);
-        canvas.drawCircle(const Offset(8, 17), 2, solid);
-        canvas.drawCircle(const Offset(9, 7), 0.7, Paint()..color = color.withValues(alpha: 0.2));
-        canvas.drawCircle(const Offset(15, 12), 0.7, Paint()..color = color.withValues(alpha: 0.2));
-        canvas.drawCircle(const Offset(8, 17), 0.7, Paint()..color = color.withValues(alpha: 0.2));
-        break;
-      case ChatyGlyph.chevronRight:
-        stroke(const <Offset>[
-          Offset(9, 4),
-          Offset(17, 12),
-          Offset(9, 20),
-        ]);
-        break;
-      case ChatyGlyph.more:
-        canvas.drawCircle(const Offset(5.2, 12), 1.45, solid);
-        canvas.drawCircle(const Offset(12, 12), 1.45, solid);
-        canvas.drawCircle(const Offset(18.8, 12), 1.45, solid);
-        break;
-      case ChatyGlyph.tune:
-        stroke(const <Offset>[Offset(3, 6), Offset(21, 6)]);
-        stroke(const <Offset>[Offset(3, 12), Offset(21, 12)]);
-        stroke(const <Offset>[Offset(3, 18), Offset(21, 18)]);
-        canvas.drawCircle(const Offset(8, 6), 1.8, solid);
-        canvas.drawCircle(const Offset(15, 12), 1.8, solid);
-        canvas.drawCircle(const Offset(10.5, 18), 1.8, solid);
-        break;
-      case ChatyGlyph.search:
-        canvas.drawCircle(const Offset(10.5, 10.5), 6.2, line);
-        stroke(const <Offset>[Offset(15, 15), Offset(20.5, 20.5)]);
-        break;
-      case ChatyGlyph.close:
-        stroke(const <Offset>[Offset(6, 6), Offset(18, 18)]);
-        stroke(const <Offset>[Offset(18, 6), Offset(6, 18)]);
-        break;
-      case ChatyGlyph.exportProfile:
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            const Rect.fromLTRB(4, 10, 20, 21),
-            const Radius.circular(2),
-          ),
-          line,
-        );
-        stroke(const <Offset>[Offset(12, 16), Offset(12, 3)]);
-        stroke(const <Offset>[Offset(7.5, 7.5), Offset(12, 3), Offset(16.5, 7.5)]);
-        break;
-      case ChatyGlyph.importProfile:
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            const Rect.fromLTRB(4, 10, 20, 21),
-            const Radius.circular(2),
-          ),
-          line,
-        );
-        stroke(const <Offset>[Offset(12, 3), Offset(12, 16)]);
-        stroke(const <Offset>[Offset(7.5, 11.5), Offset(12, 16), Offset(16.5, 11.5)]);
-        break;
-      case ChatyGlyph.reset:
-        final resetPath = Path()
-          ..moveTo(19, 8)
-          ..cubicTo(16.2, 3.5, 9.9, 2.7, 6, 6.5)
-          ..cubicTo(2.2, 10.2, 3.2, 16.7, 7.5, 19.2)
-          ..cubicTo(11.1, 21.4, 16.1, 20, 18.2, 17);
-        canvas.drawPath(resetPath, line);
-        stroke(const <Offset>[Offset(18.5, 4), Offset(19, 8), Offset(15, 8)]);
-        break;
-      case ChatyGlyph.chatBubble:
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            const Rect.fromLTRB(3, 3.5, 21, 17),
-            const Radius.circular(4),
-          ),
-          line,
-        );
-        stroke(const <Offset>[Offset(7, 17), Offset(6, 21), Offset(12, 17)]);
-        stroke(const <Offset>[Offset(7, 8), Offset(17, 8)]);
-        stroke(const <Offset>[Offset(7, 12), Offset(14, 12)]);
-        break;
-      case ChatyGlyph.person:
-        canvas.drawCircle(const Offset(12, 7.5), 3.5, line);
-        final shoulders = Path()
-          ..moveTo(4, 20)
-          ..cubicTo(4.7, 15.8, 8, 13.8, 12, 13.8)
-          ..cubicTo(16, 13.8, 19.3, 15.8, 20, 20);
-        canvas.drawPath(shoulders, line);
-        break;
-      case ChatyGlyph.list:
-        for (final y in <double>[6, 12, 18]) {
-          canvas.drawCircle(Offset(4.5, y), 1.1, solid);
-          stroke(<Offset>[Offset(8, y), Offset(20, y)]);
-        }
-        break;
-      case ChatyGlyph.updates:
-        canvas.drawCircle(const Offset(12, 12), 8.3, line);
-        canvas.drawCircle(const Offset(12, 12), 5.8, line);
-        canvas.drawCircle(const Offset(18, 6), 2.0, solid);
-        break;
-      case ChatyGlyph.calls:
-        final handset = Path()
-          ..moveTo(7, 3.5)
-          ..lineTo(4.8, 5.7)
-          ..cubicTo(4.2, 6.4, 5.2, 10.8, 9.2, 14.8)
-          ..cubicTo(13.2, 18.8, 17.6, 19.8, 18.3, 19.2)
-          ..lineTo(20.5, 17)
-          ..lineTo(16.2, 13.8)
-          ..lineTo(13.9, 15.5)
-          ..cubicTo(11.8, 14.6, 9.4, 12.2, 8.5, 10.1)
-          ..lineTo(10.2, 7.8)
-          ..close();
-        canvas.drawPath(handset, line);
-        break;
-      case ChatyGlyph.groups:
-        canvas.drawCircle(const Offset(9, 8), 3.1, line);
-        canvas.drawCircle(const Offset(17, 9), 2.4, line);
-        final primaryShoulders = Path()
-          ..moveTo(3.5, 20)
-          ..cubicTo(4.2, 15.8, 6.4, 13.7, 9.2, 13.7)
-          ..cubicTo(12.2, 13.7, 14.1, 15.8, 14.8, 20);
-        canvas.drawPath(primaryShoulders, line);
-        final secondaryShoulders = Path()
-          ..moveTo(14, 15)
-          ..cubicTo(16.9, 14.2, 19.6, 16, 20.4, 19);
-        canvas.drawPath(secondaryShoulders, line);
-        break;
-      case ChatyGlyph.tasks:
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            const Rect.fromLTRB(4, 3, 20, 21),
-            const Radius.circular(2.5),
-          ),
-          line,
-        );
-        for (final y in <double>[7, 12, 17]) {
-          stroke(<Offset>[
-            Offset(6, y),
-            Offset(7, y + 1),
-            Offset(8.7, y - 1),
-          ]);
-          stroke(<Offset>[Offset(11, y), Offset(17.5, y)]);
-        }
-        break;
+      }
     }
     canvas.restore();
   }
 
   @override
-  bool shouldRepaint(covariant _ChatyGlyphPainter oldDelegate) =>
+  bool shouldRepaint(covariant _ChatySvgGlyphPainter oldDelegate) =>
       oldDelegate.glyph != glyph ||
       oldDelegate.color != color ||
-      oldDelegate.strokeWidth != strokeWidth;
+      oldDelegate.defaultStrokeWidth != defaultStrokeWidth;
 }
