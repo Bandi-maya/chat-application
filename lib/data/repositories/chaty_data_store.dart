@@ -532,7 +532,7 @@ class ChatyDataStore extends ChangeNotifier {
     );
   }
 
-  void revokeLinkedDevice(String deviceId) =>
+  Future<void> revokeLinkedDevice(String deviceId) =>
       _backend.revokeLinkedDevice(deviceId);
 
   void updateProfile(UserProfile updated) =>
