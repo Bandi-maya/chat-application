@@ -55,7 +55,7 @@ Copy this section for every reproducible issue.
 - Root cause: The root route previously treated a non-null Supabase current session as sufficient to render MainNavigationShell before ChatyBackendService.initialize() completed profile/session hydration.
 - Fix: Root route now uses an explicit AuthBootstrapDestination policy and shows a loading/retry surface until backend initialization completes. Raw backend error details are logged locally but not shown to the user.
 - Regression test: test/auth_bootstrap_policy_test.dart covers initialized/uninitialized and authenticated/unauthenticated combinations.
-- Status: Fixed-awaiting-retest. Latest Android CI must pass before marking verified; cold-start/session restoration still requires runtime testing on Android and iOS.
+- Status: Static analysis and the full Flutter test suite passed on commit 29f570f476678c554896859bf4569a9551b96df3. Cold-start/session restoration still requires the pending Android/iOS runtime smoke and physical-device verification.
 
 ### ANALYZER-001 — Unused legacy menu helpers and disconnected responsive overflow sheet
 
@@ -66,7 +66,7 @@ Copy this section for every reproducible issue.
 - Root cause: The home overflow sheet had been implemented but not connected to the three-dot menu; the desktop popup's Starred Messages item only displayed a snackbar. A legacy chat menu helper was no longer used after migration to ChatyMenuSheet.
 - Fix: Wire widths below 600 logical pixels to the existing scrollable overflow sheet, route the desktop Starred Messages item to the real screen, and remove the obsolete helper.
 - Regression coverage: The source inventory CI remains active; fresh Flutter analyze and UI interaction tests must confirm the change.
-- Status: Fixed-awaiting-retest. The first analyzer run was on an earlier commit and failed on these warnings; rerun on the latest head before marking verified.
+- Status: Dart analysis and the full Flutter test suite passed on commit 29f570f476678c554896859bf4569a9551b96df3. A visual interaction retest on Android/iOS is still pending.
 
 ### UI-SETTINGS-001 — Advanced appearance controls had no runtime consumer
 
@@ -75,7 +75,7 @@ Copy this section for every reproducible issue.
 - Evidence: The runtime settings consumer audit reported ModCallsBackground, ModCallsIconColors, ModCallsTextColor, ModChatBubbleText, ModChatBubbleTextLeft, date_left_color, date_right_color, and text_size_pick as catalog-only settings.
 - Fix: MessageBubble now reads the current preference controller for outgoing/incoming text color, timestamp color, and message text size. OngoingCallScreen now reads the call background, text, and icon color settings and applies them to the call surfaces and controls.
 - Regression coverage: Runtime consumer audit plus Android Flutter analysis/full tests.
-- Status: Fixed-awaiting-retest on latest commit.
+- Status: Runtime consumer audit, Dart analysis, and the full Flutter test suite passed on commit 29f570f476678c554896859bf4569a9551b96df3. Visual confirmation on running Android/iOS screens remains pending.
 
 ### CI-INTEGRATION-001 — Phase-specific tests ran against a non-integrated feature branch
 
@@ -83,4 +83,4 @@ Copy this section for every reproducible issue.
 - Platform: CI
 - Evidence: The production gate tried to run encrypted-attachment, encrypted-outbox, account-purge, and phase-specific tests that are only copied in by the integration/phases-1-8 reconciliation step. That reconciliation is intentionally skipped for this feature branch, so the workflow failed with missing test files.
 - Fix: Gate those phase-specific test steps on the integration/phases-1-8 branch while keeping current-branch analysis, the full available Flutter test suite, migration checks, security checks, and APK build enabled for ordinary PRs.
-- Status: Fixed-awaiting-retest on latest CI run.
+- Status: Verified in the latest completed integration-gate analysis and full Flutter test steps on commit 29f570f476678c554896859bf4569a9551b96df3; release APK build was still running when this record was updated.
