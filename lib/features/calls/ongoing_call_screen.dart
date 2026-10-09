@@ -642,7 +642,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            const SizedBox(
+            SizedBox(
               width: 24,
               height: 24,
               child: CircularProgressIndicator(
