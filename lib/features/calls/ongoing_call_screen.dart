@@ -9,6 +9,7 @@ import '../../domain/models/call_state.dart';
 import '../../features/camera/effects/effect_engine.dart';
 import '../../features/camera/effects/effect_registry.dart';
 import '../settings/calls/call_presentation_preferences.dart';
+import '../../ui/core/controllers/preferences_controller.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../../ui/core/templates/template_controller.dart';
@@ -52,6 +53,20 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
   Timer? _autoHideTimer;
   StreamSubscription<bool>? _pipModeSubscription;
   Offset _localPipOffset = const Offset(20, 80);
+
+  ChatyPreferencesController? get _preferencesController {
+    if (!locator.isRegistered<ChatyPreferencesController>()) return null;
+    return locator<ChatyPreferencesController>();
+  }
+
+  Color _callBackgroundColor(Color fallback) =>
+      _preferencesController?.gbColor('ModCallsBackground') ?? fallback;
+
+  Color get _callTextColor =>
+      _preferencesController?.gbColor('ModCallsTextColor') ?? Colors.white;
+
+  Color get _callIconColor =>
+      _preferencesController?.gbColor('ModCallsIconColors') ?? Colors.white;
 
   @override
   void initState() {
@@ -213,7 +228,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
         final session = _callService.currentSession;
         if (session == null) {
           return Scaffold(
-            backgroundColor: Colors.black,
+            backgroundColor: _callBackgroundColor(Colors.black),
             body: SafeArea(
               child: ChatyEmptyState(
                 icon: Icons.call_end_rounded,
@@ -221,8 +236,8 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                 message:
                     _setupError ?? 'This call session is no longer available.',
                 iconColor: colors.error,
-                titleColor: Colors.white,
-                messageColor: Colors.white70,
+                titleColor: _callTextColor,
+                messageColor: _callTextColor.withValues(alpha: 0.7),
                 actionLabel: 'Close',
                 onAction: () => Navigator.of(context).maybePop(),
               ),
@@ -231,7 +246,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
         }
 
         return Scaffold(
-          backgroundColor: Colors.black,
+          backgroundColor: _callBackgroundColor(Colors.black),
           body: GestureDetector(
             onTap: _toggleControlsVisibility,
             behavior: HitTestBehavior.opaque,
@@ -302,7 +317,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                                 Center(
                                   child: Icon(
                                     Icons.videocam_off_rounded,
-                                    color: Colors.white.withValues(alpha: 0.65),
+                                    color: _callIconColor.withValues(alpha: 0.65),
                                   ),
                                 ),
                               Positioned(
@@ -324,10 +339,10 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                                         shape: BoxShape.circle,
                                       ),
                                       alignment: Alignment.center,
-                                      child: const Icon(
+                                      child: Icon(
                                         Icons.flip_camera_ios_rounded,
                                         size: 16,
-                                        color: Colors.white,
+                                        color: _callIconColor,
                                       ),
                                     ),
                                   ),
@@ -390,7 +405,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                     child: Row(
                       children: [
                         ChatyBackButton(
-                          color: Colors.white,
+                          color: _callIconColor,
                           backgroundColor: Colors.black.withValues(alpha: 0.35),
                         ),
                         Expanded(
@@ -423,7 +438,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                           ChatyIconButton(
                             icon: Icons.picture_in_picture_alt_rounded,
                             tooltip: 'Picture-in-picture',
-                            color: Colors.white,
+                            color: _callIconColor,
                             backgroundColor: Colors.black.withValues(
                               alpha: 0.35,
                             ),
@@ -435,7 +450,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                           ChatyIconButton(
                             icon: Icons.auto_awesome_rounded,
                             tooltip: 'Call filter',
-                            color: Colors.white,
+                            color: _callIconColor,
                             backgroundColor:
                                 _effectEngine.activeEffect.id != 'none'
                                 ? Colors.white.withValues(alpha: 0.28)
@@ -451,7 +466,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                           tooltip: _focusMode
                               ? 'Exit focus mode'
                               : 'Focus mode',
-                          color: Colors.white,
+                          color: _callIconColor,
                           backgroundColor: Colors.black.withValues(alpha: 0.35),
                           onPressed: () =>
                               setState(() => _focusMode = !_focusMode),
@@ -601,7 +616,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
   Widget _buildRemoteVideo(ChatyCallSession session, AppColors colors) {
     if (!_renderersReady || _callService.remoteStream == null) {
       return Container(
-        color: const Color(0xFF07090D),
+        color: _callBackgroundColor(const Color(0xFF07090D)),
         alignment: Alignment.center,
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -620,8 +635,8 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
             const SizedBox(height: 18),
             Text(
               _statusLabel(session),
-              style: const TextStyle(
-                color: Colors.white70,
+              style: TextStyle(
+                color: _callTextColor.withValues(alpha: 0.7),
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
               ),
@@ -632,7 +647,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
               height: 24,
               child: CircularProgressIndicator(
                 strokeWidth: 2.2,
-                color: Colors.white70,
+                color: _callIconColor.withValues(alpha: 0.7),
               ),
             ),
           ],
@@ -664,10 +679,10 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
                 child: Row(
                   children: [
-                    const Text(
+                    Text(
                       'Call filter',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: _callTextColor,
                         fontWeight: FontWeight.w800,
                         fontSize: 16,
                       ),
@@ -676,7 +691,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                     Text(
                       'Applies to your view',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: .55),
+                        color: _callTextColor.withValues(alpha: .55),
                         fontSize: 11.5,
                       ),
                     ),
@@ -759,7 +774,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
 
   Widget _buildVoiceCallBackdrop(ChatyCallSession session, AppColors colors) {
     return Container(
-      color: colors.surfaceElevated,
+      color: _callBackgroundColor(colors.surfaceElevated),
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -778,7 +793,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
               session.remoteDisplayName,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: colors.foreground,
+                color: _callTextColor,
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
@@ -787,7 +802,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
             Text(
               _statusLabel(session),
               style: TextStyle(
-                color: colors.foregroundSecondary,
+                color: _callTextColor.withValues(alpha: 0.72),
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
               ),
@@ -819,20 +834,20 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
             decoration: BoxDecoration(
               color: isActive
                   ? activeColor.withValues(alpha: 0.28)
-                  : Colors.white.withValues(alpha: 0.16),
+                  : _callIconColor.withValues(alpha: 0.16),
               borderRadius: BorderRadius.circular(
                 locator<TemplateController>().calls.controlBarCornerRadius,
               ),
               border: Border.all(
                 color: isActive
                     ? activeColor
-                    : Colors.white.withValues(alpha: 0.2),
+                    : _callIconColor.withValues(alpha: 0.2),
               ),
             ),
             alignment: Alignment.center,
             child: Icon(
               icon,
-              color: isActive ? activeColor : Colors.white,
+              color: isActive ? activeColor : _callIconColor,
               size: 23,
             ),
           ),
