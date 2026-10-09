@@ -50,6 +50,54 @@ const String _supabasePublishableKey = String.fromEnvironment(
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 
+/// Applies the selected typography preset to the Material text system, not
+/// just the global text scaler. Font families use platform-provided generics
+/// so this remains asset-free and works on Android and iOS.
+ThemeData _applyTypographyStyle(ThemeData base, String preset) {
+  final family = switch (preset) {
+    'Editorial' || 'Classic' => 'serif',
+    'Rounded' => 'sans-serif-rounded',
+    'Technical' => 'monospace',
+    'Geometric' || 'Product Sans' || 'Modern' || 'Business' ||
+    'Creator' || 'Focus' => 'sans-serif',
+    _ => null,
+  };
+  final letterSpacingDelta = switch (preset) {
+    'Compact' || 'Dense UI' => -0.18,
+    'Editorial' => 0.12,
+    'Geometric' || 'Product Sans' => 0.04,
+    'Minimal' || 'Focus' => -0.08,
+    _ => 0.0,
+  };
+
+  var textTheme = base.textTheme.apply(
+    fontFamily: family,
+    letterSpacingDelta: letterSpacingDelta,
+  );
+  var primaryTextTheme = base.primaryTextTheme.apply(
+    fontFamily: family,
+    letterSpacingDelta: letterSpacingDelta,
+  );
+  if (preset == 'Monospace Accent') {
+    TextStyle? mono(TextStyle? style) => style?.copyWith(fontFamily: 'monospace');
+    textTheme = textTheme.copyWith(
+      labelSmall: mono(textTheme.labelSmall),
+      labelMedium: mono(textTheme.labelMedium),
+      labelLarge: mono(textTheme.labelLarge),
+    );
+    primaryTextTheme = primaryTextTheme.copyWith(
+      labelSmall: mono(primaryTextTheme.labelSmall),
+      labelMedium: mono(primaryTextTheme.labelMedium),
+      labelLarge: mono(primaryTextTheme.labelLarge),
+    );
+  }
+  return base.copyWith(
+    fontFamily: family ?? base.fontFamily,
+    textTheme: textTheme,
+    primaryTextTheme: primaryTextTheme,
+  );
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(
@@ -578,11 +626,15 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
           _themeController.globalTheme,
           _preferencesController,
         );
+        final appTheme = _applyTypographyStyle(
+          currentTheme.toThemeData(),
+          _appearanceController.typographyStyle,
+        );
         return MaterialApp(
           navigatorKey: _rootNavigatorKey,
           title: 'Chaty',
           debugShowCheckedModeBanner: false,
-          theme: currentTheme.toThemeData().copyWith(
+          theme: appTheme.copyWith(
             pageTransitionsTheme: ChatyTransitions.build(
               entry: _appearanceController.entryAnimation,
               exit: _appearanceController.exitAnimation,
