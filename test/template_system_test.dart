@@ -184,5 +184,28 @@ void main() {
       expect(invalidKeys.baseTemplate, equals(ChatyTemplateId.messageFirst));
       expect(invalidKeys.componentOverrides.isEmpty, isTrue);
     });
+
+    test('Applying an imported profile normalizes redundant component overrides', () async {
+      await controller.applyConfiguration(
+        UserTemplateConfiguration(
+          baseTemplate: ChatyTemplateId.powerChat,
+          componentOverrides: {
+            TemplateComponentType.navigation: ChatyTemplateId.powerChat,
+            TemplateComponentType.composer: ChatyTemplateId.cameraFirst,
+          },
+        ),
+      );
+
+      expect(controller.baseTemplate, equals(ChatyTemplateId.powerChat));
+      expect(controller.componentOverrides.length, 1);
+      expect(
+        controller.resolveTemplateFor(TemplateComponentType.navigation),
+        equals(ChatyTemplateId.powerChat),
+      );
+      expect(
+        controller.resolveTemplateFor(TemplateComponentType.composer),
+        equals(ChatyTemplateId.cameraFirst),
+      );
+    });
   });
 }
