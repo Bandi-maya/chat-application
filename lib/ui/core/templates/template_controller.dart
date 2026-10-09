@@ -79,13 +79,11 @@ class TemplateController extends ChangeNotifier {
       );
     }
 
-    _config = _config.copyWithNavigationDestinations(
-      primaryDestinationIds: primary,
-      overflowDestinationIds: overflow,
-    );
-    notifyListeners();
-    _persist();
-    _syncToRuntimeControllers(
+    return _commitConfiguration(
+      _config.copyWithNavigationDestinations(
+        primaryDestinationIds: primary,
+        overflowDestinationIds: overflow,
+      ),
       appearanceController: appearanceController,
       themeController: themeController,
       applyNavigation: true,
@@ -96,10 +94,8 @@ class TemplateController extends ChangeNotifier {
     AppearanceVariantController? appearanceController,
     ThemeController? themeController,
   }) async {
-    _config = _config.withoutNavigationDestinationOverride();
-    notifyListeners();
-    _persist();
-    _syncToRuntimeControllers(
+    return _commitConfiguration(
+      _config.withoutNavigationDestinationOverride(),
       appearanceController: appearanceController,
       themeController: themeController,
       applyNavigation: true,
@@ -184,13 +180,11 @@ class TemplateController extends ChangeNotifier {
     ChatyPreferencesController? preferencesController,
     ThemeController? themeController,
   }) async {
-    _config = UserTemplateConfiguration(
-      baseTemplate: templateId,
-      componentOverrides: const {},
-    );
-    notifyListeners();
-    _persist();
-    _syncToRuntimeControllers(
+    return _commitConfiguration(
+      UserTemplateConfiguration(
+        baseTemplate: templateId,
+        componentOverrides: const {},
+      ),
       appearanceController: appearanceController,
       preferencesController: preferencesController,
       themeController: themeController,
@@ -209,10 +203,8 @@ class TemplateController extends ChangeNotifier {
     ChatyPreferencesController? preferencesController,
     ThemeController? themeController,
   }) async {
-    _config = _config.copyWithOverride(component, templateId);
-    notifyListeners();
-    _persist();
-    _syncToRuntimeControllers(
+    return _commitConfiguration(
+      _config.copyWithOverride(component, templateId),
       appearanceController: appearanceController,
       preferencesController: preferencesController,
       themeController: themeController,
@@ -237,17 +229,15 @@ class TemplateController extends ChangeNotifier {
             if (entry.value != configuration.baseTemplate)
               entry.key: entry.value,
         };
-    _config = UserTemplateConfiguration(
-      baseTemplate: configuration.baseTemplate,
-      componentOverrides: normalizedOverrides,
-      navigationPrimaryDestinationIds:
-          configuration.navigationPrimaryDestinationIds,
-      navigationOverflowDestinationIds:
-          configuration.navigationOverflowDestinationIds,
-    );
-    notifyListeners();
-    _persist();
-    _syncToRuntimeControllers(
+    return _commitConfiguration(
+      UserTemplateConfiguration(
+        baseTemplate: configuration.baseTemplate,
+        componentOverrides: normalizedOverrides,
+        navigationPrimaryDestinationIds:
+            configuration.navigationPrimaryDestinationIds,
+        navigationOverflowDestinationIds:
+            configuration.navigationOverflowDestinationIds,
+      ),
       appearanceController: appearanceController,
       preferencesController: preferencesController,
       themeController: themeController,
@@ -265,10 +255,8 @@ class TemplateController extends ChangeNotifier {
     ChatyPreferencesController? preferencesController,
     ThemeController? themeController,
   }) async {
-    _config = _config.removeOverride(component);
-    notifyListeners();
-    _persist();
-    _syncToRuntimeControllers(
+    return _commitConfiguration(
+      _config.removeOverride(component),
       appearanceController: appearanceController,
       preferencesController: preferencesController,
       themeController: themeController,
@@ -285,13 +273,11 @@ class TemplateController extends ChangeNotifier {
     ChatyPreferencesController? preferencesController,
     ThemeController? themeController,
   }) async {
-    _config = const UserTemplateConfiguration(
-      baseTemplate: ChatyTemplateId.messageFirst,
-      componentOverrides: {},
-    );
-    notifyListeners();
-    _persist();
-    _syncToRuntimeControllers(
+    return _commitConfiguration(
+      const UserTemplateConfiguration(
+        baseTemplate: ChatyTemplateId.messageFirst,
+        componentOverrides: {},
+      ),
       appearanceController: appearanceController,
       preferencesController: preferencesController,
       themeController: themeController,
@@ -389,7 +375,41 @@ class TemplateController extends ChangeNotifier {
     }
   }
 
-  void _persist() {
-    unawaited(LocalPreferencesStorage.saveTemplateState(_config.toMap()));
+  Future<void> _commitQueue = Future<void>.value();
+
+  /// Persists a complete candidate before exposing it to widgets or runtime
+  /// controllers. A failed preference write leaves the previously applied
+  /// configuration active and is surfaced to the caller.
+  Future<void> _commitConfiguration(
+    UserTemplateConfiguration next, {
+    AppearanceVariantController? appearanceController,
+    ChatyPreferencesController? preferencesController,
+    ThemeController? themeController,
+    bool applyTheme = false,
+    bool applyNavigation = false,
+    bool applyHome = false,
+    bool applyConversation = false,
+  }) {
+    final operation = _commitQueue.then((_) async {
+      await LocalPreferencesStorage.saveTemplateState(next.toMap());
+      _config = next;
+      notifyListeners();
+      _syncToRuntimeControllers(
+        appearanceController: appearanceController,
+        preferencesController: preferencesController,
+        themeController: themeController,
+        applyTheme: applyTheme,
+        applyNavigation: applyNavigation,
+        applyHome: applyHome,
+        applyConversation: applyConversation,
+      );
+    });
+    // Keep the queue usable after a failed save while returning the original
+    // failure to this operation's caller.
+    _commitQueue = operation.then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stackTrace) {},
+    );
+    return operation;
   }
 }
