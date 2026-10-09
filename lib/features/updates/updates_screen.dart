@@ -9,6 +9,7 @@ import '../camera/camera_capture_screen.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/templates/template_controller.dart';
+import '../../ui/core/templates/template_models.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/design_system/design_system.dart';
 import 'status_view_session.dart';
