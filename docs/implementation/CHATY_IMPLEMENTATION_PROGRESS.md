@@ -20,7 +20,7 @@
 - Chat composer now consumes template action placement, corner radius, camera shortcut visibility, voice-lock indicator visibility and send/voice transition motion.
 - Updates list now consumes layout mode, avatar sizing/shape treatment and card elevation.
 - Profile screen now consumes header style, avatar shape and the stats-grid toggle. Displayed counts are derived from the local data store (chats, groups and contacts).
-- Call controls consume the configured control corner radius; the in-app call island respects the template's floating-island option.
+- Call controls consume the configured control corner radius. The `enableFloatingIsland` option remains outstanding: hiding a minimized active call without a safe fallback would strand the call controls, so the existing call recovery UI is preserved until that fallback is implemented.
 - Appearance preview chips display the actual selected typography and entry/exit motion values rather than empty labels.
 - Template/component confirmation copy now names the selected template/component.
 
