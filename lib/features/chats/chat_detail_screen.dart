@@ -2751,7 +2751,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           _messageIndexById[message.id] = index;
           final itemKey = _messageItemKeys.putIfAbsent(
             message.id,
-            GlobalKey.new,
+            () => GlobalKey(),
           );
           final messageContent = !ChatAttachmentActions.isPollMessage(message)
               ? bubble
