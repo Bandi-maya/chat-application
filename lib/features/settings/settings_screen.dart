@@ -8,6 +8,7 @@ import 'settings_search_delegate.dart';
 import 'privacy/privacy_center_screen.dart';
 import 'security/security_center_screen.dart';
 import 'theme_editor_screen.dart';
+import 'templates/templates_settings_screen.dart';
 import 'appearance/universal_appearance_screen.dart';
 import 'home/home_screen_settings_page.dart';
 import 'conversation/conversation_settings_page.dart';
@@ -85,6 +86,14 @@ class SettingsScreen extends StatelessWidget {
         description: '13+ dark & light theme presets and token editor',
         icon: Icons.palette_rounded,
         destination: ThemeEditorScreen(themeController: themeController),
+      ),
+      SettingsSearchResult(
+        title: 'Global Template Studio',
+        category: 'Themes & Appearance',
+        description:
+            'Apply app-wide templates and independently customize navigation, home, chat list, bubbles, composer, updates, profile and calls',
+        icon: Icons.dashboard_customize_rounded,
+        destination: const TemplatesSettingsScreen(),
       ),
       SettingsSearchResult(
         title: 'Home UI Style',
@@ -613,6 +622,21 @@ class SettingsScreen extends StatelessWidget {
                           builder: (_) => ThemeEditorScreen(
                             themeController: themeController,
                           ),
+                        ),
+                      );
+                    },
+                  ),
+                  ChatySettingsTile(
+                    icon: Icons.dashboard_customize_rounded,
+                    iconColor: colors.primary,
+                    title: 'Global Template Studio',
+                    subtitle:
+                        'Apply a complete app template or mix component styles across navigation, chats, composer, updates, profile and calls',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const TemplatesSettingsScreen(),
                         ),
                       );
                     },
