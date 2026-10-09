@@ -1649,7 +1649,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     final isOneUiStyle = homeStyle == ChatyHomeStyleCatalog.oneUi;
     final visualAccent = isTelegramStyle
         ? const Color(0xFF229ED9)
-        : visualAccent;
+        : theme.accentColor;
     final tileRadius = isTelegramStyle
         ? 10.0
         : isIosStyle
