@@ -1038,8 +1038,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         break;
       case MessageActionType.translate:
         if (mounted) {
+          final mode = widget.preferencesController.universal.translateOption;
+          final lang = widget.preferencesController.universal.translationLanguage;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Translation: ${message.text}')),
+            SnackBar(
+              content: Text(
+                'Translation ($lang via $mode): ${message.text}',
+              ),
+            ),
           );
         }
         break;
@@ -1444,30 +1450,38 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         .map(_realtime.hydrateMessage)
         .toList(growable: false);
     final autoPrefs = widget.preferencesController.automation;
-    // Real consumers for the 'Conversation header' GB controls. All default
-    // to the current (visible) behavior and hide when explicitly disabled.
-    final showHeaderAvatar = widget.preferencesController.gbBool(
-      'PicProf',
-      fallback: true,
-    );
-    final showHeaderName = widget.preferencesController.gbBool(
-      'NameProf',
-      fallback: true,
-    );
-    final showHeaderCalls = widget.preferencesController.gbBool(
-      'Conv_call_btn',
-      fallback: true,
-    );
-    final showPresenceLine = widget.preferencesController.gbBool(
-      'statuschat',
-      fallback: true,
-    );
-    final presencePillColor = widget.preferencesController.gbColor(
-      'ModChatGStatusB',
-    );
-    final presenceTextColor = widget.preferencesController.gbColor(
-      'ModChatGStatusT',
-    );
+    final convPrefs = widget.preferencesController.conversation;
+    // Real consumers for the 'Conversation header' controls.
+    // Typed ConversationPreferences takes precedence, then legacy GB keys, defaulting to visible.
+    final showHeaderAvatar = !convPrefs.hideProfilePicture &&
+        widget.preferencesController.gbBool(
+          'PicProf',
+          fallback: true,
+        );
+    final showHeaderName = !convPrefs.hideContactName &&
+        widget.preferencesController.gbBool(
+          'NameProf',
+          fallback: true,
+        );
+    final showHeaderCalls = !convPrefs.hideCallButton &&
+        widget.preferencesController.gbBool(
+          'Conv_call_btn',
+          fallback: true,
+        );
+    final showPresenceLine = !convPrefs.disableContactStatus &&
+        widget.preferencesController.gbBool(
+          'statuschat',
+          fallback: true,
+        );
+    final presencePillColor = convPrefs.contactStatusBgColor != null
+        ? Color(convPrefs.contactStatusBgColor!)
+        : widget.preferencesController.gbColor('ModChatGStatusB');
+    final presenceTextColor = convPrefs.contactStatusTextColor != null
+        ? Color(convPrefs.contactStatusTextColor!)
+        : widget.preferencesController.gbColor('ModChatGStatusT');
+    final headerBarColor = convPrefs.actionBarColor != null
+        ? Color(convPrefs.actionBarColor!)
+        : theme.surfaceColor;
     final showDeleted =
         widget.preferencesController.privacy.antiDeleteMessages ||
         widget.preferencesController.gbBool('yoAntiRevoke');
@@ -1629,7 +1643,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             )
           : AppBar(
               automaticallyImplyLeading: false,
-              backgroundColor: theme.surfaceColor,
+              backgroundColor: headerBarColor,
               foregroundColor: theme.primaryTextColor,
               surfaceTintColor: Colors.transparent,
               elevation: 0.5,
@@ -2124,12 +2138,30 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         },
       ),
     );
-    return Row(
+    final chatContent = Row(
       children: [
         if (conversationPrefs.sidebarPosition == 'Left') sidebar(),
         Expanded(child: chat),
         if (conversationPrefs.sidebarPosition == 'Right') sidebar(),
       ],
+    );
+
+    final disableSwipe = widget.preferencesController.universal.disableSwipeToExit;
+    if (disableSwipe) {
+      return chatContent;
+    }
+
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragEnd: (details) {
+        // Swipe from left to right to exit conversation if not disabled
+        if (details.primaryVelocity != null && details.primaryVelocity! > 300) {
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          }
+        }
+      },
+      child: chatContent,
     );
   }
 
@@ -2157,9 +2189,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   /// baked into the forwarded copy's metadata.
   Future<void> _openForwardSheet(ChatMessage message) async {
     final theme = _theme;
-    final targets = widget.dataStore.conversations
+    final maxForwardChats = widget.preferencesController.universal.increaseForwardLimit ? 250 : 5;
+    final allTargets = widget.dataStore.conversations
         .where((c) => c.id != widget.conversationId)
         .toList(growable: false);
+    final targets = allTargets.take(maxForwardChats).toList(growable: false);
     if (!mounted) return;
     if (targets.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2192,7 +2226,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Forward to',
+                        'Forward to (Limit: $maxForwardChats)',
                         style: TextStyle(
                           color: theme.primaryTextColor,
                           fontWeight: FontWeight.w800,

@@ -276,8 +276,12 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     _clearSelection();
   }
 
-  String _formatMessageTime(DateTime value) =>
-      formatConversationTimestamp(value);
+  String _formatMessageTime(DateTime value) {
+    if (widget.preferencesController.home.elapsedTime) {
+      return formatElapsedTime(value);
+    }
+    return formatConversationTimestamp(value);
+  }
 
   String _formatLastSeen(String userId) {
     if (_realtime.isOnline(userId)) return 'online';
@@ -475,11 +479,14 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
             )
             .toList(growable: false);
         final entries = <Object>[];
-        if (archived.isNotEmpty &&
+        final shouldShowArchived = archived.isNotEmpty &&
             !_isSearchOpen &&
-            // Real consumer: 'Hide archived-chat shortcut on home'.
-            !widget.preferencesController.gbBool('key_mas_hide_archive_home'))
+            !homePrefs.hideArchivedChats &&
+            !widget.preferencesController.gbBool('key_mas_hide_archive_home');
+
+        if (shouldShowArchived && homePrefs.archiveChatsOnTop) {
           entries.add(_ArchivedEntry(archivedCount: archived.length));
+        }
         if (pinned.isNotEmpty) {
           if (styleShowSections)
             entries.add(const _ConversationSection('PINNED'));
@@ -498,6 +505,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
           if (styleShowSections && labelMessages)
             entries.add(const _ConversationSection('MESSAGES'));
           entries.addAll(recent);
+        }
+        if (shouldShowArchived && !homePrefs.archiveChatsOnTop) {
+          entries.add(_ArchivedEntry(archivedCount: archived.length));
         }
         final filters = widget.forcedType == null
             ? const <String>['All', 'Unread', 'Groups', 'Direct']
@@ -565,7 +575,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   if (!_isSelectionMode) ...[
                     AnimatedSize(
                       duration: const Duration(milliseconds: 180),
-                      child: _isSearchOpen && homePrefs.showSearchBar
+                      child: _isSearchOpen &&
+                              homePrefs.showSearchBar &&
+                              !homePrefs.disableSearchBar
                           ? Padding(
                               padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
                               child: TextField(
@@ -694,7 +706,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                           },
                         ),
                       ),
-                    if (styleShowFilters)
+                    if (styleShowFilters && !homePrefs.hideChatSortList)
                       Align(
                         alignment: Alignment.centerLeft,
                         child: SingleChildScrollView(
@@ -704,6 +716,14 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                             children: filters
                                 .map((filter) {
                                   final selected = _selectedFilter == filter;
+                                  final chipRadius = switch (homePrefs.tabBubbleStyle) {
+                                    'Capsule Pill' => BorderRadius.circular(20),
+                                    'Glassmorphism Glow' => BorderRadius.circular(14),
+                                    'Soft Rounded Pill' => BorderRadius.circular(10),
+                                    'Outlined Bubble' => BorderRadius.circular(18),
+                                    'Segmented Tab' => BorderRadius.circular(6),
+                                    _ => BorderRadius.circular(20),
+                                  };
                                   return Padding(
                                     padding: const EdgeInsets.only(right: 8),
                                     child: ChoiceChip(
@@ -712,6 +732,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                       selectedColor: theme.accentColor
                                           .withValues(alpha: 0.18),
                                       backgroundColor: theme.cardColor,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: chipRadius,
+                                      ),
                                       side: BorderSide(
                                         color: selected
                                             ? theme.accentColor.withValues(
@@ -925,8 +948,14 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
   // bar carries the account identity; once the large title collapses away the
   // page name takes over in the bar instead of duplicating it underneath.
   String get _compactBarTitle {
+    final homePrefs = widget.preferencesController.home;
     final user = widget.dataStore.currentUser;
-    final fallback = user.displayName.isNotEmpty ? user.displayName : 'Chaty';
+    final identity = homePrefs.setMyName
+        ? (homePrefs.myNameOverride.trim().isNotEmpty
+            ? homePrefs.myNameOverride.trim()
+            : (user.displayName.isNotEmpty ? user.displayName : 'Chaty'))
+        : 'Chaty';
+    final fallback = identity;
     final headerStyle = locator<TemplateController>().home.headerStyle;
     final largeTitleShown = _effectiveTitleCollapse < 0.5;
 
@@ -1420,6 +1449,14 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
       HomeHeaderStyle.searchForward => 19.0,
       HomeHeaderStyle.storiesFirst => 22.0,
     };
+    final effectiveShowSearch =
+        homePrefs.showSearchBar && !homePrefs.disableSearchBar;
+    final userAbout = widget.dataStore.currentUser.about.isNotEmpty
+        ? widget.dataStore.currentUser.about
+        : 'Available';
+    final showStatus =
+        !homePrefs.disableStatusUnderName && userAbout.isNotEmpty;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 4, 6),
       child: Row(
@@ -1433,17 +1470,37 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                     borderRadius: BorderRadius.circular(8),
                     onTap: _handleTopLeftIdentityTap,
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      child: Text(
-                        _compactBarTitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: theme.primaryTextColor,
-                          fontSize: titleFontSize * theme.fontScale,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.4,
-                        ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 2,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _compactBarTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: theme.primaryTextColor,
+                              fontSize: titleFontSize * theme.fontScale,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.4,
+                            ),
+                          ),
+                          if (showStatus)
+                            Text(
+                              userAbout,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: theme.secondaryTextColor,
+                                fontSize: 11 * theme.fontScale,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
@@ -1453,7 +1510,8 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   ListenableBuilder(
                     listenable: locator<ConnectionHealthService>(),
                     builder: (context, _) {
-                      final health = locator<ConnectionHealthService>().health;
+                      final health =
+                          locator<ConnectionHealthService>().health;
                       return ConnectionHealthIndicator(
                         health: health,
                         size: 15,
@@ -1478,7 +1536,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               onPressed: () => _openQrScreen(initialIndex: 1),
               icon: const ChatyGlyphIcon(glyph: ChatyGlyph.qrScan, size: 20),
             ),
-          if (homePrefs.showSearchBar &&
+          if (effectiveShowSearch &&
               headerStyle == HomeHeaderStyle.searchForward)
             IconButton(
               tooltip: _isSearchOpen ? 'Close search' : 'Search chats',
@@ -1489,7 +1547,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                 _isSearchOpen ? Icons.close_rounded : Icons.search_rounded,
               ),
             ),
-          if (homePrefs.showSearchBar &&
+          if (effectiveShowSearch &&
               headerStyle != HomeHeaderStyle.searchForward)
             IconButton(
               tooltip: _isSearchOpen ? 'Close search' : 'Search chats',
@@ -1741,13 +1799,15 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     ThemeConfig theme, {
     double density = 1.0,
   }) {
+    final homePrefs = widget.preferencesController.home;
     final chatListTemplate = locator<TemplateController>().chatList;
-    final cardRows = widget.preferencesController.home.homeStyle == 'Cards';
+    final cardRows = homePrefs.homeStyle == 'Cards';
     final effectiveDensity = density * switch (chatListTemplate.density) {
       ChatListDensity.compact => 0.92,
       ChatListDensity.regular => 1.0,
       ChatListDensity.comfortable => 1.08,
     };
+    final textSizeScale = (homePrefs.screenTextSize / 17.0).clamp(0.7, 1.5);
     final otherId = conversation.participantIds.firstWhere(
       (id) => id != widget.dataStore.currentUser.id,
       orElse: () => '',
@@ -1756,13 +1816,15 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         conversation.type == ConversationType.direct &&
         otherId.isNotEmpty &&
         _realtime.isOnline(otherId) &&
-        // Real consumer: 'Show online state in chat list rows'.
+        !homePrefs.disableContactOnlineLastSeen &&
         widget.preferencesController.gbBool('onlinechat', fallback: true);
     final activity = otherId.isEmpty
         ? null
         : _realtime.activityFor(conversation.id, otherId);
     final presence =
-        conversation.type == ConversationType.direct && otherId.isNotEmpty
+        conversation.type == ConversationType.direct &&
+        otherId.isNotEmpty &&
+        !homePrefs.disableContactOnlineLastSeen
         ? activity?.isRecording == true
               ? 'recording…'
               : activity?.isTyping == true
@@ -1773,6 +1835,35 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     final locked = widget.preferencesController.isConversationLocked(
       conversation.id,
     );
+
+    // Color resolution prioritizing typed HomePreferences over legacy GB keys over theme
+    final contactNameColor = homePrefs.rowContactNameColor != null
+        ? Color(homePrefs.rowContactNameColor!)
+        : theme.primaryTextColor;
+    final messageTextColor = homePrefs.rowTextColor != null
+        ? Color(homePrefs.rowTextColor!)
+        : theme.secondaryTextColor;
+    final onlineColor = homePrefs.contactOnlineColor != null
+        ? Color(homePrefs.contactOnlineColor!)
+        : (widget.preferencesController.gbColor('ModOnlineColor') ??
+            theme.successColor);
+    final lastSeenColor = homePrefs.lastSeenColor != null
+        ? Color(homePrefs.lastSeenColor!)
+        : (widget.preferencesController.gbColor('ModlastseenColor') ??
+            theme.secondaryTextColor);
+    final onlineDotColor = homePrefs.onlineDotColor != null
+        ? Color(homePrefs.onlineDotColor!)
+        : (widget.preferencesController.gbColor('onlineDotchatColor') ??
+            theme.successColor);
+    final unreadBgColor = homePrefs.unreadCounterColor != null
+        ? Color(homePrefs.unreadCounterColor!)
+        : (widget.preferencesController.gbColor('HomeCounterBK') ??
+            theme.accentColor);
+    final unreadTextColor = homePrefs.unreadCounterTextColor != null
+        ? Color(homePrefs.unreadCounterTextColor!)
+        : (widget.preferencesController.gbColor('HomeCounterText') ??
+            theme.onAccentColor);
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1842,6 +1933,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                             )
                           else if (chatListTemplate.showPresenceBadge &&
                               online &&
+                              !homePrefs.disableOnlineDot &&
                               widget.preferencesController.gbBool(
                                 'onlineDotchat',
                                 fallback: true,
@@ -1853,11 +1945,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                               child: ChatyOnlineDot(
                                 active: true,
                                 avatarSize: 50 * density,
-                                color:
-                                    widget.preferencesController.gbColor(
-                                      'onlineDotchatColor',
-                                    ) ??
-                                    theme.successColor,
+                                color: onlineDotColor,
                                 ringColor: theme.backgroundColor,
                               ),
                             ),
@@ -1896,11 +1984,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                               style: TextStyle(
-                                                color: theme.primaryTextColor,
-                                                // WA-iOS row metrics: 16pt name.
+                                                color: contactNameColor,
                                                 fontSize:
                                                     16 *
                                                     effectiveDensity *
+                                                    textSizeScale *
                                                     theme.fontScale,
                                                 fontWeight:
                                                     conversation.unreadCount > 0
@@ -1952,6 +2040,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                                       fontSize:
                                                           13.5 *
                                                           effectiveDensity *
+                                                          textSizeScale *
                                                           theme.fontScale,
                                                     ),
                                                   ),
@@ -1959,11 +2048,12 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                                     text:
                                                         conversation.draftText,
                                                     style: TextStyle(
-                                                      color: theme
-                                                          .secondaryTextColor,
+                                                      color: messageTextColor,
                                                       fontSize:
                                                           13.5 *
-                                                          effectiveDensity * theme.fontScale,
+                                                          effectiveDensity *
+                                                          textSizeScale *
+                                                          theme.fontScale,
                                                     ),
                                                   ),
                                                 ],
@@ -1993,11 +2083,12 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                                     ? theme.successColor
                                                     : conversation.unreadCount >
                                                           0
-                                                    ? theme.primaryTextColor
-                                                    : theme.secondaryTextColor,
+                                                    ? contactNameColor
+                                                    : messageTextColor,
                                                 fontSize:
                                                     13.5 *
                                                     effectiveDensity *
+                                                    textSizeScale *
                                                     theme.fontScale,
                                                 fontWeight:
                                                     activity?.isTyping ==
@@ -2025,20 +2116,10 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
-                                            // Real consumers: online / last-seen
-                                            // text colors for chat rows.
                                             color: online
-                                                ? widget.preferencesController
-                                                          .gbColor(
-                                                            'ModOnlineColor',
-                                                          ) ??
-                                                      theme.successColor
-                                                : widget.preferencesController
-                                                          .gbColor(
-                                                            'ModlastseenColor',
-                                                          ) ??
-                                                      theme.secondaryTextColor,
-                                            fontSize: 9.5,
+                                                ? onlineColor
+                                                : lastSeenColor,
+                                            fontSize: 9.5 * textSizeScale,
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
@@ -2062,17 +2143,10 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                     ],
                                     if (conversation.unreadCount > 0) ...[
                                       const SizedBox(width: 7),
-                                      // Real consumer: unread badge color keys.
                                       ChatyCountBadge(
                                         count: conversation.unreadCount,
-                                        color:
-                                            widget.preferencesController
-                                                .gbColor('HomeCounterBK') ??
-                                            theme.accentColor,
-                                        textColor:
-                                            widget.preferencesController
-                                                .gbColor('HomeCounterText') ??
-                                            theme.onAccentColor,
+                                        color: unreadBgColor,
+                                        textColor: unreadTextColor,
                                       ),
                                     ],
                                   ],
@@ -2091,7 +2165,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         ),
       ),
     ),
-      if (chatListTemplate.showDivider)
+      if (chatListTemplate.showDivider && !homePrefs.hideChatsDivider)
           Padding(
             padding: const EdgeInsets.only(left: 76, right: 16),
             child: Divider(

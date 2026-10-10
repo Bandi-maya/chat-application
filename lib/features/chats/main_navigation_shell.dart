@@ -1378,17 +1378,26 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     );
   }
 
-  Widget _buildContextualFab({
+  Widget? _buildContextualFab({
     required BuildContext context,
     required dynamic theme,
     required AppColors colors,
     required Color accent,
     required _NavDestinationItem activeItem,
   }) {
-    final (IconData icon, String tooltip, VoidCallback action) =
+    final prefsController = locator<ChatyPreferencesController>();
+    final homePrefs = prefsController.home;
+
+    if (homePrefs.hideFab) {
+      return null;
+    }
+
+    final (IconData defaultIcon, String tooltip, VoidCallback action) =
         switch (activeItem.id) {
       'chats' => (
-          Icons.chat_bubble_rounded,
+          homePrefs.showMetaAiIcon
+              ? Icons.psychology_rounded
+              : Icons.chat_bubble_rounded,
           'New conversation',
           () {
             HapticFeedback.lightImpact();
@@ -1520,13 +1529,24 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         ),
     };
 
+    final effectiveFabColor = homePrefs.fabNormalColor != null
+        ? Color(homePrefs.fabNormalColor!)
+        : accent;
+    final effectiveSplashColor = homePrefs.fabPressedColor != null
+        ? Color(homePrefs.fabPressedColor!)
+        : null;
+    final effectiveIconColor = homePrefs.fabIconsColor != null
+        ? Color(homePrefs.fabIconsColor!)
+        : colors.onPrimary;
+
     return FloatingActionButton(
       heroTag: 'chaty_contextual_nav_fab',
       tooltip: tooltip,
       shape: const CircleBorder(),
       elevation: 4.5,
-      backgroundColor: accent,
-      foregroundColor: colors.onPrimary,
+      backgroundColor: effectiveFabColor,
+      splashColor: effectiveSplashColor,
+      foregroundColor: effectiveIconColor,
       onPressed: action,
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
@@ -1540,9 +1560,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           );
         },
         child: Icon(
-          icon,
-          key: ValueKey<String>(activeItem.id),
+          defaultIcon,
+          key: ValueKey<String>('${activeItem.id}_${homePrefs.showMetaAiIcon}'),
           size: 24,
+          color: effectiveIconColor,
         ),
       ),
     );

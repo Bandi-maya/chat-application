@@ -52,8 +52,10 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
   void _onNotificationChanged() {
     final latest = widget.notificationService.latest;
     if (latest == null || latest.id == _lastNotificationId) return;
-    if (!widget.preferencesController.notification.enableGlobalNotifications)
+    if (!widget.preferencesController.notification.enableGlobalNotifications ||
+        widget.preferencesController.universal.disableHeadsUpNotification) {
       return;
+    }
     _hideTimer?.cancel();
     if (mounted) {
       setState(() {

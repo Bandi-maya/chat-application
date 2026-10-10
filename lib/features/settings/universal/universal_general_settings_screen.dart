@@ -1,11 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/design_system.dart';
 import '../../../ui/core/design_system/gb_design_system.dart';
 
-class UniversalGeneralSettingsScreen extends StatelessWidget {
+class UniversalGeneralSettingsScreen extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
 
   const UniversalGeneralSettingsScreen({
@@ -13,8 +16,73 @@ class UniversalGeneralSettingsScreen extends StatelessWidget {
     required this.preferencesController,
   });
 
+  @override
+  State<UniversalGeneralSettingsScreen> createState() => _UniversalGeneralSettingsScreenState();
+}
+
+class _UniversalGeneralSettingsScreenState extends State<UniversalGeneralSettingsScreen> {
+  int _logSizeBytes = 0;
+  bool _calculatingLogs = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshLogSize();
+  }
+
+  Future<void> _refreshLogSize() async {
+    setState(() => _calculatingLogs = true);
+    try {
+      final temp = await getTemporaryDirectory();
+      int total = 0;
+      if (await temp.exists()) {
+        await for (final entity in temp.list(recursive: true, followLinks: false)) {
+          if (entity is File) {
+            final name = entity.uri.pathSegments.last.toLowerCase();
+            if (name.endsWith('.log') || name.startsWith('chaty_') || name.contains('cache')) {
+              total += await entity.length();
+            }
+          }
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _logSizeBytes = total;
+          _calculatingLogs = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _calculatingLogs = false);
+    }
+  }
+
+  Future<void> _clearLogs() async {
+    int freed = 0;
+    try {
+      final temp = await getTemporaryDirectory();
+      if (await temp.exists()) {
+        await for (final entity in temp.list(recursive: true, followLinks: false)) {
+          if (entity is File) {
+            final name = entity.uri.pathSegments.last.toLowerCase();
+            if (name.endsWith('.log') || name.startsWith('chaty_') || name.contains('cache')) {
+              final len = await entity.length();
+              await entity.delete();
+              freed += len;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+    await _refreshLogSize();
+    if (!mounted) return;
+    final freedMb = (freed / (1024 * 1024)).toStringAsFixed(1);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Chaty debug logs & temp files cleared ($freedMb MB freed)')),
+    );
+  }
+
   void _showTranslateSettingsModal(BuildContext context, ThemeData gbTheme) {
-    final prefs = preferencesController.universal;
+    final prefs = widget.preferencesController.universal;
     GbRadioSelectionModal.show<String>(
       context: context,
       title: 'Translate Option Settings',
@@ -23,7 +91,7 @@ class UniversalGeneralSettingsScreen extends StatelessWidget {
           ? 'In-app Translation (Offline/Direct)'
           : 'Server Translation (Google/Cloud)',
       onSelected: (val) {
-        preferencesController.updateUniversal(
+        widget.preferencesController.updateUniversal(
           prefs.copyWith(
             translateOption: val.startsWith('In-app') ? 'In-app' : 'Server',
           ),
@@ -33,7 +101,7 @@ class UniversalGeneralSettingsScreen extends StatelessWidget {
   }
 
   void _showLanguageModal(BuildContext context, ThemeData gbTheme) {
-    final prefs = preferencesController.universal;
+    final prefs = widget.preferencesController.universal;
     final languages = [
       'Show All',
       'English (US)',
@@ -52,7 +120,7 @@ class UniversalGeneralSettingsScreen extends StatelessWidget {
       options: languages,
       selectedOption: prefs.translationLanguage,
       onSelected: (val) {
-        preferencesController.updateUniversal(
+        widget.preferencesController.updateUniversal(
           prefs.copyWith(translationLanguage: val),
         );
       },
@@ -60,14 +128,14 @@ class UniversalGeneralSettingsScreen extends StatelessWidget {
   }
 
   void _showGifProviderModal(BuildContext context, ThemeData gbTheme) {
-    final prefs = preferencesController.universal;
+    final prefs = widget.preferencesController.universal;
     GbRadioSelectionModal.show<String>(
       context: context,
       title: 'GIF Provider',
       options: ['Tenor', 'Giphy'],
       selectedOption: prefs.gifProvider,
       onSelected: (val) {
-        preferencesController.updateUniversal(
+        widget.preferencesController.updateUniversal(
           prefs.copyWith(gifProvider: val),
         );
       },
@@ -78,10 +146,10 @@ class UniversalGeneralSettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeController = locator<ThemeController>();
     return ListenableBuilder(
-      listenable: Listenable.merge([preferencesController, themeController]),
+      listenable: Listenable.merge([widget.preferencesController, themeController]),
       builder: (context, _) {
         final theme = themeController.globalTheme;
-        final prefs = preferencesController.universal;
+        final prefs = widget.preferencesController.universal;
         final gbTheme = Theme.of(context);
 
         return Scaffold(
@@ -138,7 +206,7 @@ class UniversalGeneralSettingsScreen extends StatelessWidget {
                       subtitle: 'Every chat you open will become a card, can switch from Recents easily',
                       value: prefs.conversationCards,
                       onChanged: (val) {
-                        preferencesController.updateUniversal(
+                        widget.preferencesController.updateUniversal(
                           prefs.copyWith(conversationCards: val),
                         );
                       },
@@ -149,7 +217,7 @@ class UniversalGeneralSettingsScreen extends StatelessWidget {
                       subtitle: 'Disable Heads-Up Popup in notifications',
                       value: prefs.disableHeadsUpNotification,
                       onChanged: (val) {
-                        preferencesController.updateUniversal(
+                        widget.preferencesController.updateUniversal(
                           prefs.copyWith(disableHeadsUpNotification: val),
                         );
                       },
@@ -160,7 +228,7 @@ class UniversalGeneralSettingsScreen extends StatelessWidget {
                       subtitle: 'Disables the messages counter on the icon in Home Screen/Launcher',
                       value: prefs.disableBadgeCounter,
                       onChanged: (val) {
-                        preferencesController.updateUniversal(
+                        widget.preferencesController.updateUniversal(
                           prefs.copyWith(disableBadgeCounter: val),
                         );
                       },
@@ -171,7 +239,7 @@ class UniversalGeneralSettingsScreen extends StatelessWidget {
                       subtitle: 'Remove the notification when playing voice notes/audio',
                       value: prefs.disableAudioPlayingNotification,
                       onChanged: (val) {
-                        preferencesController.updateUniversal(
+                        widget.preferencesController.updateUniversal(
                           prefs.copyWith(disableAudioPlayingNotification: val),
                         );
                       },
@@ -182,7 +250,7 @@ class UniversalGeneralSettingsScreen extends StatelessWidget {
                       subtitle: 'Forward messages up to 250 chats!',
                       value: prefs.increaseForwardLimit,
                       onChanged: (val) {
-                        preferencesController.updateUniversal(
+                        widget.preferencesController.updateUniversal(
                           prefs.copyWith(increaseForwardLimit: val),
                         );
                       },
@@ -193,7 +261,7 @@ class UniversalGeneralSettingsScreen extends StatelessWidget {
                       subtitle: 'Prevents closing the conversation by swiping from left to right',
                       value: prefs.disableSwipeToExit,
                       onChanged: (val) {
-                        preferencesController.updateUniversal(
+                        widget.preferencesController.updateUniversal(
                           prefs.copyWith(disableSwipeToExit: val),
                         );
                       },
@@ -204,7 +272,7 @@ class UniversalGeneralSettingsScreen extends StatelessWidget {
                       subtitle: 'Stay Always online, but don\'t close from Recents!',
                       value: prefs.enableAlwaysOnline,
                       onChanged: (val) {
-                        preferencesController.updateUniversal(
+                        widget.preferencesController.updateUniversal(
                           prefs.copyWith(enableAlwaysOnline: val),
                         );
                       },
@@ -219,13 +287,11 @@ class UniversalGeneralSettingsScreen extends StatelessWidget {
                     GbSettingRow(
                       icon: Icons.cleaning_services_rounded,
                       title: 'Clear Chaty Logs',
-                      subtitle: '55 MB',
+                      subtitle: _calculatingLogs
+                          ? 'Calculating…'
+                          : '${(_logSizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB',
                       hasSubScreen: false,
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Chaty debug logs cleared (55 MB freed)')),
-                        );
-                      },
+                      onTap: _clearLogs,
                     ),
                   ],
                 ),
@@ -244,7 +310,7 @@ class UniversalGeneralSettingsScreen extends StatelessWidget {
                       divisions: 5,
                       unit: 'MB',
                       onChanged: (val) {
-                        preferencesController.updateUniversal(
+                        widget.preferencesController.updateUniversal(
                           prefs.copyWith(sendImagesFullResolutionMb: val.round()),
                         );
                       },

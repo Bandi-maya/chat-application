@@ -19,36 +19,44 @@ class ImageThemeGenerator {
       targetWidth: 64,
       targetHeight: 64,
     );
-    final frame = await codec.getNextFrame();
-    final image = frame.image;
-    final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
-
+    ui.FrameInfo? frame;
+    ui.Image? image;
     Color dominant = const Color(0xFF6366F1);
-    if (byteData != null) {
-      int rSum = 0;
-      int gSum = 0;
-      int bSum = 0;
-      int count = 0;
-      for (int i = 0; i < byteData.lengthInBytes; i += 16) {
-        final r = byteData.getUint8(i);
-        final g = byteData.getUint8(i + 1);
-        final b = byteData.getUint8(i + 2);
-        final a = byteData.getUint8(i + 3);
-        if (a > 128) {
-          rSum += r;
-          gSum += g;
-          bSum += b;
-          count++;
+
+    try {
+      frame = await codec.getNextFrame();
+      image = frame.image;
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+
+      if (byteData != null) {
+        int rSum = 0;
+        int gSum = 0;
+        int bSum = 0;
+        int count = 0;
+        for (int i = 0; i < byteData.lengthInBytes; i += 16) {
+          final r = byteData.getUint8(i);
+          final g = byteData.getUint8(i + 1);
+          final b = byteData.getUint8(i + 2);
+          final a = byteData.getUint8(i + 3);
+          if (a > 128) {
+            rSum += r;
+            gSum += g;
+            bSum += b;
+            count++;
+          }
+        }
+        if (count > 0) {
+          dominant = Color.fromARGB(
+            255,
+            rSum ~/ count,
+            gSum ~/ count,
+            bSum ~/ count,
+          );
         }
       }
-      if (count > 0) {
-        dominant = Color.fromARGB(
-          255,
-          rSum ~/ count,
-          gSum ~/ count,
-          bSum ~/ count,
-        );
-      }
+    } finally {
+      image?.dispose();
+      codec.dispose();
     }
 
     final vibrant = dominant;
@@ -72,14 +80,16 @@ class ImageThemeGenerator {
         : const Color(0xFF64748B);
 
     final outgoingBubble = vibrant;
-    final outgoingText = vibrant.computeLuminance() > 0.5
+    final outgoingText = ThemeConfig.calculateContrastRatio(Colors.black, outgoingBubble) >= 4.5
         ? Colors.black
         : Colors.white;
 
     final incomingBubble = surfaceColor;
-    final incomingText = primaryText;
+    final incomingText = ThemeConfig.calculateContrastRatio(primaryText, incomingBubble) >= 3.5
+        ? primaryText
+        : (isDark ? Colors.white : Colors.black);
 
-    return ThemeConfig(
+    final config = ThemeConfig(
       id: 'image_theme_${DateTime.now().millisecondsSinceEpoch}',
       name: 'Custom Image Theme',
       brightness: isDark ? Brightness.dark : Brightness.light,
@@ -101,5 +111,7 @@ class ImageThemeGenerator {
       fontScale: 1.0,
       wallpaperId: 'subtle_dots',
     );
+
+    return config;
   }
 }

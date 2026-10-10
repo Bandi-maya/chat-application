@@ -55,7 +55,7 @@ class ThemePreviewCard extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(20),
           child: Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -64,8 +64,8 @@ class ThemePreviewCard extends StatelessWidget {
                   children: [
                     // Radio indicator
                     Container(
-                      width: 20,
-                      height: 20,
+                      width: 18,
+                      height: 18,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: isSelected
@@ -83,8 +83,8 @@ class ThemePreviewCard extends StatelessWidget {
                       child: isSelected
                           ? Center(
                               child: Container(
-                                width: 8,
-                                height: 8,
+                                width: 6,
+                                height: 6,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   color:
@@ -96,13 +96,15 @@ class ThemePreviewCard extends StatelessWidget {
                             )
                           : null,
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         themeConfig.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: themeConfig.primaryTextColor,
-                          fontSize: 15.5,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
                           letterSpacing: -0.2,
                         ),
@@ -111,8 +113,8 @@ class ThemePreviewCard extends StatelessWidget {
                     // Brightness pill
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 2,
+                        horizontal: 6,
+                        vertical: 1.5,
                       ),
                       decoration: BoxDecoration(
                         color: themeConfig.surfaceColor,
@@ -129,24 +131,24 @@ class ThemePreviewCard extends StatelessWidget {
                             : 'LIGHT',
                         style: TextStyle(
                           color: themeConfig.secondaryTextColor,
-                          fontSize: 10,
+                          fontSize: 9.5,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
 
                 // Mini App Canvas Preview
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 12,
+                    horizontal: 8,
+                    vertical: 8,
                   ),
                   decoration: BoxDecoration(
                     color: themeConfig.surfaceColor,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: themeConfig.secondaryTextColor.withValues(
                         alpha: 0.15,
@@ -159,8 +161,8 @@ class ThemePreviewCard extends StatelessWidget {
                       Row(
                         children: [
                           Container(
-                            width: 20,
-                            height: 20,
+                            width: 16,
+                            height: 16,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: themeConfig.cardColor,
@@ -170,25 +172,25 @@ class ThemePreviewCard extends StatelessWidget {
                                 'M',
                                 style: TextStyle(
                                   color: themeConfig.primaryTextColor,
-                                  fontSize: 10,
+                                  fontSize: 8.5,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 5),
                           Text(
                             'Maya',
                             style: TextStyle(
                               color: themeConfig.primaryTextColor,
-                              fontSize: 12,
+                              fontSize: 11,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                           const Spacer(),
                           Container(
-                            width: 6,
-                            height: 6,
+                            width: 5,
+                            height: 5,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: themeConfig.successColor,
@@ -196,7 +198,7 @@ class ThemePreviewCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 6),
 
                       // Incoming message preview
                       Align(
@@ -212,20 +214,20 @@ class ThemePreviewCard extends StatelessWidget {
                           ),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
+                              horizontal: 8,
+                              vertical: 4,
                             ),
                             child: Text(
                               'Sounds good! 9:41',
                               style: TextStyle(
                                 color: themeConfig.incomingTextColor,
-                                fontSize: 11.5,
+                                fontSize: 10.5,
                               ),
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
 
                       // Outgoing message preview with real tick
                       Align(
@@ -242,8 +244,8 @@ class ThemePreviewCard extends StatelessWidget {
                           ),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
+                              horizontal: 8,
+                              vertical: 4,
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -252,10 +254,10 @@ class ThemePreviewCard extends StatelessWidget {
                                   'Sure 👍',
                                   style: TextStyle(
                                     color: themeConfig.outgoingTextColor,
-                                    fontSize: 11.5,
+                                    fontSize: 10.5,
                                   ),
                                 ),
-                                const SizedBox(width: 5),
+                                const SizedBox(width: 4),
                                 DeliveryStatusIcon(
                                   style: tickStyle,
                                   state: DeliveryState.read,
@@ -265,7 +267,7 @@ class ThemePreviewCard extends StatelessWidget {
                                       themeConfig.brightness == Brightness.dark
                                       ? themeConfig.accentColor
                                       : Colors.white,
-                                  size: 13,
+                                  size: 11.5,
                                 ),
                               ],
                             ),
@@ -275,29 +277,33 @@ class ThemePreviewCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
 
                 // Palette Swatches Footer
                 Row(
                   children: [
                     _colorDot(themeConfig.backgroundColor, 'Bg'),
-                    const SizedBox(width: 5),
+                    const SizedBox(width: 4),
                     _colorDot(themeConfig.surfaceColor, 'Surface'),
-                    const SizedBox(width: 5),
+                    const SizedBox(width: 4),
                     _colorDot(themeConfig.accentColor, 'Accent'),
-                    const SizedBox(width: 5),
+                    const SizedBox(width: 4),
                     _colorDot(themeConfig.outgoingBubbleColor, 'Bubble'),
                     const Spacer(),
-                    Text(
-                      isSelected ? '● Active' : 'Tap to apply',
-                      style: TextStyle(
-                        color: isSelected
-                            ? themeConfig.accentColor
-                            : themeConfig.secondaryTextColor,
-                        fontSize: 11.5,
-                        fontWeight: isSelected
-                            ? FontWeight.bold
-                            : FontWeight.w500,
+                    Flexible(
+                      child: Text(
+                        isSelected ? '● Active' : 'Apply',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: isSelected
+                              ? themeConfig.accentColor
+                              : themeConfig.secondaryTextColor,
+                          fontSize: 11,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.w500,
+                        ),
                       ),
                     ),
                   ],

@@ -154,7 +154,7 @@ class GbSettingsScreen extends StatelessWidget {
                   iconBgColor: colors.warning.withValues(alpha: 0.14),
                   iconColor: colors.warning,
                   title: 'GBThemes',
-                  subtitle: 'Download Themes • Reset',
+                  subtitle: '23 Presets • Photo Palette • Import/Export • Reset',
                   onTap: () {
                     HapticFeedback.selectionClick();
                     Navigator.of(context).push(

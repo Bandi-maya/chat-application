@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:chat/data/services/backend_service.dart';
@@ -53,13 +54,18 @@ final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 /// Applies the selected typography preset to the Material text system, not
 /// just the global text scaler. Font families use platform-provided generics
 /// so this remains asset-free and works on Android and iOS.
-ThemeData _applyTypographyStyle(ThemeData base, String preset) {
-  final family = switch (preset) {
+ThemeData _applyTypographyStyle(ThemeData base, String preset, [String? universalPreset]) {
+  final effectivePreset = (preset.isEmpty || preset == 'Default')
+      ? (universalPreset ?? preset)
+      : preset;
+  final family = switch (effectivePreset) {
     'Editorial' || 'Classic' => 'serif',
-    'Rounded' => 'sans-serif-rounded',
-    'Technical' => 'monospace',
+    'Rounded' || 'Comfortaa' => 'sans-serif-rounded',
+    'Technical' || 'TRANSFORMERS' => 'monospace',
+    'ComicSans' => 'cursive',
+    'Bariol' => 'sans-serif-condensed',
     'Geometric' || 'Product Sans' || 'Modern' || 'Business' ||
-    'Creator' || 'Focus' => 'sans-serif',
+    'Creator' || 'Focus' || 'ProductSans' || 'FrutigerLTStdRoman' || 'Roboto-Light' || 'Roboto-Medium' => 'sans-serif',
     _ => null,
   };
   final letterSpacingDelta = switch (preset) {
@@ -591,7 +597,8 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     final ghost =
         _preferencesController.home.ghostMode ||
         _preferencesController.gbBool('yo_want_ghostmode');
-    final alwaysOnline = _preferencesController.gbBool('always_online');
+    final alwaysOnline = _preferencesController.universal.enableAlwaysOnline ||
+        _preferencesController.gbBool('always_online');
     if (airplane || ghost) {
       unawaited(_backend.setPresence(PresenceState.offline));
       return;
@@ -628,6 +635,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
         final appTheme = _applyTypographyStyle(
           currentTheme.toThemeData(),
           _appearanceController.typographyStyle,
+          _preferencesController.universal.fontStyle,
         );
         return MaterialApp(
           navigatorKey: _rootNavigatorKey,
@@ -726,51 +734,75 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
               ],
             );
 
-            if (!shouldShowLock && !showIncoming) return baseStack;
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                baseStack,
-                if (showIncoming)
-                  _IncomingCallOverlay(
-                    call: incomingCall,
-                    theme: currentTheme,
-                    onAccept: () {
-                      unawaited(() async {
-                        try {
-                          await _callService.acceptCall();
-                          if (!mounted) return;
-                          _rootNavigatorKey.currentState?.push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  OngoingCallScreen(theme: currentTheme),
-                            ),
-                          );
-                        } catch (error) {
-                          final callContext = _rootNavigatorKey.currentContext;
-                          if (callContext != null) {
-                            ScaffoldMessenger.of(callContext).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Unable to answer call: ${error.toString().replaceFirst('Exception: ', '')}',
-                                ),
-                              ),
-                            );
-                          }
-                        }
-                      }());
-                    },
-                    onDecline: () => unawaited(_callService.declineCall()),
-                  ),
-                if (shouldShowLock)
-                  AppLockOverlayModal(
-                    preferencesController: _preferencesController,
-                    lockService: _lockService,
-                    title: 'Chaty Locked',
-                    reason: 'Authenticate to unlock Chaty',
-                    onUnlocked: _handleAppUnlocked,
-                  ),
-              ],
+            final universal = _preferencesController.universal;
+            final statusBarColor = universal.statusBarColor != null
+                ? Color(universal.statusBarColor!)
+                : currentTheme.surfaceColor;
+            final navBarColor = universal.navigationBarColor != null
+                ? Color(universal.navigationBarColor!)
+                : currentTheme.surfaceColor;
+            final overlayStyle = SystemUiOverlayStyle(
+              statusBarColor: statusBarColor,
+              statusBarIconBrightness: statusBarColor.computeLuminance() > 0.5
+                  ? Brightness.dark
+                  : Brightness.light,
+              systemNavigationBarColor: navBarColor,
+              systemNavigationBarIconBrightness: navBarColor.computeLuminance() > 0.5
+                  ? Brightness.dark
+                  : Brightness.light,
+            );
+
+            final rootApp = (!shouldShowLock && !showIncoming)
+                ? baseStack
+                : Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      baseStack,
+                      if (showIncoming)
+                        _IncomingCallOverlay(
+                          call: incomingCall,
+                          theme: currentTheme,
+                          onAccept: () {
+                            unawaited(() async {
+                              try {
+                                await _callService.acceptCall();
+                                if (!mounted) return;
+                                _rootNavigatorKey.currentState?.push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        OngoingCallScreen(theme: currentTheme),
+                                  ),
+                                );
+                              } catch (error) {
+                                final callContext = _rootNavigatorKey.currentContext;
+                                if (callContext != null) {
+                                  ScaffoldMessenger.of(callContext).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Unable to answer call: ${error.toString().replaceFirst('Exception: ', '')}',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
+                            }());
+                          },
+                          onDecline: () => unawaited(_callService.declineCall()),
+                        ),
+                      if (shouldShowLock)
+                        AppLockOverlayModal(
+                          preferencesController: _preferencesController,
+                          lockService: _lockService,
+                          title: 'Chaty Locked',
+                          reason: 'Authenticate to unlock Chaty',
+                          onUnlocked: _handleAppUnlocked,
+                        ),
+                    ],
+                  );
+
+            return AnnotatedRegion<SystemUiOverlayStyle>(
+              value: overlayStyle,
+              child: rootApp,
             );
           },
           home: switch (resolveAuthBootstrapDestination(

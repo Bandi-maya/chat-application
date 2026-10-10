@@ -149,8 +149,11 @@ class NotificationChannelManager extends ChangeNotifier {
 
   /// Calculates real unread message count and updates launcher badge.
   Future<void> syncUnreadBadgeCount() async {
-    if (!preferences.notification.enableGlobalNotifications) {
+    if (!preferences.notification.enableGlobalNotifications ||
+        preferences.universal.disableBadgeCounter) {
       _badgeCount = 0;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_badgeCountKey, 0);
       notifyListeners();
       return;
     }
