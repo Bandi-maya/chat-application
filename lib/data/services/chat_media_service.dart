@@ -156,6 +156,17 @@ class ChatMediaService {
   }
 
   int _maxBytes(String type) {
+    if (type == 'image') {
+      final fullResMb = _preferences.universal.sendImagesFullResolutionMb
+          .clamp(1, 6)
+          .toDouble();
+      final configured = _preferences.gbDouble(
+        'Up_size_limit',
+        fallback: fullResMb,
+      );
+      final effectiveMb = configured.clamp(1, storageLimitMb).round();
+      return effectiveMb * 1024 * 1024;
+    }
     final configured = type == 'audio'
         ? _preferences.gbDouble(
             'abo_saleh_audio_limit_check',

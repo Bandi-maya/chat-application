@@ -21,29 +21,60 @@ class GbThemeOverrides {
     }
 
     final dark = base.brightness == Brightness.dark;
-    final accent = firstColor(<String>[
+    final universal = prefs.universal;
+    final universalAccent = universal.universalColor != null
+        ? Color(universal.universalColor!)
+        : null;
+    final universalBg = universal.backgroundColor != null
+        ? Color(universal.backgroundColor!)
+        : null;
+    final universalText = universal.universalActionBarTextColor != null
+        ? Color(universal.universalActionBarTextColor!)
+        : null;
+
+    final conv = prefs.conversation;
+    final convBg = conv.convBackgroundColor != null
+        ? Color(conv.convBackgroundColor!)
+        : null;
+    final convRightBubble = conv.rightBubbleColor != null
+        ? Color(conv.rightBubbleColor!)
+        : null;
+    final convLeftBubble = conv.leftBubbleColor != null
+        ? Color(conv.leftBubbleColor!)
+        : null;
+    final convRightText = conv.rightChatBubbleTextColor != null
+        ? Color(conv.rightChatBubbleTextColor!)
+        : null;
+    final convLeftText = conv.leftChatBubbleTextColor != null
+        ? Color(conv.leftChatBubbleTextColor!)
+        : null;
+    final convLink = conv.hyperlinksColor != null
+        ? Color(conv.hyperlinksColor!)
+        : null;
+
+    final accent = universalAccent ?? firstColor(<String>[
       if (dark) 'ModDarkConPickColor',
       'ModConPickColor',
       'ModConColor',
       'tabindicator',
     ]);
-    final background = firstColor(<String>[
+    final background = convBg ?? universalBg ?? firstColor(<String>[
       if (dark) 'ModDarkConPickColorNav',
       'ModConBackColor',
       'list_bg_color',
       'ConvoBack',
     ]);
     final surface = firstColor(<String>['ModChatColor', 'BGColor']);
-    final primaryText = firstColor(<String>[
+    final primaryText = universalText ?? firstColor(<String>[
       'ModConTextColor',
       'HomeBarText',
       'ModContactNameColor',
     ]);
-    final outgoingBubble = firstColor(<String>['ModChatRightBubble']);
-    final incomingBubble = firstColor(<String>['ModChatLeftBubble']);
-    final outgoingText = firstColor(<String>['ModChatBubbleRightColor']);
-    final incomingText = firstColor(<String>['ModChatBubbleLeftColor']);
-    final link = firstColor(<String>['ModChatLinkColor']);
+    final outgoingBubble = convRightBubble ?? firstColor(<String>['ModChatRightBubble']);
+    final incomingBubble = convLeftBubble ?? firstColor(<String>['ModChatLeftBubble']);
+    final outgoingText = convRightText ?? firstColor(<String>['ModChatBubbleRightColor']);
+    final incomingText = convLeftText ?? firstColor(<String>['ModChatBubbleLeftColor']);
+    final link = convLink ?? firstColor(<String>['ModChatLinkColor']);
     final fontScaleRaw = prefs.gbDouble('font_scale');
     final fontScale = (fontScaleRaw > 0.0 && fontScaleRaw.isFinite)
         ? fontScaleRaw.clamp(0.5, 2.0)

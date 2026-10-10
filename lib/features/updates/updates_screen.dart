@@ -43,6 +43,17 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
       mode: ChatyCaptureMode.story,
     );
     if (result == null || !mounted) return;
+
+    if (widget.preferencesController.status.confirmBeforeSendingStatus) {
+      final confirmed = await ChatyConfirmDialog.show(
+        context,
+        title: 'Post this status?',
+        message: 'Your update will be shared with your contacts for 24 hours.',
+        confirmLabel: 'Send',
+      );
+      if (confirmed != true || !mounted) return;
+    }
+
     try {
       await _statusService.publishMediaFile(
         path: result.path,
@@ -77,6 +88,19 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
         return StatefulBuilder(
           builder: (context, setSheetState) {
             Future<void> publishMedia(String type) async {
+              if (widget
+                  .preferencesController
+                  .status
+                  .confirmBeforeSendingStatus) {
+                final confirmed = await ChatyConfirmDialog.show(
+                  context,
+                  title: 'Post this status update?',
+                  message: 'This status will be shared with your contacts.',
+                  confirmLabel: 'Send',
+                );
+                if (confirmed != true) return;
+              }
+
               setSheetState(() => busyType = type);
               try {
                 final status = await _statusService.pickAndPublish(
@@ -102,6 +126,19 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
             }
 
             Future<void> publishText() async {
+              if (widget
+                  .preferencesController
+                  .status
+                  .confirmBeforeSendingStatus) {
+                final confirmed = await ChatyConfirmDialog.show(
+                  context,
+                  title: 'Post text status?',
+                  message: 'This status will be visible to your contacts.',
+                  confirmLabel: 'Send',
+                );
+                if (confirmed != true) return;
+              }
+
               setSheetState(() => busyType = 'text');
               try {
                 await _statusService.publishText(textController.text);
@@ -624,7 +661,9 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: colors.foreground,
+                  color: widget.preferencesController.status.contactNameColor != null
+                      ? Color(widget.preferencesController.status.contactNameColor!)
+                      : colors.foreground,
                   fontSize: 11.5,
                   fontWeight: FontWeight.w700,
                 ),
@@ -674,7 +713,9 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: colors.foreground,
+                  color: widget.preferencesController.status.contactNameColor != null
+                      ? Color(widget.preferencesController.status.contactNameColor!)
+                      : colors.foreground,
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),
@@ -728,7 +769,11 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                       _statusTitle(status),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: ChatyTypography.title(colors.foreground),
+                      style: ChatyTypography.title(
+                        widget.preferencesController.status.contactNameColor != null
+                            ? Color(widget.preferencesController.status.contactNameColor!)
+                            : colors.foreground,
+                      ),
                     ),
                     const SizedBox(height: 3),
                     Text(
@@ -757,7 +802,11 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
       leading: _statusAvatar(status, size: 34),
       title: Text(
         _statusTitle(status),
-        style: ChatyTypography.title(colors.foreground),
+        style: ChatyTypography.title(
+          widget.preferencesController.status.contactNameColor != null
+              ? Color(widget.preferencesController.status.contactNameColor!)
+              : colors.foreground,
+        ),
       ),
       subtitle: Text(
         _statusSubtitle(status),
@@ -978,7 +1027,10 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
             ),
           ),
           SliverToBoxAdapter(
-            child: Padding(
+            child: Container(
+              color: widget.preferencesController.status.recentUpdatesBarColor != null
+                  ? Color(widget.preferencesController.status.recentUpdatesBarColor!)
+                  : Colors.transparent,
               padding: const EdgeInsets.fromLTRB(
                 ChatySpacing.base + 4,
                 ChatySpacing.lg,
@@ -990,7 +1042,9 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                 style: TextStyle(
                   fontSize: 11.5,
                   fontWeight: FontWeight.w700,
-                  color: colors.primary,
+                  color: widget.preferencesController.status.recentUpdatesTextColor != null
+                      ? Color(widget.preferencesController.status.recentUpdatesTextColor!)
+                      : colors.primary,
                   letterSpacing: 0.8,
                 ),
               ),

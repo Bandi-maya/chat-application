@@ -234,7 +234,7 @@ void main() {
   test('call signaling bounds stalled connections and records remote terminal calls once', () {
     final source = File(
       'lib/data/services/call_signaling_service.dart',
-    ).readAsStringSync();
+    ).readAsStringSync().replaceAll('\r\n', '\n');
 
     expect(source, contains('void _startConnectionTimeout(String callId)'));
     expect(source, contains('final callId = _uuid.v4();\n    _callDurationSeconds = 0;'));

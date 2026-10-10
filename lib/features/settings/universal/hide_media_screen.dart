@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
@@ -12,6 +15,28 @@ class HideMediaScreen extends StatelessWidget {
     super.key,
     required this.preferencesController,
   });
+
+  static Future<void> _syncNoMediaMarker(bool shouldHide) async {
+    try {
+      final docDir = await getApplicationDocumentsDirectory();
+      final mediaDir = Directory('${docDir.path}/ChatyMedia');
+      if (!await mediaDir.exists()) {
+        await mediaDir.create(recursive: true);
+      }
+      final noMediaFile = File('${mediaDir.path}/.nomedia');
+      if (shouldHide) {
+        if (!await noMediaFile.exists()) {
+          await noMediaFile.writeAsString('');
+        }
+      } else {
+        if (await noMediaFile.exists()) {
+          await noMediaFile.delete();
+        }
+      }
+    } catch (e) {
+      debugPrint('Syncing .nomedia marker failed: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -69,6 +94,7 @@ class HideMediaScreen extends StatelessWidget {
                         preferencesController.updateUniversal(
                           prefs.copyWith(hideMediaPhotos: val),
                         );
+                        _syncNoMediaMarker(val || prefs.hideMediaVideos || prefs.hideMediaGifs);
                       },
                     ),
                     GbSwitchTile(
@@ -80,6 +106,7 @@ class HideMediaScreen extends StatelessWidget {
                         preferencesController.updateUniversal(
                           prefs.copyWith(hideMediaVideos: val),
                         );
+                        _syncNoMediaMarker(prefs.hideMediaPhotos || val || prefs.hideMediaGifs);
                       },
                     ),
                     GbSwitchTile(
@@ -91,6 +118,7 @@ class HideMediaScreen extends StatelessWidget {
                         preferencesController.updateUniversal(
                           prefs.copyWith(hideMediaGifs: val),
                         );
+                        _syncNoMediaMarker(prefs.hideMediaPhotos || prefs.hideMediaVideos || val);
                       },
                     ),
                   ],
@@ -106,6 +134,7 @@ class HideMediaScreen extends StatelessWidget {
                           hideMediaGifs: false,
                         ),
                       );
+                      _syncNoMediaMarker(false);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Media gallery visibility restored to default')),
                       );

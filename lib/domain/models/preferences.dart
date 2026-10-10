@@ -891,6 +891,37 @@ class ConversationPreferences {
     int? voiceNotePlayingBar,
     int? voiceNotePlayButtonColor,
     int? voiceNotePlayButton,
+    bool clearActionBarColor = false,
+    bool clearContactStatusBgColor = false,
+    bool clearContactStatusTextColor = false,
+    bool clearConvBackgroundColor = false,
+    bool clearRightBubbleColor = false,
+    bool clearRightChatBubbleTextColor = false,
+    bool clearRightBubbleTimeColor = false,
+    bool clearLeftBubbleColor = false,
+    bool clearLeftChatBubbleTextColor = false,
+    bool clearLeftBubbleTimeColor = false,
+    bool clearDeletedMessageIconColor = false,
+    bool clearQuotedDividerColor = false,
+    bool clearQuotedNameColor = false,
+    bool clearQuotedMessageColor = false,
+    bool clearQuotedBackgroundColor = false,
+    bool clearUiEntryBackgroundColor = false,
+    bool clearUiButtonsColor = false,
+    bool clearEmojiButtonColor = false,
+    bool clearSendButtonColor = false,
+    bool clearMicSendBgCircleColor = false,
+    bool clearTextEntryBackgroundColor = false,
+    bool clearTextEntryColor = false,
+    bool clearEmojiHeaderColor = false,
+    bool clearEmojiHeaderIconsColor = false,
+    bool clearEmojiPickerBgColor = false,
+    bool clearHyperlinksColor = false,
+    bool clearInfoBalloonsTextColor = false,
+    bool clearInfoBalloonsBgColor = false,
+    bool clearGroupParticipantNameColor = false,
+    bool clearVoiceNotePlayingBarColor = false,
+    bool clearVoiceNotePlayButtonColor = false,
   }) {
     return ConversationPreferences(
       bubbleStyle: bubbleStyle ?? bubbleShape ?? this.bubbleStyle,
@@ -898,12 +929,12 @@ class ConversationPreferences {
       enableQuickContactSidebar:
           enableQuickContactSidebar ?? this.enableQuickContactSidebar,
       sidebarPosition: sidebarPosition ?? this.sidebarPosition,
-      sidebarOpacity: sidebarOpacity ?? this.sidebarOpacity,
+      sidebarOpacity: (sidebarOpacity ?? this.sidebarOpacity).clamp(0.1, 1.0),
       iosStylePopupMenu: iosStylePopupMenu ?? this.iosStylePopupMenu,
       doubleTapReactionEmoji:
           doubleTapReactionEmoji ?? this.doubleTapReactionEmoji,
       wallpaperType: wallpaperType ?? this.wallpaperType,
-      voicePlaybackSpeed: voicePlaybackSpeed ?? this.voicePlaybackSpeed,
+      voicePlaybackSpeed: (voicePlaybackSpeed ?? this.voicePlaybackSpeed).clamp(0.5, 3.0),
       wallpaperPath: wallpaperPath ?? this.wallpaperPath,
       enableAnimatedEmojis: enableAnimatedEmojis ?? this.enableAnimatedEmojis,
       switchDirectContactLink:
@@ -941,83 +972,124 @@ class ConversationPreferences {
       incomingMessageRingtone:
           incomingMessageRingtone ?? this.incomingMessageRingtone,
       sendMessageRingtone: sendMessageRingtone ?? this.sendMessageRingtone,
-      actionBarColor: actionBarColor ?? this.actionBarColor,
+      actionBarColor: clearActionBarColor
+          ? null
+          : (actionBarColor ?? this.actionBarColor),
       hideProfilePicture: hideProfilePicture ?? this.hideProfilePicture,
       hideContactName: hideContactName ?? this.hideContactName,
       hideCallButton: hideCallButton ?? this.hideCallButton,
       disableContactStatus:
           disableContactStatus ?? this.disableContactStatus,
-      contactStatusBgColor:
-          contactStatusBackgroundColor ??
-          contactStatusBgColor ??
-          this.contactStatusBgColor,
-      contactStatusTextColor:
-          contactStatusTextColor ?? this.contactStatusTextColor,
-      messageTextSize: messageTextSize ?? this.messageTextSize,
-      convBackgroundColor:
-          conversationBackgroundColor ??
-          convBackgroundColor ??
-          this.convBackgroundColor,
-      rightBubbleColor: rightBubbleColor ?? this.rightBubbleColor,
-      rightChatBubbleTextColor:
-          rightChatBubbleTextColor ?? this.rightChatBubbleTextColor,
-      rightBubbleTimeColor:
-          rightBubbleTimeColor ?? this.rightBubbleTimeColor,
-      leftBubbleColor: leftBubbleColor ?? this.leftBubbleColor,
-      leftChatBubbleTextColor:
-          leftChatBubbleTextColor ?? this.leftChatBubbleTextColor,
-      leftBubbleTimeColor: leftBubbleTimeColor ?? this.leftBubbleTimeColor,
-      deletedMessageIconColor:
-          deletedMessageIconColor ?? this.deletedMessageIconColor,
-      quotedDividerColor: quotedDividerColor ?? this.quotedDividerColor,
-      quotedNameColor: quotedNameColor ?? this.quotedNameColor,
-      quotedMessageColor: quotedMessageColor ?? this.quotedMessageColor,
-      quotedBackgroundColor:
-          quotedBackgroundColor ?? this.quotedBackgroundColor,
+      contactStatusBgColor: clearContactStatusBgColor
+          ? null
+          : (contactStatusBackgroundColor ??
+              contactStatusBgColor ??
+              this.contactStatusBgColor),
+      contactStatusTextColor: clearContactStatusTextColor
+          ? null
+          : (contactStatusTextColor ?? this.contactStatusTextColor),
+      messageTextSize: (messageTextSize ?? this.messageTextSize).clamp(10.0, 30.0),
+      convBackgroundColor: clearConvBackgroundColor
+          ? null
+          : (conversationBackgroundColor ??
+              convBackgroundColor ??
+              this.convBackgroundColor),
+      rightBubbleColor: clearRightBubbleColor
+          ? null
+          : (rightBubbleColor ?? this.rightBubbleColor),
+      rightChatBubbleTextColor: clearRightChatBubbleTextColor
+          ? null
+          : (rightChatBubbleTextColor ?? this.rightChatBubbleTextColor),
+      rightBubbleTimeColor: clearRightBubbleTimeColor
+          ? null
+          : (rightBubbleTimeColor ?? this.rightBubbleTimeColor),
+      leftBubbleColor: clearLeftBubbleColor
+          ? null
+          : (leftBubbleColor ?? this.leftBubbleColor),
+      leftChatBubbleTextColor: clearLeftChatBubbleTextColor
+          ? null
+          : (leftChatBubbleTextColor ?? this.leftChatBubbleTextColor),
+      leftBubbleTimeColor: clearLeftBubbleTimeColor
+          ? null
+          : (leftBubbleTimeColor ?? this.leftBubbleTimeColor),
+      deletedMessageIconColor: clearDeletedMessageIconColor
+          ? null
+          : (deletedMessageIconColor ?? this.deletedMessageIconColor),
+      quotedDividerColor: clearQuotedDividerColor
+          ? null
+          : (quotedDividerColor ?? this.quotedDividerColor),
+      quotedNameColor: clearQuotedNameColor
+          ? null
+          : (quotedNameColor ?? this.quotedNameColor),
+      quotedMessageColor: clearQuotedMessageColor
+          ? null
+          : (quotedMessageColor ?? this.quotedMessageColor),
+      quotedBackgroundColor: clearQuotedBackgroundColor
+          ? null
+          : (quotedBackgroundColor ?? this.quotedBackgroundColor),
       makeTextSelectable: makeTextSelectable ?? this.makeTextSelectable,
       removeReadMore: removeReadMore ?? this.removeReadMore,
       entryStyle: entryStyle ?? this.entryStyle,
-      uiEntryBackgroundColor:
-          entryUiBackgroundColor ??
-          uiEntryBackgroundColor ??
-          this.uiEntryBackgroundColor,
-      uiButtonsColor:
-          entryUiButtonsColor ?? uiButtonsColor ?? this.uiButtonsColor,
-      emojiButtonColor:
-          entryEmojiButtonColor ?? emojiButtonColor ?? this.emojiButtonColor,
-      sendButtonColor:
-          entrySendButtonColor ?? sendButtonColor ?? this.sendButtonColor,
-      micSendBgCircleColor:
-          entryMicSendBackgroundCircle ??
-          micSendBgCircleColor ??
-          this.micSendBgCircleColor,
-      textEntryBackgroundColor:
-          entryTextBackground ??
-          textEntryBackgroundColor ??
-          this.textEntryBackgroundColor,
-      textEntryColor:
-          entryTextColor ?? textEntryColor ?? this.textEntryColor,
-      emojiHeaderColor: emojiHeaderColor ?? this.emojiHeaderColor,
-      emojiHeaderIconsColor:
-          emojiHeaderIconsColor ?? this.emojiHeaderIconsColor,
-      emojiPickerBgColor: emojiPickerBgColor ?? this.emojiPickerBgColor,
-      hyperlinksColor: hyperlinksColor ?? this.hyperlinksColor,
-      infoBalloonsTextColor:
-          infoBalloonsTextColor ?? this.infoBalloonsTextColor,
-      infoBalloonsBgColor:
-          infoBalloonsBackgroundColor ??
-          infoBalloonsBgColor ??
-          this.infoBalloonsBgColor,
-      groupParticipantNameColor:
-          groupParticipantNameColor ?? this.groupParticipantNameColor,
-      voiceNotePlayingBarColor:
-          voiceNotePlayingBar ??
-          voiceNotePlayingBarColor ??
-          this.voiceNotePlayingBarColor,
-      voiceNotePlayButtonColor:
-          voiceNotePlayButton ??
-          voiceNotePlayButtonColor ??
-          this.voiceNotePlayButtonColor,
+      uiEntryBackgroundColor: clearUiEntryBackgroundColor
+          ? null
+          : (entryUiBackgroundColor ??
+              uiEntryBackgroundColor ??
+              this.uiEntryBackgroundColor),
+      uiButtonsColor: clearUiButtonsColor
+          ? null
+          : (entryUiButtonsColor ?? uiButtonsColor ?? this.uiButtonsColor),
+      emojiButtonColor: clearEmojiButtonColor
+          ? null
+          : (entryEmojiButtonColor ?? emojiButtonColor ?? this.emojiButtonColor),
+      sendButtonColor: clearSendButtonColor
+          ? null
+          : (entrySendButtonColor ?? sendButtonColor ?? this.sendButtonColor),
+      micSendBgCircleColor: clearMicSendBgCircleColor
+          ? null
+          : (entryMicSendBackgroundCircle ??
+              micSendBgCircleColor ??
+              this.micSendBgCircleColor),
+      textEntryBackgroundColor: clearTextEntryBackgroundColor
+          ? null
+          : (entryTextBackground ??
+              textEntryBackgroundColor ??
+              this.textEntryBackgroundColor),
+      textEntryColor: clearTextEntryColor
+          ? null
+          : (entryTextColor ?? textEntryColor ?? this.textEntryColor),
+      emojiHeaderColor: clearEmojiHeaderColor
+          ? null
+          : (emojiHeaderColor ?? this.emojiHeaderColor),
+      emojiHeaderIconsColor: clearEmojiHeaderIconsColor
+          ? null
+          : (emojiHeaderIconsColor ?? this.emojiHeaderIconsColor),
+      emojiPickerBgColor: clearEmojiPickerBgColor
+          ? null
+          : (emojiPickerBgColor ?? this.emojiPickerBgColor),
+      hyperlinksColor: clearHyperlinksColor
+          ? null
+          : (hyperlinksColor ?? this.hyperlinksColor),
+      infoBalloonsTextColor: clearInfoBalloonsTextColor
+          ? null
+          : (infoBalloonsTextColor ?? this.infoBalloonsTextColor),
+      infoBalloonsBgColor: clearInfoBalloonsBgColor
+          ? null
+          : (infoBalloonsBackgroundColor ??
+              infoBalloonsBgColor ??
+              this.infoBalloonsBgColor),
+      groupParticipantNameColor: clearGroupParticipantNameColor
+          ? null
+          : (groupParticipantNameColor ?? this.groupParticipantNameColor),
+      voiceNotePlayingBarColor: clearVoiceNotePlayingBarColor
+          ? null
+          : (voiceNotePlayingBar ??
+              voiceNotePlayingBarColor ??
+              this.voiceNotePlayingBarColor),
+      voiceNotePlayButtonColor: clearVoiceNotePlayButtonColor
+          ? null
+          : (voiceNotePlayButton ??
+              voiceNotePlayButtonColor ??
+              this.voiceNotePlayButtonColor),
     );
   }
 
@@ -1158,11 +1230,11 @@ class ConversationPreferences {
         hideContactName: map['hideContactName'] ?? false,
         hideCallButton: map['hideCallButton'] ?? false,
         disableContactStatus: map['disableContactStatus'] ?? false,
-        contactStatusBgColor: map['contactStatusBgColor'] as int?,
+        contactStatusBgColor: (map['contactStatusBgColor'] ?? map['contactStatusBackgroundColor']) as int?,
         contactStatusTextColor: map['contactStatusTextColor'] as int?,
         messageTextSize:
-            (map['messageTextSize'] as num?)?.toDouble() ?? 16.0,
-        convBackgroundColor: map['convBackgroundColor'] as int?,
+            ((map['messageTextSize'] as num?)?.toDouble() ?? 16.0).clamp(10.0, 30.0),
+        convBackgroundColor: (map['convBackgroundColor'] ?? map['conversationBackgroundColor']) as int?,
         rightBubbleColor: map['rightBubbleColor'] as int?,
         rightChatBubbleTextColor: map['rightChatBubbleTextColor'] as int?,
         rightBubbleTimeColor: map['rightBubbleTimeColor'] as int?,
@@ -1177,22 +1249,22 @@ class ConversationPreferences {
         makeTextSelectable: map['makeTextSelectable'] ?? true,
         removeReadMore: map['removeReadMore'] ?? false,
         entryStyle: map['entryStyle'] ?? 'Stock',
-        uiEntryBackgroundColor: map['uiEntryBackgroundColor'] as int?,
-        uiButtonsColor: map['uiButtonsColor'] as int?,
-        emojiButtonColor: map['emojiButtonColor'] as int?,
-        sendButtonColor: map['sendButtonColor'] as int?,
-        micSendBgCircleColor: map['micSendBgCircleColor'] as int?,
-        textEntryBackgroundColor: map['textEntryBackgroundColor'] as int?,
-        textEntryColor: map['textEntryColor'] as int?,
+        uiEntryBackgroundColor: (map['uiEntryBackgroundColor'] ?? map['entryUiBackgroundColor']) as int?,
+        uiButtonsColor: (map['uiButtonsColor'] ?? map['entryUiButtonsColor']) as int?,
+        emojiButtonColor: (map['emojiButtonColor'] ?? map['entryEmojiButtonColor']) as int?,
+        sendButtonColor: (map['sendButtonColor'] ?? map['entrySendButtonColor']) as int?,
+        micSendBgCircleColor: (map['micSendBgCircleColor'] ?? map['entryMicSendBackgroundCircle']) as int?,
+        textEntryBackgroundColor: (map['textEntryBackgroundColor'] ?? map['entryTextBackground']) as int?,
+        textEntryColor: (map['textEntryColor'] ?? map['entryTextColor']) as int?,
         emojiHeaderColor: map['emojiHeaderColor'] as int?,
         emojiHeaderIconsColor: map['emojiHeaderIconsColor'] as int?,
         emojiPickerBgColor: map['emojiPickerBgColor'] as int?,
         hyperlinksColor: map['hyperlinksColor'] as int?,
         infoBalloonsTextColor: map['infoBalloonsTextColor'] as int?,
-        infoBalloonsBgColor: map['infoBalloonsBgColor'] as int?,
+        infoBalloonsBgColor: (map['infoBalloonsBgColor'] ?? map['infoBalloonsBackgroundColor']) as int?,
         groupParticipantNameColor: map['groupParticipantNameColor'] as int?,
-        voiceNotePlayingBarColor: map['voiceNotePlayingBarColor'] as int?,
-        voiceNotePlayButtonColor: map['voiceNotePlayButtonColor'] as int?,
+        voiceNotePlayingBarColor: (map['voiceNotePlayingBarColor'] ?? map['voiceNotePlayingBar']) as int?,
+        voiceNotePlayButtonColor: (map['voiceNotePlayButtonColor'] ?? map['voiceNotePlayButton']) as int?,
       );
 }
 

@@ -8,6 +8,7 @@ class ChatyThemeManager {
   ChatyThemeManager._();
 
   static const int schemaVersion = 1;
+  static const int maxImportSizeBytes = 1024 * 1024; // 1 MB limit
 
   /// Safely exports a ThemeConfig to a structured JSON string.
   static String exportTheme(ThemeConfig theme) {
@@ -20,8 +21,15 @@ class ChatyThemeManager {
   }
 
   /// Safely validates and parses an imported JSON string into a ThemeConfig.
-  /// Rejects malicious, invalid, or unsupported payload shapes.
+  /// Rejects oversized, malicious, invalid, or unsupported payload shapes.
   static ThemeConfig validateAndImportTheme(String jsonString) {
+    if (jsonString.isEmpty) {
+      throw const FormatException('Empty theme file provided.');
+    }
+    if (jsonString.length > maxImportSizeBytes) {
+      throw const FormatException('Theme file exceeds maximum allowed size (1 MB).');
+    }
+
     dynamic decoded;
     try {
       decoded = jsonDecode(jsonString);
@@ -48,9 +56,10 @@ class ChatyThemeManager {
     final theme = ThemeConfig.fromMap(rawTheme);
 
     // Validate contrast and key token validity
-    if (theme.primaryTextColor.toARGB32() == theme.backgroundColor.toARGB32()) {
+    if (theme.primaryTextColor.toARGB32() == theme.backgroundColor.toARGB32() ||
+        theme.hasContrastIssue) {
       throw const FormatException(
-        'Imported theme fails minimal readability check (text same as background).',
+        'Imported theme fails readability or accessibility contrast validation.',
       );
     }
 

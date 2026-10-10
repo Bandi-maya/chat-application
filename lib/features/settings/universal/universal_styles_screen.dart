@@ -1,6 +1,11 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../injection/locator.dart';
+import '../../../ui/core/controllers/app_icon_controller.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/design_system.dart';
 import '../../../ui/core/design_system/gb_design_system.dart';
@@ -256,10 +261,24 @@ class _UniversalStylesScreenState extends State<UniversalStylesScreen> {
                               final item = displayedLauncherIcons[i];
                               final isSelected = prefs.launcherIcon == item['name'];
                               return GestureDetector(
-                                onTap: () {
+                                onTap: () async {
                                   widget.preferencesController.updateUniversal(
                                     prefs.copyWith(launcherIcon: item['name'] as String),
                                   );
+                                  final iconName = item['name'] as String;
+                                  final variant = switch (iconName) {
+                                    'GB Cyan' || 'Aqua Blue' => LauncherIconVariant.signal,
+                                    'Dark Stealth' || 'Midnight Indigo' => LauncherIconVariant.obsidian,
+                                    'Purple Royal' || 'Vibrant Magenta' => LauncherIconVariant.fold,
+                                    'Ruby Red' || 'Coral Orange' => LauncherIconVariant.warm,
+                                    'Mint Green' || 'Neon Lime' || 'Emerald Forest' => LauncherIconVariant.outline,
+                                    _ => LauncherIconVariant.bird,
+                                  };
+                                  if (locator.isRegistered<AppIconController>()) {
+                                    try {
+                                      await locator<AppIconController>().applyLauncherIcon(variant);
+                                    } catch (_) {}
+                                  }
                                 },
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
@@ -412,19 +431,54 @@ class _UniversalStylesScreenState extends State<UniversalStylesScreen> {
                     GbSettingRow(
                       icon: Icons.folder_open_rounded,
                       title: 'Load Font...',
-                      subtitle: prefs.loadFontCustom ? 'Custom Font Loaded' : 'OFF',
+                      subtitle: prefs.loadFontCustom ? 'Custom Font: Loaded & Active' : 'Tap to select .ttf or .otf file',
                       hasSubScreen: true,
-                      onTap: () {
-                        widget.preferencesController.updateUniversal(
-                          prefs.copyWith(loadFontCustom: !prefs.loadFontCustom),
-                        );
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              !prefs.loadFontCustom ? 'Custom font loader active' : 'Font reset to app standard',
-                            ),
-                          ),
-                        );
+                      onTap: () async {
+                        if (prefs.loadFontCustom) {
+                          widget.preferencesController.updateUniversal(
+                            prefs.copyWith(loadFontCustom: false),
+                          );
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Custom font disabled; reverted to app default.')),
+                          );
+                          return;
+                        }
+
+                        try {
+                          final result = await FilePicker.pickFiles(
+                            type: FileType.custom,
+                            allowedExtensions: ['ttf', 'otf'],
+                          );
+                          if (result.isEmpty) return;
+                          final picked = result.first;
+                          final pickedPath = picked.path;
+                          if (pickedPath == null) return;
+                          final file = File(pickedPath);
+                          if (!await file.exists() || await file.length() == 0) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Invalid or empty font file.')),
+                            );
+                            return;
+                          }
+                          final docsDir = await getApplicationDocumentsDirectory();
+                          final fontDest = '${docsDir.path}/custom_font_${picked.name}';
+                          await file.copy(fontDest);
+
+                          widget.preferencesController.updateUniversal(
+                            prefs.copyWith(loadFontCustom: true),
+                          );
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Custom font "${picked.name}" loaded successfully!')),
+                          );
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to load font: $e')),
+                          );
+                        }
                       },
                     ),
                   ],
