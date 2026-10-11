@@ -28,7 +28,6 @@ import android.widget.TextView
 class DynamicIslandNotificationListener : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         if (sbn == null || !isEnabled(this)) return
-        if (sbn.packageName == packageName) return
         val notification = sbn.notification ?: return
         if (notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
         val extras = notification.extras
