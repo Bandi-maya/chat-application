@@ -10,12 +10,14 @@ class LockCredentialSetupModal extends StatefulWidget {
   final String method;
   final int pinLength;
   final LocalLockService lockService;
+  final bool replaceExisting;
 
   const LockCredentialSetupModal({
     super.key,
     required this.method,
     required this.pinLength,
     required this.lockService,
+    this.replaceExisting = false,
   });
 
   static Future<bool> show(
@@ -23,6 +25,7 @@ class LockCredentialSetupModal extends StatefulWidget {
     required String method,
     required int pinLength,
     required LocalLockService lockService,
+    bool replaceExisting = false,
   }) async {
     return await showModalBottomSheet<bool>(
           context: context,
@@ -37,6 +40,7 @@ class LockCredentialSetupModal extends StatefulWidget {
             method: method,
             pinLength: pinLength,
             lockService: lockService,
+            replaceExisting: replaceExisting,
           ),
         ) ??
         false;
@@ -88,8 +92,8 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
     final hasCred = await widget.lockService.hasCredential(widget.method);
     if (!mounted) return;
     setState(() {
-      _hasExistingSecret = hasCred;
-      if (hasCred) {
+      _hasExistingSecret = hasCred && !widget.replaceExisting;
+      if (_hasExistingSecret) {
         _currentStep = StepState.enterCurrent;
       } else {
         _currentStep = StepState.enterNew;
