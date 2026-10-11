@@ -43,10 +43,11 @@ class ProtectedResourceGate {
 
   /// Authorizes access to a protected conversation or resource.
   ///
-  /// If the resource is locked:
-  /// 1. Checks if credentials exist; if not, triggers setup flow.
-  /// 2. If credential exists, opens the unified [AppLockOverlayModal].
-  /// 3. Returns true ONLY upon verified local authentication.
+  /// If the resource is locked, only an already configured credential may
+  /// authorize access. Credential setup is deliberately not offered from the
+  /// protected-resource gate: creating a new credential here would let anyone
+  /// who can reach a locked conversation replace the missing credential and
+  /// immediately gain access.
   static Future<bool> authorizeConversation(
     BuildContext context, {
     required String conversationId,
@@ -71,16 +72,20 @@ class ProtectedResourceGate {
     // Check if current lock method has credentials configured
     final hasCred = await _isMethodConfigured(service, method);
     if (!hasCred) {
-      if (!context.mounted) return false;
-      // Trigger setup modal
-      final pinLen = await service.getPinLength();
-      final setupSuccess = await LockCredentialSetupModal.show(
-        context,
-        method: method,
-        pinLength: pinLen,
-        lockService: service,
-      );
-      if (!setupSuccess) return false;
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              content: Text(
+                'This chat has no usable lock credential on this device. '
+                'Open Settings → Security & Lock to configure or recover it.',
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+      }
+      return false;
     }
 
     if (!context.mounted) return false;
@@ -114,7 +119,28 @@ class ProtectedResourceGate {
     final method = preferencesController.security.lockMethod;
 
     final hasCred = await _isMethodConfigured(service, method);
-    if (!hasCred) return true; // If no credential ever existed, no check needed
+    if (!hasCred) {
+      // A protected vault without a working credential must fail closed.
+      // The secret-code route is handled explicitly by its verified caller.
+      if (preferencesController.security.lockedConversationIds.isNotEmpty ||
+          preferencesController.security.hiddenConversationIds.isNotEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Chat Lock credentials are unavailable on this device. '
+                  'Configure or recover them in Settings → Security & Lock.',
+                ),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+        }
+        return false;
+      }
+      return true;
+    }
 
     if (!context.mounted) return false;
 
