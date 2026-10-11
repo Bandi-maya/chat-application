@@ -179,6 +179,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
         title: 'Locked Chat',
         reason: 'Authenticate to open this conversation',
       );
+    } catch (_) {
+      authorized = false;
     } finally {
       _isAuthorizing = false;
     }
