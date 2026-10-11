@@ -252,13 +252,17 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
     final gridSize = _currentStep == StepState.enterCurrent
         ? _currentPatternGridSize
         : _patternGridSize;
-    if (nodes.length < 4 ||
+    final minimumPoints = gridSize == 4 ? 6 : 4;
+    if (nodes.length < minimumPoints ||
         nodes.any(
           (node) =>
               (int.tryParse(node) ?? gridSize * gridSize) >=
               gridSize * gridSize,
         )) {
-      setState(() => _error = 'Connect at least 4 unique dots on the selected grid.');
+      setState(
+        () => _error =
+            'Connect at least $minimumPoints unique dots on the selected grid.',
+      );
       return;
     }
 
@@ -379,7 +383,7 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
       case StepState.enterNew:
         if (_isPin) return 'Choose a ${widget.pinLength}-digit PIN code.';
         if (_isPattern)
-          return 'Choose a 3×3 or 4×4 grid, then connect at least 4 unique dots.';
+          return 'Use 4 unique dots on 3×3, or 6+ dots on the stronger 4×4 grid.';
         if (_isPassword) return 'Enter a password (min 6 characters).';
         return 'Choose your credential.';
       case StepState.confirmNew:
