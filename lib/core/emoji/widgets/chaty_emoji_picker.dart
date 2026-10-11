@@ -158,7 +158,14 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet> {
     final reservedHeight = widget.composerMode ? 174.0 : 110.0;
     final gridHeight = math.max(150.0, height - reservedHeight).toDouble();
 
-    return Container(
+    return PopScope<Object?>(
+      canPop: !widget.composerMode,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && widget.composerMode) {
+          _completeComposer(ChatyEmojiComposerAction.close);
+        }
+      },
+      child: Container(
       color: backgroundColor,
       child: SizedBox(
         height: height,
@@ -273,6 +280,7 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet> {
             Expanded(child: _buildCombinedEmojiPicker(context, gridHeight)),
           ],
         ),
+      ),
       ),
     );
   }
