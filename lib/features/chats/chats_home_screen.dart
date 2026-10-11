@@ -3030,7 +3030,9 @@ class _SplitQuickPane extends StatelessWidget {
                                     int.parse(conversation.avatarColorHex!),
                                   ),
                             size: 50 * effectiveDensity,
-                            shape: chatListTemplate.avatarShape,
+                            shape: homePrefs.avatarShape.isNotEmpty
+                                ? homePrefs.avatarShape
+                                : chatListTemplate.avatarShape,
                           ),
                           if (selected)
                             Positioned.fill(
