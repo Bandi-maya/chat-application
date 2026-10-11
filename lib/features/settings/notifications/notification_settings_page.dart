@@ -109,7 +109,6 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> wit
   }
 
   Future<void> _previewDynamicIsland() async {
-    SystemSound.play(SystemSoundType.click);
     try {
       if (_overlayPermissionGranted && _notificationAccessGranted) {
         await _dynamicIslandChannel.invokeMethod<void>('showPreview');
@@ -120,6 +119,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> wit
     } on MissingPluginException catch (_) {
       // Fall back to the in-app preview on non-Android platforms.
     }
+    SystemSound.play(SystemSoundType.click);
     widget.notificationService.triggerEventNotification(
       title: 'Dynamic Island preview',
       body: 'New message · Tap the pill to expand',
