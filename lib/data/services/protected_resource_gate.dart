@@ -5,7 +5,6 @@ import 'local_lock_service.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../features/settings/security/app_lock_overlay.dart';
-import '../../features/settings/security/lock_credential_setup_modal.dart';
 
 /// Centralized authorization and access gate for protected resources in Chaty.
 ///
@@ -25,6 +24,44 @@ class ProtectedResourceGate {
   static DateTime? _lastAppUnlockTime;
 
   static bool get hasRecentAppUnlock => _lastAppUnlockTime != null;
+
+  /// Ensures a usable credential exists before a new chat is marked protected.
+  /// This setup path is only for enabling a new lock; protected-resource access
+  /// never offers credential replacement as a way to bypass authentication.
+  static Future<bool> ensureCredentialForNewLock(
+    BuildContext context, {
+    required ChatyPreferencesController preferencesController,
+    LocalLockService? lockService,
+  }) async {
+    final service = lockService ?? locator<LocalLockService>();
+    final method = preferencesController.security.lockMethod;
+    if (await _isMethodConfigured(service, method)) return true;
+    if (!context.mounted) return false;
+
+    if (method == 'Biometric' || method == 'Device Credential') {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              '$method is unavailable. Choose a working lock method in '
+              'Settings → Security & Lock before locking a chat.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      return false;
+    }
+
+    final configured = await LockCredentialSetupModal.show(
+      context,
+      method: method,
+      pinLength: await service.getPinLength(),
+      lockService: service,
+    );
+    return configured && context.mounted &&
+        await _isMethodConfigured(service, method);
+  }
 
   /// Checks if a conversation currently has an active unlock session.
   static bool isConversationSessionActive(
@@ -182,7 +219,7 @@ class ProtectedResourceGate {
       case 'Biometric':
         return await service.canUseBiometrics();
       case 'Device Credential':
-        return true;
+        return await service.canUseDeviceCredential();
       default:
         return false;
     }
