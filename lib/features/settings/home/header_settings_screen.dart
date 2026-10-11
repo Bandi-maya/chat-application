@@ -25,12 +25,19 @@ class HeaderSettingsScreen extends StatefulWidget {
 
 class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
   static const List<String> _homeUiStyles = [
+    // Legacy Home UI presets — keep these labels for existing saved profiles.
     'ONE UI',
     'WhatsApp UI Stock',
     'IOS STYLE',
     'BUBBLES TAB STYLE',
     'BASIC TAB STYLE',
     'WhatsApp OLD UI',
+    // Explicit navigation layouts — these select the actual MainNavigationShell.
+    'WhatsApp-style top bar',
+    'Floating Rail',
+    '3D Perspective Drawer',
+    'Modern Side Menu',
+    'Curved Radial Menu',
   ];
 
   static const List<String> _storiesStyles = [
@@ -63,6 +70,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
   /// the app shell therefore change together instead of leaving the shell stale.
   AppNavigationMode _navigationModeForHomeUiStyle(String style) {
     switch (style.trim().toLowerCase()) {
+      // Existing presets retain their legacy visual behavior.
       case 'one ui':
         return AppNavigationMode.modernSideMenu;
       case 'whatsapp ui stock':
@@ -74,7 +82,18 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
       case 'basic tab style':
         return AppNavigationMode.compactRail;
       case 'whatsapp old ui':
+      case 'whatsapp-style top bar':
+      case 'whatsapp style top bar':
         return AppNavigationMode.topWhatsAppBar;
+      // Explicit navigation-shell presets.
+      case 'floating rail':
+        return AppNavigationMode.floatingIslandRail;
+      case '3d perspective drawer':
+        return AppNavigationMode.perspective3DDrawer;
+      case 'modern side menu':
+        return AppNavigationMode.modernSideMenu;
+      case 'curved radial menu':
+        return AppNavigationMode.curvedRadialDrawer;
       default:
         return locator<ThemeController>().navigationMode;
     }
