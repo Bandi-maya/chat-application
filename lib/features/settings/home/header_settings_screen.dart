@@ -754,7 +754,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                       children: [
                         // Home UI Style
                         GbSettingRow(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.layers_outlined,
                             color: colors.primary,
                             size: 21,
@@ -936,7 +936,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
 
                         // Tab Bubble Style
                         GbSettingRow(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.chat_bubble_outline_rounded,
                             color: colors.primary,
                             size: 21,
@@ -967,7 +967,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
 
                         // 3D Pager / Slider Transition (5 options)
                         GbSettingRow(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.view_in_ar_rounded,
                             color: colors.primary,
                             size: 21,
@@ -998,7 +998,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
 
                         // Enable Instagram-like Stories
                         GbSettingRow(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.donut_large_rounded,
                             color: colors.primary,
                             size: 21,
@@ -1016,7 +1016,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
 
                         // Carousel View
                         GbSettingRow(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.bubble_chart_outlined,
                             color: colors.primary,
                             size: 21,
@@ -1035,7 +1035,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
 
                         // Stories Style
                         GbSettingRow(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.bubble_chart_rounded,
                             color: colors.primary,
                             size: 21,
@@ -1066,7 +1066,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
 
                         // Separate Chats/Groups
                         GbSettingRow(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.alt_route_rounded,
                             color: colors.primary,
                             size: 21,
@@ -1086,7 +1086,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
 
                         // Set My Name
                         GbSettingRow(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.badge_outlined,
                             color: colors.primary,
                             size: 21,
@@ -1106,7 +1106,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
 
                         // Disable Status under my name
                         GbSettingRow(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.event_busy_outlined,
                             color: colors.primary,
                             size: 21,
@@ -1126,7 +1126,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
 
                         // Hide chat sort list
                         GbSettingRow(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.inbox_outlined,
                             color: colors.primary,
                             size: 21,
@@ -1145,7 +1145,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
 
                         // Disable search bar
                         GbSettingRow(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.saved_search_outlined,
                             color: colors.primary,
                             size: 21,
@@ -1165,7 +1165,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
 
                         // Themes
                         GbSettingRow(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.palette_outlined,
                             color: colors.primary,
                             size: 21,
@@ -1183,7 +1183,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
 
                         // Show icon Add Account
                         GbSettingRow(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.person_add_alt_1_outlined,
                             color: colors.primary,
                             size: 21,
