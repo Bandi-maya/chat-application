@@ -9,6 +9,7 @@ class PatternLockPad extends StatefulWidget {
   final bool hideTrace;
   final bool enableHaptics;
   final double size;
+  final int gridSize;
   final bool clearOnFinish;
 
   const PatternLockPad({
@@ -18,6 +19,7 @@ class PatternLockPad extends StatefulWidget {
     this.hideTrace = false,
     this.enableHaptics = true,
     this.size = 280,
+    this.gridSize = 3,
     this.clearOnFinish = true,
   });
 
@@ -41,18 +43,19 @@ class PatternLockPadState extends State<PatternLockPad> {
   }
 
   List<Offset> _centers(Size size) {
-    final cellWidth = size.width / 3;
-    final cellHeight = size.height / 3;
-    return List<Offset>.generate(9, (index) {
-      final column = index % 3;
-      final row = index ~/ 3;
+    final gridSize = widget.gridSize == 4 ? 4 : 3;
+    final cellWidth = size.width / gridSize;
+    final cellHeight = size.height / gridSize;
+    return List<Offset>.generate(gridSize * gridSize, (index) {
+      final column = index % gridSize;
+      final row = index ~/ gridSize;
       return Offset(cellWidth * (column + 0.5), cellHeight * (row + 0.5));
     });
   }
 
   int? _hitTest(Offset localPosition, Size size) {
     final centers = _centers(size);
-    final radius = math.min(size.width, size.height) / 7.0;
+    final radius = math.min(size.width, size.height) / (widget.gridSize == 4 ? 4 : 3) * 0.36;
     for (var index = 0; index < centers.length; index++) {
       if ((centers[index] - localPosition).distance <= radius) return index;
     }
@@ -85,7 +88,7 @@ class PatternLockPadState extends State<PatternLockPad> {
     final muted = theme.colorScheme.onSurface.withValues(alpha: 0.35);
 
     return Semantics(
-      label: 'Pattern lock grid 3 by 3',
+      label: 'Pattern lock grid ${widget.gridSize == 4 ? 4 : 3} by ${widget.gridSize == 4 ? 4 : 3}',
       child: SizedBox.square(
         dimension: widget.size,
         child: LayoutBuilder(
@@ -110,6 +113,7 @@ class PatternLockPadState extends State<PatternLockPad> {
                   activeColor: color,
                   inactiveColor: muted,
                   hideTrace: widget.hideTrace,
+                  gridSize: widget.gridSize == 4 ? 4 : 3,
                 ),
               ),
             );
@@ -126,6 +130,7 @@ class _PatternPainter extends CustomPainter {
   final Color activeColor;
   final Color inactiveColor;
   final bool hideTrace;
+  final int gridSize;
 
   const _PatternPainter({
     required this.selected,
@@ -133,14 +138,15 @@ class _PatternPainter extends CustomPainter {
     required this.activeColor,
     required this.inactiveColor,
     required this.hideTrace,
+    required this.gridSize,
   });
 
   List<Offset> _centers(Size size) {
-    final cellWidth = size.width / 3;
-    final cellHeight = size.height / 3;
-    return List<Offset>.generate(9, (index) {
-      final column = index % 3;
-      final row = index ~/ 3;
+    final cellWidth = size.width / gridSize;
+    final cellHeight = size.height / gridSize;
+    return List<Offset>.generate(gridSize * gridSize, (index) {
+      final column = index % gridSize;
+      final row = index ~/ gridSize;
       return Offset(cellWidth * (column + 0.5), cellHeight * (row + 0.5));
     });
   }
@@ -148,20 +154,24 @@ class _PatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final centers = _centers(size);
+    final cellSize = math.min(size.width, size.height) / gridSize;
+    final haloRadius = cellSize * 0.34;
+    final ringRadius = cellSize * 0.28;
+    final dotRadius = cellSize * 0.085;
 
     // Draw lines connecting selected dots if trace is NOT hidden
     if (!hideTrace && selected.isNotEmpty) {
       // Glow underlay for trace
       final glowPaint = Paint()
         ..color = activeColor.withValues(alpha: 0.25)
-        ..strokeWidth = 10.0
+        ..strokeWidth = cellSize * 0.14
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
         ..style = PaintingStyle.stroke;
 
       final linePaint = Paint()
         ..color = activeColor
-        ..strokeWidth = 4.5
+        ..strokeWidth = cellSize * 0.065
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
         ..style = PaintingStyle.stroke;
@@ -188,26 +198,26 @@ class _PatternPainter extends CustomPainter {
           final outerHalo = Paint()
             ..color = activeColor.withValues(alpha: 0.18)
             ..style = PaintingStyle.fill;
-          canvas.drawCircle(centers[index], 28, outerHalo);
+          canvas.drawCircle(centers[index], haloRadius, outerHalo);
 
           final outerBorder = Paint()
             ..color = activeColor.withValues(alpha: 0.75)
             ..strokeWidth = 2.0
             ..style = PaintingStyle.stroke;
-          canvas.drawCircle(centers[index], 24, outerBorder);
+          canvas.drawCircle(centers[index], ringRadius * 1.15, outerBorder);
         }
 
         // Inner solid dot with core shine
         final centerDot = Paint()
           ..color = (!hideTrace) ? activeColor : inactiveColor
           ..style = PaintingStyle.fill;
-        canvas.drawCircle(centers[index], (!hideTrace) ? 8.5 : 6.5, centerDot);
+        canvas.drawCircle(centers[index], (!hideTrace) ? dotRadius * 1.45 : dotRadius, centerDot);
 
         if (!hideTrace) {
           final centerCore = Paint()
             ..color = Colors.white.withValues(alpha: 0.8)
             ..style = PaintingStyle.fill;
-          canvas.drawCircle(centers[index], 3.0, centerCore);
+          canvas.drawCircle(centers[index], dotRadius * 0.5, centerCore);
         }
       } else {
         // Inactive unselected dot with subtle glass ring
@@ -215,12 +225,12 @@ class _PatternPainter extends CustomPainter {
           ..color = inactiveColor.withValues(alpha: 0.14)
           ..strokeWidth = 1.5
           ..style = PaintingStyle.stroke;
-        canvas.drawCircle(centers[index], 20, inactiveRing);
+        canvas.drawCircle(centers[index], ringRadius, inactiveRing);
 
         final inactiveDot = Paint()
           ..color = inactiveColor.withValues(alpha: 0.65)
           ..style = PaintingStyle.fill;
-        canvas.drawCircle(centers[index], 6, inactiveDot);
+        canvas.drawCircle(centers[index], dotRadius, inactiveDot);
       }
     }
   }
@@ -231,6 +241,7 @@ class _PatternPainter extends CustomPainter {
         oldDelegate.pointer != pointer ||
         oldDelegate.activeColor != activeColor ||
         oldDelegate.inactiveColor != inactiveColor ||
-        oldDelegate.hideTrace != hideTrace;
+        oldDelegate.hideTrace != hideTrace ||
+        oldDelegate.gridSize != gridSize;
   }
 }
