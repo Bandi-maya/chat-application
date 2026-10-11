@@ -59,6 +59,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
 
   void _queueSearch() {
     _debounce?.cancel();
+    _secretCodeDebounce?.cancel();
     final query = _searchController.text.trim();
     final lower = query.toLowerCase();
     // Invalidate an in-flight remote request even when the new query is empty
