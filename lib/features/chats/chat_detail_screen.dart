@@ -83,6 +83,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   // session locks the media again (matching WhatsApp semantics).
   final Set<String> _openedViewOnceIds = <String>{};
   final TextEditingController _textCtrl = TextEditingController();
+  final FocusNode _composerFocusNode = FocusNode();
+  bool _emojiPickerOpen = false;
   final ScrollController _scrollCtrl = ScrollController();
   final Map<String, GlobalKey> _messageItemKeys = <String, GlobalKey>{};
   final Map<String, int> _messageIndexById = <String, int>{};
@@ -262,6 +264,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     _inChatSearchCtrl.dispose();
     _inChatSearchFocus.dispose();
     _textCtrl.dispose();
+    _composerFocusNode.dispose();
     _scrollCtrl.dispose();
     super.dispose();
   }
@@ -301,24 +304,51 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   Future<void> _pickComposerEmoji() async {
+    if (_emojiPickerOpen) {
+      _composerFocusNode.requestFocus();
+      return;
+    }
     final conv = widget.preferencesController.conversation;
-    final emoji = await ChatyEmojiPicker.show(
-      context,
-      headerColor: conv.emojiHeaderColor != null ? Color(conv.emojiHeaderColor!) : null,
-      headerIconsColor: conv.emojiHeaderIconsColor != null ? Color(conv.emojiHeaderIconsColor!) : null,
-      backgroundColor: conv.emojiPickerBgColor != null ? Color(conv.emojiPickerBgColor!) : null,
-    );
-    if (emoji == null || emoji.isEmpty || !mounted) return;
-    final value = _textCtrl.value;
-    final selection = value.selection;
-    final start = selection.isValid ? selection.start : value.text.length;
-    final end = selection.isValid ? selection.end : value.text.length;
-    final nextText = value.text.replaceRange(start, end, emoji);
+    setState(() => _emojiPickerOpen = true);
+    ChatyEmojiComposerResult? result;
+    try {
+      result = await ChatyEmojiPicker.showComposer(
+        context,
+        initialText: _textCtrl.text,
+        headerColor: conv.emojiHeaderColor != null
+            ? Color(conv.emojiHeaderColor!)
+            : null,
+        headerIconsColor: conv.emojiHeaderIconsColor != null
+            ? Color(conv.emojiHeaderIconsColor!)
+            : null,
+        backgroundColor: conv.emojiPickerBgColor != null
+            ? Color(conv.emojiPickerBgColor!)
+            : null,
+      );
+    } finally {
+      if (mounted) setState(() => _emojiPickerOpen = false);
+    }
+
+    if (result == null || !mounted) return;
+    final value = result.text;
     _textCtrl.value = TextEditingValue(
-      text: nextText,
-      selection: TextSelection.collapsed(offset: start + emoji.length),
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
     );
-    _handleComposerChanged(nextText);
+    _handleComposerChanged(value);
+
+    switch (result.action) {
+      case ChatyEmojiComposerAction.send:
+        _composerFocusNode.unfocus();
+        FocusManager.instance.primaryFocus?.unfocus();
+        if (value.trim().isNotEmpty) await _sendMessage();
+      case ChatyEmojiComposerAction.keyboard:
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _composerFocusNode.requestFocus();
+        });
+      case ChatyEmojiComposerAction.close:
+        _composerFocusNode.unfocus();
+    }
   }
 
   Future<void> _sendMessage() async {
@@ -2092,6 +2122,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               theme: theme,
               convPrefs: widget.preferencesController.conversation,
               controller: _textCtrl,
+              focusNode: _composerFocusNode,
+              emojiPickerOpen: _emojiPickerOpen,
               onAttach: _openAttachmentSheet,
               onCameraTap: _captureAndSendPhoto,
               onEmoji: _pickComposerEmoji,
@@ -2988,6 +3020,8 @@ class _Composer extends StatefulWidget {
   final ThemeConfig theme;
   final ConversationPreferences convPrefs;
   final TextEditingController controller;
+  final FocusNode focusNode;
+  final bool emojiPickerOpen;
   final VoidCallback onAttach;
   final VoidCallback onCameraTap;
   final VoidCallback onEmoji;
@@ -3009,6 +3043,8 @@ class _Composer extends StatefulWidget {
     required this.theme,
     required this.convPrefs,
     required this.controller,
+    required this.focusNode,
+    required this.emojiPickerOpen,
     required this.onAttach,
     required this.onCameraTap,
     required this.onEmoji,
@@ -3320,7 +3356,7 @@ class _ComposerState extends State<_Composer>
             attachAction,
             if (cameraAction != null) cameraAction,
             IconButton(
-              tooltip: 'Emoji',
+              tooltip: widget.emojiPickerOpen ? 'Return to keyboard' : 'Emoji',
               onPressed: widget.onEmoji,
               icon: Icon(
                 Icons.emoji_emotions_outlined,
@@ -3371,6 +3407,7 @@ class _ComposerState extends State<_Composer>
         const SizedBox(height: 5),
         TextField(
           controller: widget.controller,
+          focusNode: widget.focusNode,
           minLines: 1,
           maxLines: 5,
           onChanged: widget.onChanged,
@@ -3453,6 +3490,7 @@ class _ComposerState extends State<_Composer>
         Expanded(
           child: TextField(
             controller: widget.controller,
+            focusNode: widget.focusNode,
             minLines: 1,
             maxLines: 5,
             onChanged: widget.onChanged,
@@ -3466,7 +3504,7 @@ class _ComposerState extends State<_Composer>
               filled: true,
               fillColor: inputBg,
               prefixIcon: IconButton(
-                tooltip: 'Emoji',
+                tooltip: widget.emojiPickerOpen ? 'Return to keyboard' : 'Emoji',
                 onPressed: widget.onEmoji,
                 icon: Icon(
                   Icons.emoji_emotions_outlined,
