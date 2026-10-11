@@ -83,8 +83,8 @@ void main() {
       expect(toggleValue, isTrue);
       expect(callCount, 1);
 
-      // Tap on the Switch widget
-      await tester.tap(find.byType(Switch));
+      // Tap row again (switch is intentionally IgnorePointer to avoid double-fire)
+      await tester.tap(find.byType(ChatyToggleRow));
       await tester.pumpAndSettle();
 
       expect(toggleValue, isFalse);
