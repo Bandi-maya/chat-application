@@ -2971,11 +2971,11 @@ class _CurvedRadialDrawerScaffoldState
     if (navItems.isEmpty) return const <Widget>[];
     final count = navItems.length;
     final iconSize = count > 7 ? 25.0 : 30.0;
-    final centerX = width * 0.07;
+    final centerX = width * 0.06;
     final centerY = height * 0.08;
-    final radiusX = width * 0.33;
-    final radiusY = height * 0.68;
-    final endAngle = count > 7 ? 58.0 : 65.0;
+    final radiusX = width * 0.38;
+    final radiusY = height * 1.10;
+    final endAngle = count > 7 ? 75.0 : 70.0;
 
     // Position every destination on an elliptical circular arc, rather than
     // arranging the controls along a straight diagonal. The icon itself stays
@@ -2983,8 +2983,10 @@ class _CurvedRadialDrawerScaffoldState
     return List<Widget>.generate(count, (index) {
       final progress = count <= 1 ? 0.0 : index / (count - 1);
       final angle = progress * endAngle * math.pi / 180;
-      final left = centerX + radiusX * math.cos(angle);
-      final top = centerY + radiusY * math.sin(angle);
+      // Follow the upper-left quadrant of an ellipse: icons progress
+      // from the menu button toward the lower-right, matching the reference.
+      final left = centerX + radiusX * math.sin(angle);
+      final top = centerY + radiusY * (1 - math.cos(angle));
       final item = navItems[index];
       final activeIndex = selectedIndex < 0
           ? 0
