@@ -4,6 +4,7 @@ import '../../../domain/models/preferences.dart';
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/gb_design_system.dart';
+import '../../../ui/core/design_system/design_system.dart';
 import '../../../ui/core/theme/theme_config.dart';
 import '../../../ui/core/theme/theme_controller.dart';
 
@@ -182,8 +183,12 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
     final scale = large ? 1.0 : 0.55;
     final previewWidth = large ? double.infinity : 100.0;
     final previewHeight = large ? 112.0 : 62.0;
-    final rail = mode == AppNavigationMode.floatingIslandRail ||
-        mode == AppNavigationMode.compactRail;
+    final rail = mode == AppNavigationMode.floatingIslandRail;
+    final showBottomDock = !rail &&
+        mode != AppNavigationMode.perspective3DDrawer &&
+        mode != AppNavigationMode.modernSideMenu &&
+        mode != AppNavigationMode.curvedRadialDrawer &&
+        !topTabs;
     final sideDrawer = mode == AppNavigationMode.perspective3DDrawer ||
         mode == AppNavigationMode.modernSideMenu ||
         mode == AppNavigationMode.curvedRadialDrawer;
@@ -280,7 +285,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                   : 0) * scale,
               right: 0,
               top: 0,
-              bottom: (large ? 21 : 12) * scale,
+              bottom: (showBottomDock ? (large ? 21 : 12) : 4) * scale,
               child: Padding(
                 padding: EdgeInsets.all(7 * scale),
                 child: Column(
@@ -307,6 +312,33 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                         ],
                       ],
                     ),
+                    SizedBox(height: 5 * scale),
+                    if (topTabs) ...[
+                      Container(
+                        height: 16 * scale,
+                        decoration: BoxDecoration(
+                          color: accent,
+                          borderRadius: BorderRadius.circular(3 * scale),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            for (final icon in <IconData>[
+                              Icons.chat_bubble_rounded,
+                              Icons.auto_stories_rounded,
+                              Icons.call_rounded,
+                              Icons.settings_rounded,
+                            ])
+                              Icon(
+                                icon,
+                                size: 9 * scale,
+                                color: theme.onAccentColor,
+                              ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 3 * scale),
+                    ],
                     SizedBox(height: 7 * scale),
                     if (style == 'IOS STYLE')
                       Row(
@@ -395,33 +427,32 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                   ),
                 ),
               ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: (topTabs ? 18.0 : 21.0) * scale,
-              child: ColoredBox(
-                color: topTabs ? accent : surface,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    for (int i = 0; i < 4; i++)
-                      Icon(
-                        <IconData>[
-                          Icons.chat_bubble_rounded,
-                          Icons.auto_stories_rounded,
-                          Icons.call_rounded,
-                          Icons.settings_rounded,
-                        ][i],
-                        size: 10 * scale,
-                        color: topTabs
-                            ? theme.onAccentColor
-                            : (i == 0 ? accent : muted),
-                      ),
-                  ],
+            if (showBottomDock)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 21.0 * scale,
+                child: ColoredBox(
+                  color: surface,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      for (int i = 0; i < 4; i++)
+                        Icon(
+                          <IconData>[
+                            Icons.chat_bubble_rounded,
+                            Icons.auto_stories_rounded,
+                            Icons.call_rounded,
+                            Icons.settings_rounded,
+                          ][i],
+                          size: 10 * scale,
+                          color: i == 0 ? accent : muted,
+                        ),
+                    ],
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
