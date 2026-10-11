@@ -191,6 +191,17 @@ class AppearanceVariantController extends ChangeNotifier {
       .indexOf(_typographyStyle)
       .clamp(0, typographyStyles.length - 1);
 
+  static double resolveTextScale(
+    double systemScale,
+    double appearanceScale,
+  ) {
+    final preferredScale = systemScale * appearanceScale;
+    return (systemScale > 1.0
+            ? preferredScale.clamp(systemScale, double.infinity)
+            : preferredScale.clamp(0.8, 1.6))
+        .toDouble();
+  }
+
   double get textScale {
     const scales = <double>[
       1.0,
