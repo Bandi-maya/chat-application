@@ -12,6 +12,12 @@ abstract final class HomePresetNormalizer {
     'productivity' || 'basic tab style' => 'Productivity',
     'tablet split view' => 'Tablet Split View',
     'whatsapp ui stock' => 'Chaty Default',
+    // Navigation-shell presets also pick a matching home-list treatment.
+    'whatsapp-style top bar' || 'whatsapp style top bar' => 'Classic',
+    'floating rail' => 'Stories First',
+    '3d perspective drawer' => 'Expressive',
+    'modern side menu' => 'Cards',
+    'curved radial menu' => 'Expressive',
     _ => 'Chaty Default',
   };
 
