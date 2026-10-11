@@ -159,7 +159,6 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet> {
 
     return Container(
       color: backgroundColor,
-      padding: EdgeInsets.only(bottom: bottomInset),
       child: SizedBox(
         height: height,
         child: Column(
