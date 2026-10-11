@@ -29,18 +29,25 @@ abstract final class HomePresetNormalizer {
   /// they do not accidentally override a navigation style chosen elsewhere.
   static AppNavigationMode? navigationMode(String value) =>
       switch (value.trim().toLowerCase()) {
-        'one ui' => AppNavigationMode.bottomNav,
-        'whatsapp ui stock' => AppNavigationMode.bottomNav,
-        'ios style' => AppNavigationMode.bottomNav,
-        'floating rail' => AppNavigationMode.floatingIslandRail,
-        'modern side menu' => AppNavigationMode.modernSideMenu,
-        'bubbles tab style' => AppNavigationMode.gestureTabs,
-        'basic tab style' => AppNavigationMode.compactRail,
+        // Older persisted HomePresetNormalizer names may already be canonical.
+        'classic' ||
         'whatsapp old ui' ||
         'whatsapp-style top bar' ||
         'whatsapp style top bar' => AppNavigationMode.topWhatsAppBar,
+        'one ui' ||
+        'whatsapp ui stock' ||
+        'ios style' ||
+        'chaty default' ||
+        'cards' => AppNavigationMode.bottomNav,
+        'floating rail' => AppNavigationMode.floatingIslandRail,
+        'modern side menu' => AppNavigationMode.modernSideMenu,
+        'bubbles tab style' ||
+        'compact' => AppNavigationMode.gestureTabs,
+        'basic tab style' ||
+        'productivity' => AppNavigationMode.compactRail,
         '3d perspective drawer' => AppNavigationMode.perspective3DDrawer,
         'curved radial menu' => AppNavigationMode.curvedRadialDrawer,
+        'stories first' || 'expressive' => null,
         _ => null,
       };
 
