@@ -30,6 +30,15 @@ class FaceAnchorSolver {
   TrackingHealth get health => _health;
   TrackingHealth _health = TrackingHealth.lost;
 
+  /// Drops previous-frame smoothing and grace state when the camera changes,
+  /// tracking stops, or the user leaves face-lens mode.
+  void reset() {
+    _smoothed = null;
+    _lastSeenMs = null;
+    _health = TrackingHealth.lost;
+  }
+
+
   /// Feeds one raw detection (or null when the frame had no face).
   ///
   /// [mirrored] must be true for front-camera previews where the image is
@@ -134,7 +143,7 @@ class FaceAnchorSolver {
       rightEye: rightEye,
       noseBase: noseBase,
       mouthCenter: mouthCenter,
-      rollRadians: _lerpAngle(prev?.rollRadians ?? raw.rollRadians, raw.rollRadians, smoothingAlpha),
+      rollRadians: _lerpAngle(prev?.rollRadians ?? (mirrored ? -raw.rollRadians : raw.rollRadians), mirrored ? -raw.rollRadians : raw.rollRadians, smoothingAlpha),
       yawRadians: _lerpAngle(prev?.yawRadians ?? raw.yawRadians, raw.yawRadians, smoothingAlpha),
       pitchRadians: _lerpAngle(prev?.pitchRadians ?? raw.pitchRadians, raw.pitchRadians, smoothingAlpha),
       confidence: raw.confidence * confidenceScale.clamp(0.0, 1.0),
