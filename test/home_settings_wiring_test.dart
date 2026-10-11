@@ -14,6 +14,8 @@ void main() {
       expect(HomePresetNormalizer.homeStyle('BUBBLES TAB STYLE'), 'Compact');
       expect(HomePresetNormalizer.homeStyle('BASIC TAB STYLE'), 'Productivity');
       expect(HomePresetNormalizer.homeStyle('WhatsApp OLD UI'), 'Classic');
+      expect(HomePresetNormalizer.homeStyle('Instagram Style'), 'Stories First');
+      expect(HomePresetNormalizer.homeStyle('Telegram Style'), 'Chaty Default');
       expect(
         HomePresetNormalizer.homeStyle('WhatsApp-style top bar'),
         'Classic',
@@ -34,11 +36,31 @@ void main() {
 
       expect(
         HomePresetNormalizer.navigationMode('ONE UI'),
-        AppNavigationMode.bottomNav,
+        AppNavigationMode.oneUi,
       );
       expect(
         HomePresetNormalizer.navigationMode('IOS STYLE'),
+        AppNavigationMode.iosStyle,
+      );
+      expect(
+        HomePresetNormalizer.navigationMode('WhatsApp UI Stock'),
         AppNavigationMode.bottomNav,
+      );
+      expect(
+        HomePresetNormalizer.navigationMode('BUBBLES TAB STYLE'),
+        AppNavigationMode.gestureTabs,
+      );
+      expect(
+        HomePresetNormalizer.navigationMode('BASIC TAB STYLE'),
+        AppNavigationMode.basicTabStyle,
+      );
+      expect(
+        HomePresetNormalizer.navigationMode('Instagram Style'),
+        AppNavigationMode.instagramStyle,
+      );
+      expect(
+        HomePresetNormalizer.navigationMode('Telegram Style'),
+        AppNavigationMode.telegramStyle,
       );
       expect(
         HomePresetNormalizer.navigationMode('WhatsApp OLD UI'),
