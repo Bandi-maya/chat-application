@@ -132,15 +132,19 @@ class MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final convPrefs = preferencesController?.conversation;
 
-    // Read the selected legacy/GB key at render time as well as the typed
-    // preference. This guarantees an open conversation immediately reflects a
-    // style chosen in Settings instead of keeping the theme snapshot it was
-    // created with.
+    // Read the typed Conversation selection on every message build. It is
+    // the canonical setting; the legacy key is only a migration fallback so
+    // an old GB value cannot override a newer selection from the modern picker.
+    final typedBubbleStyle =
+        preferencesController?.conversation.bubbleStyle.trim() ?? '';
     final legacyBubbleStyle =
         preferencesController?.gbString('bubble_style', fallback: '').trim() ??
         '';
-    final effectiveBubbleStyle = legacyBubbleStyle.isNotEmpty
-        ? BubbleStyleIdExtension.fromString(legacyBubbleStyle)
+    final selectedBubbleStyle = typedBubbleStyle.isNotEmpty
+        ? typedBubbleStyle
+        : legacyBubbleStyle;
+    final effectiveBubbleStyle = selectedBubbleStyle.isNotEmpty
+        ? BubbleStyleIdExtension.fromString(selectedBubbleStyle)
         : theme.bubbleStyle;
 
     if (message.type == MessageType.system) {
