@@ -24,7 +24,11 @@ class ChatyEmojiPicker {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      showDragHandle: true,
+      enableDrag: true,
+      showDragHandle: false,
+      // Open at approximately keyboard height; the user can drag up for more.
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+      clipBehavior: Clip.hardEdge,
       backgroundColor: backgroundColor ?? Theme.of(context).colorScheme.surface,
       builder: (_) => _ChatyEmojiPickerSheet(
         reactionMode: reactionMode,
@@ -97,7 +101,7 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final height =
-        MediaQuery.sizeOf(context).height * (widget.reactionMode ? 0.60 : 0.72);
+        MediaQuery.sizeOf(context).height * (widget.reactionMode ? 0.32 : 0.42);
 
     final headerColor = widget.headerColor;
     final headerIconsColor = widget.headerIconsColor;
@@ -106,7 +110,7 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
     return Container(
       color: backgroundColor,
       child: SizedBox(
-        height: height.clamp(380.0, 660.0),
+        height: height.clamp(270.0, 450.0),
         child: Column(
           children: [
             Container(
