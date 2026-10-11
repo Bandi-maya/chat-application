@@ -121,7 +121,6 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
 
   bool get _wantsFaceTracking =>
       _capturedFile == null &&
-      !_capturing &&
       _captureViewMode == _CaptureViewMode.photo &&
       _lensManager.selected.requiresFaceTracking;
 
@@ -312,7 +311,7 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
     CameraImage image,
     CameraController sourceController,
   ) async {
-    if (!_wantsFaceTracking || _processingFaceFrame) return;
+    if (!_wantsFaceTracking || _capturing || _processingFaceFrame) return;
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     if (nowMs - _lastFaceFrameMs < 45) return;
     _lastFaceFrameMs = nowMs;
@@ -324,7 +323,8 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
       );
       if (!mounted ||
           !identical(sourceController, _controller) ||
-          !_wantsFaceTracking) {
+          !_wantsFaceTracking ||
+          _capturing) {
         return;
       }
 
@@ -443,7 +443,8 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
     setState(() => _capturing = true);
     ChatyHaptics.light();
     try {
-      await _syncFaceDetectionStream();
+      // Keep the latest stable face pose while the still capture runs. The
+      // stream callback is gated during capture, then stopped after review opens.
       final file = await controller.takePicture();
       if (!mounted) return;
       var capturedPath = file.path;
