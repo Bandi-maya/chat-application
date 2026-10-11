@@ -184,38 +184,126 @@ class _LensAnchorPainter extends CustomPainter {
   }
 
   void _paintAviators(Canvas canvas, FacePose pose) {
+    // Premium, dimensional aviators: layered lens tint, metal rim, bevel,
+    // soft specular reflections and a bridge that follows the solved eye pose.
     final mid = pose.eyesMidpoint;
     final unit = pose.interocular * 1.08;
     _withFaceTransform(canvas, pose, mid, unit, () {
-      final fill = Paint()
-        ..color = const Color(0xFF0F172A).withValues(alpha: 0.90 * opacity)
-        ..style = PaintingStyle.fill;
-      final rim = Paint()
-        ..color = lens.accentColor.withValues(alpha: opacity)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 5
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round;
-
       final leftLens = Path()
         ..moveTo(-91, -22)
-        ..quadraticBezierTo(-50, -34, -15, -17)
-        ..lineTo(-25, 20)
-        ..quadraticBezierTo(-48, 42, -70, 22)
+        ..cubicTo(-67, -32, -38, -30, -15, -17)
+        ..lineTo(-25, 18)
+        ..cubicTo(-36, 39, -58, 43, -72, 25)
         ..close();
       final rightLens = Path()
         ..moveTo(15, -17)
-        ..quadraticBezierTo(50, -34, 91, -22)
-        ..lineTo(70, 22)
-        ..quadraticBezierTo(48, 42, 25, 20)
+        ..cubicTo(38, -30, 67, -32, 91, -22)
+        ..lineTo(72, 25)
+        ..cubicTo(58, 43, 36, 39, 25, 18)
         ..close();
-      canvas.drawPath(leftLens, fill);
-      canvas.drawPath(rightLens, fill);
+
+      final shadow = Paint()
+        ..color = const Color(0x99000000).withValues(alpha: opacity)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+      canvas.save();
+      canvas.translate(0, 3);
+      canvas.drawPath(leftLens, shadow);
+      canvas.drawPath(rightLens, shadow);
+      canvas.restore();
+
+      final tint = Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF34445F),
+            Color(0xFF10182A),
+            Color(0xFF030711),
+          ],
+          stops: [0.0, 0.48, 1.0],
+        ).createShader(const Rect.fromLTRB(-96, -36, 96, 46))
+        ..color = Colors.white.withValues(alpha: opacity);
+      canvas.drawPath(leftLens, tint);
+      canvas.drawPath(rightLens, tint);
+
+      final reflection = Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.34 * opacity),
+            Colors.white.withValues(alpha: 0.025 * opacity),
+            Colors.transparent,
+          ],
+          stops: const [0, 0.32, 1],
+        ).createShader(const Rect.fromLTRB(-94, -34, 94, 42));
+      canvas.drawPath(leftLens, reflection);
+      canvas.drawPath(rightLens, reflection);
+
+      // Restrained diagonal glints make the lens material feel glass-like
+      // without hiding the eyes or creating a distracting neon outline.
+      final glint = Paint()
+        ..color = Colors.white.withValues(alpha: 0.25 * opacity)
+        ..strokeWidth = 2.2
+        ..strokeCap = StrokeCap.round;
+      canvas.save();
+      canvas.clipPath(leftLens);
+      canvas.drawLine(const Offset(-77, -21), const Offset(-53, -26), glint);
+      canvas.drawLine(const Offset(-72, -16), const Offset(-59, -19), glint);
+      canvas.restore();
+      canvas.save();
+      canvas.clipPath(rightLens);
+      canvas.drawLine(const Offset(53, -26), const Offset(77, -21), glint);
+      canvas.drawLine(const Offset(59, -19), const Offset(72, -16), glint);
+      canvas.restore();
+
+      final rimGlow = Paint()
+        ..color = lens.accentColor.withValues(alpha: 0.16 * opacity)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 8
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+      final rim = Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF9CE5FF), Color(0xFF39BDF4), Color(0xFF0875B8)],
+        ).createShader(const Rect.fromLTRB(-110, -32, 110, 44))
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4.5
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+      canvas.drawPath(leftLens, rimGlow);
+      canvas.drawPath(rightLens, rimGlow);
       canvas.drawPath(leftLens, rim);
       canvas.drawPath(rightLens, rim);
-      canvas.drawLine(const Offset(-16, -16), const Offset(16, -16), rim);
-      canvas.drawLine(const Offset(-90, -20), const Offset(-108, -26), rim);
-      canvas.drawLine(const Offset(90, -20), const Offset(108, -26), rim);
+
+      final bridge = Paint()
+        ..color = const Color(0xFF63D4FF).withValues(alpha: opacity)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 5
+        ..strokeCap = StrokeCap.round;
+      canvas.drawPath(
+        Path()
+          ..moveTo(-16, -17)
+          ..quadraticBezierTo(0, -10, 16, -17),
+        bridge,
+      );
+
+      final temple = Paint()
+        ..color = const Color(0xFF39BDF4).withValues(alpha: opacity)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4.5
+        ..strokeCap = StrokeCap.round;
+      canvas.drawLine(const Offset(-89, -22), const Offset(-108, -28), temple);
+      canvas.drawLine(const Offset(89, -22), const Offset(108, -28), temple);
+
+      // Small polished metal highlights on the upper rim.
+      final metal = Paint()
+        ..color = Colors.white.withValues(alpha: 0.72 * opacity)
+        ..strokeWidth = 1.15
+        ..strokeCap = StrokeCap.round;
+      canvas.drawLine(const Offset(-69, -27), const Offset(-45, -28), metal);
+      canvas.drawLine(const Offset(45, -28), const Offset(69, -27), metal);
     });
   }
 
