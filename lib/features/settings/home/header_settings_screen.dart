@@ -724,7 +724,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                 disableStatusUnderName: home.disableStatusUnderName,
                 disableSearchBar: home.disableSearchBar,
                 separateChatsAndGroups: home.separateChatsAndGroups,
-                homeStyle: home.homeStyle,
+                homeStyle: _selectedHomeUiStyle(home),
                 tabBubbleStyle: home.tabBubbleStyle,
                 pagerTransition3d: home.pagerTransition3d,
                 onThreeDotsClick: () {
