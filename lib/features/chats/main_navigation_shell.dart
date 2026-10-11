@@ -2557,7 +2557,7 @@ class _CurvedRadialDrawerScaffold extends StatefulWidget {
 
 class _CurvedRadialDrawerScaffoldState
     extends State<_CurvedRadialDrawerScaffold> {
-  bool _menuOpen = true;
+  bool _menuOpen = false;
 
   @override
   Widget build(BuildContext context) {
