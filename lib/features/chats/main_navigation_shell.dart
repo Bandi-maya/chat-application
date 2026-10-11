@@ -19,6 +19,7 @@ import 'new_chat_screen.dart';
 import 'linked_devices_qr_screen.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/design_system/design_system.dart';
+import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/templates/template_shell.dart';
 import '../../ui/core/templates/template_controller.dart';
 import '../../ui/core/templates/template_models.dart';
