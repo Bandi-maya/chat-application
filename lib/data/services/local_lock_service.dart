@@ -404,7 +404,8 @@ class LocalLockService {
         .split('-')
         .where((value) => value.isNotEmpty)
         .toList(growable: false);
-    if (values.length < 4) return false;
+    final minimumPoints = gridSize == 4 ? 6 : 4;
+    if (values.length < minimumPoints) return false;
     final parsed = values.map(int.tryParse).toList(growable: false);
     final maxIndex = gridSize * gridSize - 1;
     if (parsed.any((value) => value == null || value < 0 || value > maxIndex)) {
