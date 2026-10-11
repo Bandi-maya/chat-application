@@ -1759,14 +1759,14 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               ],
             ),
           ),
-          if (homePrefs.showCameraIcon && !compactHeader)
+          if (homePrefs.showCameraIcon)
             IconButton(
               tooltip: 'Camera Effects',
               color: theme.primaryTextColor,
               onPressed: () => EffectPickerSheet.show(context),
               icon: const ChatyGlyphIcon(glyph: ChatyGlyph.camera, size: 20),
             ),
-          if (homePrefs.showDesktopIcon && !compactHeader)
+          if (homePrefs.showDesktopIcon)
             IconButton(
               tooltip: 'QR / Scan',
               color: theme.primaryTextColor,
@@ -1796,7 +1796,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               ),
             ),
           // Optional account shortcut controlled by Header Settings.
-          if (homePrefs.showIconAddAccount && !compactHeader)
+          if (homePrefs.showIconAddAccount)
             IconButton(
               tooltip: 'Account settings',
               color: theme.primaryTextColor,
