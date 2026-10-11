@@ -125,6 +125,16 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
       _captureViewMode == _CaptureViewMode.photo &&
       _lensManager.selected.requiresFaceTracking;
 
+  String? _lensIdForEffect(String effectId) => switch (effectId) {
+    'face_dog_filter' => 'lens_dog_ears',
+    'face_sparkles' => 'lens_sparkles',
+    'face_hearts_float' => 'lens_hearts_float',
+    'face_neon_crown' => 'lens_neon_crown',
+    'face_angel_halo' => 'lens_angel_halo',
+    'face_sunglasses_aviator' => 'lens_sunglasses_aviator',
+    _ => null,
+  };
+
   bool _switchingCamera = false;
 
   XFile? _capturedFile;
@@ -586,9 +596,9 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
     final ready = _phase == _CameraPhase.ready;
     final screen = MediaQuery.sizeOf(context);
     final tight = screen.shortestSide < 340 || screen.height < 680;
-    final allEffects = EffectRegistry.allEffects
-        .where((effect) => !effect.isFaceTrackingRequired)
-        .toList(growable: false);
+    // Preserve the entire legacy filter catalog. Face-effect entries now
+    // select their tracked lens equivalent instead of losing a menu option.
+    final allEffects = EffectRegistry.allEffects;
 
     return Container(
       decoration: const BoxDecoration(
@@ -694,13 +704,22 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
                 itemCount: allEffects.length,
                 itemBuilder: (context, index) {
                   final effect = allEffects[index];
-                  final isSelected = _engine.activeEffect.id == effect.id;
+                  final lensId = _lensIdForEffect(effect.id);
+                  final isSelected = effect.isFaceTrackingRequired
+                      ? lensId != null && _lensManager.selected.id == lensId
+                      : _engine.activeEffect.id == effect.id;
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 5),
                     child: GestureDetector(
                       onTap: () {
                         ChatyHaptics.selection();
-                        setState(() => _engine.selectEffect(effect));
+                        if (effect.isFaceTrackingRequired) {
+                          final lensId = _lensIdForEffect(effect.id);
+                          if (lensId != null) _lensManager.select(lensId);
+                          setState(() => _effectsOpen = false);
+                        } else {
+                          setState(() => _engine.selectEffect(effect));
+                        }
                       },
                       child: AnimatedScale(
                         scale: isSelected ? 1.06 : 0.88,
