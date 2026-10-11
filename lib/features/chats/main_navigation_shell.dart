@@ -1522,6 +1522,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   dataStore: locator<ChatyDataStore>(),
                   preferencesController:
                       locator<ChatyPreferencesController>(),
+                  startInGroupMode: true,
                 ),
               ),
             );
@@ -1707,6 +1708,14 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   ),
                   const Spacer(),
                   IconButton(
+                    tooltip: 'Dial a number',
+                    icon: Icon(Icons.dialpad_rounded, color: colors.primary),
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      _openDialpad(context, theme);
+                    },
+                  ),
+                  IconButton(
                     icon: Icon(Icons.close_rounded, color: colors.foregroundSecondary),
                     onPressed: () => Navigator.of(ctx).pop(),
                   ),
@@ -1807,6 +1816,269 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     );
   }
 
+
+  void _openDialpad(BuildContext context, dynamic theme) {
+    final numberController = TextEditingController();
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) {
+          final colors = sheetContext.colors;
+          const keys = <String>[
+            '1', '2', '3',
+            '4', '5', '6',
+            '7', '8', '9',
+            '*', '0', '#',
+          ];
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+            ),
+            child: Container(
+              height: MediaQuery.sizeOf(sheetContext).height * 0.72,
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(28),
+                ),
+                border: Border.all(color: colors.borderSubtle),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: colors.borderSubtle,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Dial a Chaty contact',
+                          style: TextStyle(
+                            color: colors.foreground,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close keypad',
+                        onPressed: () => Navigator.of(sheetContext).pop(),
+                        icon: Icon(Icons.close_rounded,
+                            color: colors.foregroundSecondary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: numberController,
+                    autofocus: true,
+                    keyboardType: TextInputType.phone,
+                    textAlign: TextAlign.center,
+                    onChanged: (_) => setSheetState(() {}),
+                    style: TextStyle(
+                      color: colors.foreground,
+                      fontSize: 27,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.2,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: '+ country code / phone number',
+                      hintStyle: TextStyle(
+                        color: colors.foregroundTertiary,
+                        fontSize: 14,
+                        letterSpacing: 0,
+                      ),
+                      filled: true,
+                      fillColor: colors.surfaceSecondary,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      suffixIcon: numberController.text.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'Delete last digit',
+                              onPressed: () {
+                                final text = numberController.text;
+                                if (text.isNotEmpty) {
+                                  numberController.text =
+                                      text.substring(0, text.length - 1);
+                                  numberController.selection =
+                                      TextSelection.collapsed(
+                                    offset: numberController.text.length,
+                                  );
+                                  setSheetState(() {});
+                                }
+                              },
+                              icon: Icon(Icons.backspace_outlined,
+                                  color: colors.foregroundSecondary),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Expanded(
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 330),
+                        child: GridView.count(
+                          physics: const NeverScrollableScrollPhysics(),
+                          crossAxisCount: 3,
+                          mainAxisSpacing: 8,
+                          crossAxisSpacing: 22,
+                          childAspectRatio: 1.25,
+                          children: [
+                            for (final key in keys)
+                              InkWell(
+                                borderRadius: BorderRadius.circular(22),
+                                onTap: () {
+                                  numberController.text += key;
+                                  numberController.selection =
+                                      TextSelection.collapsed(
+                                    offset: numberController.text.length,
+                                  );
+                                  setSheetState(() {});
+                                },
+                                child: Center(
+                                  child: Container(
+                                    width: 66,
+                                    height: 52,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: colors.surfaceSecondary,
+                                      borderRadius: BorderRadius.circular(18),
+                                    ),
+                                    child: Text(
+                                      key,
+                                      style: TextStyle(
+                                        color: colors.foreground,
+                                        fontSize: 23,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: 66,
+                    height: 58,
+                    child: FilledButton(
+                      onPressed: numberController.text
+                              .replaceAll(RegExp(r'[^0-9]'), '')
+                              .length <
+                          5
+                          ? null
+                          : () async {
+                              final number = numberController.text.trim();
+                              Navigator.of(sheetContext).pop();
+                              await _callChatyContactByPhone(
+                                context,
+                                theme,
+                                number,
+                              );
+                            },
+                      style: FilledButton.styleFrom(
+                        shape: const CircleBorder(),
+                        backgroundColor: colors.success,
+                        foregroundColor: colors.onPrimary,
+                      ),
+                      child: const Icon(Icons.call_rounded, size: 25),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Calls connect to registered Chaty contacts only.',
+                    style: TextStyle(
+                      color: colors.foregroundSecondary,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    ).whenComplete(numberController.dispose);
+  }
+
+  Future<void> _callChatyContactByPhone(
+    BuildContext context,
+    dynamic theme,
+    String phoneNumber,
+  ) async {
+    final digits = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+    final dataStore = locator<ChatyDataStore>();
+    dynamic matchedContact;
+
+    for (final contact in dataStore.contacts) {
+      final contactDigits = contact.phone.replaceAll(RegExp(r'[^0-9]'), '');
+      if (contactDigits.isEmpty) continue;
+      final isExact = contactDigits == digits;
+      final isCountryCodeVariant = contactDigits.length >= 7 &&
+          digits.length >= 7 &&
+          (contactDigits.endsWith(digits) || digits.endsWith(contactDigits));
+      if (isExact || isCountryCodeVariant) {
+        matchedContact = contact;
+        break;
+      }
+    }
+
+    if (matchedContact == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No Chaty contact matches that number. Calls need a registered Chaty account.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      await locator<CallSignalingService>().initiateCall(
+        remoteUserId: matchedContact.id as String,
+        remoteDisplayName: matchedContact.displayName as String,
+        remoteAvatarInitials: (matchedContact.displayName as String).isNotEmpty
+            ? (matchedContact.displayName as String).substring(0, 1)
+            : '?',
+        remoteAvatarColorHex: matchedContact.avatarColorHex as String?,
+        isVideo: false,
+      );
+      if (!context.mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => OngoingCallScreen(theme: theme),
+        ),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Unable to start call: ${error.toString().replaceFirst('Exception: ', '')}',
+          ),
+        ),
+      );
+    }
+  }
 
   Widget _buildCustomNavItem({
     required _NavDestinationItem item,
