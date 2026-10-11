@@ -682,7 +682,6 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
         locator<ThemeController>(),
       ]),
       builder: (context, _) {
-        final theme = locator<ThemeController>().globalTheme;
         final colors = context.colors;
         final home = widget.preferencesController.home;
         final currentUser = widget.dataStore?.currentUser;
@@ -1213,12 +1212,13 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
   }
 
   Widget _divider() {
-    return const Divider(
+    final theme = locator<ThemeController>().globalTheme;
+    return Divider(
       height: 1,
       thickness: 0.8,
       indent: 68,
       endIndent: 16,
-      color: colors.divider,
+      color: theme.cardColor,
     );
   }
 }
