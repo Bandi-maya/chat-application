@@ -2598,7 +2598,7 @@ class _CurvedRadialDrawerScaffoldState
                         children: [
                           Positioned(
                             right: 12,
-                            top: MediaQuery.paddingOf(context).top + 6,
+                            top: 6,
                             child: Material(
                               color: onAccent.withValues(alpha: 0.96),
                               shape: const CircleBorder(),
@@ -2606,9 +2606,9 @@ class _CurvedRadialDrawerScaffoldState
                                 tooltip: 'Close navigation menu',
                                 visualDensity: VisualDensity.compact,
                                 onPressed: () => setState(() => _menuOpen = false),
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.close_rounded,
-                                  color: Color(0xFF26303B),
+                                  color: accent,
                                   size: 19,
                                 ),
                               ),
@@ -2621,6 +2621,8 @@ class _CurvedRadialDrawerScaffoldState
                             widget.navItems,
                             widget.selectedIndex,
                             colors,
+                            accent,
+                            onAccent,
                           ),
                         ],
                       ),
@@ -2656,6 +2658,8 @@ class _CurvedRadialDrawerScaffoldState
     List<_NavDestinationItem> navItems,
     int selectedIndex,
     AppColors colors,
+    Color accent,
+    Color onAccent,
   ) {
     final items = navItems.take(7).toList(growable: false);
     if (items.isEmpty) return const <Widget>[];
