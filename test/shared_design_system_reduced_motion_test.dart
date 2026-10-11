@@ -35,6 +35,11 @@ void main() {
       'lib/features/settings/customization/customization_center_screen.dart',
       'lib/features/settings/appearance/app_icon_settings_screen.dart',
       'lib/features/settings/pro_pricing_screen.dart',
+      'lib/features/settings/security/app_lock_overlay.dart',
+      'lib/features/onboarding/permission_onboarding_screen.dart',
+      'lib/ui/core/design_system/components/signature_components.dart',
+      'lib/ui/core/design_system/components/chaty_modal.dart',
+      'lib/ui/core/design_system/gb_design_system.dart',
     ];
 
     for (final path in paths) {
