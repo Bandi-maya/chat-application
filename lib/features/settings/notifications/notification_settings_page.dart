@@ -23,7 +23,111 @@ class NotificationSettingsPage extends StatefulWidget {
       _NotificationSettingsPageState();
 }
 
-class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
+class _NotificationSettingsPageState extends State<NotificationSettingsPage> with WidgetsBindingObserver {
+  static const MethodChannel _dynamicIslandChannel = MethodChannel('chaty/dynamic_island');
+  bool _overlayPermissionGranted = false;
+  bool _notificationAccessGranted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refreshDynamicIslandPermissions();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshDynamicIslandPermissions();
+  }
+
+  Future<void> _refreshDynamicIslandPermissions() async {
+    try {
+      final state = await _dynamicIslandChannel.invokeMapMethod<String, dynamic>('getPermissionState');
+      if (!mounted || state == null) return;
+      setState(() {
+        _overlayPermissionGranted = state['overlay'] == true;
+        _notificationAccessGranted = state['notificationAccess'] == true;
+      });
+    } on PlatformException catch (_) {
+      // Keep the controls visible; Android-only methods are unavailable on other platforms.
+    } on MissingPluginException catch (_) {
+      // iOS and widget tests do not provide the Android platform bridge.
+    }
+  }
+
+  Future<void> _openDynamicIslandPermission({required bool notificationAccess}) async {
+    final title = notificationAccess ? 'Allow notification access' : 'Allow display over other apps';
+    final explanation = notificationAccess
+        ? 'Android lets Chaty read notification content only after you explicitly enable Chaty Dynamic Island in Notification access settings. This is required to show notifications from other apps.'
+        : 'Android requires display-over-other-apps access so the island can float above your current app. Chaty only draws the temporary notification pill.';
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: Text(explanation),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Not now')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Open Settings')),
+        ],
+      ),
+    );
+    if (accepted != true || !mounted) return;
+    try {
+      await _dynamicIslandChannel.invokeMethod<void>(
+        notificationAccess ? 'openNotificationAccessSettings' : 'openOverlaySettings',
+      );
+    } on PlatformException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open Android settings: ${error.message ?? 'Please open Settings manually.'}')));
+    } on MissingPluginException {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('System-wide Dynamic Island is available on Android only.')));
+    }
+  }
+
+  Future<void> _setDynamicIslandEnabled(bool value) async {
+    widget.preferencesController.updateGbFeature(
+      'dynamic_island_notifications', value,
+      logTitle: 'Dynamic Island Notifications',
+    );
+    try {
+      await _dynamicIslandChannel.invokeMethod<bool>('setEnabled', {'enabled': value});
+      if (value && mounted && (!_notificationAccessGranted || !_overlayPermissionGranted)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Grant Notification access and Display over other apps below to activate system-wide notifications.')),
+        );
+      }
+    } on PlatformException catch (_) {
+      // Keep the in-app island functional where native Android overlay APIs are unavailable.
+    } on MissingPluginException catch (_) {
+      // Android-only capability; the in-app island remains available cross-platform.
+    }
+  }
+
+  Future<void> _previewDynamicIsland() async {
+    SystemSound.play(SystemSoundType.click);
+    try {
+      if (_overlayPermissionGranted && _notificationAccessGranted) {
+        await _dynamicIslandChannel.invokeMethod<void>('showPreview');
+        return;
+      }
+    } on PlatformException catch (_) {
+      // Fall back to the in-app preview if native overlay cannot be displayed.
+    } on MissingPluginException catch (_) {
+      // Fall back to the in-app preview on non-Android platforms.
+    }
+    widget.notificationService.triggerEventNotification(
+      title: 'Dynamic Island preview',
+      body: 'New message · Tap the pill to expand',
+      icon: Icons.chat_bubble_rounded,
+      color: locator<ThemeController>().globalTheme.accentColor,
+    );
+  }
+
   void _pickColor({
     required String title,
     required int? currentColor,
@@ -198,60 +302,109 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
               ],
             ),
 
-            // Dynamic Island: an opt-in presentation mode for Chaty's in-app event notifications.
+            // System-wide Android Dynamic Island.
             ChatySettingsSection(
               title: 'Dynamic Island notifications',
               description:
-                  'Show incoming Chaty in-app events in a compact animated pill inspired by the reference project. Existing event-category switches below still decide which events are generated.',
+                  'Show notifications from across your phone in a floating island. Android requires two explicit permissions; you can revoke either at any time in system settings.',
               children: [
                 ChatySwitchTile(
                   icon: Icons.motion_photos_on_rounded,
                   iconColor: colors.primary,
                   title: 'Enable Dynamic Island',
-                  subtitle:
-                      'Replace standard in-app event toasts with an animated top pill while Chaty is open',
+                  subtitle: 'Turn on the island for supported notifications across apps',
                   value: widget.preferencesController.gbBool(
                     'dynamic_island_notifications',
                     fallback: false,
                   ),
-                  onChanged: (value) =>
-                      widget.preferencesController.updateGbFeature(
-                    'dynamic_island_notifications',
-                    value,
-                    logTitle: 'Dynamic Island Notifications',
+                  onChanged: _setDynamicIslandEnabled,
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: colors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: colors.borderSubtle),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          Icon(
+                            _notificationAccessGranted ? Icons.check_circle_rounded : Icons.notifications_active_rounded,
+                            color: _notificationAccessGranted ? colors.success : colors.primary,
+                            size: 21,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Notification access', style: TextStyle(color: colors.foreground, fontWeight: FontWeight.w700)),
+                              Text(
+                                _notificationAccessGranted ? 'Granted · system notifications can be read' : 'Required · allow Chaty in Android Settings',
+                                style: TextStyle(color: colors.foregroundSecondary, fontSize: 12),
+                              ),
+                            ],
+                          )),
+                          TextButton(
+                            onPressed: () => _openDynamicIslandPermission(notificationAccess: true),
+                            child: Text(_notificationAccessGranted ? 'Review' : 'Allow'),
+                          ),
+                        ]),
+                        const SizedBox(height: 10),
+                        Divider(height: 1, color: colors.borderSubtle),
+                        const SizedBox(height: 10),
+                        Row(children: [
+                          Icon(
+                            _overlayPermissionGranted ? Icons.check_circle_rounded : Icons.layers_rounded,
+                            color: _overlayPermissionGranted ? colors.success : colors.primary,
+                            size: 21,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Display over other apps', style: TextStyle(color: colors.foreground, fontWeight: FontWeight.w700)),
+                              Text(
+                                _overlayPermissionGranted ? 'Granted · island can float above apps' : 'Required · permit the floating pill',
+                                style: TextStyle(color: colors.foregroundSecondary, fontSize: 12),
+                              ),
+                            ],
+                          )),
+                          TextButton(
+                            onPressed: () => _openDynamicIslandPermission(notificationAccess: false),
+                            child: Text(_overlayPermissionGranted ? 'Review' : 'Allow'),
+                          ),
+                        ]),
+                        const SizedBox(height: 8),
+                        TextButton.icon(
+                          onPressed: _refreshDynamicIslandPermissions,
+                          icon: const Icon(Icons.refresh_rounded, size: 18),
+                          label: const Text('Refresh permission status'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            SystemSound.play(SystemSoundType.click);
-                            widget.notificationService.triggerEventNotification(
-                              title: 'Dynamic Island preview',
-                              body: 'New message · Tap the pill to expand',
-                              icon: Icons.chat_bubble_rounded,
-                              color: colors.primary,
-                            );
-                          },
-                          icon: const Icon(Icons.play_circle_outline_rounded),
-                          label: const Text('Preview animation + tone'),
-                        ),
+                  child: Row(children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _previewDynamicIsland,
+                        icon: const Icon(Icons.play_circle_outline_rounded),
+                        label: const Text('Preview island + tone'),
                       ),
-                    ],
-                  ),
+                    ),
+                  ]),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
                   child: Text(
-                    'Preview sends a local sample event and plays the system click sound. For real events, the island respects the master in-app notifications switch and the individual event switches below.',
-                    style: TextStyle(
-                      color: colors.foregroundSecondary,
-                      fontSize: 12,
-                      height: 1.35,
-                    ),
+                    'The island shows a compact notification first. Tap to expand details; tap again to open the source notification. Call notifications stay visible longer. Android may limit sensitive content based on the source app and device settings.',
+                    style: TextStyle(color: colors.foregroundSecondary, fontSize: 12, height: 1.35),
                   ),
                 ),
               ],
