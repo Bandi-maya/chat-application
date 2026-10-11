@@ -899,7 +899,21 @@ class _ChatySkeletonState extends State<ChatySkeleton>
     _pulse = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1100),
-    )..repeat(reverse: true);
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncPulseWithMotionPreference();
+  }
+
+  void _syncPulseWithMotionPreference() {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      if (_pulse.isAnimating) _pulse.stop();
+    } else if (!_pulse.isAnimating) {
+      _pulse.repeat(reverse: true);
+    }
   }
 
   @override
