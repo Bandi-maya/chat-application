@@ -313,6 +313,8 @@ class HomePreferences {
   final bool ghostMode;
   final bool airplaneModeSimulator;
   final bool showSearchBar;
+  /// Header action, Below header, or Above chat filters.
+  final String searchPlacement;
   final bool showCameraIcon;
   final bool showDesktopIcon;
 
@@ -370,6 +372,7 @@ class HomePreferences {
     this.ghostMode = false,
     this.airplaneModeSimulator = false,
     this.showSearchBar = true,
+    this.searchPlacement = 'Header action',
     this.showCameraIcon = false,
     this.showDesktopIcon = true,
     this.carouselView = false,
@@ -425,6 +428,7 @@ class HomePreferences {
     bool? ghostMode,
     bool? airplaneModeSimulator,
     bool? showSearchBar,
+    String? searchPlacement,
     bool? showCameraIcon,
     bool? showDesktopIcon,
     bool? carouselView,
@@ -480,6 +484,7 @@ class HomePreferences {
       airplaneModeSimulator:
           airplaneModeSimulator ?? this.airplaneModeSimulator,
       showSearchBar: showSearchBar ?? this.showSearchBar,
+      searchPlacement: searchPlacement ?? this.searchPlacement,
       showCameraIcon: showCameraIcon ?? this.showCameraIcon,
       showDesktopIcon: showDesktopIcon ?? this.showDesktopIcon,
       carouselView: carouselView ?? this.carouselView,
@@ -546,6 +551,7 @@ class HomePreferences {
     'ghostMode': ghostMode,
     'airplaneModeSimulator': airplaneModeSimulator,
     'showSearchBar': showSearchBar,
+    'searchPlacement': searchPlacement,
     'showCameraIcon': showCameraIcon,
     'showDesktopIcon': showDesktopIcon,
     'carouselView': carouselView,
@@ -599,6 +605,7 @@ class HomePreferences {
     ghostMode: map['ghostMode'] ?? false,
     airplaneModeSimulator: map['airplaneModeSimulator'] ?? false,
     showSearchBar: map['showSearchBar'] ?? true,
+    searchPlacement: map['searchPlacement'] as String? ?? 'Header action',
     showCameraIcon: map['showCameraIcon'] ?? false,
     showDesktopIcon: map['showDesktopIcon'] ?? true,
     carouselView: map['carouselView'] ?? false,
