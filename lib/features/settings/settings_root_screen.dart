@@ -263,16 +263,20 @@ class SettingsRootScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = dataStore.currentUser;
-    final homePrefs = preferencesController.home;
-    final displayName = homePrefs.myNameOverride.isNotEmpty
-        ? homePrefs.myNameOverride
-        : (user.displayName.isNotEmpty ? user.displayName : 'Bandi Maya');
-    final handle = user.username.isNotEmpty ? '@${user.username}' : '@bandi_maya';
-
     return ListenableBuilder(
-      listenable: Listenable.merge([preferencesController, dataStore]),
-      builder: (context, _) => Scaffold(
+      listenable: Listenable.merge([preferencesController, dataStore, themeController]),
+      builder: (context, _) {
+        // Read account fields inside the listener so changed avatars, names,
+        // and banners refresh without leaving Settings and reopening it.
+        final user = dataStore.currentUser;
+        final homePrefs = preferencesController.home;
+        final displayName = homePrefs.myNameOverride.isNotEmpty
+            ? homePrefs.myNameOverride
+            : (user.displayName.isNotEmpty ? user.displayName : 'Bandi Maya');
+        final handle = user.username.isNotEmpty ? '@${user.username}' : '@bandi_maya';
+        final colors = context.colors;
+        final theme = themeController.globalTheme;
+        return Scaffold(
         backgroundColor: const Color(0xFF0C1014),
         appBar: AppBar(
           backgroundColor: const Color(0xFF0C1014),
@@ -445,7 +449,8 @@ class SettingsRootScreen extends StatelessWidget {
             ],
           ),
         ),
-      ),
+        );
+      },
     );
   }
 
