@@ -376,12 +376,15 @@ internal class LauncherIconManager(
             }
             packageManager.setComponentEnabledSettings(changes)
         } else {
-            setComponent(targetAlias, PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
+            // On older Android versions component updates are not atomic.
+            // Disable old aliases first, then enable the target, so the launcher
+            // never observes two enabled MAIN/LAUNCHER components at once.
             for (candidate in launcherComponents.keys) {
                 if (candidate != targetAlias) {
                     setComponent(candidate, PackageManager.COMPONENT_ENABLED_STATE_DISABLED)
                 }
             }
+            setComponent(targetAlias, PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
         }
 
         // Enforce the invariant: exactly one launcher component must be enabled
