@@ -179,7 +179,7 @@ class _ImageEditorCropperDialogState extends State<ImageEditorCropperDialog> {
     final coverScale = math.max(
       cropBoxWidth / rotatedSourceSize.width,
       cropBoxHeight / rotatedSourceSize.height,
-    );
+    ).toDouble();
     final rotatedDisplaySize = Size(
       rotatedSourceSize.width * coverScale,
       rotatedSourceSize.height * coverScale,
