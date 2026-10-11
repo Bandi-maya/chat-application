@@ -32,13 +32,29 @@ class CameraFaceDetectionBridge {
       final frame = _toFaceMeshFrame(image);
       if (frame != null) {
         final pipeline = await _ensureMeshPipeline();
-        if (!pipeline.isBusy && !pipeline.isClosed) {
+        if (pipeline.isBusy) {
+          // Skip this camera frame instead of running the slower native
+          // fallback concurrently. FaceAnchorSolver keeps the last stable pose
+          // briefly while the worker finishes its current frame.
+          final rotated = sensorOrientation % 180 != 0;
+          return CameraFaceDetectionResult(
+            imageWidth: rotated ? image.height : image.width,
+            imageHeight: rotated ? image.width : image.height,
+            faces: const <int, RawFace>{},
+          );
+        }
+        if (!pipeline.isClosed) {
           final result = await pipeline.processMultiFace(
             frame,
             maxMeshFaces: 3,
             rotationDegrees: sensorOrientation,
           );
-          return _fromMeshResult(result);
+          final rotated = sensorOrientation % 180 != 0;
+          return _fromMeshResult(
+            result,
+            fallbackWidth: rotated ? image.height : image.width,
+            fallbackHeight: rotated ? image.width : image.height,
+          );
         }
       }
     } catch (_) {
@@ -151,11 +167,13 @@ class CameraFaceDetectionBridge {
   }
 
   CameraFaceDetectionResult _fromMeshResult(
-    FaceMeshMultiInferenceResult result,
-  ) {
+    FaceMeshMultiInferenceResult result, {
+    required int fallbackWidth,
+    required int fallbackHeight,
+  }) {
     final faces = <int, RawFace>{};
-    var width = 1;
-    var height = 1;
+    var width = result.detectionResult?.imageWidth ?? fallbackWidth;
+    var height = result.detectionResult?.imageHeight ?? fallbackHeight;
 
     for (final tracked in result.faces) {
       final mesh = tracked.mesh;
