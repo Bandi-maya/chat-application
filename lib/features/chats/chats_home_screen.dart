@@ -490,6 +490,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         };
         final storyShowOnlineRing = storiesStyle != 'Minimal';
         final storyCardWrap = storiesStyle == 'Card' || homePrefs.carouselView;
+        final showStoriesStrip = homePrefs.enableStoriesStrip || styleStoriesFirst;
         final storyCompact = storiesStyle == 'Compact';
         final storyTileWidth = storyCardWrap
             ? 74.0
@@ -637,7 +638,17 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   if (!_isSelectionMode &&
                       searchEnabled &&
                       searchPlacement == 'Below header')
-                    _homeSearchField(theme),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      child: KeyedSubtree(
+                        key: ValueKey<String>(
+                          'home-search-${homePrefs.searchPlacement}-${homePrefs.showSearchBar}',
+                        ),
+                        child: _homeSearchField(theme),
+                      ),
+                    ),
                   // P4: iOS collapsing LARGE title. Shrinks away as the list
                   // scrolls; the compact bar title fades in to replace it.
                   if (!_isSelectionMode && widget.pageTitle != null)
@@ -688,7 +699,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                         searchPlacement == 'Header action' &&
                         _isSearchOpen)
                       _homeSearchField(theme),
-                    if ((homePrefs.enableStoriesStrip || styleStoriesFirst) &&
+                    if (showStoriesStrip &&
                         !styleStoriesHidden &&
                         widget.forcedType != ConversationType.group)
                       SizedBox(
