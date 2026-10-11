@@ -63,7 +63,7 @@ class GbSettingsScreen extends StatelessWidget {
           ),
         ),
         title: Text(
-          'Settings',
+          'Chaty Settings',
           style: TextStyle(
             color: theme.primaryTextColor,
             fontSize: 20 * theme.fontScale,
