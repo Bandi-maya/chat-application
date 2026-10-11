@@ -997,6 +997,9 @@ class GbLiveHeaderPreview extends StatelessWidget {
   final bool disableStatusUnderName;
   final bool disableSearchBar;
   final bool showSearchBar;
+  final bool showCameraIcon;
+  final bool showDesktopIcon;
+  final bool showIconAddAccount;
   final bool separateChatsAndGroups;
   final String homeStyle;
   final String tabBubbleStyle;
@@ -1019,6 +1022,9 @@ class GbLiveHeaderPreview extends StatelessWidget {
     required this.disableStatusUnderName,
     required this.disableSearchBar,
     this.showSearchBar = true,
+    this.showCameraIcon = false,
+    this.showDesktopIcon = true,
+    this.showIconAddAccount = false,
     required this.separateChatsAndGroups,
     required this.homeStyle,
     this.tabBubbleStyle = 'Capsule Pill',
@@ -1123,6 +1129,23 @@ class GbLiveHeaderPreview extends StatelessWidget {
           else
             _buildBasicHeader(title),
 
+          if ((showCameraIcon && !isStock && !isOldUi) ||
+              showDesktopIcon ||
+              showIconAddAccount)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (showCameraIcon && !isStock && !isOldUi)
+                    _buildHeaderActionPreviewIcon(Icons.photo_camera_outlined, 'Camera'),
+                  if (showDesktopIcon)
+                    _buildHeaderActionPreviewIcon(Icons.qr_code_scanner_rounded, 'Scan'),
+                  if (showIconAddAccount)
+                    _buildHeaderActionPreviewIcon(Icons.person_add_alt_1_rounded, 'Account'),
+                ],
+              ),
+            ),
           // Search placement is previewed in the same position as the live Chats screen.
           if (_showInlineSearch &&
               searchPlacement.trim().toLowerCase() == 'below header')
@@ -1163,6 +1186,18 @@ class GbLiveHeaderPreview extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildHeaderActionPreviewIcon(IconData icon, String label) => Padding(
+    padding: const EdgeInsets.only(left: 11),
+    child: Tooltip(
+      message: label,
+      child: Icon(
+        icon,
+        color: _liveTheme.primaryTextColor,
+        size: 18,
+      ),
+    ),
+  );
 
   Widget _buildSearchPlacementPreview() => Padding(
     padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
@@ -1705,8 +1740,10 @@ class GbLiveHeaderPreview extends StatelessWidget {
             ),
           ),
           Spacer(),
-          Icon(Icons.camera_alt_outlined, color: _liveTheme.primaryTextColor, size: 21),
-          SizedBox(width: 14),
+          if (showCameraIcon) ...[
+            Icon(Icons.camera_alt_outlined, color: _liveTheme.primaryTextColor, size: 21),
+            SizedBox(width: 14),
+          ],
           if (_showHeaderSearch) ...[
             Icon(Icons.search_rounded, color: _liveTheme.primaryTextColor, size: 21),
             SizedBox(width: 14),
@@ -1798,7 +1835,8 @@ class GbLiveHeaderPreview extends StatelessWidget {
           ),
           Row(
             children: [
-              SizedBox(width: 36, child: Center(child: Icon(Icons.camera_alt, color: _liveTheme.secondaryTextColor, size: 18))),
+              if (showCameraIcon)
+                SizedBox(width: 36, child: Center(child: Icon(Icons.camera_alt, color: _liveTheme.secondaryTextColor, size: 18))),
               Expanded(
                 child: Column(
                   children: [
