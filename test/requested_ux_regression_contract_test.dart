@@ -9,7 +9,7 @@ void main() {
       'lib/features/calls/call_contact_picker_screen.dart',
     ).readAsStringSync();
 
-    expect(calls, contains("label: 'Add call'"));
+    expect(calls, contains("Text('Add call')"));
     expect(calls, contains('CallContactPickerMode.dialpad'));
     expect(calls, isNot(contains("tooltip: 'Open dialpad'")));
     expect(picker, contains('Widget _buildDialpad()'));
