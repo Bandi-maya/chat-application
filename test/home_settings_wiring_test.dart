@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:chat/domain/models/preferences.dart';
 import 'package:chat/ui/core/controllers/home_preset_normalizer.dart';
 import 'package:chat/ui/core/formatting/chat_formatters.dart';
+import 'package:chat/ui/core/theme/theme_config.dart';
 
 void main() {
   group('HomePresetNormalizer Tests', () {
@@ -30,6 +31,28 @@ void main() {
       expect(HomePresetNormalizer.homeStyle('Classic'), 'Classic');
       expect(HomePresetNormalizer.homeStyle('Tablet Split View'), 'Tablet Split View');
       expect(HomePresetNormalizer.homeStyle('Unknown Value'), 'Chaty Default');
+
+      expect(
+        HomePresetNormalizer.navigationMode('WhatsApp-style top bar'),
+        AppNavigationMode.topWhatsAppBar,
+      );
+      expect(
+        HomePresetNormalizer.navigationMode('Floating Rail'),
+        AppNavigationMode.floatingIslandRail,
+      );
+      expect(
+        HomePresetNormalizer.navigationMode('3D Perspective Drawer'),
+        AppNavigationMode.perspective3DDrawer,
+      );
+      expect(
+        HomePresetNormalizer.navigationMode('Modern Side Menu'),
+        AppNavigationMode.modernSideMenu,
+      );
+      expect(
+        HomePresetNormalizer.navigationMode('Curved Radial Menu'),
+        AppNavigationMode.curvedRadialDrawer,
+      );
+      expect(HomePresetNormalizer.navigationMode('Cards'), isNull);
     });
 
     test('canonicalizes story styles', () {
