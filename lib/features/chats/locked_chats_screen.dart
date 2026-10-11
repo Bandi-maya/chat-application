@@ -306,6 +306,9 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
                   widget.preferencesController.unlockConversationCompletely(
                     conversation.id,
                   );
+                  ProtectedResourceGate.invalidateConversationSession(
+                    conversation.id,
+                  );
                 },
               ),
             ],
