@@ -29,6 +29,10 @@ class LockCredentialSetupModal extends StatefulWidget {
           isScrollControlled: true,
           useSafeArea: true,
           showDragHandle: true,
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
           builder: (_) => LockCredentialSetupModal(
             method: method,
             pinLength: pinLength,
