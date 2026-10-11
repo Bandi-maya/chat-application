@@ -10,6 +10,7 @@ import '../../../ui/core/controllers/app_icon_controller.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/design_system.dart';
 import '../../../ui/core/design_system/gb_design_system.dart';
+import '../../../ui/core/notifications/notification_icon_preset.dart';
 import '../../../ui/core/widgets/app_brand_icon.dart';
 
 class UniversalStylesScreen extends StatefulWidget {
@@ -113,37 +114,14 @@ class _UniversalStylesScreenState extends State<UniversalStylesScreen> {
     'System Emoji (BETA)',
   ];
 
-  final List<Map<String, dynamic>> _notificationIcons = [
-    // Brand-adjacent notification marks: all remain legible at status-bar size.
-    {'name': 'White', 'color': Colors.white, 'icon': Icons.chat_bubble_outline_rounded},
-    {'name': 'Black', 'color': Colors.black87, 'icon': Icons.chat_bubble_rounded},
-    {'name': 'Blue', 'color': Colors.blue, 'icon': Icons.forum_rounded},
-    {'name': 'Red', 'color': Colors.redAccent, 'icon': Icons.mode_comment_rounded},
-    {'name': 'Green', 'color': Colors.green, 'icon': Icons.sms_rounded},
-    {'name': 'Yellow', 'color': Colors.amber, 'icon': Icons.chat_rounded},
-    {'name': 'Orange', 'color': Colors.deepOrange, 'icon': Icons.mark_chat_unread_rounded},
-    {'name': 'Gold', 'color': Color(0xFFFFD700), 'icon': Icons.message_rounded},
-    {'name': 'Cyan', 'color': Colors.cyan, 'icon': Icons.bubble_chart_rounded},
-    {'name': 'Pink', 'color': Colors.pinkAccent, 'icon': Icons.chat_bubble_rounded},
-    {'name': 'Magenta', 'color': Colors.purpleAccent, 'icon': Icons.chat_bubble_outline_rounded},
-    {'name': 'Purple', 'color': Colors.deepPurple, 'icon': Icons.forum_outlined},
-    {'name': 'Notifybar 12', 'color': Colors.grey, 'icon': Icons.mode_comment_outlined},
-    {'name': 'Notifybar 13', 'color': Colors.pink, 'icon': Icons.chat_bubble_outline_rounded},
-    {'name': 'Notifybar 14', 'color': Colors.teal, 'icon': Icons.forum_rounded},
-    {'name': 'Notifybar 15', 'color': Colors.deepPurpleAccent, 'icon': Icons.message_outlined},
-    {'name': 'Notifybar 16', 'color': Colors.orangeAccent, 'icon': Icons.chat_rounded},
-    {'name': 'Notifybar 17', 'color': Colors.amberAccent, 'icon': Icons.mark_chat_unread_rounded},
-    {'name': 'Notifybar 18', 'color': Colors.lightGreen, 'icon': Icons.chat_bubble_rounded},
-    {'name': 'Notifybar 19', 'color': Colors.red, 'icon': Icons.sms_outlined},
-    {'name': 'Notifybar 20', 'color': Colors.pink, 'icon': Icons.mode_comment_rounded},
-    {'name': 'Notifybar 21', 'color': Colors.grey, 'icon': Icons.forum_outlined},
-    {'name': 'Notifybar 22', 'color': Colors.redAccent, 'icon': Icons.chat_bubble_outline_rounded},
-    {'name': 'Notifybar 23', 'color': Colors.greenAccent, 'icon': Icons.mark_chat_unread_rounded},
-    {'name': 'Notifybar 24', 'color': Colors.pinkAccent, 'icon': Icons.message_rounded},
-    {'name': 'Notifybar 25', 'color': Colors.amber, 'icon': Icons.forum_rounded},
-    {'name': 'Notifybar 26', 'color': Colors.lightBlueAccent, 'icon': Icons.chat_bubble_rounded},
-    {'name': 'Notifybar 27', 'color': Colors.brown, 'icon': Icons.chat_rounded},
-  ];
+  final List<Map<String, dynamic>> _notificationIcons =
+      ChatyNotificationIconPresets.values
+          .map((preset) => <String, dynamic>{
+                'name': preset.name,
+                'color': preset.color,
+                'icon': preset.icon,
+              })
+          .toList(growable: false);
 
   final List<Map<String, dynamic>> _fontStyles = [
     {'name': 'Default', 'style': TextStyle(fontWeight: FontWeight.normal)},
