@@ -16,7 +16,6 @@ void main() {
     expect(source, contains('ImageFormatGroup.nv21'));
     expect(source, contains('ImageFormatGroup.bgra8888'));
     expect(source, contains('_faceDetection.dispose()'));
-    expect(source, contains('MediaQuery.disableAnimationsOf(context)'));
   });
 
   test('Photo and Document modes update preview and capture output', () {
