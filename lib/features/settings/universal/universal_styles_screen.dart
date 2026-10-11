@@ -369,7 +369,7 @@ class _UniversalStylesScreenState extends State<UniversalStylesScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      variant.title,
+                                      item['name'] as String,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       textAlign: TextAlign.center,
