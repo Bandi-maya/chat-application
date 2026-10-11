@@ -80,7 +80,9 @@ class _ProPricingScreenState extends State<ProPricingScreen> {
                       GestureDetector(
                         onTap: () => setState(() => _isYearly = false),
                         child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
+                          duration: MediaQuery.disableAnimationsOf(context)
+                            ? Duration.zero
+                            : const Duration(milliseconds: 200),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 22,
                             vertical: 10,
@@ -110,7 +112,9 @@ class _ProPricingScreenState extends State<ProPricingScreen> {
                       GestureDetector(
                         onTap: () => setState(() => _isYearly = true),
                         child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
+                          duration: MediaQuery.disableAnimationsOf(context)
+                            ? Duration.zero
+                            : const Duration(milliseconds: 200),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 18,
                             vertical: 10,
