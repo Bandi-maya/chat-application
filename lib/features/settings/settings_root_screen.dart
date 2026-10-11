@@ -13,7 +13,6 @@ import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/design_system/gb_design_system.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../../ui/core/settings/settings_registry.dart';
-import '../../ui/core/theme/theme_controller.dart';
 import '../chats/linked_devices_qr_screen.dart';
 import '../profile/profile_actions.dart';
 import 'account/account_settings_screen.dart';
