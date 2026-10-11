@@ -1008,7 +1008,8 @@ class GbLiveHeaderPreview extends StatelessWidget {
       showSearchBar && !disableSearchBar &&
       searchPlacement.trim().toLowerCase() == 'header action';
   bool get _showInlineSearch =>
-      showSearchBar && !disableSearchBar && !_showHeaderSearch;
+      showSearchBar &&
+      searchPlacement.trim().toLowerCase() != 'header action';
 
   const GbLiveHeaderPreview({
     super.key,
