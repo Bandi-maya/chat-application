@@ -1352,7 +1352,6 @@ class GbLiveHeaderPreview extends StatelessWidget {
     return Container(
       height: 44,
       color: _liveTheme.backgroundColor,
-      decoration: null,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -1361,6 +1360,36 @@ class GbLiveHeaderPreview extends StatelessWidget {
           Icon(Icons.add_box_outlined, color: _liveTheme.primaryTextColor, size: 23),
           Icon(Icons.play_circle_outline_rounded, color: _liveTheme.primaryTextColor, size: 23),
           Icon(Icons.person_outline_rounded, color: _liveTheme.primaryTextColor, size: 23),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreviewTab(
+    IconData icon,
+    String label, {
+    bool selected = false,
+  }) {
+    return Expanded(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            icon,
+            size: 15,
+            color: selected ? _liveTheme.accentColor : _liveTheme.secondaryTextColor,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: selected ? _liveTheme.primaryTextColor : _liveTheme.secondaryTextColor,
+              fontSize: 8.5,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+            ),
+          ),
         ],
       ),
     );
@@ -1376,10 +1405,10 @@ class GbLiveHeaderPreview extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _item(Icons.chat_bubble_rounded, 'Chats', null),
-          _item(Icons.contacts_rounded, 'Contacts', null),
-          _item(Icons.call_rounded, 'Calls', null),
-          _item(Icons.settings_rounded, 'Settings', null),
+          _buildPreviewTab(Icons.chat_bubble_rounded, 'Chats', selected: true),
+          _buildPreviewTab(Icons.contacts_rounded, 'Contacts'),
+          _buildPreviewTab(Icons.call_rounded, 'Calls'),
+          _buildPreviewTab(Icons.settings_rounded, 'Settings'),
         ],
       ),
     );
@@ -1392,10 +1421,10 @@ class GbLiveHeaderPreview extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _item(Icons.chat_bubble_rounded, 'Chats', null),
-          _item(Icons.auto_stories_rounded, 'Updates', null),
-          _item(Icons.call_rounded, 'Calls', null),
-          _item(Icons.settings_rounded, 'Settings', null),
+          _buildPreviewTab(Icons.chat_bubble_rounded, 'Chats', selected: true),
+          _buildPreviewTab(Icons.auto_stories_rounded, 'Updates'),
+          _buildPreviewTab(Icons.call_rounded, 'Calls'),
+          _buildPreviewTab(Icons.settings_rounded, 'Settings'),
         ],
       ),
     );
@@ -1408,9 +1437,9 @@ class GbLiveHeaderPreview extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _item(Icons.chat_bubble_rounded, 'Chats', null),
-          _item(Icons.auto_stories_rounded, 'Updates', null),
-          _item(Icons.call_rounded, 'Calls', null),
+          _buildPreviewTab(Icons.chat_bubble_rounded, 'Chats', selected: true),
+          _buildPreviewTab(Icons.auto_stories_rounded, 'Updates'),
+          _buildPreviewTab(Icons.call_rounded, 'Calls'),
         ],
       ),
     );
@@ -1451,10 +1480,10 @@ class GbLiveHeaderPreview extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _item(Icons.chat_bubble_rounded, 'Chats', null),
-          _item(Icons.auto_stories_rounded, 'Updates', null),
-          _item(Icons.call_rounded, 'Calls', null),
-          _item(Icons.settings_rounded, 'Settings', null),
+          _buildPreviewTab(Icons.chat_bubble_rounded, 'Chats', selected: true),
+          _buildPreviewTab(Icons.auto_stories_rounded, 'Updates'),
+          _buildPreviewTab(Icons.call_rounded, 'Calls'),
+          _buildPreviewTab(Icons.settings_rounded, 'Settings'),
         ],
       ),
     );
