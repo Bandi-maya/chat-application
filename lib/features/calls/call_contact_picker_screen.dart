@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -33,22 +34,55 @@ class CallContactPickerScreen extends StatefulWidget {
 class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
   late final TextEditingController _searchController;
   late final FocusNode _searchFocusNode;
+  late final ScrollController _scrollController;
   String? _startingContactId;
   late bool _isDialpad;
+  bool _isKeypadCollapsed = false;
 
   @override
   void initState() {
     super.initState();
     _searchController = TextEditingController();
     _searchFocusNode = FocusNode();
+    _scrollController = ScrollController();
+    _scrollController.addListener(_handleScroll);
     _isDialpad = widget.initialMode == CallContactPickerMode.dialpad;
   }
 
+  void _handleScroll() {
+    if (!_isDialpad) return;
+    if (_scrollController.hasClients && _scrollController.offset > 24) {
+      if (!_isKeypadCollapsed) setState(() => _isKeypadCollapsed = true);
+    }
+  }
+
+  Timer? _backspaceTimer;
+
   @override
   void dispose() {
+    _backspaceTimer?.cancel();
+    _scrollController.removeListener(_handleScroll);
+    _scrollController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  void _startContinuousBackspace() {
+    _removeDigit();
+    _backspaceTimer?.cancel();
+    _backspaceTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      if (_searchController.text.isEmpty) {
+        _stopContinuousBackspace();
+      } else {
+        _removeDigit();
+      }
+    });
+  }
+
+  void _stopContinuousBackspace() {
+    _backspaceTimer?.cancel();
+    _backspaceTimer = null;
   }
 
   String _initials(String name) {
@@ -145,13 +179,15 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
     String digit, {
     String subtitle = '',
     VoidCallback? onPressed,
+    VoidCallback? onLongPress,
   }) {
     final colors = context.colors;
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(36),
         onTap: onPressed ?? () => _appendDigit(digit),
+        onLongPress: onLongPress,
         child: SizedBox.expand(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -160,28 +196,64 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
                 digit,
                 style: TextStyle(
                   color: colors.foreground,
-                  fontSize: 26,
-                  height: 1.0,
-                  fontWeight: FontWeight.w500,
+                  fontSize: 28,
+                  height: 1.05,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
-              if (subtitle.isNotEmpty) ...[
-                const SizedBox(height: 4),
+              const SizedBox(height: 2),
+              if (digit == '1')
+                Icon(
+                  Icons.voicemail_rounded,
+                  size: 13,
+                  color: colors.foregroundSecondary,
+                )
+              else if (subtitle.isNotEmpty)
                 Text(
                   subtitle,
                   style: TextStyle(
                     color: colors.foregroundSecondary,
-                    fontSize: 9,
-                    letterSpacing: 1.3,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 9.5,
+                    letterSpacing: 1.4,
+                    fontWeight: FontWeight.w600,
                   ),
-                ),
-              ],
+                )
+              else
+                const SizedBox(height: 12),
             ],
           ),
         ),
       ),
     );
+  }
+
+  void _triggerCall() {
+    final digits = _searchController.text.replaceAll(
+      RegExp(r'[^0-9]'),
+      '',
+    );
+    final matches = widget.dataStore.contacts.where((contact) {
+      if (contact.id == widget.dataStore.currentUser.id) {
+        return false;
+      }
+      final phoneDigits = contact.phone.replaceAll(
+        RegExp(r'[^0-9]'),
+        '',
+      );
+      return digits.length >= 7 &&
+          (phoneDigits == digits || phoneDigits.endsWith(digits));
+    }).toList(growable: false);
+    if (matches.length != 1) {
+      ChatyToast.show(
+        context,
+        matches.isEmpty
+            ? 'Enter a registered Chaty number to call.'
+            : 'More than one contact matches. Choose the right contact below.',
+        background: matches.isEmpty ? context.colors.error : context.colors.surfaceElevated,
+      );
+      return;
+    }
+    _startCall(matches.single, isVideo: false);
   }
 
   Widget _buildDialpad() {
@@ -192,94 +264,105 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
       ('7', 'PQRS'), ('8', 'TUV'), ('9', 'WXYZ'),
       ('*', ''), ('0', '+'), ('#', ''),
     ];
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(30, 0, 30, 10),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              // Reserve enough vertical room for the number field, call action,
-              // and contact results on short screens and when display scaling is high.
-              final keyHeight = ((MediaQuery.sizeOf(context).height - 520) / 4)
-                  .clamp(42.0, 58.0)
-                  .toDouble();
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: keys.length,
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  mainAxisExtent: keyHeight,
-                  mainAxisSpacing: 3,
-                  crossAxisSpacing: 18,
-                ),
-                itemBuilder: (context, index) {
-                  final (digit, subtitle) = keys[index];
-                  return _buildDialKey(digit, subtitle: subtitle);
-                },
-              );
-            },
-          ),
-          const SizedBox(height: 2),
-          Row(
-            children: [
-              const Spacer(),
-              Material(
-                color: colors.success,
-                shape: const CircleBorder(),
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: () {
-                    final digits = _searchController.text.replaceAll(
-                      RegExp(r'[^0-9]'),
-                      '',
-                    );
-                    final matches = widget.dataStore.contacts.where((contact) {
-                      if (contact.id == widget.dataStore.currentUser.id) {
-                        return false;
-                      }
-                      final phoneDigits = contact.phone.replaceAll(
-                        RegExp(r'[^0-9]'),
-                        '',
-                      );
-                      return digits.length >= 7 &&
-                          (phoneDigits == digits || phoneDigits.endsWith(digits));
-                    }).toList(growable: false);
-                    if (matches.length != 1) {
-                      ChatyToast.show(
-                        context,
-                        matches.isEmpty
-                            ? 'Enter a registered Chaty number to call.'
-                            : 'More than one contact matches. Choose the right contact below.',
-                        background: matches.isEmpty ? colors.error : colors.surfaceElevated,
-                      );
-                      return;
-                    }
-                    _startCall(matches.single, isVideo: false);
-                  },
-                  child: const SizedBox(
-                    width: 58,
-                    height: 58,
-                    child: Icon(Icons.call_rounded, color: Colors.white, size: 27),
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOutCubic,
+      child: _isKeypadCollapsed
+          ? const SizedBox.shrink()
+          : Container(
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.18),
+                    blurRadius: 18,
+                    offset: const Offset(0, -4),
+                    spreadRadius: 2,
                   ),
-                ),
+                ],
               ),
-              const Spacer(),
-              IconButton(
-                tooltip: 'Delete last digit',
-                onPressed: _searchController.text.isEmpty ? null : _removeDigit,
-                icon: Icon(
-                  Icons.backspace_outlined,
-                  color: _searchController.text.isEmpty
-                      ? colors.foregroundTertiary
-                      : colors.foregroundSecondary,
-                ),
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: keys.length,
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      mainAxisExtent: 64,
+                      mainAxisSpacing: 6,
+                      crossAxisSpacing: 16,
+                    ),
+                    itemBuilder: (context, index) {
+                      final (digit, subtitle) = keys[index];
+                      return _buildDialKey(
+                        digit,
+                        subtitle: subtitle,
+                        onLongPress: digit == '0' ? () => _appendDigit('+') : null,
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      IconButton(
+                        tooltip: 'Hide dialpad',
+                        onPressed: () => setState(() => _isKeypadCollapsed = true),
+                        icon: Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: colors.foregroundSecondary,
+                          size: 28,
+                        ),
+                      ),
+                      const Spacer(),
+                      Material(
+                        color: const Color(0xFF48D597),
+                        shape: const CircleBorder(),
+                        elevation: 4,
+                        shadowColor: Colors.black45,
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: _triggerCall,
+                          child: const SizedBox(
+                            width: 60,
+                            height: 60,
+                            child: Icon(
+                              Icons.call_rounded,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _searchController.text.isEmpty ? null : _removeDigit,
+                        onLongPressStart: (_) => _startContinuousBackspace(),
+                        onLongPressEnd: (_) => _stopContinuousBackspace(),
+                        onLongPressCancel: () => _stopContinuousBackspace(),
+                        child: SizedBox(
+                          width: 48,
+                          height: 48,
+                          child: Center(
+                            child: Icon(
+                              Icons.backspace_outlined,
+                              color: _searchController.text.isEmpty
+                                  ? colors.foregroundTertiary
+                                  : colors.foregroundSecondary,
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
-        ],
-      ),
+            ),
     );
   }
 
@@ -332,7 +415,7 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 6, 18, 5),
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 6),
               child: Row(
                 children: [
                   Expanded(
@@ -340,7 +423,9 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
                       controller: _searchController,
                       focusNode: _searchFocusNode,
                       readOnly: _isDialpad,
-                      showCursor: !_isDialpad,
+                      showCursor: true,
+                      cursorColor: colors.primary,
+                      cursorWidth: 2.2,
                       keyboardType: _isDialpad
                           ? TextInputType.none
                           : TextInputType.text,
@@ -350,7 +435,7 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
                       textAlign: _isDialpad ? TextAlign.center : TextAlign.start,
                       style: TextStyle(
                         color: colors.foreground,
-                        fontSize: _isDialpad ? 28 : 16,
+                        fontSize: _isDialpad ? 32 : 16,
                         letterSpacing: _isDialpad ? 1.4 : 0,
                         fontWeight: _isDialpad
                             ? FontWeight.w400
@@ -364,24 +449,30 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
                                 Icons.search_rounded,
                                 color: colors.foregroundSecondary,
                               ),
-                        filled: true,
+                        filled: !_isDialpad,
                         fillColor: colors.surfaceSecondary,
-                        contentPadding: const EdgeInsets.symmetric(
+                        contentPadding: EdgeInsets.symmetric(
                           horizontal: 16,
-                          vertical: 14,
+                          vertical: _isDialpad ? 8 : 14,
                         ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(18),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(18),
-                          borderSide: BorderSide(color: colors.borderSubtle),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(18),
-                          borderSide: BorderSide(color: colors.primary, width: 1.4),
-                        ),
+                        border: _isDialpad
+                            ? InputBorder.none
+                            : OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(18),
+                                borderSide: BorderSide.none,
+                              ),
+                        enabledBorder: _isDialpad
+                            ? InputBorder.none
+                            : OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(18),
+                                borderSide: BorderSide(color: colors.borderSubtle),
+                              ),
+                        focusedBorder: _isDialpad
+                            ? InputBorder.none
+                            : OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(18),
+                                borderSide: BorderSide(color: colors.primary, width: 1.4),
+                              ),
                       ),
                     ),
                   ),
@@ -397,32 +488,27 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
                 ],
               ),
             ),
-            if (_isDialpad) ...[
+            if (_isDialpad && query.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
                 child: Align(
-                  alignment: Alignment.centerLeft,
+                  alignment: Alignment.center,
                   child: Text(
-                    query.isEmpty
-                        ? 'Enter a number to find a Chaty contact'
-                        : contacts.isEmpty
-                            ? 'No registered contact matches this number'
-                            : contacts.length == 1
-                                ? '1 matching Chaty contact'
-                                : '${contacts.length} matching Chaty contacts',
+                    contacts.isEmpty
+                        ? 'No registered contact matches this number'
+                        : contacts.length == 1
+                            ? '1 matching Chaty contact'
+                            : '${contacts.length} matching Chaty contacts',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: contacts.isEmpty && query.isNotEmpty
-                          ? colors.foregroundSecondary
-                          : colors.foregroundSecondary,
+                      color: colors.foregroundSecondary,
                       fontSize: 12,
                     ),
                   ),
                 ),
               ),
-              _buildDialpad(),
-            ] else
+            if (!_isDialpad)
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
                 child: Align(
@@ -479,9 +565,10 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
                       ),
                     )
                   : ListView.separated(
+                      controller: _scrollController,
                       keyboardDismissBehavior:
                           ScrollViewKeyboardDismissBehavior.onDrag,
-                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
                       itemCount: contacts.length,
                       separatorBuilder: (_, __) => Divider(
                         height: 1,
@@ -577,9 +664,19 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
                       },
                     ),
             ),
+            if (_isDialpad) _buildDialpad(),
           ],
         ),
       ),
+      floatingActionButton: (_isDialpad && _isKeypadCollapsed)
+          ? FloatingActionButton(
+              tooltip: 'Show dialpad',
+              backgroundColor: const Color(0xFF48D597),
+              foregroundColor: Colors.white,
+              onPressed: () => setState(() => _isKeypadCollapsed = false),
+              child: const Icon(Icons.dialpad_rounded, size: 28),
+            )
+          : null,
     );
   }
 }

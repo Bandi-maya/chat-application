@@ -116,6 +116,22 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
   }
 
 
+  void _rescheduleDismiss({required bool isExpanded}) {
+    _hideTimer?.cancel();
+    final baseSeconds = widget.preferencesController
+        .gbInt('event_toast_duration_seconds', fallback: 3)
+        .clamp(2, 8);
+    final seconds = isExpanded ? 15 : baseSeconds;
+    _hideTimer = Timer(Duration(seconds: seconds), () {
+      if (mounted) {
+        setState(() {
+          _visible = null;
+          _islandExpanded = false;
+        });
+      }
+    });
+  }
+
   Widget _buildDynamicIsland(
     BuildContext context,
     ChatyEventNotification notification,
@@ -124,7 +140,34 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
     final recent = widget.notificationService.notifications.take(3).toList();
     final expanded = _islandExpanded;
     return GestureDetector(
-      onTap: () => setState(() => _islandExpanded = !_islandExpanded),
+      onTap: () {
+        setState(() => _islandExpanded = !_islandExpanded);
+        _rescheduleDismiss(isExpanded: _islandExpanded);
+      },
+      onLongPress: () {
+        if (!_islandExpanded) {
+          setState(() => _islandExpanded = true);
+          _rescheduleDismiss(isExpanded: true);
+        }
+      },
+      onVerticalDragEnd: (details) {
+        if (details.primaryVelocity != null && details.primaryVelocity! < -100) {
+          // Swiped up -> collapse
+          if (_islandExpanded) {
+            setState(() => _islandExpanded = false);
+            _rescheduleDismiss(isExpanded: false);
+          }
+        }
+      },
+      onHorizontalDragEnd: (details) {
+        if (details.primaryVelocity != null && details.primaryVelocity!.abs() > 150) {
+          // Swiped sideways -> dismiss
+          setState(() {
+            _visible = null;
+            _islandExpanded = false;
+          });
+        }
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 360),
         curve: Curves.easeOutCubic,
@@ -410,7 +453,7 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
             child: AnimatedPadding(
               duration: const Duration(milliseconds: 320),
               curve: Curves.easeOutCubic,
-              padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 7),
+              padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 1),
               child: AnimatedOpacity(
                 opacity: notification != null &&
                         prefs.notification.enableGlobalNotifications &&

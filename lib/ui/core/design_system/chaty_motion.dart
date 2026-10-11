@@ -16,9 +16,20 @@ abstract final class ChatyMotion {
   static const Curve exit = Curves.easeInCubic;
   static const Curve springSoft = Curves.easeOutBack;
 
+  /// High-precision Apple/Emil Kowalski inspired spring curves
+  static const Curve springSnappy = Cubic(0.16, 1.0, 0.3, 1.0);
+  static const Curve springGentle = Cubic(0.2, 1.0, 0.25, 1.0);
+  static const Curve microPress = Curves.easeOutQuad;
+
   static Duration duration(BuildContext context, {Duration preferred = base}) {
     return MediaQuery.maybeOf(context)?.disableAnimations == true
         ? Duration.zero
+        : preferred;
+  }
+
+  static Curve curve(BuildContext context, {Curve preferred = springSnappy}) {
+    return MediaQuery.maybeOf(context)?.disableAnimations == true
+        ? Curves.linear
         : preferred;
   }
 }
