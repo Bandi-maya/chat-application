@@ -449,11 +449,20 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
               poses: poses,
             );
             final temporary = await getTemporaryDirectory();
-            final output = File(
-              '${temporary.path}/chaty_lens_${DateTime.now().microsecondsSinceEpoch}.png',
+            final stamp = DateTime.now().microsecondsSinceEpoch;
+            final staged = File('${temporary.path}/chaty_lens_$stamp.png');
+            await staged.writeAsBytes(bytes, flush: true);
+            final compressed = await FlutterImageCompress.compressAndGetFile(
+              staged.absolute.path,
+              '${temporary.path}/chaty_lens_$stamp.jpg',
+              quality: 92,
             );
-            await output.writeAsBytes(bytes, flush: true);
-            capturedPath = output.path;
+            if (compressed != null) {
+              capturedPath = compressed.path;
+              unawaited(staged.delete().catchError((_) => staged));
+            } else {
+              capturedPath = staged.path;
+            }
           } catch (_) {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
