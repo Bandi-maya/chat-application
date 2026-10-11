@@ -108,8 +108,13 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
           .toList(),
     ).then((val) {
       if (val != null) {
-        widget.preferencesController.updateConversation(
-          prefs.copyWith(bubbleStyle: val),
+        // The runtime theme resolves bubble geometry from the legacy
+        // `bubble_style` key first. Update that key through the semantic alias
+        // so it and the typed ConversationPreferences stay in sync; otherwise
+        // an older saved GB value can silently override the selection.
+        widget.preferencesController.updateGbFeatures(
+          <String, Object?>{'bubble_style': val},
+          logTitle: 'Bubbles Style',
         );
       }
     });
