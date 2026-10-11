@@ -178,12 +178,8 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
                 unselectedLabelColor: headerIconsColor?.withValues(alpha: 0.6),
                 tabs: const [
                   Tab(
-                    icon: Icon(Icons.auto_awesome_rounded),
-                    text: 'Animated Emojis',
-                  ),
-                  Tab(
                     icon: Icon(Icons.emoji_emotions_outlined),
-                    text: 'All Emojis',
+                    text: 'Emojis',
                   ),
                 ],
               ),
@@ -193,8 +189,7 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildAnimatedTab(context),
-                _buildUnicodePicker(context, height),
+                _buildCombinedEmojiPicker(context, height),
               ],
             ),
           ),
@@ -203,6 +198,12 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
     ),
   );
 }
+
+  Widget _buildCombinedEmojiPicker(BuildContext context, double height) {
+    // A single, clearly named Emojis tab avoids duplicate choices. Animated
+    // emoji rendering remains enabled in messages and reactions as before.
+    return _buildUnicodePicker(context, height);
+  }
 
   Widget _buildAnimatedTab(BuildContext context) {
     final theme = Theme.of(context);
