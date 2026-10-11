@@ -45,6 +45,42 @@ Turn the existing chat camera into a polished capture flow with native-feeling p
 - Camera modes and carousels stay usable on narrow devices, and camera controls don't block the center of the page.
 - Regression tests cover tracking reset/mirroring, mode selection UI, and existing camera/effect contracts.
 
+## Deduplicated pattern inventory and applied UX laws
+
+This is the unique set of camera patterns that fit the current Flutter app. Similar patterns from multiple component libraries are recorded once below; the 70-site index later in this document is a discovery catalogue, not a claim that every dynamic catalogue page was exhaustively crawled or that a web component can be dropped into a native Flutter camera.
+
+| Unique pattern | Behavior / distinctive feature | Primary reference |
+|---|---|---|
+| Full-screen live viewfinder | Preview is the visual focus; camera actions sit over it rather than inside a dense settings panel | [Flutter camera recipe](https://docs.flutter.dev/cookbook/plugins/picture-using-camera) |
+| Center-snapping live lens rail | The nearest lens settles exactly in the center; selected artwork, label, and applied effect stay synchronized | [Snapchat Lens Studio](https://support.lensstudio.snapchat.com/hc/en-us/articles/360051085391-Lens-Studio-Quick-Start), [Lens overview](https://support.lensstudio.snapchat.com/hc/en-us/articles/360031423371-What-is-a-Lens) |
+| Face-anchored lens renderer | Attach glasses, ears, nose marks, sparkles, hearts, halo, and crown to face landmarks / pose rather than fixed screen coordinates | [Apple Vision face landmarks](https://developer.apple.com/documentation/vision/vndetectfacelandmarksrequest), [ML Kit face concepts](https://developers.google.com/ml-kit/vision/face-detection/face-detection-concepts) |
+| Tracking feedback | Clearly distinguish “Find a face”, “Face locked”, and “Reacquiring” instead of silently showing an inaccurate sticker | [Nielsen Norman Group usability heuristics](https://www.nngroup.com/articles/ten-usability-heuristics/) |
+| Color look picker | A secondary horizontal rail keeps the active image look visible and easy to compare without competing with the main face-lens rail | [Snapchat filter and lens help](https://help.snapchat.com/hc/en-us/sections/5686515003156-Filters-and-Lenses), [Mobbin](https://mobbin.com) |
+| Photo / Document mode selector | Two explicit modes sit immediately above the shutter; active mode is high contrast and the layout remains narrow-screen safe | [Material Design](https://m3.material.io), [Apple Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines) |
+| Document framing guide | Four corner markers establish the page boundary; a high-contrast monochrome treatment is applied to preview and saved output | [ML Kit Document Scanner capability reference](https://developers.google.com/ml-kit/vision/doc-scanner) |
+| Capture review / recoverability | Keep the existing confirmation, caption, discard, send/story route, and gallery fallback; processing failure keeps the original photo | [Flutter camera recipe](https://docs.flutter.dev/cookbook/plugins/picture-using-camera) |
+| Familiar utility controls | Close, flash, gallery, and camera flip stay in predictable corners and the shutter remains the strongest target | [Apple Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines), [Material Design](https://m3.material.io) |
+| Accessible lens interaction | Every lens item exposes a semantic label, selected state, and button role; tap targets are not dependent on a decorative icon | [React Aria accessibility patterns](https://react-spectrum.adobe.com/react-aria), [Radix primitives](https://www.radix-ui.com/primitives) |
+| Responsive thumb-zone hierarchy | Rails and swatches scale with the shortest screen dimension; tight layouts reduce spacing instead of scaling the entire screen down | [Flutter UI guidance](https://docs.flutter.dev/ui), [Material Design](https://m3.material.io) |
+| Reduced-motion-aware transitions | Selected controls use short, eased transitions and honor system reduced-motion settings where supported | [Motion](https://motion.dev), [Animista](https://animista.net) |
+| Lightweight frame delivery | Downsample to a small local thumbnail, throttle detection, and update the overlay separately from the viewfinder | [Flutter camera package](https://pub.dev/packages/camera), [Apple Vision](https://developer.apple.com/documentation/vision) |
+| Native-first dependency policy | Study web component catalogs for layout and motion only; do not install React/web UI components or an extra Flutter face/document package for this pass | [21st.dev](https://21st.dev), [React Bits](https://reactbits.dev), [Magic UI](https://magicui.design) |
+
+### UX laws / heuristics translated into decisions
+
+- **Fitts’s Law:** the shutter is the largest, most central target; frequent gallery and flip actions remain separated and tappable.
+- **Hick–Hyman Law:** expose only Photo and Document as top-level modes for now; put detailed color looks in a secondary rail rather than adding a crowded mode grid.
+- **Jakob’s Law:** use familiar camera conventions for close, flash, flip, gallery, shutter, and horizontally browsed lenses.
+- **Miller’s Law:** keep the high-level choice set small and group detailed looks into one scrollable collection.
+- **Von Restorff Effect:** selected lens and active mode have a strong contrast boundary, scale, and clear label; decorative highlights are not used for every control.
+- **Zeigarnik / Goal-Gradient effects:** the review stage preserves the captured image and clear next actions, while the document frame communicates the immediate goal. No fake percent progress is shown because this implementation has no asynchronous scanner pipeline.
+- **Gestalt proximity / continuity:** lens label sits next to the rail, and mode choices are directly above the shutter they change.
+- **Visibility of system status:** display tracking state, camera loading/errors, capture progress, and a recoverable message when effect baking fails.
+- **Error prevention and recovery:** unsupported native detectors degrade to normal capture; a failed scan/lens composition keeps the original image instead of losing the capture.
+- **Doherty Threshold / performance:** frame detection is throttled and runs natively off the UI thread; the camera preview is not rebuilt for every detection.
+- **Peak–End Rule:** preserve a clear captured-image review state and immediate haptic feedback for selection rather than interrupting with unrelated dialogs.
+- **WCAG / platform accessibility principles:** semantic labels and selected states are included for lens items, and animations can reduce under the system motion preference.
+
 ## References studied
 
 - Snapchat Lens Studio: https://support.lensstudio.snapchat.com/hc/en-us/articles/360051085391-Lens-Studio-Quick-Start
