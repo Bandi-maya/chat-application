@@ -52,6 +52,46 @@ const List<LensDefinition> kBuiltInLenses = <LensDefinition>[
     accentColor: Color(0xFFF472B6),
     supportsCalls: true,
   ),
+  LensDefinition(
+    id: 'lens_sunglasses_aviator',
+    name: 'Aviator Shades',
+    category: defaultLensCategory,
+    anchor: LensAnchor.eyes,
+    icon: Icons.remove_red_eye_rounded,
+    accentColor: Color(0xFF38BDF8),
+  ),
+  LensDefinition(
+    id: 'lens_sparkles',
+    name: 'Face Sparkles',
+    category: defaultLensCategory,
+    anchor: LensAnchor.forehead,
+    icon: Icons.auto_awesome_rounded,
+    accentColor: Color(0xFFFDE68A),
+  ),
+  LensDefinition(
+    id: 'lens_hearts_float',
+    name: 'Heart Pop',
+    category: defaultLensCategory,
+    anchor: LensAnchor.fullHead,
+    icon: Icons.favorite_rounded,
+    accentColor: Color(0xFFF472B6),
+  ),
+  LensDefinition(
+    id: 'lens_angel_halo',
+    name: 'Angel Halo',
+    category: defaultLensCategory,
+    anchor: LensAnchor.forehead,
+    icon: Icons.wb_twilight_rounded,
+    accentColor: Color(0xFFE0F2FE),
+  ),
+  LensDefinition(
+    id: 'lens_neon_crown',
+    name: 'Neon Crown',
+    category: defaultLensCategory,
+    anchor: LensAnchor.forehead,
+    icon: Icons.workspace_premium_rounded,
+    accentColor: Color(0xFF22D3EE),
+  ),
 ];
 
 /// Placeholder until a themed category system ships; keeps the model honest

@@ -146,19 +146,26 @@ class _LensCarouselState extends State<LensCarousel> {
         padding: EdgeInsets.symmetric(horizontal: (viewportWidth - _slotExtent) / 2),
         itemCount: catalog.length,
         itemBuilder: (context, index) {
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => _centerOn(index),
-            child: Center(
-              child: _LensItem(
-                lens: catalog[index],
-                index: index,
-                selected: index == _currentIndex,
-                diameter: _selectedDiameter,
-                slotExtent: _slotExtent,
-                viewportWidth: viewportWidth,
-                controller: _controller,
-                runtimeState: widget.manager.runtimeState,
+          final selected = index == _currentIndex;
+          return Semantics(
+            key: ValueKey<String>('lens-semantic-${catalog[index].id}'),
+            button: true,
+            selected: selected,
+            label: '${catalog[index].name} lens',
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _centerOn(index),
+              child: Center(
+                child: _LensItem(
+                  lens: catalog[index],
+                  index: index,
+                  selected: selected,
+                  diameter: _selectedDiameter,
+                  slotExtent: _slotExtent,
+                  viewportWidth: viewportWidth,
+                  controller: _controller,
+                  runtimeState: widget.manager.runtimeState,
+                ),
               ),
             ),
           );
@@ -273,7 +280,13 @@ class _LensItem extends StatelessWidget {
                       ]
                     : null,
               ),
-              child: Icon(lens.icon, size: size * 0.46, color: Colors.white),
+              child: CustomPaint(
+                size: Size.square(size * 0.5),
+                painter: _LensGlyphPainter(
+                  lensId: lens.id,
+                  color: Colors.white,
+                ),
+              ),
             ),
             if (selected && runtimeState == LensRuntimeState.applying)
               SizedBox(
@@ -303,3 +316,165 @@ class _LensItem extends StatelessWidget {
     return 0.78 + 0.22 * (1.0 - normalizedDistance);
   }
 }
+
+
+/// Original vector-style lens marks painted in code instead of shipping an
+/// icon font or adding an icon package.
+class _LensGlyphPainter extends CustomPainter {
+  const _LensGlyphPainter({required this.lensId, required this.color});
+
+  final String lensId;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scale = size.shortestSide / 48;
+    canvas.save();
+    canvas.translate((size.width - 48 * scale) / 2, (size.height - 48 * scale) / 2);
+    canvas.scale(scale);
+    final stroke = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final fill = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    if (lensId == 'lens_glasses_classic') {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(const Rect.fromLTWH(2, 14, 19, 16), const Radius.circular(6)),
+        stroke,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(const Rect.fromLTWH(27, 14, 19, 16), const Radius.circular(6)),
+        stroke,
+      );
+      canvas.drawLine(const Offset(21, 19), const Offset(27, 19), stroke);
+      canvas.drawLine(const Offset(2, 17), const Offset(0, 13), stroke);
+      canvas.drawLine(const Offset(46, 17), const Offset(48, 13), stroke);
+    } else if (lensId == 'lens_sunglasses_aviator') {
+      final left = Path()
+        ..moveTo(2, 12)
+        ..quadraticBezierTo(12, 8, 22, 13)
+        ..lineTo(19, 29)
+        ..quadraticBezierTo(11, 38, 6, 28)
+        ..close();
+      final right = Path()
+        ..moveTo(26, 13)
+        ..quadraticBezierTo(36, 8, 46, 12)
+        ..lineTo(42, 28)
+        ..quadraticBezierTo(37, 38, 29, 29)
+        ..close();
+      canvas.drawPath(left, fill);
+      canvas.drawPath(right, fill);
+      canvas.drawPath(left, stroke);
+      canvas.drawPath(right, stroke);
+      canvas.drawLine(const Offset(22, 14), const Offset(26, 14), stroke);
+    } else if (lensId == 'lens_dog_ears') {
+      final left = Path()
+        ..moveTo(8, 25)
+        ..quadraticBezierTo(-1, 3, 13, 5)
+        ..quadraticBezierTo(23, 13, 20, 27)
+        ..close();
+      final right = Path()
+        ..moveTo(28, 27)
+        ..quadraticBezierTo(25, 11, 36, 5)
+        ..quadraticBezierTo(50, 4, 40, 26)
+        ..close();
+      canvas.drawPath(left, fill);
+      canvas.drawPath(right, fill);
+      canvas.drawOval(const Rect.fromLTWH(14, 24, 20, 15), stroke);
+      canvas.drawCircle(const Offset(24, 29), 2, fill);
+    } else if (lensId == 'lens_hearts_float') {
+      _heart(canvas, const Offset(7, 10), 0.32, fill);
+      _heart(canvas, const Offset(25, 20), 0.48, fill);
+      _heart(canvas, const Offset(36, 7), 0.25, fill);
+    } else if (lensId == 'lens_sparkles') {
+      _star(canvas, const Offset(13, 17), 9, fill);
+      _star(canvas, const Offset(34, 11), 7, fill);
+      _star(canvas, const Offset(32, 33), 4, fill);
+    } else if (lensId == 'lens_angel_halo') {
+      canvas.drawOval(
+        Rect.fromCenter(center: const Offset(24, 10), width: 34, height: 10),
+        stroke,
+      );
+      canvas.drawArc(
+        const Rect.fromLTWH(7, 16, 34, 28),
+        math.pi * 1.05,
+        math.pi * 0.9,
+        false,
+        stroke,
+      );
+    } else if (lensId == 'lens_crown_gold' || lensId == 'lens_neon_crown') {
+      final crown = Path()
+        ..moveTo(5, 35)
+        ..lineTo(8, 14)
+        ..lineTo(19, 24)
+        ..lineTo(24, 6)
+        ..lineTo(30, 24)
+        ..lineTo(41, 14)
+        ..lineTo(43, 35)
+        ..close();
+      canvas.drawPath(crown, stroke);
+      canvas.drawLine(const Offset(7, 39), const Offset(42, 39), stroke);
+    } else if (lensId == 'lens_blush_glow') {
+      canvas.drawCircle(const Offset(12, 26), 7, stroke);
+      canvas.drawCircle(const Offset(36, 26), 7, stroke);
+      canvas.drawArc(
+        const Rect.fromLTWH(18, 24, 12, 10),
+        0,
+        math.pi,
+        false,
+        stroke,
+      );
+      _star(canvas, const Offset(24, 10), 5, fill);
+    } else {
+      canvas.drawCircle(const Offset(24, 24), 17, stroke);
+      canvas.drawCircle(const Offset(24, 24), 5, fill);
+    }
+    canvas.restore();
+  }
+
+  void _heart(Canvas canvas, Offset origin, double scale, Paint paint) {
+    final path = Path()
+      ..moveTo(origin.dx, origin.dy + 14 * scale)
+      ..cubicTo(
+        origin.dx - 24 * scale, origin.dy - 1 * scale,
+        origin.dx - 16 * scale, origin.dy - 13 * scale,
+        origin.dx, origin.dy - 6 * scale,
+      )
+      ..cubicTo(
+        origin.dx + 16 * scale, origin.dy - 13 * scale,
+        origin.dx + 24 * scale, origin.dy - 1 * scale,
+        origin.dx, origin.dy + 14 * scale,
+      )
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  void _star(Canvas canvas, Offset center, double radius, Paint paint) {
+    final path = Path();
+    for (var i = 0; i < 8; i++) {
+      final angle = -math.pi / 2 + i * math.pi / 4;
+      final r = i.isEven ? radius : radius * 0.28;
+      final point = Offset(
+        center.dx + math.cos(angle) * r,
+        center.dy + math.sin(angle) * r,
+      );
+      if (i == 0) {
+        path.moveTo(point.dx, point.dy);
+      } else {
+        path.lineTo(point.dx, point.dy);
+      }
+    }
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _LensGlyphPainter oldDelegate) =>
+      oldDelegate.lensId != lensId || oldDelegate.color != color;
+}
+
