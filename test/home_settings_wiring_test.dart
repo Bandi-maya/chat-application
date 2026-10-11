@@ -33,6 +33,18 @@ void main() {
       expect(HomePresetNormalizer.homeStyle('Unknown Value'), 'Chaty Default');
 
       expect(
+        HomePresetNormalizer.navigationMode('ONE UI'),
+        AppNavigationMode.bottomNav,
+      );
+      expect(
+        HomePresetNormalizer.navigationMode('IOS STYLE'),
+        AppNavigationMode.bottomNav,
+      );
+      expect(
+        HomePresetNormalizer.navigationMode('WhatsApp OLD UI'),
+        AppNavigationMode.topWhatsAppBar,
+      );
+      expect(
         HomePresetNormalizer.navigationMode('WhatsApp-style top bar'),
         AppNavigationMode.topWhatsAppBar,
       );
