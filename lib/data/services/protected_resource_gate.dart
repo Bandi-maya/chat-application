@@ -35,23 +35,36 @@ class ProtectedResourceGate {
   }) async {
     final service = lockService ?? locator<LocalLockService>();
     final method = preferencesController.security.lockMethod;
-    if (await _isMethodConfigured(service, method)) return true;
     if (!context.mounted) return false;
 
+    // OS authentication methods have no local password hash, so prove that
+    // the native prompt actually works before applying a new lock.
     if (method == 'Biometric' || method == 'Device Credential') {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(
-              '$method is unavailable. Choose a working lock method in '
-              'Settings → Security & Lock before locking a chat.',
+      final confirmed = method == 'Biometric'
+          ? await service.authenticateBiometric(
+              reason: 'Confirm biometric unlock works for this chat',
+            )
+          : await service.authenticateDeviceCredential(
+              reason: 'Confirm your device lock works for this chat',
+            );
+      if (!confirmed && context.mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                '$method could not be verified. Choose a working lock method '
+                'in Settings → Security & Lock before locking a chat.',
+              ),
+              behavior: SnackBarBehavior.floating,
             ),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      return false;
+          );
+      }
+      return confirmed;
     }
+
+    if (await _isMethodConfigured(service, method)) return true;
+    if (!context.mounted) return false;
 
     final configured = await LockCredentialSetupModal.show(
       context,
