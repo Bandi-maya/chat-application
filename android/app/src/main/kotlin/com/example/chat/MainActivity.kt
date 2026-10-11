@@ -26,6 +26,8 @@ import android.util.Rational
 import android.graphics.Shader
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.Icon
+import android.graphics.PointF
+import android.media.FaceDetector
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -47,6 +49,7 @@ open class MainActivity : FlutterFragmentActivity() {
     private val callPipChannel = "chaty/call_pip"
     private var callPipMethodChannel: MethodChannel? = null
     private val imageExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+    private val faceDetectorExecutor: ExecutorService = Executors.newSingleThreadExecutor()
 
     private var pendingImageResult: MethodChannel.Result? = null
     private var pendingCameraUri: Uri? = null
@@ -130,6 +133,31 @@ open class MainActivity : FlutterFragmentActivity() {
                 else -> result.notImplemented()
             }
         }
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "chaty/camera_face_tracking",
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "detectFaces" -> {
+                    val width = call.argument<Int>("width") ?: 0
+                    val height = call.argument<Int>("height") ?: 0
+                    val rgbBytes = call.argument<ByteArray>("rgbBytes")
+                    if (width <= 0 || height <= 0 || width > 160 || height > 160 ||
+                        rgbBytes == null || rgbBytes.size < width * height * 3
+                    ) {
+                        result.error("invalid_frame", "A valid downsampled RGB frame is required.", null)
+                    } else {
+                        faceDetectorExecutor.execute {
+                            val detections = runCatching {
+                                detectFacesOnDevice(width, height, rgbBytes)
+                            }.getOrDefault(emptyList())
+                            runOnUiThread { result.success(detections) }
+                        }
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
         callPipMethodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, callPipChannel)
         callPipMethodChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
@@ -181,6 +209,7 @@ open class MainActivity : FlutterFragmentActivity() {
         pendingImageResult?.error("activity_destroyed", "Image selection was interrupted.", null)
         pendingImageResult = null
         imageExecutor.shutdownNow()
+        faceDetectorExecutor.shutdownNow()
         super.onDestroy()
     }
 
@@ -275,6 +304,72 @@ open class MainActivity : FlutterFragmentActivity() {
         val intent = launcherManager.buildRestartIntent()
         startActivity(intent)
         finishAffinity()
+    }
+}
+
+private fun detectFacesOnDevice(
+    width: Int,
+    height: Int,
+    rgbBytes: ByteArray,
+): List<Map<String, Any>> {
+    // Android's built-in frontal detector requires RGB_565. The incoming
+    // thumbnail is already capped at 160px and remains entirely on-device.
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+    try {
+        val pixels = IntArray(width * height)
+        var src = 0
+        for (i in pixels.indices) {
+            val red = rgbBytes[src++].toInt() and 0xFF
+            val green = rgbBytes[src++].toInt() and 0xFF
+            val blue = rgbBytes[src++].toInt() and 0xFF
+            pixels[i] = Color.rgb(red, green, blue)
+        }
+        bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+
+        val maxFaces = 3
+        val detector = FaceDetector(width, height, maxFaces)
+        val nativeFaces = arrayOfNulls<FaceDetector.Face>(maxFaces)
+        val count = detector.findFaces(bitmap, nativeFaces)
+        val output = ArrayList<Map<String, Any>>(count)
+        for (index in 0 until count) {
+            val face = nativeFaces[index] ?: continue
+            val midpoint = PointF()
+            face.getMidPoint(midpoint)
+            val eyeDistance = face.eyesDistance().toDouble().coerceAtLeast(4.0)
+            val faceWidth = (eyeDistance * 2.35).coerceIn(eyeDistance * 1.8, width.toDouble())
+            val faceHeight = (faceWidth * 1.32).coerceAtMost(height.toDouble())
+            val left = (midpoint.x - faceWidth / 2).coerceAtLeast(0.0)
+            val top = (midpoint.y - eyeDistance * 0.95).coerceAtLeast(0.0)
+            val right = (left + faceWidth).coerceAtMost(width.toDouble())
+            val bottom = (top + faceHeight).coerceAtMost(height.toDouble())
+            val roll = runCatching { face.pose(FaceDetector.Face.EULER_Z).toDouble() }
+                .getOrDefault(0.0)
+            val confidence = face.confidence().toDouble().coerceIn(0.0, 1.0)
+            output.add(
+                mapOf(
+                    "trackingId" to index + 1,
+                    "headLeft" to left,
+                    "headTop" to top,
+                    "headRight" to right,
+                    "headBottom" to bottom,
+                    "leftEyeX" to (midpoint.x - eyeDistance / 2).toDouble(),
+                    "leftEyeY" to midpoint.y.toDouble(),
+                    "rightEyeX" to (midpoint.x + eyeDistance / 2).toDouble(),
+                    "rightEyeY" to midpoint.y.toDouble(),
+                    "noseX" to midpoint.x.toDouble(),
+                    "noseY" to (midpoint.y + eyeDistance * 0.55).coerceAtMost(height.toDouble()),
+                    "mouthX" to midpoint.x.toDouble(),
+                    "mouthY" to (midpoint.y + eyeDistance * 1.0).coerceAtMost(height.toDouble()),
+                    "rollRadians" to Math.toRadians(roll),
+                    "yawRadians" to 0.0,
+                    "pitchRadians" to 0.0,
+                    "confidence" to confidence,
+                ),
+            )
+        }
+        return output
+    } finally {
+        bitmap.recycle()
     }
 }
 

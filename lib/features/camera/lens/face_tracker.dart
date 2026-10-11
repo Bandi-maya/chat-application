@@ -1,6 +1,6 @@
 import 'dart:ui' show Offset, Rect, Size;
 
-import 'package:flutter/foundation.dart' show immutable, visibleForTesting;
+import 'package:flutter/foundation.dart' show immutable;
 
 import 'lens_definition.dart';
 
@@ -8,8 +8,8 @@ import 'lens_definition.dart';
 /// mirrored preview-space poses and solves lens anchor transforms.
 ///
 /// Everything here is deterministic and unit-tested; no widget, camera or
-/// platform dependency. The platform tracker (ML Kit on Android/iOS) only
-/// supplies raw face data in IMAGE coordinates.
+/// platform dependency. The native tracker (Vision on iOS and Android's
+/// built-in frontal detector) supplies raw face data in IMAGE coordinates.
 class FaceAnchorSolver {
   FaceAnchorSolver({
     this.smoothingAlpha = 0.45,
@@ -30,6 +30,15 @@ class FaceAnchorSolver {
   TrackingHealth get health => _health;
   TrackingHealth _health = TrackingHealth.lost;
 
+  /// Drops previous-frame smoothing and grace state when the camera changes,
+  /// tracking stops, or the user leaves face-lens mode.
+  void reset() {
+    _smoothed = null;
+    _lastSeenMs = null;
+    _health = TrackingHealth.lost;
+  }
+
+
   /// Feeds one raw detection (or null when the frame had no face).
   ///
   /// [mirrored] must be true for front-camera previews where the image is
@@ -39,7 +48,7 @@ class FaceAnchorSolver {
   /// (requirement 44): scale then offset, never stretch.
   List<FacePose> update({
     required int nowMs,
-    @visibleForTesting Map<int, RawFace>? rawFaces,
+    Map<int, RawFace>? rawFaces,
     bool mirrored = true,
     required Size imageExtent,
     required Rect previewCrop,
@@ -134,7 +143,7 @@ class FaceAnchorSolver {
       rightEye: rightEye,
       noseBase: noseBase,
       mouthCenter: mouthCenter,
-      rollRadians: _lerpAngle(prev?.rollRadians ?? raw.rollRadians, raw.rollRadians, smoothingAlpha),
+      rollRadians: _lerpAngle(prev?.rollRadians ?? (mirrored ? -raw.rollRadians : raw.rollRadians), mirrored ? -raw.rollRadians : raw.rollRadians, smoothingAlpha),
       yawRadians: _lerpAngle(prev?.yawRadians ?? raw.yawRadians, raw.yawRadians, smoothingAlpha),
       pitchRadians: _lerpAngle(prev?.pitchRadians ?? raw.pitchRadians, raw.pitchRadians, smoothingAlpha),
       confidence: raw.confidence * confidenceScale.clamp(0.0, 1.0),

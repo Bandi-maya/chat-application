@@ -84,6 +84,18 @@ void main() {
       expect(poses.single.noseBase.dx, closeTo(900, 1.0));
     });
 
+    test('reset removes stale poses and tracking grace state', () {
+      final solver = FaceAnchorSolver(smoothingAlpha: 1);
+      feed(solver, 0, {4: _faceAt(id: 4, centerX: 420)});
+      expect(solver.health, TrackingHealth.tracked);
+
+      solver.reset();
+
+      expect(solver.health, TrackingHealth.lost);
+      expect(feed(solver, 40, null), isEmpty);
+      expect(solver.health, TrackingHealth.lost);
+    });
+
     test('tracking loss holds through grace then reports lost', () {
       final solver = FaceAnchorSolver(
         smoothingAlpha: 1,
@@ -209,7 +221,7 @@ void main() {
       await tester.pumpWidget(harness(manager));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(Icons.visibility_rounded));
+      await tester.tap(find.byKey(const ValueKey('lens-semantic-lens_glasses_classic')));
       await tester.pumpAndSettle();
 
       expect(manager.selected.id, 'lens_glasses_classic');
