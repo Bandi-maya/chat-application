@@ -35,7 +35,6 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
   late final FocusNode _searchFocusNode;
   String? _startingContactId;
   late bool _isDialpad;
-  bool _showNumberActions = true;
 
   @override
   void initState() {
