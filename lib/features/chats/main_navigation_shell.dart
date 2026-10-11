@@ -3339,7 +3339,7 @@ class _CurvedRadialDrawerScaffoldState
           final availableHeight = constraints.maxHeight;
           final panelHeight = availableHeight < 250
               ? availableHeight
-              : (availableHeight * 0.56).clamp(240.0, 330.0).toDouble();
+              : (availableHeight * 0.60).clamp(250.0, 360.0).toDouble();
           final accent = widget.theme.accentColor as Color;
           final onAccent = widget.theme.onAccentColor as Color;
 
@@ -3353,18 +3353,23 @@ class _CurvedRadialDrawerScaffoldState
                   left: 0,
                   width: panelWidth,
                   height: panelHeight,
-                  child: ClipPath(
-                    clipper: const _CurvedRadialMenuClipper(),
-                    child: Container(
-                      color: accent,
-                      child: Stack(
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 190),
+                    curve: Curves.easeOutCubic,
+                    opacity: _menuOpen ? 1 : 0,
+                    child: ClipPath(
+                      clipper: const _CurvedRadialMenuClipper(),
+                      child: Container(
+                        color: accent,
+                        child: Stack(
                         clipBehavior: Clip.none,
                         children: [
                           Positioned(
-                            right: 12,
-                            top: 6,
+                            left: 10,
+                            top: MediaQuery.paddingOf(context).top + 8,
                             child: Material(
-                              color: onAccent.withValues(alpha: 0.96),
+                              elevation: 4,
+                              color: onAccent.withValues(alpha: 0.98),
                               shape: const CircleBorder(),
                               child: IconButton(
                                 tooltip: 'Close navigation menu',
@@ -3373,7 +3378,7 @@ class _CurvedRadialDrawerScaffoldState
                                 icon: Icon(
                                   Icons.close_rounded,
                                   color: accent,
-                                  size: 19,
+                                  size: 20,
                                 ),
                               ),
                             ),
@@ -3392,7 +3397,8 @@ class _CurvedRadialDrawerScaffoldState
                       ),
                     ),
                   ),
-                )
+                ),
+              )
               else
                 Positioned(
                   top: MediaQuery.paddingOf(context).top + 8,
