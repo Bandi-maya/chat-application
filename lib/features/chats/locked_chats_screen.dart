@@ -182,13 +182,30 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
             onPressed: () async {
               final secret = _secretWordCtrl.text.trim();
               if (secret.isEmpty) return;
-              await _lockService.setSecretPhrase(secret);
-              widget.preferencesController.updateSecurity(
-                widget.preferencesController.security.copyWith(
-                  entryBySecretPhrase: true,
-                ),
-              );
-              if (ctx.mounted) Navigator.of(ctx).pop(true);
+              try {
+                await _lockService.setSecretPhrase(secret);
+                widget.preferencesController.updateSecurity(
+                  widget.preferencesController.security.copyWith(
+                    entryBySecretPhrase: true,
+                  ),
+                );
+                if (ctx.mounted) Navigator.of(ctx).pop(true);
+              } catch (error) {
+                if (!ctx.mounted) return;
+                ScaffoldMessenger.of(ctx)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        error.toString().replaceFirst(
+                          'Invalid argument(s): ',
+                          '',
+                        ),
+                      ),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+              }
             },
             style: FilledButton.styleFrom(backgroundColor: theme.accentColor),
             child: const Text('Save Code'),
