@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -54,6 +56,38 @@ class _ImageEditorCropperDialogState extends State<ImageEditorCropperDialog> {
       TransformationController();
   int _quarterRotations = 0;
   bool _isProcessing = false;
+  Size? _sourceImageSize;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadSourceImageSize());
+  }
+
+  Future<void> _loadSourceImageSize() async {
+    ui.Codec? codec;
+    ui.FrameInfo? frame;
+    try {
+      final bytes = await widget.sourceImageFile.readAsBytes();
+      codec = await ui.instantiateImageCodec(
+        bytes,
+        targetWidth: 1280,
+        targetHeight: 1280,
+      );
+      frame = await codec.getNextFrame();
+      final image = frame.image;
+      final decodedSize = Size(
+        image.width.toDouble(),
+        image.height.toDouble(),
+      );
+      if (mounted) setState(() => _sourceImageSize = decodedSize);
+    } catch (error) {
+      debugPrint('Chaty crop source sizing skipped: $error');
+    } finally {
+      frame?.image.dispose();
+      codec?.dispose();
+    }
+  }
 
   void _rotateClockwise() {
     setState(() {
@@ -133,6 +167,27 @@ class _ImageEditorCropperDialogState extends State<ImageEditorCropperDialog> {
         ? cropBoxWidth
         : (cropBoxWidth * 9 / 16);
 
+    // Size the decoded source to cover the crop viewport without destroying
+    // its aspect ratio. The content can extend beyond the crop window so users
+    // can reposition a portrait or landscape image before saving.
+    final sourceSize =
+        _sourceImageSize ?? Size(cropBoxWidth, cropBoxHeight);
+    final isRotated = _quarterRotations.isOdd;
+    final rotatedSourceSize = isRotated
+        ? Size(sourceSize.height, sourceSize.width)
+        : sourceSize;
+    final coverScale = math.max(
+      cropBoxWidth / rotatedSourceSize.width,
+      cropBoxHeight / rotatedSourceSize.height,
+    );
+    final rotatedDisplaySize = Size(
+      rotatedSourceSize.width * coverScale,
+      rotatedSourceSize.height * coverScale,
+    );
+    final childDisplaySize = isRotated
+        ? Size(rotatedDisplaySize.height, rotatedDisplaySize.width)
+        : rotatedDisplaySize;
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -209,16 +264,23 @@ class _ImageEditorCropperDialogState extends State<ImageEditorCropperDialog> {
                         // margins allow panning the entire image out of frame,
                         // which can save a blank banner after editing.
                         clipBehavior: Clip.hardEdge,
+                        constrained: false,
+                        alignment: Alignment.center,
                         minScale: 1.0,
                         maxScale: 4.0,
                         boundaryMargin: EdgeInsets.zero,
                         child: RotatedBox(
                           quarterTurns: _quarterRotations,
-                          child: Image.file(
-                            widget.sourceImageFile,
-                            fit: BoxFit.cover,
-                            width: cropBoxWidth,
-                            height: cropBoxHeight,
+                          child: SizedBox(
+                            width: childDisplaySize.width,
+                            height: childDisplaySize.height,
+                            child: Image.file(
+                              widget.sourceImageFile,
+                              fit: BoxFit.fill,
+                              width: childDisplaySize.width,
+                              height: childDisplaySize.height,
+                              filterQuality: FilterQuality.medium,
+                            ),
                           ),
                         ),
                       ),
