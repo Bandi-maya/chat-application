@@ -179,10 +179,10 @@ class CameraFaceDetectionBridge {
                 landmark.y * mesh.imageHeight,
               ))
           .toList(growable: false);
-      final left = pixelPoints.map((p) => p.dx).reduce(math.min);
-      final top = pixelPoints.map((p) => p.dy).reduce(math.min);
-      final right = pixelPoints.map((p) => p.dx).reduce(math.max);
-      final bottom = pixelPoints.map((p) => p.dy).reduce(math.max);
+      final left = pixelPoints.map((p) => p.dx).reduce((a, b) => a < b ? a : b);
+      final top = pixelPoints.map((p) => p.dy).reduce((a, b) => a < b ? a : b);
+      final right = pixelPoints.map((p) => p.dx).reduce((a, b) => a > b ? a : b);
+      final bottom = pixelPoints.map((p) => p.dy).reduce((a, b) => a > b ? a : b);
       final roll = math.atan2(
         rightEye.dy - leftEye.dy,
         rightEye.dx - leftEye.dx,
