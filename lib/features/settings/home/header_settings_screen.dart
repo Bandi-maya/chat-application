@@ -191,9 +191,14 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
     final mode = _navigationModeForHomeUiStyle(style);
     final scale = large ? 1.0 : 0.55;
     final previewWidth = large ? double.infinity : 100.0;
-    final previewHeight = large ? 112.0 : 62.0;
     final topTabs = mode == AppNavigationMode.topWhatsAppBar;
     final rail = mode == AppNavigationMode.floatingIslandRail;
+    final isInstagram = mode == AppNavigationMode.instagramStyle;
+    final isTelegram = mode == AppNavigationMode.telegramStyle;
+    final isOneUi = mode == AppNavigationMode.oneUi;
+    final isIos = mode == AppNavigationMode.iosStyle;
+    final isBubbles = mode == AppNavigationMode.gestureTabs;
+    final isBasic = mode == AppNavigationMode.basicTabStyle;
     final showBottomDock = !rail &&
         mode != AppNavigationMode.perspective3DDrawer &&
         mode != AppNavigationMode.modernSideMenu &&
@@ -202,6 +207,9 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
     final sideDrawer = mode == AppNavigationMode.perspective3DDrawer ||
         mode == AppNavigationMode.modernSideMenu ||
         mode == AppNavigationMode.curvedRadialDrawer;
+    final previewHeight = large
+        ? (mode == AppNavigationMode.curvedRadialDrawer ? 205.0 : 128.0)
+        : 62.0;
 
     return Container(
       key: key,
@@ -416,22 +424,76 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
               Positioned(
                 left: 0,
                 top: 0,
-                width: (large ? 172.0 : 58.0) * scale,
-                height: (large ? 65.0 : 37.0) * scale,
+                width: large ? 246 : 58,
+                height: large ? 174 : 37,
                 child: ClipPath(
                   clipper: _HomePreviewCurveClipper(),
                   child: ColoredBox(
                     color: accent,
-                    child: Align(
-                      alignment: Alignment.topLeft,
-                      child: Padding(
-                        padding: EdgeInsets.all(5 * scale),
-                        child: Icon(
-                          Icons.menu_rounded,
-                          color: theme.onAccentColor,
-                          size: 12 * scale,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Positioned(
+                          right: large ? 7 : 2,
+                          top: large ? 7 : 2,
+                          child: Icon(
+                            Icons.close_rounded,
+                            color: theme.onAccentColor,
+                            size: large ? 14 : 7,
+                          ),
                         ),
-                      ),
+                        for (int i = 0; i < 5; i++)
+                          Positioned(
+                            left: large ? 16 + i * 19.0 : 4 + i * 4.2,
+                            top: large ? 10 + i * 27.0 : 7 + i * 5.1,
+                            child: Container(
+                              width: large ? 25 : 9,
+                              height: large ? 25 : 9,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: theme.onAccentColor,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                <IconData>[
+                                  Icons.chat_bubble_rounded,
+                                  Icons.photo_camera_rounded,
+                                  Icons.call_rounded,
+                                  Icons.checklist_rounded,
+                                  Icons.settings_rounded,
+                                ][i],
+                                color: accent,
+                                size: large ? 12 : 5.5,
+                              ),
+                            ),
+                          ),
+                        if (large)
+                          Positioned(
+                            left: 48,
+                            top: 17,
+                            child: Text(
+                              'CHATS',
+                              style: TextStyle(
+                                color: theme.onAccentColor,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        if (large)
+                          Positioned(
+                            left: 67,
+                            top: 45,
+                            child: Text(
+                              'UPDATES',
+                              style: TextStyle(
+                                color: theme.onAccentColor,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -441,22 +503,161 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                height: 21.0 * scale,
-                child: ColoredBox(
-                  color: surface,
+                height: (isInstagram ? 18.0 : isBasic ? 26.0 : 25.0) * scale,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: surface,
+                    border: Border(
+                      top: BorderSide(color: muted.withValues(alpha: 0.28), width: 0.7),
+                    ),
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       for (int i = 0; i < 4; i++)
-                        Icon(
-                          <IconData>[
-                            Icons.chat_bubble_rounded,
-                            Icons.auto_stories_rounded,
-                            Icons.call_rounded,
-                            Icons.settings_rounded,
-                          ][i],
-                          size: 10 * scale,
-                          color: i == 0 ? accent : muted,
+                        Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 1 * scale),
+                            child: isBubbles
+                                ? Center(
+                                    child: Container(
+                                      width: 16 * scale,
+                                      height: 16 * scale,
+                                      decoration: BoxDecoration(
+                                        color: i == 0 ? accent.withValues(alpha: 0.18) : Colors.transparent,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: i == 0 ? accent : muted.withValues(alpha: 0.45),
+                                          width: 0.65,
+                                        ),
+                                      ),
+                                      child: Icon(
+                                        <IconData>[
+                                          Icons.chat_bubble_rounded,
+                                          Icons.auto_stories_rounded,
+                                          Icons.call_rounded,
+                                          Icons.settings_rounded,
+                                        ][i],
+                                        size: 8 * scale,
+                                        color: i == 0 ? accent : muted,
+                                      ),
+                                    ),
+                                  )
+                                : isOneUi
+                                    ? Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Container(
+                                            width: i == 0 ? 14 * scale : 0,
+                                            height: 1.5 * scale,
+                                            color: accent,
+                                          ),
+                                          Icon(
+                                            <IconData>[
+                                              Icons.chat_bubble_rounded,
+                                              Icons.auto_stories_rounded,
+                                              Icons.call_rounded,
+                                              Icons.settings_rounded,
+                                            ][i],
+                                            size: 9 * scale,
+                                            color: i == 0 ? accent : muted,
+                                          ),
+                                          Container(
+                                            width: 10 * scale,
+                                            height: 1 * scale,
+                                            color: i == 0 ? fg.withValues(alpha: 0.65) : muted.withValues(alpha: 0.45),
+                                          ),
+                                        ],
+                                      )
+                                    : isIos
+                                        ? Center(
+                                            child: Container(
+                                              width: 16 * scale,
+                                              height: 16 * scale,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: i == 0 ? accent.withValues(alpha: 0.18) : Colors.transparent,
+                                              ),
+                                              child: Icon(
+                                                <IconData>[
+                                                  Icons.chat_bubble_outline_rounded,
+                                                  Icons.search_rounded,
+                                                  Icons.add_box_outlined,
+                                                  Icons.person_outline_rounded,
+                                                ][i],
+                                                size: 9 * scale,
+                                                color: i == 0 ? accent : muted,
+                                              ),
+                                            ),
+                                          )
+                                        : isInstagram
+                                            ? Center(
+                                                child: Icon(
+                                                  <IconData>[
+                                                    Icons.home_rounded,
+                                                    Icons.search_rounded,
+                                                    Icons.add_box_outlined,
+                                                    Icons.person_outline_rounded,
+                                                  ][i],
+                                                  size: 11 * scale,
+                                                  color: i == 0 ? fg : muted,
+                                                ),
+                                              )
+                                            : isTelegram
+                                                ? Column(
+                                                    mainAxisAlignment: MainAxisAlignment.center,
+                                                    children: [
+                                                      Icon(
+                                                        <IconData>[
+                                                          Icons.chat_bubble_rounded,
+                                                          Icons.contacts_rounded,
+                                                          Icons.call_rounded,
+                                                          Icons.settings_rounded,
+                                                        ][i],
+                                                        size: 9 * scale,
+                                                        color: i == 0 ? accent : muted,
+                                                      ),
+                                                      Container(
+                                                        margin: EdgeInsets.only(top: 2 * scale),
+                                                        width: 10 * scale,
+                                                        height: 1 * scale,
+                                                        color: i == 0 ? accent : muted.withValues(alpha: 0.4),
+                                                      ),
+                                                    ],
+                                                  )
+                                                : isBasic
+                                                    ? Column(
+                                                        mainAxisAlignment: MainAxisAlignment.center,
+                                                        children: [
+                                                          Icon(
+                                                            <IconData>[
+                                                              Icons.chat_bubble_rounded,
+                                                              Icons.auto_stories_rounded,
+                                                              Icons.call_rounded,
+                                                              Icons.settings_rounded,
+                                                            ][i],
+                                                            size: 9 * scale,
+                                                            color: i == 0 ? accent : muted,
+                                                          ),
+                                                          Container(
+                                                            margin: EdgeInsets.only(top: 2 * scale),
+                                                            width: 15 * scale,
+                                                            height: 1.3 * scale,
+                                                            color: i == 0 ? fg : muted.withValues(alpha: 0.4),
+                                                          ),
+                                                        ],
+                                                      )
+                                                    : Icon(
+                                                        <IconData>[
+                                                          Icons.chat_bubble_rounded,
+                                                          Icons.auto_stories_rounded,
+                                                          Icons.call_rounded,
+                                                          Icons.settings_rounded,
+                                                        ][i],
+                                                        size: 10 * scale,
+                                                        color: i == 0 ? accent : muted,
+                                                      ),
+                          ),
                         ),
                     ],
                   ),
