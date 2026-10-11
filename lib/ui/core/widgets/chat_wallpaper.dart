@@ -26,6 +26,8 @@ class ChatWallpaper extends StatelessWidget {
   final String patternId;
   final String? profileColorHex;
   final String? imagePath;
+  final bool profilePicWallpaper;
+  final String? avatarUrl;
 
   const ChatWallpaper({
     super.key,
@@ -34,6 +36,8 @@ class ChatWallpaper extends StatelessWidget {
     this.patternId = 'subtle_dots',
     this.profileColorHex,
     this.imagePath,
+    this.profilePicWallpaper = false,
+    this.avatarUrl,
   });
 
   static Color? _tryParseHex(String? hex) {
@@ -65,6 +69,26 @@ class ChatWallpaper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (profilePicWallpaper && avatarUrl != null && avatarUrl!.isNotEmpty) {
+      if (avatarUrl!.startsWith('http://') || avatarUrl!.startsWith('https://')) {
+        return Image.network(
+          avatarUrl!,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          errorBuilder: (_, __, ___) => _gradientBox(),
+        );
+      } else if (File(avatarUrl!).existsSync()) {
+        return Image.file(
+          File(avatarUrl!),
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          errorBuilder: (_, __, ___) => _gradientBox(),
+        );
+      }
+    }
+
     switch (wallpaperType) {
       case 'Solid':
         {

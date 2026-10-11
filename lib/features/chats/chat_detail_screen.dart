@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
-
 import '../../ui/core/formatting/chat_formatters.dart';
 import '../../ui/core/theme/app_theme.dart';
 import '../../data/repositories/chaty_data_store.dart';
@@ -17,6 +16,7 @@ import '../../domain/models/chat_message.dart';
 import '../../domain/models/chat_task.dart';
 import '../../domain/models/contact_relationship.dart';
 import '../../domain/models/conversation.dart';
+import '../../domain/models/preferences.dart';
 import '../../domain/models/user_profile.dart';
 import '../../features/camera/camera_capture_screen.dart';
 import '../../features/tasks/task_detail_screen.dart';
@@ -301,7 +301,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   Future<void> _pickComposerEmoji() async {
-    final emoji = await ChatyEmojiPicker.show(context);
+    final conv = widget.preferencesController.conversation;
+    final emoji = await ChatyEmojiPicker.show(
+      context,
+      headerColor: conv.emojiHeaderColor != null ? Color(conv.emojiHeaderColor!) : null,
+      headerIconsColor: conv.emojiHeaderIconsColor != null ? Color(conv.emojiHeaderIconsColor!) : null,
+      backgroundColor: conv.emojiPickerBgColor != null ? Color(conv.emojiPickerBgColor!) : null,
+    );
     if (emoji == null || emoji.isEmpty || !mounted) return;
     final value = _textCtrl.value;
     final selection = value.selection;
@@ -800,7 +806,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         );
       },
       onAddReaction: () async {
-        final emoji = await ChatyEmojiPicker.show(context, reactionMode: true);
+        final conv = widget.preferencesController.conversation;
+        final emoji = await ChatyEmojiPicker.show(
+          context,
+          reactionMode: true,
+          headerColor: conv.emojiHeaderColor != null ? Color(conv.emojiHeaderColor!) : null,
+          headerIconsColor: conv.emojiHeaderIconsColor != null ? Color(conv.emojiHeaderIconsColor!) : null,
+          backgroundColor: conv.emojiPickerBgColor != null ? Color(conv.emojiPickerBgColor!) : null,
+        );
         if (emoji != null && emoji.isNotEmpty && mounted) {
           widget.dataStore.toggleReaction(
             widget.conversationId,
@@ -1513,10 +1526,18 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   icon: const Icon(Icons.copy_outlined),
                   tooltip: 'Copy',
                   onPressed: () async {
+                    final hideDateAndName = widget.preferencesController.conversation.hideDateAndName;
                     final msgs = widget.dataStore
                         .getMessages(widget.conversationId)
                         .where((m) => _selectedMessageIds.contains(m.id))
-                        .map((m) => m.text)
+                        .map((m) {
+                          if (hideDateAndName) return m.text;
+                          final dt = m.createdAt.toLocal();
+                          final timeStr =
+                              '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+                          final sender = _senderName(m.senderId);
+                          return '[$timeStr, $sender]: ${m.text}';
+                        })
                         .join('\n');
                     await Clipboard.setData(ClipboardData(text: msgs));
                     if (!mounted) return;
@@ -1838,6 +1859,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                           .preferencesController
                           .conversation
                           .wallpaperPath,
+                      profilePicWallpaper: widget
+                          .preferencesController
+                          .conversation
+                          .profilePicWallpaper,
+                      avatarUrl: otherUser?.avatarUrl,
                     ),
                     _messagesBody(theme, conversation, messages, showDeleted),
                     // Floating scroll-to-bottom arrow with unseen count —
@@ -2064,6 +2090,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               ),
             _Composer(
               theme: theme,
+              convPrefs: widget.preferencesController.conversation,
               controller: _textCtrl,
               onAttach: _openAttachmentSheet,
               onCameraTap: _captureAndSendPhoto,
@@ -2092,50 +2119,67 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         MediaQuery.sizeOf(context).width < 720)
       return chat;
     final contacts = dataStore.contacts;
+    final sidebarBg = conversationPrefs.quickContactBgColor != 0xFF000000
+        ? Color(conversationPrefs.quickContactBgColor)
+        : theme.surfaceColor.withValues(alpha: conversationPrefs.sidebarOpacity);
+    final sidebarTextColor = Color(conversationPrefs.quickContactTextColor);
+
     Widget sidebar() => Container(
       width: 62,
-      color: theme.surfaceColor.withValues(
-        alpha: conversationPrefs.sidebarOpacity,
-      ),
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: contacts.length,
-        itemBuilder: (context, index) {
-          final contact = contacts[index];
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(30),
-              onTap: () async {
-                try {
-                  final next = await dataStore.getOrCreateDirectConversation(
-                    contact,
-                  );
-                  if (!mounted) return;
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (_) => ChatDetailScreen(
-                        conversationId: next.id,
-                        theme: theme,
-                        dataStore: dataStore,
-                        preferencesController: widget.preferencesController,
-                        themeController: widget.themeController,
+      color: sidebarBg,
+      child: Column(
+        mainAxisAlignment: conversationPrefs.quickContactSidebarPosition == 'Bottom'
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
+        children: [
+          Expanded(
+            child: ListView.builder(
+              reverse: conversationPrefs.quickContactSidebarPosition == 'Bottom',
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: contacts.length,
+              itemBuilder: (context, index) {
+                final contact = contacts[index];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 5),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(30),
+                    onTap: () async {
+                      try {
+                        final next = await dataStore.getOrCreateDirectConversation(
+                          contact,
+                        );
+                        if (!mounted) return;
+                        Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(
+                            builder: (_) => ChatDetailScreen(
+                              conversationId: next.id,
+                              theme: theme,
+                              dataStore: dataStore,
+                              preferencesController: widget.preferencesController,
+                              themeController: widget.themeController,
+                            ),
+                          ),
+                        );
+                      } catch (_) {}
+                    },
+                    child: Center(
+                      child: Tooltip(
+                        message: contact.displayName,
+                        textStyle: TextStyle(color: sidebarTextColor, fontSize: 12),
+                        child: ChatyAvatar(
+                          initials: contact.avatarInitials,
+                          color: Color(int.parse(contact.avatarColorHex)),
+                          size: 38,
+                          shape: widget.preferencesController.home.avatarShape,
+                        ),
                       ),
                     ),
-                  );
-                } catch (_) {}
+                  ),
+                );
               },
-              child: Center(
-                child: ChatyAvatar(
-                  initials: contact.avatarInitials,
-                  color: Color(int.parse(contact.avatarColorHex)),
-                  size: 38,
-                  shape: widget.preferencesController.home.avatarShape,
-                ),
-              ),
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
     final chatContent = Row(
@@ -2699,6 +2743,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             senderName: conversation.type == ConversationType.group && !isMine
                 ? _senderName(message.senderId)
                 : null,
+            isSenderAdmin: conversation.type == ConversationType.group &&
+                conversation.adminIds.contains(message.senderId),
             showGroupAvatar: locator<TemplateController>()
                 .conversation
                 .showAvatarInGroup,
@@ -2716,11 +2762,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             ),
             onReactionBadgeTap: (reaction) =>
                 _showReactionDetailsSheet(message, reaction),
-            onDoubleTap: () => widget.dataStore.toggleReaction(
-              conversation.id,
-              message.id,
-              widget.preferencesController.conversation.doubleTapReactionEmoji,
-            ),
+            onDoubleTap: widget.preferencesController.conversation.disableDoubleTapReaction
+                ? null
+                : () => widget.dataStore.toggleReaction(
+                    conversation.id,
+                    message.id,
+                    widget.preferencesController.conversation.doubleTapReactionEmoji,
+                  ),
             voicePlaybackSpeed:
                 widget.preferencesController.conversation.voicePlaybackSpeed,
             task: message.linkedTaskId != null
@@ -2860,6 +2908,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 /// simply omitted rather than faked.
 class _Composer extends StatefulWidget {
   final ThemeConfig theme;
+  final ConversationPreferences convPrefs;
   final TextEditingController controller;
   final VoidCallback onAttach;
   final VoidCallback onCameraTap;
@@ -2880,6 +2929,7 @@ class _Composer extends StatefulWidget {
 
   const _Composer({
     required this.theme,
+    required this.convPrefs,
     required this.controller,
     required this.onAttach,
     required this.onCameraTap,
@@ -2976,12 +3026,17 @@ class _ComposerState extends State<_Composer>
   @override
   Widget build(BuildContext context) {
     final theme = widget.theme;
+    final conv = widget.convPrefs;
     final reduceMotion = MediaQuery.of(context).disableAnimations;
     final composerTemplate = locator<TemplateController>().composer;
+    final containerBg = conv.uiEntryBackgroundColor != null
+        ? Color(conv.uiEntryBackgroundColor!)
+        : theme.surfaceColor;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(6, 8, 8, 8),
       decoration: BoxDecoration(
-        color: theme.surfaceColor,
+        color: containerBg,
         border: Border(top: BorderSide(color: theme.cardColor)),
       ),
       child: SafeArea(
@@ -3000,6 +3055,11 @@ class _ComposerState extends State<_Composer>
     bool reduceMotion,
     ComposerTemplate template,
   ) {
+    final conv = widget.convPrefs;
+    final micSendFill = conv.micSendBgCircleColor != null
+        ? Color(conv.micSendBgCircleColor!)
+        : (conv.sendButtonColor != null ? Color(conv.sendButtonColor!) : theme.accentColor);
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -3037,7 +3097,9 @@ class _ComposerState extends State<_Composer>
                 height: 44,
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 decoration: BoxDecoration(
-                  color: theme.cardColor,
+                  color: conv.textEntryBackgroundColor != null
+                      ? Color(conv.textEntryBackgroundColor!)
+                      : theme.cardColor,
                   borderRadius: BorderRadius.circular(22),
                   border: Border.all(
                     color: theme.secondaryTextColor.withValues(alpha: 0.12),
@@ -3063,7 +3125,9 @@ class _ComposerState extends State<_Composer>
                     Text(
                       _time,
                       style: TextStyle(
-                        color: theme.primaryTextColor,
+                        color: conv.textEntryColor != null
+                            ? Color(conv.textEntryColor!)
+                            : theme.primaryTextColor,
                         fontSize: 13.5,
                         fontWeight: FontWeight.w700,
                         fontFeatures: const [FontFeature.tabularFigures()],
@@ -3098,11 +3162,11 @@ class _ComposerState extends State<_Composer>
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: theme.accentColor,
+                    color: micSendFill,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: theme.accentColor.withValues(alpha: 0.35),
+                        color: micSendFill.withValues(alpha: 0.35),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -3152,7 +3216,24 @@ class _ComposerState extends State<_Composer>
     Widget attachAction,
     Widget? cameraAction,
   ) {
+    final conv = widget.convPrefs;
     final reduceMotion = MediaQuery.of(context).disableAnimations;
+    final emojiIconColor = conv.emojiButtonColor != null
+        ? Color(conv.emojiButtonColor!)
+        : (conv.uiButtonsColor != null ? Color(conv.uiButtonsColor!) : theme.secondaryTextColor);
+    final sendFill = conv.sendButtonColor != null
+        ? Color(conv.sendButtonColor!)
+        : theme.accentColor;
+    final micFill = conv.micSendBgCircleColor != null
+        ? Color(conv.micSendBgCircleColor!)
+        : (conv.sendButtonColor != null ? Color(conv.sendButtonColor!) : theme.accentColor);
+    final inputBg = conv.textEntryBackgroundColor != null
+        ? Color(conv.textEntryBackgroundColor!)
+        : theme.cardColor;
+    final inputTextColor = conv.textEntryColor != null
+        ? Color(conv.textEntryColor!)
+        : theme.primaryTextColor;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -3165,7 +3246,7 @@ class _ComposerState extends State<_Composer>
               onPressed: widget.onEmoji,
               icon: Icon(
                 Icons.emoji_emotions_outlined,
-                color: theme.secondaryTextColor,
+                color: emojiIconColor,
               ),
             ),
             const Spacer(),
@@ -3186,7 +3267,7 @@ class _ComposerState extends State<_Composer>
                           semanticsLabel: 'Send message',
                           tooltip: 'Send',
                           icon: Icons.send_rounded,
-                          fillColor: theme.accentColor,
+                          fillColor: sendFill,
                           iconColor: theme.onAccentColor,
                           emphasized: true,
                           onTap: widget.onSend,
@@ -3195,7 +3276,7 @@ class _ComposerState extends State<_Composer>
                           key: const ValueKey<String>('power-voice-action'),
                           theme: theme,
                           icon: Icons.mic_rounded,
-                          fillColor: theme.accentColor,
+                          fillColor: micFill,
                           iconColor: theme.onAccentColor,
                           semanticsLabel:
                               'Voice note. Tap to start locked recording, or hold to record and slide.',
@@ -3216,14 +3297,14 @@ class _ComposerState extends State<_Composer>
           maxLines: 5,
           onChanged: widget.onChanged,
           style: TextStyle(
-            color: theme.primaryTextColor,
+            color: inputTextColor,
             fontSize: 14 * theme.fontScale,
           ),
           decoration: InputDecoration(
             hintText: 'Message…  /task or #reply',
             hintStyle: TextStyle(color: theme.secondaryTextColor),
             filled: true,
-            fillColor: theme.cardColor,
+            fillColor: inputBg,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(template.cornerRadius),
               borderSide: BorderSide.none,
@@ -3240,12 +3321,30 @@ class _ComposerState extends State<_Composer>
   }
 
   Widget _buildInputRow(ThemeConfig theme, ComposerTemplate template) {
+    final conv = widget.convPrefs;
+    final uiBtnColor = conv.uiButtonsColor != null ? Color(conv.uiButtonsColor!) : theme.accentColor;
+    final emojiIconColor = conv.emojiButtonColor != null
+        ? Color(conv.emojiButtonColor!)
+        : (conv.uiButtonsColor != null ? Color(conv.uiButtonsColor!) : theme.secondaryTextColor);
+    final sendFill = conv.sendButtonColor != null
+        ? Color(conv.sendButtonColor!)
+        : theme.accentColor;
+    final micFill = conv.micSendBgCircleColor != null
+        ? Color(conv.micSendBgCircleColor!)
+        : (conv.sendButtonColor != null ? Color(conv.sendButtonColor!) : theme.accentColor);
+    final inputBg = conv.textEntryBackgroundColor != null
+        ? Color(conv.textEntryBackgroundColor!)
+        : theme.cardColor;
+    final inputTextColor = conv.textEntryColor != null
+        ? Color(conv.textEntryColor!)
+        : theme.primaryTextColor;
+
     final attachAction = ChatyComposerActionButton(
       theme: theme,
       semanticsLabel: 'Attach',
       tooltip: 'Attach',
       icon: Icons.add_circle_outline_rounded,
-      iconColor: theme.accentColor,
+      iconColor: uiBtnColor,
       onTap: widget.onAttach,
     );
     final cameraAction = template.showCameraShortcut
@@ -3254,7 +3353,7 @@ class _ComposerState extends State<_Composer>
             semanticsLabel: 'Camera',
             tooltip: 'Camera',
             icon: Icons.photo_camera_rounded,
-            iconColor: theme.accentColor,
+            iconColor: uiBtnColor,
             onTap: widget.onCameraTap,
           )
         : null;
@@ -3280,20 +3379,20 @@ class _ComposerState extends State<_Composer>
             maxLines: 5,
             onChanged: widget.onChanged,
             style: TextStyle(
-              color: theme.primaryTextColor,
+              color: inputTextColor,
               fontSize: 14 * theme.fontScale,
             ),
             decoration: InputDecoration(
               hintText: 'Message…  /task or #reply',
               hintStyle: TextStyle(color: theme.secondaryTextColor),
               filled: true,
-              fillColor: theme.cardColor,
+              fillColor: inputBg,
               prefixIcon: IconButton(
                 tooltip: 'Emoji',
                 onPressed: widget.onEmoji,
                 icon: Icon(
                   Icons.emoji_emotions_outlined,
-                  color: theme.secondaryTextColor,
+                  color: emojiIconColor,
                 ),
               ),
               border: OutlineInputBorder(
@@ -3326,7 +3425,7 @@ class _ComposerState extends State<_Composer>
                       semanticsLabel: 'Send message',
                       tooltip: 'Send',
                       icon: Icons.send_rounded,
-                      fillColor: theme.accentColor,
+                      fillColor: sendFill,
                       iconColor: theme.onAccentColor,
                       emphasized: true,
                       onTap: widget.onSend,
@@ -3335,7 +3434,7 @@ class _ComposerState extends State<_Composer>
                       key: const ValueKey<String>('voice-action'),
                       theme: theme,
                       icon: Icons.mic_rounded,
-                      fillColor: theme.accentColor,
+                      fillColor: micFill,
                       iconColor: theme.onAccentColor,
                       semanticsLabel:
                           'Voice note. Tap to start locked recording, or hold to record and slide.',

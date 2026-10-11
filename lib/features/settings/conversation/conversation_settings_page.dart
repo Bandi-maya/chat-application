@@ -222,10 +222,25 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
                     _buildChevronRow(
                       icon: Icons.verified_user_outlined,
                       title: 'Group admin icon',
-                      subtitle: 'Change admin icon in groups',
+                      subtitle: convPrefs.groupAdminIcon.isNotEmpty
+                          ? convPrefs.groupAdminIcon
+                          : 'Default',
                       theme: theme,
                       colors: colors,
-                      onTap: () {},
+                      onTap: () {
+                        GbRadioSelectionModal.show<String>(
+                          context: context,
+                          title: 'Group Admin Icon',
+                          options: const ['Default', 'Star', 'Shield', 'Crown', 'Badge'],
+                          selectedOption: convPrefs.groupAdminIcon,
+                          onSelected: (val) {
+                            widget.preferencesController.updateConversation(
+                              convPrefs.copyWith(groupAdminIcon: val),
+                              logTitle: 'Group admin icon',
+                            );
+                          },
+                        );
+                      },
                     ),
 
                     // Section: Quick Replies
@@ -350,10 +365,27 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
                     _buildChevronRow(
                       icon: Icons.translate_rounded,
                       title: 'Translate Option Settings',
-                      subtitle: 'Choose how the translated text works. Server / In-outside apps',
+                      subtitle: convPrefs.translateOptionSettings,
                       theme: theme,
                       colors: colors,
-                      onTap: () {},
+                      onTap: () {
+                        GbRadioSelectionModal.show<String>(
+                          context: context,
+                          title: 'Translate Option Settings',
+                          options: const [
+                            'Server',
+                            'In-outside apps',
+                            'Server + In-outside apps',
+                          ],
+                          selectedOption: convPrefs.translateOptionSettings,
+                          onSelected: (val) {
+                            widget.preferencesController.updateConversation(
+                              convPrefs.copyWith(translateOptionSettings: val),
+                              logTitle: 'Translate option',
+                            );
+                          },
+                        );
+                      },
                     ),
                     _buildSwitchRow(
                       icon: Icons.g_translate_rounded,
@@ -462,18 +494,60 @@ class _ConversationSettingsPageState extends State<ConversationSettingsPage> {
                     _buildChevronRow(
                       icon: Icons.notifications_none_rounded,
                       title: 'Incoming message ringtone',
-                      subtitle: "Change the 'Incoming message' sound in chat",
+                      subtitle: convPrefs.incomingMessageRingtone.isNotEmpty
+                          ? convPrefs.incomingMessageRingtone
+                          : 'Default',
                       theme: theme,
                       colors: colors,
-                      onTap: () {},
+                      onTap: () {
+                        GbRadioSelectionModal.show<String>(
+                          context: context,
+                          title: 'Incoming Message Ringtone',
+                          options: const [
+                            'Default',
+                            'Soft Ping',
+                            'Pop Bubble',
+                            'Chime Bell',
+                            'Silent',
+                          ],
+                          selectedOption: convPrefs.incomingMessageRingtone,
+                          onSelected: (val) {
+                            widget.preferencesController.updateConversation(
+                              convPrefs.copyWith(incomingMessageRingtone: val),
+                              logTitle: 'Incoming ringtone',
+                            );
+                          },
+                        );
+                      },
                     ),
                     _buildChevronRow(
                       icon: Icons.notification_important_outlined,
                       title: 'Send message ringtone',
-                      subtitle: "Change the 'Send message' sound in chat",
+                      subtitle: convPrefs.sendMessageRingtone.isNotEmpty
+                          ? convPrefs.sendMessageRingtone
+                          : 'Default',
                       theme: theme,
                       colors: colors,
-                      onTap: () {},
+                      onTap: () {
+                        GbRadioSelectionModal.show<String>(
+                          context: context,
+                          title: 'Send Message Ringtone',
+                          options: const [
+                            'Default',
+                            'Soft Ping',
+                            'Pop Bubble',
+                            'Chime Bell',
+                            'Silent',
+                          ],
+                          selectedOption: convPrefs.sendMessageRingtone,
+                          onSelected: (val) {
+                            widget.preferencesController.updateConversation(
+                              convPrefs.copyWith(sendMessageRingtone: val),
+                              logTitle: 'Send ringtone',
+                            );
+                          },
+                        );
+                      },
                     ),
                     const SizedBox(height: 8),
                   ],

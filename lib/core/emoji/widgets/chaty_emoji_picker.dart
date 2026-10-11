@@ -16,21 +16,37 @@ class ChatyEmojiPicker {
   static Future<String?> show(
     BuildContext context, {
     bool reactionMode = false,
+    Color? headerColor,
+    Color? headerIconsColor,
+    Color? backgroundColor,
   }) {
     return showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      builder: (_) => _ChatyEmojiPickerSheet(reactionMode: reactionMode),
+      backgroundColor: backgroundColor ?? Theme.of(context).colorScheme.surface,
+      builder: (_) => _ChatyEmojiPickerSheet(
+        reactionMode: reactionMode,
+        headerColor: headerColor,
+        headerIconsColor: headerIconsColor,
+        backgroundColor: backgroundColor,
+      ),
     );
   }
 }
 
 class _ChatyEmojiPickerSheet extends StatefulWidget {
   final bool reactionMode;
-  const _ChatyEmojiPickerSheet({required this.reactionMode});
+  final Color? headerColor;
+  final Color? headerIconsColor;
+  final Color? backgroundColor;
+  const _ChatyEmojiPickerSheet({
+    required this.reactionMode,
+    this.headerColor,
+    this.headerIconsColor,
+    this.backgroundColor,
+  });
 
   @override
   State<_ChatyEmojiPickerSheet> createState() => _ChatyEmojiPickerSheetState();
@@ -83,48 +99,58 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
     final height =
         MediaQuery.sizeOf(context).height * (widget.reactionMode ? 0.60 : 0.72);
 
-    return SizedBox(
-      height: height.clamp(380.0, 660.0),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 2, 14, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    widget.reactionMode ? 'Choose reaction' : 'Choose emoji',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
+    final headerColor = widget.headerColor;
+    final headerIconsColor = widget.headerIconsColor;
+    final backgroundColor = widget.backgroundColor;
+
+    return Container(
+      color: backgroundColor,
+      child: SizedBox(
+        height: height.clamp(380.0, 660.0),
+        child: Column(
+          children: [
+            Container(
+              color: headerColor,
+              padding: const EdgeInsets.fromLTRB(18, 2, 14, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.reactionMode ? 'Choose reaction' : 'Choose emoji',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: headerIconsColor,
+                      ),
                     ),
                   ),
-                ),
-                IconButton(
-                  tooltip: 'Close',
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close_rounded),
-                ),
-              ],
+                  IconButton(
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: Icon(Icons.close_rounded, color: headerIconsColor),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: TabBar(
-              controller: _tabController,
-              indicatorSize: TabBarIndicatorSize.tab,
-              dividerColor: Colors.transparent,
-              tabs: const [
-                Tab(
-                  icon: Icon(Icons.auto_awesome_rounded),
-                  text: 'Animated Emojis',
-                ),
-                Tab(
-                  icon: Icon(Icons.emoji_emotions_outlined),
-                  text: 'All Emojis',
-                ),
-              ],
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TabBar(
+                controller: _tabController,
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                labelColor: headerIconsColor,
+                unselectedLabelColor: headerIconsColor?.withValues(alpha: 0.6),
+                tabs: const [
+                  Tab(
+                    icon: Icon(Icons.auto_awesome_rounded),
+                    text: 'Animated Emojis',
+                  ),
+                  Tab(
+                    icon: Icon(Icons.emoji_emotions_outlined),
+                    text: 'All Emojis',
+                  ),
+                ],
+              ),
             ),
-          ),
           const SizedBox(height: 8),
           Expanded(
             child: TabBarView(
@@ -137,8 +163,9 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildAnimatedTab(BuildContext context) {
     final theme = Theme.of(context);

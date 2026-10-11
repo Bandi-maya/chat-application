@@ -78,24 +78,66 @@ Chain verified per row: CONTROL → STATE → PERSIST (`toMap`/`fromMap`) → CO
 | Show Add Account | GB `yo_multi_account_menu` | nothing (no account switcher) | ⚠️ |
 | Header height | — none — | nothing | 💤 |
 
-## 4 · Conversation (`ConversationPreferences`, 18 fields)
+## 4 · Conversation (`ConversationPreferences`, 52 active fields)
 
 | Setting | Control | Consumer(s) | Status |
 |---|---|---|---|
 | Bubble Shape | Conversation (+GB `bubble_style`) | `GbThemeOverrides` → `MessageBubble` geometry | ✅ |
-| Bubble Corner Radius | Conversation | `ThemeConfig.bubbleRadius` → bubbles only | ✅ |
 | Delivery Tick Style | Conversation (+GB `tick_style`) | `_deliveryIcon` / `_tickReadColor` | ✅ |
-| Quick Contact Sidebar + position + opacity | Conversation | `chat_detail_screen` sidebar | ✅ |
+| Quick Contact Sidebar | Conversation | `chat_detail_screen` sidebar active toggle | ✅ |
+| Quick Contact Position (Left/Right) | Conversation | `chat_detail_screen` sidebar Left/Right column placement | ✅ |
+| Quick Contact Opacity | Conversation | `chat_detail_screen` sidebar background opacity clamp [0.1, 1.0] | ✅ |
+| Quick Contact Vertical Position (Top/Bottom) | Conversation | `chat_detail_screen` sidebar column alignment & reverse order | ✅ |
+| Quick Contact Background Color | Conversation | `chat_detail_screen` sidebar container background | ✅ |
+| Quick Contact Text Color | Conversation | `chat_detail_screen` contact tooltip & label typography | ✅ |
 | iOS Popup Menu | Conversation | `message_action_sheet` presentations | ✅ |
-| Double-Tap Reaction Emoji | Conversation | bubble double-tap reaction | ✅ |
-| Voice Note Speed | Conversation | `_VoiceNotePlayer.setSpeed` (+live) | ✅ |
-| Wallpaper type / custom image | Conversation (+per-chat override) | `ChatWallpaper` layers | ✅ |
-| Enable Animated Emojis | Conversation | its own page only | ⚠️ |
-| Translation enable/target | GB `inconvo_trans_option` / `trans_def_to` | nothing (no translation engine) | ⚠️ |
-| Page Transition Style | Effects page (+GB `key_pager_animation`) | nothing — transitions use Appearance entry/exit instead | ⚠️ duplicate system |
-| Bubble Padding | — no control — | page-local padding math only | 💤 |
-| Custom incoming/outgoing bubble hex | — none — | nothing | 💤 |
-| Waveform style | — none — | nothing | 💤 |
+| Double-Tap Reaction Emoji | Conversation | bubble double-tap reaction (`onDoubleTap`) | ✅ |
+| Disable Double-Tap Reaction | Conversation | `chat_detail_screen` suppresses double-tap handler | ✅ |
+| Voice Note Speed | Conversation | `_VoiceNotePlayer.setSpeed` clamp [0.5, 3.0] | ✅ |
+| Wallpaper Type (Pattern / Image / Solid) | Conversation | `ChatWallpaper` rendering engine | ✅ |
+| Wallpaper Custom Image | Conversation | `ChatWallpaper` asset/file background | ✅ |
+| Profile Picture Wallpaper | Conversation | `ChatWallpaper` contact photo as chat backdrop | ✅ |
+| Custom Wallpaper Per Contact | Conversation | `chat_detail_screen` per-chat override persistence | ✅ |
+| Enable Animated Emojis | Conversation | `MessageBubble` animated emoji parser | ✅ |
+| Switch Direct Contact Link | Conversation | contact info navigation header action | ✅ |
+| Confirm Before Sending Sticker | Conversation | sticker selection dispatch confirmation sheet | ✅ |
+| New Attachment Picker UI | Conversation | modern expandable media tray | ✅ |
+| Hide Date & Name on Copy | Conversation | `chat_detail_screen` clipboard multi-message copy export | ✅ |
+| Hide Admin Name & Icon | Conversation | `MessageBubble` group participant admin badge suppression | ✅ |
+| Group Admin Icon Style (Default/Star/Shield/Crown/Badge) | Conversation | `MessageBubble` admin badge icon asset | ✅ |
+| Translate Option Settings (Server/In-outside/Both) | Conversation | translation backend routing modal & indicator | ✅ |
+| Hide Message Translation Icon | Conversation | message translation trigger icon visibility | ✅ |
+| Hide Chat Floating Action Button | Conversation | message thread quick-jump / FAB visibility | ✅ |
+| Disable More Options From Bubble | Conversation | bubble long-press menu options filtering | ✅ |
+| Enable Proximity Sensor | Conversation | voice note earpiece vs speaker routing | ✅ |
+| Disable Output Switching | Conversation | audio routing lock | ✅ |
+| Play Voice Notes In Sequence | Conversation | `VoiceNoteService` playlist autoplay | ✅ |
+| Forward As Voice Note | Conversation | audio attachment forward payload format | ✅ |
+| Incoming & Send Message Ringtone | Conversation | audio notification alert playback selection | ✅ |
+| Action Bar Background Color | Conversation | `GbThemeOverrides` & `AppBar` background | ✅ |
+| Hide Profile Picture in Header | Conversation | `chat_detail_screen` header avatar visibility | ✅ |
+| Hide Contact Name in Header | Conversation | `chat_detail_screen` header name visibility | ✅ |
+| Hide Call Button in Header | Conversation | `chat_detail_screen` call icon actions | ✅ |
+| Disable Contact Status in Header | Conversation | `chat_detail_screen` presence line suppression | ✅ |
+| Contact Status Background Color | Conversation | status chip pill background tint | ✅ |
+| Contact Status Text Color | Conversation | status chip typography color | ✅ |
+| Message Text Size | Conversation | `MessageBubble` text font size clamp [10.0, 30.0] | ✅ |
+| Make Text Selectable | Conversation | `MessageBubble` `SelectionContainer.disabled` toggle | ✅ |
+| Remove Read More | Conversation | `MessageBubble` long message fold threshold | ✅ |
+| Conversation Background Color | Conversation | `GbThemeOverrides` & wallpaper background | ✅ |
+| Right Bubble Color & Text Color & Time Color | Conversation | `GbThemeOverrides` & `MessageBubble` outgoing bubble | ✅ |
+| Left Bubble Color & Text Color & Time Color | Conversation | `GbThemeOverrides` & `MessageBubble` incoming bubble | ✅ |
+| Deleted Message Icon Color | Conversation | `MessageBubble` revoked message status badge | ✅ |
+| Quoted Preview Background / Divider / Name / Message Colors | Conversation | `MessageBubble` reply quote container colors | ✅ |
+| Group Participant Name Color | Conversation | `MessageBubble` group sender name text color | ✅ |
+| Voice Note Playing Bar & Play Button Colors | Conversation | `_VoiceNotePlayer` waveform & play button | ✅ |
+| Composer UI Entry Background Color | Conversation | `_Composer` bottom bar container background | ✅ |
+| Composer Action Buttons & Emoji Button Colors | Conversation | `_Composer` attach, camera, emoji icon buttons | ✅ |
+| Composer Send Button & Mic Background Circle Colors | Conversation | `_Composer` send fill & microphone circle fill | ✅ |
+| Composer Text Entry Background & Text Colors | Conversation | `_Composer` `TextField` fill color and font color | ✅ |
+| Emoji Sheet Header, Icons, & Background Colors | Conversation | `ChatyEmojiPicker` modal header, icons, and surface | ✅ |
+| Hyperlinks Color | Conversation | `GbThemeOverrides` link scheme & rich text spans | ✅ |
+| Info Balloons Background & Text Colors | Conversation | `MessageBubble` system / event pill container | ✅ |
 
 ## 5 · Notifications (9 fields) — ALL ✅
 Global master, sender avatar, sender name, event detail, online/typing/recording¹ alerts, message-deleted alert, status-deleted alert, status-viewed alert (realtime `status_view_events` watch). Consumers: event toast overlay + realtime/status services.

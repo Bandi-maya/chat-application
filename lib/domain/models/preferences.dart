@@ -1184,10 +1184,13 @@ class ConversationPreferences {
 
   factory ConversationPreferences.fromMap(Map<String, dynamic> map) =>
       ConversationPreferences(
-        bubbleStyle: map['bubbleStyle'] ?? map['bubbleShape'] ?? 'Stock',
+        bubbleStyle: map['bubbleStyle'] ?? map['bubbleShape'] ?? map['conversation_style_row'] ?? 'Stock',
         tickStyle: map['tickStyle'] ?? 'RC iOS 11',
-        enableQuickContactSidebar: map['enableQuickContactSidebar'] ?? false,
-        sidebarPosition: map['sidebarPosition'] ?? 'Right',
+        enableQuickContactSidebar: map['enableQuickContactSidebar'] ??
+            (map['abu_saleh_quickcontact'] != null &&
+                map['abu_saleh_quickcontact'] != 'Off'),
+        sidebarPosition: map['sidebarPosition'] ??
+            (map['abu_saleh_quickcontact'] == 'Left' ? 'Left' : 'Right'),
         sidebarOpacity: (map['sidebarOpacity'] as num?)?.toDouble() ?? 0.9,
         iosStylePopupMenu: map['iosStylePopupMenu'] ?? true,
         doubleTapReactionEmoji: map['doubleTapReactionEmoji'] ?? '❤️',
@@ -1204,9 +1207,9 @@ class ConversationPreferences {
         hideAdminNameIcon: map['hideAdminNameIcon'] ?? false,
         groupAdminIcon: map['groupAdminIcon'] ?? 'Default',
         quickContactSidebarPosition:
-            map['quickContactSidebarPosition'] ?? 'Top',
-        quickContactBgColor: map['quickContactBgColor'] ?? 0xFF000000,
-        quickContactTextColor: map['quickContactTextColor'] ?? 0xFF000000,
+            map['quickContactSidebarPosition'] ?? map['abu_saleh_quickcontact_pos'] ?? 'Top',
+        quickContactBgColor: map['quickContactBgColor'] ?? map['abu_saleh_quickcontact_bg'] ?? 0xFF000000,
+        quickContactTextColor: map['quickContactTextColor'] ?? map['abu_saleh_quickcontact_txt'] ?? 0xFF000000,
         hideChatFab: map['hideChatFab'] ?? true,
         disableMoreOptionsFromBubble:
             map['disableMoreOptionsFromBubble'] ?? false,
