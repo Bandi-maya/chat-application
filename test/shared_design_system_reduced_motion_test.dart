@@ -25,6 +25,29 @@ void main() {
     }
   });
 
+  test('core feature screens suppress decorative transitions for reduced motion', () {
+    final paths = <String>[
+      'lib/features/calls/call_contact_picker_screen.dart',
+      'lib/features/tasks/tasks_screen.dart',
+      'lib/features/messages/message_bubble.dart',
+      'lib/features/messages/chat_attachment_actions.dart',
+      'lib/features/chats/main_navigation_shell.dart',
+      'lib/features/settings/customization/customization_center_screen.dart',
+      'lib/features/settings/appearance/app_icon_settings_screen.dart',
+      'lib/features/settings/pro_pricing_screen.dart',
+    ];
+
+    for (final path in paths) {
+      final source = File(path).readAsStringSync();
+      expect(
+        source.contains('MediaQuery.disableAnimationsOf(context)') ||
+            source.contains('ChatyMotion.duration(context'),
+        isTrue,
+        reason: '$path should respect reduced motion',
+      );
+    }
+  });
+
   test('feature navigation and swipe-to-reply controllers honor reduced motion', () {
     final navigation = File(
       'lib/features/chats/main_navigation_shell.dart',
