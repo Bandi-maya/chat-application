@@ -1054,7 +1054,9 @@ class GbLiveHeaderPreview extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
       decoration: BoxDecoration(
         color: _liveTheme.backgroundColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(
+          _liveTheme.cornerRadius.clamp(0.0, 32.0).toDouble(),
+        ),
         border: Border.all(color: _liveTheme.cardColor, width: 1.2),
         boxShadow: [
           BoxShadow(
@@ -1206,6 +1208,9 @@ class GbLiveHeaderPreview extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: _liveTheme.cardColor,
+        borderRadius: BorderRadius.circular(
+          _liveTheme.cornerRadius.clamp(0.0, 28.0).toDouble(),
+        ),
         border: Border.all(
           color: _liveTheme.secondaryTextColor.withValues(alpha: 0.24),
         ),
