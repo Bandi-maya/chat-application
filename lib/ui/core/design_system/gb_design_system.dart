@@ -2111,6 +2111,8 @@ class GbLiveHeaderPreview extends StatelessWidget {
 
 /// Side Dropdown Popup Menu anchored at the top-right, matching Image 5.
 class GbHeaderOverflowMenu extends StatelessWidget {
+  dynamic get _liveTheme => locator<ThemeController>().globalTheme;
+
   final VoidCallback? onGbSettings;
   final VoidCallback? onMessageScheduler;
   final VoidCallback? onAutoReply;
@@ -2165,7 +2167,7 @@ class GbHeaderOverflowMenu extends StatelessWidget {
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Dismiss',
-      barrierColor: Colors.black38,
+      barrierColor: context.colors.shadow.withValues(alpha: 0.38),
       transitionDuration: const Duration(milliseconds: 180),
       pageBuilder: (ctx, anim1, anim2) {
         return Stack(
@@ -2261,19 +2263,19 @@ class GbHeaderOverflowMenu extends StatelessWidget {
         maxHeight: MediaQuery.of(context).size.height * 0.8,
       ),
       decoration: BoxDecoration(
-        color: GbColors.menuSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF23323B), width: 1.1),
+        color: _liveTheme.surfaceColor,
+        borderRadius: BorderRadius.zero,
+        border: Border.all(color: _liveTheme.cardColor, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.55),
+            color: _liveTheme.backgroundColor.withValues(alpha: 0.55),
             blurRadius: 24,
             offset: const Offset(-2, 10),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.zero,
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Column(
@@ -2305,13 +2307,13 @@ class GbHeaderOverflowMenu extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
         child: Row(
           children: [
-            Icon(icon, color: const Color(0xFF8696A0), size: 21),
+            Icon(icon, color: _liveTheme.secondaryTextColor, size: 21),
             const SizedBox(width: 16),
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: _liveTheme.primaryTextColor,
                   fontSize: 14.5,
                   fontWeight: FontWeight.w500,
                   letterSpacing: -0.1,
