@@ -9,13 +9,20 @@ import '../../domain/models/other_models.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../../ui/core/widgets/app_avatar.dart';
+import 'call_contact_picker_screen.dart';
 import 'ongoing_call_screen.dart';
 
 class CallsScreen extends StatefulWidget {
   final ThemeConfig theme;
   final ChatyDataStore dataStore;
+  final bool showCallActions;
 
-  const CallsScreen({super.key, required this.theme, required this.dataStore});
+  const CallsScreen({
+    super.key,
+    required this.theme,
+    required this.dataStore,
+    this.showCallActions = true,
+  });
 
   @override
   State<CallsScreen> createState() => _CallsScreenState();
@@ -43,6 +50,46 @@ class _CallsScreenState extends State<CallsScreen> {
     _history.removeListener(_handleHistoryChanged);
     _history.dispose();
     super.dispose();
+  }
+
+  void _openContactPicker(CallContactPickerMode mode) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CallContactPickerScreen(
+          theme: theme,
+          dataStore: dataStore,
+          initialMode: mode,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCallActions(BuildContext context) {
+    final colors = context.colors;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        FloatingActionButton.small(
+          heroTag: 'chaty_calls_dialpad_fab',
+          tooltip: 'Dialpad',
+          backgroundColor: colors.surfaceElevated,
+          foregroundColor: colors.primary,
+          onPressed: () => _openContactPicker(CallContactPickerMode.dialpad),
+          child: const Icon(Icons.dialpad_rounded),
+        ),
+        const SizedBox(height: 12),
+        FloatingActionButton.extended(
+          heroTag: 'chaty_calls_add_call_fab',
+          tooltip: 'Add call',
+          backgroundColor: colors.primary,
+          foregroundColor: colors.onPrimary,
+          icon: const Icon(Icons.add_ic_call_rounded),
+          label: const Text('Add call'),
+          onPressed: () => _openContactPicker(CallContactPickerMode.contacts),
+        ),
+      ],
+    );
   }
 
   String _formatCallTime(DateTime dt) {
@@ -91,6 +138,9 @@ class _CallsScreenState extends State<CallsScreen> {
     final historyError = _history.lastError;
 
     return ChatyScaffold(
+      floatingActionButton: widget.showCallActions
+          ? _buildCallActions(context)
+          : null,
       safeAreaTop: true,
       safeAreaBottom: false,
       body: RefreshIndicator(
