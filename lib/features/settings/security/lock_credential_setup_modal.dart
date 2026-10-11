@@ -555,7 +555,7 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
                   ignoring: _busy,
                   child: PatternLockPad(
                     key: _padKey,
-                    clearOnFinish: false,
+                    clearOnFinish: true,
                     onPatternComplete: _onPatternComplete,
                     onPatternReset: () {
                       if (_currentStep == StepState.confirmNew) {
