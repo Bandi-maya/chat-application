@@ -110,102 +110,119 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
   }) async {
     final security = widget.preferencesController.security;
     final current = _methodTypeOf(security.lockMethod);
+    final currentHasSecret = SecurityFlowPlan.hasVerifiableSecret(current)
+        ? await _lockService.hasCredential(_storageKeyOf(current))
+        : false;
     var chosen = target ?? current;
-    var secretConfigured = await _lockService.hasCredential(
-      _storageKeyOf(current),
-    );
-    // True once this flow has proven knowledge of the current secret.
-    var verifiedInFlow = false;
+    var verifiedCurrent = false;
 
-    for (final step in SecurityFlowPlan.plan(
-      intent: intent,
-      currentMethod: current,
-      currentSecretConfigured: secretConfigured,
-      targetMethod: chosen,
-    )) {
-      if (!mounted) return false;
-      switch (step) {
-        case SecurityFlowStep.verifyCurrent:
-          final ok = await _verifyCurrent(current);
-          if (!ok) return false;
-          verifiedInFlow = true;
+    // The previous implementation precomputed a step list before the lock
+    // type was selected. That meant "change method" could loop into the old
+    // method's setup step and ask for the same pattern again. Verify once,
+    // select once, and then build the rest of the flow from that selection.
+    final requiresCurrentProof = security.isAppLockEnabled &&
+        (intent == SecurityIntent.changeMethod ||
+            intent == SecurityIntent.changeCredential ||
+            intent == SecurityIntent.disableLock);
+    if (requiresCurrentProof &&
+        (!SecurityFlowPlan.hasVerifiableSecret(current) || currentHasSecret)) {
+      final valid = await _verifyCurrent(current);
+      if (!valid || !mounted) return false;
+      verifiedCurrent = true;
+    }
 
-        case SecurityFlowStep.chooseMethod:
-          final picked = await LockMethodSelectorSheet.show(
-            context,
-            lockService: _lockService,
-            currentMethod: chosen,
+    if (intent == SecurityIntent.enableLock ||
+        (intent == SecurityIntent.changeMethod && target == null)) {
+      final picked = await LockMethodSelectorSheet.show(
+        context,
+        lockService: _lockService,
+        currentMethod: intent == SecurityIntent.enableLock ? null : current,
+      );
+      if (picked == null || !mounted) return false;
+      chosen = picked;
+    }
+
+    final chosenHasSecret = SecurityFlowPlan.hasVerifiableSecret(chosen)
+        ? await _lockService.hasCredential(_storageKeyOf(chosen))
+        : false;
+    final sameAsCurrent = chosen == current;
+    final needsCredentialSetup =
+        SecurityFlowPlan.hasVerifiableSecret(chosen) &&
+        !(sameAsCurrent && verifiedCurrent && chosenHasSecret);
+
+    if (intent != SecurityIntent.disableLock &&
+        SecurityFlowPlan.hasVerifiableSecret(chosen) &&
+        needsCredentialSetup) {
+      // We have already verified the active method (when enabled). A
+      // different selected credential must never ask for its stale, unused
+      // previous value; go straight to new + confirmation.
+      final configured = await LockCredentialSetupModal.show(
+        context,
+        method: _storageKeyOf(chosen),
+        pinLength: setupPinLength ?? _pinLength,
+        lockService: _lockService,
+        replaceExisting: true,
+      );
+      if (!configured || !mounted) return false;
+      await _loadCapabilities();
+    }
+
+    if (intent != SecurityIntent.disableLock &&
+        !SecurityFlowPlan.hasVerifiableSecret(chosen)) {
+      final ok = chosen == LockMethodType.biometric
+          ? await _lockService.authenticateBiometric(
+              reason: 'Confirm biometric unlock works for Chaty',
+            )
+          : await _lockService.authenticateDeviceCredential(
+              reason: 'Confirm your device lock works for Chaty',
+            );
+      if (!ok) {
+        if (mounted) {
+          _toast(
+            chosen == LockMethodType.biometric
+                ? 'Biometric unavailable or not confirmed — choose another lock type.'
+                : 'Device lock not confirmed — set a device screen lock first or choose another type.',
           );
-          if (picked == null || !mounted) return false;
-          chosen = picked;
-          secretConfigured = await _lockService.hasCredential(
-            _storageKeyOf(chosen),
-          );
-
-        case SecurityFlowStep.setupNew:
-          // Keeping the type you already have (and just verified) does not
-          // require typing a brand-new secret — matching platform behavior.
-          if (verifiedInFlow && secretConfigured && chosen == current) {
-            break;
-          }
-          final configured = await LockCredentialSetupModal.show(
-            context,
-            method: _storageKeyOf(chosen),
-            pinLength: setupPinLength ?? _pinLength,
-            lockService: _lockService,
-          );
-          if (!configured || !mounted) return false;
-          await _loadCapabilities();
-
-        case SecurityFlowStep.preflightOsAuth:
-          final ok = chosen == LockMethodType.biometric
-              ? await _lockService.authenticateBiometric(
-                  reason: 'Confirm biometric unlock works for Chaty',
-                )
-              : await _lockService.authenticateDeviceCredential(
-                  reason: 'Confirm your device lock works for Chaty',
-                );
-          if (!ok) {
-            if (mounted) {
-              _toast(
-                chosen == LockMethodType.biometric
-                    ? 'Biometric unavailable or not confirmed — pick another '
-                          'lock type so you cannot be locked out.'
-                    : 'Device lock not confirmed — set a device screen lock '
-                          'first or pick another lock type.',
-              );
-            }
-            return false;
-          }
-
-        case SecurityFlowStep.apply:
-          final latest = widget.preferencesController.security;
-          switch (intent) {
-            case SecurityIntent.enableLock:
-              widget.preferencesController.updateSecurity(
-                latest.copyWith(
-                  lockMethod: _storageKeyOf(chosen),
-                  isAppLockEnabled: true,
-                ),
-                logTitle: 'Enable Chaty Lock (${_storageKeyOf(chosen)})',
-              );
-            case SecurityIntent.changeMethod:
-              widget.preferencesController.updateSecurity(
-                latest.copyWith(lockMethod: _storageKeyOf(chosen)),
-                logTitle: 'Lock Method',
-              );
-            case SecurityIntent.changeCredential:
-              // Secret already persisted by the setup modal; nothing else to
-              // change preference-side.
-              break;
-            case SecurityIntent.disableLock:
-              widget.preferencesController.updateSecurity(
-                latest.copyWith(isAppLockEnabled: false),
-                logTitle: 'Disable App Lock',
-              );
-          }
+        }
+        return false;
       }
     }
+
+    if (!mounted) return false;
+    final latest = widget.preferencesController.security;
+    switch (intent) {
+      case SecurityIntent.enableLock:
+        widget.preferencesController.updateSecurity(
+          latest.copyWith(
+            lockMethod: _storageKeyOf(chosen),
+            isAppLockEnabled: true,
+          ),
+          logTitle: 'Enable Chaty Lock (${_storageKeyOf(chosen)})',
+        );
+      case SecurityIntent.changeMethod:
+        widget.preferencesController.updateSecurity(
+          latest.copyWith(
+            lockMethod: _storageKeyOf(chosen),
+            isAppLockEnabled: true,
+          ),
+          logTitle: 'Lock Method',
+        );
+      case SecurityIntent.changeCredential:
+        // The setup modal already persisted the new salted credential. The
+        // method selector does not appear for per-method credential changes.
+        if (chosen != current) {
+          widget.preferencesController.updateSecurity(
+            latest.copyWith(lockMethod: _storageKeyOf(chosen)),
+            logTitle: 'Lock Authentication Method',
+          );
+        }
+      case SecurityIntent.disableLock:
+        widget.preferencesController.updateSecurity(
+          latest.copyWith(isAppLockEnabled: false),
+          logTitle: 'Disable App Lock',
+        );
+    }
+
     if (mounted) setState(() {});
     return true;
   }
