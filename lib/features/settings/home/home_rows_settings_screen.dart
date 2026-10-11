@@ -98,7 +98,7 @@ class _HomeRowsSettingsScreenState extends State<HomeRowsSettingsScreen> {
                                     width: 13,
                                     height: 13,
                                     decoration: BoxDecoration(
-                                      color: _color(prefs.onlineDotColor) ?? Colors.greenAccent,
+                                      color: _color(prefs.onlineDotColor) ?? theme.successColor,
                                       shape: BoxShape.circle,
                                       border: Border.all(color: theme.surfaceColor, width: 2),
                                     ),
@@ -155,7 +155,7 @@ class _HomeRowsSettingsScreenState extends State<HomeRowsSettingsScreen> {
                                       child: Text(
                                         '3',
                                         style: TextStyle(
-                                          color: _color(prefs.unreadCounterTextColor) ?? Colors.white,
+                                          color: _color(prefs.unreadCounterTextColor) ?? theme.onAccentColor,
                                           fontSize: 11,
                                           fontWeight: FontWeight.bold,
                                         ),
