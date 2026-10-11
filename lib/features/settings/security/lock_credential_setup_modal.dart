@@ -61,6 +61,7 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
   String _newSecret = '';
   String _error = '';
   bool _busy = false;
+  bool _obscurePassword = true;
 
   // Pattern states
   String? _firstPatternDrawn;
@@ -605,17 +606,58 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
               TextField(
                 controller: _textController,
                 enabled: !_busy,
-                obscureText: true,
+                obscureText: _obscurePassword,
                 keyboardType: TextInputType.visiblePassword,
                 autofillHints: const <String>[],
+                textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _handleContinue(),
+                style: TextStyle(
+                  fontSize: 16,
+                  letterSpacing: _obscurePassword ? 2.2 : 0,
+                  color: theme.colorScheme.onSurface,
+                ),
                 decoration: InputDecoration(
                   labelText: _currentStep == StepState.enterCurrent
                       ? 'Current Password'
                       : _currentStep == StepState.enterNew
                       ? 'New Password'
                       : 'Confirm Password',
-                  border: const OutlineInputBorder(),
+                  hintText: 'At least 6 characters',
+                  filled: true,
+                  fillColor: theme.colorScheme.surfaceContainerHighest
+                      .withValues(alpha: 0.58),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 17,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: BorderSide(
+                      color: theme.colorScheme.outline.withValues(alpha: 0.22),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: BorderSide(
+                      color: theme.colorScheme.primary,
+                      width: 1.5,
+                    ),
+                  ),
+                  suffixIcon: IconButton(
+                    tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+                    onPressed: () => setState(
+                      () => _obscurePassword = !_obscurePassword,
+                    ),
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_rounded
+                          : Icons.visibility_off_rounded,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
