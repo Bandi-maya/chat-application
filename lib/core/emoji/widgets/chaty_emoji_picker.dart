@@ -5,6 +5,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/emoji_recent_cache.dart';
 
+enum ChatyEmojiComposerAction { send, keyboard, close }
+
+class ChatyEmojiComposerResult {
+  const ChatyEmojiComposerResult({required this.text, required this.action});
+
+  final String text;
+  final ChatyEmojiComposerAction action;
+}
+
 /// Telegram-quality Emoji Picker bottom sheet with:
 /// - Fast animated vector emoji grid & search
 /// - Native Unicode emoji picker with categories & recents
@@ -18,24 +27,54 @@ class ChatyEmojiPicker {
     Color? headerColor,
     Color? headerIconsColor,
     Color? backgroundColor,
-  }) {
-    return showModalBottomSheet<String>(
+  }) async {
+    final result = await showModalBottomSheet<Object?>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       enableDrag: false,
       showDragHandle: false,
-      // Open at approximately keyboard height; the user can drag up for more.
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
       clipBehavior: Clip.hardEdge,
       backgroundColor: backgroundColor ?? Theme.of(context).colorScheme.surface,
       builder: (_) => _ChatyEmojiPickerSheet(
         reactionMode: reactionMode,
+        composerMode: false,
+        initialText: '',
         headerColor: headerColor,
         headerIconsColor: headerIconsColor,
         backgroundColor: backgroundColor,
       ),
     );
+    return result is String ? result : null;
+  }
+
+  static Future<ChatyEmojiComposerResult?> showComposer(
+    BuildContext context, {
+    String initialText = '',
+    Color? headerColor,
+    Color? headerIconsColor,
+    Color? backgroundColor,
+  }) async {
+    final result = await showModalBottomSheet<Object?>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      enableDrag: false,
+      showDragHandle: false,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+      clipBehavior: Clip.hardEdge,
+      backgroundColor: backgroundColor ?? Theme.of(context).colorScheme.surface,
+      builder: (_) => _ChatyEmojiPickerSheet(
+        reactionMode: false,
+        composerMode: true,
+        initialText: initialText,
+        headerColor: headerColor,
+        headerIconsColor: headerIconsColor,
+        backgroundColor: backgroundColor,
+      ),
+    );
+    return result is ChatyEmojiComposerResult ? result : null;
   }
 }
 
