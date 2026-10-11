@@ -72,12 +72,53 @@ class PatternLockPadState extends State<PatternLockPad> {
     });
   }
 
+  double _distanceToSegment(Offset point, Offset start, Offset end) {
+    final delta = end - start;
+    final lengthSquared = delta.dx * delta.dx + delta.dy * delta.dy;
+    if (lengthSquared == 0) return (point - start).distance;
+    final projection = (((point.dx - start.dx) * delta.dx) +
+            ((point.dy - start.dy) * delta.dy)) /
+        lengthSquared;
+    final t = projection.clamp(0.0, 1.0);
+    final nearest = Offset(start.dx + delta.dx * t, start.dy + delta.dy * t);
+    return (point - nearest).distance;
+  }
+
+  void _selectAlongSegment(Offset start, Offset end, Size size) {
+    final gridSize = widget.gridSize == 4 ? 4 : 3;
+    final centers = _centers(size);
+    final hitRadius = math.min(size.width, size.height) / gridSize * 0.30;
+    final additions = <int>[];
+    for (var index = 0; index < centers.length; index++) {
+      if (!_selected.contains(index) &&
+          _distanceToSegment(centers[index], start, end) <= hitRadius) {
+        additions.add(index);
+      }
+    }
+    final endHit = _hitTest(end, size);
+    if (endHit != null && !_selected.contains(endHit) &&
+        !additions.contains(endHit)) {
+      additions.add(endHit);
+    }
+    if (widget.enableHaptics && additions.isNotEmpty) {
+      HapticFeedback.selectionClick();
+    }
+    setState(() {
+      _selected.addAll(additions);
+      _pointer = end;
+    });
+  }
+
   void _finish() {
     if (_selected.isNotEmpty) {
-      widget.onPatternComplete(_selected.join('-'));
+      final pattern = _selected.join('-');
+      widget.onPatternComplete(pattern);
     }
     if (mounted) {
-      setState(() => _pointer = null);
+      setState(() {
+        _pointer = null;
+        if (widget.clearOnFinish) _selected.clear();
+      });
     }
   }
 
@@ -102,11 +143,12 @@ class PatternLockPadState extends State<PatternLockPad> {
                 _selectAt(details.localPosition, size);
               },
               onPanUpdate: (details) {
-                _selectAt(details.localPosition, size);
-                if (mounted) setState(() => _pointer = details.localPosition);
+                final start = _pointer ?? details.localPosition;
+                _selectAlongSegment(start, details.localPosition, size);
               },
               onPanEnd: (_) => _finish(),
-              onPanCancel: _finish,
+              // A system interruption must not submit a partial credential.
+              onPanCancel: reset,
               child: CustomPaint(
                 painter: _PatternPainter(
                   selected: _selected,
