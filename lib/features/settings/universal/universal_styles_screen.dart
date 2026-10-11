@@ -10,6 +10,7 @@ import '../../../ui/core/controllers/app_icon_controller.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/design_system.dart';
 import '../../../ui/core/design_system/gb_design_system.dart';
+import '../../../ui/core/widgets/app_brand_icon.dart';
 
 class UniversalStylesScreen extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
@@ -344,28 +345,26 @@ class _UniversalStylesScreenState extends State<UniversalStylesScreen> {
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Container(
-                                      width: 44,
-                                      height: 44,
-                                      decoration: BoxDecoration(
-                                        color: item['color'] as Color,
-                                        borderRadius: BorderRadius.circular(14),
-                                        border: isSelected
-                                            ? Border.all(color: Colors.white, width: 2.5)
-                                            : null,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: (item['color'] as Color).withValues(alpha: 0.4),
-                                            blurRadius: 6,
-                                            offset: const Offset(0, 2),
+                                    Stack(
+                                      children: [
+                                        LauncherIconPreview(
+                                          variant: variant,
+                                          size: 44,
+                                          borderRadius: 14,
+                                        ),
+                                        if (isSelected)
+                                          Positioned.fill(
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                borderRadius: BorderRadius.circular(14),
+                                                border: Border.all(
+                                                  color: theme.accentColor,
+                                                  width: 2.5,
+                                                ),
+                                              ),
+                                            ),
                                           ),
-                                        ],
-                                      ),
-                                      child: Icon(
-                                        item['icon'] as IconData,
-                                        color: Colors.white,
-                                        size: 24,
-                                      ),
+                                      ],
                                     ),
                                     const SizedBox(height: 4),
                                     if (isSelected)
