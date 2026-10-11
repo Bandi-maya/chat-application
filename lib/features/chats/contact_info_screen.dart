@@ -8,6 +8,7 @@ import '../../domain/models/contact_relationship.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/user_profile.dart';
 import '../../ui/core/design_system/design_system.dart';
+import '../../ui/core/controllers/preferences_controller.dart';
 import '../messages/media_viewer_screen.dart';
 import 'contact_privacy_screen.dart';
 
@@ -15,6 +16,7 @@ class ContactInfoScreen extends StatefulWidget {
   final ThemeConfig theme;
   final ChatyDataStore dataStore;
   final Conversation conversation;
+  final ChatyPreferencesController preferencesController;
   final UserProfile contact;
   final ContactRelationshipService relationshipService;
   final RichChatRealtimeService realtimeService;
@@ -24,6 +26,7 @@ class ContactInfoScreen extends StatefulWidget {
     required this.theme,
     required this.dataStore,
     required this.conversation,
+    required this.preferencesController,
     required this.contact,
     required this.relationshipService,
     required this.realtimeService,
@@ -176,6 +179,8 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => MediaViewerScreen(
+          conversationId: widget.conversation.id,
+          preferencesController: widget.preferencesController,
           title: attachment.name,
           type: attachment.type,
           size: attachment.size,
