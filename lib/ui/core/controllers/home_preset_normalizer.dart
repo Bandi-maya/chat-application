@@ -47,7 +47,8 @@ abstract final class HomePresetNormalizer {
         'productivity' => AppNavigationMode.compactRail,
         '3d perspective drawer' => AppNavigationMode.perspective3DDrawer,
         'curved radial menu' => AppNavigationMode.curvedRadialDrawer,
-        'stories first' || 'expressive' => null,
+        'stories first' => AppNavigationMode.bottomNav,
+        'expressive' => null,
         _ => null,
       };
 
