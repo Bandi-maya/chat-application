@@ -129,7 +129,7 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Enter a secret word, phrase, or emoji. Typing this secret into the chat search bar will instantly reveal your locked chats.',
+              'Use at least 8 characters. Typing your secret code into chat search reveals your locked chats.',
               style: TextStyle(
                 color: theme.secondaryTextColor,
                 fontSize: 13,
@@ -142,7 +142,7 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
               autofocus: true,
               style: TextStyle(color: theme.primaryTextColor),
               decoration: InputDecoration(
-                hintText: 'e.g. 🔒 secret or my-vault',
+                hintText: 'Use 8+ characters, e.g. 🔒 private-vault',
                 hintStyle: TextStyle(color: theme.secondaryTextColor),
                 filled: true,
                 fillColor: theme.surfaceColor,
