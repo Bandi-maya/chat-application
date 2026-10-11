@@ -2568,13 +2568,16 @@ class _CurvedRadialDrawerScaffoldState
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final panelWidth = constraints.maxWidth < 330
-              ? constraints.maxWidth
-              : 330.0;
+          // Keep the arc compact enough to preserve visible chat context.
+          // Width and height scale with the device, including older/smaller phones.
+          final panelWidth =
+              (constraints.maxWidth * 0.84).clamp(0.0, 310.0).toDouble();
           final availableHeight = constraints.maxHeight;
-          final panelHeight = availableHeight < 300
+          final panelHeight = availableHeight < 250
               ? availableHeight
-              : (availableHeight * 0.78).clamp(260.0, 340.0).toDouble();
+              : (availableHeight * 0.53).clamp(225.0, 305.0).toDouble();
+          final accent = widget.theme.accentColor as Color;
+          final onAccent = widget.theme.onAccentColor as Color;
 
           return Stack(
             fit: StackFit.expand,
@@ -2582,14 +2585,14 @@ class _CurvedRadialDrawerScaffoldState
               widget.child,
               if (_menuOpen)
                 Positioned(
-                  top: 0,
+                  top: MediaQuery.paddingOf(context).top + 3,
                   left: 0,
                   width: panelWidth,
                   height: panelHeight,
                   child: ClipPath(
                     clipper: const _CurvedRadialMenuClipper(),
                     child: Container(
-                      color: const Color(0xFFF052BD),
+                      color: accent,
                       child: Stack(
                         clipBehavior: Clip.none,
                         children: [
@@ -2597,7 +2600,7 @@ class _CurvedRadialDrawerScaffoldState
                             right: 12,
                             top: MediaQuery.paddingOf(context).top + 6,
                             child: Material(
-                              color: Colors.white.withValues(alpha: 0.95),
+                              color: onAccent.withValues(alpha: 0.96),
                               shape: const CircleBorder(),
                               child: IconButton(
                                 tooltip: 'Close navigation menu',
@@ -2686,8 +2689,8 @@ class _CurvedRadialDrawerScaffoldState
                     height: 30,
                     decoration: BoxDecoration(
                       color: selected
-                          ? const Color(0xFFFFFFFF)
-                          : Colors.white.withValues(alpha: 0.88),
+                          ? onAccent
+                          : onAccent.withValues(alpha: 0.88),
                       shape: BoxShape.circle,
                       boxShadow: selected
                           ? <BoxShadow>[
@@ -2703,7 +2706,7 @@ class _CurvedRadialDrawerScaffoldState
                       child: ChatyGlyphIcon(
                         glyph: selected ? item.activeIcon : item.icon,
                         size: 15,
-                        color: const Color(0xFFEF4DB7),
+                        color: accent,
                       ),
                     ),
                   ),
@@ -2714,7 +2717,7 @@ class _CurvedRadialDrawerScaffoldState
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white,
+                        color: onAccent,
                         fontSize: 10,
                         fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
                         letterSpacing: 0.35,
