@@ -385,7 +385,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     context: context,
                     theme: theme,
                     colors: context.colors,
-                    accent: theme.accentColor as Color,
+                    accent: theme.accentColor,
                     activeItem: allDestinations[effectiveIndex],
                   ),
                   onSelect: (idx) {
@@ -420,7 +420,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     context: context,
                     theme: theme,
                     colors: context.colors,
-                    accent: theme.accentColor as Color,
+                    accent: theme.accentColor,
                     activeItem: allDestinations[effectiveIndex],
                   ),
                   onSelect: (idx) {
