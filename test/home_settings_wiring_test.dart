@@ -64,7 +64,7 @@ void main() {
         HomePresetNormalizer.navigationMode('Curved Radial Menu'),
         AppNavigationMode.curvedRadialDrawer,
       );
-            expect(
+      expect(
         HomePresetNormalizer.navigationMode('Cards'),
         AppNavigationMode.bottomNav,
       );
