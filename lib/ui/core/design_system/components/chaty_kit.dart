@@ -572,7 +572,7 @@ class _ChatySwipeActionsState extends State<ChatySwipeActions>
     final start = _dragOffset;
     void listener() {
       final t = Curves.easeOutCubic.transform(_snap.value);
-      setState(() => _dragOffset = start + (target - start) * (1 - t));
+      setState(() => _dragOffset = start + (target - start) * t);
     }
 
     _snap
