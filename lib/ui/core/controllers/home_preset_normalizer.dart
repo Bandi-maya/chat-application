@@ -25,13 +25,12 @@ abstract final class HomePresetNormalizer {
 
   /// Resolves the selected Home UI label to the runtime shell mode.
   ///
-  /// Returns null for ambiguous presets such as Expressive, which can represent
-  /// more than one navigation layout. The caller then preserves the runtime mode.
+  /// Resolves both explicit Home UI labels and canonical labels stored by
+  /// older releases, so previously saved selections restore the same layout.
+  /// Unknown/custom presets return null and retain the Template Studio mode.
   static AppNavigationMode? navigationMode(String value) =>
       switch (value.trim().toLowerCase()) {
-        // Resolve explicit labels from the Home UI Style picker. Canonical
-        // list-only presets (Classic/Cards/Compact/etc.) return null so the
-        // existing Template Studio navigation setting remains authoritative.
+        // Explicit labels and their legacy canonical equivalents share a mode.
         'classic' ||
         'whatsapp old ui' ||
         'whatsapp-style top bar' ||
