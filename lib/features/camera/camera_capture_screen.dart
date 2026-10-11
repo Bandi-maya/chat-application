@@ -588,56 +588,62 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
         mainAxisSize: MainAxisSize.min,
         children: [
           if (ready && _captureViewMode == _CaptureViewMode.photo) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Flexible(
-                    child: Text(
-                      _lensManager.selected.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: .15,
+            ValueListenableBuilder<List<FacePose>>(
+              valueListenable: _facePoses,
+              builder: (context, poses, _) {
+                final trackingHealth = _faceSolver.health;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          _lensManager.selected.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: .15,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    width: 5,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: _lensManager.selected.requiresFaceTracking &&
-                              _faceSolver.health == TrackingHealth.tracked
-                          ? const Color(0xFF7CFAAE)
-                          : Colors.white38,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      !_lensManager.selected.requiresFaceTracking
-                          ? 'Swipe to explore'
-                          : switch (_faceSolver.health) {
-                              TrackingHealth.tracked => 'Face locked',
-                              TrackingHealth.temporarilyLost => 'Reacquiring…',
-                              TrackingHealth.lost => 'Find a face',
-                            },
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 11,
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 5,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: _lensManager.selected.requiresFaceTracking &&
+                                  trackingHealth == TrackingHealth.tracked
+                              ? const Color(0xFF7CFAAE)
+                              : Colors.white38,
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          !_lensManager.selected.requiresFaceTracking
+                              ? 'Swipe to explore'
+                              : switch (trackingHealth) {
+                                  TrackingHealth.tracked => 'Face locked',
+                                  TrackingHealth.temporarilyLost => 'Reacquiring…',
+                                  TrackingHealth.lost => 'Find a face',
+                                },
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
             ),
             SizedBox(height: tight ? 1 : 4),
             LensCarousel(manager: _lensManager),
@@ -895,7 +901,10 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
 
   Widget _buildViewfinder() {
     final controller = _controller;
-    return Stack(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _previewViewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+        return Stack(
       fit: StackFit.expand,
       children: [
         switch (_phase) {
@@ -952,7 +961,9 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
             ),
           ),
         _buildTopBar(),
-      ],
+        ],
+        );
+      },
     );
   }
 
