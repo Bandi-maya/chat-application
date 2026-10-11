@@ -666,7 +666,7 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
                 padding: EdgeInsets.symmetric(
-                  horizontal: math.max(8, (screen.width - 52) / 2),
+                  horizontal: math.max(8.0, (screen.width - 52) / 2),
                 ),
                 itemCount: allEffects.length,
                 itemBuilder: (context, index) {
