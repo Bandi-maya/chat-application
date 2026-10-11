@@ -9,6 +9,7 @@ import '../../ui/core/theme/app_theme.dart';
 import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/notification_service.dart';
 import '../../data/services/contact_relationship_service.dart';
+import '../../data/services/call_signaling_service.dart';
 import '../../data/services/rich_chat_realtime_service.dart';
 import '../../domain/models/conversation.dart';
 import '../../injection/locator.dart';
@@ -28,6 +29,7 @@ import '../notifications/notification_permission_sheet.dart';
 import '../search/global_search_screen.dart';
 import '../camera/effects/widgets/effect_picker_sheet.dart';
 import 'chat_detail_screen.dart';
+import '../calls/ongoing_call_screen.dart';
 import '../messages/starred_messages_screen.dart';
 import 'linked_devices_qr_screen.dart';
 import '../profile/profile_screen.dart';
@@ -830,6 +832,26 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         // P4: WhatsApp-iOS swipe actions — Pin, Mute, Archive.
         return ChatySwipeActions(
           backgroundColor: theme.backgroundColor,
+          leadingActions: conversation.type == ConversationType.direct
+              ? <ChatySwipeAction>[
+                  ChatySwipeAction(
+                    icon: Icons.call_rounded,
+                    label: 'Call',
+                    color: context.colors.success,
+                    onTriggered: () {
+                      _startSwipeCall(conversation, isVideo: false);
+                    },
+                  ),
+                  ChatySwipeAction(
+                    icon: Icons.videocam_rounded,
+                    label: 'Video',
+                    color: context.colors.primary,
+                    onTriggered: () {
+                      _startSwipeCall(conversation, isVideo: true);
+                    },
+                  ),
+                ]
+              : const <ChatySwipeAction>[],
           actions: [
             ChatySwipeAction(
               icon: conversation.isPinned
@@ -861,6 +883,66 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         );
       },
     );
+  }
+
+  Future<void> _startSwipeCall(
+    Conversation conversation, {
+    required bool isVideo,
+  }) async {
+    if (conversation.type != ConversationType.direct) return;
+    final currentUserId = widget.dataStore.currentUser.id;
+    final otherId = conversation.participantIds.firstWhere(
+      (id) => id != currentUserId,
+      orElse: () => '',
+    );
+    final contact = otherId.isEmpty ? null : widget.dataStore.getUser(otherId);
+    if (contact == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This contact is not available for calling.')),
+        );
+      }
+      return;
+    }
+
+    try {
+      final status = await _relationships.connectionStatus(contact.id);
+      if (!mounted) return;
+      if (!status.callsAllowed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Calling is unavailable for this connection.'),
+          ),
+        );
+        return;
+      }
+      await locator<CallSignalingService>().initiateCall(
+        remoteUserId: contact.id,
+        remoteDisplayName: contact.displayName.isNotEmpty
+            ? contact.displayName
+            : conversation.title,
+        remoteAvatarInitials: contact.avatarInitials,
+        remoteAvatarColorHex: contact.avatarColorHex,
+        isVideo: isVideo,
+      );
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => OngoingCallScreen(
+            theme: widget.themeController.globalTheme,
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Unable to start ${isVideo ? 'video' : 'voice'} call: ${error.toString().replaceFirst('Exception: ', '')}',
+          ),
+        ),
+      );
+    }
   }
 
   /// 'Tablet Split View' Home Style: on sufficiently wide layouts the
