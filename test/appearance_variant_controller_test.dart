@@ -13,15 +13,15 @@ void main() {
   test(
     'concurrent appearance changes persist without losing independent values',
     () async {
-    final controller = AppearanceVariantController();
+      final controller = AppearanceVariantController();
 
-    await Future.wait(<Future<void>>[
-      controller.setTypographyStyle('Accessibility'),
-      controller.setEntryAnimation('None'),
-      controller.setTypographyStyle('Large UI'),
-    ]);
+      await Future.wait(<Future<void>>[
+        controller.setTypographyStyle('Accessibility'),
+        controller.setEntryAnimation('None'),
+        controller.setTypographyStyle('Large UI'),
+      ]);
 
-    final preferences = await SharedPreferences.getInstance();
+      final preferences = await SharedPreferences.getInstance();
       expect(preferences.getString('appearance.typography'), 'Large UI');
       expect(preferences.getString('appearance.entryAnimation'), 'None');
       expect(controller.typographyStyle, 'Large UI');
