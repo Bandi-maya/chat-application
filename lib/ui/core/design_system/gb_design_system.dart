@@ -1036,7 +1036,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
       decoration: BoxDecoration(
-        color: const _liveTheme.backgroundColor,
+        color: _liveTheme.backgroundColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _liveTheme.cardColor, width: 1.2),
         boxShadow: [
@@ -1054,7 +1054,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
           // Mode Indicator Header Bar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            color: const _liveTheme.surfaceColor,
+            color: _liveTheme.surfaceColor,
             child: Row(
               children: [
                 Container(
@@ -1414,22 +1414,6 @@ class GbLiveHeaderPreview extends StatelessWidget {
     );
   }
 
-  Widget _buildBasicBottomBar() {
-    return Container(
-      height: 44,
-      color: _liveTheme.surfaceColor,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildPreviewTab(Icons.chat_bubble_rounded, 'Chats', selected: true),
-          _buildPreviewTab(Icons.auto_stories_rounded, 'Updates'),
-          _buildPreviewTab(Icons.call_rounded, 'Calls'),
-          _buildPreviewTab(Icons.settings_rounded, 'Settings'),
-        ],
-      ),
-    );
-  }
-
   Widget _buildFloatingRailBottomBar() {
     return Container(
       height: 44,
@@ -1493,7 +1477,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
   Widget _buildOneUiHeader(String title) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-      color: const _liveTheme.surfaceColor,
+      color: _liveTheme.surfaceColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1563,7 +1547,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
   Widget _buildIosHeader(String title) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-      color: const _liveTheme.surfaceColor,
+      color: _liveTheme.surfaceColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1600,7 +1584,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
               height: 32,
               padding: const EdgeInsets.symmetric(horizontal: 10),
               decoration: BoxDecoration(
-                color: const _liveTheme.cardColor,
+                color: _liveTheme.cardColor,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -1624,7 +1608,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
   Widget _buildStockHeader(String title) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-      color: const _liveTheme.backgroundColor,
+      color: _liveTheme.backgroundColor,
       child: Row(
         children: [
           Text(
@@ -1655,7 +1639,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
   Widget _buildBubblesHeader(String title) {
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-      color: const _liveTheme.backgroundColor,
+      color: _liveTheme.backgroundColor,
       child: Column(
         children: [
           Row(
@@ -1700,7 +1684,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
   // --- WhatsApp Old UI Header ---
   Widget _buildOldUiHeader(String title) {
     return Container(
-      color: const _liveTheme.surfaceColor,
+      color: _liveTheme.surfaceColor,
       child: Column(
         children: [
           Padding(
@@ -1756,7 +1740,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
   Widget _buildBasicHeader(String title) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-      color: const _liveTheme.backgroundColor,
+      color: _liveTheme.backgroundColor,
       child: Column(
         children: [
           Row(
@@ -1796,7 +1780,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
   Widget _buildSampleChatRow() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      color: const _liveTheme.backgroundColor,
+      color: _liveTheme.backgroundColor,
       child: Row(
         children: [
           Container(
@@ -1804,7 +1788,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
             height: 44,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: const _liveTheme.cardColor,
+              color: _liveTheme.cardColor,
               border: Border.all(color: _liveTheme.accentColor.withOpacity(0.4), width: 1.5),
             ),
             child: Center(
@@ -1865,7 +1849,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
   Widget _buildOneUiBottomBar() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      color: const _liveTheme.surfaceColor,
+      color: _liveTheme.surfaceColor,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
@@ -1938,7 +1922,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(12, 4, 12, 8),
       padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
       decoration: BoxDecoration(
-        color: const _liveTheme.surfaceColor,
+        color: _liveTheme.surfaceColor,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: _liveTheme.cardColor, width: 1),
       ),
@@ -1971,7 +1955,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
   Widget _buildOldUiBottomBar() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      color: const _liveTheme.surfaceColor,
+      color: _liveTheme.surfaceColor,
       child: Center(
         child: Text(
           'Classic Full-Screen Tab View (Old UI)',
@@ -1985,7 +1969,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
   Widget _buildBasicBottomBar() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      color: const _liveTheme.surfaceColor,
+      color: _liveTheme.surfaceColor,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
@@ -2012,7 +1996,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: isSelected ? _liveTheme.onAccentColor : const _liveTheme.secondaryTextColor,
+              color: isSelected ? _liveTheme.onAccentColor : _liveTheme.secondaryTextColor,
               fontSize: 11,
               fontWeight: FontWeight.bold,
             ),
@@ -2053,7 +2037,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
           child: Text(
             count != null ? '$label ($count)' : label,
             style: TextStyle(
-              color: isSelected ? _liveTheme.accentColor : const _liveTheme.secondaryTextColor,
+              color: isSelected ? _liveTheme.accentColor : _liveTheme.secondaryTextColor,
               fontSize: 11,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
             ),
@@ -2065,7 +2049,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
 
   Widget _buildIosTabItem(IconData icon, String label, {bool isSelected = false, String? badge}) {
     final activeColor = _liveTheme.accentColor;
-    final color = isSelected ? activeColor : const _liveTheme.secondaryTextColor;
+    final color = isSelected ? activeColor : _liveTheme.secondaryTextColor;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -2095,7 +2079,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
   }
 
   Widget _buildStockTabItem(IconData icon, String label, {bool isSelected = false, String? badge}) {
-    final color = isSelected ? _liveTheme.accentColor : const _liveTheme.secondaryTextColor;
+    final color = isSelected ? _liveTheme.accentColor : _liveTheme.secondaryTextColor;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
