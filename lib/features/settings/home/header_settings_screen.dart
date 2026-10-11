@@ -43,19 +43,19 @@ class _HomePreviewCurveClipper extends CustomClipper<Path> {
 
 class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
   static const List<String> _homeUiStyles = [
-    // Legacy Home UI presets — keep these labels for existing saved profiles.
+    // Keep the existing labels, but each now has its own layout implementation.
     'ONE UI',
     'WhatsApp UI Stock',
     'IOS STYLE',
     'BUBBLES TAB STYLE',
     'BASIC TAB STYLE',
     'WhatsApp OLD UI',
-    // Explicit navigation layouts — these select the actual MainNavigationShell.
-    'WhatsApp-style top bar',
     'Floating Rail',
     '3D Perspective Drawer',
     'Modern Side Menu',
     'Curved Radial Menu',
+    'Instagram Style',
+    'Telegram Style',
   ];
 
   static const List<String> _storiesStyles = [
@@ -88,20 +88,21 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
   /// the app shell therefore change together instead of leaving the shell stale.
   AppNavigationMode _navigationModeForHomeUiStyle(String style) {
     switch (style.trim().toLowerCase()) {
-      // Existing presets retain their legacy visual behavior.
+      // Every selector option resolves to a different layout mode.
       case 'one ui':
+        return AppNavigationMode.oneUi;
       case 'whatsapp ui stock':
-      case 'ios style':
         return AppNavigationMode.bottomNav;
+      case 'ios style':
+        return AppNavigationMode.iosStyle;
       case 'bubbles tab style':
         return AppNavigationMode.gestureTabs;
       case 'basic tab style':
-        return AppNavigationMode.compactRail;
+        return AppNavigationMode.basicTabStyle;
       case 'whatsapp old ui':
       case 'whatsapp-style top bar':
       case 'whatsapp style top bar':
         return AppNavigationMode.topWhatsAppBar;
-      // Explicit navigation-shell presets.
       case 'floating rail':
         return AppNavigationMode.floatingIslandRail;
       case '3d perspective drawer':
@@ -110,6 +111,10 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
         return AppNavigationMode.modernSideMenu;
       case 'curved radial menu':
         return AppNavigationMode.curvedRadialDrawer;
+      case 'instagram style':
+        return AppNavigationMode.instagramStyle;
+      case 'telegram style':
+        return AppNavigationMode.telegramStyle;
       default:
         return locator<ThemeController>().navigationMode;
     }
@@ -140,7 +145,12 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
     // For newer shell modes, use the restored runtime mode when the stored
     // Home label came from a previous canonicalization step.
     return switch (locator<ThemeController>().navigationMode) {
-      AppNavigationMode.topWhatsAppBar => 'WhatsApp-style top bar',
+      AppNavigationMode.oneUi => 'ONE UI',
+      AppNavigationMode.iosStyle => 'IOS STYLE',
+      AppNavigationMode.instagramStyle => 'Instagram Style',
+      AppNavigationMode.telegramStyle => 'Telegram Style',
+      AppNavigationMode.basicTabStyle => 'BASIC TAB STYLE',
+      AppNavigationMode.topWhatsAppBar => 'WhatsApp OLD UI',
       AppNavigationMode.floatingIslandRail => 'Floating Rail',
       AppNavigationMode.perspective3DDrawer => '3D Perspective Drawer',
       AppNavigationMode.modernSideMenu => 'Modern Side Menu',
@@ -152,17 +162,18 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
   }
 
   String _homeUiStyleDescription(String style) => switch (style) {
-    'ONE UI' => 'Spacious header and card-like chat rows',
-    'WhatsApp UI Stock' => 'Standard WhatsApp-style conversation list',
-    'IOS STYLE' => 'Stories-first header with roomy spacing',
-    'BUBBLES TAB STYLE' => 'Gesture-first page navigation',
-    'BASIC TAB STYLE' => 'Compact navigation rail',
-    'WhatsApp OLD UI' => 'Classic top tabs aligned with the header',
-    'WhatsApp-style top bar' => 'Tabs below the current app header',
+    'ONE UI' => 'Large title, spacious rows, and One UI bottom navigation',
+    'WhatsApp UI Stock' => 'Classic conversation rows with a standard bottom bar',
+    'IOS STYLE' => 'Minimal iOS-inspired icon dock and airy stories header',
+    'BUBBLES TAB STYLE' => 'Swipe-first pages with circular bubble destinations',
+    'BASIC TAB STYLE' => 'Compact square icon-and-label tabs',
+    'WhatsApp OLD UI' => 'Classic WhatsApp top tabs aligned with the header',
     'Floating Rail' => 'Floating vertical icon rail',
-    '3D Perspective Drawer' => 'Rotated foreground screen and side drawer',
+    '3D Perspective Drawer' => 'Perspective-shifted content with a side drawer',
     'Modern Side Menu' => 'Labeled side drawer with identity header',
-    'Curved Radial Menu' => 'Curved accent panel with a diagonal icon rail',
+    'Curved Radial Menu' => 'Circular icon positions inside a themed curved menu',
+    'Instagram Style' => 'Clean icon-only bottom dock with creator-style hierarchy',
+    'Telegram Style' => 'Compact labeled navigation dock inspired by Telegram',
     _ => 'Home layout and navigation preview',
   };
 
