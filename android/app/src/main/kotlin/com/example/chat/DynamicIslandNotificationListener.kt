@@ -132,7 +132,19 @@ internal object IslandOverlay {
         dismissRunnable?.let(main::removeCallbacks)
         windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         render(context)
-        val timeout = if (isCall) 12000L else 5500L
+        scheduleDismiss(context, isExpanded = false)
+    }
+
+    private fun scheduleDismiss(context: Context, isExpanded: Boolean) {
+        dismissRunnable?.let(main::removeCallbacks)
+        // A collapsed notification is transient. Once the user expands it,
+        // give them enough time to read and use the available actions.
+        val timeout = when {
+            latestCall && isExpanded -> 30000L
+            latestCall -> 12000L
+            isExpanded -> 15000L
+            else -> 5500L
+        }
         dismissRunnable = Runnable { remove() }
         main.postDelayed(dismissRunnable!!, timeout)
     }
@@ -234,6 +246,7 @@ internal object IslandOverlay {
             if (!expanded) {
                 expanded = true
                 render(context)
+                scheduleDismiss(context, isExpanded = true)
             } else {
                 runCatching { latestPendingIntent?.send() }
                 remove()
