@@ -86,6 +86,8 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
   bool _isSearchOpen = false;
   // P4 large-title collapse: 0 = fully expanded, 1 = fully collapsed.
   double _largeTitleCollapse = 0;
+  Timer? _secretSearchTimer;
+  int _secretSearchGeneration = 0;
 
   double get _effectiveTitleCollapse =>
       (_isSelectionMode || _isSearchOpen) ? 1.0 : _largeTitleCollapse;
@@ -139,6 +141,8 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
 
   @override
   void dispose() {
+    _secretSearchTimer?.cancel();
+    _secretSearchGeneration++;
     _searchCtrl.dispose();
     _searchFocus.dispose();
     super.dispose();
@@ -210,15 +214,42 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     );
   }
 
-  Future<void> _checkSecretSearchPhrase(String query) async {
-    if (query.isEmpty) return;
-    final lockService = locator<LocalLockService>();
-    final isMatch = await lockService.verifySecretPhrase(query);
-    if (isMatch && mounted) {
+  void _checkSecretSearchPhrase(String query) {
+    _secretSearchTimer?.cancel();
+    final generation = ++_secretSearchGeneration;
+    final security = widget.preferencesController.security;
+
+    // Secret-code entry is opt-in. Avoid running the expensive PBKDF2 check
+    // for every keystroke or when there are no hidden conversations to reveal.
+    if (query.trim().isEmpty ||
+        !security.entryBySecretPhrase ||
+        security.hiddenConversationIds.isEmpty) {
+      return;
+    }
+
+    _secretSearchTimer = Timer(const Duration(milliseconds: 350), () async {
+      final lockService = locator<LocalLockService>();
+      final isMatch = await lockService.verifySecretPhrase(query);
+      if (!isMatch ||
+          !mounted ||
+          generation != _secretSearchGeneration ||
+          _searchCtrl.text != query ||
+          !widget.preferencesController.security.entryBySecretPhrase) {
+        return;
+      }
+
+      _secretSearchTimer?.cancel();
       _searchCtrl.clear();
       setState(() => _isSearchOpen = false);
-      _openLockedChatsVault();
-    }
+      _searchFocus.unfocus();
+      LockedChatsScreen.open(
+        context,
+        dataStore: widget.dataStore,
+        preferencesController: widget.preferencesController,
+        themeController: widget.themeController,
+        secretCodeVerified: true,
+      );
+    });
   }
 
   void _handleConversationTap(Conversation conversation) async {
@@ -284,14 +315,29 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     _clearSelection();
   }
 
-  void _toggleLockSelected() {
+  Future<void> _toggleLockSelected() async {
     final ids = List<String>.from(_selectedConversationIds);
-    final lock = ids.any(
+    if (ids.isEmpty) return;
+    final shouldLock = ids.any(
       (id) => !widget.preferencesController.isConversationLocked(id),
     );
-    for (final id in ids)
-      widget.preferencesController.toggleLockConversation(id, lock: lock);
-    _clearSelection();
+
+    // Locking is a user-initiated preference change. Removing protection is
+    // sensitive and must be authenticated before any selected item is changed.
+    if (!shouldLock) {
+      final authorized = await ProtectedResourceGate.authorizeGeneralAction(
+        context,
+        preferencesController: widget.preferencesController,
+        title: 'Unlock selected chats',
+        reason: 'Authenticate to remove chat protection',
+      );
+      if (!authorized || !mounted) return;
+    }
+
+    for (final id in ids) {
+      widget.preferencesController.toggleLockConversation(id, lock: shouldLock);
+    }
+    if (mounted) _clearSelection();
   }
 
   void _markSelectedReadUnread({required bool markAsUnread}) {
