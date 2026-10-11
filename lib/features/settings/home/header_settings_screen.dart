@@ -847,10 +847,13 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                                                         children: [
                                                           SizedBox(
                                                             width: 100,
-                                                            child: _buildHomeUiPreview(
-                                                              option,
-                                                              theme,
-                                                              large: false,
+                                                            child: ListenableBuilder(
+                                                              listenable: locator<ThemeController>(),
+                                                              builder: (context, _) => _buildHomeUiPreview(
+                                                                option,
+                                                                locator<ThemeController>().globalTheme,
+                                                                large: false,
+                                                              ),
                                                             ),
                                                           ),
                                                           const SizedBox(width: 12),
