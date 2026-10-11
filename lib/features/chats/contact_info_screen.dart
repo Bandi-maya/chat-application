@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/contact_relationship_service.dart';
 import '../../data/services/rich_chat_realtime_service.dart';
+import '../../data/services/protected_resource_gate.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/contact_relationship.dart';
 import '../../domain/models/conversation.dart';
@@ -36,17 +37,117 @@ class ContactInfoScreen extends StatefulWidget {
   State<ContactInfoScreen> createState() => _ContactInfoScreenState();
 }
 
-class _ContactInfoScreenState extends State<ContactInfoScreen> {
+class _ContactInfoScreenState extends State<ContactInfoScreen>
+    with WidgetsBindingObserver {
   ContactConnectionStatus _connection = const ContactConnectionStatus();
   bool _blocked = false;
   bool _loading = true;
   bool _busy = false;
   String? _error;
+  bool _accessAuthorized = false;
+  bool _authorizing = false;
+  bool _accessDenied = false;
+  bool _appIsResumed = true;
+  bool _accessCheckStarted = false;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    WidgetsBinding.instance.addObserver(this);
+    unawaited(_authorizeBeforeLoading());
+  }
+
+  Future<void> _authorizeBeforeLoading({bool isResume = false}) async {
+    if (_authorizing || (_accessCheckStarted && !isResume)) return;
+    if (!isResume) _accessCheckStarted = true;
+    _authorizing = true;
+    bool authorized;
+    try {
+      authorized = await ProtectedResourceGate.authorizeConversation(
+        context,
+        conversationId: widget.conversation.id,
+        preferencesController: widget.preferencesController,
+        title: 'Protected Contact Details',
+        reason: 'Authenticate to view this conversation’s contact details',
+      );
+    } catch (_) {
+      authorized = false;
+    } finally {
+      _authorizing = false;
+    }
+    if (!mounted) return;
+    if (!authorized) {
+      _accessDenied = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            ModalRoute.of(context)?.isCurrent == true &&
+            Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+      });
+      return;
+    }
+    _accessDenied = false;
+    setState(() => _accessAuthorized = true);
+    await _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_appIsResumed ||
+        !_accessCheckStarted ||
+        _accessAuthorized ||
+        _authorizing ||
+        _accessDenied ||
+        !widget.preferencesController.isConversationProtected(
+          widget.conversation.id,
+        )) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted &&
+          _appIsResumed &&
+          !_accessAuthorized &&
+          !_authorizing &&
+          !_accessDenied &&
+          ModalRoute.of(context)?.isCurrent == true &&
+          widget.preferencesController.isConversationProtected(
+            widget.conversation.id,
+          )) {
+        unawaited(_authorizeBeforeLoading(isResume: true));
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _appIsResumed = false;
+      if (_accessAuthorized &&
+          widget.preferencesController.isConversationProtected(
+            widget.conversation.id,
+          )) {
+        ProtectedResourceGate.invalidateConversationSession(
+          widget.conversation.id,
+        );
+        setState(() => _accessAuthorized = false);
+      }
+      return;
+    }
+    if (state == AppLifecycleState.resumed) {
+      _appIsResumed = true;
+      if (!_accessAuthorized &&
+          !_authorizing &&
+          !_accessDenied &&
+          ModalRoute.of(context)?.isCurrent == true &&
+          widget.preferencesController.isConversationProtected(
+            widget.conversation.id,
+          )) {
+        unawaited(_authorizeBeforeLoading(isResume: true));
+      }
+    }
   }
 
   Future<void> _load() async {
@@ -192,7 +293,34 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
   }
 
   @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (!_accessAuthorized) {
+      return Scaffold(
+        backgroundColor: widget.theme.backgroundColor,
+        appBar: AppBar(
+          backgroundColor: widget.theme.backgroundColor,
+          foregroundColor: widget.theme.primaryTextColor,
+          leading: const ChatyBackButton(),
+          title: const Text('Protected contact'),
+        ),
+        body: const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(strokeWidth: 2.2),
+              SizedBox(height: 14),
+              Text('Verifying access…'),
+            ],
+          ),
+        ),
+      );
+    }
     final media = _media;
     final documents = _documents;
     final links = _links;
