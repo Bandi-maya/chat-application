@@ -1320,6 +1320,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
           theme: _theme,
           dataStore: widget.dataStore,
           conversation: conversation,
+          preferencesController: widget.preferencesController,
           contact: contact,
           relationshipService: _relationships,
           realtimeService: _realtime,
@@ -2324,6 +2325,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => MediaViewerScreen(
+          conversationId: widget.conversationId,
+          preferencesController: widget.preferencesController,
           title: attachment.name,
           type: attachment.type,
           size: attachment.size,
@@ -2970,6 +2973,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
                 : () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => MediaViewerScreen(
+                        conversationId: widget.conversationId,
+                        preferencesController: widget.preferencesController,
                         title: message.attachment!.name,
                         type: message.attachment!.type,
                         size: message.attachment!.size,
