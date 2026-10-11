@@ -721,9 +721,9 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
           appBar: AppBar(
             backgroundColor: colors.background,
             elevation: 0,
-            leading: IconButton(
-              icon: Icon(Icons.arrow_back, color: colors.foreground),
-              onPressed: () => Navigator.of(context).pop(),
+            leading: const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: ChatyBackButton(),
             ),
             title: Text(
               'Header',
