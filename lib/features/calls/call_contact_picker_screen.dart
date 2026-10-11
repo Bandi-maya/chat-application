@@ -183,43 +183,50 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
   }) {
     final colors = context.colors;
     return Material(
-      color: Colors.transparent,
+      color: colors.surfaceSecondary.withValues(alpha: 0.5),
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(36),
+        customBorder: const CircleBorder(),
         onTap: onPressed ?? () => _appendDigit(digit),
         onLongPress: onLongPress,
-        child: SizedBox.expand(
+        child: Center(
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
                 digit,
                 style: TextStyle(
                   color: colors.foreground,
-                  fontSize: 28,
+                  fontSize: 27,
                   height: 1.05,
                   fontWeight: FontWeight.w400,
+                  letterSpacing: -0.2,
                 ),
               ),
-              const SizedBox(height: 2),
               if (digit == '1')
-                Icon(
-                  Icons.voicemail_rounded,
-                  size: 13,
-                  color: colors.foregroundSecondary,
-                )
-              else if (subtitle.isNotEmpty)
-                Text(
-                  subtitle,
-                  style: TextStyle(
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Icon(
+                    Icons.voicemail_rounded,
+                    size: 13,
                     color: colors.foregroundSecondary,
-                    fontSize: 9.5,
-                    letterSpacing: 1.4,
-                    fontWeight: FontWeight.w600,
                   ),
                 )
-              else
-                const SizedBox(height: 12),
+              else if (subtitle.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: colors.foregroundSecondary,
+                      fontSize: 9.5,
+                      letterSpacing: 1.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -265,8 +272,8 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
       ('*', ''), ('0', '+'), ('#', ''),
     ];
     return AnimatedSize(
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOutCubic,
+      duration: ChatyMotion.standard,
+      curve: ChatyMotion.enter,
       child: _isKeypadCollapsed
           ? const SizedBox.shrink()
           : Container(
@@ -282,7 +289,7 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
                   ),
                 ],
               ),
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
+              padding: const EdgeInsets.fromLTRB(28, 16, 28, 16),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -292,9 +299,9 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
                     itemCount: keys.length,
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 3,
-                      mainAxisExtent: 64,
-                      mainAxisSpacing: 6,
-                      crossAxisSpacing: 16,
+                      mainAxisExtent: 68,
+                      mainAxisSpacing: 10,
+                      crossAxisSpacing: 24,
                     ),
                     itemBuilder: (context, index) {
                       final (digit, subtitle) = keys[index];

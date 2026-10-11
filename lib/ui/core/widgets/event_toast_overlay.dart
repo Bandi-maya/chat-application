@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../data/services/notification_service.dart';
 import '../controllers/preferences_controller.dart';
+import '../design_system/chaty_motion.dart';
 import '../theme/app_theme.dart';
 import '../notifications/notification_icon_preset.dart';
 
@@ -169,8 +170,8 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
         }
       },
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 360),
-        curve: Curves.easeOutCubic,
+        duration: ChatyMotion.duration(context, preferred: const Duration(milliseconds: 260)),
+        curve: ChatyMotion.curve(context, preferred: ChatyMotion.springSnappy),
         width: expanded ? (MediaQuery.sizeOf(context).width - 36).clamp(260.0, 390.0).toDouble() : 174.0,
         constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width - 28),
         padding: EdgeInsets.symmetric(horizontal: expanded ? 16 : 13, vertical: expanded ? 13 : 9),
@@ -183,8 +184,8 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
           ],
         ),
         child: AnimatedSize(
-          duration: const Duration(milliseconds: 320),
-          curve: Curves.easeOutCubic,
+          duration: ChatyMotion.duration(context, preferred: const Duration(milliseconds: 240)),
+          curve: ChatyMotion.curve(context, preferred: ChatyMotion.springSnappy),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
