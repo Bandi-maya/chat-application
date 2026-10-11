@@ -434,7 +434,60 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 );
               }
 
-              // 6. STANDARD BOTTOM NAVIGATION / GESTURE TABS / ADAPTIVE RAIL
+              // Dedicated visual systems for the named Home UI choices.
+              // All keep the same destinations and screen state; only navigation
+              // presentation changes.
+              if ({
+                AppNavigationMode.oneUi,
+                AppNavigationMode.iosStyle,
+                AppNavigationMode.instagramStyle,
+                AppNavigationMode.telegramStyle,
+                AppNavigationMode.basicTabStyle,
+                AppNavigationMode.gestureTabs,
+              }.contains(navMode)) {
+                final Widget presetContent = navMode == AppNavigationMode.gestureTabs
+                    ? PageView(
+                        controller: _pageController,
+                        physics: const BouncingScrollPhysics(),
+                        onPageChanged: (idx) {
+                          if (idx >= 0 &&
+                              idx < allDestinations.length &&
+                              (_currentIndex != idx ||
+                                  _currentDestinationId != allDestinations[idx].id)) {
+                            setState(() {
+                              _currentIndex = idx;
+                              _currentDestinationId = allDestinations[idx].id;
+                            });
+                          }
+                        },
+                        children: screens,
+                      )
+                    : IndexedStack(index: effectiveIndex, children: screens);
+                return _buildPresetNavigationShell(
+                  mode: navMode,
+                  theme: theme,
+                  content: presetContent,
+                  navItems: allDestinations,
+                  selectedIndex: effectiveIndex,
+                  floatingActionButton: _buildContextualFab(
+                    context: context,
+                    theme: theme,
+                    colors: context.colors,
+                    accent: theme.accentColor,
+                    activeItem: allDestinations[effectiveIndex],
+                  ),
+                  onDestinationTap: (idx) {
+                    if (idx >= 0 && idx < allDestinations.length) {
+                      _selectRootDestination(
+                        idx,
+                        destinationId: allDestinations[idx].id,
+                      );
+                    }
+                  },
+                );
+              }
+
+              // 7. STANDARD BOTTOM NAVIGATION / ADAPTIVE RAIL
               final layoutMode = themeController.layoutMode;
               final useRail =
                   constraints.maxWidth >= 600 &&
@@ -1013,6 +1066,258 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             VerticalDivider(width: 1, color: theme.cardColor),
             Expanded(child: content),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPresetNavigationShell({
+    required AppNavigationMode mode,
+    required dynamic theme,
+    required Widget content,
+    required List<_NavDestinationItem> navItems,
+    required int selectedIndex,
+    required Widget? floatingActionButton,
+    required ValueChanged<int> onDestinationTap,
+  }) {
+    final colors = context.colors;
+    final accent = theme.accentColor as Color;
+    final foreground = theme.primaryTextColor as Color;
+    final secondary = theme.secondaryTextColor as Color;
+    final isDark = theme.brightness == Brightness.dark;
+    final isInstagram = mode == AppNavigationMode.instagramStyle;
+    final isIos = mode == AppNavigationMode.iosStyle;
+    final isOneUi = mode == AppNavigationMode.oneUi;
+    final isTelegram = mode == AppNavigationMode.telegramStyle;
+    final isBubbles = mode == AppNavigationMode.gestureTabs;
+    final isBasic = mode == AppNavigationMode.basicTabStyle;
+    final barHeight = isInstagram
+        ? 54.0
+        : isBasic
+            ? 52.0
+            : isIos
+                ? 70.0
+                : isBubbles
+                    ? 68.0
+                    : 72.0;
+    final horizontalPadding = isIos ? 10.0 : 0.0;
+    final itemWidth = isInstagram
+        ? 58.0
+        : isBasic
+            ? 76.0
+            : isTelegram
+                ? 82.0
+                : isOneUi
+                    ? 88.0
+                    : isBubbles
+                        ? 76.0
+                        : 80.0;
+    final dockBackground = isIos
+        ? colors.surface.withValues(alpha: isDark ? 0.96 : 0.93)
+        : isTelegram
+            ? colors.surfaceElevated
+            : colors.surface;
+    final dockDecoration = BoxDecoration(
+      color: dockBackground,
+      border: Border(
+        top: BorderSide(
+          color: colors.borderSubtle,
+          width: isInstagram ? 0.7 : 1.0,
+        ),
+        bottom: isIos
+            ? BorderSide(color: colors.borderSubtle, width: 0.7)
+            : BorderSide.none,
+      ),
+      boxShadow: isIos
+          ? <BoxShadow>[
+              BoxShadow(
+                color: colors.shadow,
+                blurRadius: 14,
+                offset: const Offset(0, -3),
+              ),
+            ]
+          : null,
+    );
+
+    return Scaffold(
+      backgroundColor: theme.backgroundColor,
+      body: content,
+      floatingActionButton: floatingActionButton,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+          child: Container(
+            height: barHeight,
+            decoration: dockDecoration,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: List<Widget>.generate(navItems.length, (index) {
+                  final item = navItems[index];
+                  final selected = index == selectedIndex;
+                  final icon = selected ? item.activeIcon : item.icon;
+                  final useCircle = isIos || isBubbles;
+                  final activeIcon = Container(
+                    width: isBubbles ? 34 : 32,
+                    height: isBubbles ? 34 : 32,
+                    alignment: Alignment.center,
+                    decoration: useCircle
+                        ? BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: selected
+                                ? accent.withValues(alpha: isIos ? 0.18 : 0.22)
+                                : Colors.transparent,
+                            border: Border.all(
+                              color: selected
+                                  ? accent
+                                  : colors.borderSubtle,
+                              width: selected ? 1.3 : 0.7,
+                            ),
+                          )
+                        : BoxDecoration(
+                            color: selected && (isOneUi || isTelegram)
+                                ? accent.withValues(alpha: 0.13)
+                                : Colors.transparent,
+                            border: isBasic && selected
+                                ? Border(
+                                    top: BorderSide(color: accent, width: 2.0),
+                                  )
+                                : null,
+                          ),
+                    child: Center(
+                      child: ChatyGlyphIcon(
+                        glyph: icon,
+                        size: isInstagram ? 23 : (isBasic ? 19 : 21),
+                        color: selected ? accent : secondary,
+                      ),
+                    ),
+                  );
+
+                  return Semantics(
+                    button: true,
+                    selected: selected,
+                    label: item.label,
+                    child: Tooltip(
+                      message: item.label,
+                      child: InkWell(
+                        onTap: () => onDestinationTap(index),
+                        child: SizedBox(
+                          width: itemWidth,
+                          height: barHeight,
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isBasic ? 2 : 4,
+                              vertical: isInstagram ? 0 : 4,
+                            ),
+                            child: isInstagram
+                                ? Center(
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 5),
+                                      decoration: BoxDecoration(
+                                        border: Border(
+                                          top: BorderSide(
+                                            color: selected
+                                                ? accent
+                                                : Colors.transparent,
+                                            width: 2,
+                                          ),
+                                        ),
+                                      ),
+                                      child: ChatyGlyphIcon(
+                                        glyph: icon,
+                                        size: 23,
+                                        color: selected ? foreground : secondary,
+                                      ),
+                                    ),
+                                  )
+                                : isBasic
+                                    ? Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          ChatyGlyphIcon(
+                                            glyph: icon,
+                                            size: 18,
+                                            color: selected ? accent : secondary,
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            item.label,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: selected ? foreground : secondary,
+                                              fontSize: 9.5,
+                                              fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    : Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (isOneUi)
+                                            Container(
+                                              width: selected ? 22 : 0,
+                                              height: 2,
+                                              color: selected ? accent : Colors.transparent,
+                                            ),
+                                          isTelegram
+                                              ? activeIcon
+                                              : useCircle
+                                                  ? activeIcon
+                                                  : Container(
+                                                      width: itemWidth - 8,
+                                                      height: 34,
+                                                      decoration: BoxDecoration(
+                                                        color: selected && isOneUi
+                                                            ? accent.withValues(alpha: 0.13)
+                                                            : Colors.transparent,
+                                                        border: isBasic && selected
+                                                            ? Border(
+                                                                top: BorderSide(color: accent, width: 2),
+                                                              )
+                                                            : null,
+                                                      ),
+                                                      alignment: Alignment.center,
+                                                      child: ChatyGlyphIcon(
+                                                        glyph: icon,
+                                                        size: 20,
+                                                        color: selected ? accent : secondary,
+                                                      ),
+                                                    ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            item.label,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: selected ? foreground : secondary,
+                                              fontSize: isBubbles ? 9 : 10,
+                                              fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                                            ),
+                                          ),
+                                          if (isTelegram)
+                                            Container(
+                                              width: selected ? 16 : 0,
+                                              height: 2,
+                                              color: selected ? accent : Colors.transparent,
+                                            ),
+                                        ],
+                                      ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ),
         ),
       ),
     );
