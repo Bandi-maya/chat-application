@@ -86,11 +86,11 @@ void main() {
         HomePresetNormalizer.navigationMode('Curved Radial Menu'),
         AppNavigationMode.curvedRadialDrawer,
       );
-      expect(HomePresetNormalizer.navigationMode('Cards'), isNull);
-      expect(HomePresetNormalizer.navigationMode('Classic'), isNull);
-      expect(HomePresetNormalizer.navigationMode('Stories First'), isNull);
-      expect(HomePresetNormalizer.navigationMode('Compact'), isNull);
-      expect(HomePresetNormalizer.navigationMode('Productivity'), isNull);
+      expect(HomePresetNormalizer.navigationMode('Cards'), AppNavigationMode.oneUi);
+      expect(HomePresetNormalizer.navigationMode('Classic'), AppNavigationMode.topWhatsAppBar);
+      expect(HomePresetNormalizer.navigationMode('Stories First'), AppNavigationMode.iosStyle);
+      expect(HomePresetNormalizer.navigationMode('Compact'), AppNavigationMode.gestureTabs);
+      expect(HomePresetNormalizer.navigationMode('Productivity'), AppNavigationMode.basicTabStyle);
       expect(
         HomePresetNormalizer.navigationMode('Tablet Split View'),
         isNull,
