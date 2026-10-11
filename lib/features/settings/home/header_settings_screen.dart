@@ -183,6 +183,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
     final scale = large ? 1.0 : 0.55;
     final previewWidth = large ? double.infinity : 100.0;
     final previewHeight = large ? 112.0 : 62.0;
+    final topTabs = mode == AppNavigationMode.topWhatsAppBar;
     final rail = mode == AppNavigationMode.floatingIslandRail;
     final showBottomDock = !rail &&
         mode != AppNavigationMode.perspective3DDrawer &&
@@ -192,7 +193,6 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
     final sideDrawer = mode == AppNavigationMode.perspective3DDrawer ||
         mode == AppNavigationMode.modernSideMenu ||
         mode == AppNavigationMode.curvedRadialDrawer;
-    final topTabs = mode == AppNavigationMode.topWhatsAppBar;
 
     return Container(
       key: key,
