@@ -57,6 +57,8 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
   // Pattern states
   String? _firstPatternDrawn;
   String? _confirmPatternDrawn;
+  int _patternGridSize = 3;
+  int _currentPatternGridSize = 3;
   final GlobalKey<PatternLockPadState> _padKey =
       GlobalKey<PatternLockPadState>();
 
@@ -71,6 +73,7 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
     super.initState();
     _initPinControllers();
     _checkExistingSecret();
+    _loadPatternGridSize();
   }
 
   void _initPinControllers() {
@@ -78,6 +81,15 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
       _pinControllers.add(TextEditingController());
       _pinFocusNodes.add(FocusNode());
     }
+  }
+
+  Future<void> _loadPatternGridSize() async {
+    final size = await widget.lockService.getPatternGridSize();
+    if (!mounted) return;
+    setState(() {
+      _patternGridSize = size;
+      _currentPatternGridSize = size;
+    });
   }
 
   Future<void> _checkExistingSecret() async {
@@ -221,6 +233,7 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
         widget.method,
         secret,
         pinLength: _isPin ? widget.pinLength : null,
+        patternGridSize: _isPattern ? _patternGridSize : null,
       );
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
@@ -236,8 +249,12 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
   // --- Pattern Flow ---
   void _onPatternComplete(String pattern) {
     final nodes = pattern.split('-').where((v) => v.isNotEmpty).toList();
-    if (nodes.length < 4) {
-      setState(() => _error = 'Connect at least 4 dots.');
+    final gridSize = _currentStep == StepState.enterCurrent
+        ? _currentPatternGridSize
+        : _patternGridSize;
+    if (nodes.length < 4 ||
+        nodes.any((node) => (int.tryParse(node) ?? gridSize * gridSize) >= gridSize * gridSize)) {
+      setState(() => _error = 'Connect at least 4 unique dots on the selected grid.');
       return;
     }
 
@@ -358,7 +375,7 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
       case StepState.enterNew:
         if (_isPin) return 'Choose a ${widget.pinLength}-digit PIN code.';
         if (_isPattern)
-          return 'Draw an unlock pattern connecting at least 4 dots.';
+          return 'Choose a 3×3 or 4×4 grid, then connect at least 4 unique dots.';
         if (_isPassword) return 'Enter a password (min 6 characters).';
         return 'Choose your credential.';
       case StepState.confirmNew:
@@ -492,6 +509,31 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
               const SizedBox(height: 16),
             ],
             if (_isPattern) ...[
+              if (_currentStep != StepState.enterCurrent) ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Pattern grid', style: theme.textTheme.labelLarge),
+                ),
+                const SizedBox(height: 8),
+                SegmentedButton<int>(
+                  segments: const [
+                    ButtonSegment<int>(value: 3, label: Text('3 × 3')),
+                    ButtonSegment<int>(value: 4, label: Text('4 × 4')),
+                  ],
+                  selected: <int>{_patternGridSize},
+                  onSelectionChanged: _busy ? null : (values) {
+                    if (values.isEmpty || values.first == _patternGridSize) return;
+                    setState(() {
+                      _patternGridSize = values.first;
+                      _firstPatternDrawn = null;
+                      _confirmPatternDrawn = null;
+                      _error = '';
+                    });
+                    _padKey.currentState?.reset();
+                  },
+                ),
+                const SizedBox(height: 12),
+              ],
               Center(
                 child: IgnorePointer(
                   ignoring: _busy,
