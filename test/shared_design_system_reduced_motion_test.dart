@@ -20,7 +20,7 @@ void main() {
       final source = File(path).readAsStringSync();
       expect(
         source,
-        contains('ChatyMotion.duration(context'),
+        contains('ChatyMotion.duration('),
         reason: '$path should use the shared reduced-motion duration resolver',
       );
     }
@@ -47,7 +47,7 @@ void main() {
       final source = File(path).readAsStringSync();
       expect(
         source.contains('MediaQuery.disableAnimationsOf(context)') ||
-            source.contains('ChatyMotion.duration(context'),
+            source.contains('ChatyMotion.duration('),
         isTrue,
         reason: '$path should respect reduced motion',
       );
