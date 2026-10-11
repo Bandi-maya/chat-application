@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:camera/camera.dart';
@@ -13,11 +14,33 @@ import '../../ui/core/design_system/chaty_haptics.dart';
 import 'effects/effect_engine.dart';
 import 'effects/effect_model.dart';
 import 'effects/effect_registry.dart';
+import 'lens/camera_face_detection_bridge.dart';
+import 'lens/face_tracker.dart';
+import 'lens/lens_carousel.dart';
+import 'lens/lens_definition.dart';
+import 'lens/lens_manager.dart';
+import 'lens/lens_overlay.dart';
 
 /// What the caller wants to do with the capture. Drives the confirm-pane
 /// caption copy and whether the chosen look is returned as metadata (chat)
 /// or baked into the pixels (stories, which carry no metadata column).
 enum ChatyCaptureMode { chat, story }
+
+enum _CaptureViewMode { photo, document }
+
+const ChatyCameraEffect _documentScanEffect = ChatyCameraEffect(
+  id: 'document_scan',
+  name: 'Document Scan',
+  category: EffectCategory.color,
+  icon: Icons.document_scanner_rounded,
+  previewColor: Color(0xFFCBD5E1),
+  colorMatrix: [
+    0.48, 0.94, 0.08, 0.0, -45.0,
+    0.48, 0.94, 0.08, 0.0, -45.0,
+    0.48, 0.94, 0.08, 0.0, -45.0,
+    0.0, 0.0, 0.0, 1.0, 0.0,
+  ],
+);
 
 class ChatyCaptureResult {
   const ChatyCaptureResult({
@@ -77,6 +100,11 @@ class ChatyCameraCaptureScreen extends StatefulWidget {
 class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
     with WidgetsBindingObserver {
   final EffectEngine _engine = EffectEngine();
+  final LensManager _lensManager = LensManager();
+  final FaceAnchorSolver _faceSolver = FaceAnchorSolver();
+  final CameraFaceDetectionBridge _faceDetection = CameraFaceDetectionBridge();
+  final ValueNotifier<List<FacePose>> _facePoses =
+      ValueNotifier<List<FacePose>>(const <FacePose>[]);
 
   CameraController? _controller;
   _CameraPhase _phase = _CameraPhase.initializing;
@@ -84,6 +112,13 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
   bool _flashOn = false;
   bool _effectsOpen = false;
   bool _capturing = false;
+  _CaptureViewMode _captureViewMode = _CaptureViewMode.photo;
+  bool _processingFaceFrame = false;
+  int _lastFaceFrameMs = 0;
+
+  bool get _wantsFaceTracking =>
+      _captureViewMode == _CaptureViewMode.photo &&
+      _lensManager.selected.requiresFaceTracking;
 
   bool _switchingCamera = false;
 
@@ -95,6 +130,7 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _lensManager.addListener(_onLensManagerChanged);
     unawaited(_bootstrap());
   }
 
@@ -143,7 +179,7 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
       description,
       ResolutionPreset.high,
       enableAudio: false,
-      imageFormatGroup: ImageFormatGroup.jpeg,
+      imageFormatGroup: ImageFormatGroup.yuv420,
     );
     try {
       await controller.initialize();
@@ -162,6 +198,7 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
         if (mounted) setState(() => _flashOn = false);
       }
       setState(() => _phase = _CameraPhase.ready);
+      unawaited(_syncFaceDetectionStream());
     } on CameraException catch (error) {
       await controller.dispose();
       if (!mounted) return;
@@ -192,9 +229,127 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
     WidgetsBinding.instance.removeObserver(this);
     _captionCtrl.dispose();
     _captionFocus.dispose();
+    _lensManager.removeListener(_onLensManagerChanged);
+    _lensManager.dispose();
+    _facePoses.dispose();
     unawaited(_controller?.dispose());
     _engine.dispose();
     super.dispose();
+  }
+
+
+  void _onLensManagerChanged() {
+    if (mounted) setState(() {});
+    if (!_wantsFaceTracking) {
+      _faceSolver.reset();
+      _facePoses.value = const <FacePose>[];
+    }
+    unawaited(_syncFaceDetectionStream());
+  }
+
+  Future<void> _syncFaceDetectionStream() async {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) return;
+    try {
+      if (_wantsFaceTracking) {
+        if (!controller.value.isStreamingImages) {
+          await controller.startImageStream((image) {
+            unawaited(_processFaceFrame(image, controller));
+          });
+        }
+      } else {
+        if (controller.value.isStreamingImages) {
+          await controller.stopImageStream();
+        }
+        _faceSolver.reset();
+        _facePoses.value = const <FacePose>[];
+      }
+    } on CameraException {
+      // The camera must remain usable even when this device/plugin cannot
+      // provide a YUV image stream.
+      _faceSolver.reset();
+      _facePoses.value = const <FacePose>[];
+    }
+  }
+
+  Future<void> _processFaceFrame(
+    CameraImage image,
+    CameraController sourceController,
+  ) async {
+    if (!_wantsFaceTracking || _processingFaceFrame) return;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    if (nowMs - _lastFaceFrameMs < 90) return;
+    _lastFaceFrameMs = nowMs;
+    _processingFaceFrame = true;
+    try {
+      final detection = await _faceDetection.detect(
+        image,
+        sensorOrientation: sourceController.description.sensorOrientation,
+      );
+      if (!mounted ||
+          !identical(sourceController, _controller) ||
+          !_wantsFaceTracking) {
+        return;
+      }
+
+      final previewSize = MediaQuery.sizeOf(context);
+      final imageSize = Size(
+        detection.imageWidth.toDouble(),
+        detection.imageHeight.toDouble(),
+      );
+      final scale = math.max(
+        previewSize.width / imageSize.width,
+        previewSize.height / imageSize.height,
+      );
+      final scaledWidth = imageSize.width * scale;
+      final scaledHeight = imageSize.height * scale;
+      final crop = Rect.fromLTWH(
+        (previewSize.width - scaledWidth) / 2,
+        (previewSize.height - scaledHeight) / 2,
+        scaledWidth,
+        scaledHeight,
+      );
+      final poses = _faceSolver.update(
+        nowMs: nowMs,
+        rawFaces: detection.faces,
+        mirrored:
+            sourceController.description.lensDirection ==
+            CameraLensDirection.front,
+        imageExtent: imageSize,
+        previewCrop: crop,
+        confidenceScale: 1,
+      );
+      _facePoses.value = poses;
+    } catch (_) {
+      // Detection is best-effort. Never interrupt capture when unsupported.
+    } finally {
+      _processingFaceFrame = false;
+    }
+  }
+
+  void _setCaptureViewMode(_CaptureViewMode mode) {
+    if (_captureViewMode == mode) return;
+    ChatyHaptics.selection();
+    setState(() {
+      _captureViewMode = mode;
+      _effectsOpen = false;
+    });
+    unawaited(_syncFaceDetectionStream());
+  }
+
+  Rect _coverCropFor(Size previewSize, Size imageSize) {
+    final scale = math.max(
+      previewSize.width / imageSize.width,
+      previewSize.height / imageSize.height,
+    );
+    final width = imageSize.width * scale;
+    final height = imageSize.height * scale;
+    return Rect.fromLTWH(
+      (previewSize.width - width) / 2,
+      (previewSize.height - height) / 2,
+      width,
+      height,
+    );
   }
 
   Future<void> _toggleFlash() async {
@@ -238,8 +393,17 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
     final path = files.isEmpty ? null : files.single.path;
     if (path == null || path.isEmpty) return;
     if (!mounted) return;
+    var selectedPath = path;
+    if (_captureViewMode == _CaptureViewMode.document) {
+      try {
+        selectedPath = await bakeEffectIntoFile(path, _documentScanEffect, 1);
+      } catch (_) {
+        // Keep the selected original image available if processing fails.
+      }
+    }
+    if (!mounted) return;
     setState(() {
-      _capturedFile = XFile(path);
+      _capturedFile = XFile(selectedPath);
       _effectsOpen = false;
     });
   }
@@ -253,8 +417,55 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
     ChatyHaptics.light();
     try {
       final file = await controller.takePicture();
+      var capturedPath = file.path;
+      if (_captureViewMode == _CaptureViewMode.document) {
+        try {
+          capturedPath = await bakeEffectIntoFile(
+            capturedPath,
+            _documentScanEffect,
+            1,
+          );
+        } catch (_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Could not enhance this scan; the original photo is kept.'),
+              ),
+            );
+          }
+        }
+      } else {
+        final lens = _lensManager.selected;
+        final poses = _facePoses.value;
+        if (!lens.isNoLens &&
+            poses.isNotEmpty &&
+            _faceSolver.health != TrackingHealth.lost) {
+          try {
+            final bytes = await composeLensIntoImage(
+              sourceBytes: await File(capturedPath).readAsBytes(),
+              previewSize: MediaQuery.sizeOf(context),
+              lens: lens,
+              poses: poses,
+            );
+            final temporary = await getTemporaryDirectory();
+            final output = File(
+              '${temporary.path}/chaty_lens_${DateTime.now().microsecondsSinceEpoch}.png',
+            );
+            await output.writeAsBytes(bytes, flush: true);
+            capturedPath = output.path;
+          } catch (_) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('The face lens could not be baked into this capture. The photo is kept.'),
+                ),
+              );
+            }
+          }
+        }
+      }
       if (!mounted) return;
-      setState(() => _capturedFile = file);
+      setState(() => _capturedFile = XFile(capturedPath));
     } on CameraException catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -279,11 +490,16 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
 
     final engineEffect = _engine.activeEffect;
     var path = raw.path;
-    var effectId = engineEffect.id;
-    var intensity = _engine.intensity;
+    var effectId = _captureViewMode == _CaptureViewMode.document
+        ? 'none'
+        : engineEffect.id;
+    var intensity = _captureViewMode == _CaptureViewMode.document
+        ? 1.0
+        : _engine.intensity;
 
     // Stories carry no metadata channel, so the look must live in the pixels.
     if (widget.mode == ChatyCaptureMode.story &&
+        _captureViewMode != _CaptureViewMode.document &&
         effectId != 'none' &&
         engineEffect.colorMatrix != null) {
       try {
@@ -335,7 +551,11 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
 
   Widget _buildBottomControls() {
     final ready = _phase == _CameraPhase.ready;
-    final allEffects = EffectRegistry.allEffects;
+    final screen = MediaQuery.sizeOf(context);
+    final tight = screen.shortestSide < 340 || screen.height < 680;
+    final allEffects = EffectRegistry.allEffects
+        .where((effect) => !effect.isFaceTrackingRequired)
+        .toList(growable: false);
 
     return Container(
       decoration: const BoxDecoration(
@@ -346,73 +566,146 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
         ),
       ),
       padding: EdgeInsets.only(
-        bottom: MediaQuery.paddingOf(context).bottom + 12,
-        top: 16,
+        bottom: MediaQuery.paddingOf(context).bottom + (tight ? 6 : 12),
+        top: tight ? 8 : 14,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Filter carousel centered horizontally with snap physics
-          if (ready && _effectsOpen) ...[
+          if (ready && _captureViewMode == _CaptureViewMode.photo) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: Text(
+                      _lensManager.selected.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: .15,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 5,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: _lensManager.selected.requiresFaceTracking &&
+                              _faceSolver.health == TrackingHealth.tracked
+                          ? const Color(0xFF7CFAAE)
+                          : Colors.white38,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      !_lensManager.selected.requiresFaceTracking
+                          ? 'Swipe to explore'
+                          : switch (_faceSolver.health) {
+                              TrackingHealth.tracked => 'Face locked',
+                              TrackingHealth.temporarilyLost => 'Reacquiring…',
+                              TrackingHealth.lost => 'Find a face',
+                            },
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: tight ? 1 : 4),
+            LensCarousel(manager: _lensManager),
+          ],
+          if (ready && _captureViewMode == _CaptureViewMode.document) ...[
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 7),
+              child: Text(
+                'DOCUMENT  •  Fit the page inside the frame',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  letterSpacing: 1.0,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+          if (ready && _effectsOpen && _captureViewMode == _CaptureViewMode.photo) ...[
             SizedBox(
-              height: 74,
+              height: tight ? 66 : 74,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
                 padding: EdgeInsets.symmetric(
-                  horizontal: MediaQuery.sizeOf(context).width * 0.38,
+                  horizontal: math.max(8, (screen.width - 52) / 2),
                 ),
                 itemCount: allEffects.length,
                 itemBuilder: (context, index) {
                   final effect = allEffects[index];
                   final isSelected = _engine.activeEffect.id == effect.id;
-
                   return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 5),
                     child: GestureDetector(
                       onTap: () {
                         ChatyHaptics.selection();
-                        _engine.selectEffect(effect);
+                        setState(() => _engine.selectEffect(effect));
                       },
                       child: AnimatedScale(
-                        scale: isSelected ? 1.08 : 0.86,
-                        duration: const Duration(milliseconds: 200),
+                        scale: isSelected ? 1.06 : 0.88,
+                        duration: MediaQuery.disableAnimationsOf(context)
+                            ? Duration.zero
+                            : const Duration(milliseconds: 180),
                         curve: Curves.easeOutCubic,
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Container(
-                              width: 48,
-                              height: 48,
+                              width: tight ? 42 : 48,
+                              height: tight ? 42 : 48,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: effect.previewColor.withValues(
                                   alpha: isSelected ? 0.95 : 0.4,
                                 ),
                                 border: Border.all(
-                                  color: isSelected
-                                      ? Colors.white
-                                      : Colors.white30,
+                                  color: isSelected ? Colors.white : Colors.white30,
                                   width: isSelected ? 2.5 : 1.2,
                                 ),
                               ),
                               child: Icon(
                                 effect.icon,
-                                size: 22,
+                                size: tight ? 20 : 22,
                                 color: isSelected ? Colors.black : Colors.white,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              effect.name,
-                              style: TextStyle(
-                                color: isSelected
-                                    ? Colors.white
-                                    : Colors.white60,
-                                fontSize: 10,
-                                fontWeight: isSelected
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
+                            const SizedBox(height: 3),
+                            SizedBox(
+                              width: tight ? 56 : 64,
+                              child: Text(
+                                effect.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : Colors.white60,
+                                  fontSize: 10,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                ),
                               ),
                             ),
                           ],
@@ -423,12 +716,12 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
                 },
               ),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: tight ? 4 : 9),
           ],
-
-          // Main Controls Row: Gallery, Capture Shutter, Flip Camera
+          _buildModeSelector(tight: tight),
+          SizedBox(height: tight ? 4 : 8),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            padding: EdgeInsets.symmetric(horizontal: tight ? 16 : 24),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -438,13 +731,13 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
                   child: InkWell(
                     borderRadius: BorderRadius.circular(26),
                     onTap: _pickFromGallery,
-                    child: const SizedBox.square(
-                      dimension: 52,
-                      child: Center(
+                    child: SizedBox.square(
+                      dimension: tight ? 46 : 52,
+                      child: const Center(
                         child: Icon(
                           Icons.photo_library_rounded,
                           color: Colors.white,
-                          size: 28,
+                          size: 27,
                         ),
                       ),
                     ),
@@ -458,17 +751,90 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
                     borderRadius: BorderRadius.circular(26),
                     onTap: ready ? _flipCamera : null,
                     child: SizedBox.square(
-                      dimension: 52,
+                      dimension: tight ? 46 : 52,
                       child: Icon(
                         Icons.cameraswitch_rounded,
                         color: ready ? Colors.white : Colors.white30,
-                        size: 28,
+                        size: 27,
                       ),
                     ),
                   ),
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeSelector({required bool tight}) {
+    Widget modeButton({
+      required _CaptureViewMode mode,
+      required String label,
+      required IconData icon,
+    }) {
+      final selected = _captureViewMode == mode;
+      return Expanded(
+        child: Semantics(
+          button: true,
+          selected: selected,
+          label: '$label camera mode',
+          child: GestureDetector(
+            onTap: () => _setCaptureViewMode(mode),
+            child: AnimatedContainer(
+              duration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              height: tight ? 34 : 38,
+              padding: EdgeInsets.symmetric(horizontal: tight ? 9 : 14),
+              decoration: BoxDecoration(
+                color: selected ? Colors.white : Colors.white.withValues(alpha: .08),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: selected ? Colors.white : Colors.white30,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    icon,
+                    size: 16,
+                    color: selected ? Colors.black : Colors.white,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: selected ? Colors.black : Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 62),
+      child: Row(
+        children: [
+          modeButton(
+            mode: _CaptureViewMode.photo,
+            label: 'Photo',
+            icon: Icons.camera_alt_rounded,
+          ),
+          const SizedBox(width: 8),
+          modeButton(
+            mode: _CaptureViewMode.document,
+            label: 'Document',
+            icon: Icons.document_scanner_rounded,
           ),
         ],
       ),
@@ -544,19 +910,48 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
                 child: SizedBox(
                   width: controller!.value.previewSize!.height,
                   height: controller.value.previewSize!.width,
-                  child: KeyedSubtree(
-                    key: ValueKey(_engine.activeEffect.id),
-                    child: _engine.renderEffect(
-                      child: CameraPreview(controller),
-                    ),
-                  ),
+                  child: _buildCameraPreview(controller),
                 ),
               ),
             ),
           ),
         },
+        if (_phase == _CameraPhase.ready &&
+            _captureViewMode == _CaptureViewMode.photo)
+          ValueListenableBuilder<List<FacePose>>(
+            valueListenable: _facePoses,
+            builder: (context, poses, _) => LensOverlay(
+              lens: _lensManager.selected,
+              poses: poses,
+              health: _faceSolver.health,
+            ),
+          ),
+        if (_phase == _CameraPhase.ready &&
+            _captureViewMode == _CaptureViewMode.document)
+          const Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(painter: _DocumentGuidePainter()),
+            ),
+          ),
         _buildTopBar(),
       ],
+    );
+  }
+
+  Widget _buildCameraPreview(CameraController controller) {
+    final camera = CameraPreview(controller);
+    if (_captureViewMode == _CaptureViewMode.document) {
+      return KeyedSubtree(
+        key: const ValueKey<String>('document-preview'),
+        child: ColorFiltered(
+          colorFilter: ColorFilter.matrix(_documentScanEffect.colorMatrix!),
+          child: camera,
+        ),
+      );
+    }
+    return KeyedSubtree(
+      key: ValueKey<String>('photo-preview:${_engine.activeEffect.id}'),
+      child: _engine.renderEffect(child: camera),
     );
   }
 
@@ -580,15 +975,16 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
               onPressed: _toggleFlash,
             ),
             const SizedBox(width: 10),
-            _RoundIconAction(
-              semanticsLabel: _effectsOpen ? 'Hide effects' : 'Show effects',
-              icon: Icons.auto_awesome_rounded,
-              highlighted: _effectsOpen || _engine.activeEffect.id != 'none',
-              onPressed: () {
-                ChatyHaptics.selection();
-                setState(() => _effectsOpen = !_effectsOpen);
-              },
-            ),
+            if (_captureViewMode == _CaptureViewMode.photo)
+              _RoundIconAction(
+                semanticsLabel: _effectsOpen ? 'Hide color filters' : 'Show color filters',
+                icon: Icons.auto_awesome_rounded,
+                highlighted: _effectsOpen || _engine.activeEffect.id != 'none',
+                onPressed: () {
+                  ChatyHaptics.selection();
+                  setState(() => _effectsOpen = !_effectsOpen);
+                },
+              ),
           ],
         ],
       ),
@@ -827,3 +1223,54 @@ const List<double> _identity = <double>[
   0, 0, 1, 0, 0, //
   0, 0, 0, 1, 0,
 ];
+
+
+class _DocumentGuidePainter extends CustomPainter {
+  const _DocumentGuidePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final pageWidth = math.min(size.width * 0.78, size.height * 0.58 / 1.414);
+    final pageHeight = pageWidth * 1.414;
+    final page = Rect.fromCenter(
+      center: Offset(size.width / 2, size.height * 0.47),
+      width: pageWidth,
+      height: pageHeight,
+    );
+    final cornerLength = math.min(28.0, pageWidth * 0.12);
+    final paint = Paint()
+      ..color = const Color(0xFFF8FAFC)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final corners = Path()
+      ..moveTo(page.left, page.top + cornerLength)
+      ..lineTo(page.left, page.top)
+      ..lineTo(page.left + cornerLength, page.top)
+      ..moveTo(page.right - cornerLength, page.top)
+      ..lineTo(page.right, page.top)
+      ..lineTo(page.right, page.top + cornerLength)
+      ..moveTo(page.right, page.bottom - cornerLength)
+      ..lineTo(page.right, page.bottom)
+      ..lineTo(page.right - cornerLength, page.bottom)
+      ..moveTo(page.left + cornerLength, page.bottom)
+      ..lineTo(page.left, page.bottom)
+      ..lineTo(page.left, page.bottom - cornerLength);
+    canvas.drawPath(corners, paint);
+
+    final small = Paint()
+      ..color = const Color(0xFF60A5FA).withValues(alpha: 0.7)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(page.deflate(5), const Radius.circular(3)),
+      small,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _DocumentGuidePainter oldDelegate) => false;
+}
+
