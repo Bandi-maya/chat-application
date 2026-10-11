@@ -27,15 +27,20 @@ class LockedChatsScreen extends StatefulWidget {
     required ChatyDataStore dataStore,
     required ChatyPreferencesController preferencesController,
     required ThemeController themeController,
+    bool secretCodeVerified = false,
   }) async {
-    final authorized = await ProtectedResourceGate.authorizeGeneralAction(
-      context,
-      preferencesController: preferencesController,
-      title: 'Locked & Hidden Chats',
-      reason: 'Authenticate to access your locked conversations',
-    );
+    // A verified secret code is an explicit alternate credential for the
+    // hidden vault, matching the established Chat Lock flow. Do not prompt a
+    // second time after successfully verifying it.
+    final authorized = secretCodeVerified ||
+        await ProtectedResourceGate.authorizeGeneralAction(
+          context,
+          preferencesController: preferencesController,
+          title: 'Locked & Hidden Chats',
+          reason: 'Authenticate to access your locked conversations',
+        );
 
-    if (authorized && context.mounted) {
+    if (authorized && context.mounted)
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => LockedChatsScreen(
