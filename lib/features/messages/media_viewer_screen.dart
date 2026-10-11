@@ -51,7 +51,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen>
     unawaited(_authorizeAndLoad());
   }
 
-  Future<void> _authorizeAndLoad({bool isResume = false}) async {
+  Future<void> _authorizeAndLoad() async {
     if (_authorizing) return;
     _authorizing = true;
     bool authorized;
@@ -63,6 +63,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen>
         title: 'Protected Attachment',
         reason: 'Authenticate to view this attachment',
       );
+    } catch (_) {
+      authorized = false;
     } finally {
       _authorizing = false;
     }
@@ -107,7 +109,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen>
         widget.preferencesController.isConversationProtected(
           widget.conversationId,
         )) {
-      unawaited(_authorizeAndLoad(isResume: true));
+      unawaited(_authorizeAndLoad());
     }
   }
 
