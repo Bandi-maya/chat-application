@@ -136,6 +136,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
   bool _accessCheckStarted = false;
   bool _isAuthorizing = false;
   bool _accessDenied = false;
+  bool _appIsResumed = true;
 
   ChatyPreferencesController get _preferences => widget.preferencesController;
 
@@ -221,7 +222,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_accessCheckStarted ||
+    if (!_appIsResumed ||
+        !_accessCheckStarted ||
         _accessAuthorized ||
         _isAuthorizing ||
         _accessDenied ||
@@ -248,6 +250,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
+      _appIsResumed = false;
       if (_accessAuthorized &&
           widget.preferencesController.isConversationProtected(
             widget.conversationId,
@@ -263,6 +266,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
       return;
     }
 
+    if (state == AppLifecycleState.resumed) {
+      _appIsResumed = true;
+    }
     if (state == AppLifecycleState.resumed &&
         !_accessAuthorized &&
         !_isAuthorizing &&
