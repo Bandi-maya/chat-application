@@ -73,7 +73,7 @@ jobs:
             mkdir -p artifacts
             adb wait-for-device
             booted=''
-            for attempt in $(seq 1 60); do
+            for attempt in $(seq 1 120); do
               booted="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
               [ "$booted" = "1" ] && break
               sleep 2
