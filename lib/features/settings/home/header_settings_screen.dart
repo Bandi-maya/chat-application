@@ -23,6 +23,25 @@ class HeaderSettingsScreen extends StatefulWidget {
   State<HeaderSettingsScreen> createState() => _HeaderSettingsScreenState();
 }
 
+class _HomePreviewCurveClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) => Path()
+    ..moveTo(0, 0)
+    ..lineTo(size.width, 0)
+    ..cubicTo(
+      size.width * 1.02,
+      size.height * 0.45,
+      size.width * 0.72,
+      size.height * 0.98,
+      0,
+      size.height * 0.78,
+    )
+    ..close();
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
 class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
   static const List<String> _homeUiStyles = [
     // Legacy Home UI presets — keep these labels for existing saved profiles.
@@ -133,6 +152,282 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
     };
   }
 
+  String _homeUiStyleDescription(String style) => switch (style) {
+    'ONE UI' => 'Spacious header and card-like chat rows',
+    'WhatsApp UI Stock' => 'Standard WhatsApp-style conversation list',
+    'IOS STYLE' => 'Stories-first header with roomy spacing',
+    'BUBBLES TAB STYLE' => 'Gesture-first page navigation',
+    'BASIC TAB STYLE' => 'Compact navigation rail',
+    'WhatsApp OLD UI' => 'Classic top tabs aligned with the header',
+    'WhatsApp-style top bar' => 'Tabs below the current app header',
+    'Floating Rail' => 'Floating vertical icon rail',
+    '3D Perspective Drawer' => 'Rotated foreground screen and side drawer',
+    'Modern Side Menu' => 'Labeled side drawer with identity header',
+    'Curved Radial Menu' => 'Curved accent panel with a diagonal icon rail',
+    _ => 'Home layout and navigation preview',
+  };
+
+  Widget _buildHomeUiPreview(
+    String style,
+    ThemeConfig theme, {
+    Key? key,
+    bool large = false,
+  }) {
+    final accent = theme.accentColor;
+    final fg = theme.primaryTextColor;
+    final muted = theme.secondaryTextColor;
+    final surface = theme.surfaceColor;
+    final bg = theme.backgroundColor;
+    final mode = _navigationModeForHomeUiStyle(style);
+    final scale = large ? 1.0 : 0.55;
+    final previewWidth = large ? double.infinity : 100.0;
+    final previewHeight = large ? 112.0 : 62.0;
+    final rail = mode == AppNavigationMode.floatingIslandRail ||
+        mode == AppNavigationMode.compactRail;
+    final sideDrawer = mode == AppNavigationMode.perspective3DDrawer ||
+        mode == AppNavigationMode.modernSideMenu ||
+        mode == AppNavigationMode.curvedRadialDrawer;
+    final topTabs = mode == AppNavigationMode.topWhatsAppBar;
+
+    return Container(
+      key: key,
+      width: previewWidth,
+      height: previewHeight,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(large ? 15 : 9),
+        border: Border.all(color: accent.withValues(alpha: 0.55)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(large ? 14 : 8),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ColoredBox(color: bg),
+            if (rail)
+              Positioned(
+                left: 3 * scale,
+                top: 3 * scale,
+                bottom: 3 * scale,
+                width: 21 * scale,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: surface,
+                    borderRadius: BorderRadius.circular(8 * scale),
+                    border: Border.all(color: accent.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      for (final icon in <IconData>[
+                        Icons.chat_bubble_rounded,
+                        Icons.auto_stories_rounded,
+                        Icons.call_rounded,
+                        Icons.settings_rounded,
+                      ])
+                        Icon(icon, size: 11 * scale, color: accent),
+                    ],
+                  ),
+                ),
+              ),
+            if (sideDrawer && mode != AppNavigationMode.curvedRadialDrawer)
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: (large ? 92 : 36) * scale,
+                child: Container(
+                  padding: EdgeInsets.all(5 * scale),
+                  color: surface,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      for (int i = 0; i < 4; i++)
+                        Row(
+                          children: [
+                            Icon(
+                              <IconData>[
+                                Icons.chat_bubble_rounded,
+                                Icons.auto_stories_rounded,
+                                Icons.call_rounded,
+                                Icons.settings_rounded,
+                              ][i],
+                              size: 10 * scale,
+                              color: i == 0 ? accent : muted,
+                            ),
+                            if (large) ...[
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Container(
+                                  height: 3,
+                                  decoration: BoxDecoration(
+                                    color: muted.withValues(alpha: 0.55),
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            Positioned(
+              left: (rail ? 29 : sideDrawer && mode != AppNavigationMode.curvedRadialDrawer
+                  ? (large ? 100 : 40)
+                  : 0) * scale,
+              right: 0,
+              top: 0,
+              bottom: (large ? 21 : 12) * scale,
+              child: Padding(
+                padding: EdgeInsets.all(7 * scale),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        if (topTabs) ...[
+                          Icon(Icons.menu_rounded, size: 12 * scale, color: accent),
+                          SizedBox(width: 3 * scale),
+                        ],
+                        Expanded(
+                          child: Container(
+                            height: 4 * scale,
+                            decoration: BoxDecoration(
+                              color: topTabs ? accent : fg.withValues(alpha: 0.85),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        ),
+                        if (large) ...[
+                          const SizedBox(width: 8),
+                          Icon(Icons.search_rounded, size: 13, color: fg),
+                        ],
+                      ],
+                    ),
+                    SizedBox(height: 7 * scale),
+                    if (style == 'IOS STYLE')
+                      Row(
+                        children: List.generate(
+                          4,
+                          (i) => Expanded(
+                            child: Padding(
+                              padding: EdgeInsets.only(right: 3 * scale),
+                              child: Container(
+                                height: 17 * scale,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: accent.withValues(alpha: 0.16 + i * 0.08),
+                                  border: Border.all(color: accent.withValues(alpha: 0.65)),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    for (int i = 0; i < 3; i++) ...[
+                      SizedBox(height: 5 * scale),
+                      Row(
+                        children: [
+                          Container(
+                            width: 13 * scale,
+                            height: 13 * scale,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: accent.withValues(alpha: 0.32 + i * 0.12),
+                            ),
+                          ),
+                          SizedBox(width: 5 * scale),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  height: 3 * scale,
+                                  width: (large ? 120.0 : 58.0) * scale,
+                                  decoration: BoxDecoration(
+                                    color: fg.withValues(alpha: 0.8),
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                ),
+                                SizedBox(height: 3 * scale),
+                                Container(
+                                  height: 2 * scale,
+                                  width: (large ? 170.0 : 64.0) * scale,
+                                  decoration: BoxDecoration(
+                                    color: muted.withValues(alpha: 0.7),
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            if (mode == AppNavigationMode.curvedRadialDrawer)
+              Positioned(
+                left: 0,
+                top: 0,
+                width: (large ? 172.0 : 58.0) * scale,
+                height: (large ? 65.0 : 37.0) * scale,
+                child: ClipPath(
+                  clipper: _HomePreviewCurveClipper(),
+                  child: ColoredBox(
+                    color: accent,
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: Padding(
+                        padding: EdgeInsets.all(5 * scale),
+                        child: Icon(
+                          Icons.menu_rounded,
+                          color: theme.onAccentColor,
+                          size: 12 * scale,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: (topTabs ? 18.0 : 21.0) * scale,
+              child: ColoredBox(
+                color: topTabs ? accent : surface,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    for (int i = 0; i < 4; i++)
+                      Icon(
+                        <IconData>[
+                          Icons.chat_bubble_rounded,
+                          Icons.auto_stories_rounded,
+                          Icons.call_rounded,
+                          Icons.settings_rounded,
+                        ][i],
+                        size: 10 * scale,
+                        color: topTabs
+                            ? theme.onAccentColor
+                            : (i == 0 ? accent : muted),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _updateHome(HomePreferences newPrefs, {String? logTitle}) {
     widget.preferencesController.updateHome(newPrefs, logTitle: logTitle);
     setState(() {});
@@ -222,17 +517,154 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                           subtitle: _selectedHomeUiStyle(home),
                           showChevron: true,
                           onTap: () async {
-                            final chosen = await GbRadioSelectionDialog.show(
+                            final selected = _selectedHomeUiStyle(home);
+                            final theme = locator<ThemeController>().globalTheme;
+                            final chosen = await showModalBottomSheet<String>(
                               context: context,
-                              title: 'Home UI Style',
-                              options: _homeUiStyles,
-                              selectedOption: _selectedHomeUiStyle(home),
+                              isScrollControlled: true,
+                              useSafeArea: true,
+                              showDragHandle: true,
+                              backgroundColor: theme.surfaceColor,
+                              builder: (sheetContext) {
+                                var draft = selected;
+                                return StatefulBuilder(
+                                  builder: (context, setSheetState) {
+                                    final colors = context.colors;
+                                    return SizedBox(
+                                      height: MediaQuery.sizeOf(context).height * 0.84,
+                                      child: SafeArea(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                                          children: [
+                                            Padding(
+                                              padding: const EdgeInsets.fromLTRB(20, 2, 20, 0),
+                                              child: Text(
+                                                'Home UI Style',
+                                                style: TextStyle(
+                                                  color: colors.foreground,
+                                                  fontSize: 20,
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              ),
+                                            ),
+                                            Padding(
+                                              padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
+                                              child: Text(
+                                                'Select a layout to see a live preview, then apply it.',
+                                                style: TextStyle(
+                                                  color: colors.foregroundSecondary,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ),
+                                            Padding(
+                                              padding: const EdgeInsets.symmetric(horizontal: 18),
+                                              child: AnimatedSwitcher(
+                                                duration: const Duration(milliseconds: 180),
+                                                child: _buildHomeUiPreview(
+                                                  draft,
+                                                  theme,
+                                                  key: ValueKey<String>(draft),
+                                                  large: true,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Expanded(
+                                              child: ListView.separated(
+                                                padding: const EdgeInsets.fromLTRB(14, 2, 14, 10),
+                                                itemCount: _homeUiStyles.length,
+                                                separatorBuilder: (_, __) => Divider(
+                                                  height: 1,
+                                                  color: colors.divider,
+                                                ),
+                                                itemBuilder: (context, index) {
+                                                  final option = _homeUiStyles[index];
+                                                  final isSelected = draft == option;
+                                                  return InkWell(
+                                                    borderRadius: BorderRadius.circular(14),
+                                                    onTap: () => setSheetState(() => draft = option),
+                                                    child: Padding(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 7),
+                                                      child: Row(
+                                                        children: [
+                                                          SizedBox(
+                                                            width: 100,
+                                                            child: _buildHomeUiPreview(
+                                                              option,
+                                                              theme,
+                                                              large: false,
+                                                            ),
+                                                          ),
+                                                          const SizedBox(width: 12),
+                                                          Expanded(
+                                                            child: Column(
+                                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                                              children: [
+                                                                Text(
+                                                                  option,
+                                                                  style: TextStyle(
+                                                                    color: isSelected ? colors.primary : colors.foreground,
+                                                                    fontSize: 13,
+                                                                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                                                  ),
+                                                                ),
+                                                                const SizedBox(height: 2),
+                                                                Text(
+                                                                  _homeUiStyleDescription(option),
+                                                                  maxLines: 2,
+                                                                  overflow: TextOverflow.ellipsis,
+                                                                  style: TextStyle(
+                                                                    color: colors.foregroundSecondary,
+                                                                    fontSize: 10.5,
+                                                                    height: 1.2,
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                          const SizedBox(width: 8),
+                                                          Icon(
+                                                            isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
+                                                            color: isSelected ? colors.primary : colors.foregroundTertiary,
+                                                            size: 20,
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                              ),
+                                            ),
+                                            Padding(
+                                              padding: const EdgeInsets.fromLTRB(18, 6, 18, 14),
+                                              child: Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: OutlinedButton(
+                                                      onPressed: () => Navigator.of(sheetContext).pop(),
+                                                      child: const Text('Cancel'),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 12),
+                                                  Expanded(
+                                                    child: FilledButton(
+                                                      onPressed: () => Navigator.of(sheetContext).pop(draft),
+                                                      child: const Text('Apply style'),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
                             );
                             if (chosen != null && mounted) {
-                              // This is a structural choice, not just a preview
-                              // preference: route it through ThemeController so
-                              // MainNavigationShell rebuilds the matching header
-                              // and navigation layout immediately.
                               locator<ThemeController>().setNavigationMode(
                                 _navigationModeForHomeUiStyle(chosen),
                               );
