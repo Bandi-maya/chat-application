@@ -277,6 +277,9 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
                     conversation.id,
                     hide: !isHidden,
                   );
+                  ProtectedResourceGate.invalidateConversationSession(
+                    conversation.id,
+                  );
                 },
               ),
               ListTile(
