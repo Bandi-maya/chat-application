@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -25,23 +26,60 @@ class UniversalStylesScreen extends StatefulWidget {
 class _UniversalStylesScreenState extends State<UniversalStylesScreen> {
   bool _showAllLauncherIcons = false;
 
+  @override
+  void initState() {
+    super.initState();
+    if (locator.isRegistered<AppIconController>()) {
+      unawaited(locator<AppIconController>().initialize());
+    }
+  }
+
+  // Each visible option maps to one distinct Android launcher alias.
+  // Do not map multiple labels to a shared alias: it makes the UI claim a
+  // different icon was selected even though Android displays the same artwork.
   final List<Map<String, dynamic>> _launcherIcons = [
-    {'name': 'Default Green', 'color': Color(0xFF25D366), 'icon': Icons.chat_bubble_rounded},
-    {'name': 'GB Cyan', 'color': Color(0xFF00B0FF), 'icon': Icons.flash_on_rounded},
-    {'name': 'Mint Green', 'color': Color(0xFF00E676), 'icon': Icons.shield_rounded},
-    {'name': 'Aqua Blue', 'color': Color(0xFF00E5FF), 'icon': Icons.chat_rounded},
-    {'name': 'Purple Royal', 'color': Color(0xFF7C4DFF), 'icon': Icons.favorite_rounded},
-    {'name': 'Vibrant Magenta', 'color': Color(0xFFE040FB), 'icon': Icons.bolt_rounded},
-    {'name': 'Ruby Red', 'color': Color(0xFFFF5252), 'icon': Icons.star_rounded},
-    {'name': 'Amber Gold', 'color': Color(0xFFFFAB00), 'icon': Icons.circle_rounded},
-    {'name': 'Dark Stealth', 'color': Color(0xFF212121), 'icon': Icons.nightlight_round},
-    {'name': 'Deep Teal', 'color': Color(0xFF00BFA5), 'icon': Icons.spa_rounded},
-    {'name': 'Coral Orange', 'color': Color(0xFFFF6E40), 'icon': Icons.local_fire_department_rounded},
-    {'name': 'Neon Lime', 'color': Color(0xFFAEEA00), 'icon': Icons.send_rounded},
-    {'name': 'Rose Pink', 'color': Color(0xFFFF4081), 'icon': Icons.favorite_border_rounded},
-    {'name': 'Cobalt Blue', 'color': Color(0xFF3D5AFE), 'icon': Icons.send_and_archive_rounded},
-    {'name': 'Emerald Forest', 'color': Color(0xFF00C853), 'icon': Icons.security_rounded},
-    {'name': 'Midnight Indigo', 'color': Color(0xFF304FFE), 'icon': Icons.fingerprint_rounded},
+    {
+      'name': 'Swift Flight',
+      'variant': LauncherIconVariant.bird,
+      'color': Color(0xFF25D366),
+      'icon': Icons.air_rounded,
+    },
+    {
+      'name': 'Warm Signature',
+      'variant': LauncherIconVariant.warm,
+      'color': Color(0xFFB18B67),
+      'icon': Icons.chat_bubble_rounded,
+    },
+    {
+      'name': 'Warm Outline',
+      'variant': LauncherIconVariant.outline,
+      'color': Color(0xFFD8C7B2),
+      'icon': Icons.chat_bubble_outline_rounded,
+    },
+    {
+      'name': 'Obsidian',
+      'variant': LauncherIconVariant.obsidian,
+      'color': Color(0xFF202124),
+      'icon': Icons.mode_comment_rounded,
+    },
+    {
+      'name': 'Spatial Glass',
+      'variant': LauncherIconVariant.glass,
+      'color': Color(0xFF75D5D9),
+      'icon': Icons.bubble_chart_rounded,
+    },
+    {
+      'name': 'Signal',
+      'variant': LauncherIconVariant.signal,
+      'color': Color(0xFF18B5D1),
+      'icon': Icons.graphic_eq_rounded,
+    },
+    {
+      'name': 'Fold',
+      'variant': LauncherIconVariant.fold,
+      'color': Color(0xFFEF5AB7),
+      'icon': Icons.layers_rounded,
+    },
   ];
 
   final List<String> _emojiVariants = [
@@ -203,8 +241,16 @@ class _UniversalStylesScreenState extends State<UniversalStylesScreen> {
   @override
   Widget build(BuildContext context) {
     final themeController = locator<ThemeController>();
+    final appIconController = locator.isRegistered<AppIconController>()
+        ? locator<AppIconController>()
+        : null;
+    final signals = <Listenable>[
+      widget.preferencesController,
+      themeController,
+      if (appIconController != null) appIconController,
+    ];
     return ListenableBuilder(
-      listenable: Listenable.merge([widget.preferencesController, themeController]),
+      listenable: Listenable.merge(signals),
       builder: (context, _) {
         final theme = themeController.globalTheme;
         final colors = context.colors;
@@ -259,26 +305,40 @@ class _UniversalStylesScreenState extends State<UniversalStylesScreen> {
                             ),
                             itemBuilder: (ctx, i) {
                               final item = displayedLauncherIcons[i];
-                              final isSelected = prefs.launcherIcon == item['name'];
+                              final variant = item['variant'] as LauncherIconVariant;
+                              final isSelected = appIconController != null
+                                  ? appIconController.launcherIcon == variant &&
+                                      appIconController.brandIconSource == BrandIconSource.bundled
+                                  : prefs.launcherIcon == variant.title;
                               return GestureDetector(
                                 onTap: () async {
-                                  widget.preferencesController.updateUniversal(
-                                    prefs.copyWith(launcherIcon: item['name'] as String),
-                                  );
-                                  final iconName = item['name'] as String;
-                                  final variant = switch (iconName) {
-                                    'GB Cyan' || 'Aqua Blue' => LauncherIconVariant.signal,
-                                    'Dark Stealth' || 'Midnight Indigo' => LauncherIconVariant.obsidian,
-                                    'Purple Royal' || 'Vibrant Magenta' => LauncherIconVariant.fold,
-                                    'Ruby Red' || 'Coral Orange' => LauncherIconVariant.warm,
-                                    'Mint Green' || 'Neon Lime' || 'Emerald Forest' => LauncherIconVariant.outline,
-                                    _ => LauncherIconVariant.bird,
-                                  };
-                                  if (locator.isRegistered<AppIconController>()) {
-                                    try {
-                                      await locator<AppIconController>().applyLauncherIcon(variant);
-                                    } catch (_) {}
+                                  final controller = appIconController;
+                                  if (controller == null) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Launcher icon switching is unavailable on this platform.'),
+                                      ),
+                                    );
+                                    return;
                                   }
+                                  final applied = await controller.applyLauncherIcon(variant);
+                                  if (!mounted) return;
+                                  if (!applied) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          controller.lastError ??
+                                              'The launcher did not confirm the selected icon.',
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  widget.preferencesController.updateUniversal(
+                                    widget.preferencesController.universal.copyWith(
+                                      launcherIcon: variant.title,
+                                    ),
+                                  );
                                 },
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
