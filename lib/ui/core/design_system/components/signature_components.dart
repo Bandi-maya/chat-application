@@ -220,8 +220,8 @@ class ChatyPresenceAvatar extends StatelessWidget {
         children: [
           AnimatedContainer(
             duration: MediaQuery.disableAnimationsOf(context)
-              ? Duration.zero
-              : const Duration(milliseconds: 220),
+                ? Duration.zero
+                : const Duration(milliseconds: 220),
             padding: EdgeInsets.all(ring == Colors.transparent ? 0 : 2.4),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
@@ -561,8 +561,8 @@ class ChatyComposerShell extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return AnimatedContainer(
       duration: MediaQuery.disableAnimationsOf(context)
-              ? Duration.zero
-              : const Duration(milliseconds: 180),
+          ? Duration.zero
+          : const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
       margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       padding: const EdgeInsets.all(4),
