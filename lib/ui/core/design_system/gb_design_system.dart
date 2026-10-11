@@ -858,7 +858,7 @@ class GbCardContainer extends StatelessWidget {
       padding: padding ?? const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(_liveTheme.cornerRadius),
+        borderRadius: BorderRadius.circular(theme.cornerRadius),
         border: Border.all(color: colors.borderSubtle, width: 0.9),
         boxShadow: [
           BoxShadow(
