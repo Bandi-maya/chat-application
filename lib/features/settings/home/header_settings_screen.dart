@@ -83,6 +83,28 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
     'Segmented Tab',
   ];
 
+  static const List<String> _searchPlacementOptions = [
+    'Header action',
+    'Below header',
+    'Above chat filters',
+  ];
+
+  IconData _homeUiStyleIcon(String style) => switch (style) {
+    'ONE UI' => Icons.view_quilt_rounded,
+    'WhatsApp UI Stock' => Icons.chat_rounded,
+    'IOS STYLE' => Icons.phone_iphone_rounded,
+    'BUBBLES TAB STYLE' => Icons.bubble_chart_rounded,
+    'BASIC TAB STYLE' => Icons.dashboard_rounded,
+    'WhatsApp OLD UI' => Icons.view_week_rounded,
+    'Floating Rail' => Icons.view_sidebar_rounded,
+    '3D Perspective Drawer' => Icons.view_in_ar_rounded,
+    'Modern Side Menu' => Icons.menu_open_rounded,
+    'Curved Radial Menu' => Icons.donut_large_rounded,
+    'Instagram Style' => Icons.camera_alt_rounded,
+    'Telegram Style' => Icons.send_rounded,
+    _ => Icons.dashboard_customize_rounded,
+  };
+
   /// Keep the Home UI selector wired to the same persisted navigation-mode
   /// controller used by the main navigation shell. The selected home preset and
   /// the app shell therefore change together instead of leaving the shell stale.
@@ -844,8 +866,23 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                                                       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 7),
                                                       child: Row(
                                                         children: [
+                                                          Container(
+                                                            width: 28,
+                                                            height: 28,
+                                                            decoration: BoxDecoration(
+                                                              color: (isSelected ? colors.primary : colors.foregroundSecondary)
+                                                                  .withValues(alpha: 0.12),
+                                                              shape: BoxShape.circle,
+                                                            ),
+                                                            child: Icon(
+                                                              _homeUiStyleIcon(option),
+                                                              size: 17,
+                                                              color: isSelected ? colors.primary : colors.foregroundSecondary,
+                                                            ),
+                                                          ),
+                                                          const SizedBox(width: 6),
                                                           SizedBox(
-                                                            width: 100,
+                                                            width: 72,
                                                             child: ListenableBuilder(
                                                               listenable: locator<ThemeController>(),
                                                               builder: (context, _) => _buildHomeUiPreview(
@@ -1145,21 +1182,73 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                         ),
                         _divider(),
 
-                        // Disable search bar
+                        // Search placement — search stays functional and moves
+                        // to a usable position instead of disappearing with a layout change.
                         GbSettingRow(
                           icon: Icon(
-                            Icons.saved_search_outlined,
+                            Icons.manage_search_rounded,
                             color: colors.primary,
                             size: 21,
                           ),
-                          title: 'Disable search bar',
+                          title: 'Search placement',
+                          subtitle: home.searchPlacement,
+                          showChevron: true,
+                          onTap: () async {
+                            final chosen = await GbRadioSelectionDialog.show(
+                              context: context,
+                              title: 'Search placement',
+                              options: _searchPlacementOptions,
+                              selectedOption: _searchPlacementOptions.contains(home.searchPlacement)
+                                  ? home.searchPlacement
+                                  : 'Header action',
+                            );
+                            if (chosen != null && mounted) {
+                              _updateHome(
+                                home.copyWith(searchPlacement: chosen),
+                                logTitle: 'Search placement',
+                              );
+                            }
+                          },
+                        ),
+                        _divider(),
+
+                        // Airplane mode is a reversible simulated presence mode.
+                        GbSettingRow(
+                          icon: Icon(
+                            Icons.airplanemode_active_rounded,
+                            color: home.airplaneModeSimulator ? colors.primary : colors.foregroundSecondary,
+                            size: 21,
+                          ),
+                          title: 'Airplane mode',
+                          subtitle: home.airplaneModeSimulator
+                              ? 'Enabled — Chaty presence is offline until you turn it off'
+                              : 'Simulate offline presence; you can turn this on or off anytime',
+                          switchValue: home.airplaneModeSimulator,
+                          onSwitchChanged: (val) {
+                            _updateHome(
+                              home.copyWith(airplaneModeSimulator: val),
+                              logTitle: 'Airplane Mode',
+                            );
+                          },
+                        ),
+                        _divider(),
+
+                        // Hide search completely; placement remains saved for
+                        // when the user enables it again.
+                        GbSettingRow(
+                          icon: Icon(
+                            Icons.search_off_rounded,
+                            color: colors.primary,
+                            size: 21,
+                          ),
+                          title: 'Hide search everywhere',
                           subtitle:
-                              'You can disable the search bar on the main screen',
+                              'Turns search off in the header and all home placements.',
                           switchValue: home.disableSearchBar,
                           onSwitchChanged: (val) {
                             _updateHome(
                               home.copyWith(disableSearchBar: val),
-                              logTitle: 'Disable Search Bar',
+                              logTitle: 'Hide Search Everywhere',
                             );
                           },
                         ),
