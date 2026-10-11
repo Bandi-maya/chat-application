@@ -177,6 +177,37 @@ void main() {
     });
 
     testWidgets(
+      'PatternLockPad captures fast diagonal swipes in path order and clears them',
+      (tester) async {
+        String? completedPattern;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: PatternLockPad(
+                  onPatternComplete: (pattern) => completedPattern = pattern,
+                  size: 300,
+                ),
+              ),
+            ),
+          ),
+        );
+
+        final topLeft = tester.getTopLeft(find.byType(PatternLockPad));
+        final gesture = await tester.startGesture(topLeft + const Offset(50, 50));
+        await gesture.moveTo(topLeft + const Offset(250, 250));
+        await gesture.up();
+        await tester.pumpAndSettle();
+
+        expect(completedPattern, '0-4-8');
+        expect(
+          tester.state<PatternLockPadState>(find.byType(PatternLockPad)).currentPattern,
+          isEmpty,
+        );
+      },
+    );
+
+    testWidgets(
       'PatternLockPad exposes a 4 by 4 grid for accessibility',
       (tester) async {
         await tester.pumpWidget(
