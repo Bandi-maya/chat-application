@@ -13,6 +13,20 @@ void main() {
       expect(HomePresetNormalizer.homeStyle('BUBBLES TAB STYLE'), 'Compact');
       expect(HomePresetNormalizer.homeStyle('BASIC TAB STYLE'), 'Productivity');
       expect(HomePresetNormalizer.homeStyle('WhatsApp OLD UI'), 'Classic');
+      expect(
+        HomePresetNormalizer.homeStyle('WhatsApp-style top bar'),
+        'Classic',
+      );
+      expect(HomePresetNormalizer.homeStyle('Floating Rail'), 'Stories First');
+      expect(
+        HomePresetNormalizer.homeStyle('3D Perspective Drawer'),
+        'Expressive',
+      );
+      expect(HomePresetNormalizer.homeStyle('Modern Side Menu'), 'Cards');
+      expect(
+        HomePresetNormalizer.homeStyle('Curved Radial Menu'),
+        'Expressive',
+      );
       expect(HomePresetNormalizer.homeStyle('Classic'), 'Classic');
       expect(HomePresetNormalizer.homeStyle('Tablet Split View'), 'Tablet Split View');
       expect(HomePresetNormalizer.homeStyle('Unknown Value'), 'Chaty Default');
