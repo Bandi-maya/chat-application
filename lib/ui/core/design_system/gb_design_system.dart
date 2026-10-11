@@ -858,7 +858,7 @@ class GbCardContainer extends StatelessWidget {
       padding: padding ?? const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(_liveTheme.cornerRadius),
         border: Border.all(color: colors.borderSubtle, width: 0.9),
         boxShadow: [
           BoxShadow(
@@ -1880,7 +1880,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 20),
       decoration: BoxDecoration(
-        color: Color(0xFF141C22),
+        color: _liveTheme.surfaceColor,
         border: Border(top: BorderSide(color: _liveTheme.cardColor, width: 0.8)),
       ),
       child: Row(
@@ -1987,7 +1987,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: isSelected ? _liveTheme.accentColor : const Color(0xFF1F2830),
+        color: isSelected ? _liveTheme.accentColor : _liveTheme.cardColor,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
