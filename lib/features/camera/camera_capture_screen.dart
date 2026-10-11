@@ -443,8 +443,11 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
     setState(() => _capturing = true);
     ChatyHaptics.light();
     try {
-      // Keep the latest stable face pose while the still capture runs. The
-      // stream callback is gated during capture, then stopped after review opens.
+      // Preserve the last stable face pose for compositing, but pause frame
+      // delivery before the still capture to reduce work and avoid camera races.
+      if (controller.value.isStreamingImages) {
+        await controller.stopImageStream();
+      }
       final file = await controller.takePicture();
       if (!mounted) return;
       var capturedPath = file.path;
