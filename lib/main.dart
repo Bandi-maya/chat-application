@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:chat/core/emoji/emoji_registry.dart';
+import 'package:chat/core/emoji/services/emoji_recent_cache.dart';
 import 'package:chat/data/services/backend_service.dart';
 import 'package:chat/data/services/auth_bootstrap_policy.dart';
 import 'package:chat/data/services/call_signaling_service.dart';
@@ -135,6 +137,26 @@ Future<void> main() async {
   });
 }
 
+// Build the emoji lookup/label cache after login while the user is not
+// waiting on the picker. The picker then uses cached registry and recents on
+// its first open; it does not synchronously enumerate all emojis on tap.
+bool _emojiCacheWarmupStarted = false;
+
+void _warmEmojiCacheAfterLogin() {
+  if (_emojiCacheWarmupStarted) return;
+  _emojiCacheWarmupStarted = true;
+  unawaited(
+    Future<void>.delayed(const Duration(milliseconds: 250))
+        .then((_) async {
+          ChatyEmojiRegistry.ensureInitialized();
+          await EmojiRecentCache.instance.initialize();
+        })
+        .catchError((Object error) {
+          debugPrint('Chaty emoji cache warmup skipped: $error');
+        }),
+  );
+}
+
 /// Noncritical startup work deferred until after the first frame so cold
 /// start renders the cached shell immediately. Each step fails soft: a
 /// skipped service must never take the app down during boot.
@@ -230,6 +252,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     _statusService = locator<StatusService>();
     if (Supabase.instance.client.auth.currentSession != null) {
       _statusService.startRevocationWatch();
+      _warmEmojiCacheAfterLogin();
     }
     _automationService = locator<MessageAutomationService>();
     _authUiSubscription = Supabase.instance.client.auth.onAuthStateChange
@@ -517,7 +540,10 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   }
 
   void _handleAuthUiEvent(AuthState state) {
-    if (state.session != null) unawaited(_registerCurrentDevice());
+    if (state.session != null) {
+      unawaited(_registerCurrentDevice());
+      _warmEmojiCacheAfterLogin();
+    }
     if (state.event == AuthChangeEvent.passwordRecovery &&
         !_recoveryRouteOpen) {
       _recoveryRouteOpen = true;
