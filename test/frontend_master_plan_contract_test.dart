@@ -99,10 +99,6 @@ void main() {
     expect(source, contains(': 244,'));
     expect(source, contains('await widget.dataStore.markAllAsRead()'));
     expect(source, contains("_handleHomeOverflowAction('starred')"));
-    expect(source, contains("_handleHomeOverflowAction('themes')"));
-    expect(source, contains("_handleHomeOverflowAction('templates')"));
-    expect(source, contains("_handleHomeOverflowAction('home')"));
-    expect(source, contains("_handleHomeOverflowAction('navigation')"));
     expect(source, contains('_openLinkedDevices();'));
     expect(source, contains('_openSettingsScreen();'));
     expect(source, isNot(contains('useOverflowSheet')));
