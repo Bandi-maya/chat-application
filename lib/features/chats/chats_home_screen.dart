@@ -322,8 +322,18 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
       (id) => !widget.preferencesController.isConversationLocked(id),
     );
 
-    // Locking is a user-initiated preference change. Removing protection is
-    // sensitive and must be authenticated before any selected item is changed.
+    // Configure a working credential before marking new chats as protected.
+    // This avoids creating locked chats that cannot be opened on this device.
+    if (shouldLock) {
+      final configured = await ProtectedResourceGate.ensureCredentialForNewLock(
+        context,
+        preferencesController: widget.preferencesController,
+      );
+      if (!configured || !mounted) return;
+    }
+
+    // Removing protection is sensitive and must be authenticated before any
+    // selected item is changed.
     if (!shouldLock) {
       final authorized = await ProtectedResourceGate.authorizeGeneralAction(
         context,
