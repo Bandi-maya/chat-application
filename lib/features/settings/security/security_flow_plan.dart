@@ -79,6 +79,7 @@ class SecurityFlowPlan {
         return <SecurityFlowStep>[
           if (hasVerifiableSecret(currentMethod) && currentSecretConfigured)
             SecurityFlowStep.verifyCurrent,
+          SecurityFlowStep.chooseMethod,
           if (hasVerifiableSecret(target)) SecurityFlowStep.setupNew,
           if (!hasVerifiableSecret(target)) SecurityFlowStep.preflightOsAuth,
           SecurityFlowStep.apply,

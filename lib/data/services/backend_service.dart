@@ -2028,6 +2028,57 @@ class ChatyBackendService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Clears every unread counter as one user-initiated action. For chats
+  /// where read receipts are permitted, persist the read state; in privacy /
+  /// ghost mode only clear the local counter and do not publish a receipt.
+  Future<void> markAllAsRead() async {
+    final unreadIds = _conversationsById.values
+        .where((conversation) => conversation.unreadCount > 0)
+        .map((conversation) => conversation.id)
+        .toList(growable: false);
+    if (unreadIds.isEmpty) return;
+
+    void clearLocalCounters() {
+      for (final id in unreadIds) {
+        final conversation = _conversationsById[id];
+        if (conversation != null && conversation.unreadCount != 0) {
+          _conversationsById[id] = conversation.copyWith(unreadCount: 0);
+        }
+      }
+      notifyListeners();
+    }
+
+    clearLocalCounters();
+    if (_isDemoMode) return;
+
+    final persistIds = unreadIds
+        .where(_shouldSendReadReceipts)
+        .toList(growable: false);
+    if (persistIds.isNotEmpty) {
+      await Future.wait(
+        persistIds.map((id) async {
+          try {
+            await _client.rpc(
+              'mark_conversation_read',
+              params: <String, dynamic>{'p_conversation_id': id},
+            );
+          } catch (error, stackTrace) {
+            debugPrint('Error marking conversation $id as read: $error\\n$stackTrace');
+          }
+        }),
+      );
+      try {
+        await _loadConversations(loadMembers: false);
+      } catch (error, stackTrace) {
+        debugPrint('Unable to refresh conversations after mark-all-read: $error\\n$stackTrace');
+      }
+    }
+
+    // A refresh can reintroduce server-side unread counts when read receipts
+    // are intentionally suppressed. Keep the immediate user-requested state.
+    clearLocalCounters();
+  }
+
   bool _shouldSendReadReceipts(String conversationId) {
     if (!locator.isRegistered<ChatyPreferencesController>()) return true;
     final prefs = locator<ChatyPreferencesController>();

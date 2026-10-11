@@ -1344,11 +1344,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         child: Row(
           children: [
             Icon(icon, size: 24, color: theme.primaryTextColor.withValues(alpha: 0.9)),
-            const SizedBox(width: 15),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 title,
@@ -1363,6 +1363,25 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _markAllConversationsAsRead() async {
+    try {
+      await widget.dataStore.markAllAsRead();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Marked all chats as read')),
+        );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('Could not mark chats as read: $error')),
+        );
+    }
   }
 
   void _openHomeThreeDotMenu({
@@ -1388,9 +1407,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               child: Material(
                 color: Colors.transparent,
                 child: Container(
-                  width: MediaQuery.sizeOf(ctx).width < 320
+                  width: MediaQuery.sizeOf(ctx).width < 260
                       ? MediaQuery.sizeOf(ctx).width - 24
-                      : 276,
+                      : 244,
                   constraints: BoxConstraints(
                     maxHeight: MediaQuery.of(ctx).size.height * 0.75,
                   ),
@@ -1451,44 +1470,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                             },
                           ),
                           _popupMenuItem(
-                              icon: Icons.camera_alt_rounded,
-                              title: 'Camera Effects',
-                              onTap: () {
-                                Navigator.pop(ctx);
-                                _handleHomeOverflowAction('effects');
-                              },
-                            ),
-                          _popupMenuItem(
-                              icon: Icons.qr_code_scanner_rounded,
-                              title: 'QR / Scan',
-                              onTap: () {
-                                Navigator.pop(ctx);
-                                _handleHomeOverflowAction('qr');
-                              },
-                            ),
-                          _popupMenuItem(
                             icon: Icons.devices_rounded,
                             title: 'Linked Devices',
                             onTap: () {
                               Navigator.pop(ctx);
                               _openLinkedDevices();
-                            },
-                          ),
-                          if (homePrefs.themesEnabled)
-                            _popupMenuItem(
-                              icon: Icons.palette_outlined,
-                              title: 'Themes & Colors',
-                              onTap: () {
-                                Navigator.pop(ctx);
-                                _handleHomeOverflowAction('themes');
-                              },
-                            ),
-                          _popupMenuItem(
-                            icon: Icons.dashboard_customize_rounded,
-                            title: 'Templates & Layouts',
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              _handleHomeOverflowAction('templates');
                             },
                           ),
                           _popupMenuItem(
@@ -1497,22 +1483,6 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                             onTap: () {
                               Navigator.pop(ctx);
                               _handleHomeOverflowAction('starred');
-                            },
-                          ),
-                          _popupMenuItem(
-                            icon: Icons.home_filled,
-                            title: 'Home & Navigation',
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              _handleHomeOverflowAction('home');
-                            },
-                          ),
-                          _popupMenuItem(
-                            icon: Icons.swap_horiz_rounded,
-                            title: 'Navigation Destinations',
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              _handleHomeOverflowAction('navigation');
                             },
                           ),
                           _popupMenuItem(
@@ -1558,12 +1528,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                             title: 'Mark All as Read',
                             onTap: () {
                               Navigator.pop(ctx);
-                              for (final c in widget.dataStore.conversations) {
-                                widget.dataStore.markAsRead(c.id);
-                              }
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Marked all chats as read')),
-                              );
+                              unawaited(_markAllConversationsAsRead());
                             },
                           ),
                           _popupMenuItem(

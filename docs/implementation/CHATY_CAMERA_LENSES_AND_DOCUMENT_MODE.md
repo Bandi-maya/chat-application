@@ -7,9 +7,10 @@ Turn the existing chat camera into a polished capture flow with native-feeling p
 ## Research findings
 
 - Snapchat's lens interaction is built around a centered, horizontally scrollable lens carousel and real face/world tracking. A face lens must be attached to landmarks/pose; a screen-fixed sticker is not face tracking.
-- Flutter's existing `camera` plugin exposes a preview, photo capture, and image streams. This project already depends on it, so the feature does not need another Dart camera package.
-- Apple Vision's `VNDetectFaceLandmarksRequest` can identify face regions and eye/mouth landmarks on-device.
-- Google's ML Kit documents real-time face tracking, landmarks, pose, and multi-frame tracking. However, adding ML Kit as a dependency would violate this project brief's no-new-external-library constraint. This implementation therefore uses built-in platform APIs and the existing pure-Dart `FaceAnchorSolver`.
+- Flutter's existing `camera` plugin provides preview, photo capture, and camera image streams.
+- The primary face engine is [`mediapipe_face_mesh` 3.2.1](https://pub.dev/packages/mediapipe_face_mesh/versions/3.2.1), an open-source Flutter implementation providing 478 face landmarks, iris points, and multi-face tracking on-device. Its source is BSD-3-Clause; bundled MediaPipe/TensorFlow Lite runtime/model components are separately Apache-2.0. The app calls it through a worker isolate and keeps camera pixels on-device.
+- Apple Vision (`VNDetectFaceLandmarksRequest`) and Android's built-in `android.media.FaceDetector` remain fallbacks when the mesh pipeline cannot start. The Android fallback has materially fewer landmarks and is not Snapchat-grade tracking.
+- GitHub candidate review: [`cornpip/mediapipe_face_mesh`](https://github.com/cornpip/mediapipe_face_mesh) is the selected, directly reusable Flutter runtime; [`vishnusajimon14-beep/realtime-face-filters`](https://github.com/vishnusajimon14-beep/realtime-face-filters) and [`charlielito/snapchat-filters-opencv`](https://github.com/charlielito/snapchat-filters-opencv) demonstrate landmark-to-accessory placement, but are Python/desktop examples rather than drop-in Flutter libraries. [`ridvanaltun/react-native-deepar`](https://github.com/ridvanaltun/react-native-deepar) wraps a proprietary/paid AR service, so it is not used. No proprietary Snapchat lenses or graphics are copied.
 - Google's ML Kit Document Scanner offers edge detection, auto-capture, crop/rotation, cleanup, and PDF/JPEG output, but it is an external SDK. Document mode in this no-new-dependency pass provides a guided framing overlay and a baked high-contrast scan look; perspective correction and automatic edge detection are a separate opt-in dependency decision.
 
 ## UX direction
@@ -27,11 +28,10 @@ Turn the existing chat camera into a polished capture flow with native-feeling p
 ## Implementation architecture
 
 - Reuse `LensManager`, `LensCarousel`, `LensOverlay`, and `FaceAnchorSolver`.
-- Add a thin Dart bridge that downsamples/rotates the camera image to a tiny RGB thumbnail and calls a native method channel only while a face lens is active.
-- Android: use the built-in `android.media.FaceDetector` as a dependency-free fallback. It is a legacy frontal-face detector and does not provide the contour/expression quality of ML Kit; landmarks other than eyes are estimated from the detected face box.
-- iOS: use the built-in Vision face-landmark request for eyes, nose, mouth, face box, and pose.
-- Throttle face detections and update only the lens overlay via a `ValueNotifier`; do not rebuild the camera viewfinder for every detection.
-- When no native detector exists (desktop/test builds), normal photo capture and gallery fallback continue working.
+- Add a Dart bridge that feeds BGRA/NV21 camera frames to the MediaPipe mesh in a worker isolate, mapping eye corners, nose, mouth, face bounds, and roll into `FaceAnchorSolver`.
+- Use Apple Vision and Android's built-in frontal `FaceDetector` as fallback paths. The older Android fallback estimates some anchors from the face box, so those fallback lenses are less precise than the mesh path.
+- Throttle frame handling and update the lens layer through a `ValueNotifier`; keep camera preview rebuilds separate from landmark updates.
+- If the mesh runtime is unsupported or unavailable, ordinary camera, gallery, and photo/document capture remain available rather than failing the whole camera.
 
 ## Acceptance criteria
 
@@ -41,7 +41,7 @@ Turn the existing chat camera into a polished capture flow with native-feeling p
 - Tracking loss fades/removes the lens gracefully; no face means no face-attached graphic.
 - Face frames remain on-device and are only generated while a face lens is selected.
 - Document mode gives a visible framing guide and applies the monochrome scan look to both preview and resulting file.
-- No new Flutter packages or external assets are added.
+- One vetted open-source Flutter package (`mediapipe_face_mesh`) is added for face tracking; no paid AR SDK, additional icon library, or external lens artwork is added.
 - Camera modes and carousels stay usable on narrow devices, and camera controls don't block the center of the page.
 - Regression tests cover tracking reset/mirroring, mode selection UI, and existing camera/effect contracts.
 
@@ -64,7 +64,7 @@ This is the unique set of camera patterns that fit the current Flutter app. Simi
 | Responsive thumb-zone hierarchy | Rails and swatches scale with the shortest screen dimension; tight layouts reduce spacing instead of scaling the entire screen down | [Flutter UI guidance](https://docs.flutter.dev/ui), [Material Design](https://m3.material.io) |
 | Reduced-motion-aware transitions | Selected controls use short, eased transitions and honor system reduced-motion settings where supported | [Motion](https://motion.dev), [Animista](https://animista.net) |
 | Lightweight frame delivery | Downsample to a small local thumbnail, throttle detection, and update the overlay separately from the viewfinder | [Flutter camera package](https://pub.dev/packages/camera), [Apple Vision](https://developer.apple.com/documentation/vision) |
-| Native-first dependency policy | Study web component catalogs for layout and motion only; do not install React/web UI components or an extra Flutter face/document package for this pass | [21st.dev](https://21st.dev), [React Bits](https://reactbits.dev), [Magic UI](https://magicui.design) |
+| Native-first dependency policy | Study web component catalogs for layout and motion only; use a single open-source native-on-device mesh runtime rather than porting React components or integrating a paid AR SDK | [21st.dev](https://21st.dev), [React Bits](https://reactbits.dev), [Magic UI](https://magicui.design), [MediaPipe face mesh](https://github.com/cornpip/mediapipe_face_mesh) |
 
 ### UX laws / heuristics translated into decisions
 
@@ -87,6 +87,11 @@ This is the unique set of camera patterns that fit the current Flutter app. Simi
 - Snapchat Lenses overview: https://support.lensstudio.snapchat.com/hc/en-us/articles/360031423371-What-is-a-Lens
 - Flutter camera recipe: https://docs.flutter.dev/cookbook/plugins/picture-using-camera
 - Flutter camera package: https://pub.dev/packages/camera
+- MediaPipe Face Mesh for Flutter (BSD-3-Clause source; bundled runtime/model notices included): https://pub.dev/packages/mediapipe_face_mesh/versions/3.2.1
+- MediaPipe Flutter source repository: https://github.com/cornpip/mediapipe_face_mesh
+- Desktop filter concept reference (not imported into the app): https://github.com/vishnusajimon14-beep/realtime-face-filters
+- Desktop OpenCV example (not imported into the app): https://github.com/charlielito/snapchat-filters-opencv
+- DeepAR React Native wrapper reviewed but not used due its proprietary service requirement: https://github.com/ridvanaltun/react-native-deepar
 - Apple Vision face landmarks: https://developer.apple.com/documentation/vision/vndetectfacelandmarksrequest
 - ML Kit face detection concepts: https://developers.google.com/ml-kit/vision/face-detection/face-detection-concepts
 - ML Kit document scanner: https://developers.google.com/ml-kit/vision/doc-scanner

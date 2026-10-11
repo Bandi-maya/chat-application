@@ -83,11 +83,15 @@ class PatternLockPadState extends State<PatternLockPad> {
     final theme = Theme.of(context);
     final color = theme.colorScheme.primary;
     final muted = theme.colorScheme.onSurface.withValues(alpha: 0.35);
+    final availableWidth = (MediaQuery.sizeOf(context).width - 32)
+        .clamp(168.0, 280.0)
+        .toDouble();
+    final effectiveSize = math.min(widget.size, availableWidth).toDouble();
 
     return Semantics(
       label: 'Pattern lock grid 3 by 3',
       child: SizedBox.square(
-        dimension: widget.size,
+        dimension: effectiveSize,
         child: LayoutBuilder(
           builder: (context, constraints) {
             final size = Size(constraints.maxWidth, constraints.maxHeight);
@@ -151,17 +155,10 @@ class _PatternPainter extends CustomPainter {
 
     // Draw lines connecting selected dots if trace is NOT hidden
     if (!hideTrace && selected.isNotEmpty) {
-      // Glow underlay for trace
-      final glowPaint = Paint()
-        ..color = activeColor.withValues(alpha: 0.25)
-        ..strokeWidth = 10.0
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..style = PaintingStyle.stroke;
-
+      // One crisp trace stroke—no double-painted glow underlay.
       final linePaint = Paint()
         ..color = activeColor
-        ..strokeWidth = 4.5
+        ..strokeWidth = 4.2
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
         ..style = PaintingStyle.stroke;
@@ -174,7 +171,6 @@ class _PatternPainter extends CustomPainter {
       if (pointer != null) {
         path.lineTo(pointer!.dx, pointer!.dy);
       }
-      canvas.drawPath(path, glowPaint);
       canvas.drawPath(path, linePaint);
     }
 
@@ -183,44 +179,29 @@ class _PatternPainter extends CustomPainter {
       final isSelected = selected.contains(index);
 
       if (isSelected) {
-        // Outer glow halo when selected
+        // Minimal selected node with one outline and one solid center.
         if (!hideTrace) {
-          final outerHalo = Paint()
-            ..color = activeColor.withValues(alpha: 0.18)
-            ..style = PaintingStyle.fill;
-          canvas.drawCircle(centers[index], 28, outerHalo);
-
           final outerBorder = Paint()
-            ..color = activeColor.withValues(alpha: 0.75)
-            ..strokeWidth = 2.0
+            ..color = activeColor.withValues(alpha: 0.72)
+            ..strokeWidth = 1.4
             ..style = PaintingStyle.stroke;
-          canvas.drawCircle(centers[index], 24, outerBorder);
+          canvas.drawCircle(centers[index], 18, outerBorder);
         }
-
-        // Inner solid dot with core shine
         final centerDot = Paint()
           ..color = (!hideTrace) ? activeColor : inactiveColor
           ..style = PaintingStyle.fill;
-        canvas.drawCircle(centers[index], (!hideTrace) ? 8.5 : 6.5, centerDot);
-
-        if (!hideTrace) {
-          final centerCore = Paint()
-            ..color = Colors.white.withValues(alpha: 0.8)
-            ..style = PaintingStyle.fill;
-          canvas.drawCircle(centers[index], 3.0, centerCore);
-        }
+        canvas.drawCircle(centers[index], (!hideTrace) ? 6.5 : 5.5, centerDot);
       } else {
-        // Inactive unselected dot with subtle glass ring
         final inactiveRing = Paint()
-          ..color = inactiveColor.withValues(alpha: 0.14)
-          ..strokeWidth = 1.5
+          ..color = inactiveColor.withValues(alpha: 0.22)
+          ..strokeWidth = 1
           ..style = PaintingStyle.stroke;
-        canvas.drawCircle(centers[index], 20, inactiveRing);
+        canvas.drawCircle(centers[index], 18, inactiveRing);
 
         final inactiveDot = Paint()
-          ..color = inactiveColor.withValues(alpha: 0.65)
+          ..color = inactiveColor.withValues(alpha: 0.7)
           ..style = PaintingStyle.fill;
-        canvas.drawCircle(centers[index], 6, inactiveDot);
+        canvas.drawCircle(centers[index], 4.5, inactiveDot);
       }
     }
   }
