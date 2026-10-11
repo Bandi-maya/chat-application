@@ -210,6 +210,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   bool _postLoginAppLockPromptScheduled = false;
   bool _postLoginAppLockPromptShown = false;
   DateTime? _backgroundedAt;
+  bool _presenceOverrideWasActive = false;
   Object? _backendBootstrapError;
 
   @override
@@ -269,6 +270,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     try {
       await _backend.initialize();
       if (!mounted) return;
+      _applyPresenceOverrideOnPreferenceChange();
       setState(() => _backendBootstrapError = null);
     } catch (error, stackTrace) {
       debugPrint('Chaty backend bootstrap failed: $error\n$stackTrace');
@@ -286,10 +288,40 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
   }
 
   void _handleSecurityPreferenceChanged() {
-    if (_preferencesController.security.isAppLockEnabled) return;
-    _initialAppLockScheduled = false;
-    _backgroundedAt = null;
-    if (_appLockRequired && mounted) setState(() => _appLockRequired = false);
+    if (!_preferencesController.security.isAppLockEnabled) {
+      _initialAppLockScheduled = false;
+      _backgroundedAt = null;
+      if (_appLockRequired && mounted) setState(() => _appLockRequired = false);
+    }
+    _applyPresenceOverrideOnPreferenceChange();
+  }
+
+  /// Applies airplane/ghost presence switches immediately instead of waiting
+  /// for the next pause/resume lifecycle event. Turning the last override off
+  /// restores online presence only while the app is in the foreground.
+  void _applyPresenceOverrideOnPreferenceChange() {
+    final airplane =
+        _preferencesController.home.airplaneModeSimulator ||
+        _preferencesController.gbBool('yo_want_airplanemode');
+    final ghost =
+        _preferencesController.home.ghostMode ||
+        _preferencesController.gbBool('yo_want_ghostmode');
+    final overrideActive = airplane || ghost;
+
+    if (overrideActive) {
+      _presenceOverrideWasActive = true;
+      if (_backend.isAuthenticated) {
+        unawaited(_backend.setPresence(PresenceState.offline));
+      }
+      return;
+    }
+
+    if (!_presenceOverrideWasActive) return;
+    _presenceOverrideWasActive = false;
+    if (_backend.isAuthenticated &&
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+      unawaited(_backend.setPresence(PresenceState.online));
+    }
   }
 
   Future<bool> _isCurrentLockMethodReady() async {
@@ -626,9 +658,11 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     final alwaysOnline = _preferencesController.universal.enableAlwaysOnline ||
         _preferencesController.gbBool('always_online');
     if (airplane || ghost) {
+      _presenceOverrideWasActive = true;
       unawaited(_backend.setPresence(PresenceState.offline));
       return;
     }
+    _presenceOverrideWasActive = false;
     if (state == AppLifecycleState.resumed || alwaysOnline) {
       unawaited(_backend.setPresence(PresenceState.online));
     } else if (state == AppLifecycleState.paused ||
