@@ -10,7 +10,9 @@ void main() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
   });
 
-  test('concurrent appearance changes persist without losing independent values', () async {
+  test(
+    'concurrent appearance changes persist without losing independent values',
+    () async {
     final controller = AppearanceVariantController();
 
     await Future.wait(<Future<void>>[
@@ -20,11 +22,12 @@ void main() {
     ]);
 
     final preferences = await SharedPreferences.getInstance();
-    expect(preferences.getString('appearance.typography'), 'Large UI');
-    expect(preferences.getString('appearance.entryAnimation'), 'None');
-    expect(controller.typographyStyle, 'Large UI');
-    expect(controller.entryAnimation, 'None');
-  });
+      expect(preferences.getString('appearance.typography'), 'Large UI');
+      expect(preferences.getString('appearance.entryAnimation'), 'None');
+      expect(controller.typographyStyle, 'Large UI');
+      expect(controller.entryAnimation, 'None');
+    },
+  );
 
   test('unsupported appearance values are ignored', () async {
     final controller = AppearanceVariantController();
