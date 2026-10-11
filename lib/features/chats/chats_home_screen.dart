@@ -472,7 +472,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
           'above chat filters' => 'Above chat filters',
           _ => 'Header action',
         };
-        final searchEnabled = homePrefs.showSearchBar && !homePrefs.disableSearchBar;
+        final searchEnabled = homePrefs.showSearchBar;
         final styleSplitView = homeStyle == 'Tablet Split View';
         // Stories Style consumers: each value renders the strip differently.
         final storiesStyle = homePrefs.storiesStyle;
