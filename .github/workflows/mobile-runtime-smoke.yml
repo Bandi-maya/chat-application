@@ -64,7 +64,9 @@ jobs:
           profile: pixel_6
           disable-animations: true
           script: |
-            set -euo pipefail
+            # android-emulator-runner executes this script with /bin/sh;
+            # POSIX sh does not support Bash's pipefail option.
+            set -eu
             mkdir -p artifacts
             adb logcat -c
             adb install -r build/app/outputs/flutter-apk/app-debug.apk
