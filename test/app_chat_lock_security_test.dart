@@ -27,7 +27,7 @@ void main() {
     );
 
     test(
-      'Pattern validator requires at least 4 unique dots between 0 and 8',
+      'Pattern validator supports 3x3 and 4x4 grids with unique dots',
       () async {
         final service = LocalLockService();
         // Valid pattern
@@ -48,6 +48,16 @@ void main() {
         // Duplicate nodes
         expect(
           () => service.setCredential('Pattern', '0-1-2-1'),
+          throwsA(isA<ArgumentError>()),
+        );
+        // 4x4 supports indexes 0..15 and persists the selected grid size.
+        await expectLater(
+          service.setCredential('Pattern', '0-1-2-5-9-13', patternGridSize: 4),
+          completes,
+        );
+        expect(await service.getPatternGridSize(), 4);
+        expect(
+          () => service.setCredential('Pattern', '0-1-2-16', patternGridSize: 4),
           throwsA(isA<ArgumentError>()),
         );
       },
@@ -150,6 +160,19 @@ void main() {
       expect(find.byType(PatternLockPad), findsOneWidget);
       expect(find.bySemanticsLabel('Pattern lock grid 3 by 3'), findsOneWidget);
       expect(completedPattern, isNull);
+    });
+
+    testWidgets('PatternLockPad exposes a 4 by 4 grid for accessibility', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: PatternLockPad(onPatternComplete: (_) {}, gridSize: 4),
+            ),
+          ),
+        ),
+      );
+      expect(find.bySemanticsLabel('Pattern lock grid 4 by 4'), findsOneWidget);
     });
   });
 }
