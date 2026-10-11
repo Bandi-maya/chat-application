@@ -83,7 +83,7 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
 }
 
 /** Lightweight native overlay. No notification content is persisted or uploaded. */
-private object IslandOverlay {
+internal object IslandOverlay {
     private val main = Handler(Looper.getMainLooper())
     private var windowManager: WindowManager? = null
     private var currentView: View? = null
@@ -114,7 +114,7 @@ private object IslandOverlay {
         latestCall = isCall
         latestPendingIntent = pendingIntent
         expanded = false
-        main.removeCallbacks(dismissRunnable ?: return@show)
+        dismissRunnable?.let(main::removeCallbacks)
         windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         render(context)
         val timeout = if (isCall) 12000L else 5500L
@@ -224,7 +224,7 @@ private object IslandOverlay {
     }
 
     fun remove() {
-        main.removeCallbacks(dismissRunnable ?: return)
+        dismissRunnable?.let(main::removeCallbacks)
         val view = currentView
         currentView = null
         if (view != null) runCatching { windowManager?.removeView(view) }
