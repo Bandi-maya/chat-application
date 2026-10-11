@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../../data/repositories/chaty_data_store.dart';
 import '../../../domain/models/preferences.dart';
+import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/gb_design_system.dart';
+import '../../../ui/core/theme/theme_config.dart';
+import '../../../ui/core/theme/theme_controller.dart';
 
 /// Header Settings Screen with pinned Live Preview at top matching Image 2 & 3.
 /// Changes to settings update the live preview above lively and in real time.
@@ -54,6 +57,28 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
     'Outlined Bubble',
     'Segmented Tab',
   ];
+
+  /// Keep the Home UI selector wired to the same persisted navigation-mode
+  /// controller used by the main navigation shell. The selected home preset and
+  /// the app shell therefore change together instead of leaving the shell stale.
+  AppNavigationMode _navigationModeForHomeUiStyle(String style) {
+    switch (style.trim().toLowerCase()) {
+      case 'one ui':
+        return AppNavigationMode.modernSideMenu;
+      case 'whatsapp ui stock':
+        return AppNavigationMode.bottomNav;
+      case 'ios style':
+        return AppNavigationMode.floatingIslandRail;
+      case 'bubbles tab style':
+        return AppNavigationMode.gestureTabs;
+      case 'basic tab style':
+        return AppNavigationMode.compactRail;
+      case 'whatsapp old ui':
+        return AppNavigationMode.topWhatsAppBar;
+      default:
+        return locator<ThemeController>().navigationMode;
+    }
+  }
 
   void _updateHome(HomePreferences newPrefs, {String? logTitle}) {
     widget.preferencesController.updateHome(newPrefs, logTitle: logTitle);
@@ -155,6 +180,13 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                                   : 'WhatsApp OLD UI',
                             );
                             if (chosen != null && mounted) {
+                              // This is a structural choice, not just a preview
+                              // preference: route it through ThemeController so
+                              // MainNavigationShell rebuilds the matching header
+                              // and navigation layout immediately.
+                              locator<ThemeController>().setNavigationMode(
+                                _navigationModeForHomeUiStyle(chosen),
+                              );
                               _updateHome(
                                 home.copyWith(homeStyle: chosen),
                                 logTitle: 'Home UI Style',
