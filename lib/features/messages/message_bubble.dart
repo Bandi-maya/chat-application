@@ -141,7 +141,7 @@ class MessageBubble extends StatelessWidget {
         '';
     final effectiveBubbleStyle = legacyBubbleStyle.isNotEmpty
         ? BubbleStyleIdExtension.fromString(legacyBubbleStyle)
-        : effectiveBubbleStyle;
+        : theme.bubbleStyle;
 
     if (message.type == MessageType.system) {
       final infoBg = convPrefs?.infoBalloonsBgColor != null
