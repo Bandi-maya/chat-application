@@ -84,7 +84,7 @@ class _ChatyBackButtonState extends State<ChatyBackButton> {
       child: Center(
         child: AnimatedScale(
           scale: _isPressed ? ChatyMotion.activeIconScale : 1.0,
-          duration: ChatyMotion.instant,
+          duration: ChatyMotion.duration(context, preferred: ChatyMotion.instant),
           curve: ChatyMotion.enter,
           child: Material(
             color: Colors.transparent,
@@ -272,7 +272,7 @@ class _ChatyPrimaryButtonState extends State<ChatyPrimaryButton> {
 
     return AnimatedScale(
       scale: _isPressed && isEnabled ? ChatyMotion.activeScale : 1.0,
-      duration: ChatyMotion.instant,
+      duration: ChatyMotion.duration(context, preferred: ChatyMotion.instant),
       curve: ChatyMotion.enter,
       child: SizedBox(
         height: widget.height,
@@ -310,7 +310,7 @@ class _ChatyPrimaryButtonState extends State<ChatyPrimaryButton> {
               if (_isPressed) setState(() => _isPressed = false);
             },
             child: AnimatedSwitcher(
-              duration: ChatyMotion.fast,
+              duration: ChatyMotion.duration(context, preferred: ChatyMotion.fast),
               child: widget.isLoading
                   ? SizedBox(
                       width: 20,
@@ -396,7 +396,7 @@ class _ChatySecondaryButtonState extends State<ChatySecondaryButton> {
 
     return AnimatedScale(
       scale: _isPressed && isEnabled ? ChatyMotion.activeScale : 1.0,
-      duration: ChatyMotion.instant,
+      duration: ChatyMotion.duration(context, preferred: ChatyMotion.instant),
       curve: ChatyMotion.enter,
       child: SizedBox(
         height: widget.height,
@@ -517,7 +517,7 @@ class _ChatyIconButtonState extends State<ChatyIconButton> {
             scale: _isPressed && widget.onPressed != null
                 ? ChatyMotion.activeIconScale
                 : 1.0,
-            duration: ChatyMotion.instant,
+            duration: ChatyMotion.duration(context, preferred: ChatyMotion.instant),
             curve: ChatyMotion.enter,
             child: Icon(
               widget.icon,
