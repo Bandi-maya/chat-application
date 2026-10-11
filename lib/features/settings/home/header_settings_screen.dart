@@ -99,6 +99,42 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
     }
   }
 
+  String _selectedHomeUiStyle(HomePreferences home) {
+    final saved = home.homeStyle.trim();
+    if (_homeUiStyles.contains(saved)) return saved;
+
+    // Older versions sometimes persisted the canonical Home preset instead
+    // of the label shown by this selector. Reverse-map those values so a radio
+    // choice remains visibly selected after an upgrade.
+    switch (saved.toLowerCase()) {
+      case 'classic':
+        return 'WhatsApp OLD UI';
+      case 'chaty default':
+        return 'WhatsApp UI Stock';
+      case 'cards':
+        return 'ONE UI';
+      case 'stories first':
+        return 'IOS STYLE';
+      case 'compact':
+        return 'BUBBLES TAB STYLE';
+      case 'productivity':
+        return 'BASIC TAB STYLE';
+    }
+
+    // For newer shell modes, use the restored runtime mode when the stored
+    // Home label came from a previous canonicalization step.
+    return switch (locator<ThemeController>().navigationMode) {
+      AppNavigationMode.topWhatsAppBar => 'WhatsApp-style top bar',
+      AppNavigationMode.floatingIslandRail => 'Floating Rail',
+      AppNavigationMode.perspective3DDrawer => '3D Perspective Drawer',
+      AppNavigationMode.modernSideMenu => 'Modern Side Menu',
+      AppNavigationMode.curvedRadialDrawer => 'Curved Radial Menu',
+      AppNavigationMode.gestureTabs => 'BUBBLES TAB STYLE',
+      AppNavigationMode.compactRail => 'BASIC TAB STYLE',
+      AppNavigationMode.bottomNav => 'WhatsApp UI Stock',
+    };
+  }
+
   void _updateHome(HomePreferences newPrefs, {String? logTitle}) {
     widget.preferencesController.updateHome(newPrefs, logTitle: logTitle);
     setState(() {});
@@ -185,18 +221,14 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                             size: 21,
                           ),
                           title: 'Home UI Style',
-                          subtitle: home.homeStyle.isNotEmpty
-                              ? home.homeStyle
-                              : 'WhatsApp OLD UI',
+                          subtitle: _selectedHomeUiStyle(home),
                           showChevron: true,
                           onTap: () async {
                             final chosen = await GbRadioSelectionDialog.show(
                               context: context,
                               title: 'Home UI Style',
                               options: _homeUiStyles,
-                              selectedOption: home.homeStyle.isNotEmpty
-                                  ? home.homeStyle
-                                  : 'WhatsApp OLD UI',
+                              selectedOption: _selectedHomeUiStyle(home),
                             );
                             if (chosen != null && mounted) {
                               // This is a structural choice, not just a preview
