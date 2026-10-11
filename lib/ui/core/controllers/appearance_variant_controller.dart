@@ -311,9 +311,22 @@ class AppearanceVariantController extends ChangeNotifier {
     required ValueChanged<String> apply,
   }) async {
     if (!options.contains(value)) return;
-    apply(value);
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(key, value);
+    await _loadFuture;
+
+    // Serialize independent writes and publish only after persistence succeeds.
+    final previousWrite = _writeQueue;
+    final completed = Completer<void>();
+    _writeQueue = completed.future;
+    try {
+      await previousWrite;
+      final prefs = await SharedPreferences.getInstance();
+      if (!await prefs.setString(key, value)) {
+        throw StateError('Could not persist appearance preference: $key');
+      }
+      apply(value);
+      notifyListeners();
+    } finally {
+      completed.complete();
+    }
   }
 }
