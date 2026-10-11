@@ -178,19 +178,42 @@ extension BubbleStyleIdExtension on BubbleStyleId {
       }
     }
 
-    // Legacy migrations
+    // Legacy migrations and the labels exposed by Conversation > Bubbles Style.
+    // Keep every visible option mapped to a real renderer so selections never
+    // silently collapse to the default WhatsApp bubble.
     switch (normalized) {
       case 'classic':
       case 'default':
       case 'tail':
+      case 'whatsappdefault':
         return BubbleStyleId.stock;
       case 'tailless':
       case 'compact':
       case 'pill':
+      case 'roundedpill':
         return BubbleStyleId.facebookMessenger;
+      case 'chatymodern':
+        return BubbleStyleId.rounded;
       case 'squircle':
       case 'softsquare':
+      case 'squirclesoft':
         return BubbleStyleId.gabiSqua;
+      case 'paperchat':
+        return BubbleStyleId.waPaperRedesigned;
+      case 'glassmorphic':
+        return BubbleStyleId.transparent;
+      case 'iosflat':
+        return BubbleStyleId.ios;
+      case 'telegramarc':
+        return BubbleStyleId.telegram;
+      case '3dshadow':
+        return BubbleStyleId.threeD;
+      case 'minimalborder':
+        return BubbleStyleId.gabiOutline;
+      case 'retrobubble':
+        return BubbleStyleId.oldHangouts;
+      case 'futuristicclip':
+        return BubbleStyleId.foldV2;
       case 'card':
       case 'minimal':
         return BubbleStyleId.materialized;
