@@ -281,27 +281,27 @@ class SettingsRootScreen extends StatelessWidget {
         final colors = context.colors;
         final theme = themeController.globalTheme;
         return Scaffold(
-        backgroundColor: const Color(0xFF0C1014),
+        backgroundColor: colors.background,
         appBar: AppBar(
-          backgroundColor: const Color(0xFF0C1014),
+          backgroundColor: colors.background,
           elevation: 0,
-          title: const Text(
+          title: Text(
             'Settings',
             style: TextStyle(
-              color: Colors.white,
+              color: colors.foreground,
               fontWeight: FontWeight.bold,
               fontSize: 20,
             ),
           ),
           leading: Navigator.of(context).canPop()
               ? IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+                  icon: Icon(Icons.arrow_back, color: colors.foreground, size: 24),
                   onPressed: () => Navigator.of(context).pop(),
                 )
               : null,
           actions: [
             IconButton(
-              icon: const Icon(Icons.search_rounded, color: Colors.white, size: 24),
+              icon: Icon(Icons.search_rounded, color: colors.foreground, size: 24),
               tooltip: 'Search settings',
               onPressed: () => showSearch(
                 context: context,
@@ -309,7 +309,7 @@ class SettingsRootScreen extends StatelessWidget {
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 25),
+              icon: Icon(Icons.qr_code_2_rounded, color: colors.foreground, size: 25),
               tooltip: 'QR code',
               onPressed: () => _openQrScreen(context),
             ),
@@ -474,22 +474,23 @@ class SettingsRootScreen extends StatelessWidget {
                 ),
               ),
 
-              const Divider(height: 1, color: Color(0xFF1E282E)),
+              Divider(height: 1, color: colors.divider),
               const SizedBox(height: 8),
 
               // Settings Container Card: Only displaying the 5 requested items
               Container(
                 width: double.infinity,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF11161B),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                decoration: BoxDecoration(
+                  color: colors.surfaceSecondary,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                  border: Border(top: BorderSide(color: colors.borderSubtle)),
                 ),
                 padding: const EdgeInsets.only(top: 8, bottom: 32),
                 child: Column(
                   children: [
                     // Customization Center
                     _SettingsItemTile(
-                      icon: const Icon(Icons.palette_outlined, color: Color(0xFF22C55E), size: 24),
+                      icon: Icon(Icons.palette_outlined, color: colors.primary, size: 24),
                       title: 'Customization Center',
                       subtitle: 'Visual dialects, headers, bubbles, ticks, composers & motion',
                       onTap: () => Navigator.of(context).push(
@@ -501,7 +502,7 @@ class SettingsRootScreen extends StatelessWidget {
 
                     // 1. Linked devices
                     _SettingsItemTile(
-                      icon: const Icon(Icons.devices_rounded, color: Color(0xFF8696A0), size: 24),
+                      icon: Icon(Icons.devices_rounded, color: colors.foregroundSecondary, size: 24),
                       title: 'Linked devices',
                       subtitle: 'Use Chaty on other devices',
                       onTap: () => _openLinkedDevices(context),
@@ -509,7 +510,7 @@ class SettingsRootScreen extends StatelessWidget {
 
                     // 2. Share Chaty
                     _SettingsItemTile(
-                      icon: const Icon(Icons.share_rounded, color: Color(0xFF8696A0), size: 24),
+                      icon: Icon(Icons.share_rounded, color: colors.foregroundSecondary, size: 24),
                       title: 'Share Chaty',
                       subtitle: 'Invite friends and family to join Chaty',
                       onTap: () => ChatyShareService.shareApp(context),
@@ -517,7 +518,7 @@ class SettingsRootScreen extends StatelessWidget {
 
                     // 3. Privacy policy
                     _SettingsItemTile(
-                      icon: const Icon(Icons.shield_outlined, color: Color(0xFF8696A0), size: 24),
+                      icon: Icon(Icons.shield_outlined, color: colors.foregroundSecondary, size: 24),
                       title: 'Privacy policy',
                       subtitle: 'Read our security and data privacy policy',
                       onTap: () => _showPrivacyPolicy(context),
@@ -525,19 +526,19 @@ class SettingsRootScreen extends StatelessWidget {
 
                     // 4. About
                     _SettingsItemTile(
-                      icon: const Icon(Icons.info_outline_rounded, color: Color(0xFF8696A0), size: 24),
+                      icon: Icon(Icons.info_outline_rounded, color: colors.foregroundSecondary, size: 24),
                       title: 'About',
                       subtitle: 'App version, build and information',
                       onTap: () => _showAboutDialog(context),
                     ),
 
                     const SizedBox(height: 12),
-                    const Divider(height: 1, color: Color(0xFF1E282E), indent: 20, endIndent: 20),
+                    Divider(height: 1, color: colors.divider, indent: 20, endIndent: 20),
                     const SizedBox(height: 12),
 
                     // 5. Log out
                     _SettingsItemTile(
-                      icon: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 24),
+                      icon: Icon(Icons.logout_rounded, color: colors.error, size: 24),
                       title: 'Log out',
                       subtitle: 'Sign out of your session on this device',
                       onTap: () => _logout(context),
@@ -622,15 +623,16 @@ class SettingsRootScreen extends StatelessWidget {
   }
 
   Widget _avatarFallback(UserProfile user, {double size = 60}) {
+    final colors = context.colors;
     return Container(
-      color: const Color(0xFF223038),
+      color: colors.surfaceElevated,
       width: size,
       height: size,
       child: Center(
         child: Text(
           user.avatarInitials.isNotEmpty ? user.avatarInitials : 'BM',
           style: TextStyle(
-            color: Colors.white,
+            color: colors.foreground,
             fontSize: size * 0.46,
             fontWeight: FontWeight.w700,
           ),
@@ -676,7 +678,7 @@ class _SettingsItemTile extends StatelessWidget {
                   Text(
                     title,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: context.colors.foreground,
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                       letterSpacing: -0.1,
