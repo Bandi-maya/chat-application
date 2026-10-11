@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:chat/injection/locator.dart';
@@ -109,13 +110,32 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> wit
   }
 
   Future<void> _previewDynamicIsland() async {
+    if (Platform.isAndroid && !_overlayPermissionGranted) {
+      await _openDynamicIslandPermission(notificationAccess: false);
+      if (!_overlayPermissionGranted) {
+        // Fall back to in-app event island preview so user can still see how it works
+        SystemSound.play(SystemSoundType.click);
+        widget.notificationService.triggerEventNotification(
+          title: 'Dynamic Island preview',
+          body: 'New message · Tap the pill to expand',
+          icon: Icons.chat_bubble_rounded,
+          color: locator<ThemeController>().globalTheme.accentColor,
+        );
+        return;
+      }
+    }
+
     try {
       if (_overlayPermissionGranted) {
         await _dynamicIslandChannel.invokeMethod<void>('showPreview');
         return;
       }
-    } on PlatformException catch (_) {
-      // Fall back to the in-app preview if native overlay cannot be displayed.
+    } on PlatformException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not show system preview: ${e.message ?? 'Unknown error'}')),
+        );
+      }
     } on MissingPluginException catch (_) {
       // Fall back to the in-app preview on non-Android platforms.
     }

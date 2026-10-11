@@ -18,6 +18,7 @@ import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
@@ -108,6 +109,9 @@ internal object IslandOverlay {
     private var latestPendingIntent: PendingIntent? = null
     private var latestActions: List<IslandAction> = emptyList()
 
+    private var lastPostedKey = ""
+    private var lastPostedTime = 0L
+
     fun show(
         context: Context,
         title: String,
@@ -120,7 +124,17 @@ internal object IslandOverlay {
         forcePreview: Boolean = false,
     ) {
         if (!forcePreview && !DynamicIslandNotificationListener.isEnabled(context)) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
+        val appContext = context.applicationContext ?: context
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(appContext)) return
+
+        val notifKey = "$packageName:$title:$body"
+        val now = System.currentTimeMillis()
+        if (!forcePreview && notifKey == lastPostedKey && (now - lastPostedTime) < 1500L) {
+            return // Skip rapid duplicate events to prevent flickering/blinking
+        }
+        lastPostedKey = notifKey
+        lastPostedTime = now
+
         latestTitle = title
         latestBody = body
         latestIcon = icon
@@ -130,21 +144,22 @@ internal object IslandOverlay {
         latestActions = actions
         expanded = false
         dismissRunnable?.let(main::removeCallbacks)
-        windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        render(context)
-        // Keep the collapsed island stable instead of flashing away on a timer.
-        // It remains until the user opens it or another notification replaces it.
+        try {
+            windowManager = appContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        } catch (_: Exception) {
+            return
+        }
+        render(appContext)
+        scheduleDismiss(appContext, false)
     }
 
     private fun scheduleDismiss(context: Context, isExpanded: Boolean) {
         dismissRunnable?.let(main::removeCallbacks)
-        // A collapsed notification is transient. Once the user expands it,
-        // give them enough time to read and use the available actions.
         val timeout = when {
             latestCall && isExpanded -> 30000L
             latestCall -> 12000L
             isExpanded -> 15000L
-            else -> 5500L
+            else -> 6000L
         }
         dismissRunnable = Runnable { remove() }
         main.postDelayed(dismissRunnable!!, timeout)
@@ -155,7 +170,7 @@ internal object IslandOverlay {
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(context, 15), dp(context, 10), dp(context, 15), dp(context, 10))
+            setPadding(dp(context, 16), dp(context, 10), dp(context, 16), dp(context, 10))
             background = GradientDrawable().apply {
                 setColor(Color.rgb(8, 9, 11))
                 cornerRadius = dp(context, if (expanded) 24 else 32).toFloat()
@@ -243,15 +258,48 @@ internal object IslandOverlay {
             }
             root.addView(actionsRow)
         }
-        root.setOnClickListener {
-            if (!expanded) {
-                expanded = true
-                render(context)
-            } else {
-                runCatching { latestPendingIntent?.send() }
-                remove()
+        root.setOnTouchListener(object : View.OnTouchListener {
+            var downX = 0f
+            var downY = 0f
+            override fun onTouch(v: View, event: MotionEvent): Boolean {
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        downX = event.rawX
+                        downY = event.rawY
+                        return true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        val deltaX = event.rawX - downX
+                        val deltaY = event.rawY - downY
+                        // Swipe Up collapses
+                        if (expanded && deltaY < -dp(context, 20)) {
+                            expanded = false
+                            render(context)
+                            scheduleDismiss(context, false)
+                            return true
+                        }
+                        // Swipe Left or Right dismisses
+                        if (Math.abs(deltaX) > dp(context, 40) && Math.abs(deltaY) < dp(context, 30)) {
+                            remove()
+                            return true
+                        }
+                        // Simple Tap
+                        if (Math.abs(deltaX) < dp(context, 10) && Math.abs(deltaY) < dp(context, 10)) {
+                            if (!expanded) {
+                                expanded = true
+                                render(context)
+                                scheduleDismiss(context, true)
+                            } else {
+                                runCatching { latestPendingIntent?.send() }
+                                remove()
+                            }
+                            return true
+                        }
+                    }
+                }
+                return false
             }
-        }
+        })
         @Suppress("DEPRECATION")
         val windowType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -270,7 +318,9 @@ internal object IslandOverlay {
         }
         try {
             val old = currentView
-            if (old != null) runCatching { wm.removeView(old) }
+            if (old != null && old.isAttachedToWindow) {
+                runCatching { wm.removeViewImmediate(old) }
+            }
             currentView = root
             wm.addView(root, params)
         } catch (_: Exception) {
@@ -279,17 +329,28 @@ internal object IslandOverlay {
     }
 
     fun preview(context: Context) {
-        val tone = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 70)
-        tone.startTone(ToneGenerator.TONE_PROP_BEEP, 180)
-        main.postDelayed({ tone.release() }, 250)
-        show(context, "Chaty Dynamic Island", "Preview notification · Tap to expand", "✦", context.packageName, false, null, emptyList(), forcePreview = true)
+        val appContext = context.applicationContext ?: context
+        try {
+            val tone = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 70)
+            tone.startTone(ToneGenerator.TONE_PROP_BEEP, 180)
+            main.postDelayed({ runCatching { tone.release() } }, 250)
+        } catch (_: Exception) {}
+        show(appContext, "Chaty Dynamic Island", "Preview notification · Tap to expand", "✦", appContext.packageName, false, null, emptyList(), forcePreview = true)
     }
 
     fun remove() {
         dismissRunnable?.let(main::removeCallbacks)
         val view = currentView
         currentView = null
-        if (view != null) runCatching { windowManager?.removeView(view) }
+        if (view != null) {
+            runCatching {
+                if (view.isAttachedToWindow) {
+                    windowManager?.removeViewImmediate(view)
+                } else {
+                    windowManager?.removeView(view)
+                }
+            }
+        }
     }
 
     private fun dp(context: Context, value: Int): Int =

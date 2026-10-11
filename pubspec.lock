@@ -944,6 +944,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.13.0"
+  mediapipe_face_mesh:
+    dependency: "direct main"
+    description:
+      name: mediapipe_face_mesh
+      sha256: acc5150b2bab012a340b26892fd63f350f29839b0397daa8cf768ffb165a29eb
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.2.1"
   meta:
     dependency: transitive
     description:
