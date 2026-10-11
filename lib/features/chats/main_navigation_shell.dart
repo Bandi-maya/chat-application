@@ -66,7 +66,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   }) {
     return PageView(
       controller: _pageController,
-      physics: const PageScrollPhysics(),
+      physics: const BouncingScrollPhysics(parent: PageScrollPhysics()),
       onPageChanged: (index) {
         if (index < 0 || index >= navItems.length) return;
         if (_currentIndex == index &&
@@ -2908,6 +2908,27 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         ),
       ),
     );
+  }
+}
+
+class _NavigationKeepAlive extends StatefulWidget {
+  final Widget child;
+
+  const _NavigationKeepAlive({super.key, required this.child});
+
+  @override
+  State<_NavigationKeepAlive> createState() => _NavigationKeepAliveState();
+}
+
+class _NavigationKeepAliveState extends State<_NavigationKeepAlive>
+    with AutomaticKeepAliveClientMixin<_NavigationKeepAlive> {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }
 
