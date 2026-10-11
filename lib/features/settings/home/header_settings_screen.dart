@@ -1204,7 +1204,10 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                             );
                             if (chosen != null && mounted) {
                               _updateHome(
-                                home.copyWith(searchPlacement: chosen),
+                                home.copyWith(
+                                  searchPlacement: chosen,
+                                  disableSearchBar: chosen != 'Header action',
+                                ),
                                 logTitle: 'Search placement',
                               );
                             }
@@ -1240,8 +1243,43 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                         ),
                         _divider(),
 
-                        // Hide search completely; placement remains saved for
-                        // when the user enables it again.
+                        // Move the search action out of the header without
+                        // removing search functionality from the Home screen.
+                        GbSettingRow(
+                          icon: Icon(
+                            Icons.move_down_rounded,
+                            color: colors.primary,
+                            size: 21,
+                          ),
+                          title: 'Move search out of header',
+                          subtitle: home.searchPlacement == 'Above chat filters'
+                              ? 'Search appears above the chat filter tags.'
+                              : home.disableSearchBar
+                              ? 'Search appears below the header.'
+                              : 'Move the header search action below the header or above chat filters.',
+                          switchValue: home.disableSearchBar ||
+                              home.searchPlacement != 'Header action',
+                          onSwitchChanged: (val) {
+                            final targetPlacement = val
+                                ? (home.searchPlacement == 'Above chat filters'
+                                    ? 'Above chat filters'
+                                    : 'Below header')
+                                : 'Header action';
+                            _updateHome(
+                              home.copyWith(
+                                disableSearchBar: val,
+                                searchPlacement: targetPlacement,
+                              ),
+                              logTitle: val
+                                  ? 'Move Search Out of Header'
+                                  : 'Move Search Into Header',
+                            );
+                          },
+                        ),
+                        _divider(),
+
+                        // This separate master switch is the only setting
+                        // that hides search from every placement.
                         GbSettingRow(
                           icon: Icon(
                             Icons.search_off_rounded,
@@ -1250,12 +1288,14 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                           ),
                           title: 'Hide search everywhere',
                           subtitle:
-                              'Turns search off in the header and all home placements.',
-                          switchValue: home.disableSearchBar,
+                              'Temporarily hides search from the header, below-header area, and chat filters.',
+                          switchValue: !home.showSearchBar,
                           onSwitchChanged: (val) {
                             _updateHome(
-                              home.copyWith(disableSearchBar: val),
-                              logTitle: 'Hide Search Everywhere',
+                              home.copyWith(showSearchBar: !val),
+                              logTitle: val
+                                  ? 'Hide Search Everywhere'
+                                  : 'Show Search Everywhere',
                             );
                           },
                         ),
