@@ -135,6 +135,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
   bool _accessAuthorized = false;
   bool _accessCheckStarted = false;
   bool _isAuthorizing = false;
+  bool _accessDenied = false;
 
   ChatyPreferencesController get _preferences => widget.preferencesController;
 
@@ -186,13 +187,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
     }
     if (!mounted) return;
     if (!authorized) {
+      _accessDenied = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && Navigator.of(context).canPop()) {
+        if (mounted &&
+            ModalRoute.of(context)?.isCurrent == true &&
+            Navigator.of(context).canPop()) {
           Navigator.of(context).pop();
         }
       });
       return;
     }
+    _accessDenied = false;
 
     final conversation = widget.dataStore.conversations
         .where((item) => item.id == widget.conversationId)
@@ -211,6 +216,32 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
     unawaited(_loadChatWallpaperOverride());
     if (widget.initialMessageId == null) _scrollToBottom(animate: false);
     unawaited(_loadConversation());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_accessCheckStarted ||
+        _accessAuthorized ||
+        _isAuthorizing ||
+        _accessDenied ||
+        !widget.preferencesController.isConversationProtected(
+          widget.conversationId,
+        )) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted &&
+          !_accessAuthorized &&
+          !_isAuthorizing &&
+          !_accessDenied &&
+          ModalRoute.of(context)?.isCurrent == true &&
+          widget.preferencesController.isConversationProtected(
+            widget.conversationId,
+          )) {
+        unawaited(_authorizeBeforeLoading(isResume: true));
+      }
+    });
   }
 
   @override
@@ -235,6 +266,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
     if (state == AppLifecycleState.resumed &&
         !_accessAuthorized &&
         !_isAuthorizing &&
+        !_accessDenied &&
+        ModalRoute.of(context)?.isCurrent == true &&
         widget.preferencesController.isConversationProtected(
           widget.conversationId,
         )) {
