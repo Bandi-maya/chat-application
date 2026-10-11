@@ -9,17 +9,22 @@ abstract final class HomePresetNormalizer {
     'compact' || 'bubbles tab style' => 'Compact',
     'cards' || 'one ui' => 'Cards',
     'minimal' => 'Minimal',
-    'stories first' || 'stories-first' || 'ios style' || 'instagram style' => 'Stories First',
+    'stories first' || 'stories-first' || 'ios style' => 'Stories First',
+    // Navigation-only presets must keep their own persisted identity. Mapping
+    // these to unrelated home presets caused the shell to restore the wrong
+    // navigation mode after a restart or settings refresh.
+    'instagram style' => 'Instagram Style',
+    'telegram style' => 'Telegram Style',
     'expressive' => 'Expressive',
     'productivity' || 'basic tab style' => 'Productivity',
     'tablet split view' => 'Tablet Split View',
     'whatsapp ui stock' || 'telegram style' => 'Chaty Default',
     // Navigation-shell presets also pick a matching home-list treatment.
     'whatsapp-style top bar' || 'whatsapp style top bar' => 'Classic',
-    'floating rail' => 'Stories First',
-    '3d perspective drawer' => 'Expressive',
-    'modern side menu' => 'Cards',
-    'curved radial menu' => 'Expressive',
+    'floating rail' => 'Floating Rail',
+    '3d perspective drawer' => '3D Perspective Drawer',
+    'modern side menu' => 'Modern Side Menu',
+    'curved radial menu' => 'Curved Radial Menu',
     _ => 'Chaty Default',
   };
 
