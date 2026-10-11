@@ -3262,6 +3262,14 @@ class _PerspectiveDrawerScaffoldState extends State<_PerspectiveDrawerScaffold>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _ctrl.duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 280);
+  }
+
+  @override
   void dispose() {
     _ctrl.dispose();
     super.dispose();
