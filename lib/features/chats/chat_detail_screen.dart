@@ -222,6 +222,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
         ProtectedResourceGate.invalidateConversationSession(
           widget.conversationId,
         );
+        if (_realtime.activeConversationId == widget.conversationId) {
+          _realtime.setActiveConversation(null);
+        }
         if (mounted) setState(() => _accessAuthorized = false);
       }
       return;
