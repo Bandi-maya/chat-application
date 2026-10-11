@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:chat/injection/locator.dart';
 import 'package:chat/ui/core/controllers/preferences_controller.dart';
 import 'package:chat/ui/core/design_system/settings_primitives.dart';
@@ -193,6 +194,65 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                         notif.copyWith(showMessagePreview: value),
                         logTitle: 'Show Message Preview',
                       ),
+                ),
+              ],
+            ),
+
+            // Dynamic Island: an opt-in presentation mode for Chaty's in-app event notifications.
+            ChatySettingsSection(
+              title: 'Dynamic Island notifications',
+              description:
+                  'Show incoming Chaty in-app events in a compact animated pill inspired by the reference project. Existing event-category switches below still decide which events are generated.',
+              children: [
+                ChatySwitchTile(
+                  icon: Icons.motion_photos_on_rounded,
+                  iconColor: colors.primary,
+                  title: 'Enable Dynamic Island',
+                  subtitle:
+                      'Replace standard in-app event toasts with an animated top pill while Chaty is open',
+                  value: widget.preferencesController.gbBool(
+                    'dynamic_island_notifications',
+                    fallback: false,
+                  ),
+                  onChanged: (value) =>
+                      widget.preferencesController.updateGbFeature(
+                    'dynamic_island_notifications',
+                    value,
+                    logTitle: 'Dynamic Island Notifications',
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            SystemSound.play(SystemSoundType.click);
+                            widget.notificationService.triggerEventNotification(
+                              title: 'Dynamic Island preview',
+                              body: 'New message · Tap the pill to expand',
+                              icon: Icons.chat_bubble_rounded,
+                              color: colors.primary,
+                            );
+                          },
+                          icon: const Icon(Icons.play_circle_outline_rounded),
+                          label: const Text('Preview animation + tone'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                  child: Text(
+                    'Preview sends a local sample event and plays the system click sound. For real events, the island respects the master in-app notifications switch and the individual event switches below.',
+                    style: TextStyle(
+                      color: colors.foregroundSecondary,
+                      fontSize: 12,
+                      height: 1.35,
+                    ),
+                  ),
                 ),
               ],
             ),
