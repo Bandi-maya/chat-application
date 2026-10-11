@@ -65,18 +65,34 @@ class DeliveryStatusIconPainter extends CustomPainter {
 
       // 2. RC iOS 11: Double chevron check
       case DeliveryIconStyle.rcIos11:
-      case DeliveryIconStyle.ios2:
-        final p1 = Path()
+        final rcP1 = Path()
           ..moveTo(size.width * 0.12, size.height * 0.52)
           ..lineTo(size.width * 0.34, size.height * 0.74)
           ..lineTo(size.width * 0.68, size.height * 0.32);
-        canvas.drawPath(p1, paint);
+        canvas.drawPath(rcP1, paint);
         if (isDelivered || isRead) {
-          final p2 = Path()
+          final rcP2 = Path()
             ..moveTo(size.width * 0.38, size.height * 0.52)
             ..lineTo(size.width * 0.60, size.height * 0.74)
             ..lineTo(size.width * 0.94, size.height * 0.32);
-          canvas.drawPath(p2, paint);
+          canvas.drawPath(rcP2, paint);
+        }
+        break;
+
+      // iOS Ticks: a slimmer, smooth double-check treatment distinct from RC iOS 11.
+      case DeliveryIconStyle.ios2:
+        paint.strokeWidth = 1.25;
+        final iosP1 = Path()
+          ..moveTo(size.width * 0.08, size.height * 0.52)
+          ..lineTo(size.width * 0.30, size.height * 0.72)
+          ..lineTo(size.width * 0.60, size.height * 0.34);
+        canvas.drawPath(iosP1, paint);
+        if (isDelivered || isRead) {
+          final iosP2 = Path()
+            ..moveTo(size.width * 0.36, size.height * 0.52)
+            ..lineTo(size.width * 0.58, size.height * 0.72)
+            ..lineTo(size.width * 0.91, size.height * 0.30);
+          canvas.drawPath(iosP2, paint);
         }
         break;
 
@@ -280,7 +296,212 @@ class DeliveryStatusIconPainter extends CustomPainter {
           );
         }
         break;
+
+      // Dedicated settings presets. Each has its own shape painter so the
+      // visible selector label matches the indicator used beside every message.
+      case DeliveryIconStyle.wings:
+        final wingPath = Path()
+          ..moveTo(size.width * 0.5, size.height * 0.46)
+          ..quadraticBezierTo(
+            size.width * 0.27,
+            size.height * 0.08,
+            size.width * 0.08,
+            size.height * 0.22,
+          )
+          ..lineTo(size.width * 0.18, size.height * 0.66)
+          ..lineTo(size.width * 0.36, size.height * 0.54)
+          ..lineTo(size.width * 0.5, size.height * 0.80)
+          ..lineTo(size.width * 0.64, size.height * 0.54)
+          ..lineTo(size.width * 0.82, size.height * 0.66)
+          ..lineTo(size.width * 0.92, size.height * 0.22)
+          ..quadraticBezierTo(
+            size.width * 0.73,
+            size.height * 0.08,
+            size.width * 0.5,
+            size.height * 0.46,
+          )
+          ..close();
+        canvas.drawPath(wingPath, isRead ? fillPaint : paint);
+        break;
+
+      case DeliveryIconStyle.trafficLights:
+        final trafficCount = isRead ? 3 : isDelivered ? 2 : 1;
+        for (var i = 0; i < trafficCount; i++) {
+          canvas.drawCircle(
+            Offset(
+              size.width * (0.2 + i * 0.3),
+              size.height / 2,
+            ),
+            size.width * 0.105,
+            fillPaint,
+          );
+        }
+        break;
+
+      case DeliveryIconStyle.stars:
+        final starCount = (isDelivered || isRead) ? 2 : 1;
+        for (var i = 0; i < starCount; i++) {
+          final center = starCount == 1
+              ? Offset(size.width / 2, size.height / 2)
+              : Offset(size.width * (i == 0 ? 0.32 : 0.72), size.height / 2);
+          canvas.drawPath(
+            _starPath(center, size.width * (starCount == 1 ? 0.28 : 0.23)),
+            fillPaint,
+          );
+        }
+        break;
+
+      case DeliveryIconStyle.hearts:
+        final heartCount = (isDelivered || isRead) ? 2 : 1;
+        for (var i = 0; i < heartCount; i++) {
+          final center = heartCount == 1
+              ? Offset(size.width / 2, size.height * 0.52)
+              : Offset(size.width * (i == 0 ? 0.30 : 0.70), size.height * 0.52);
+          canvas.drawPath(
+            _heartPath(center, size.width * (heartCount == 1 ? 0.24 : 0.20)),
+            fillPaint,
+          );
+        }
+        break;
+
+      case DeliveryIconStyle.batman:
+        final batPath = _batmanPath(
+          Rect.fromLTWH(
+            size.width * 0.05,
+            size.height * 0.20,
+            size.width * 0.90,
+            size.height * 0.62,
+          ),
+        );
+        canvas.drawPath(batPath, isRead ? fillPaint : paint);
+        break;
+
+      case DeliveryIconStyle.doubleSword:
+        final swordPaint = Paint()
+          ..color = activeColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.55
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round;
+        final swords = Path()
+          ..moveTo(size.width * 0.22, size.height * 0.16)
+          ..lineTo(size.width * 0.76, size.height * 0.78)
+          ..moveTo(size.width * 0.16, size.height * 0.27)
+          ..lineTo(size.width * 0.30, size.height * 0.20)
+          ..moveTo(size.width * 0.70, size.height * 0.73)
+          ..lineTo(size.width * 0.82, size.height * 0.64)
+          ..moveTo(size.width * 0.78, size.height * 0.16)
+          ..lineTo(size.width * 0.24, size.height * 0.78)
+          ..moveTo(size.width * 0.70, size.height * 0.20)
+          ..lineTo(size.width * 0.84, size.height * 0.28)
+          ..moveTo(size.width * 0.18, size.height * 0.65)
+          ..lineTo(size.width * 0.30, size.height * 0.75);
+        canvas.drawPath(swords, swordPaint);
+        break;
+
+      case DeliveryIconStyle.glowingDots:
+        final glowingCount = isRead ? 3 : isDelivered ? 2 : 1;
+        for (var i = 0; i < glowingCount; i++) {
+          final center = Offset(
+            size.width * (0.2 + i * 0.3),
+            size.height / 2,
+          );
+          canvas.drawCircle(
+            center,
+            size.width * 0.16,
+            Paint()
+              ..color = activeColor.withValues(alpha: 0.42)
+              ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.2),
+          );
+          canvas.drawCircle(center, size.width * 0.085, fillPaint);
+        }
+        break;
+
+      case DeliveryIconStyle.material3Rounded:
+        final shape = RRect.fromRectAndRadius(
+          Rect.fromLTWH(
+            size.width * 0.08,
+            size.height * 0.17,
+            size.width * 0.84,
+            size.height * 0.66,
+          ),
+          Radius.circular(size.height * 0.30),
+        );
+        canvas.drawRRect(shape, isRead ? fillPaint : paint);
+        final checkPaint = Paint()
+          ..color = isRead ? Colors.white : activeColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.3
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round;
+        final materialCheck = Path()
+          ..moveTo(size.width * 0.28, size.height * 0.50)
+          ..lineTo(size.width * 0.43, size.height * 0.63)
+          ..lineTo(size.width * 0.70, size.height * 0.36);
+        canvas.drawPath(materialCheck, checkPaint);
+        break;
     }
+  }
+
+  Path _starPath(Offset center, double radius) {
+    final path = Path();
+    for (var i = 0; i < 10; i++) {
+      final angle = -math.pi / 2 + i * math.pi / 5;
+      final r = i.isEven ? radius : radius * 0.44;
+      final point = Offset(
+        center.dx + math.cos(angle) * r,
+        center.dy + math.sin(angle) * r,
+      );
+      if (i == 0) {
+        path.moveTo(point.dx, point.dy);
+      } else {
+        path.lineTo(point.dx, point.dy);
+      }
+    }
+    return path..close();
+  }
+
+  Path _heartPath(Offset center, double radius) {
+    return Path()
+      ..moveTo(center.dx, center.dy + radius * 0.95)
+      ..cubicTo(
+        center.dx - radius * 1.25,
+        center.dy + radius * 0.15,
+        center.dx - radius * 1.15,
+        center.dy - radius * 0.95,
+        center.dx,
+        center.dy - radius * 0.30,
+      )
+      ..cubicTo(
+        center.dx + radius * 1.15,
+        center.dy - radius * 0.95,
+        center.dx + radius * 1.25,
+        center.dy + radius * 0.15,
+        center.dx,
+        center.dy + radius * 0.95,
+      )
+      ..close();
+  }
+
+  Path _batmanPath(Rect rect) {
+    final w = rect.width;
+    final h = rect.height;
+    final x = rect.left;
+    final y = rect.top;
+    return Path()
+      ..moveTo(x + w * 0.50, y + h * 0.96)
+      ..lineTo(x + w * 0.35, y + h * 0.62)
+      ..lineTo(x + w * 0.15, y + h * 0.80)
+      ..lineTo(x + w * 0.05, y + h * 0.23)
+      ..lineTo(x + w * 0.31, y + h * 0.45)
+      ..lineTo(x + w * 0.30, y + h * 0.05)
+      ..lineTo(x + w * 0.50, y + h * 0.27)
+      ..lineTo(x + w * 0.70, y + h * 0.05)
+      ..lineTo(x + w * 0.69, y + h * 0.45)
+      ..lineTo(x + w * 0.95, y + h * 0.23)
+      ..lineTo(x + w * 0.85, y + h * 0.80)
+      ..lineTo(x + w * 0.65, y + h * 0.62)
+      ..close();
   }
 
   void _paintClock(Canvas canvas, Size size) {
