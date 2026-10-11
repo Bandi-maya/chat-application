@@ -3,10 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../emoji_registry.dart';
 import '../services/emoji_recent_cache.dart';
-import 'animated_emoji_view.dart';
-import '../models/parsed_emoji_span.dart';
 
 /// Telegram-quality Emoji Picker bottom sheet with:
 /// - Fast animated vector emoji grid & search
@@ -58,47 +55,16 @@ class _ChatyEmojiPickerSheet extends StatefulWidget {
   State<_ChatyEmojiPickerSheet> createState() => _ChatyEmojiPickerSheetState();
 }
 
-class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
-  final TextEditingController _searchCtrl = TextEditingController();
-  String _searchQuery = '';
-  List<ChatyEmojiEntry> _filteredAnimated = const <ChatyEmojiEntry>[];
+class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet> {
   double _heightFactor = 0.42;
 
   @override
   void initState() {
     super.initState();
     _heightFactor = widget.reactionMode ? 0.32 : 0.42;
-    _tabController = TabController(length: 2, vsync: this);
-    _filteredAnimated = ChatyEmojiRegistry.entries;
-    _searchCtrl.addListener(_onSearchChanged);
     EmojiRecentCache.instance.initialize().then((_) {
       if (mounted) setState(() {});
     });
-  }
-
-  void _onSearchChanged() {
-    final q = _searchCtrl.text.trim().toLowerCase();
-    if (q == _searchQuery) return;
-    setState(() {
-      _searchQuery = q;
-      if (q.isEmpty) {
-        _filteredAnimated = ChatyEmojiRegistry.entries;
-      } else {
-        _filteredAnimated = ChatyEmojiRegistry.entries
-            .where((entry) => entry.matches(q))
-            .toList(growable: false);
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _searchCtrl.removeListener(_onSearchChanged);
-    _searchCtrl.dispose();
-    _tabController.dispose();
-    super.dispose();
   }
 
   @override
