@@ -30,8 +30,10 @@ The reference is a Next.js/Framer Motion web component. Chaty is a Flutter mobil
 - Touch: tap the pill to expand/collapse; the rest of the screen remains interactive.
 - Settings: one global style switch plus a preview action; existing event category switches remain the source of truth for which events are generated.
 
-## Scope boundary
-This implementation handles Chaty's existing **in-app event notification stream while the Flutter app UI is alive**. The cited repository is web-only and does not implement Android system notification interception. Showing a floating island over other apps or while Chaty is backgrounded would require a separate Android native NotificationListenerService/overlay feature, explicit notification-access and draw-over-other-apps permission education, OEM-specific QA, and a privacy review. This change does not claim that cross-app/system-wide behavior.
+## System-wide Android implementation
+Android uses a native `NotificationListenerService` to receive posted notifications after the user explicitly enables Chaty in Android Notification Access settings. A native `WindowManager` overlay renders the island above other apps only after the user grants Display over other apps. Permission state is checked in the app and can be refreshed when returning from Settings. The overlay displays a compact title/body, expands on tap, opens the source notification on the next tap, exposes up to two source notification actions, and gives call-category notifications a longer display duration. Notification text is processed in memory only; this feature does not persist or upload notification content.
+
+The native system-wide listener is Android-only. iOS retains the existing in-app presentation because iOS does not allow third-party apps to read all other apps' notifications or draw unrestricted system-wide overlays.
 
 ## QA checklist
 - [ ] Flutter analyze and unit/widget test suite pass on the current `main` commit.
@@ -46,7 +48,10 @@ This implementation handles Chaty's existing **in-app event notification stream 
 - [ ] App-lock concealment still hides notification body where enabled.
 - [ ] Narrow Android device, large text scale, and top cutout/safe-area layouts do not overflow.
 - [ ] Android smoke test and manual physical-device verification complete.
+- [ ] Verify Notification Access denied/granted/revoked flows and overlay permission denied/granted/revoked flows.
+- [ ] Verify notification action buttons and content intents for message and call notifications.
+- [ ] Verify behavior on Android 12–16 and OEM battery/background restrictions.
 - [ ] Confirm no notification payloads are logged or sent to a remote service.
 
-## Known limitation / next phase
-The preview sound uses Android/iOS system UI click feedback, not a configurable ringtone asset. A dedicated tone picker and true system-wide notifications should be scoped separately rather than implying that an in-app overlay can intercept OS notifications.
+## Known limitations / next phase
+The preview sound uses Android/iOS system UI click feedback, not a configurable ringtone asset. NotificationListenerService can expose sensitive notification content; the user must explicitly enable it in Android Settings and can revoke it at any time. Some OEMs may restrict listener/background reliability or overlay presentation; device QA is required. Android restricts secure/hidden notifications and some call actions; Chaty cannot bypass source-app privacy choices or Android security controls.
