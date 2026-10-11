@@ -30,7 +30,7 @@ void main() {
     });
 
     test('All 16 DeliveryIconStyle values have valid descriptors', () {
-      expect(DeliveryIconStyle.values.length, 16);
+      expect(DeliveryIconStyle.values.length, 24);
 
       for (final style in DeliveryIconStyle.values) {
         expect(style.displayName.isNotEmpty, isTrue);
@@ -38,6 +38,57 @@ void main() {
         final parsed = DeliveryIconStyleExtension.fromString(style.displayName);
         expect(parsed, style);
       }
+    });
+
+    test('Conversation bubble picker labels select distinct real renderers', () {
+      final labels = <String, BubbleStyleId>{
+        'WhatsApp Default': BubbleStyleId.stock,
+        'Rounded Pill': BubbleStyleId.facebookMessenger,
+        'Chaty Modern': BubbleStyleId.rounded,
+        'Squircle Soft': BubbleStyleId.gabiSqua,
+        'Paper Chat': BubbleStyleId.waPaperRedesigned,
+        'Glassmorphic': BubbleStyleId.transparent,
+        'iOS Flat': BubbleStyleId.ios,
+        'Telegram Arc': BubbleStyleId.telegram,
+        '3D Shadow': BubbleStyleId.threeD,
+        'Minimal Border': BubbleStyleId.gabiOutline,
+        'Retro Bubble': BubbleStyleId.oldHangouts,
+        'Futuristic Clip': BubbleStyleId.foldV2,
+      };
+
+      for (final entry in labels.entries) {
+        expect(
+          BubbleStyleIdExtension.fromString(entry.key),
+          entry.value,
+          reason: '${entry.key} must render its selected bubble geometry.',
+        );
+      }
+      expect(labels.values.toSet().length, labels.length);
+    });
+
+    test('Conversation tick picker labels select distinct real renderers', () {
+      final labels = <String, DeliveryIconStyle>{
+        'Default': DeliveryIconStyle.rcIos11,
+        'iOS Ticks': DeliveryIconStyle.ios2,
+        'Wings': DeliveryIconStyle.wings,
+        'Traffic Lights': DeliveryIconStyle.trafficLights,
+        'Circles': DeliveryIconStyle.cirCheck,
+        'Stars': DeliveryIconStyle.stars,
+        'Hearts': DeliveryIconStyle.hearts,
+        'Batman': DeliveryIconStyle.batman,
+        'Double Sword': DeliveryIconStyle.doubleSword,
+        'Glowing Dots': DeliveryIconStyle.glowingDots,
+        'Material 3 Rounded': DeliveryIconStyle.material3Rounded,
+      };
+
+      for (final entry in labels.entries) {
+        expect(
+          DeliveryIconStyleExtension.fromString(entry.key),
+          entry.value,
+          reason: '${entry.key} must render its selected tick design.',
+        );
+      }
+      expect(labels.values.toSet().length, labels.length);
     });
 
     test(
