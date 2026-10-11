@@ -70,6 +70,7 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
   bool _hasConfiguredCredential = true;
   bool _nativePromptStarted = false;
   int _pinLength = 4;
+  int _patternGridSize = 3;
   int _cooldownSeconds = 0;
 
   LocalLockService get _lockService =>
@@ -93,6 +94,7 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
   Future<void> _loadCapabilities() async {
     final method = widget.preferencesController.security.lockMethod;
     final pinLength = await _lockService.getPinLength();
+    final patternGridSize = await _lockService.getPatternGridSize();
     final biometric = await _lockService.canUseBiometrics();
     final cooldown = await _lockService.getRemainingCooldownSeconds();
     var hasCredential = true;
@@ -102,6 +104,7 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
     if (!mounted) return;
     setState(() {
       _pinLength = pinLength;
+      _patternGridSize = patternGridSize;
       _biometricAvailable = biometric;
       _hasConfiguredCredential = hasCredential;
       _cooldownSeconds = cooldown;
@@ -466,6 +469,7 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
                       ),
                     ] else if (method == 'Pattern') ...[
                       PatternLockPad(
+                        gridSize: _patternGridSize,
                         hideTrace: security.makePatternInvisible,
                         enableHaptics: !security.disablePatternVibration,
                         onPatternComplete: (pattern) =>

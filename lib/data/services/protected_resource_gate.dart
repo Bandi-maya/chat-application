@@ -21,10 +21,67 @@ class ProtectedResourceGate {
   static final Map<String, DateTime> _unlockedConversations =
       <String, DateTime>{};
 
+  // Multiple visible routes can observe the same app-resume event. Share one
+  // in-flight authentication request per conversation instead of stacking
+  // duplicate native prompts or allowing route-specific races.
+  static final Map<String, Future<bool>> _pendingConversationAuthorizations =
+      <String, Future<bool>>{};
+
   // General unlocked session timestamp for app-level or settings changes
   static DateTime? _lastAppUnlockTime;
 
   static bool get hasRecentAppUnlock => _lastAppUnlockTime != null;
+
+  /// Ensures a usable credential exists before a new chat is marked protected.
+  /// This setup path is only for enabling a new lock; protected-resource access
+  /// never offers credential replacement as a way to bypass authentication.
+  static Future<bool> ensureCredentialForNewLock(
+    BuildContext context, {
+    required ChatyPreferencesController preferencesController,
+    LocalLockService? lockService,
+  }) async {
+    final service = lockService ?? locator<LocalLockService>();
+    final method = preferencesController.security.lockMethod;
+    if (!context.mounted) return false;
+
+    // OS authentication methods have no local password hash, so prove that
+    // the native prompt actually works before applying a new lock.
+    if (method == 'Biometric' || method == 'Device Credential') {
+      final confirmed = method == 'Biometric'
+          ? await service.authenticateBiometric(
+              reason: 'Confirm biometric unlock works for this chat',
+            )
+          : await service.authenticateDeviceCredential(
+              reason: 'Confirm your device lock works for this chat',
+            );
+      if (!confirmed && context.mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                '$method could not be verified. Choose a working lock method '
+                'in Settings → Security & Lock before locking a chat.',
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+      }
+      return confirmed;
+    }
+
+    if (await _isMethodConfigured(service, method)) return true;
+    if (!context.mounted) return false;
+
+    final configured = await LockCredentialSetupModal.show(
+      context,
+      method: method,
+      pinLength: await service.getPinLength(),
+      lockService: service,
+    );
+    return configured && context.mounted &&
+        await _isMethodConfigured(service, method);
+  }
 
   /// Checks if a conversation currently has an active unlock session.
   static bool isConversationSessionActive(
@@ -43,10 +100,11 @@ class ProtectedResourceGate {
 
   /// Authorizes access to a protected conversation or resource.
   ///
-  /// If the resource is locked:
-  /// 1. Checks if credentials exist; if not, triggers setup flow.
-  /// 2. If credential exists, opens the unified [AppLockOverlayModal].
-  /// 3. Returns true ONLY upon verified local authentication.
+  /// If the resource is locked, only an already configured credential may
+  /// authorize access. Credential setup is deliberately not offered from the
+  /// protected-resource gate: creating a new credential here would let anyone
+  /// who can reach a locked conversation replace the missing credential and
+  /// immediately gain access.
   static Future<bool> authorizeConversation(
     BuildContext context, {
     required String conversationId,
@@ -55,37 +113,74 @@ class ProtectedResourceGate {
     String? title,
     String? reason,
   }) async {
-    // If conversation is not locked or hidden, allow instantly
     if (!preferencesController.isConversationProtected(conversationId)) {
       return true;
     }
+    if (isConversationSessionActive(conversationId, preferencesController)) {
+      return true;
+    }
 
-    // Check active session window
+    final pending = _pendingConversationAuthorizations[conversationId];
+    if (pending != null) return pending;
+
+    final request = _authorizeConversationInternal(
+      context,
+      conversationId: conversationId,
+      preferencesController: preferencesController,
+      lockService: lockService,
+      title: title,
+      reason: reason,
+    );
+    _pendingConversationAuthorizations[conversationId] = request;
+    try {
+      return await request;
+    } finally {
+      if (identical(
+        _pendingConversationAuthorizations[conversationId],
+        request,
+      )) {
+        _pendingConversationAuthorizations.remove(conversationId);
+      }
+    }
+  }
+
+  static Future<bool> _authorizeConversationInternal(
+    BuildContext context, {
+    required String conversationId,
+    required ChatyPreferencesController preferencesController,
+    LocalLockService? lockService,
+    String? title,
+    String? reason,
+  }) async {
+    // Re-check after entering the shared request to handle state changes.
+    if (!preferencesController.isConversationProtected(conversationId)) {
+      return true;
+    }
     if (isConversationSessionActive(conversationId, preferencesController)) {
       return true;
     }
 
     final service = lockService ?? locator<LocalLockService>();
     final method = preferencesController.security.lockMethod;
-
-    // Check if current lock method has credentials configured
     final hasCred = await _isMethodConfigured(service, method);
     if (!hasCred) {
-      if (!context.mounted) return false;
-      // Trigger setup modal
-      final pinLen = await service.getPinLength();
-      final setupSuccess = await LockCredentialSetupModal.show(
-        context,
-        method: method,
-        pinLength: pinLen,
-        lockService: service,
-      );
-      if (!setupSuccess) return false;
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              content: Text(
+                'This chat has no usable lock credential on this device. '
+                'Open Settings → Security & Lock to configure or recover it.',
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+      }
+      return false;
     }
 
     if (!context.mounted) return false;
-
-    // Show authentication prompt
     final unlocked = await AppLockOverlayModal.show(
       context,
       preferencesController: preferencesController,
@@ -114,7 +209,28 @@ class ProtectedResourceGate {
     final method = preferencesController.security.lockMethod;
 
     final hasCred = await _isMethodConfigured(service, method);
-    if (!hasCred) return true; // If no credential ever existed, no check needed
+    if (!hasCred) {
+      // A protected vault without a working credential must fail closed.
+      // The secret-code route is handled explicitly by its verified caller.
+      if (preferencesController.security.lockedConversationIds.isNotEmpty ||
+          preferencesController.security.hiddenConversationIds.isNotEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Chat Lock credentials are unavailable on this device. '
+                  'Configure or recover them in Settings → Security & Lock.',
+                ),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+        }
+        return false;
+      }
+      return true;
+    }
 
     if (!context.mounted) return false;
 
@@ -156,7 +272,7 @@ class ProtectedResourceGate {
       case 'Biometric':
         return await service.canUseBiometrics();
       case 'Device Credential':
-        return true;
+        return await service.canUseDeviceCredential();
       default:
         return false;
     }

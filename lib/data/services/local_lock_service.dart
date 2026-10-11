@@ -24,6 +24,7 @@ class LocalLockService {
 
   static const String _prefix = 'chaty.local_lock.v2';
   static const String _pinLengthKey = '$_prefix.pin_length';
+  static const String _patternGridSizeKey = '$_prefix.pattern_grid_size';
   static const String _secretPhraseHashKey = '$_prefix.secret_phrase.hash';
   static const String _secretPhraseSaltKey = '$_prefix.secret_phrase.salt';
   static const String _failedAttemptsKey = '$_prefix.failed_attempts';
@@ -92,6 +93,7 @@ class LocalLockService {
     String method,
     String secret, {
     int? pinLength,
+    int? patternGridSize,
   }) async {
     final normalized = _normalizedMethod(method);
     if (secret.isEmpty) throw ArgumentError('Credential must not be empty.');
@@ -103,8 +105,12 @@ class LocalLockService {
       }
       await setPinLength(expectedLength);
     }
-    if (normalized == 'pattern' && !_isValidPattern(secret)) {
-      throw ArgumentError('Pattern must connect at least 4 unique points.');
+    final safePatternGridSize = patternGridSize == 4 ? 4 : 3;
+    if (normalized == 'pattern' &&
+        !_isValidPattern(secret, gridSize: safePatternGridSize)) {
+      throw ArgumentError(
+        'Pattern must connect at least 4 unique points within the selected grid.',
+      );
     }
     if (normalized == 'password' && secret.length < 6) {
       throw ArgumentError('Password must contain at least 6 characters.');
@@ -124,6 +130,12 @@ class LocalLockService {
       key: _hashKey(normalized),
       value: base64Encode(bytes),
     );
+    if (normalized == 'pattern') {
+      await _secureStorage.write(
+        key: _patternGridSizeKey,
+        value: '$safePatternGridSize',
+      );
+    }
   }
 
   /// Verifies credential with brute-force rate-limiting & cooldown.
@@ -184,8 +196,10 @@ class LocalLockService {
 
   Future<void> setSecretPhrase(String rawPhrase) async {
     final normalized = normalizeSecretPhrase(rawPhrase);
-    if (normalized.isEmpty) {
-      throw ArgumentError('Secret phrase cannot be empty.');
+    if (normalized.runes.length < 8) {
+      throw ArgumentError(
+        'Secret code must contain at least 8 characters after normalization.',
+      );
     }
     final salt = List<int>.generate(_saltLength, (_) => _random.nextInt(256));
     final derived = await _pbkdf2.deriveKeyFromPassword(
@@ -205,7 +219,8 @@ class LocalLockService {
 
   Future<bool> verifySecretPhrase(String rawQuery) async {
     final normalized = normalizeSecretPhrase(rawQuery);
-    if (normalized.isEmpty) return false;
+    // Avoid expensive PBKDF2 work for empty or obviously weak search terms.
+    if (normalized.runes.length < 8) return false;
     try {
       final encodedHash = await _secureStorage.read(key: _secretPhraseHashKey);
       final encodedSalt = await _secureStorage.read(key: _secretPhraseSaltKey);
@@ -325,6 +340,16 @@ class LocalLockService {
     }
   }
 
+  Future<bool> canUseDeviceCredential() async {
+    try {
+      return await _localAuthentication.isDeviceSupported();
+    } on PlatformException {
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<bool> authenticateDeviceCredential({
     String reason = 'Use your device lock to unlock Chaty',
   }) async {
@@ -360,16 +385,30 @@ class LocalLockService {
     await clearSecretPhrase();
     await resetFailedAttempts();
     await _secureStorage.delete(key: _pinLengthKey);
+    await _secureStorage.delete(key: _patternGridSizeKey);
   }
 
-  bool _isValidPattern(String pattern) {
+  Future<int> getPatternGridSize() async {
+    try {
+      final value = int.tryParse(
+        await _secureStorage.read(key: _patternGridSizeKey) ?? '',
+      );
+      return value == 4 ? 4 : 3;
+    } catch (_) {
+      return 3;
+    }
+  }
+
+  bool _isValidPattern(String pattern, {int gridSize = 3}) {
     final values = pattern
         .split('-')
         .where((value) => value.isNotEmpty)
         .toList(growable: false);
-    if (values.length < 4) return false;
+    final minimumPoints = gridSize == 4 ? 6 : 4;
+    if (values.length < minimumPoints) return false;
     final parsed = values.map(int.tryParse).toList(growable: false);
-    if (parsed.any((value) => value == null || value < 0 || value > 8)) {
+    final maxIndex = gridSize * gridSize - 1;
+    if (parsed.any((value) => value == null || value < 0 || value > maxIndex)) {
       return false;
     }
     return parsed.toSet().length == parsed.length;

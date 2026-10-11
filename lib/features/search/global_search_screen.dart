@@ -39,6 +39,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
   bool _isSearching = false;
   bool _isOpeningChat = false;
   Timer? _debounce;
+  Timer? _secretCodeDebounce;
   final SearchRequestGuard _requestGuard = SearchRequestGuard();
 
   @override
@@ -50,6 +51,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _secretCodeDebounce?.cancel();
     _searchController.removeListener(_queueSearch);
     _searchController.dispose();
     super.dispose();
@@ -57,23 +59,35 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
 
   void _queueSearch() {
     _debounce?.cancel();
+    _secretCodeDebounce?.cancel();
     final query = _searchController.text.trim();
     final lower = query.toLowerCase();
     // Invalidate an in-flight remote request even when the new query is empty
     // or too short to start another remote request.
     final requestId = _requestGuard.begin();
 
-    // Check secret search phrase for revealing locked vault
-    if (query.isNotEmpty) {
-      final lockService = locator<LocalLockService>();
-      lockService.verifySecretPhrase(query).then((isMatch) {
-        if (isMatch && mounted && _requestGuard.isCurrent(requestId)) {
+    // Only evaluate the secret code when the feature is enabled and there
+    // are hidden conversations. The request guard prevents stale async checks
+    // from opening the vault after the user has already changed their query.
+    final security = widget.preferencesController.security;
+    if (query.isNotEmpty &&
+        security.entryBySecretPhrase &&
+        security.hiddenConversationIds.isNotEmpty) {
+      _debounce = Timer(const Duration(milliseconds: 350), () async {
+        final lockService = locator<LocalLockService>();
+        final isMatch = await lockService.verifySecretPhrase(query);
+        if (isMatch &&
+            mounted &&
+            _requestGuard.isCurrent(requestId) &&
+            _searchController.text.trim() == query &&
+            widget.preferencesController.security.entryBySecretPhrase) {
           _searchController.clear();
           LockedChatsScreen.open(
             context,
             dataStore: widget.dataStore,
             preferencesController: widget.preferencesController,
             themeController: widget.themeController,
+            secretCodeVerified: true,
           );
         }
       });

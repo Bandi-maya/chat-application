@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:chat/domain/models/conversation.dart';
@@ -27,13 +29,18 @@ class LockedChatsScreen extends StatefulWidget {
     required ChatyDataStore dataStore,
     required ChatyPreferencesController preferencesController,
     required ThemeController themeController,
+    bool secretCodeVerified = false,
   }) async {
-    final authorized = await ProtectedResourceGate.authorizeGeneralAction(
-      context,
-      preferencesController: preferencesController,
-      title: 'Locked & Hidden Chats',
-      reason: 'Authenticate to access your locked conversations',
-    );
+    // A verified secret code is an explicit alternate credential for the
+    // hidden vault, matching the established Chat Lock flow. Do not prompt a
+    // second time after successfully verifying it.
+    final authorized = secretCodeVerified ||
+        await ProtectedResourceGate.authorizeGeneralAction(
+          context,
+          preferencesController: preferencesController,
+          title: 'Locked & Hidden Chats',
+          reason: 'Authenticate to access your locked conversations',
+        );
 
     if (authorized && context.mounted) {
       Navigator.of(context).push(
@@ -52,22 +59,105 @@ class LockedChatsScreen extends StatefulWidget {
   State<LockedChatsScreen> createState() => _LockedChatsScreenState();
 }
 
-class _LockedChatsScreenState extends State<LockedChatsScreen> {
+class _LockedChatsScreenState extends State<LockedChatsScreen>
+    with WidgetsBindingObserver {
   final TextEditingController _secretWordCtrl = TextEditingController();
   late final LocalLockService _lockService;
   bool _hasSecretPhrase = false;
+  bool _vaultAuthorized = true;
+  bool _vaultAuthorizing = false;
+  bool _vaultDenied = false;
+  bool _appIsResumed = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _lockService = locator<LocalLockService>();
     _checkSecretPhrase();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _secretWordCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _reauthorizeVault() async {
+    if (_vaultAuthorizing || _vaultAuthorized || _vaultDenied) return;
+    _vaultAuthorizing = true;
+    bool authorized;
+    try {
+      authorized = await ProtectedResourceGate.authorizeGeneralAction(
+        context,
+        preferencesController: widget.preferencesController,
+        title: 'Locked & Hidden Chats',
+        reason: 'Re-authenticate to reveal your protected conversations',
+      );
+    } catch (_) {
+      authorized = false;
+    } finally {
+      _vaultAuthorizing = false;
+    }
+    if (!mounted) return;
+    if (!authorized) {
+      _vaultDenied = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            ModalRoute.of(context)?.isCurrent == true &&
+            Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+      });
+      return;
+    }
+    _vaultDenied = false;
+    setState(() => _vaultAuthorized = true);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_appIsResumed ||
+        _vaultAuthorized ||
+        _vaultAuthorizing ||
+        _vaultDenied) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted &&
+          _appIsResumed &&
+          !_vaultAuthorized &&
+          !_vaultAuthorizing &&
+          !_vaultDenied &&
+          ModalRoute.of(context)?.isCurrent == true) {
+        unawaited(_reauthorizeVault());
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _appIsResumed = false;
+      if (_vaultAuthorized) {
+        ProtectedResourceGate.invalidateAllSessions();
+        _vaultDenied = false;
+        setState(() => _vaultAuthorized = false);
+      }
+      return;
+    }
+    if (state == AppLifecycleState.resumed) {
+      _appIsResumed = true;
+      if (!_vaultAuthorized &&
+          !_vaultAuthorizing &&
+          !_vaultDenied &&
+          ModalRoute.of(context)?.isCurrent == true) {
+        unawaited(_reauthorizeVault());
+      }
+    }
   }
 
   Future<void> _checkSecretPhrase() async {
@@ -124,7 +214,7 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Enter a secret word, phrase, or emoji. Typing this secret into the chat search bar will instantly reveal your locked chats.',
+              'Use at least 8 characters. Typing your secret code into chat search reveals your locked chats.',
               style: TextStyle(
                 color: theme.secondaryTextColor,
                 fontSize: 13,
@@ -137,7 +227,7 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
               autofocus: true,
               style: TextStyle(color: theme.primaryTextColor),
               decoration: InputDecoration(
-                hintText: 'e.g. 🔒 secret or my-vault',
+                hintText: 'Use 8+ characters, e.g. 🔒 private-vault',
                 hintStyle: TextStyle(color: theme.secondaryTextColor),
                 filled: true,
                 fillColor: theme.surfaceColor,
@@ -177,13 +267,30 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
             onPressed: () async {
               final secret = _secretWordCtrl.text.trim();
               if (secret.isEmpty) return;
-              await _lockService.setSecretPhrase(secret);
-              widget.preferencesController.updateSecurity(
-                widget.preferencesController.security.copyWith(
-                  entryBySecretPhrase: true,
-                ),
-              );
-              if (ctx.mounted) Navigator.of(ctx).pop(true);
+              try {
+                await _lockService.setSecretPhrase(secret);
+                widget.preferencesController.updateSecurity(
+                  widget.preferencesController.security.copyWith(
+                    entryBySecretPhrase: true,
+                  ),
+                );
+                if (ctx.mounted) Navigator.of(ctx).pop(true);
+              } catch (error) {
+                if (!ctx.mounted) return;
+                ScaffoldMessenger.of(ctx)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        error.toString().replaceFirst(
+                          'Invalid argument(s): ',
+                          '',
+                        ),
+                      ),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+              }
             },
             style: FilledButton.styleFrom(backgroundColor: theme.accentColor),
             child: const Text('Save Code'),
@@ -272,6 +379,9 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
                     conversation.id,
                     hide: !isHidden,
                   );
+                  ProtectedResourceGate.invalidateConversationSession(
+                    conversation.id,
+                  );
                 },
               ),
               ListTile(
@@ -301,6 +411,9 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
                   widget.preferencesController.unlockConversationCompletely(
                     conversation.id,
                   );
+                  ProtectedResourceGate.invalidateConversationSession(
+                    conversation.id,
+                  );
                 },
               ),
             ],
@@ -313,6 +426,27 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = widget.themeController.globalTheme;
+    if (!_vaultAuthorized) {
+      return Scaffold(
+        backgroundColor: theme.backgroundColor,
+        appBar: AppBar(
+          backgroundColor: theme.backgroundColor,
+          foregroundColor: theme.primaryTextColor,
+          leading: const ChatyBackButton(),
+          title: const Text('Locked & Hidden Chats'),
+        ),
+        body: const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(strokeWidth: 2.2),
+              SizedBox(height: 14),
+              Text('Verifying vault access…'),
+            ],
+          ),
+        ),
+      );
+    }
     final security = widget.preferencesController.security;
 
     // Retrieve all conversations that are locked or hidden

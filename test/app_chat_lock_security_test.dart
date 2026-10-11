@@ -27,7 +27,7 @@ void main() {
     );
 
     test(
-      'Pattern validator requires at least 4 unique dots between 0 and 8',
+      'Pattern validator supports 3x3 and 4x4 grids with unique dots',
       () async {
         final service = LocalLockService();
         // Valid pattern
@@ -48,6 +48,25 @@ void main() {
         // Duplicate nodes
         expect(
           () => service.setCredential('Pattern', '0-1-2-1'),
+          throwsA(isA<ArgumentError>()),
+        );
+        // A 4x4 pattern requires 6 unique points to avoid weak short patterns.
+        await expectLater(
+          service.setCredential(
+            'Pattern',
+            '0-1-2-3',
+            patternGridSize: 4,
+          ),
+          throwsA(isA<ArgumentError>()),
+        );
+        // 4x4 supports indexes 0..15 and persists the selected grid size.
+        await expectLater(
+          service.setCredential('Pattern', '0-1-2-5-9-13', patternGridSize: 4),
+          completes,
+        );
+        expect(await service.getPatternGridSize(), 4);
+        expect(
+          () => service.setCredential('Pattern', '0-1-2-16', patternGridSize: 4),
           throwsA(isA<ArgumentError>()),
         );
       },
@@ -94,7 +113,12 @@ void main() {
       'Secret search phrase verification works with normalized Unicode',
       () async {
         final service = LocalLockService();
+        await expectLater(
+          service.setSecretPhrase('abc'),
+          throwsA(isA<ArgumentError>()),
+        );
         await service.setSecretPhrase('  🔒 Secret Vault  ');
+        expect(await service.verifySecretPhrase('abc'), isFalse);
         expect(await service.verifySecretPhrase('🔒 secret vault'), isTrue);
         expect(await service.verifySecretPhrase('🔒 Secret Vault'), isTrue);
         expect(await service.verifySecretPhrase('wrong password'), isFalse);
@@ -151,5 +175,58 @@ void main() {
       expect(find.bySemanticsLabel('Pattern lock grid 3 by 3'), findsOneWidget);
       expect(completedPattern, isNull);
     });
+
+    testWidgets(
+      'PatternLockPad captures fast diagonal swipes in path order and clears them',
+      (tester) async {
+        String? completedPattern;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: PatternLockPad(
+                  onPatternComplete: (pattern) => completedPattern = pattern,
+                  size: 300,
+                ),
+              ),
+            ),
+          ),
+        );
+
+        final topLeft = tester.getTopLeft(find.byType(PatternLockPad));
+        final gesture = await tester.startGesture(topLeft + const Offset(50, 50));
+        await gesture.moveTo(topLeft + const Offset(250, 250));
+        await gesture.up();
+        await tester.pumpAndSettle();
+
+        expect(completedPattern, '0-4-8');
+        expect(
+          tester.state<PatternLockPadState>(find.byType(PatternLockPad)).currentPattern,
+          isEmpty,
+        );
+      },
+    );
+
+    testWidgets(
+      'PatternLockPad exposes a 4 by 4 grid for accessibility',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: PatternLockPad(
+                  onPatternComplete: (_) {},
+                  gridSize: 4,
+                ),
+              ),
+            ),
+          ),
+        );
+        expect(
+          find.bySemanticsLabel('Pattern lock grid 4 by 4'),
+          findsOneWidget,
+        );
+      },
+    );
   });
 }
