@@ -24,6 +24,7 @@ class LocalLockService {
 
   static const String _prefix = 'chaty.local_lock.v2';
   static const String _pinLengthKey = '$_prefix.pin_length';
+  static const String _patternGridSizeKey = '$_prefix.pattern_grid_size';
   static const String _secretPhraseHashKey = '$_prefix.secret_phrase.hash';
   static const String _secretPhraseSaltKey = '$_prefix.secret_phrase.salt';
   static const String _failedAttemptsKey = '$_prefix.failed_attempts';
