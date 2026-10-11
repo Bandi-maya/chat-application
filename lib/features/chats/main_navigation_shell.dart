@@ -28,7 +28,6 @@ import '../../data/services/status_service.dart';
 import '../../data/services/call_signaling_service.dart';
 import '../calls/ongoing_call_screen.dart';
 import '../settings/settings_root_screen.dart';
-import '../settings/home/home_screen_settings_page.dart';
 import '../settings/gb_features/gb_settings_screen.dart';
 import '../tasks/task_create_edit_modal.dart';
 
@@ -2169,17 +2168,39 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     if (!homePrefs.hideCutEditFab) {
       quickActions.add(
         _HomeSpeedDialAction(
-          id: 'home-tools',
-          label: 'Home tools',
-          icon: Icons.content_cut_rounded,
-          onPressed: () {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => HomeScreenSettingsPage(
-                  preferencesController: prefsController,
+          id: 'restart-chaty',
+          label: 'Restart Chaty',
+          icon: Icons.restart_alt_rounded,
+          onPressed: () async {
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (dialogContext) => AlertDialog(
+                title: const Text('Restart Chaty?'),
+                content: const Text(
+                  'Chaty will close and reopen. Make sure any unsent text is saved first.',
                 ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(true),
+                    child: const Text('Restart'),
+                  ),
+                ],
               ),
             );
+            if (confirmed != true || !context.mounted) return;
+            try {
+              await const MethodChannel('chaty/launcher_icon')
+                  .invokeMethod<void>('restartApp');
+            } catch (error) {
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Chaty could not restart: $error')),
+              );
+            }
           },
         ),
       );
