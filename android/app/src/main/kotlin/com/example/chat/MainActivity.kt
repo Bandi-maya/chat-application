@@ -291,6 +291,7 @@ internal class LauncherIconManager(
 
     private val launcherComponents: LinkedHashMap<String, String>
         get() = linkedMapOf(
+            "bird" to "${context.packageName}.LauncherBird",
             "warm" to "${context.packageName}.LauncherWarm",
             "outline" to "${context.packageName}.LauncherOutline",
             "obsidian" to "${context.packageName}.LauncherObsidian",
@@ -299,23 +300,20 @@ internal class LauncherIconManager(
             "fold" to "${context.packageName}.LauncherFold",
         )
 
-    // "bird" is the primary icon variant — all aliases disabled, MainActivity is launcher.
-    fun isKnownAlias(alias: String): Boolean = alias == "bird" || launcherComponents.containsKey(alias)
+    // Every variant, including the default brand icon, has exactly one launcher alias.
+    // MainActivity itself deliberately has no MAIN/LAUNCHER filter.
+    fun isKnownAlias(alias: String): Boolean = launcherComponents.containsKey(alias)
 
     fun getCurrentLauncherIcon(): String {
         val enabledAliases = launcherComponents.keys.filter(::isComponentEnabled)
-        if (enabledAliases.isEmpty()) {
-            // Primary (bird/MainActivity) is active — no alias enabled.
-            preferences.edit().putString(LAUNCHER_PREFERENCE_KEY, "bird").apply()
-            return "bird"
-        }
         if (enabledAliases.size == 1) {
             val alias = enabledAliases.first()
             preferences.edit().putString(LAUNCHER_PREFERENCE_KEY, alias).apply()
             return alias
         }
 
-        // Multiple aliases enabled — abnormal state, recover to bird (primary).
+        // Empty/multiple enabled aliases are invalid. Recover to the last saved
+        // choice, falling back to the bundled default, and enable just that alias.
         val preferred = selectedBundledAlias()
         setLauncherIcon(preferred)
         return preferred
@@ -331,20 +329,14 @@ internal class LauncherIconManager(
         val previous = selectedBundledAlias()
 
         try {
-            if (canonicalAlias == "bird") {
-                // Bird = primary. Disable ALL aliases so MainActivity is the launcher.
-                disableAllAliases()
-            } else {
-                switchLauncherAlias(canonicalAlias)
-            }
+            // The active alias is the only launcher entry; this includes "bird".
+            switchLauncherAlias(canonicalAlias)
             preferences.edit()
                 .putString(LAUNCHER_PREFERENCE_KEY, canonicalAlias)
                 .apply()
         } catch (error: Exception) {
-            // Rollback to previous on failure.
-            runCatching {
-                if (previous == "bird") disableAllAliases() else switchLauncherAlias(previous)
-            }
+            // Rollback to the last known-good launcher component.
+            runCatching { switchLauncherAlias(previous) }
             preferences.edit()
                 .putString(LAUNCHER_PREFERENCE_KEY, previous)
                 .apply()
@@ -408,16 +400,9 @@ internal class LauncherIconManager(
         val selected = selectedBundledAlias()
         val enabled = launcherComponents.keys.filter(::isComponentEnabled)
 
-        if (selected == "bird") {
-            // Primary icon selected: ensure all aliases are disabled.
-            if (enabled.isNotEmpty()) {
-                runCatching { disableAllAliases() }
-            }
-        } else {
-            // A specific alias should be the only enabled one.
-            if (enabled.size != 1 || enabled.first() != selected) {
-                runCatching { switchLauncherAlias(selected) }
-            }
+        // Exactly one alias must be active for every selection, including bird.
+        if (enabled.size != 1 || enabled.firstOrNull() != selected) {
+            runCatching { switchLauncherAlias(selected) }
         }
     }
 
@@ -438,13 +423,7 @@ internal class LauncherIconManager(
     fun buildRestartIntent(): Intent {
         val selected = selectedBundledAlias()
         return Intent(Intent.ACTION_MAIN).apply {
-            // When bird (primary) is selected, target MainActivity directly.
-            // Otherwise target the active alias component.
-            component = if (selected == "bird") {
-                ComponentName(context, "${context.packageName}.MainActivity")
-            } else {
-                componentFor(selected)
-            }
+            component = componentFor(selected)
             addCategory(Intent.CATEGORY_LAUNCHER)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         }
