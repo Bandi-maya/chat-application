@@ -373,6 +373,13 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   screens: screens,
                   navItems: allDestinations,
                   selectedIndex: effectiveIndex,
+                  floatingActionButton: _buildContextualFab(
+                    context: context,
+                    theme: theme,
+                    colors: context.colors,
+                    accent: theme.accentColor as Color,
+                    activeItem: allDestinations[effectiveIndex],
+                  ),
                   onSelect: (idx) {
                     if (idx >= 0 && idx < allDestinations.length) {
                       _selectRootDestination(
@@ -394,7 +401,32 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 );
               }
 
-              // 5. STANDARD BOTTOM NAVIGATION / GESTURE TABS / ADAPTIVE RAIL
+              // 5. Curved radial menu inspired by reference image 1.
+              if (navMode == AppNavigationMode.curvedRadialDrawer) {
+                return _buildCurvedRadialDrawerShell(
+                  theme: theme,
+                  screens: screens,
+                  navItems: allDestinations,
+                  selectedIndex: effectiveIndex,
+                  floatingActionButton: _buildContextualFab(
+                    context: context,
+                    theme: theme,
+                    colors: context.colors,
+                    accent: theme.accentColor as Color,
+                    activeItem: allDestinations[effectiveIndex],
+                  ),
+                  onSelect: (idx) {
+                    if (idx >= 0 && idx < allDestinations.length) {
+                      _selectRootDestination(
+                        idx,
+                        destinationId: allDestinations[idx].id,
+                      );
+                    }
+                  },
+                );
+              }
+
+              // 6. STANDARD BOTTOM NAVIGATION / GESTURE TABS / ADAPTIVE RAIL
               final layoutMode = themeController.layoutMode;
               final useRail =
                   constraints.maxWidth >= 600 &&
@@ -484,6 +516,27 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   }
 
   // ---------------------------------------------------------------------------
+  // Curved radial drawer (reference image 1)
+  // ---------------------------------------------------------------------------
+  Widget _buildCurvedRadialDrawerShell({
+    required dynamic theme,
+    required List<Widget> screens,
+    required List<_NavDestinationItem> navItems,
+    required int selectedIndex,
+    required Widget? floatingActionButton,
+    required ValueChanged<int> onSelect,
+  }) {
+    return _CurvedRadialDrawerScaffold(
+      theme: theme,
+      selectedIndex: selectedIndex,
+      navItems: navItems,
+      floatingActionButton: floatingActionButton,
+      onSelect: onSelect,
+      child: IndexedStack(index: selectedIndex, children: screens),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
   // 1. Top WhatsApp Style Tab Bar (Image 1)
   // ---------------------------------------------------------------------------
   Widget _buildTopWhatsAppShell({
@@ -564,6 +617,14 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
     return Scaffold(
       backgroundColor: theme.backgroundColor,
+      floatingActionButton: _buildContextualFab(
+        context: context,
+        theme: theme,
+        colors: colors,
+        accent: theme.accentColor as Color,
+        activeItem: navItems[selectedIndex],
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: SafeArea(
         child: Row(
           children: [
@@ -696,12 +757,32 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     required List<Widget> screens,
     required List<_NavDestinationItem> navItems,
     required int selectedIndex,
+    required Widget? floatingActionButton,
     required ValueChanged<int> onSelect,
   }) {
     return _PerspectiveDrawerScaffold(
       theme: theme,
       selectedIndex: selectedIndex,
       navItems: navItems,
+      floatingActionButton: floatingActionButton,
+      onSelect: onSelect,
+      child: IndexedStack(index: selectedIndex, children: screens),
+    );
+  }
+
+  Widget _buildCurvedRadialDrawerShell({
+    required dynamic theme,
+    required List<Widget> screens,
+    required List<_NavDestinationItem> navItems,
+    required int selectedIndex,
+    required Widget? floatingActionButton,
+    required ValueChanged<int> onSelect,
+  }) {
+    return _CurvedRadialDrawerScaffold(
+      theme: theme,
+      selectedIndex: selectedIndex,
+      navItems: navItems,
+      floatingActionButton: floatingActionButton,
       onSelect: onSelect,
       child: IndexedStack(index: selectedIndex, children: screens),
     );
@@ -731,6 +812,14 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     return Scaffold(
       key: scaffoldKey,
       backgroundColor: theme.backgroundColor,
+      floatingActionButton: _buildContextualFab(
+        context: context,
+        theme: theme,
+        colors: colors,
+        accent: theme.accentColor as Color,
+        activeItem: navItems[selectedIndex],
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       drawer: Drawer(
         backgroundColor: colors.surfaceSecondary,
         child: SafeArea(
@@ -880,6 +969,14 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
     return Scaffold(
       backgroundColor: theme.backgroundColor,
+      floatingActionButton: _buildContextualFab(
+        context: context,
+        theme: theme,
+        colors: context.colors,
+        accent: theme.accentColor as Color,
+        activeItem: navItems[selectedIndex],
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: SafeArea(
         child: Row(
           children: [
@@ -2137,12 +2234,261 @@ class _NavDestinationItem {
   static Widget _dummyBuilder(BuildContext context) => const SizedBox.shrink();
 }
 
+class _CurvedRadialDrawerScaffold extends StatefulWidget {
+  final dynamic theme;
+  final int selectedIndex;
+  final List<_NavDestinationItem> navItems;
+  final ValueChanged<int> onSelect;
+  final Widget child;
+  final Widget? floatingActionButton;
+
+  const _CurvedRadialDrawerScaffold({
+    required this.theme,
+    required this.selectedIndex,
+    required this.navItems,
+    required this.onSelect,
+    required this.child,
+    required this.floatingActionButton,
+  });
+
+  @override
+  State<_CurvedRadialDrawerScaffold> createState() =>
+      _CurvedRadialDrawerScaffoldState();
+}
+
+class _CurvedRadialDrawerScaffoldState
+    extends State<_CurvedRadialDrawerScaffold> {
+  bool _menuOpen = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Scaffold(
+      backgroundColor: widget.theme.backgroundColor as Color,
+      floatingActionButton: widget.floatingActionButton,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final panelWidth = constraints.maxWidth < 330
+              ? constraints.maxWidth
+              : 330.0;
+          final availableHeight = constraints.maxHeight;
+          final panelHeight = availableHeight < 300
+              ? availableHeight
+              : (availableHeight * 0.78).clamp(260.0, 340.0).toDouble();
+
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              widget.child,
+              if (_menuOpen)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  width: panelWidth,
+                  height: panelHeight,
+                  child: ClipPath(
+                    clipper: const _CurvedRadialMenuClipper(),
+                    child: Container(
+                      color: const Color(0xFFF052BD),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Positioned(
+                            right: 12,
+                            top: MediaQuery.paddingOf(context).top + 6,
+                            child: Material(
+                              color: Colors.white.withValues(alpha: 0.95),
+                              shape: const CircleBorder(),
+                              child: IconButton(
+                                tooltip: 'Close navigation menu',
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () => setState(() => _menuOpen = false),
+                                icon: const Icon(
+                                  Icons.close_rounded,
+                                  color: Color(0xFF26303B),
+                                  size: 19,
+                                ),
+                              ),
+                            ),
+                          ),
+                          ..._radialMenuItems(
+                            context,
+                            panelWidth,
+                            panelHeight,
+                            widget.navItems,
+                            widget.selectedIndex,
+                            colors,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Positioned(
+                  top: MediaQuery.paddingOf(context).top + 8,
+                  left: 10,
+                  child: Material(
+                    elevation: 5,
+                    color: colors.surface,
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      tooltip: 'Open navigation menu',
+                      onPressed: () => setState(() => _menuOpen = true),
+                      icon: Icon(Icons.menu_rounded, color: colors.foreground),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  List<Widget> _radialMenuItems(
+    BuildContext context,
+    double width,
+    double height,
+    List<_NavDestinationItem> navItems,
+    int selectedIndex,
+    AppColors colors,
+  ) {
+    final items = navItems.take(7).toList(growable: false);
+    if (items.isEmpty) return const <Widget>[];
+    return List<Widget>.generate(items.length, (index) {
+      final progress = items.length == 1 ? 0.0 : index / (items.length - 1);
+      final left = width * (0.11 + progress * 0.38);
+      final top = height * (0.09 + progress * 0.70);
+      final item = items[index];
+      final selected = item.id == navItems[selectedIndex].id;
+      final textWidth = (width - left - 12).clamp(72.0, 180.0).toDouble();
+      return Positioned(
+        left: left,
+        top: top,
+        child: Transform.rotate(
+          angle: -0.20,
+          alignment: Alignment.centerLeft,
+          child: SizedBox(
+            width: textWidth,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(22),
+              onTap: () {
+                widget.onSelect(index);
+                setState(() => _menuOpen = false);
+              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? const Color(0xFFFFFFFF)
+                          : Colors.white.withValues(alpha: 0.88),
+                      shape: BoxShape.circle,
+                      boxShadow: selected
+                          ? <BoxShadow>[
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.14),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Center(
+                      child: ChatyGlyphIcon(
+                        glyph: selected ? item.activeIcon : item.icon,
+                        size: 15,
+                        color: const Color(0xFFEF4DB7),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      item.label.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+                        letterSpacing: 0.35,
+                        shadows: const <Shadow>[
+                          Shadow(color: Color(0x33230D25), blurRadius: 2),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    });
+  }
+}
+
+class _CurvedRadialMenuClipper extends CustomClipper<Path> {
+  const _CurvedRadialMenuClipper();
+
+  @override
+  Path getClip(Size size) {
+    return Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..cubicTo(
+        size.width * 1.01,
+        size.height * 0.24,
+        size.width * 0.98,
+        size.height * 0.48,
+        size.width * 0.80,
+        size.height * 0.65,
+      )
+      ..cubicTo(
+        size.width * 0.62,
+        size.height * 0.84,
+        size.width * 0.39,
+        size.height * 0.94,
+        size.width * 0.20,
+        size.height * 0.84,
+      )
+      ..cubicTo(
+        -size.width * 0.02,
+        size.height * 0.73,
+        -size.width * 0.06,
+        size.height * 0.43,
+        size.width * 0.08,
+        size.height * 0.18,
+      )
+      ..cubicTo(
+        size.width * 0.13,
+        size.height * 0.08,
+        size.width * 0.20,
+        0,
+        size.width * 0.20,
+        0,
+      )
+      ..close();
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
 class _PerspectiveDrawerScaffold extends StatefulWidget {
   final dynamic theme;
   final int selectedIndex;
   final List<_NavDestinationItem> navItems;
   final ValueChanged<int> onSelect;
   final Widget child;
+  final Widget? floatingActionButton;
 
   const _PerspectiveDrawerScaffold({
     required this.theme,
@@ -2150,6 +2496,7 @@ class _PerspectiveDrawerScaffold extends StatefulWidget {
     required this.navItems,
     required this.onSelect,
     required this.child,
+    required this.floatingActionButton,
   });
 
   @override
@@ -2192,6 +2539,8 @@ class _PerspectiveDrawerScaffoldState extends State<_PerspectiveDrawerScaffold>
 
     return Scaffold(
       backgroundColor: colors.surfaceElevated,
+      floatingActionButton: widget.floatingActionButton,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: AnimatedBuilder(
         animation: _anim,
         builder: (context, _) {
