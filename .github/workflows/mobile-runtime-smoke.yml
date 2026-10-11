@@ -62,12 +62,27 @@ jobs:
           api-level: 35
           arch: x86_64
           profile: pixel_6
-          disable-animations: true
+          # Avoid the runner's fragile post-boot keyevent on slow hosted emulators.
+          # SwiftShader and disabled snapshots make cold boots more repeatable.
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot
+          disable-animations: false
           script: |
             # android-emulator-runner executes this script with /bin/sh;
             # POSIX sh does not support Bash's pipefail option.
             set -eu
             mkdir -p artifacts
+            adb wait-for-device
+            booted=''
+            for attempt in $(seq 1 60); do
+              booted="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+              [ "$booted" = "1" ] && break
+              sleep 2
+            done
+            if [ "$booted" != "1" ]; then
+              echo "Android emulator did not reach sys.boot_completed=1."
+              adb devices -l || true
+              exit 1
+            fi
             adb logcat -c
             adb install -r build/app/outputs/flutter-apk/app-debug.apk
             adb shell am force-stop com.example.chat || true
