@@ -300,11 +300,11 @@ class _UniversalStylesScreenState extends State<UniversalStylesScreen> {
                             itemCount: displayedLauncherIcons.length,
                             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount:
-                                  MediaQuery.sizeOf(ctx).width < 380 ? 4 : 5,
+                                  MediaQuery.sizeOf(context).width < 380 ? 4 : 5,
                               mainAxisSpacing: 10,
                               crossAxisSpacing: 10,
                               childAspectRatio:
-                                  MediaQuery.sizeOf(ctx).width < 380 ? 0.62 : 0.78,
+                                  MediaQuery.sizeOf(context).width < 380 ? 0.62 : 0.78,
                             ),
                             itemBuilder: (ctx, i) {
                               final item = displayedLauncherIcons[i];
