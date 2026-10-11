@@ -1294,17 +1294,17 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 9),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: theme.primaryTextColor.withValues(alpha: 0.8)),
-            const SizedBox(width: 14),
+            Icon(icon, size: 19, color: theme.primaryTextColor.withValues(alpha: 0.82)),
+            const SizedBox(width: 13),
             Expanded(
               child: Text(
                 title,
                 style: TextStyle(
                   color: theme.primaryTextColor,
-                  fontSize: 14,
+                  fontSize: 13.5,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -1369,16 +1369,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                             title: 'Chaty Settings',
                             onTap: () {
                               Navigator.pop(ctx);
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => GbSettingsScreen(
-                                    preferencesController: widget.preferencesController,
-                                    themeController: widget.themeController,
-                                    dataStore: widget.dataStore,
-                                    notificationService: widget.notificationService,
-                                  ),
-                                ),
-                              );
+                              _openSettingsScreen();
                             },
                           ),
                           _popupMenuItem(
@@ -1521,6 +1512,14 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                               ChatyShareService.shareApp(context);
                             },
                           ),
+                          _popupMenuItem(
+                            icon: Icons.restart_alt_rounded,
+                            title: 'Restart Chaty',
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              unawaited(_restartChaty());
+                            },
+                          ),
                           const Divider(height: 8, indent: 12, endIndent: 12),
                           _popupMenuItem(
                             icon: Icons.settings_rounded,
@@ -1553,6 +1552,22 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         );
       },
     );
+  }
+
+  Future<void> _restartChaty() async {
+    try {
+      await const MethodChannel('chaty/launcher_icon')
+          .invokeMethod<void>('restartApp');
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('Chaty could not restart: ${error.toString()}'),
+          ),
+        );
+    }
   }
 
   Widget _standardAppBar(ThemeConfig theme, HomePreferences homePrefs) {
