@@ -1220,13 +1220,20 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                             size: 21,
                           ),
                           title: 'Airplane mode',
-                          subtitle: home.airplaneModeSimulator
+                          subtitle: (home.airplaneModeSimulator ||
+                                  widget.preferencesController.gbBool('yo_want_airplanemode'))
                               ? 'Enabled — Chaty presence is offline until you turn it off'
                               : 'Simulate offline presence; you can turn this on or off anytime',
-                          switchValue: home.airplaneModeSimulator,
+                          switchValue: home.airplaneModeSimulator ||
+                              widget.preferencesController.gbBool('yo_want_airplanemode'),
                           onSwitchChanged: (val) {
                             _updateHome(
                               home.copyWith(airplaneModeSimulator: val),
+                              logTitle: 'Airplane Mode',
+                            );
+                            widget.preferencesController.updateGbFeature(
+                              'yo_want_airplanemode',
+                              val,
                               logTitle: 'Airplane Mode',
                             );
                           },
