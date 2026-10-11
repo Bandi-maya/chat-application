@@ -11,6 +11,9 @@ void main() {
       expect(HomePresetNormalizer.homeStyle('Compact'), 'Compact');
       expect(HomePresetNormalizer.homeStyle('Minimal'), 'Minimal');
       expect(HomePresetNormalizer.homeStyle('Productivity'), 'Productivity');
+      expect(HomePresetNormalizer.homeStyle('Floating Rail'), 'Floating Rail');
+      expect(HomePresetNormalizer.homeStyle('3D Perspective Drawer'), '3D Perspective Drawer');
+      expect(HomePresetNormalizer.homeStyle('WhatsApp OLD UI'), 'Classic');
     });
 
     test('normalizes stories preset labels consumed by the stories rail', () {

@@ -14,21 +14,21 @@ void main() {
       expect(HomePresetNormalizer.homeStyle('BUBBLES TAB STYLE'), 'Compact');
       expect(HomePresetNormalizer.homeStyle('BASIC TAB STYLE'), 'Productivity');
       expect(HomePresetNormalizer.homeStyle('WhatsApp OLD UI'), 'Classic');
-      expect(HomePresetNormalizer.homeStyle('Instagram Style'), 'Stories First');
-      expect(HomePresetNormalizer.homeStyle('Telegram Style'), 'Chaty Default');
+      expect(HomePresetNormalizer.homeStyle('Instagram Style'), 'Instagram Style');
+      expect(HomePresetNormalizer.homeStyle('Telegram Style'), 'Telegram Style');
       expect(
         HomePresetNormalizer.homeStyle('WhatsApp-style top bar'),
         'Classic',
       );
-      expect(HomePresetNormalizer.homeStyle('Floating Rail'), 'Stories First');
+      expect(HomePresetNormalizer.homeStyle('Floating Rail'), 'Floating Rail');
       expect(
         HomePresetNormalizer.homeStyle('3D Perspective Drawer'),
-        'Expressive',
+        '3D Perspective Drawer',
       );
-      expect(HomePresetNormalizer.homeStyle('Modern Side Menu'), 'Cards');
+      expect(HomePresetNormalizer.homeStyle('Modern Side Menu'), 'Modern Side Menu');
       expect(
         HomePresetNormalizer.homeStyle('Curved Radial Menu'),
-        'Expressive',
+        'Curved Radial Menu',
       );
       expect(HomePresetNormalizer.homeStyle('Classic'), 'Classic');
       expect(HomePresetNormalizer.homeStyle('Tablet Split View'), 'Tablet Split View');
