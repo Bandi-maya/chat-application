@@ -110,7 +110,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> wit
 
   Future<void> _previewDynamicIsland() async {
     try {
-      if (_overlayPermissionGranted && _notificationAccessGranted) {
+      if (_overlayPermissionGranted) {
         await _dynamicIslandChannel.invokeMethod<void>('showPreview');
         return;
       }
