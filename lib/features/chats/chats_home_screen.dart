@@ -1669,8 +1669,6 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
   }
 
   Widget _standardAppBar(ThemeConfig theme, HomePreferences homePrefs) {
-    final availableWidth = MediaQuery.sizeOf(context).width;
-    final compactHeader = availableWidth < 390;
     final headerStyle = _effectiveHomeHeaderStyle;
     final homeStyle = HomePresetNormalizer.homeStyle(homePrefs.homeStyle);
     final titleFontSize = switch (headerStyle) {
