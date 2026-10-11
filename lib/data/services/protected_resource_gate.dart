@@ -21,6 +21,12 @@ class ProtectedResourceGate {
   static final Map<String, DateTime> _unlockedConversations =
       <String, DateTime>{};
 
+  // Multiple visible routes can observe the same app-resume event. Share one
+  // in-flight authentication request per conversation instead of stacking
+  // duplicate native prompts or allowing route-specific races.
+  static final Map<String, Future<bool>> _pendingConversationAuthorizations =
+      <String, Future<bool>>{};
+
   // General unlocked session timestamp for app-level or settings changes
   static DateTime? _lastAppUnlockTime;
 
@@ -107,20 +113,55 @@ class ProtectedResourceGate {
     String? title,
     String? reason,
   }) async {
-    // If conversation is not locked or hidden, allow instantly
     if (!preferencesController.isConversationProtected(conversationId)) {
       return true;
     }
+    if (isConversationSessionActive(conversationId, preferencesController)) {
+      return true;
+    }
 
-    // Check active session window
+    final pending = _pendingConversationAuthorizations[conversationId];
+    if (pending != null) return pending;
+
+    final request = _authorizeConversationInternal(
+      context,
+      conversationId: conversationId,
+      preferencesController: preferencesController,
+      lockService: lockService,
+      title: title,
+      reason: reason,
+    );
+    _pendingConversationAuthorizations[conversationId] = request;
+    try {
+      return await request;
+    } finally {
+      if (identical(
+        _pendingConversationAuthorizations[conversationId],
+        request,
+      )) {
+        _pendingConversationAuthorizations.remove(conversationId);
+      }
+    }
+  }
+
+  static Future<bool> _authorizeConversationInternal(
+    BuildContext context, {
+    required String conversationId,
+    required ChatyPreferencesController preferencesController,
+    LocalLockService? lockService,
+    String? title,
+    String? reason,
+  }) async {
+    // Re-check after entering the shared request to handle state changes.
+    if (!preferencesController.isConversationProtected(conversationId)) {
+      return true;
+    }
     if (isConversationSessionActive(conversationId, preferencesController)) {
       return true;
     }
 
     final service = lockService ?? locator<LocalLockService>();
     final method = preferencesController.security.lockMethod;
-
-    // Check if current lock method has credentials configured
     final hasCred = await _isMethodConfigured(service, method);
     if (!hasCred) {
       if (context.mounted) {
@@ -140,8 +181,6 @@ class ProtectedResourceGate {
     }
 
     if (!context.mounted) return false;
-
-    // Show authentication prompt
     final unlocked = await AppLockOverlayModal.show(
       context,
       preferencesController: preferencesController,
