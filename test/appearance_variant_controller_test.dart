@@ -29,6 +29,21 @@ void main() {
     },
   );
 
+  test('appearance presets never shrink enlarged system text', () {
+    expect(
+      AppearanceVariantController.resolveTextScale(1.3, 0.9),
+      1.3,
+    );
+    expect(
+      AppearanceVariantController.resolveTextScale(1.3, 1.1),
+      closeTo(1.43, 0.0001),
+    );
+    expect(
+      AppearanceVariantController.resolveTextScale(1.0, 0.94),
+      0.94,
+    );
+  });
+
   test('unsupported appearance values are ignored', () async {
     final controller = AppearanceVariantController();
     await controller.setTypographyStyle('Not a supported style');
