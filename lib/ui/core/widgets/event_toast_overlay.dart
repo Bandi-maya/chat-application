@@ -128,7 +128,7 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 360),
         curve: Curves.easeOutCubic,
-        width: expanded ? (MediaQuery.sizeOf(context).width - 36).clamp(260.0, 390.0) : 174,
+        width: expanded ? (MediaQuery.sizeOf(context).width - 36).clamp(260.0, 390.0).toDouble() : 174.0,
         constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width - 28),
         padding: EdgeInsets.symmetric(horizontal: expanded ? 16 : 13, vertical: expanded ? 13 : 9),
         decoration: BoxDecoration(
