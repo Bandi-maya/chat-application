@@ -715,6 +715,11 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
         final statusText = currentUser?.about.isNotEmpty == true
             ? currentUser!.about
             : 'Available';
+        final effectiveSearchPlacement =
+            home.disableSearchBar &&
+                    home.searchPlacement.trim().toLowerCase() == 'header action'
+                ? 'Below header'
+                : home.searchPlacement;
 
         return Scaffold(
           backgroundColor: colors.background,
@@ -745,7 +750,10 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                 disableStatusUnderName: home.disableStatusUnderName,
                 disableSearchBar: home.disableSearchBar,
                 showSearchBar: home.showSearchBar,
-                searchPlacement: home.searchPlacement,
+                showCameraIcon: home.showCameraIcon,
+                showDesktopIcon: home.showDesktopIcon,
+                showIconAddAccount: home.showIconAddAccount,
+                searchPlacement: effectiveSearchPlacement,
                 separateChatsAndGroups: home.separateChatsAndGroups,
                 homeStyle: _selectedHomeUiStyle(home),
                 tabBubbleStyle: home.tabBubbleStyle,
@@ -1193,15 +1201,15 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                             size: 21,
                           ),
                           title: 'Search placement',
-                          subtitle: home.searchPlacement,
+                          subtitle: effectiveSearchPlacement,
                           showChevron: true,
                           onTap: () async {
                             final chosen = await GbRadioSelectionDialog.show(
                               context: context,
                               title: 'Search placement',
                               options: _searchPlacementOptions,
-                              selectedOption: _searchPlacementOptions.contains(home.searchPlacement)
-                                  ? home.searchPlacement
+                              selectedOption: _searchPlacementOptions.contains(effectiveSearchPlacement)
+                                  ? effectiveSearchPlacement
                                   : 'Header action',
                             );
                             if (chosen != null && mounted) {
@@ -1263,7 +1271,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                               home.searchPlacement != 'Header action',
                           onSwitchChanged: (val) {
                             final targetPlacement = val
-                                ? (home.searchPlacement == 'Above chat filters'
+                                ? (effectiveSearchPlacement == 'Above chat filters'
                                     ? 'Above chat filters'
                                     : 'Below header')
                                 : 'Header action';
