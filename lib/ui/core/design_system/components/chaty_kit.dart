@@ -528,7 +528,14 @@ class ChatySwipeAction {
 
 class ChatySwipeActions extends StatefulWidget {
   final Widget child;
+
+  /// Actions shown when the row is swiped left (revealed on the right).
   final List<ChatySwipeAction> actions;
+
+  /// Optional actions shown when the row is swiped right (revealed on the left).
+  /// Existing callers need not provide this, so their trailing swipe behavior
+  /// remains unchanged.
+  final List<ChatySwipeAction> leadingActions;
   final double actionExtent;
 
   /// Opaque backdrop painted behind the ROW CONTENT. Rows with transparent
@@ -540,6 +547,7 @@ class ChatySwipeActions extends StatefulWidget {
     super.key,
     required this.child,
     required this.actions,
+    this.leadingActions = const <ChatySwipeAction>[],
     this.actionExtent = 74,
     this.backgroundColor,
   });
@@ -556,7 +564,9 @@ class _ChatySwipeActionsState extends State<ChatySwipeActions>
     value: 1.0,
   );
   double _dragOffset = 0;
-  double get _maxDrag => widget.actionExtent * widget.actions.length;
+  double get _maxTrailingDrag => widget.actionExtent * widget.actions.length;
+  double get _maxLeadingDrag =>
+      widget.actionExtent * widget.leadingActions.length;
 
   void _settle(double target) {
     final start = _dragOffset;
@@ -569,6 +579,48 @@ class _ChatySwipeActionsState extends State<ChatySwipeActions>
       ..reset()
       ..addListener(listener)
       ..forward().whenComplete(() => _snap.removeListener(listener));
+  }
+
+  void _triggerAction(ChatySwipeAction action) {
+    action.onTriggered();
+    _settle(0.0);
+  }
+
+  Widget _actionCell(ChatySwipeAction action, {required bool leading}) {
+    final maxDrag = leading ? _maxLeadingDrag : _maxTrailingDrag;
+    final showLabel = maxDrag > 0 && _dragOffset.abs() > maxDrag * 0.72;
+    final isRevealed = leading ? _dragOffset < -6 : _dragOffset > 6;
+    return SizedBox(
+      width: widget.actionExtent,
+      child: Material(
+        color: action.color,
+        child: InkWell(
+          onTap: isRevealed ? () => _triggerAction(action) : null,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(action.icon, size: 21, color: Colors.white),
+              if (showLabel) ...[
+                const SizedBox(height: 4),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  child: Text(
+                    action.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -584,63 +636,48 @@ class _ChatySwipeActionsState extends State<ChatySwipeActions>
       onHorizontalDragStart: (_) => _snap.stop(),
       onHorizontalDragUpdate: (details) {
         setState(() {
-          _dragOffset = (_dragOffset - details.delta.dx).clamp(0.0, _maxDrag);
+          _dragOffset = (_dragOffset - details.delta.dx)
+              .clamp(-_maxLeadingDrag, _maxTrailingDrag)
+              .toDouble();
         });
       },
       onHorizontalDragEnd: (details) {
         final velocity = -(details.primaryVelocity ?? 0.0);
-        final open =
-            _dragOffset > _maxDrag / 2 || (velocity > 420 && _dragOffset > 12);
-        _settle(open ? _maxDrag : 0.0);
+        if (_dragOffset < 0) {
+          final openLeading = _maxLeadingDrag > 0 &&
+              (_dragOffset.abs() > _maxLeadingDrag / 2 ||
+                  (velocity < -420 && _dragOffset.abs() > 12));
+          _settle(openLeading ? -_maxLeadingDrag : 0.0);
+        } else {
+          final openTrailing = _maxTrailingDrag > 0 &&
+              (_dragOffset > _maxTrailingDrag / 2 ||
+                  (velocity > 420 && _dragOffset > 12));
+          _settle(openTrailing ? _maxTrailingDrag : 0.0);
+        }
       },
       child: Stack(
         fit: StackFit.passthrough,
         children: [
-          // Action layer behind the row.
+          // Draw actions on the side requested by the swipe direction.
           Positioned.fill(
-            child: Row(
-              children: [
-                const Spacer(),
-                for (final action in widget.actions)
-                  Expanded(
-                    flex: (_dragOffset / widget.actionExtent)
-                        .clamp(0.6, 1.4)
-                        .toInt(),
-                    child: Material(
-                      color: action.color,
-                      child: InkWell(
-                        onTap: _dragOffset > 6
-                            ? () {
-                                action.onTriggered();
-                                _settle(0.0);
-                              }
-                            : null,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(action.icon, size: 21, color: Colors.white),
-                            if (_dragOffset > _maxDrag * 0.72) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                action.label,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
+            child: _dragOffset < 0
+                ? Row(
+                    children: [
+                      for (final action in widget.leadingActions)
+                        _actionCell(action, leading: true),
+                      const Spacer(),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      const Spacer(),
+                      for (final action in widget.actions)
+                        _actionCell(action, leading: false),
+                    ],
                   ),
-              ],
-            ),
           ),
-          // The row itself slides left to reveal the actions. The opaque
-          // backdrop guarantees the action layer stays invisible until an
-          // actual drag, even for fully transparent row content.
+          // The row itself slides away to reveal actions. An opaque backdrop
+          // prevents the action layer bleeding through on transparent rows.
           Transform.translate(
             offset: Offset(-_dragOffset, 0),
             child: ColoredBox(
@@ -648,7 +685,7 @@ class _ChatySwipeActionsState extends State<ChatySwipeActions>
                   widget.backgroundColor ??
                   Theme.of(context).scaffoldBackgroundColor,
               child: AbsorbPointer(
-                absorbing: _dragOffset > 4,
+                absorbing: _dragOffset.abs() > 4,
                 child: widget.child,
               ),
             ),
