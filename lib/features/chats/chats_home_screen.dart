@@ -1461,14 +1461,15 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                               _openLinkedDevices();
                             },
                           ),
-                          _popupMenuItem(
-                            icon: Icons.palette_outlined,
-                            title: 'Themes & Colors',
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              _handleHomeOverflowAction('themes');
-                            },
-                          ),
+                          if (homePrefs.themesEnabled)
+                            _popupMenuItem(
+                              icon: Icons.palette_outlined,
+                              title: 'Themes & Colors',
+                              onTap: () {
+                                Navigator.pop(ctx);
+                                _handleHomeOverflowAction('themes');
+                              },
+                            ),
                           _popupMenuItem(
                             icon: Icons.dashboard_customize_rounded,
                             title: 'Templates & Layouts',
@@ -1815,16 +1816,17 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                 ),
               ),
             ),
-          IconButton(
-            tooltip: 'Toggle light / dark',
-            color: theme.primaryTextColor,
-            onPressed: widget.themeController.toggleBrightness,
-            icon: Icon(
-              theme.brightness == Brightness.dark
-                  ? Icons.light_mode_rounded
-                  : Icons.dark_mode_rounded,
+          if (homePrefs.themesEnabled)
+            IconButton(
+              tooltip: 'Toggle light / dark',
+              color: theme.primaryTextColor,
+              onPressed: widget.themeController.toggleBrightness,
+              icon: Icon(
+                theme.brightness == Brightness.dark
+                    ? Icons.light_mode_rounded
+                    : Icons.dark_mode_rounded,
+              ),
             ),
-          ),
           IconButton(
             tooltip: 'More options',
             icon: Icon(
@@ -2181,9 +2183,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                     int.parse(conversation.avatarColorHex!),
                                   ),
                             size: 50 * effectiveDensity,
-                            shape: homePrefs.avatarShape.isNotEmpty
-                                ? homePrefs.avatarShape
-                                : chatListTemplate.avatarShape,
+                            shape: homePrefs.avatarShape == 'circle'
+                                ? chatListTemplate.avatarShape
+                                : homePrefs.avatarShape,
                           ),
                           if (selected)
                             Positioned.fill(
@@ -2267,6 +2269,27 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                               ),
                                             ),
                                           ),
+                                          if (conversation.lastMessageText.contains('@')) ...[
+                                            const SizedBox(width: 4),
+                                            Container(
+                                              width: 19,
+                                              height: 19,
+                                              decoration: BoxDecoration(
+                                                color: homePrefs.mentionIndicatorBgColor != null
+                                                    ? Color(homePrefs.mentionIndicatorBgColor!)
+                                                    : theme.accentColor.withValues(alpha: 0.14),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              alignment: Alignment.center,
+                                              child: Icon(
+                                                Icons.alternate_email_rounded,
+                                                size: 12,
+                                                color: homePrefs.mentionIconColor != null
+                                                    ? Color(homePrefs.mentionIconColor!)
+                                                    : theme.accentColor,
+                                              ),
+                                            ),
+                                          ],
                                         ],
                                       ),
                                     ),
