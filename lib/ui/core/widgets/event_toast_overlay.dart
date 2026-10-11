@@ -164,7 +164,7 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
                         if (expanded)
                           Padding(
                             padding: const EdgeInsets.only(top: 3),
-                            child: Text(notification.body, maxLines: 2, overflow: TextOverflow.ellipsis,
+                            child: Text(widget.concealWhileLocked ? '••••••' : notification.body, maxLines: 2, overflow: TextOverflow.ellipsis,
                               style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 12, height: 1.25)),
                           ),
                       ],
@@ -400,6 +400,8 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
         ),
         IgnorePointer(
           ignoring: notification == null ||
+              !prefs.notification.enableGlobalNotifications ||
+              prefs.universal.disableHeadsUpNotification ||
               !prefs.gbBool('dynamic_island_notifications', fallback: false),
           child: AnimatedAlign(
             alignment: Alignment.topCenter,
@@ -411,6 +413,8 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
               padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 7),
               child: AnimatedOpacity(
                 opacity: notification != null &&
+                        prefs.notification.enableGlobalNotifications &&
+                        !prefs.universal.disableHeadsUpNotification &&
                         prefs.gbBool('dynamic_island_notifications', fallback: false)
                     ? 1
                     : 0,
