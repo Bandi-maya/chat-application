@@ -15,7 +15,12 @@ import ImageIO
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
 
-    let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "ChatyFaceTracking")
+    guard let registrar = engineBridge.pluginRegistry.registrar(
+      forPlugin: "ChatyFaceTracking"
+    ) else {
+      assertionFailure("Unable to register Chaty face tracking channel.")
+      return
+    }
     let channel = FlutterMethodChannel(
       name: "chaty/camera_face_tracking",
       binaryMessenger: registrar.messenger()
