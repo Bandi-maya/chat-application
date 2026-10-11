@@ -57,6 +57,83 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     super.dispose();
   }
 
+  Widget _buildTransitionPage({
+    required int index,
+    required String destinationId,
+    required Widget screen,
+  }) {
+    final transition = locator<ChatyPreferencesController>().home.pagerTransition3d;
+    return AnimatedBuilder(
+      animation: _pageController,
+      child: _NavigationKeepAlive(
+        key: ValueKey<String>(destinationId),
+        child: screen,
+      ),
+      builder: (context, child) {
+        var page = _currentIndex.toDouble();
+        if (_pageController.hasClients) {
+          try {
+            page = _pageController.page ?? page;
+          } catch (_) {
+            // Keep initial layout stable until the first viewport layout.
+          }
+        }
+        final delta = (index.toDouble() - page).clamp(-1.0, 1.0).toDouble();
+        switch (transition) {
+          case 'Cube 3D':
+            return Transform(
+              alignment: delta >= 0 ? Alignment.centerLeft : Alignment.centerRight,
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, 0.001)
+                ..rotateY(delta * 0.62),
+              child: child,
+            );
+          case 'Accordion Fold':
+            return Transform(
+              alignment: delta >= 0 ? Alignment.centerLeft : Alignment.centerRight,
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, 0.001)
+                ..rotateY(delta * 0.28)
+                ..scale(1.0 - delta.abs() * 0.025, 1.0, 1.0),
+              child: child,
+            );
+          case 'Card Flip':
+            return Transform(
+              alignment: delta >= 0 ? Alignment.centerRight : Alignment.centerLeft,
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, 0.0012)
+                ..rotateY(delta * math.pi / 2),
+              child: Opacity(
+                opacity: (1.0 - delta.abs() * 0.18).clamp(0.0, 1.0).toDouble(),
+                child: child,
+              ),
+            );
+          case 'Depth Zoom':
+            return Transform.translate(
+              offset: Offset(delta * 18, 0),
+              child: Transform.scale(
+                scale: (1.0 - delta.abs() * 0.09).clamp(0.88, 1.0).toDouble(),
+                child: Opacity(
+                  opacity: (1.0 - delta.abs() * 0.12).clamp(0.0, 1.0).toDouble(),
+                  child: child,
+                ),
+              ),
+            );
+          case 'Stack Rotate':
+            return Transform.rotate(
+              angle: delta * 0.045,
+              child: Transform.scale(
+                scale: (1.0 - delta.abs() * 0.045).clamp(0.92, 1.0).toDouble(),
+                child: child,
+              ),
+            );
+          default:
+            return child ?? const SizedBox.shrink();
+        }
+      },
+    );
+  }
+
   /// A shared swipeable page host for every navigation style. PageView owns
   /// horizontal gesture arbitration (so story strips and other child scrollers
   /// still work), while keep-alive wrappers preserve state on inactive screens.
@@ -83,9 +160,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         final destinationId = index < navItems.length
             ? navItems[index].id
             : 'destination-$index';
-        return _NavigationKeepAlive(
-          key: ValueKey<String>(destinationId),
-          child: screens[index],
+        return _buildTransitionPage(
+          index: index,
+          destinationId: destinationId,
+          screen: screens[index],
         );
       }, growable: false),
     );
