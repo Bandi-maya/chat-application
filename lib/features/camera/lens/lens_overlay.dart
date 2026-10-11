@@ -60,7 +60,7 @@ Future<Uint8List> composeLensIntoImage({
   required LensDefinition lens,
   required List<FacePose> poses,
 }) async {
-  final codec = await ui.instantiateImageCodec(sourceBytes);
+  final codec = await ui.instantiateImageCodec(sourceBytes, targetWidth: 2048);
   final frame = await codec.getNextFrame();
   final image = frame.image;
   try {
