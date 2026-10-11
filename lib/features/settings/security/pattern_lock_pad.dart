@@ -79,7 +79,7 @@ class PatternLockPadState extends State<PatternLockPad> {
     final projection = (((point.dx - start.dx) * delta.dx) +
             ((point.dy - start.dy) * delta.dy)) /
         lengthSquared;
-    final t = projection.clamp(0.0, 1.0);
+    final t = projection.clamp(0.0, 1.0).toDouble();
     final nearest = Offset(start.dx + delta.dx * t, start.dy + delta.dy * t);
     return (point - nearest).distance;
   }
@@ -100,6 +100,17 @@ class PatternLockPadState extends State<PatternLockPad> {
         !additions.contains(endHit)) {
       additions.add(endHit);
     }
+    final delta = end - start;
+    final lengthSquared = delta.dx * delta.dx + delta.dy * delta.dy;
+    additions.sort((a, b) {
+      if (lengthSquared == 0) return 0;
+      double progress(int index) {
+        final offset = centers[index] - start;
+        return ((offset.dx * delta.dx) + (offset.dy * delta.dy)) /
+            lengthSquared;
+      }
+      return progress(a).compareTo(progress(b));
+    });
     if (widget.enableHaptics && additions.isNotEmpty) {
       HapticFeedback.selectionClick();
     }
