@@ -102,7 +102,9 @@ class _AnimatedEmojiViewState extends State<AnimatedEmojiView>
         animatedData,
         key: ValueKey('${animatedData.id}_$_replayKey'),
         size: widget.size,
-        repeat: widget.mode == EmojiDisplayMode.reaction ? false : true,
+        // Chat message emojis loop; reaction and picker previews play once.
+        // Repeating every visible picker tile overwhelms older devices.
+        repeat: widget.mode == EmojiDisplayMode.inline,
       );
     } else {
       content = Text(
