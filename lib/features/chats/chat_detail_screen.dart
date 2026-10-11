@@ -2234,12 +2234,64 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Future<void> _openForwardSheet(ChatMessage message) async {
     final theme = _theme;
     final maxForwardChats = widget.preferencesController.universal.increaseForwardLimit ? 250 : 5;
+    final homePrefs = widget.preferencesController.home;
     final allTargets = widget.dataStore.conversations
         .where((c) => c.id != widget.conversationId)
         .toList(growable: false);
     final targets = allTargets.take(maxForwardChats).toList(growable: false);
+    final recentOrdered = [...targets]
+      ..sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
+    final directByFrequency = targets
+        .where((conversation) => conversation.type == ConversationType.direct)
+        .toList()
+      ..sort(
+        (a, b) => widget.dataStore
+            .getMessages(b.id)
+            .length
+            .compareTo(widget.dataStore.getMessages(a.id).length),
+      );
+    final frequentTargets = directByFrequency.take(5).toList(growable: false);
+    final frequentIds = frequentTargets.map((item) => item.id).toSet();
+    final recentPool = recentOrdered
+        .where((item) => !frequentIds.contains(item.id))
+        .toList(growable: false);
+    final recentTargets = recentPool.take(5).toList(growable: false);
+    final recentIds = recentTargets.map((item) => item.id).toSet();
+    final otherContactTargets = recentOrdered
+        .where(
+          (item) =>
+              item.type == ConversationType.direct &&
+              !frequentIds.contains(item.id) &&
+              !recentIds.contains(item.id),
+        )
+        .toList(growable: false);
+    final otherGroupTargets = recentOrdered
+        .where(
+          (item) =>
+              item.type == ConversationType.group &&
+              !recentIds.contains(item.id),
+        )
+        .toList(growable: false);
+    final forwardItems = <({String section, Conversation conversation})>[];
+    void addSection(String title, List<Conversation> items) {
+      for (final item in items) {
+        forwardItems.add((section: title, conversation: item));
+      }
+    }
+    if (!homePrefs.hideFrequentlyContacted) {
+      addSection('Frequently contacted', frequentTargets);
+    }
+    if (!homePrefs.hideRecentChats) {
+      addSection('Recent chats', recentTargets);
+    }
+    if (!homePrefs.hideOtherContacts) {
+      addSection('Other contacts', otherContactTargets);
+    }
+    // The Home forwarding switches target contact sections. Keep groups visible
+    // so the user always has a viable destination when the contact sections hide.
+    addSection('Groups', otherGroupTargets);
     if (!mounted) return;
-    if (targets.isEmpty) {
+    if (forwardItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No other chats to forward to.')),
       );
@@ -2285,27 +2337,53 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               Flexible(
                 child: ListView.builder(
                   shrinkWrap: true,
-                  itemCount: targets.length,
+                  itemCount: forwardItems.length,
                   itemBuilder: (context, index) {
-                    final conversation = targets[index];
-                    return ListTile(
-                      leading: AppAvatar(
-                        initials:
-                            conversation.avatarInitials ??
-                            conversation.title.characters
-                                .take(2)
-                                .toString()
-                                .toUpperCase(),
-                        colorHex: conversation.avatarColorHex ?? '0xFF6366F1',
-                        size: 36,
-                      ),
-                      title: Text(
-                        conversation.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: theme.primaryTextColor),
-                      ),
-                      onTap: () => Navigator.pop(sheetContext, conversation),
+                    final item = forwardItems[index];
+                    final conversation = item.conversation;
+                    final showSectionHeader =
+                        index == 0 ||
+                        forwardItems[index - 1].section != item.section;
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (showSectionHeader)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                item.section.toUpperCase(),
+                                style: TextStyle(
+                                  color: theme.secondaryTextColor,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.7,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ListTile(
+                          leading: AppAvatar(
+                            initials:
+                                conversation.avatarInitials ??
+                                conversation.title.characters
+                                    .take(2)
+                                    .toString()
+                                    .toUpperCase(),
+                            colorHex: conversation.avatarColorHex ?? '0xFF6366F1',
+                            size: 36,
+                          ),
+                          title: Text(
+                            conversation.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: theme.primaryTextColor),
+                          ),
+                          onTap: () =>
+                              Navigator.pop(sheetContext, conversation),
+                        ),
+                      ],
                     );
                   },
                 ),
