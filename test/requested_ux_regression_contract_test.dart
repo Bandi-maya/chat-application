@@ -16,7 +16,7 @@ void main() {
     expect(picker, contains('TextInputType.none'));
     expect(picker, contains('readOnly: _isDialpad'));
     expect(picker, contains('matches.length != 1'));
-    expect(picker, contains('No registered Chaty number'));
+    expect(picker, contains('Enter a registered Chaty number'));
   });
 
   test('Mark All as Read awaits a real bulk data operation', () {
