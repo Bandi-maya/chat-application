@@ -12,6 +12,7 @@ enum AppNavigationMode {
   floatingIslandRail,
   perspective3DDrawer,
   modernSideMenu,
+  curvedRadialDrawer,
   gestureTabs,
   compactRail,
 }
