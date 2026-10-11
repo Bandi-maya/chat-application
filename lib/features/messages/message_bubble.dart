@@ -2127,6 +2127,14 @@ class _SwipeToReplyContainerState extends State<_SwipeToReplyContainer>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _controller.duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 200);
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
