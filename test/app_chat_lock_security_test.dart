@@ -50,6 +50,15 @@ void main() {
           () => service.setCredential('Pattern', '0-1-2-1'),
           throwsA(isA<ArgumentError>()),
         );
+        // A 4x4 pattern requires 6 unique points to avoid weak short patterns.
+        await expectLater(
+          service.setCredential(
+            'Pattern',
+            '0-1-2-3',
+            patternGridSize: 4,
+          ),
+          throwsA(isA<ArgumentError>()),
+        );
         // 4x4 supports indexes 0..15 and persists the selected grid size.
         await expectLater(
           service.setCredential('Pattern', '0-1-2-5-9-13', patternGridSize: 4),
