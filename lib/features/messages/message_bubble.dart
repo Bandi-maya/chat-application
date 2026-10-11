@@ -19,6 +19,7 @@ import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/theme/theme_config.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/bubbles/bubble_painter.dart';
+import '../../ui/core/bubbles/bubble_style_id.dart';
 import '../../ui/core/bubbles/bubble_style_registry.dart';
 import '../../ui/core/ticks/delivery_status_icon.dart';
 import 'emoji_only.dart';
@@ -130,6 +131,18 @@ class MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final convPrefs = preferencesController?.conversation;
+
+    // Read the selected legacy/GB key at render time as well as the typed
+    // preference. This guarantees an open conversation immediately reflects a
+    // style chosen in Settings instead of keeping the theme snapshot it was
+    // created with.
+    final legacyBubbleStyle =
+        preferencesController?.gbString('bubble_style', fallback: '').trim() ??
+        '';
+    final effectiveBubbleStyle = legacyBubbleStyle.isNotEmpty
+        ? BubbleStyleIdExtension.fromString(legacyBubbleStyle)
+        : effectiveBubbleStyle;
+
     if (message.type == MessageType.system) {
       final infoBg = convPrefs?.infoBalloonsBgColor != null
           ? Color(convPrefs!.infoBalloonsBgColor!)
@@ -375,11 +388,11 @@ class MessageBubble extends StatelessWidget {
                                     theme.bubbleMaxWidthFactor,
                               ),
                               margin: BubbleStyleRegistry.getGeometry(
-                                theme.bubbleStyle,
+                                effectiveBubbleStyle,
                               ).bubbleMargin,
                               child: CustomPaint(
                                 painter: BubblePainter(
-                                  styleId: theme.bubbleStyle,
+                                  styleId: effectiveBubbleStyle,
                                   isMe: isMe,
                                   fillColor: bubbleBg,
                                   strokeColor: theme.accentColor.withValues(
@@ -389,7 +402,7 @@ class MessageBubble extends StatelessWidget {
                                 ),
                                 child: Padding(
                                   padding: BubbleStyleRegistry.getGeometry(
-                                    theme.bubbleStyle,
+                                    effectiveBubbleStyle,
                                   ).contentPadding,
                                   child: Column(
                                     crossAxisAlignment:
