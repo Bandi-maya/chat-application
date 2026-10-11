@@ -90,6 +90,32 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
   double get _effectiveTitleCollapse =>
       (_isSelectionMode || _isSearchOpen) ? 1.0 : _largeTitleCollapse;
 
+  /// The Home UI selector owns its header presentation. Component templates
+  /// remain the fallback for styles that do not declare a dedicated header.
+  HomeHeaderStyle get _effectiveHomeHeaderStyle {
+    final homeStyle =
+        HomePresetNormalizer.homeStyle(widget.preferencesController.home.homeStyle);
+    switch (homeStyle) {
+      case 'Classic':
+        return HomeHeaderStyle.prominentIdentity;
+      case 'Cards':
+        return HomeHeaderStyle.prominentIdentity;
+      case 'Stories First':
+        return HomeHeaderStyle.storiesFirst;
+      case 'Compact':
+        return HomeHeaderStyle.compact;
+      case 'Productivity':
+        return HomeHeaderStyle.searchForward;
+      case 'Expressive':
+        return HomeHeaderStyle.prominentIdentity;
+      case 'Chaty Default':
+      case 'Tablet Split View':
+        return HomeHeaderStyle.compact;
+      default:
+        return locator<TemplateController>().home.headerStyle;
+    }
+  }
+
   bool get _isSelectionMode => _selectedConversationIds.isNotEmpty;
 
   @override
@@ -1039,8 +1065,14 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
             : (user.displayName.isNotEmpty ? user.displayName : 'Chaty'))
         : 'Chaty';
     final fallback = identity;
-    final headerStyle = locator<TemplateController>().home.headerStyle;
+    final homeStyle =
+        HomePresetNormalizer.homeStyle(homePrefs.homeStyle);
+    final headerStyle = _effectiveHomeHeaderStyle;
     final largeTitleShown = _effectiveTitleCollapse < 0.5;
+
+    if (homeStyle == 'Classic' && widget.pageTitle == null) {
+      return 'WhatsApp';
+    }
 
     switch (headerStyle) {
       case HomeHeaderStyle.prominentIdentity:
@@ -1525,7 +1557,8 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
   Widget _standardAppBar(ThemeConfig theme, HomePreferences homePrefs) {
     final availableWidth = MediaQuery.sizeOf(context).width;
     final compactHeader = availableWidth < 390;
-    final headerStyle = locator<TemplateController>().home.headerStyle;
+    final headerStyle = _effectiveHomeHeaderStyle;
+    final homeStyle = HomePresetNormalizer.homeStyle(homePrefs.homeStyle);
     final titleFontSize = switch (headerStyle) {
       HomeHeaderStyle.compact => 19.0,
       HomeHeaderStyle.prominentIdentity => 24.0,
@@ -1566,10 +1599,15 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: theme.primaryTextColor,
+                              color: homeStyle == 'Classic'
+                                  ? theme.accentColor
+                                  : theme.primaryTextColor,
                               fontSize: titleFontSize * theme.fontScale,
                               fontWeight: FontWeight.w800,
-                              letterSpacing: -0.4,
+                              letterSpacing: headerStyle ==
+                                      HomeHeaderStyle.prominentIdentity
+                                  ? -0.55
+                                  : -0.2,
                             ),
                           ),
                           if (showStatus)
