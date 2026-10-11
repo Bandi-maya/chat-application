@@ -32,18 +32,19 @@ abstract final class HomePresetNormalizer {
         // Resolve explicit labels from the Home UI Style picker. Canonical
         // list-only presets (Classic/Cards/Compact/etc.) return null so the
         // existing Template Studio navigation setting remains authoritative.
+        'classic' ||
         'whatsapp old ui' ||
         'whatsapp-style top bar' ||
         'whatsapp style top bar' => AppNavigationMode.topWhatsAppBar,
-        'one ui' => AppNavigationMode.oneUi,
-        'whatsapp ui stock' => AppNavigationMode.bottomNav,
-        'ios style' => AppNavigationMode.iosStyle,
+        'cards' || 'one ui' => AppNavigationMode.oneUi,
+        'chaty default' || 'whatsapp ui stock' => AppNavigationMode.bottomNav,
+        'stories first' || 'ios style' => AppNavigationMode.iosStyle,
         'instagram style' => AppNavigationMode.instagramStyle,
         'telegram style' => AppNavigationMode.telegramStyle,
         'floating rail' => AppNavigationMode.floatingIslandRail,
         'modern side menu' => AppNavigationMode.modernSideMenu,
-        'bubbles tab style' => AppNavigationMode.gestureTabs,
-        'basic tab style' => AppNavigationMode.basicTabStyle,
+        'compact' || 'bubbles tab style' => AppNavigationMode.gestureTabs,
+        'productivity' || 'basic tab style' => AppNavigationMode.basicTabStyle,
         '3d perspective drawer' => AppNavigationMode.perspective3DDrawer,
         'curved radial menu' => AppNavigationMode.curvedRadialDrawer,
         _ => null,
