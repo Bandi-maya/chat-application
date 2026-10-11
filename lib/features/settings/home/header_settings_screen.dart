@@ -72,11 +72,9 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
     switch (style.trim().toLowerCase()) {
       // Existing presets retain their legacy visual behavior.
       case 'one ui':
-        return AppNavigationMode.modernSideMenu;
       case 'whatsapp ui stock':
-        return AppNavigationMode.bottomNav;
       case 'ios style':
-        return AppNavigationMode.floatingIslandRail;
+        return AppNavigationMode.bottomNav;
       case 'bubbles tab style':
         return AppNavigationMode.gestureTabs;
       case 'basic tab style':
