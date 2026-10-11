@@ -34,6 +34,7 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
   ChatyEventNotification? _visible;
   String? _lastNotificationId;
   Timer? _hideTimer;
+  bool _islandExpanded = false;
 
   @override
   void initState() {
@@ -62,6 +63,7 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
       setState(() {
         _lastNotificationId = latest.id;
         _visible = latest;
+        _islandExpanded = false;
       });
     }
     final seconds = widget.preferencesController
@@ -113,6 +115,89 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
     super.dispose();
   }
 
+
+  Widget _buildDynamicIsland(
+    BuildContext context,
+    ChatyEventNotification notification,
+    ChatyPreferencesController prefs,
+  ) {
+    final recent = widget.notificationService.notifications.take(3).toList();
+    final expanded = _islandExpanded;
+    return GestureDetector(
+      onTap: () => setState(() => _islandExpanded = !_islandExpanded),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 360),
+        curve: Curves.easeOutCubic,
+        width: expanded ? (MediaQuery.sizeOf(context).width - 36).clamp(260.0, 390.0) : 174,
+        constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width - 28),
+        padding: EdgeInsets.symmetric(horizontal: expanded ? 16 : 13, vertical: expanded ? 13 : 9),
+        decoration: BoxDecoration(
+          color: const Color(0xFF08090B),
+          borderRadius: BorderRadius.circular(expanded ? 26 : 32),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 22, offset: const Offset(0, 8)),
+          ],
+        ),
+        child: AnimatedSize(
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 27,
+                    height: 27,
+                    decoration: BoxDecoration(color: notification.color.withValues(alpha: 0.2), shape: BoxShape.circle),
+                    child: Icon(notification.icon, color: notification.color, size: 16),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(notification.title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+                        if (expanded)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 3),
+                            child: Text(notification.body, maxLines: 2, overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 12, height: 1.25)),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 7),
+                  Container(width: 5, height: 5, decoration: const BoxDecoration(color: Color(0xFF48D597), shape: BoxShape.circle)),
+                ],
+              ),
+              if (expanded && recent.length > 1) ...[
+                const SizedBox(height: 10),
+                Divider(height: 1, color: Colors.white.withValues(alpha: 0.12)),
+                for (final item in recent.skip(1))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 9),
+                    child: Row(children: [
+                      Icon(item.icon, color: item.color, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12, fontWeight: FontWeight.w600))),
+                      Expanded(child: Text(item.body, maxLines: 1, overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11))),
+                    ]),
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final notification = _visible;
@@ -160,7 +245,8 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
                     : Offset.zero,
                 duration: const Duration(milliseconds: 180),
                 curve: Curves.easeOutCubic,
-                child: notification == null
+                child: notification == null ||
+                        prefs.gbBool('dynamic_island_notifications', fallback: false)
                     ? const SizedBox.shrink()
                     : Padding(
                         padding: _padding(context),
@@ -308,6 +394,30 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
                           ),
                         ),
                       ),
+              ),
+            ),
+          ),
+        ),
+        IgnorePointer(
+          ignoring: notification == null ||
+              !prefs.gbBool('dynamic_island_notifications', fallback: false),
+          child: AnimatedAlign(
+            alignment: Alignment.topCenter,
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeOutBack,
+            child: AnimatedPadding(
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeOutCubic,
+              padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 7),
+              child: AnimatedOpacity(
+                opacity: notification != null &&
+                        prefs.gbBool('dynamic_island_notifications', fallback: false)
+                    ? 1
+                    : 0,
+                duration: const Duration(milliseconds: 180),
+                child: notification == null
+                    ? const SizedBox.shrink()
+                    : _buildDynamicIsland(context, notification, prefs),
               ),
             ),
           ),
