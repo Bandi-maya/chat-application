@@ -199,8 +199,10 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
         children: [
           LayoutBuilder(
             builder: (context, constraints) {
-              final keyHeight = ((MediaQuery.sizeOf(context).height - 430) / 4)
-                  .clamp(48.0, 66.0)
+              // Reserve enough vertical room for the number field, call action,
+              // and contact results on short screens and when display scaling is high.
+              final keyHeight = ((MediaQuery.sizeOf(context).height - 520) / 4)
+                  .clamp(42.0, 58.0)
                   .toDouble();
               return GridView.builder(
                 shrinkWrap: true,
