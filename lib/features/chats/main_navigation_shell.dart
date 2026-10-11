@@ -516,27 +516,6 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   }
 
   // ---------------------------------------------------------------------------
-  // Curved radial drawer (reference image 1)
-  // ---------------------------------------------------------------------------
-  Widget _buildCurvedRadialDrawerShell({
-    required dynamic theme,
-    required List<Widget> screens,
-    required List<_NavDestinationItem> navItems,
-    required int selectedIndex,
-    required Widget? floatingActionButton,
-    required ValueChanged<int> onSelect,
-  }) {
-    return _CurvedRadialDrawerScaffold(
-      theme: theme,
-      selectedIndex: selectedIndex,
-      navItems: navItems,
-      floatingActionButton: floatingActionButton,
-      onSelect: onSelect,
-      child: IndexedStack(index: selectedIndex, children: screens),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
   // 1. Top WhatsApp Style Tab Bar (Image 1)
   // ---------------------------------------------------------------------------
   Widget _buildTopWhatsAppShell({
