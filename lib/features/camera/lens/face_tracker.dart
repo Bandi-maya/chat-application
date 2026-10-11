@@ -8,8 +8,8 @@ import 'lens_definition.dart';
 /// mirrored preview-space poses and solves lens anchor transforms.
 ///
 /// Everything here is deterministic and unit-tested; no widget, camera or
-/// platform dependency. The platform tracker (ML Kit on Android/iOS) only
-/// supplies raw face data in IMAGE coordinates.
+/// platform dependency. The native tracker (Vision on iOS and Android's
+/// built-in frontal detector) supplies raw face data in IMAGE coordinates.
 class FaceAnchorSolver {
   FaceAnchorSolver({
     this.smoothingAlpha = 0.45,
