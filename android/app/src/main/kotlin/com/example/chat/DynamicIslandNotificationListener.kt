@@ -18,6 +18,7 @@ import android.service.notification.StatusBarNotification
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
+import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 
@@ -53,6 +54,10 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
                 sbn.packageName,
                 isCall,
                 pendingIntent,
+                (notification.actions ?: emptyArray()).take(2).mapNotNull { action ->
+                    val actionIntent = action.actionIntent ?: return@mapNotNull null
+                    IslandAction(action.title?.toString()?.take(24) ?: "Action", actionIntent)
+                },
             )
         }
     }
@@ -93,7 +98,7 @@ internal object IslandOverlay {
     private var latestIcon = "●"
     private var latestPackage = ""
     private var latestCall = false
-    private var latestPendingIntent: PendingIntent? = null
+    private var latestPendingIntent: PendingIntent? = null\n    private var latestActions: List<IslandAction> = emptyList()
 
     fun show(
         context: Context,
@@ -103,6 +108,7 @@ internal object IslandOverlay {
         packageName: String,
         isCall: Boolean,
         pendingIntent: PendingIntent?,
+        actions: List<IslandAction> = emptyList(),
     ) {
         if (!DynamicIslandNotificationListener.isEnabled(context)) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
@@ -111,8 +117,7 @@ internal object IslandOverlay {
         latestIcon = icon
         latestPackage = packageName
         latestCall = isCall
-        latestPendingIntent = pendingIntent
-        expanded = false
+        latestPendingIntent = pendingIntent\n        latestActions = actions\n        expanded = false
         dismissRunnable?.let(main::removeCallbacks)
         windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         render(context)
@@ -185,6 +190,35 @@ internal object IslandOverlay {
         }
         row.addView(dot)
         root.addView(row)
+        if (expanded && latestActions.isNotEmpty()) {
+            val actionsRow = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.END
+                setPadding(0, dp(context, 8), 0, 0)
+            }
+            latestActions.forEach { action ->
+                val button = Button(context).apply {
+                    text = action.title
+                    isAllCaps = false
+                    textSize = 11f
+                    setTextColor(Color.WHITE)
+                    background = GradientDrawable().apply {
+                        setColor(Color.rgb(37, 40, 46))
+                        cornerRadius = dp(context, 14).toFloat()
+                        setStroke(dp(context, 1), Color.argb(45, 255, 255, 255))
+                    }
+                    setPadding(dp(context, 8), 0, dp(context, 8), 0)
+                    setOnClickListener {
+                        runCatching { action.pendingIntent.send() }
+                        remove()
+                    }
+                }
+                val lp = LinearLayout.LayoutParams(-2, dp(context, 38))
+                lp.marginStart = dp(context, 6)
+                actionsRow.addView(button, lp)
+            }
+            root.addView(actionsRow)
+        }
         root.setOnClickListener {
             if (!expanded) {
                 expanded = true
@@ -219,7 +253,7 @@ internal object IslandOverlay {
     }
 
     fun preview(context: Context) {
-        show(context, "Chaty Dynamic Island", "Preview notification · Tap to expand", "✦", context.packageName, false, null)
+        show(context, "Chaty Dynamic Island", "Preview notification · Tap to expand", "✦", context.packageName, false, null, emptyList())
     }
 
     fun remove() {
