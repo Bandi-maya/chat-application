@@ -2986,7 +2986,12 @@ class _CurvedRadialDrawerScaffoldState
       final left = centerX + radiusX * math.cos(angle);
       final top = centerY + radiusY * math.sin(angle);
       final item = navItems[index];
-      final selected = item.id == navItems[selectedIndex.clamp(0, count - 1)].id;
+      final activeIndex = selectedIndex < 0
+          ? 0
+          : selectedIndex >= count
+              ? count - 1
+              : selectedIndex;
+      final selected = item.id == navItems[activeIndex].id;
       final labelWidth =
           (width - left - iconSize - 18).clamp(48.0, 180.0).toDouble();
 
