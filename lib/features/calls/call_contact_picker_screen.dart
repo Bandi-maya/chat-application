@@ -419,7 +419,6 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
                   ),
                 ),
               ),
-              _buildDialpad(),
             ] else
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
@@ -575,6 +574,7 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
                       },
                     ),
             ),
+            if (_isDialpad) _buildDialpad(),
           ],
         ),
       ),
