@@ -117,8 +117,9 @@ internal object IslandOverlay {
         isCall: Boolean,
         pendingIntent: PendingIntent?,
         actions: List<IslandAction> = emptyList(),
+        forcePreview: Boolean = false,
     ) {
-        if (!DynamicIslandNotificationListener.isEnabled(context)) return
+        if (!forcePreview && !DynamicIslandNotificationListener.isEnabled(context)) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
         latestTitle = title
         latestBody = body
@@ -268,7 +269,7 @@ internal object IslandOverlay {
         val tone = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 70)
         tone.startTone(ToneGenerator.TONE_PROP_BEEP, 180)
         main.postDelayed({ tone.release() }, 250)
-        show(context, "Chaty Dynamic Island", "Preview notification · Tap to expand", "✦", context.packageName, false, null, emptyList())
+        show(context, "Chaty Dynamic Island", "Preview notification · Tap to expand", "✦", context.packageName, false, null, emptyList(), forcePreview = true)
     }
 
     fun remove() {
