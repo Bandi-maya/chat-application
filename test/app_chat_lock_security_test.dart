@@ -104,7 +104,12 @@ void main() {
       'Secret search phrase verification works with normalized Unicode',
       () async {
         final service = LocalLockService();
+        await expectLater(
+          service.setSecretPhrase('abc'),
+          throwsA(isA<ArgumentError>()),
+        );
         await service.setSecretPhrase('  🔒 Secret Vault  ');
+        expect(await service.verifySecretPhrase('abc'), isFalse);
         expect(await service.verifySecretPhrase('🔒 secret vault'), isTrue);
         expect(await service.verifySecretPhrase('🔒 Secret Vault'), isTrue);
         expect(await service.verifySecretPhrase('wrong password'), isFalse);
