@@ -12,17 +12,14 @@ void main() {
     expect(source, contains('MediaQuery.textScalerOf'));
   });
 
-  test('emoji search uses Chaty metadata instead of raw ids only', () {
-    final registry = File(
-      'lib/core/emoji/emoji_registry.dart',
-    ).readAsStringSync();
+  test('emoji picker exposes one Unicode picker without duplicate animated tab', () {
     final picker = File(
       'lib/core/emoji/widgets/chaty_emoji_picker.dart',
     ).readAsStringSync();
-    expect(registry, contains('class ChatyEmojiEntry'));
-    expect(registry, contains('aliases'));
-    expect(registry, contains('keywords'));
-    expect(picker, contains('entry.matches(q)'));
+    expect(picker, contains('EmojiPicker('));
+    expect(picker, contains('_buildUnicodePicker(context, height)'));
+    expect(picker, isNot(contains('_buildAnimatedTab')));
+    expect(picker, isNot(contains('TabController(length: 2')));
   });
 
   test('bubble and tick selectors require explicit apply', () {
