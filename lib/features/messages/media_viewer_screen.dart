@@ -42,6 +42,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen>
   bool _loading = true;
   bool _authorized = false;
   bool _authorizing = false;
+  bool _accessDenied = false;
+  bool _appIsResumed = true;
   VideoPlayerController? _videoController;
 
   @override
@@ -70,21 +72,53 @@ class _MediaViewerScreenState extends State<MediaViewerScreen>
     }
     if (!mounted) return;
     if (!authorized) {
+      _accessDenied = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && Navigator.of(context).canPop()) {
+        if (mounted &&
+            ModalRoute.of(context)?.isCurrent == true &&
+            Navigator.of(context).canPop()) {
           Navigator.of(context).pop();
         }
       });
       return;
     }
+    _accessDenied = false;
     setState(() => _authorized = true);
     await _loadMedia();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_appIsResumed ||
+        _authorized ||
+        _authorizing ||
+        _accessDenied ||
+        !widget.preferencesController.isConversationProtected(
+          widget.conversationId,
+        )) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted &&
+          _appIsResumed &&
+          !_authorized &&
+          !_authorizing &&
+          !_accessDenied &&
+          ModalRoute.of(context)?.isCurrent == true &&
+          widget.preferencesController.isConversationProtected(
+            widget.conversationId,
+          )) {
+        unawaited(_authorizeAndLoad());
+      }
+    });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
+      _appIsResumed = false;
       if (_authorized &&
           widget.preferencesController.isConversationProtected(
             widget.conversationId,
@@ -97,6 +131,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen>
         unawaited(video?.dispose());
         setState(() {
           _authorized = false;
+          _accessDenied = false;
           _signedUrl = null;
           _loading = true;
           _error = null;
@@ -104,9 +139,14 @@ class _MediaViewerScreenState extends State<MediaViewerScreen>
       }
       return;
     }
+    if (state == AppLifecycleState.resumed) {
+      _appIsResumed = true;
+    }
     if (state == AppLifecycleState.resumed &&
         !_authorized &&
         !_authorizing &&
+        !_accessDenied &&
+        ModalRoute.of(context)?.isCurrent == true &&
         widget.preferencesController.isConversationProtected(
           widget.conversationId,
         )) {
