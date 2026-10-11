@@ -169,8 +169,16 @@ class CameraFaceDetectionBridge {
         points[index].y * mesh.imageHeight,
       );
 
-      final leftEye = point(points.length >= 478 ? 468 : 33);
-      final rightEye = point(points.length >= 478 ? 473 : 263);
+      // Use eye-corner anchors rather than iris centers. The eye corners
+      // produce correctly sized glasses and remain stable as the pupils move.
+      final leftEye = Offset(
+        (point(33).dx + point(133).dx) / 2,
+        (point(33).dy + point(133).dy) / 2,
+      );
+      final rightEye = Offset(
+        (point(362).dx + point(263).dx) / 2,
+        (point(362).dy + point(263).dy) / 2,
+      );
       final nose = point(2);
       final mouth = point(13);
       final pixelPoints = points
