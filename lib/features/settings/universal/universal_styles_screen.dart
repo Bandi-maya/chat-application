@@ -299,11 +299,13 @@ class _UniversalStylesScreenState extends State<UniversalStylesScreen> {
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             itemCount: displayedLauncherIcons.length,
-                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 6,
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount:
+                                  MediaQuery.sizeOf(ctx).width < 380 ? 4 : 5,
                               mainAxisSpacing: 10,
                               crossAxisSpacing: 10,
-                              childAspectRatio: 0.85,
+                              childAspectRatio:
+                                  MediaQuery.sizeOf(ctx).width < 380 ? 0.62 : 0.78,
                             ),
                             itemBuilder: (ctx, i) {
                               final item = displayedLauncherIcons[i];
@@ -367,6 +369,22 @@ class _UniversalStylesScreenState extends State<UniversalStylesScreen> {
                                       ],
                                     ),
                                     const SizedBox(height: 4),
+                                    Text(
+                                      variant.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? colors.foreground
+                                            : colors.foregroundSecondary,
+                                        fontSize: 9.5,
+                                        fontWeight: isSelected
+                                            ? FontWeight.w800
+                                            : FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
                                     if (isSelected)
                                       Container(
                                         width: 5,
