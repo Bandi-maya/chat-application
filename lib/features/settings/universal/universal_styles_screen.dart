@@ -31,7 +31,28 @@ class _UniversalStylesScreenState extends State<UniversalStylesScreen> {
   void initState() {
     super.initState();
     if (locator.isRegistered<AppIconController>()) {
-      unawaited(locator<AppIconController>().initialize());
+      unawaited(_initializeAndSyncLauncherIcon());
+    }
+  }
+
+  Future<void> _initializeAndSyncLauncherIcon() async {
+    final controller = locator<AppIconController>();
+    try {
+      await controller.initialize();
+      if (!mounted || controller.brandIconSource != BrandIconSource.bundled) {
+        return;
+      }
+      // Reconcile the visible Universal preference with Android's confirmed
+      // launcher alias. A stale legacy label must not suggest that an icon is
+      // active when the system is showing another one.
+      final title = controller.launcherIcon.title;
+      if (widget.preferencesController.universal.launcherIcon != title) {
+        widget.preferencesController.updateUniversal(
+          widget.preferencesController.universal.copyWith(launcherIcon: title),
+        );
+      }
+    } catch (error) {
+      debugPrint('Universal launcher selection sync skipped: $error');
     }
   }
 
