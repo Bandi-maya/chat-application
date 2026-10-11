@@ -96,7 +96,7 @@ void main() {
     ]) {
       expect(source, isNot(contains(hiddenOption)), reason: 'Removed from three-dot menu: $hiddenOption');
     }
-    expect(source, contains('width: 244'));
+    expect(source, contains(': 244,'));
     expect(source, contains('await widget.dataStore.markAllAsRead()'));
     expect(source, contains("_handleHomeOverflowAction('starred')"));
     expect(source, contains("_handleHomeOverflowAction('themes')"));
