@@ -223,7 +223,9 @@ class _AppLockOverlayModalState extends State<AppLockOverlayModal> {
           children: List<Widget>.generate(_pinLength, (index) {
             final filled = index < _enteredPin.length;
             return AnimatedContainer(
-              duration: const Duration(milliseconds: 120),
+              duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 120),
               width: 16,
               height: 16,
               decoration: BoxDecoration(
@@ -621,7 +623,9 @@ class _NumberKeyState extends State<_NumberKey> {
 
     return AnimatedScale(
       scale: _pressed ? 0.94 : 1.0,
-      duration: const Duration(milliseconds: 100),
+      duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 100),
       curve: Curves.easeOutCubic,
       child: Material(
         color: isDark
@@ -713,7 +717,9 @@ class _PinActionKeyState extends State<_PinActionKey> {
       label: widget.semanticsLabel,
       child: AnimatedScale(
         scale: _pressed ? 0.94 : 1.0,
-        duration: const Duration(milliseconds: 100),
+        duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 100),
         curve: Curves.easeOutCubic,
         child: Material(
           color: isDark
