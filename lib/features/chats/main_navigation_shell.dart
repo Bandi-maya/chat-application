@@ -755,7 +755,36 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           fontWeight: FontWeight.w500,
           fontSize: 14,
         ),
-        tabs: navItems.map((item) => Tab(text: item.label)).toList(),
+        tabs: navItems.map((item) {
+          final selected = _currentDestinationId == item.id;
+          return Tab(
+            iconMargin: const EdgeInsets.only(bottom: 3),
+            icon: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: selected
+                    ? colors.onPrimary.withValues(alpha: 0.18)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(9),
+                border: selected
+                    ? Border.all(
+                        color: colors.onPrimary.withValues(alpha: 0.26),
+                      )
+                    : null,
+              ),
+              child: ChatyGlyphIcon(
+                glyph: selected ? item.activeIcon : item.icon,
+                size: 18,
+                color: selected
+                    ? colors.onPrimary
+                    : colors.onPrimary.withValues(alpha: 0.72),
+              ),
+            ),
+            text: item.label,
+          );
+        }).toList(growable: false),
         onTap: (idx) => _selectRootDestination(
           idx,
           destinationId: navItems[idx].id,
@@ -3701,11 +3730,52 @@ class _PerspectiveDrawerScaffoldState extends State<_PerspectiveDrawerScaffold>
                                 selectedTileColor: colors.primary.withValues(
                                   alpha: 0.15,
                                 ),
-                                leading: ChatyGlyphIcon(glyph: isSel ? item.activeIcon : item.icon,
-                                  color: isSel
-                                      ? colors.primary
-                                      : colors.foregroundSecondary,
-                                  size: 20,
+                                leading: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  curve: Curves.easeOutCubic,
+                                  width: 38,
+                                  height: 38,
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: isSel
+                                          ? <Color>[
+                                              colors.primary.withValues(alpha: 0.30),
+                                              colors.primary.withValues(alpha: 0.10),
+                                            ]
+                                          : <Color>[
+                                              colors.surfaceSecondary,
+                                              colors.surface,
+                                            ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: isSel
+                                          ? colors.primary.withValues(alpha: 0.55)
+                                          : colors.borderSubtle,
+                                    ),
+                                    boxShadow: isSel
+                                        ? <BoxShadow>[
+                                            BoxShadow(
+                                              color: colors.primary.withValues(alpha: 0.18),
+                                              blurRadius: 10,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ]
+                                        : const <BoxShadow>[],
+                                  ),
+                                  child: Transform.translate(
+                                    offset: Offset(0, isSel ? -1 : 0),
+                                    child: ChatyGlyphIcon(
+                                      glyph: isSel ? item.activeIcon : item.icon,
+                                      color: isSel
+                                          ? colors.primary
+                                          : colors.foregroundSecondary,
+                                      size: 20,
+                                    ),
+                                  ),
                                 ),
                                 title: Text(
                                   item.label,
