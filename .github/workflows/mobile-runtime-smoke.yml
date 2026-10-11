@@ -39,6 +39,12 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
+      - name: Flutter static analysis
+        run: flutter analyze --no-pub
+
+      - name: Flutter unit and widget tests
+        run: flutter test --no-pub
+
       - name: Provision OpenMLS native asset tooling
         shell: bash
         run: |
@@ -85,9 +91,11 @@ jobs:
             mkdir -p artifacts
             adb wait-for-device
             booted=''
-            for attempt in $(seq 1 120); do
+            attempt=0
+            while [ "$attempt" -lt 120 ]; do
               booted="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
               [ "$booted" = "1" ] && break
+              attempt=$((attempt + 1))
               sleep 2
             done
             if [ "$booted" != "1" ]; then
