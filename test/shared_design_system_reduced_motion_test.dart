@@ -15,6 +15,7 @@ void main() {
       'lib/ui/core/design_system/components/chaty_kit.dart',
       'lib/ui/core/design_system/components/messaging_components.dart',
       'lib/ui/core/design_system/components/social_components.dart',
+      'lib/ui/core/components/composer/chaty_composer_renderer.dart',
     ]) {
       final source = File(path).readAsStringSync();
       expect(
