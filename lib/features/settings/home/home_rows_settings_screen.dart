@@ -161,6 +161,23 @@ class _HomeRowsSettingsScreenState extends State<HomeRowsSettingsScreen> {
                                         ),
                                       ),
                                     ),
+                                    const SizedBox(width: 5),
+                                    Container(
+                                      width: 18,
+                                      height: 18,
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: _color(prefs.mentionIndicatorBgColor) ??
+                                            theme.accentColor.withValues(alpha: 0.14),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        Icons.alternate_email_rounded,
+                                        size: 11,
+                                        color: _color(prefs.mentionIconColor) ??
+                                            theme.accentColor,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ],
