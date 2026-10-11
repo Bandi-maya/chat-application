@@ -98,23 +98,21 @@ void main() {
     }
     expect(source, contains(': 244,'));
     expect(source, contains('await widget.dataStore.markAllAsRead()'));
-    expect(source, contains("_handleHomeOverflowAction('starred')"));
+    expect(source, contains('_openStarredMessages();'));
     expect(source, contains('_openLinkedDevices();'));
     expect(source, contains('_openSettingsScreen();'));
     expect(source, isNot(contains('useOverflowSheet')));
     expect(source, isNot(contains('_showHomeOverflowSheet')));
-    for (final route in <String>[
+    expect(source, isNot(contains('_handleHomeOverflowAction')));
+    for (final removedRoute in <String>[
       "case 'effects':",
       "case 'qr':",
-      "case 'linked':",
       "case 'themes':",
       "case 'templates':",
-      "case 'starred':",
       "case 'home':",
       "case 'navigation':",
-      "case 'settings':",
     ]) {
-      expect(source, contains(route), reason: 'Missing overflow action $route');
+      expect(source, isNot(contains(removedRoute)), reason: 'Removed legacy overflow route $removedRoute');
     }
   });
 
