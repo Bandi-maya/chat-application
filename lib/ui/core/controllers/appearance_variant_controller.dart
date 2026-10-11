@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -163,9 +165,11 @@ class AppearanceVariantController extends ChangeNotifier {
   String _entryAnimation = entryAnimations.first;
   String _exitAnimation = exitAnimations.first;
   bool _loaded = false;
+  late final Future<void> _loadFuture;
+  Future<void> _writeQueue = Future<void>.value();
 
   AppearanceVariantController() {
-    _load();
+    _loadFuture = _load();
   }
 
   String get navigationStyle => _navigationStyle;
