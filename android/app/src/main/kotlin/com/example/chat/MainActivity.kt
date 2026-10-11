@@ -47,6 +47,7 @@ import java.util.concurrent.Executors
 open class MainActivity : FlutterFragmentActivity() {
     private val launcherChannel = "chaty/launcher_icon"
     private val callPipChannel = "chaty/call_pip"
+    private val dynamicIslandChannel = "chaty/dynamic_island"
     private var callPipMethodChannel: MethodChannel? = null
     private val imageExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val faceDetectorExecutor: ExecutorService = Executors.newSingleThreadExecutor()
@@ -153,6 +154,56 @@ open class MainActivity : FlutterFragmentActivity() {
                             }.getOrDefault(emptyList())
                             runOnUiThread { result.success(detections) }
                         }
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, dynamicIslandChannel).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getPermissionState" -> result.success(mapOf(
+                    "overlay" to (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || android.provider.Settings.canDrawOverlays(this)),
+                    "notificationAccess" to DynamicIslandNotificationListener.hasNotificationAccess(this),
+                    "enabled" to DynamicIslandNotificationListener.isEnabled(this),
+                ))
+                "openOverlaySettings" -> {
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+                            !android.provider.Settings.canDrawOverlays(this)
+                        ) {
+                            startActivity(Intent(
+                                android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:$packageName"),
+                            ))
+                        }
+                        result.success(null)
+                    } catch (error: Exception) {
+                        result.error("overlay_settings_failed", error.message, null)
+                    }
+                }
+                "openNotificationAccessSettings" -> {
+                    try {
+                        startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                        result.success(null)
+                    } catch (error: Exception) {
+                        result.error("notification_access_settings_failed", error.message, null)
+                    }
+                }
+                "setEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    getSharedPreferences("chaty_dynamic_island", Context.MODE_PRIVATE)
+                        .edit().putBoolean("enabled", enabled).apply()
+                    if (!enabled) IslandOverlay.remove()
+                    result.success(enabled)
+                }
+                "showPreview" -> {
+                    val hasOverlay = Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
+                        android.provider.Settings.canDrawOverlays(this)
+                    if (!hasOverlay) {
+                        result.error("overlay_permission_required", "Allow display over other apps first.", null)
+                    } else {
+                        IslandOverlay.preview(this)
+                        result.success(null)
                     }
                 }
                 else -> result.notImplemented()
