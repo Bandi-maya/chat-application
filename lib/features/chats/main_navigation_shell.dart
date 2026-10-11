@@ -3256,9 +3256,7 @@ class _PerspectiveDrawerScaffoldState extends State<_PerspectiveDrawerScaffold>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: MediaQuery.disableAnimationsOf(context)
-                            ? Duration.zero
-                            : const Duration(milliseconds: 280),
+      duration: const Duration(milliseconds: 280),
     );
     _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic);
   }
