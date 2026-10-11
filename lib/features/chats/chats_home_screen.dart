@@ -49,6 +49,7 @@ import '../../data/services/chaty_share_service.dart';
 import '../settings/message_management/message_management_page.dart';
 import '../settings/privacy/privacy_center_screen.dart';
 import '../settings/security/app_lock_overlay.dart';
+import '../settings/gb_features/gb_settings_screen.dart';
 
 class ChatsHomeScreen extends StatefulWidget {
   final ThemeConfig theme;
@@ -1368,7 +1369,16 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                             title: 'Chaty Settings',
                             onTap: () {
                               Navigator.pop(ctx);
-                              _openSettingsScreen();
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => GbSettingsScreen(
+                                    preferencesController: widget.preferencesController,
+                                    themeController: widget.themeController,
+                                    dataStore: widget.dataStore,
+                                    notificationService: widget.notificationService,
+                                  ),
+                                ),
+                              );
                             },
                           ),
                           _popupMenuItem(
