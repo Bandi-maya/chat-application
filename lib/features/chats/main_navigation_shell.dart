@@ -1644,12 +1644,50 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             ),
           );
         },
-        child: Icon(
-          defaultIcon,
-          key: ValueKey<String>('${activeItem.id}_${homePrefs.showMetaAiIcon}'),
-          size: 24,
-          color: effectiveIconColor,
-        ),
+        child: activeItem.id == 'chats'
+            ? Stack(
+                key: ValueKey<String>(
+                  'chats_message_${homePrefs.showMetaAiIcon}',
+                ),
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(
+                    Icons.chat_bubble_rounded,
+                    size: 24,
+                    color: effectiveIconColor,
+                  ),
+                  if (homePrefs.showMetaAiIcon)
+                    Positioned(
+                      right: -5,
+                      top: -5,
+                      child: Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: effectiveFabColor,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: effectiveIconColor.withValues(alpha: 0.95),
+                            width: 1,
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.auto_awesome_rounded,
+                          size: 10,
+                          color: effectiveIconColor,
+                        ),
+                      ),
+                    ),
+                ],
+              )
+            : Icon(
+                defaultIcon,
+                key: ValueKey<String>(
+                  '${activeItem.id}_${homePrefs.showMetaAiIcon}',
+                ),
+                size: 24,
+                color: effectiveIconColor,
+              ),
       ),
     );
   }
