@@ -996,6 +996,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
   final bool setMyName;
   final bool disableStatusUnderName;
   final bool disableSearchBar;
+  final bool showSearchBar;
   final bool separateChatsAndGroups;
   final String homeStyle;
   final String tabBubbleStyle;
@@ -1004,9 +1005,10 @@ class GbLiveHeaderPreview extends StatelessWidget {
   final VoidCallback onThreeDotsClick;
 
   bool get _showHeaderSearch =>
-      _showHeaderSearch && searchPlacement.trim().toLowerCase() == 'header action';
+      showSearchBar && !disableSearchBar &&
+      searchPlacement.trim().toLowerCase() == 'header action';
   bool get _showInlineSearch =>
-      _showHeaderSearch && !_showHeaderSearch;
+      showSearchBar && !disableSearchBar && !_showHeaderSearch;
 
   const GbLiveHeaderPreview({
     super.key,
@@ -1015,6 +1017,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
     required this.setMyName,
     required this.disableStatusUnderName,
     required this.disableSearchBar,
+    this.showSearchBar = true,
     required this.separateChatsAndGroups,
     required this.homeStyle,
     this.tabBubbleStyle = 'Capsule Pill',
