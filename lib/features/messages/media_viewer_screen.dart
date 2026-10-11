@@ -99,6 +99,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen>
           _authorized = false;
           _signedUrl = null;
           _loading = true;
+          _error = null;
         });
       }
       return;
@@ -114,6 +115,12 @@ class _MediaViewerScreenState extends State<MediaViewerScreen>
   }
 
   Future<void> _loadMedia() async {
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     final path = widget.storagePath;
     if (path == null || path.isEmpty) {
       if (mounted) {
@@ -143,6 +150,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen>
         _signedUrl = url;
         _videoController = video;
         _loading = false;
+        _error = null;
       });
     } catch (error) {
       if (!mounted) return;
