@@ -287,6 +287,8 @@ class ChatyDataStore extends ChangeNotifier {
   void markAsRead(String conversationId) =>
       unawaited(_backend.markAsRead(conversationId));
 
+  Future<void> markAllAsRead() => _backend.markAllAsRead();
+
   void markAsUnread(String conversationId) =>
       unawaited(_backend.markAsUnread(conversationId));
 
