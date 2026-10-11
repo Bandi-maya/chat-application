@@ -117,6 +117,7 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
   bool _faceStreamSyncing = false;
   bool _faceStreamSyncRequested = false;
   int _lastFaceFrameMs = 0;
+  Size _previewViewportSize = Size.zero;
 
   bool get _wantsFaceTracking =>
       _captureViewMode == _CaptureViewMode.photo &&
@@ -308,7 +309,9 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
         return;
       }
 
-      final previewSize = MediaQuery.sizeOf(context);
+      final previewSize = _previewViewportSize == Size.zero
+          ? MediaQuery.sizeOf(context)
+          : _previewViewportSize;
       final imageSize = Size(
         detection.imageWidth.toDouble(),
         detection.imageHeight.toDouble(),
@@ -444,7 +447,9 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
           try {
             final bytes = await composeLensIntoImage(
               sourceBytes: await File(capturedPath).readAsBytes(),
-              previewSize: MediaQuery.sizeOf(context),
+              previewSize: _previewViewportSize == Size.zero
+                  ? MediaQuery.sizeOf(context)
+                  : _previewViewportSize,
               lens: lens,
               poses: poses,
             );
@@ -835,7 +840,7 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 62),
+      padding: EdgeInsets.symmetric(horizontal: tight ? 30 : 62),
       child: Row(
         children: [
           modeButton(
