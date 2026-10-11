@@ -112,6 +112,12 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
         // `bubble_style` key first. Update that key through the semantic alias
         // so it and the typed ConversationPreferences stay in sync; otherwise
         // an older saved GB value can silently override the selection.
+        // Persist both the typed preference and the legacy GB alias. The
+        // detail screen resolves both live, while exports and older settings
+        // screens continue to read the typed value.
+        widget.preferencesController.updateConversation(
+          prefs.copyWith(bubbleStyle: val, bubbleShape: val),
+        );
         widget.preferencesController.updateGbFeatures(
           <String, Object?>{'bubble_style': val},
           logTitle: 'Bubbles Style',
