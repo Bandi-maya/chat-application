@@ -93,7 +93,7 @@ class CameraFaceDetectionBridge {
     final orientedWidth = rotate ? image.height : image.width;
     final orientedHeight = rotate ? image.width : image.height;
     final scale = math.min(1.0, _longSide / math.max(orientedWidth, orientedHeight));
-    final width = math.max(1, (orientedWidth * scale).round());
+    final width = math.max(2, (orientedWidth * scale).round() & ~1);
     final height = math.max(1, (orientedHeight * scale).round());
     final pixels = Uint8List(width * height * 3);
     final group = image.format.group;
