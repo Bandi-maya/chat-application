@@ -64,7 +64,30 @@ void main() {
         HomePresetNormalizer.navigationMode('Curved Radial Menu'),
         AppNavigationMode.curvedRadialDrawer,
       );
-      expect(HomePresetNormalizer.navigationMode('Cards'), isNull);
+            expect(
+        HomePresetNormalizer.navigationMode('Cards'),
+        AppNavigationMode.bottomNav,
+      );
+      expect(
+        HomePresetNormalizer.navigationMode('Classic'),
+        AppNavigationMode.topWhatsAppBar,
+      );
+      expect(
+        HomePresetNormalizer.navigationMode('Stories First'),
+        AppNavigationMode.bottomNav,
+      );
+      expect(
+        HomePresetNormalizer.navigationMode('Compact'),
+        AppNavigationMode.gestureTabs,
+      );
+      expect(
+        HomePresetNormalizer.navigationMode('Productivity'),
+        AppNavigationMode.compactRail,
+      );
+      expect(
+        HomePresetNormalizer.navigationMode('Tablet Split View'),
+        isNull,
+      );
     });
 
     test('canonicalizes story styles', () {
