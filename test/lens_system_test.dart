@@ -221,7 +221,7 @@ void main() {
       await tester.pumpWidget(harness(manager));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(Icons.visibility_rounded));
+      await tester.tap(find.byKey(const ValueKey('lens-semantic-lens_glasses_classic')));
       await tester.pumpAndSettle();
 
       expect(manager.selected.id, 'lens_glasses_classic');
