@@ -29,7 +29,7 @@ void main() {
       }
     });
 
-    test('All 16 DeliveryIconStyle values have valid descriptors', () {
+    test('All DeliveryIconStyle values have valid descriptors', () {
       expect(DeliveryIconStyle.values.length, 24);
 
       for (final style in DeliveryIconStyle.values) {
