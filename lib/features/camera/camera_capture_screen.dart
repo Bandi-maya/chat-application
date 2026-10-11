@@ -353,21 +353,6 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
     unawaited(_syncFaceDetectionStream());
   }
 
-  Rect _coverCropFor(Size previewSize, Size imageSize) {
-    final scale = math.max(
-      previewSize.width / imageSize.width,
-      previewSize.height / imageSize.height,
-    );
-    final width = imageSize.width * scale;
-    final height = imageSize.height * scale;
-    return Rect.fromLTWH(
-      (previewSize.width - width) / 2,
-      (previewSize.height - height) / 2,
-      width,
-      height,
-    );
-  }
-
   Future<void> _toggleFlash() async {
     ChatyHaptics.selection();
     final next = !_flashOn;
@@ -701,10 +686,13 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
                                   width: isSelected ? 2.5 : 1.2,
                                 ),
                               ),
-                              child: Icon(
-                                effect.icon,
-                                size: tight ? 20 : 22,
-                                color: isSelected ? Colors.black : Colors.white,
+                              child: CustomPaint(
+                                size: Size.square(tight ? 20 : 22),
+                                painter: _EffectGlyphPainter(
+                                  id: effect.id,
+                                  category: effect.category,
+                                  color: isSelected ? Colors.black : Colors.white,
+                                ),
                               ),
                             ),
                             const SizedBox(height: 3),
@@ -750,8 +738,8 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
                     child: SizedBox.square(
                       dimension: tight ? 46 : 52,
                       child: const Center(
-                        child: Icon(
-                          Icons.photo_library_rounded,
+                        child: _CameraGlyph(
+                          kind: 'gallery',
                           color: Colors.white,
                           size: 27,
                         ),
@@ -768,8 +756,8 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
                     onTap: ready ? _flipCamera : null,
                     child: SizedBox.square(
                       dimension: tight ? 46 : 52,
-                      child: Icon(
-                        Icons.cameraswitch_rounded,
+                      child: _CameraGlyph(
+                        kind: 'flip',
                         color: ready ? Colors.white : Colors.white30,
                         size: 27,
                       ),
@@ -788,7 +776,7 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
     Widget modeButton({
       required _CaptureViewMode mode,
       required String label,
-      required IconData icon,
+      required bool document,
     }) {
       final selected = _captureViewMode == mode;
       return Expanded(
@@ -815,10 +803,10 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    icon,
-                    size: 16,
+                  _CameraGlyph(
+                    kind: document ? 'document' : 'camera',
                     color: selected ? Colors.black : Colors.white,
+                    size: 16,
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -844,13 +832,13 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
           modeButton(
             mode: _CaptureViewMode.photo,
             label: 'Photo',
-            icon: Icons.camera_alt_rounded,
+            document: false,
           ),
           const SizedBox(width: 8),
           modeButton(
             mode: _CaptureViewMode.document,
             label: 'Document',
-            icon: Icons.document_scanner_rounded,
+            document: true,
           ),
         ],
       ),
@@ -980,21 +968,21 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
         children: [
           _RoundIconAction(
             semanticsLabel: 'Close camera',
-            icon: Icons.close_rounded,
+            kind: 'close',
             onPressed: () => Navigator.of(context).maybePop(),
           ),
           const Spacer(),
           if (_phase == _CameraPhase.ready) ...[
             _RoundIconAction(
               semanticsLabel: _flashOn ? 'Turn flash off' : 'Turn flash on',
-              icon: _flashOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+              kind: 'flash',
               onPressed: _toggleFlash,
             ),
             const SizedBox(width: 10),
             if (_captureViewMode == _CaptureViewMode.photo)
               _RoundIconAction(
                 semanticsLabel: _effectsOpen ? 'Hide color filters' : 'Show color filters',
-                icon: Icons.auto_awesome_rounded,
+                kind: 'filters',
                 highlighted: _effectsOpen || _engine.activeEffect.id != 'none',
                 onPressed: () {
                   ChatyHaptics.selection();
@@ -1154,13 +1142,13 @@ enum _CameraPhase { initializing, ready, permissionDenied, noCamera }
 class _RoundIconAction extends StatelessWidget {
   const _RoundIconAction({
     required this.semanticsLabel,
-    required this.icon,
+    required this.kind,
     required this.onPressed,
     this.highlighted = false,
   });
 
   final String semanticsLabel;
-  final IconData icon;
+  final String kind;
   final VoidCallback onPressed;
   final bool highlighted;
 
@@ -1177,7 +1165,7 @@ class _RoundIconAction extends StatelessWidget {
           backgroundColor: highlighted
               ? Colors.white.withValues(alpha: .28)
               : Colors.white24,
-          child: Icon(icon, color: Colors.white, size: 21),
+          child: _CameraGlyph(kind: kind, color: Colors.white, size: 21),
         ),
       ),
     );
@@ -1288,5 +1276,248 @@ class _DocumentGuidePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DocumentGuidePainter oldDelegate) => false;
+}
+
+
+
+/// Compact custom vector glyphs for camera actions and capture modes.
+class _CameraGlyph extends StatelessWidget {
+  const _CameraGlyph({
+    required this.kind,
+    required this.color,
+    required this.size,
+  });
+
+  final String kind;
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(
+    size: Size.square(size),
+    painter: _CameraGlyphPainter(kind: kind, color: color),
+  );
+}
+
+class _CameraGlyphPainter extends CustomPainter {
+  const _CameraGlyphPainter({required this.kind, required this.color});
+  final String kind;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.scale(size.width / 32, size.height / 32);
+    final line = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final fill = Paint()..color = color;
+
+    switch (kind) {
+      case 'close':
+        canvas.drawLine(const Offset(10, 10), const Offset(22, 22), line);
+        canvas.drawLine(const Offset(22, 10), const Offset(10, 22), line);
+      case 'flash':
+        final bolt = Path()
+          ..moveTo(18, 3)
+          ..lineTo(8, 17)
+          ..lineTo(15, 17)
+          ..lineTo(13, 29)
+          ..lineTo(24, 13)
+          ..lineTo(17, 13)
+          ..close();
+        canvas.drawPath(bolt, fill);
+      case 'filters':
+        canvas.drawCircle(const Offset(11, 21), 3, fill);
+        canvas.drawCircle(const Offset(22, 12), 2.3, fill);
+        final star = Path()
+          ..moveTo(16, 2)
+          ..lineTo(18, 8)
+          ..lineTo(24, 10)
+          ..lineTo(18, 12)
+          ..lineTo(16, 18)
+          ..lineTo(14, 12)
+          ..lineTo(8, 10)
+          ..lineTo(14, 8)
+          ..close();
+        canvas.drawPath(star, line);
+      case 'camera':
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(const Rect.fromLTWH(3, 9, 26, 19), const Radius.circular(4)),
+          line,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(9, 9)
+            ..lineTo(12, 5)
+            ..lineTo(20, 5)
+            ..lineTo(23, 9),
+          line,
+        );
+        canvas.drawCircle(const Offset(16, 18), 5.2, line);
+      case 'document':
+        final page = Path()
+          ..moveTo(8, 3)
+          ..lineTo(20, 3)
+          ..lineTo(25, 8)
+          ..lineTo(25, 29)
+          ..lineTo(7, 29)
+          ..lineTo(7, 4)
+          ..close();
+        canvas.drawPath(page, line);
+        canvas.drawLine(const Offset(11, 14), const Offset(21, 14), line);
+        canvas.drawLine(const Offset(11, 19), const Offset(21, 19), line);
+        canvas.drawLine(const Offset(11, 24), const Offset(18, 24), line);
+        canvas.drawLine(const Offset(20, 3), const Offset(20, 8), line);
+        canvas.drawLine(const Offset(20, 8), const Offset(25, 8), line);
+      case 'gallery':
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(const Rect.fromLTWH(3, 4, 26, 24), const Radius.circular(4)),
+          line,
+        );
+        canvas.drawCircle(const Offset(11, 11), 2.1, line);
+        canvas.drawPath(
+          Path()
+            ..moveTo(5, 24)
+            ..lineTo(13, 16)
+            ..lineTo(18, 21)
+            ..lineTo(22, 17)
+            ..lineTo(28, 24),
+          line,
+        );
+      case 'flip':
+        canvas.drawArc(const Rect.fromLTWH(3, 5, 20, 20), math.pi * .15, math.pi * 1.28, false, line);
+        canvas.drawPath(
+          Path()
+            ..moveTo(19, 3)
+            ..lineTo(26, 6)
+            ..lineTo(21, 12),
+          line,
+        );
+        canvas.drawArc(const Rect.fromLTWH(9, 9, 20, 20), math.pi * 1.12, math.pi * 1.25, false, line);
+        canvas.drawPath(
+          Path()
+            ..moveTo(13, 29)
+            ..lineTo(6, 26)
+            ..lineTo(11, 20),
+          line,
+        );
+      default:
+        canvas.drawCircle(const Offset(16, 16), 10, line);
+        canvas.drawCircle(const Offset(16, 16), 3, fill);
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _CameraGlyphPainter oldDelegate) =>
+      oldDelegate.kind != kind || oldDelegate.color != color;
+}
+
+/// Distinctive category-specific line art for filter swatches; actual looks
+/// remain driven by the effect's color matrix rather than the thumbnail.
+class _EffectGlyphPainter extends CustomPainter {
+  const _EffectGlyphPainter({
+    required this.id,
+    required this.category,
+    required this.color,
+  });
+
+  final String id;
+  final EffectCategory category;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.scale(size.width / 32, size.height / 32);
+    final line = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.1
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final fill = Paint()..color = color;
+
+    switch (category) {
+      case EffectCategory.beauty:
+      case EffectCategory.glow:
+      case EffectCategory.faceAR:
+      case EffectCategory.celebration:
+        for (final point in const <Offset>[
+          Offset(9, 9), Offset(23, 7), Offset(22, 23), Offset(9, 24),
+        ]) {
+          canvas.drawCircle(point, id == 'none' ? 2 : 2.3, fill);
+        }
+        canvas.drawLine(const Offset(16, 1), const Offset(16, 31), line);
+        canvas.drawLine(const Offset(1, 16), const Offset(31, 16), line);
+      case EffectCategory.portrait:
+        canvas.drawOval(const Rect.fromLTWH(7, 3, 18, 26), line);
+        canvas.drawCircle(const Offset(12, 13), 1.8, fill);
+        canvas.drawCircle(const Offset(20, 13), 1.8, fill);
+        canvas.drawArc(const Rect.fromLTWH(11, 15, 10, 8), 0, math.pi, false, line);
+      case EffectCategory.cinematic:
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(const Rect.fromLTWH(3, 6, 26, 22), const Radius.circular(3)),
+          line,
+        );
+        canvas.drawLine(const Offset(3, 13), const Offset(29, 13), line);
+        for (final x in <double>[6, 14, 22]) {
+          canvas.drawLine(Offset(x, 6), Offset(x + 4, 13), line);
+        }
+      case EffectCategory.retro:
+      case EffectCategory.film:
+        canvas.drawCircle(const Offset(16, 16), 7, line);
+        for (var i = 0; i < 8; i++) {
+          final angle = i * math.pi / 4;
+          canvas.drawLine(
+            Offset(16 + math.cos(angle) * 11, 16 + math.sin(angle) * 11),
+            Offset(16 + math.cos(angle) * 14, 16 + math.sin(angle) * 14),
+            line,
+          );
+        }
+      case EffectCategory.color:
+        for (var i = 0; i < 3; i++) {
+          final bar = Rect.fromLTWH(5 + i * 8.5, 5 + (i % 2) * 4, 6, 23 - (i % 2) * 8);
+          canvas.drawRRect(RRect.fromRectAndRadius(bar, const Radius.circular(2)), fill);
+        }
+      case EffectCategory.cyber:
+        canvas.drawPath(
+          Path()
+            ..moveTo(3, 7)
+            ..lineTo(12, 7)
+            ..lineTo(16, 13)
+            ..lineTo(24, 13)
+            ..lineTo(29, 20)
+            ..lineTo(18, 20)
+            ..lineTo(14, 26)
+            ..lineTo(4, 26),
+          line,
+        );
+        canvas.drawCircle(const Offset(16, 16), 13, line);
+      case EffectCategory.background:
+        canvas.drawPath(
+          Path()
+            ..moveTo(2, 27)
+            ..lineTo(10, 14)
+            ..lineTo(16, 22)
+            ..lineTo(22, 9)
+            ..lineTo(30, 27)
+            ..close(),
+          line,
+        );
+        canvas.drawLine(const Offset(2, 28), const Offset(30, 28), line);
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _EffectGlyphPainter oldDelegate) =>
+      oldDelegate.id != id ||
+      oldDelegate.category != category ||
+      oldDelegate.color != color;
 }
 
