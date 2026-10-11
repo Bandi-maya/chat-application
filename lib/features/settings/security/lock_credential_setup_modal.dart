@@ -253,7 +253,11 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
         ? _currentPatternGridSize
         : _patternGridSize;
     if (nodes.length < 4 ||
-        nodes.any((node) => (int.tryParse(node) ?? gridSize * gridSize) >= gridSize * gridSize)) {
+        nodes.any(
+          (node) =>
+              (int.tryParse(node) ?? gridSize * gridSize) >=
+              gridSize * gridSize,
+        )) {
       setState(() => _error = 'Connect at least 4 unique dots on the selected grid.');
       return;
     }
