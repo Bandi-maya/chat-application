@@ -68,7 +68,7 @@ class AnimatedEmojiText extends StatelessWidget {
                     size: inlineSize,
                     animate: animate,
                     mode: EmojiDisplayMode.inline,
-                    interactive: false,
+                    interactive: true,
                     onTap: onEmojiTap,
                   ),
                 ),
