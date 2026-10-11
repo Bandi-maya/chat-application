@@ -396,12 +396,12 @@ class SettingsRootScreen extends StatelessWidget {
                                       width: 84,
                                       height: 84,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => _avatarFallback(user, size: 84),
+                                      errorBuilder: (_, __, ___) => _avatarFallback(user, size: 84, colors: colors),
                                     )
                                   : SizedBox(
                                       width: 84,
                                       height: 84,
-                                      child: _avatarFallback(user, size: 84),
+                                      child: _avatarFallback(user, size: 84, colors: colors),
                                     ),
                             ),
                           ),
@@ -622,8 +622,11 @@ class SettingsRootScreen extends StatelessWidget {
     }
   }
 
-  Widget _avatarFallback(UserProfile user, {double size = 60}) {
-    final colors = context.colors;
+  Widget _avatarFallback(
+    UserProfile user, {
+    double size = 60,
+    required AppColors colors,
+  }) {
     return Container(
       color: colors.surfaceElevated,
       width: size,
@@ -677,7 +680,7 @@ class _SettingsItemTile extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: context.colors.foreground,
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
@@ -688,8 +691,8 @@ class _SettingsItemTile extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       subtitle!,
-                      style: const TextStyle(
-                        color: Color(0xFF8696A0),
+                      style: TextStyle(
+                        color: context.colors.foregroundSecondary,
                         fontSize: 13,
                         height: 1.25,
                       ),
