@@ -1,4 +1,6 @@
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../emoji_registry.dart';
@@ -24,7 +26,7 @@ class ChatyEmojiPicker {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      enableDrag: true,
+      enableDrag: false,
       showDragHandle: false,
       // Open at approximately keyboard height; the user can drag up for more.
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
@@ -62,10 +64,12 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
   List<ChatyEmojiEntry> _filteredAnimated = const <ChatyEmojiEntry>[];
+  double _heightFactor = 0.42;
 
   @override
   void initState() {
     super.initState();
+    _heightFactor = widget.reactionMode ? 0.32 : 0.42;
     _tabController = TabController(length: 2, vsync: this);
     _filteredAnimated = ChatyEmojiRegistry.entries;
     _searchCtrl.addListener(_onSearchChanged);
@@ -100,8 +104,11 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final height =
-        MediaQuery.sizeOf(context).height * (widget.reactionMode ? 0.32 : 0.42);
+    final availableHeight = MediaQuery.sizeOf(context).height;
+    final maxSheetHeight = availableHeight * 0.90;
+    final height = (availableHeight * _heightFactor)
+        .clamp(math.min(250.0, maxSheetHeight), maxSheetHeight)
+        .toDouble();
 
     final headerColor = widget.headerColor;
     final headerIconsColor = widget.headerIconsColor;
@@ -110,9 +117,35 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
     return Container(
       color: backgroundColor,
       child: SizedBox(
-        height: height.clamp(270.0, 450.0),
+        height: height,
         child: Column(
           children: [
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onVerticalDragUpdate: (details) {
+                if (availableHeight <= 0) return;
+                setState(() {
+                  _heightFactor = (_heightFactor -
+                          details.delta.dy / availableHeight)
+                      .clamp(0.32, 0.90)
+                      .toDouble();
+                });
+              },
+              child: SizedBox(
+                height: 22,
+                width: double.infinity,
+                child: Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.32),
+                      borderRadius: BorderRadius.zero,
+                    ),
+                  ),
+                ),
+              ),
+            ),
             Container(
               color: headerColor,
               padding: const EdgeInsets.fromLTRB(18, 2, 14, 8),
