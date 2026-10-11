@@ -1,3 +1,5 @@
+import '../theme/theme_config.dart';
+
 /// Canonicalizes legacy/GB-facing home and stories labels before they are
 /// persisted into the typed preference model consumed by the UI.
 abstract final class HomePresetNormalizer {
@@ -20,6 +22,25 @@ abstract final class HomePresetNormalizer {
     'curved radial menu' => 'Expressive',
     _ => 'Chaty Default',
   };
+
+  /// Resolves the selected Home UI label to the runtime shell mode.
+  ///
+  /// Returns null for list-only presets such as Classic, Compact, or Cards so
+  /// they do not accidentally override a navigation style chosen elsewhere.
+  static AppNavigationMode? navigationMode(String value) =>
+      switch (value.trim().toLowerCase()) {
+        'one ui' || 'modern side menu' => AppNavigationMode.modernSideMenu,
+        'whatsapp ui stock' => AppNavigationMode.bottomNav,
+        'ios style' || 'floating rail' => AppNavigationMode.floatingIslandRail,
+        'bubbles tab style' => AppNavigationMode.gestureTabs,
+        'basic tab style' => AppNavigationMode.compactRail,
+        'whatsapp old ui' ||
+        'whatsapp-style top bar' ||
+        'whatsapp style top bar' => AppNavigationMode.topWhatsAppBar,
+        '3d perspective drawer' => AppNavigationMode.perspective3DDrawer,
+        'curved radial menu' => AppNavigationMode.curvedRadialDrawer,
+        _ => null,
+      };
 
   static String storiesStyle(String value) =>
       switch (value.trim().toLowerCase()) {
