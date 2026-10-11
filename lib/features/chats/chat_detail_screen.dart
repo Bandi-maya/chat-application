@@ -78,7 +78,7 @@ class ChatDetailScreen extends StatefulWidget {
   State<ChatDetailScreen> createState() => _ChatDetailScreenState();
 }
 
-class _ChatDetailScreenState extends State<ChatDetailScreen> {
+class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBindingObserver {
   // View-once media the local user has already opened this session.
   // Deliberately local-only: the server never learns open state, and a fresh
   // session locks the media again (matching WhatsApp semantics).
@@ -145,6 +145,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _realtime = locator<RichChatRealtimeService>();
     _relationships = locator<ContactRelationshipService>();
     _attachments = ChatAttachmentActions(
@@ -164,9 +165,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     unawaited(_authorizeBeforeLoading());
   }
 
-  Future<void> _authorizeBeforeLoading() async {
-    if (_accessCheckStarted) return;
-    _accessCheckStarted = true;
+  Future<void> _authorizeBeforeLoading({bool isResume = false}) async {
+    if (_accessCheckStarted && !isResume) return;
+    if (!isResume) _accessCheckStarted = true;
     final authorized = await ProtectedResourceGate.authorizeConversation(
       context,
       conversationId: widget.conversationId,
@@ -192,13 +193,43 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
 
     _realtime.setActiveConversation(widget.conversationId);
-    _scrollCtrl.addListener(_handleScrollChanged);
-    widget.dataStore.addListener(_onDataStoreChanged);
+    if (!isResume) {
+      _scrollCtrl.addListener(_handleScrollChanged);
+      widget.dataStore.addListener(_onDataStoreChanged);
+    }
     setState(() => _accessAuthorized = true);
     unawaited(_realtime.trackConversation(widget.conversationId));
     unawaited(_loadChatWallpaperOverride());
     if (widget.initialMessageId == null) _scrollToBottom(animate: false);
     unawaited(_loadConversation());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      if (widget.preferencesController.isConversationProtected(
+        widget.conversationId,
+      )) {
+        ProtectedResourceGate.invalidateConversationSession(
+          widget.conversationId,
+        );
+        if (_accessAuthorized && mounted) {
+          setState(() => _accessAuthorized = false);
+        }
+      }
+      return;
+    }
+
+    if (state == AppLifecycleState.resumed &&
+        !_accessAuthorized &&
+        widget.preferencesController.isConversationProtected(
+          widget.conversationId,
+        )) {
+      // A previously visible protected conversation is masked while the app
+      // is backgrounded, then must re-authenticate before its content returns.
+      unawaited(_authorizeBeforeLoading(isResume: true));
+    }
   }
 
   Future<void> _loadChatWallpaperOverride() async {
@@ -276,6 +307,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (_realtime.activeConversationId == widget.conversationId) {
       _realtime.setActiveConversation(null);
     }
