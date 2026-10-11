@@ -132,20 +132,37 @@ class _LensAnchorPainter extends CustomPainter {
     // face receives an independent transform — never everything on face #0.
     for (final pose in poses.take(math.max(1, lens.maxFaces))) {
       canvas.save();
-      switch (lens.anchor) {
-        case LensAnchor.eyes:
-          _paintGlasses(canvas, pose);
-        case LensAnchor.forehead:
-          _paintCrown(canvas, pose);
-        case LensAnchor.ears:
-          _paintEars(canvas, pose);
-        case LensAnchor.mouth:
-          _paintMouthGlow(canvas, pose);
-        case LensAnchor.noseBridge:
-        case LensAnchor.noseTip:
-          _paintNoseDot(canvas, pose);
-        case LensAnchor.fullHead:
-          break;
+      if (lens.id == 'lens_hearts_float') {
+        _paintHearts(canvas, pose);
+      } else {
+        switch (lens.anchor) {
+          case LensAnchor.eyes:
+            if (lens.id == 'lens_sunglasses_aviator') {
+              _paintAviators(canvas, pose);
+            } else {
+              _paintGlasses(canvas, pose);
+            }
+          case LensAnchor.forehead:
+            if (lens.id == 'lens_angel_halo') {
+              _paintAngelHalo(canvas, pose);
+            } else if (lens.id == 'lens_sparkles') {
+              _paintSparkles(canvas, pose);
+            } else if (lens.id == 'lens_neon_crown') {
+              _paintNeonCrown(canvas, pose);
+            } else {
+              _paintCrown(canvas, pose);
+            }
+          case LensAnchor.ears:
+            _paintEars(canvas, pose);
+            if (lens.id == 'lens_dog_ears') _paintDogNose(canvas, pose);
+          case LensAnchor.mouth:
+            _paintMouthGlow(canvas, pose);
+          case LensAnchor.noseBridge:
+          case LensAnchor.noseTip:
+            _paintNoseDot(canvas, pose);
+          case LensAnchor.fullHead:
+            break;
+        }
       }
       canvas.restore();
     }
@@ -164,6 +181,217 @@ class _LensAnchorPainter extends CustomPainter {
     canvas.rotate(pose.rollRadians);
     canvas.scale(unit / 100.0); // art authored against a 100px reference
     draw();
+  }
+
+  void _paintAviators(Canvas canvas, FacePose pose) {
+    final mid = pose.eyesMidpoint;
+    final unit = pose.interocular * 2.55;
+    _withFaceTransform(canvas, pose, mid, unit, () {
+      final fill = Paint()
+        ..color = const Color(0xFF0F172A).withValues(alpha: 0.90 * opacity)
+        ..style = PaintingStyle.fill;
+      final rim = Paint()
+        ..color = lens.accentColor.withValues(alpha: opacity)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 5
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+
+      final leftLens = Path()
+        ..moveTo(-91, -22)
+        ..quadraticBezierTo(-50, -34, -15, -17)
+        ..lineTo(-25, 20)
+        ..quadraticBezierTo(-48, 42, -70, 22)
+        ..close();
+      final rightLens = Path()
+        ..moveTo(15, -17)
+        ..quadraticBezierTo(50, -34, 91, -22)
+        ..lineTo(70, 22)
+        ..quadraticBezierTo(48, 42, 25, 20)
+        ..close();
+      canvas.drawPath(leftLens, fill);
+      canvas.drawPath(rightLens, fill);
+      canvas.drawPath(leftLens, rim);
+      canvas.drawPath(rightLens, rim);
+      canvas.drawLine(const Offset(-16, -16), const Offset(16, -16), rim);
+      canvas.drawLine(const Offset(-90, -20), const Offset(-108, -26), rim);
+      canvas.drawLine(const Offset(90, -20), const Offset(108, -26), rim);
+    });
+  }
+
+  void _paintNeonCrown(Canvas canvas, FacePose pose) {
+    final origin = Offset(
+      pose.headBounds.center.dx,
+      pose.headBounds.top + pose.headBounds.height * 0.08,
+    );
+    final unit = pose.headBounds.width * 0.72;
+    _withFaceTransform(canvas, pose, origin, unit, () {
+      final glow = Paint()
+        ..color = lens.accentColor.withValues(alpha: 0.45 * opacity)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 11
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7);
+      final line = Paint()
+        ..color = lens.accentColor.withValues(alpha: opacity)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+      final path = Path()
+        ..moveTo(-60, 20)
+        ..lineTo(-45, -22)
+        ..lineTo(-20, 2)
+        ..lineTo(0, -40)
+        ..lineTo(20, 2)
+        ..lineTo(45, -22)
+        ..lineTo(60, 20);
+      canvas.drawPath(path, glow);
+      canvas.drawPath(path, line);
+      canvas.drawLine(const Offset(-60, 20), const Offset(60, 20), line);
+    });
+  }
+
+  void _paintAngelHalo(Canvas canvas, FacePose pose) {
+    final origin = Offset(
+      pose.headBounds.center.dx,
+      pose.headBounds.top + pose.headBounds.height * 0.05,
+    );
+    final unit = pose.headBounds.width * 0.68;
+    _withFaceTransform(canvas, pose, origin, unit, () {
+      final glow = Paint()
+        ..color = lens.accentColor.withValues(alpha: 0.45 * opacity)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 12
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+      final halo = Paint()
+        ..color = lens.accentColor.withValues(alpha: opacity)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 5;
+      canvas.drawOval(
+        Rect.fromCenter(center: const Offset(0, -28), width: 112, height: 24),
+        glow,
+      );
+      canvas.drawOval(
+        Rect.fromCenter(center: const Offset(0, -28), width: 112, height: 24),
+        halo,
+      );
+      for (final x in <double>[-42, 0, 42]) {
+        canvas.drawCircle(
+          Offset(x, -29),
+          x == 0 ? 3.5 : 2.2,
+          Paint()..color = Colors.white.withValues(alpha: opacity),
+        );
+      }
+    });
+  }
+
+  void _paintSparkles(Canvas canvas, FacePose pose) {
+    final origin = pose.eyesMidpoint;
+    final unit = pose.interocular * 2.15;
+    _withFaceTransform(canvas, pose, origin, unit, () {
+      void star(Offset center, double radius, double alpha) {
+        final path = Path();
+        for (var i = 0; i < 8; i++) {
+          final angle = -math.pi / 2 + i * math.pi / 4;
+          final r = i.isEven ? radius : radius * 0.28;
+          final point = Offset(
+            center.dx + math.cos(angle) * r,
+            center.dy + math.sin(angle) * r,
+          );
+          if (i == 0) {
+            path.moveTo(point.dx, point.dy);
+          } else {
+            path.lineTo(point.dx, point.dy);
+          }
+        }
+        path.close();
+        canvas.drawPath(
+          path,
+          Paint()
+            ..color = lens.accentColor.withValues(alpha: alpha * opacity)
+            ..style = PaintingStyle.fill,
+        );
+      }
+
+      star(const Offset(-70, -26), 17, 1.0);
+      star(const Offset(74, -34), 13, 0.9);
+      star(const Offset(-48, 42), 9, 0.75);
+      star(const Offset(53, 37), 8, 0.8);
+    });
+  }
+
+  void _paintHearts(Canvas canvas, FacePose pose) {
+    final origin = Offset(
+      pose.headBounds.center.dx,
+      pose.headBounds.top + pose.headBounds.height * 0.18,
+    );
+    final unit = pose.headBounds.width * 0.9;
+    _withFaceTransform(canvas, pose, origin, unit, () {
+      final paint = Paint()
+        ..color = lens.accentColor.withValues(alpha: 0.9 * opacity)
+        ..style = PaintingStyle.fill;
+
+      void heart(Offset center, double scale, double alpha) {
+        final path = Path()
+          ..moveTo(center.dx, center.dy + 24 * scale)
+          ..cubicTo(
+            center.dx - 40 * scale,
+            center.dy - 1 * scale,
+            center.dx - 26 * scale,
+            center.dy - 25 * scale,
+            center.dx,
+            center.dy - 10 * scale,
+          )
+          ..cubicTo(
+            center.dx + 26 * scale,
+            center.dy - 25 * scale,
+            center.dx + 40 * scale,
+            center.dy - 1 * scale,
+            center.dx,
+            center.dy + 24 * scale,
+          )
+          ..close();
+        canvas.drawPath(
+          path,
+          Paint()..color = lens.accentColor.withValues(alpha: alpha * opacity),
+        );
+      }
+
+      heart(const Offset(-48, -6), 0.40, 0.90);
+      heart(const Offset(44, -28), 0.30, 0.78);
+      heart(const Offset(78, 36), 0.22, 0.66);
+    });
+  }
+
+  void _paintDogNose(Canvas canvas, FacePose pose) {
+    _withFaceTransform(canvas, pose, pose.noseBase, pose.interocular * 0.72, () {
+      final outer = Paint()
+        ..color = const Color(0xFF1F2937).withValues(alpha: 0.95 * opacity)
+        ..style = PaintingStyle.fill;
+      final inner = Paint()
+        ..color = const Color(0xFF111827).withValues(alpha: opacity)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2;
+      canvas.drawOval(
+        Rect.fromCenter(center: Offset.zero, width: 32, height: 22),
+        outer,
+      );
+      canvas.drawLine(const Offset(0, 9), const Offset(0, 17), inner);
+      canvas.drawArc(
+        Rect.fromCenter(center: const Offset(-5, 17), width: 10, height: 7),
+        0,
+        math.pi,
+        false,
+        inner,
+      );
+      canvas.drawArc(
+        Rect.fromCenter(center: const Offset(5, 17), width: 10, height: 7),
+        0,
+        math.pi,
+        false,
+        inner,
+      );
+    });
   }
 
   void _paintGlasses(Canvas canvas, FacePose pose) {
