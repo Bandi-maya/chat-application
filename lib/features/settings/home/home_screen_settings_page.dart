@@ -34,11 +34,14 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
   @override
   Widget build(BuildContext context) {
     final themeController = locator<ThemeController>();
-    final theme = themeController.globalTheme;
-    final colors = context.colors;
-    final isDark = theme.brightness == Brightness.dark;
+    return ListenableBuilder(
+      listenable: themeController,
+      builder: (context, _) {
+        final theme = themeController.globalTheme;
+        final colors = context.colors;
+        final isDark = theme.brightness == Brightness.dark;
 
-    return Scaffold(
+        return Scaffold(
       backgroundColor: theme.backgroundColor,
       appBar: AppBar(
         backgroundColor: theme.backgroundColor,
@@ -218,6 +221,8 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
           },
         ),
       ),
+        );
+      },
     );
   }
 
