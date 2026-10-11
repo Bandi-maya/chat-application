@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -78,20 +79,32 @@ class _ImageEditorCropperDialogState extends State<ImageEditorCropperDialog> {
         throw Exception('Crop boundary unavailable');
       }
 
-      // High density snapshot (2.5x)
+      // High density snapshot (2.5x). Always release the rasterized image
+      // after extracting bytes; long crop sessions can otherwise retain native
+      // image memory, especially on older phones.
       final ui.Image image = await boundary.toImage(pixelRatio: 2.5);
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData == null) {
-        throw Exception('Unable to encode cropped image bytes');
+      late final Uint8List buffer;
+      try {
+        final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+        if (byteData == null) {
+          throw Exception('Unable to encode cropped image bytes');
+        }
+        buffer = byteData.buffer.asUint8List();
+      } finally {
+        image.dispose();
       }
 
-      final buffer = byteData.buffer.asUint8List();
+      if (buffer.isEmpty) {
+        throw Exception('The crop is empty. Reposition the image inside the frame.');
+      }
       final tempDir = await getTemporaryDirectory();
       final tag = widget.isAvatar ? 'avatar' : 'banner';
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final file = File('${tempDir.path}/cropped_${tag}_$timestamp.png');
-
       await file.writeAsBytes(buffer, flush: true);
+      if (await file.length() == 0) {
+        throw Exception('The crop could not be saved. Try again.');
+      }
 
       if (!mounted) return;
       Navigator.of(context).pop(file);
@@ -192,10 +205,13 @@ class _ImageEditorCropperDialogState extends State<ImageEditorCropperDialog> {
                       key: _cropKey,
                       child: InteractiveViewer(
                         transformationController: _transformController,
-                        clipBehavior: Clip.none,
-                        minScale: 0.5,
-                        maxScale: 4.5,
-                        boundaryMargin: const EdgeInsets.all(double.infinity),
+                        // Keep the bitmap inside the crop window. Infinite
+                        // margins allow panning the entire image out of frame,
+                        // which can save a blank banner after editing.
+                        clipBehavior: Clip.hardEdge,
+                        minScale: 1.0,
+                        maxScale: 4.0,
+                        boundaryMargin: EdgeInsets.zero,
                         child: RotatedBox(
                           quarterTurns: _quarterRotations,
                           child: Image.file(
