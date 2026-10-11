@@ -132,7 +132,8 @@ internal object IslandOverlay {
         dismissRunnable?.let(main::removeCallbacks)
         windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         render(context)
-        scheduleDismiss(context, isExpanded = false)
+        // Keep the collapsed island stable instead of flashing away on a timer.
+        // It remains until the user opens it or another notification replaces it.
     }
 
     private fun scheduleDismiss(context: Context, isExpanded: Boolean) {
@@ -246,7 +247,6 @@ internal object IslandOverlay {
             if (!expanded) {
                 expanded = true
                 render(context)
-                scheduleDismiss(context, isExpanded = true)
             } else {
                 runCatching { latestPendingIntent?.send() }
                 remove()
@@ -266,7 +266,7 @@ internal object IslandOverlay {
             android.graphics.PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            y = dp(context, 8) + statusBarHeight(context)
+            y = dp(context, 1) + statusBarHeight(context)
         }
         try {
             val old = currentView
