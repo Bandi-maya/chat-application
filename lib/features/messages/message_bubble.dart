@@ -61,6 +61,8 @@ class MessageBubble extends StatelessWidget {
   final VoidCallback? onViewOnceOpen;
   final VoidCallback? onRetry;
 
+  final bool isSenderAdmin;
+
   const MessageBubble({
     super.key,
     required this.message,
@@ -68,6 +70,7 @@ class MessageBubble extends StatelessWidget {
     required this.theme,
     this.preferencesController,
     this.senderName,
+    this.isSenderAdmin = false,
     this.showGroupAvatar = true,
     required this.onLongPress,
     this.onLongPressWithRect,
@@ -126,13 +129,21 @@ class MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final convPrefs = preferencesController?.conversation;
     if (message.type == MessageType.system) {
+      final infoBg = convPrefs?.infoBalloonsBgColor != null
+          ? Color(convPrefs!.infoBalloonsBgColor!)
+          : theme.surfaceColor.withValues(alpha: 0.8);
+      final infoText = convPrefs?.infoBalloonsTextColor != null
+          ? Color(convPrefs!.infoBalloonsTextColor!)
+          : theme.secondaryTextColor;
+
       return Center(
         child: Container(
           margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 24),
           padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 12),
           decoration: BoxDecoration(
-            color: theme.surfaceColor.withValues(alpha: 0.8),
+            color: infoBg,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: theme.cardColor),
           ),
@@ -140,7 +151,7 @@ class MessageBubble extends StatelessWidget {
             message.text,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: theme.secondaryTextColor,
+              color: infoText,
               fontSize: 11.5 * theme.fontScale,
             ),
           ),
@@ -167,7 +178,9 @@ class MessageBubble extends StatelessWidget {
                 Icon(
                   Icons.cancel_outlined,
                   size: 17,
-                  color: theme.secondaryTextColor,
+                  color: convPrefs?.deletedMessageIconColor != null
+                      ? Color(convPrefs!.deletedMessageIconColor!)
+                      : theme.secondaryTextColor,
                 ),
                 const SizedBox(width: 7),
                 Text(
@@ -198,26 +211,41 @@ class MessageBubble extends StatelessWidget {
         : const EmojiOnlyInfo(false, 0);
 
     final bubbleBg = isMe
-        ? theme.outgoingBubbleColor
-        : theme.incomingBubbleColor;
-    final configuredTextColor = preferencesController?.gbColor(
-      isMe ? 'ModChatBubbleText' : 'ModChatBubbleTextLeft',
-    );
+        ? (convPrefs?.rightBubbleColor != null
+            ? Color(convPrefs!.rightBubbleColor!)
+            : theme.outgoingBubbleColor)
+        : (convPrefs?.leftBubbleColor != null
+            ? Color(convPrefs!.leftBubbleColor!)
+            : theme.incomingBubbleColor);
+
+    final configuredTextColor = isMe
+        ? (convPrefs?.rightChatBubbleTextColor != null
+            ? Color(convPrefs!.rightChatBubbleTextColor!)
+            : preferencesController?.gbColor('ModChatBubbleText'))
+        : (convPrefs?.leftChatBubbleTextColor != null
+            ? Color(convPrefs!.leftChatBubbleTextColor!)
+            : preferencesController?.gbColor('ModChatBubbleTextLeft'));
+
     final textColor =
         configuredTextColor ??
         (isMe ? theme.outgoingTextColor : theme.incomingTextColor);
+
+    final configuredTimeColor = isMe
+        ? (convPrefs?.rightBubbleTimeColor != null
+            ? Color(convPrefs!.rightBubbleTimeColor!)
+            : preferencesController?.gbColor('date_right_color'))
+        : (convPrefs?.leftBubbleTimeColor != null
+            ? Color(convPrefs!.leftBubbleTimeColor!)
+            : preferencesController?.gbColor('date_left_color'));
+
     final timestampColor =
-        preferencesController?.gbColor(
-          isMe ? 'date_right_color' : 'date_left_color',
-        ) ??
+        configuredTimeColor ??
         textColor.withValues(alpha: 0.65);
-    final messageTextSize = (preferencesController?.gbDouble(
-              'text_size_pick',
-              fallback: 15.0,
-            ) ??
-            15.0)
-        .clamp(10.0, 30.0)
-        .toDouble();
+
+    final rawTextSize = convPrefs?.messageTextSize ??
+        preferencesController?.gbDouble('text_size_pick', fallback: 15.0) ??
+        15.0;
+    final messageTextSize = rawTextSize.clamp(10.0, 30.0).toDouble();
 
     if (emojiInfo.isEmojiOnly) {
       return RepaintBoundary(
@@ -368,13 +396,49 @@ class MessageBubble extends StatelessWidget {
                                         CrossAxisAlignment.start,
                                     children: [
                                       if (!isMe && senderName != null) ...[
-                                        Text(
-                                          senderName!,
-                                          style: TextStyle(
-                                            color: theme.accentColor,
-                                            fontSize: 11.5 * theme.fontScale,
-                                            fontWeight: FontWeight.w700,
-                                          ),
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              senderName!,
+                                              style: TextStyle(
+                                                color: convPrefs?.groupParticipantNameColor != null
+                                                    ? Color(convPrefs!.groupParticipantNameColor!)
+                                                    : theme.accentColor,
+                                                fontSize: 11.5 * theme.fontScale,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                            if (isSenderAdmin && !(convPrefs?.hideAdminNameIcon ?? false)) ...[
+                                              const SizedBox(width: 4),
+                                              Builder(builder: (_) {
+                                                IconData adminIcon = Icons.verified_user_rounded;
+                                                switch (convPrefs?.groupAdminIcon) {
+                                                  case 'Star':
+                                                    adminIcon = Icons.star_rounded;
+                                                    break;
+                                                  case 'Shield':
+                                                    adminIcon = Icons.shield_rounded;
+                                                    break;
+                                                  case 'Crown':
+                                                    adminIcon = Icons.military_tech_rounded;
+                                                    break;
+                                                  case 'Badge':
+                                                    adminIcon = Icons.workspace_premium_rounded;
+                                                    break;
+                                                  default:
+                                                    adminIcon = Icons.verified_user_rounded;
+                                                }
+                                                return Icon(
+                                                  adminIcon,
+                                                  size: 13,
+                                                  color: convPrefs?.groupParticipantNameColor != null
+                                                      ? Color(convPrefs!.groupParticipantNameColor!)
+                                                      : theme.accentColor,
+                                                );
+                                              }),
+                                            ],
+                                          ],
                                         ),
                                         const SizedBox(height: 3),
                                       ],
@@ -402,9 +466,11 @@ class MessageBubble extends StatelessWidget {
                                               Icon(
                                                 Icons.cancel_outlined,
                                                 size: 14,
-                                                color: textColor.withValues(
-                                                  alpha: 0.8,
-                                                ),
+                                                color: convPrefs?.deletedMessageIconColor != null
+                                                    ? Color(convPrefs!.deletedMessageIconColor!)
+                                                    : textColor.withValues(
+                                                        alpha: 0.8,
+                                                      ),
                                               ),
                                               const SizedBox(width: 5),
                                               Text(
@@ -430,17 +496,21 @@ class MessageBubble extends StatelessWidget {
                                             vertical: 5,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: Colors.black.withValues(
-                                              alpha: 0.13,
-                                            ),
+                                            color: convPrefs?.quotedBackgroundColor != null
+                                                ? Color(convPrefs!.quotedBackgroundColor!)
+                                                : Colors.black.withValues(
+                                                    alpha: 0.13,
+                                                  ),
                                             borderRadius: BorderRadius.circular(
                                               8,
                                             ),
                                             border: Border(
                                               left: BorderSide(
-                                                color: isMe
-                                                    ? Colors.white70
-                                                    : theme.accentColor,
+                                                color: convPrefs?.quotedDividerColor != null
+                                                    ? Color(convPrefs!.quotedDividerColor!)
+                                                    : (isMe
+                                                        ? Colors.white70
+                                                        : theme.accentColor),
                                                 width: 3,
                                               ),
                                             ),
@@ -453,9 +523,11 @@ class MessageBubble extends StatelessWidget {
                                                 message.replyToSenderName ??
                                                     'Reply',
                                                 style: TextStyle(
-                                                  color: isMe
-                                                      ? Colors.white
-                                                      : theme.accentColor,
+                                                  color: convPrefs?.quotedNameColor != null
+                                                      ? Color(convPrefs!.quotedNameColor!)
+                                                      : (isMe
+                                                          ? Colors.white
+                                                          : theme.accentColor),
                                                   fontSize: 11,
                                                   fontWeight: FontWeight.bold,
                                                 ),
@@ -468,9 +540,11 @@ class MessageBubble extends StatelessWidget {
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
-                                                  color: textColor.withValues(
-                                                    alpha: 0.8,
-                                                  ),
+                                                  color: convPrefs?.quotedMessageColor != null
+                                                      ? Color(convPrefs!.quotedMessageColor!)
+                                                      : textColor.withValues(
+                                                          alpha: 0.8,
+                                                        ),
                                                   fontSize: 11,
                                                 ),
                                                 enableExpressiveSizing: false,
@@ -900,6 +974,12 @@ class MessageBubble extends StatelessWidget {
                                           textColor: textColor,
                                           accentColor: theme.accentColor,
                                           playbackSpeed: voicePlaybackSpeed,
+                                          playButtonColor: convPrefs?.voiceNotePlayButtonColor != null
+                                              ? Color(convPrefs!.voiceNotePlayButtonColor!)
+                                              : null,
+                                          playingBarColor: convPrefs?.voiceNotePlayingBarColor != null
+                                              ? Color(convPrefs!.voiceNotePlayingBarColor!)
+                                              : null,
                                         ),
                                       if (message.attachment?.type ==
                                           'document')
@@ -991,6 +1071,21 @@ class MessageBubble extends StatelessWidget {
                                               height: 1.35,
                                             );
 
+                                            final textWidget = enableAnimatedEmojis
+                                                ? AnimatedEmojiText(
+                                                    text: message.text,
+                                                    style: textStyle,
+                                                  )
+                                                : Text(
+                                                    message.text,
+                                                    style: textStyle,
+                                                  );
+
+                                            final selectable = convPrefs?.makeTextSelectable ?? true;
+                                            final contentWidget = selectable
+                                                ? textWidget
+                                                : SelectionContainer.disabled(child: textWidget);
+
                                             return Wrap(
                                               alignment: WrapAlignment.end,
                                               crossAxisAlignment:
@@ -998,15 +1093,7 @@ class MessageBubble extends StatelessWidget {
                                               spacing: 8,
                                               runSpacing: 2,
                                               children: [
-                                                enableAnimatedEmojis
-                                                    ? AnimatedEmojiText(
-                                                        text: message.text,
-                                                        style: textStyle,
-                                                      )
-                                                    : Text(
-                                                        message.text,
-                                                        style: textStyle,
-                                                      ),
+                                                contentWidget,
                                                 Padding(
                                                   padding:
                                                       const EdgeInsets.only(
@@ -1464,11 +1551,15 @@ class _VoiceNotePlayer extends StatefulWidget {
   final Color textColor;
   final Color accentColor;
   final double playbackSpeed;
+  final Color? playButtonColor;
+  final Color? playingBarColor;
   const _VoiceNotePlayer({
     required this.attachment,
     required this.textColor,
     required this.accentColor,
     this.playbackSpeed = 1.0,
+    this.playButtonColor,
+    this.playingBarColor,
   });
 
   @override
@@ -1556,7 +1647,7 @@ class _VoiceNotePlayerState extends State<_VoiceNotePlayer> {
           IconButton.filled(
             visualDensity: VisualDensity.compact,
             style: IconButton.styleFrom(
-              backgroundColor: widget.accentColor,
+              backgroundColor: widget.playButtonColor ?? widget.accentColor,
               foregroundColor: Colors.white,
             ),
             onPressed: _loading ? null : _toggle,
@@ -1595,6 +1686,9 @@ class _VoiceNotePlayerState extends State<_VoiceNotePlayer> {
                       value: progress,
                       minHeight: 3,
                       borderRadius: BorderRadius.circular(3),
+                      valueColor: widget.playingBarColor != null
+                          ? AlwaysStoppedAnimation<Color>(widget.playingBarColor!)
+                          : null,
                     ),
                     const SizedBox(height: 5),
                     Text(

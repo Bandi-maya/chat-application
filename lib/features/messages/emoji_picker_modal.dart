@@ -8,8 +8,17 @@ class ChatyEmojiPicker {
   static Future<String?> show(
     BuildContext context, {
     bool reactionMode = false,
+    Color? headerColor,
+    Color? headerIconsColor,
+    Color? backgroundColor,
   }) {
-    return central.ChatyEmojiPicker.show(context, reactionMode: reactionMode);
+    return central.ChatyEmojiPicker.show(
+      context,
+      reactionMode: reactionMode,
+      headerColor: headerColor,
+      headerIconsColor: headerIconsColor,
+      backgroundColor: backgroundColor,
+    );
   }
 }
 
