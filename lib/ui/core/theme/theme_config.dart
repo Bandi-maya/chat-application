@@ -8,6 +8,11 @@ enum UILayoutMode { classic, compact, expressive, focus, tabletDesktop }
 
 enum AppNavigationMode {
   bottomNav,
+  oneUi,
+  iosStyle,
+  instagramStyle,
+  telegramStyle,
+  basicTabStyle,
   topWhatsAppBar,
   floatingIslandRail,
   perspective3DDrawer,
