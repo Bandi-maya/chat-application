@@ -25,15 +25,31 @@ class UniversalStylesScreen extends StatefulWidget {
   State<UniversalStylesScreen> createState() => _UniversalStylesScreenState();
 }
 
-class _UniversalStylesScreenState extends State<UniversalStylesScreen> {
+class _UniversalStylesScreenState extends State<UniversalStylesScreen>
+    with WidgetsBindingObserver {
   bool _showAllLauncherIcons = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (locator.isRegistered<AppIconController>()) {
       unawaited(_initializeAndSyncLauncherIcon());
     }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        locator.isRegistered<AppIconController>()) {
+      unawaited(locator<AppIconController>().refreshNativeLauncherState());
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<void> _initializeAndSyncLauncherIcon() async {
@@ -324,6 +340,7 @@ class _UniversalStylesScreenState extends State<UniversalStylesScreen> {
                                     );
                                     return;
                                   }
+                                  if (controller.isBusy) return;
                                   final applied = await controller.applyLauncherIcon(variant);
                                   if (!mounted) return;
                                   if (!applied) {
@@ -337,11 +354,23 @@ class _UniversalStylesScreenState extends State<UniversalStylesScreen> {
                                     );
                                     return;
                                   }
+                                  await controller.refreshNativeLauncherState();
+                                  if (!mounted) return;
+                                  setState(() {});
                                   widget.preferencesController.updateUniversal(
                                     widget.preferencesController.universal.copyWith(
                                       launcherIcon: variant.title,
                                     ),
                                   );
+                                  ScaffoldMessenger.of(context)
+                                    ..hideCurrentSnackBar()
+                                    ..showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Launcher icon updated: ${variant.title}. Some launchers may cache the previous icon briefly.',
+                                        ),
+                                      ),
+                                    );
                                 },
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,

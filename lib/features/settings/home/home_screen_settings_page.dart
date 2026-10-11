@@ -34,190 +34,195 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
   @override
   Widget build(BuildContext context) {
     final themeController = locator<ThemeController>();
-    final theme = themeController.globalTheme;
-    final colors = context.colors;
-    final isDark = theme.brightness == Brightness.dark;
+    return ListenableBuilder(
+      listenable: themeController,
+      builder: (context, _) {
+        final theme = themeController.globalTheme;
+        final colors = context.colors;
+        final isDark = theme.brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: theme.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: theme.backgroundColor,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: ChatyBackButton(
-            onPressed: () => Navigator.of(context).pop(),
+        return Scaffold(
+          backgroundColor: theme.backgroundColor,
+          appBar: AppBar(
+            backgroundColor: theme.backgroundColor,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            leading: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: ChatyBackButton(
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
+            title: Text(
+              'Home Screen',
+              style: TextStyle(
+                color: theme.primaryTextColor,
+                fontSize: 20 * theme.fontScale,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.3,
+              ),
+            ),
           ),
-        ),
-        title: Text(
-          'Home Screen',
-          style: TextStyle(
-            color: theme.primaryTextColor,
-            fontSize: 20 * theme.fontScale,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.3,
+          body: SafeArea(
+            top: false,
+            child: ListenableBuilder(
+              listenable: widget.preferencesController,
+              builder: (context, _) {
+                final homePrefs = widget.preferencesController.home;
+
+                return ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  children: [
+                    // Card 1: Sub-screens (Header, Rows, Floating Action Button, Status)
+                    _buildCardContainer(
+                      theme: theme,
+                      colors: colors,
+                      isDark: isDark,
+                      children: [
+                        _buildSubpageRow(
+                          icon: Icons.view_headline_rounded,
+                          title: 'Header',
+                          theme: theme,
+                          colors: colors,
+                          onTap: () => _openSubScreen(
+                            'Header',
+                            HeaderSettingsScreen(
+                              preferencesController: widget.preferencesController,
+                            ),
+                          ),
+                        ),
+                        _buildDivider(colors),
+                        _buildSubpageRow(
+                          icon: Icons.view_agenda_outlined,
+                          title: 'Rows',
+                          theme: theme,
+                          colors: colors,
+                          onTap: () => _openSubScreen(
+                            'Rows',
+                            HomeRowsSettingsScreen(
+                              preferencesController: widget.preferencesController,
+                            ),
+                          ),
+                        ),
+                        _buildDivider(colors),
+                        _buildSubpageRow(
+                          icon: Icons.add_circle_outline_rounded,
+                          title: 'Floating Action Button',
+                          theme: theme,
+                          colors: colors,
+                          onTap: () => _openSubScreen(
+                            'Floating Action Button',
+                            HomeFabSettingsScreen(
+                              preferencesController: widget.preferencesController,
+                            ),
+                          ),
+                        ),
+                        _buildDivider(colors),
+                        _buildSubpageRow(
+                          icon: Icons.account_circle_outlined,
+                          title: 'Status',
+                          theme: theme,
+                          colors: colors,
+                          onTap: () => _openSubScreen(
+                            'Status',
+                            StatusSettingsScreen(
+                              preferencesController: widget.preferencesController,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Card 2: Mods & Forward Settings
+                    _buildCardContainer(
+                      theme: theme,
+                      colors: colors,
+                      isDark: isDark,
+                      children: [
+                        _buildSectionDivider(label: 'Mods', accent: theme.accentColor),
+                        _buildSwitchRow(
+                          icon: Icons.horizontal_rule_rounded,
+                          title: 'Hide Chats Divider',
+                          subtitle: 'Removes grey line between chats in Main Screen',
+                          value: homePrefs.hideChatsDivider,
+                          theme: theme,
+                          colors: colors,
+                          onChanged: (val) {
+                            widget.preferencesController.updateHome(
+                              homePrefs.copyWith(hideChatsDivider: val),
+                              logTitle: 'Hide Chats Divider',
+                            );
+                          },
+                        ),
+                        _buildSwitchRow(
+                          icon: Icons.person_off_outlined,
+                          title: 'Hide unsaved numbers',
+                          subtitle: 'If contact number not saved then it ll set default contact name',
+                          value: homePrefs.hideUnsavedNumbers,
+                          theme: theme,
+                          colors: colors,
+                          onChanged: (val) {
+                            widget.preferencesController.updateHome(
+                              homePrefs.copyWith(hideUnsavedNumbers: val),
+                              logTitle: 'Hide unsaved numbers',
+                            );
+                          },
+                        ),
+                        _buildSectionDivider(label: 'Forward Settings', accent: theme.accentColor),
+                        _buildSwitchRow(
+                          icon: Icons.person_search_outlined,
+                          title: 'Frequently contacted',
+                          subtitle: 'Hide Frequently contacted from Forward section',
+                          value: homePrefs.hideFrequentlyContacted,
+                          theme: theme,
+                          colors: colors,
+                          onChanged: (val) {
+                            widget.preferencesController.updateHome(
+                              homePrefs.copyWith(hideFrequentlyContacted: val),
+                              logTitle: 'Hide Frequently contacted',
+                            );
+                          },
+                        ),
+                        _buildSwitchRow(
+                          icon: Icons.group_outlined,
+                          title: 'Other contacts',
+                          subtitle: 'Hide Other contacts from Forward section',
+                          value: homePrefs.hideOtherContacts,
+                          theme: theme,
+                          colors: colors,
+                          onChanged: (val) {
+                            widget.preferencesController.updateHome(
+                              homePrefs.copyWith(hideOtherContacts: val),
+                              logTitle: 'Hide Other contacts',
+                            );
+                          },
+                        ),
+                        _buildSwitchRow(
+                          icon: Icons.chat_bubble_outline_rounded,
+                          title: 'Recent chats',
+                          subtitle: 'Hide Recent chats from Forward section',
+                          value: homePrefs.hideRecentChats,
+                          theme: theme,
+                          colors: colors,
+                          onChanged: (val) {
+                            widget.preferencesController.updateHome(
+                              homePrefs.copyWith(hideRecentChats: val),
+                              logTitle: 'Hide Recent chats',
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+                  ],
+                );
+              },
+            ),
           ),
-        ),
-      ),
-      body: SafeArea(
-        top: false,
-        child: ListenableBuilder(
-          listenable: widget.preferencesController,
-          builder: (context, _) {
-            final homePrefs = widget.preferencesController.home;
-
-            return ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              children: [
-                // Card 1: Sub-screens (Header, Rows, Floating Action Button, Status)
-                _buildCardContainer(
-                  theme: theme,
-                  colors: colors,
-                  isDark: isDark,
-                  children: [
-                    _buildSubpageRow(
-                      icon: Icons.view_headline_rounded,
-                      title: 'Header',
-                      theme: theme,
-                      colors: colors,
-                      onTap: () => _openSubScreen(
-                        'Header',
-                        HeaderSettingsScreen(
-                          preferencesController: widget.preferencesController,
-                        ),
-                      ),
-                    ),
-                    _buildDivider(colors),
-                    _buildSubpageRow(
-                      icon: Icons.view_agenda_outlined,
-                      title: 'Rows',
-                      theme: theme,
-                      colors: colors,
-                      onTap: () => _openSubScreen(
-                        'Rows',
-                        HomeRowsSettingsScreen(
-                          preferencesController: widget.preferencesController,
-                        ),
-                      ),
-                    ),
-                    _buildDivider(colors),
-                    _buildSubpageRow(
-                      icon: Icons.add_circle_outline_rounded,
-                      title: 'Floating Action Button',
-                      theme: theme,
-                      colors: colors,
-                      onTap: () => _openSubScreen(
-                        'Floating Action Button',
-                        HomeFabSettingsScreen(
-                          preferencesController: widget.preferencesController,
-                        ),
-                      ),
-                    ),
-                    _buildDivider(colors),
-                    _buildSubpageRow(
-                      icon: Icons.account_circle_outlined,
-                      title: 'Status',
-                      theme: theme,
-                      colors: colors,
-                      onTap: () => _openSubScreen(
-                        'Status',
-                        StatusSettingsScreen(
-                          preferencesController: widget.preferencesController,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Card 2: Mods & Forward Settings
-                _buildCardContainer(
-                  theme: theme,
-                  colors: colors,
-                  isDark: isDark,
-                  children: [
-                    _buildSectionDivider(label: 'Mods', accent: theme.accentColor),
-                    _buildSwitchRow(
-                      icon: Icons.horizontal_rule_rounded,
-                      title: 'Hide Chats Divider',
-                      subtitle: 'Removes grey line between chats in Main Screen',
-                      value: homePrefs.hideChatsDivider,
-                      theme: theme,
-                      colors: colors,
-                      onChanged: (val) {
-                        widget.preferencesController.updateHome(
-                          homePrefs.copyWith(hideChatsDivider: val),
-                          logTitle: 'Hide Chats Divider',
-                        );
-                      },
-                    ),
-                    _buildSwitchRow(
-                      icon: Icons.person_off_outlined,
-                      title: 'Hide unsaved numbers',
-                      subtitle: 'If contact number not saved then it ll set default contact name',
-                      value: homePrefs.hideUnsavedNumbers,
-                      theme: theme,
-                      colors: colors,
-                      onChanged: (val) {
-                        widget.preferencesController.updateHome(
-                          homePrefs.copyWith(hideUnsavedNumbers: val),
-                          logTitle: 'Hide unsaved numbers',
-                        );
-                      },
-                    ),
-                    _buildSectionDivider(label: 'Forward Settings', accent: theme.accentColor),
-                    _buildSwitchRow(
-                      icon: Icons.person_search_outlined,
-                      title: 'Frequently contacted',
-                      subtitle: 'Hide Frequently contacted from Forward section',
-                      value: homePrefs.hideFrequentlyContacted,
-                      theme: theme,
-                      colors: colors,
-                      onChanged: (val) {
-                        widget.preferencesController.updateHome(
-                          homePrefs.copyWith(hideFrequentlyContacted: val),
-                          logTitle: 'Hide Frequently contacted',
-                        );
-                      },
-                    ),
-                    _buildSwitchRow(
-                      icon: Icons.group_outlined,
-                      title: 'Other contacts',
-                      subtitle: 'Hide Other contacts from Forward section',
-                      value: homePrefs.hideOtherContacts,
-                      theme: theme,
-                      colors: colors,
-                      onChanged: (val) {
-                        widget.preferencesController.updateHome(
-                          homePrefs.copyWith(hideOtherContacts: val),
-                          logTitle: 'Hide Other contacts',
-                        );
-                      },
-                    ),
-                    _buildSwitchRow(
-                      icon: Icons.chat_bubble_outline_rounded,
-                      title: 'Recent chats',
-                      subtitle: 'Hide Recent chats from Forward section',
-                      value: homePrefs.hideRecentChats,
-                      theme: theme,
-                      colors: colors,
-                      onChanged: (val) {
-                        widget.preferencesController.updateHome(
-                          homePrefs.copyWith(hideRecentChats: val),
-                          logTitle: 'Hide Recent chats',
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                ),
-                const SizedBox(height: 32),
-              ],
-            );
-          },
-        ),
-      ),
+        );
+      },
     );
   }
 

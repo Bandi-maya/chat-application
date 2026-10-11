@@ -14,6 +14,27 @@ void main() {
     expect(styles, contains('windowSplashScreenAnimatedIcon'));
   });
 
+  test('default launch resources use the application launcher icon', () {
+    final manifest = File(
+      'android/app/src/main/AndroidManifest.xml',
+    ).readAsStringSync();
+    final background = File(
+      'android/app/src/main/res/drawable/launch_background.xml',
+    ).readAsStringSync();
+    final styles = File(
+      'android/app/src/main/res/values-v31/styles.xml',
+    ).readAsStringSync();
+
+    expect(manifest, contains('android:icon="@mipmap/ic_launcher"'));
+    expect(background, contains('@mipmap/ic_launcher'));
+    expect(
+      styles,
+      contains(
+        '<item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>',
+      ),
+    );
+  });
+
   test('every launcher alias uses its matching launch theme', () {
     final manifest = File(
       'android/app/src/main/AndroidManifest.xml',

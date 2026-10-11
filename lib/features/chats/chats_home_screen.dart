@@ -1344,18 +1344,18 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 9),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
         child: Row(
           children: [
-            Icon(icon, size: 19, color: theme.primaryTextColor.withValues(alpha: 0.82)),
-            const SizedBox(width: 13),
+            Icon(icon, size: 24, color: theme.primaryTextColor.withValues(alpha: 0.9)),
+            const SizedBox(width: 15),
             Expanded(
               child: Text(
                 title,
                 style: TextStyle(
                   color: theme.primaryTextColor,
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w500,
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -1388,7 +1388,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               child: Material(
                 color: Colors.transparent,
                 child: Container(
-                  width: 250,
+                  width: MediaQuery.sizeOf(ctx).width < 320
+                      ? MediaQuery.sizeOf(ctx).width - 24
+                      : 276,
                   constraints: BoxConstraints(
                     maxHeight: MediaQuery.of(ctx).size.height * 0.75,
                   ),
@@ -1841,6 +1843,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
             icon: Icon(
               Icons.more_vert_rounded,
               color: theme.primaryTextColor,
+              size: 26,
             ),
             onPressed: () => _openHomeThreeDotMenu(
               homePrefs: homePrefs,
