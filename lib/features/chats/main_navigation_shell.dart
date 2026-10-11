@@ -475,6 +475,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 navigationTemplate: navigationTemplate,
                 onCenterAction: () => _handleNavigationCenterAction(navigationTemplate),
                 navItems: navItems,
+                activeItem: allDestinations[effectiveIndex],
                 selectedIndex: bottomNavSelectedIndex,
                 onDestinationTap: (idx) {
                   ChatyHaptics.selection();
@@ -1024,6 +1025,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     required NavigationTemplate navigationTemplate,
     required VoidCallback onCenterAction,
     required List<_NavDestinationItem> navItems,
+    required _NavDestinationItem activeItem,
     required int selectedIndex,
     required ValueChanged<int> onDestinationTap,
   }) {
@@ -1118,7 +1120,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         theme: theme,
         colors: colors,
         accent: accent,
-        activeItem: navItems[selectedIndex],
+        activeItem: activeItem,
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: SafeArea(
