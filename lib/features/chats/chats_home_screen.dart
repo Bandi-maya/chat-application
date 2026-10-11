@@ -12,6 +12,7 @@ import '../../data/services/contact_relationship_service.dart';
 import '../../data/services/rich_chat_realtime_service.dart';
 import '../../domain/models/conversation.dart';
 import '../../injection/locator.dart';
+import '../../ui/core/controllers/home_preset_normalizer.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/templates/template_controller.dart';
 import '../../ui/core/templates/template_models.dart';
@@ -388,7 +389,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         // Home Style consumers: each variant maps to REAL structural
         // differences below (filters, sections, stories strip geometry,
         // tile density, unread grouping, split view).
-        final homeStyle = homePrefs.homeStyle;
+        final homeStyle = HomePresetNormalizer.homeStyle(homePrefs.homeStyle);
         final styleShowFilters =
             homeStyle != 'Classic' && homeStyle != 'Minimal';
         final styleShowSections = homeStyle != 'Minimal';
@@ -1801,7 +1802,8 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
   }) {
     final homePrefs = widget.preferencesController.home;
     final chatListTemplate = locator<TemplateController>().chatList;
-    final cardRows = homePrefs.homeStyle == 'Cards';
+    final cardRows =
+        HomePresetNormalizer.homeStyle(homePrefs.homeStyle) == 'Cards';
     final effectiveDensity = density * switch (chatListTemplate.density) {
       ChatListDensity.compact => 0.92,
       ChatListDensity.regular => 1.0,
