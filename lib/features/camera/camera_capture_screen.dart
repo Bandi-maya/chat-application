@@ -121,6 +121,7 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
 
   bool get _wantsFaceTracking =>
       _capturedFile == null &&
+      !_capturing &&
       _captureViewMode == _CaptureViewMode.photo &&
       _lensManager.selected.requiresFaceTracking;
 
@@ -426,10 +427,15 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
     if (controller == null || !controller.value.isInitialized || _capturing) {
       return;
     }
+    final capturePreviewSize = _previewViewportSize == Size.zero
+        ? MediaQuery.sizeOf(context)
+        : _previewViewportSize;
     setState(() => _capturing = true);
     ChatyHaptics.light();
     try {
+      await _syncFaceDetectionStream();
       final file = await controller.takePicture();
+      if (!mounted) return;
       var capturedPath = file.path;
       if (_captureViewMode == _CaptureViewMode.document) {
         try {
@@ -456,9 +462,7 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
           try {
             final bytes = await composeLensIntoImage(
               sourceBytes: await File(capturedPath).readAsBytes(),
-              previewSize: _previewViewportSize == Size.zero
-                  ? MediaQuery.sizeOf(context)
-                  : _previewViewportSize,
+              previewSize: capturePreviewSize,
               lens: lens,
               poses: poses,
             );
@@ -499,7 +503,10 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
         ),
       );
     } finally {
-      if (mounted) setState(() => _capturing = false);
+      if (mounted) {
+        setState(() => _capturing = false);
+        unawaited(_syncFaceDetectionStream());
+      }
     }
   }
 
@@ -601,7 +608,7 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
           if (ready && _captureViewMode == _CaptureViewMode.photo) ...[
             ValueListenableBuilder<List<FacePose>>(
               valueListenable: _facePoses,
-              builder: (context, poses, _) {
+              builder: (context, _, __) {
                 final trackingHealth = _faceSolver.health;
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
