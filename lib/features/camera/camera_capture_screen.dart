@@ -114,6 +114,8 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
   bool _capturing = false;
   _CaptureViewMode _captureViewMode = _CaptureViewMode.photo;
   bool _processingFaceFrame = false;
+  bool _faceStreamSyncing = false;
+  bool _faceStreamSyncRequested = false;
   int _lastFaceFrameMs = 0;
 
   bool get _wantsFaceTracking =>
@@ -217,6 +219,8 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
         state == AppLifecycleState.paused) {
       unawaited(controller.dispose());
       _controller = null;
+      _faceSolver.reset();
+      _facePoses.value = const <FacePose>[];
       if (mounted && _capturedFile == null) {
         setState(() => _phase = _CameraPhase.initializing);
         unawaited(_bootstrap());
@@ -248,27 +252,39 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
   }
 
   Future<void> _syncFaceDetectionStream() async {
-    final controller = _controller;
-    if (controller == null || !controller.value.isInitialized) return;
+    if (_faceStreamSyncing) {
+      _faceStreamSyncRequested = true;
+      return;
+    }
+    _faceStreamSyncing = true;
     try {
-      if (_wantsFaceTracking) {
-        if (!controller.value.isStreamingImages) {
-          await controller.startImageStream((image) {
-            unawaited(_processFaceFrame(image, controller));
-          });
+      do {
+        _faceStreamSyncRequested = false;
+        final controller = _controller;
+        if (controller == null || !controller.value.isInitialized) break;
+        try {
+          if (_wantsFaceTracking) {
+            if (!controller.value.isStreamingImages) {
+              await controller.startImageStream((image) {
+                unawaited(_processFaceFrame(image, controller));
+              });
+            }
+          } else {
+            if (controller.value.isStreamingImages) {
+              await controller.stopImageStream();
+            }
+            _faceSolver.reset();
+            _facePoses.value = const <FacePose>[];
+          }
+        } on CameraException {
+          // Keep photo capture available when image streaming is unsupported.
+          _faceSolver.reset();
+          _facePoses.value = const <FacePose>[];
         }
-      } else {
-        if (controller.value.isStreamingImages) {
-          await controller.stopImageStream();
-        }
-        _faceSolver.reset();
-        _facePoses.value = const <FacePose>[];
-      }
-    } on CameraException {
-      // The camera must remain usable even when this device/plugin cannot
-      // provide a YUV image stream.
-      _faceSolver.reset();
-      _facePoses.value = const <FacePose>[];
+      } while (_faceStreamSyncRequested);
+    } finally {
+      _faceStreamSyncing = false;
+      if (_faceStreamSyncRequested) unawaited(_syncFaceDetectionStream());
     }
   }
 
