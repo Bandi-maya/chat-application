@@ -744,6 +744,8 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                 setMyName: home.setMyName,
                 disableStatusUnderName: home.disableStatusUnderName,
                 disableSearchBar: home.disableSearchBar,
+                showSearchBar: home.showSearchBar,
+                searchPlacement: home.searchPlacement,
                 separateChatsAndGroups: home.separateChatsAndGroups,
                 homeStyle: _selectedHomeUiStyle(home),
                 tabBubbleStyle: home.tabBubbleStyle,
