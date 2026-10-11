@@ -346,6 +346,8 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
 
     for (final id in ids) {
       widget.preferencesController.toggleLockConversation(id, lock: shouldLock);
+      // A stale unlock window must never survive a lock-state transition.
+      ProtectedResourceGate.invalidateConversationSession(id);
     }
     if (mounted) _clearSelection();
   }
