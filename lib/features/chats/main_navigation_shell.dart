@@ -406,19 +406,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               if (navMode == AppNavigationMode.floatingIslandRail) {
                 return _buildFloatingIslandRailShell(
                   theme: theme,
-                  content: PageView(
-                    controller: _pageController,
-                    onPageChanged: (idx) {
-                      if (idx >= 0 && idx < allDestinations.length &&
-                          (_currentIndex != idx ||
-                              _currentDestinationId != allDestinations[idx].id)) {
-                        setState(() {
-                          _currentIndex = idx;
-                          _currentDestinationId = allDestinations[idx].id;
-                        });
-                      }
-                    },
-                    children: screens,
+                  content: _buildSwipeableRootStack(
+                    screens: screens,
+                    navItems: allDestinations,
+                    selectedIndex: effectiveIndex,
                   ),
                   navItems: allDestinations,
                   selectedIndex: effectiveIndex,
@@ -496,28 +487,11 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 AppNavigationMode.basicTabStyle,
                 AppNavigationMode.gestureTabs,
               }.contains(navMode)) {
-                final Widget presetContent = navMode == AppNavigationMode.gestureTabs
-                    ? PageView(
-                        controller: _pageController,
-                        physics: const BouncingScrollPhysics(),
-                        onPageChanged: (idx) {
-                          if (idx >= 0 &&
-                              idx < allDestinations.length &&
-                              (_currentIndex != idx ||
-                                  _currentDestinationId != allDestinations[idx].id)) {
-                            setState(() {
-                              _currentIndex = idx;
-                              _currentDestinationId = allDestinations[idx].id;
-                            });
-                          }
-                        },
-                        children: screens,
-                      )
-                    : _buildSwipeableRootStack(
-                        screens: screens,
-                        navItems: allDestinations,
-                        selectedIndex: effectiveIndex,
-                      );
+                final Widget presetContent = _buildSwipeableRootStack(
+                  screens: screens,
+                  navItems: allDestinations,
+                  selectedIndex: effectiveIndex,
+                );
                 return _buildPresetNavigationShell(
                   mode: navMode,
                   theme: theme,
@@ -549,22 +523,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   (navMode == AppNavigationMode.compactRail ||
                       (navMode != AppNavigationMode.gestureTabs &&
                           (layoutMode == UILayoutMode.tabletDesktop || autoRail)));
-              Widget content = PageView(
-                controller: _pageController,
-                physics: navMode == AppNavigationMode.gestureTabs
-                    ? const BouncingScrollPhysics()
-                    : const PageScrollPhysics(),
-                onPageChanged: (idx) {
-                  if (idx >= 0 && idx < allDestinations.length &&
-                      (_currentIndex != idx ||
-                          _currentDestinationId != allDestinations[idx].id)) {
-                    setState(() {
-                      _currentIndex = idx;
-                      _currentDestinationId = allDestinations[idx].id;
-                    });
-                  }
-                },
-                children: screens,
+              Widget content = _buildSwipeableRootStack(
+                screens: screens,
+                navItems: allDestinations,
+                selectedIndex: effectiveIndex,
               );
               if (useRail) {
                 return _buildRailShell(
