@@ -327,10 +327,6 @@ class _LensAnchorPainter extends CustomPainter {
     );
     final unit = pose.headBounds.width * 0.9;
     _withFaceTransform(canvas, pose, origin, unit, () {
-      final paint = Paint()
-        ..color = lens.accentColor.withValues(alpha: 0.9 * opacity)
-        ..style = PaintingStyle.fill;
-
       void heart(Offset center, double scale, double alpha) {
         final path = Path()
           ..moveTo(center.dx, center.dy + 24 * scale)
