@@ -148,7 +148,7 @@ void main() {
   });
 
   group('HomePreferences Serialization and Defaults', () {
-    test('roundtrips all 43 fields through toMap and fromMap', () {
+    test('roundtrips all 44 fields through toMap and fromMap', () {
       const original = HomePreferences(
         homeStyle: 'Cards',
         enableStoriesStrip: true,
@@ -159,6 +159,7 @@ void main() {
         ghostMode: true,
         airplaneModeSimulator: true,
         showSearchBar: true,
+        searchPlacement: 'Above chat filters',
         showCameraIcon: true,
         showDesktopIcon: false,
         carouselView: true,
@@ -217,6 +218,7 @@ void main() {
       expect(restored.hideChatsDivider, original.hideChatsDivider);
       expect(restored.hideArchivedChats, original.hideArchivedChats);
       expect(restored.archiveChatsOnTop, original.archiveChatsOnTop);
+      expect(restored.searchPlacement, original.searchPlacement);
       expect(restored.screenTextSize, original.screenTextSize);
       expect(restored.rowTextColor, original.rowTextColor);
       expect(restored.rowContactNameColor, original.rowContactNameColor);
