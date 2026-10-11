@@ -57,22 +57,105 @@ class LockedChatsScreen extends StatefulWidget {
   State<LockedChatsScreen> createState() => _LockedChatsScreenState();
 }
 
-class _LockedChatsScreenState extends State<LockedChatsScreen> {
+class _LockedChatsScreenState extends State<LockedChatsScreen>
+    with WidgetsBindingObserver {
   final TextEditingController _secretWordCtrl = TextEditingController();
   late final LocalLockService _lockService;
   bool _hasSecretPhrase = false;
+  bool _vaultAuthorized = true;
+  bool _vaultAuthorizing = false;
+  bool _vaultDenied = false;
+  bool _appIsResumed = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _lockService = locator<LocalLockService>();
     _checkSecretPhrase();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _secretWordCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _reauthorizeVault() async {
+    if (_vaultAuthorizing || _vaultAuthorized || _vaultDenied) return;
+    _vaultAuthorizing = true;
+    bool authorized;
+    try {
+      authorized = await ProtectedResourceGate.authorizeGeneralAction(
+        context,
+        preferencesController: widget.preferencesController,
+        title: 'Locked & Hidden Chats',
+        reason: 'Re-authenticate to reveal your protected conversations',
+      );
+    } catch (_) {
+      authorized = false;
+    } finally {
+      _vaultAuthorizing = false;
+    }
+    if (!mounted) return;
+    if (!authorized) {
+      _vaultDenied = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            ModalRoute.of(context)?.isCurrent == true &&
+            Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+      });
+      return;
+    }
+    _vaultDenied = false;
+    setState(() => _vaultAuthorized = true);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_appIsResumed ||
+        _vaultAuthorized ||
+        _vaultAuthorizing ||
+        _vaultDenied) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted &&
+          _appIsResumed &&
+          !_vaultAuthorized &&
+          !_vaultAuthorizing &&
+          !_vaultDenied &&
+          ModalRoute.of(context)?.isCurrent == true) {
+        unawaited(_reauthorizeVault());
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _appIsResumed = false;
+      if (_vaultAuthorized) {
+        ProtectedResourceGate.invalidateAllSessions();
+        _vaultDenied = false;
+        setState(() => _vaultAuthorized = false);
+      }
+      return;
+    }
+    if (state == AppLifecycleState.resumed) {
+      _appIsResumed = true;
+      if (!_vaultAuthorized &&
+          !_vaultAuthorizing &&
+          !_vaultDenied &&
+          ModalRoute.of(context)?.isCurrent == true) {
+        unawaited(_reauthorizeVault());
+      }
+    }
   }
 
   Future<void> _checkSecretPhrase() async {
@@ -341,6 +424,27 @@ class _LockedChatsScreenState extends State<LockedChatsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = widget.themeController.globalTheme;
+    if (!_vaultAuthorized) {
+      return Scaffold(
+        backgroundColor: theme.backgroundColor,
+        appBar: AppBar(
+          backgroundColor: theme.backgroundColor,
+          foregroundColor: theme.primaryTextColor,
+          leading: const ChatyBackButton(),
+          title: const Text('Locked & Hidden Chats'),
+        ),
+        body: const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(strokeWidth: 2.2),
+              SizedBox(height: 14),
+              Text('Verifying vault access…'),
+            ],
+          ),
+        ),
+      );
+    }
     final security = widget.preferencesController.security;
 
     // Retrieve all conversations that are locked or hidden
