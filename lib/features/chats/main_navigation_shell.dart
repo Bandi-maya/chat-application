@@ -1908,7 +1908,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: numberController,
-                    autofocus: true,
+                    autofocus: false,
                     keyboardType: TextInputType.phone,
                     textAlign: TextAlign.center,
                     onChanged: (_) => setSheetState(() {}),
