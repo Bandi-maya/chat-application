@@ -5,8 +5,6 @@ import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/gb_design_system.dart';
 import '../../../ui/core/design_system/design_system.dart';
-import '../../../ui/core/theme/theme_config.dart';
-import '../../../ui/core/theme/theme_controller.dart';
 
 /// Header Settings Screen with pinned Live Preview at top matching Image 2 & 3.
 /// Changes to settings update the live preview above lively and in real time.
