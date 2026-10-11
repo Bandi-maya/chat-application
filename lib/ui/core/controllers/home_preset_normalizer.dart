@@ -9,11 +9,11 @@ abstract final class HomePresetNormalizer {
     'compact' || 'bubbles tab style' => 'Compact',
     'cards' || 'one ui' => 'Cards',
     'minimal' => 'Minimal',
-    'stories first' || 'stories-first' || 'ios style' => 'Stories First',
+    'stories first' || 'stories-first' || 'ios style' || 'instagram style' => 'Stories First',
     'expressive' => 'Expressive',
     'productivity' || 'basic tab style' => 'Productivity',
     'tablet split view' => 'Tablet Split View',
-    'whatsapp ui stock' => 'Chaty Default',
+    'whatsapp ui stock' || 'telegram style' => 'Chaty Default',
     // Navigation-shell presets also pick a matching home-list treatment.
     'whatsapp-style top bar' || 'whatsapp style top bar' => 'Classic',
     'floating rail' => 'Stories First',
@@ -35,13 +35,15 @@ abstract final class HomePresetNormalizer {
         'whatsapp old ui' ||
         'whatsapp-style top bar' ||
         'whatsapp style top bar' => AppNavigationMode.topWhatsAppBar,
-        'one ui' ||
-        'whatsapp ui stock' ||
-        'ios style' => AppNavigationMode.bottomNav,
+        'one ui' => AppNavigationMode.oneUi,
+        'whatsapp ui stock' => AppNavigationMode.bottomNav,
+        'ios style' => AppNavigationMode.iosStyle,
+        'instagram style' => AppNavigationMode.instagramStyle,
+        'telegram style' => AppNavigationMode.telegramStyle,
         'floating rail' => AppNavigationMode.floatingIslandRail,
         'modern side menu' => AppNavigationMode.modernSideMenu,
         'bubbles tab style' => AppNavigationMode.gestureTabs,
-        'basic tab style' => AppNavigationMode.compactRail,
+        'basic tab style' => AppNavigationMode.basicTabStyle,
         '3d perspective drawer' => AppNavigationMode.perspective3DDrawer,
         'curved radial menu' => AppNavigationMode.curvedRadialDrawer,
         _ => null,
