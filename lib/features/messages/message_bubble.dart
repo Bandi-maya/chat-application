@@ -2115,9 +2115,7 @@ class _SwipeToReplyContainerState extends State<_SwipeToReplyContainer>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: MediaQuery.disableAnimationsOf(context)
-                            ? Duration.zero
-                            : const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 200),
     );
     _animation = Tween<double>(
       begin: 0,
