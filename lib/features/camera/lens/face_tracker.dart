@@ -1,6 +1,6 @@
 import 'dart:ui' show Offset, Rect, Size;
 
-import 'package:flutter/foundation.dart' show immutable, visibleForTesting;
+import 'package:flutter/foundation.dart' show immutable;
 
 import 'lens_definition.dart';
 
@@ -48,7 +48,7 @@ class FaceAnchorSolver {
   /// (requirement 44): scale then offset, never stretch.
   List<FacePose> update({
     required int nowMs,
-    @visibleForTesting Map<int, RawFace>? rawFaces,
+    Map<int, RawFace>? rawFaces,
     bool mirrored = true,
     required Size imageExtent,
     required Rect previewCrop,
