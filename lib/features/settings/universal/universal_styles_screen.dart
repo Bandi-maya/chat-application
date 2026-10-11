@@ -367,9 +367,7 @@ class _UniversalStylesScreenState extends State<UniversalStylesScreen>
                                     ..showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                          'Launcher icon updated: ' +
-                                              variant.title +
-                                              '. Some launchers may cache the previous icon briefly.',
+                                          'Launcher icon updated: ${variant.title}. Some launchers may cache the previous icon briefly.',
                                         ),
                                       ),
                                     );
