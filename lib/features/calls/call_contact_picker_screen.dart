@@ -223,43 +223,65 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
           Row(
             children: [
               const Spacer(),
-              Material(
-                color: colors.success,
-                shape: const CircleBorder(),
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: () {
-                    final digits = _searchController.text.replaceAll(
-                      RegExp(r'[^0-9]'),
-                      '',
-                    );
-                    final matches = widget.dataStore.contacts.where((contact) {
-                      if (contact.id == widget.dataStore.currentUser.id) {
-                        return false;
-                      }
-                      final phoneDigits = contact.phone.replaceAll(
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [colors.success, Color.lerp(colors.success, Colors.black, 0.16)!],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colors.success.withValues(alpha: 0.28),
+                      blurRadius: 18,
+                      offset: const Offset(0, 7),
+                    ),
+                    const BoxShadow(
+                      color: Color(0x22FFFFFF),
+                      blurRadius: 1,
+                      offset: Offset(0, -1),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () {
+                      final digits = _searchController.text.replaceAll(
                         RegExp(r'[^0-9]'),
                         '',
                       );
-                      return digits.length >= 7 &&
-                          (phoneDigits == digits || phoneDigits.endsWith(digits));
-                    }).toList(growable: false);
-                    if (matches.length != 1) {
-                      ChatyToast.show(
-                        context,
-                        matches.isEmpty
-                            ? 'Enter a registered Chaty number to call.'
-                            : 'More than one contact matches. Choose the right contact below.',
-                        background: matches.isEmpty ? colors.error : colors.surfaceElevated,
-                      );
-                      return;
-                    }
-                    _startCall(matches.single, isVideo: false);
-                  },
-                  child: const SizedBox(
-                    width: 58,
-                    height: 58,
-                    child: Icon(Icons.call_rounded, color: Colors.white, size: 27),
+                      final matches = widget.dataStore.contacts.where((contact) {
+                        if (contact.id == widget.dataStore.currentUser.id) {
+                          return false;
+                        }
+                        final phoneDigits = contact.phone.replaceAll(
+                          RegExp(r'[^0-9]'),
+                          '',
+                        );
+                        return digits.length >= 7 &&
+                            (phoneDigits == digits || phoneDigits.endsWith(digits));
+                      }).toList(growable: false);
+                      if (matches.length != 1) {
+                        ChatyToast.show(
+                          context,
+                          matches.isEmpty
+                              ? 'Enter a registered Chaty number to call.'
+                              : 'More than one contact matches. Choose the right contact below.',
+                          background: matches.isEmpty ? colors.error : colors.surfaceElevated,
+                        );
+                        return;
+                      }
+                      _startCall(matches.single, isVideo: false);
+                    },
+                    child: const SizedBox(
+                      width: 62,
+                      height: 62,
+                      child: Icon(Icons.call_rounded, color: Colors.white, size: 28),
+                    ),
                   ),
                 ),
               ),
