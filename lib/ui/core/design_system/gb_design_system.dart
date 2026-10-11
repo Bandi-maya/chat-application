@@ -1000,7 +1000,13 @@ class GbLiveHeaderPreview extends StatelessWidget {
   final String homeStyle;
   final String tabBubbleStyle;
   final String pagerTransition3d;
+  final String searchPlacement;
   final VoidCallback onThreeDotsClick;
+
+  bool get _showHeaderSearch =>
+      _showHeaderSearch && searchPlacement.trim().toLowerCase() == 'header action';
+  bool get _showInlineSearch =>
+      _showHeaderSearch && !_showHeaderSearch;
 
   const GbLiveHeaderPreview({
     super.key,
@@ -1013,6 +1019,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
     required this.homeStyle,
     this.tabBubbleStyle = 'Capsule Pill',
     this.pagerTransition3d = 'Cube 3D',
+    this.searchPlacement = 'Header action',
     required this.onThreeDotsClick,
   });
 
@@ -1112,6 +1119,14 @@ class GbLiveHeaderPreview extends StatelessWidget {
           else
             _buildBasicHeader(title),
 
+          // Search placement is previewed in the same position as the live Chats screen.
+          if (_showInlineSearch &&
+              searchPlacement.trim().toLowerCase() == 'below header')
+            _buildSearchPlacementPreview(),
+          if (_showInlineSearch &&
+              searchPlacement.trim().toLowerCase() == 'above chat filters')
+            _buildSearchAboveFiltersPreview(),
+
           // 2. LIVE SAMPLE CHAT ROW (Tyler Durden)
           _buildSampleChatRow(),
 
@@ -1145,6 +1160,72 @@ class GbLiveHeaderPreview extends StatelessWidget {
     );
   }
 
+  Widget _buildSearchPlacementPreview() => Padding(
+    padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+    child: Container(
+      height: 30,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: _liveTheme.cardColor,
+        border: Border.all(
+          color: _liveTheme.secondaryTextColor.withValues(alpha: 0.24),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.search_rounded, color: _liveTheme.secondaryTextColor, size: 15),
+          const SizedBox(width: 7),
+          Text(
+            'Search chats',
+            style: TextStyle(color: _liveTheme.secondaryTextColor, fontSize: 11),
+          ),
+          const Spacer(),
+          Icon(Icons.tune_rounded, color: _liveTheme.secondaryTextColor, size: 14),
+        ],
+      ),
+    ),
+  );
+
+  Widget _buildSearchAboveFiltersPreview() => Padding(
+    padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+    child: Column(
+      children: [
+        _buildSearchPlacementPreview(),
+        Row(
+          children: [
+            for (final tag in const <String>['All', 'Unread', 'Groups'])
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: tag == 'All'
+                        ? _liveTheme.accentColor.withValues(alpha: 0.14)
+                        : _liveTheme.cardColor,
+                    border: Border.all(
+                      color: tag == 'All'
+                          ? _liveTheme.accentColor.withValues(alpha: 0.45)
+                          : _liveTheme.secondaryTextColor.withValues(alpha: 0.18),
+                    ),
+                  ),
+                  child: Text(
+                    tag,
+                    style: TextStyle(
+                      color: tag == 'All'
+                          ? _liveTheme.accentColor
+                          : _liveTheme.secondaryTextColor,
+                      fontSize: 9,
+                      fontWeight: tag == 'All' ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
+    ),
+  );
+
   // Each preview below mirrors the selected layout's hierarchy while using
   // the same live theme tokens as the real application shell.
   Widget _buildInstagramHeader(String title) {
@@ -1163,7 +1244,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
               ),
             ),
           ),
-          if (!disableSearchBar)
+          if (_showHeaderSearch)
             Icon(Icons.search_rounded, color: _liveTheme.primaryTextColor, size: 21),
           SizedBox(width: 12),
           Icon(Icons.favorite_border_rounded, color: _liveTheme.primaryTextColor, size: 21),
@@ -1197,7 +1278,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
                   ),
                 ),
               ),
-              if (!disableSearchBar)
+              if (_showHeaderSearch)
                 Icon(Icons.search_rounded, color: _liveTheme.secondaryTextColor, size: 21),
               SizedBox(width: 12),
               GestureDetector(
@@ -1207,7 +1288,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
             ],
           ),
           SizedBox(height: 8),
-          if (!disableSearchBar)
+          if (_showHeaderSearch)
             Container(
               height: 30,
               padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -1484,7 +1565,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              if (!disableSearchBar)
+              if (_showHeaderSearch)
                 IconButton(
                   icon: Icon(Icons.search_rounded, color: _liveTheme.primaryTextColor, size: 21),
                   onPressed: () {},
@@ -1578,7 +1659,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
               letterSpacing: -0.5,
             ),
           ),
-          if (!disableSearchBar) ...[
+          if (_showHeaderSearch) ...[
             SizedBox(height: 8),
             Container(
               height: 32,
@@ -1622,7 +1703,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
           Spacer(),
           Icon(Icons.camera_alt_outlined, color: _liveTheme.primaryTextColor, size: 21),
           SizedBox(width: 14),
-          if (!disableSearchBar) ...[
+          if (_showHeaderSearch) ...[
             Icon(Icons.search_rounded, color: _liveTheme.primaryTextColor, size: 21),
             SizedBox(width: 14),
           ],
@@ -1653,7 +1734,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
                 ),
               ),
               Spacer(),
-              if (!disableSearchBar)
+              if (_showHeaderSearch)
                 Icon(Icons.search_rounded, color: _liveTheme.primaryTextColor, size: 20),
               SizedBox(width: 12),
               GestureDetector(
@@ -1700,7 +1781,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
                   ),
                 ),
                 Spacer(),
-                if (!disableSearchBar) ...[
+                if (_showHeaderSearch) ...[
                   Icon(Icons.search, color: _liveTheme.primaryTextColor, size: 21),
                   SizedBox(width: 14),
                 ],
@@ -1750,7 +1831,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
                 style: TextStyle(color: _liveTheme.primaryTextColor, fontSize: 18, fontWeight: FontWeight.bold),
               ),
               Spacer(),
-              if (!disableSearchBar) ...[
+              if (_showHeaderSearch) ...[
                 Icon(Icons.search, color: _liveTheme.primaryTextColor, size: 20),
                 SizedBox(width: 12),
               ],
