@@ -168,30 +168,9 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: TabBar(
-                controller: _tabController,
-                indicatorSize: TabBarIndicatorSize.tab,
-                dividerColor: Colors.transparent,
-                labelColor: headerIconsColor,
-                unselectedLabelColor: headerIconsColor?.withValues(alpha: 0.6),
-                tabs: const [
-                  Tab(
-                    icon: Icon(Icons.emoji_emotions_outlined),
-                    text: 'Emojis',
-                  ),
-                ],
-              ),
-            ),
           const SizedBox(height: 8),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildCombinedEmojiPicker(context, height),
-              ],
-            ),
+            child: _buildCombinedEmojiPicker(context, height),
           ),
         ],
       ),
