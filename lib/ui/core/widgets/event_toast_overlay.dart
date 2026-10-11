@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../data/services/notification_service.dart';
 import '../controllers/preferences_controller.dart';
 import '../theme/app_theme.dart';
+import '../notifications/notification_icon_preset.dart';
 
 class ChatyEventToastOverlay extends StatefulWidget {
   final ChatyNotificationService notificationService;
@@ -121,6 +122,9 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
     // padding scales with accessibility text scale, and the max width never
     // exceeds the screen.
     final prefs = widget.preferencesController;
+    final notificationIconPreset = ChatyNotificationIconPresets.forName(
+      prefs.universal.notificationIcon,
+    );
     final avatarSize = prefs
         .gbDouble('toast_avatar_size', fallback: 40)
         .clamp(24.0, 56.0);
@@ -188,33 +192,66 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
                                           .notification
                                           .showSenderAvatar &&
                                       notification.avatarInitials != null) ...[
-                                    CircleAvatar(
-                                      radius: avatarSize / 2,
-                                      backgroundColor: _avatarColor(
-                                        notification,
-                                      ),
-                                      foregroundColor: context.colors.onPrimary,
-                                      child: Text(
-                                        notification.avatarInitials!,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 12,
+                                    Stack(
+                                      clipBehavior: Clip.none,
+                                      children: [
+                                        CircleAvatar(
+                                          radius: avatarSize / 2,
+                                          backgroundColor: _avatarColor(
+                                            notification,
+                                          ),
+                                          foregroundColor: context.colors.onPrimary,
+                                          child: Text(
+                                            notification.avatarInitials!,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 12,
+                                            ),
+                                          ),
                                         ),
-                                      ),
+                                        Positioned(
+                                          right: -2,
+                                          bottom: -2,
+                                          child: Container(
+                                            width: 19,
+                                            height: 19,
+                                            decoration: BoxDecoration(
+                                              color: notificationIconPreset.color
+                                                          .computeLuminance() >
+                                                      0.86
+                                                  ? context.colors.foreground
+                                                  : context.colors.surfaceElevated,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: context.colors.surface,
+                                                width: 1.2,
+                                              ),
+                                            ),
+                                            child: Icon(
+                                              notificationIconPreset.icon,
+                                              color: notificationIconPreset.color,
+                                              size: 11,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ] else
                                     Container(
                                       width: avatarSize,
                                       height: avatarSize,
                                       decoration: BoxDecoration(
-                                        color: notification.color.withValues(
-                                          alpha: 0.14,
-                                        ),
+                                        color: notificationIconPreset.color
+                                                    .computeLuminance() >
+                                                0.86
+                                            ? context.colors.foreground
+                                            : notificationIconPreset.color
+                                                .withValues(alpha: 0.14),
                                         shape: BoxShape.circle,
                                       ),
                                       child: Icon(
-                                        notification.icon,
-                                        color: notification.color,
+                                        notificationIconPreset.icon,
+                                        color: notificationIconPreset.color,
                                         size: 21,
                                       ),
                                     ),
