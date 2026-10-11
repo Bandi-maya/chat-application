@@ -56,6 +56,14 @@ jobs:
           --dart-define="SUPABASE_URL=${SUPABASE_URL}"
           --dart-define="SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}"
 
+      - name: Upload installable Android debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: chaty-dynamic-island-android-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Launch app and check first-frame runtime
         uses: reactivecircus/android-emulator-runner@v2
         with:
