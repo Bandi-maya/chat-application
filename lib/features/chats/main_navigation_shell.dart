@@ -184,6 +184,15 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         final separateGroups =
             preferencesController.home.separateChatsAndGroups;
         final showDesktopIcon = preferencesController.home.showDesktopIcon;
+        final homeNavMode =
+            HomePresetNormalizer.navigationMode(
+              preferencesController.home.homeStyle,
+            ) ??
+            themeController.navigationMode;
+        // Filled after the destination catalog is resolved and before screen
+        // widgets are built, so the legacy WhatsApp tabs can live under the
+        // Chats/Groups header rather than preceding it.
+        Widget? homeHeaderBottomWidget;
 
         // Base candidate destinations
         final destinationCatalog = <_NavDestinationItem>[
@@ -200,6 +209,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               notificationService: notificationService,
               forcedType: separateGroups ? ConversationType.direct : null,
               pageTitle: separateGroups ? 'Chats' : null,
+              headerBottomWidget: homeHeaderBottomWidget,
             ),
           ),
           if (separateGroups || templateController.hasCustomNavigationDestinations)
@@ -216,6 +226,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 notificationService: notificationService,
                 forcedType: ConversationType.group,
                 pageTitle: 'Groups',
+                headerBottomWidget: homeHeaderBottomWidget,
               ),
             ),
           _NavDestinationItem(
@@ -337,6 +348,13 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             ),
         ];
 
+        if (homeNavMode == AppNavigationMode.topWhatsAppBar) {
+          homeHeaderBottomWidget = _buildTopWhatsAppTabs(
+            theme: theme,
+            navigationTemplate: navigationTemplate,
+            navItems: allDestinations,
+          );
+        }
         final List<Widget> screens = allDestinations
             .map((item) => item.builder(context))
             .toList(growable: false);
@@ -395,11 +413,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               // The Home UI selection is persisted with user preferences.
               // Resolve it before the template-owned fallback so the chosen
               // shell survives startup template synchronization and app restart.
-              final navMode =
-                  HomePresetNormalizer.navigationMode(
-                    preferencesController.home.homeStyle,
-                  ) ??
-                  themeController.navigationMode;
+              final navMode = homeNavMode;
 
               // 1. TOP WHATSAPP-STYLE GREEN TAB BAR (Image 1)
               if (navMode == AppNavigationMode.topWhatsAppBar) {
@@ -656,63 +670,82 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     required int selectedIndex,
   }) {
     final colors = context.colors;
-    final brandPrimary = theme.accentColor as Color;
-    final indicatorColor = colors.onPrimary;
+    final activeIndex = navItems.isEmpty
+        ? 0
+        : selectedIndex.clamp(0, navItems.length - 1).toInt();
+    final activeId = navItems.isEmpty ? '' : navItems[activeIndex].id;
+    // On the Chats/Groups Home, the child places this bar immediately after
+    // its own header. Other root destinations retain a reachable top tab bar.
+    final tabsBelongUnderHomeHeader = activeId == 'chats' || activeId == 'groups';
 
     return DefaultTabController(
-      key: ValueKey<int>(selectedIndex),
+      key: ValueKey<int>(activeIndex),
       length: navItems.length,
-      initialIndex: selectedIndex,
+      initialIndex: activeIndex,
       child: Scaffold(
         backgroundColor: theme.backgroundColor,
         floatingActionButton: _buildContextualFab(
           context: context,
           theme: theme,
           colors: colors,
-          accent: brandPrimary,
-          activeItem: navItems[selectedIndex],
+          accent: theme.accentColor as Color,
+          activeItem: navItems[activeIndex],
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         body: SafeArea(
           bottom: false,
           child: Column(
             children: [
-              Container(
-                height: navigationTemplate.height.clamp(48.0, 88.0).toDouble(),
-                color: brandPrimary,
-                child: TabBar(
-                  isScrollable: navItems.length > 4,
-                  indicatorColor: indicatorColor,
-                  indicatorWeight: 3.5,
-                  labelColor: colors.onPrimary,
-                  unselectedLabelColor: colors.onPrimary.withValues(
-                    alpha: 0.72,
-                  ),
-                  labelStyle: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    letterSpacing: 0.2,
-                  ),
-                  unselectedLabelStyle: const TextStyle(
-                    fontWeight: FontWeight.w500,
-                    fontSize: 14,
-                  ),
-                  tabs: navItems.map((item) => Tab(text: item.label)).toList(),
-                  onTap: (idx) => _selectRootDestination(
-                    idx,
-                    destinationId: navItems[idx].id,
-                  ),
+              if (!tabsBelongUnderHomeHeader)
+                _buildTopWhatsAppTabs(
+                  theme: theme,
+                  navigationTemplate: navigationTemplate,
+                  navItems: navItems,
                 ),
-              ),
               Expanded(
                 child: _buildSwipeableRootStack(
-        screens: screens,
-        navItems: navItems,
-        selectedIndex: selectedIndex,
-      ),
+                  screens: screens,
+                  navItems: navItems,
+                  selectedIndex: activeIndex,
+                ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopWhatsAppTabs({
+    required dynamic theme,
+    required NavigationTemplate navigationTemplate,
+    required List<_NavDestinationItem> navItems,
+  }) {
+    final colors = context.colors;
+    final brandPrimary = theme.accentColor as Color;
+    final indicatorColor = colors.onPrimary;
+    return Container(
+      height: navigationTemplate.height.clamp(48.0, 88.0).toDouble(),
+      color: brandPrimary,
+      child: TabBar(
+        isScrollable: navItems.length > 4,
+        indicatorColor: indicatorColor,
+        indicatorWeight: 3.5,
+        labelColor: colors.onPrimary,
+        unselectedLabelColor: colors.onPrimary.withValues(alpha: 0.72),
+        labelStyle: const TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 14,
+          letterSpacing: 0.2,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.w500,
+          fontSize: 14,
+        ),
+        tabs: navItems.map((item) => Tab(text: item.label)).toList(),
+        onTap: (idx) => _selectRootDestination(
+          idx,
+          destinationId: navItems[idx].id,
         ),
       ),
     );
