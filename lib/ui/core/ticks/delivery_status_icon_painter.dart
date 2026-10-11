@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../domain/models/chat_message.dart';
 import 'delivery_icon_style.dart';
 
-/// Renders vectorized status icons for all 16 tick styles and real message delivery states.
+/// Renders vectorized status icons for every selectable tick style and preserves real delivery states.
 class DeliveryStatusIconPainter extends CustomPainter {
   final DeliveryIconStyle style;
   final DeliveryState state;
