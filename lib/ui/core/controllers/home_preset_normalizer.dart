@@ -29,9 +29,11 @@ abstract final class HomePresetNormalizer {
   /// they do not accidentally override a navigation style chosen elsewhere.
   static AppNavigationMode? navigationMode(String value) =>
       switch (value.trim().toLowerCase()) {
-        'one ui' || 'modern side menu' => AppNavigationMode.modernSideMenu,
+        'one ui' => AppNavigationMode.bottomNav,
         'whatsapp ui stock' => AppNavigationMode.bottomNav,
-        'ios style' || 'floating rail' => AppNavigationMode.floatingIslandRail,
+        'ios style' => AppNavigationMode.bottomNav,
+        'floating rail' => AppNavigationMode.floatingIslandRail,
+        'modern side menu' => AppNavigationMode.modernSideMenu,
         'bubbles tab style' => AppNavigationMode.gestureTabs,
         'basic tab style' => AppNavigationMode.compactRail,
         'whatsapp old ui' ||
