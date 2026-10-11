@@ -135,7 +135,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen>
         await video.initialize();
         await video.setLooping(false);
       }
-      if (!mounted) {
+      if (!mounted || !_authorized) {
         await video?.dispose();
         return;
       }
