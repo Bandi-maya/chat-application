@@ -100,7 +100,8 @@ internal object IslandOverlay {
     private var latestIcon = "●"
     private var latestPackage = ""
     private var latestCall = false
-    private var latestPendingIntent: PendingIntent? = null\n    private var latestActions: List<IslandAction> = emptyList()
+    private var latestPendingIntent: PendingIntent? = null
+    private var latestActions: List<IslandAction> = emptyList()
 
     fun show(
         context: Context,
@@ -119,7 +120,9 @@ internal object IslandOverlay {
         latestIcon = icon
         latestPackage = packageName
         latestCall = isCall
-        latestPendingIntent = pendingIntent\n        latestActions = actions\n        expanded = false
+        latestPendingIntent = pendingIntent
+        latestActions = actions
+        expanded = false
         dismissRunnable?.let(main::removeCallbacks)
         windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         render(context)
