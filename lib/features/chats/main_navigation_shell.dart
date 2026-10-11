@@ -42,8 +42,6 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   int _currentIndex = 0;
   String _currentDestinationId = 'chats';
   DateTime? _lastExitAttempt;
-  Offset? _rootSwipeStart;
-  int? _rootSwipePointer;
   late final PageController _pageController;
 
   @override
@@ -58,59 +56,37 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     super.dispose();
   }
 
-  /// Tracks raw touch movement above every root destination, independently of
-  /// child gesture recognizers, so all shell styles share the same direction.
+  /// A shared swipeable page host for every navigation style. PageView owns
+  /// horizontal gesture arbitration (so story strips and other child scrollers
+  /// still work), while keep-alive wrappers preserve state on inactive screens.
   Widget _buildSwipeableRootStack({
     required List<Widget> screens,
     required List<_NavDestinationItem> navItems,
     required int selectedIndex,
   }) {
-    return Listener(
-      behavior: HitTestBehavior.translucent,
-      onPointerDown: _recordRootPointerDown,
-      onPointerUp: (event) => _handleRootPointerUp(event, navItems),
-      onPointerCancel: _recordRootPointerCancel,
-      child: IndexedStack(index: selectedIndex, children: screens),
-    );
-  }
-
-  void _recordRootPointerDown(PointerDownEvent event) {
-    if (event.kind != PointerDeviceKind.touch || _rootSwipePointer != null) {
-      return;
-    }
-    _rootSwipePointer = event.pointer;
-    _rootSwipeStart = event.position;
-  }
-
-  void _recordRootPointerCancel(PointerCancelEvent event) {
-    if (event.pointer == _rootSwipePointer) {
-      _rootSwipePointer = null;
-      _rootSwipeStart = null;
-    }
-  }
-
-  void _handleRootPointerUp(
-    PointerUpEvent event,
-    List<_NavDestinationItem> navItems,
-  ) {
-    if (event.pointer != _rootSwipePointer) return;
-    final start = _rootSwipeStart;
-    _rootSwipePointer = null;
-    _rootSwipeStart = null;
-    if (start == null) return;
-
-    final delta = event.position - start;
-    // Ignore taps, vertical scrolling, and diagonal drags.
-    if (delta.dx.abs() < 78 || delta.dx.abs() < delta.dy.abs() * 1.3) {
-      return;
-    }
-
-    // Requested direction: left -> right advances; right -> left goes back.
-    final nextIndex = _currentIndex + (delta.dx > 0 ? 1 : -1);
-    if (nextIndex < 0 || nextIndex >= navItems.length) return;
-    _selectRootDestination(
-      nextIndex,
-      destinationId: navItems[nextIndex].id,
+    return PageView(
+      controller: _pageController,
+      physics: const PageScrollPhysics(),
+      onPageChanged: (index) {
+        if (index < 0 || index >= navItems.length) return;
+        if (_currentIndex == index &&
+            _currentDestinationId == navItems[index].id) {
+          return;
+        }
+        setState(() {
+          _currentIndex = index;
+          _currentDestinationId = navItems[index].id;
+        });
+      },
+      children: List<Widget>.generate(screens.length, (index) {
+        final destinationId = index < navItems.length
+            ? navItems[index].id
+            : 'destination-$index';
+        return _NavigationKeepAlive(
+          key: ValueKey<String>(destinationId),
+          child: screens[index],
+        );
+      }, growable: false),
     );
   }
 
@@ -432,7 +408,6 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   theme: theme,
                   content: PageView(
                     controller: _pageController,
-                        reverse: true,
                     onPageChanged: (idx) {
                       if (idx >= 0 && idx < allDestinations.length &&
                           (_currentIndex != idx ||
@@ -524,7 +499,6 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 final Widget presetContent = navMode == AppNavigationMode.gestureTabs
                     ? PageView(
                         controller: _pageController,
-                        reverse: true,
                         physics: const BouncingScrollPhysics(),
                         onPageChanged: (idx) {
                           if (idx >= 0 &&
@@ -577,7 +551,6 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                           (layoutMode == UILayoutMode.tabletDesktop || autoRail)));
               Widget content = PageView(
                 controller: _pageController,
-                        reverse: true,
                 physics: navMode == AppNavigationMode.gestureTabs
                     ? const BouncingScrollPhysics()
                     : const PageScrollPhysics(),
