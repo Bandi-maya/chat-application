@@ -719,8 +719,8 @@ class _VoiceNoteRecorderSheetState extends State<_VoiceNoteRecorderSheet> {
           const SizedBox(height: 18),
           AnimatedContainer(
             duration: MediaQuery.disableAnimationsOf(context)
-                            ? Duration.zero
-                            : const Duration(milliseconds: 180),
+                ? Duration.zero
+                : const Duration(milliseconds: 180),
             width: 78,
             height: 78,
             decoration: BoxDecoration(
