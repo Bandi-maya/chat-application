@@ -202,7 +202,7 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
       enableAudio: false,
       imageFormatGroup: Platform.isIOS
           ? ImageFormatGroup.bgra8888
-          : ImageFormatGroup.nv21,
+          : ImageFormatGroup.yuv420,
     );
     try {
       await controller.initialize();
