@@ -96,10 +96,10 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> wit
     );
     try {
       await _dynamicIslandChannel.invokeMethod<bool>('setEnabled', {'enabled': value});
-      if (value && mounted && (!_notificationAccessGranted || !_overlayPermissionGranted)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Grant Notification access and Display over other apps below to activate system-wide notifications.')),
-        );
+      if (value && mounted && !_notificationAccessGranted) {
+        await _openDynamicIslandPermission(notificationAccess: true);
+      } else if (value && mounted && !_overlayPermissionGranted) {
+        await _openDynamicIslandPermission(notificationAccess: false);
       }
     } on PlatformException catch (_) {
       // Keep the in-app island functional where native Android overlay APIs are unavailable.
