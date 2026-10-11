@@ -25,6 +25,20 @@ void main() {
     }
   });
 
+  test('feature navigation and swipe-to-reply controllers honor reduced motion', () {
+    final navigation = File(
+      'lib/features/chats/main_navigation_shell.dart',
+    ).readAsStringSync();
+    final messageBubble = File(
+      'lib/features/messages/message_bubble.dart',
+    ).readAsStringSync();
+
+    expect(navigation, contains('_ctrl.duration = MediaQuery.disableAnimationsOf(context)'));
+    expect(messageBubble, contains('_controller.duration = MediaQuery.disableAnimationsOf(context)'));
+    expect(navigation, contains('duration: MediaQuery.disableAnimationsOf(context)'));
+    expect(messageBubble, contains('duration: MediaQuery.disableAnimationsOf(context)'));
+  });
+
   test('skeleton shimmer stops and resumes when reduced-motion preference changes', () {
     final source = File(
       'lib/ui/core/design_system/components/app_components.dart',
