@@ -25,8 +25,8 @@ abstract final class HomePresetNormalizer {
 
   /// Resolves the selected Home UI label to the runtime shell mode.
   ///
-  /// Returns null for list-only presets such as Classic, Compact, or Cards so
-  /// they do not accidentally override a navigation style chosen elsewhere.
+  /// Returns null for ambiguous presets such as Expressive, which can represent
+  /// more than one navigation layout. The caller then preserves the runtime mode.
   static AppNavigationMode? navigationMode(String value) =>
       switch (value.trim().toLowerCase()) {
         // Older persisted HomePresetNormalizer names may already be canonical.
