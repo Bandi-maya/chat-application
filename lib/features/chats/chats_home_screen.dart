@@ -1982,8 +1982,12 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
   }) {
     final homePrefs = widget.preferencesController.home;
     final chatListTemplate = locator<TemplateController>().chatList;
+    final rawHomeUiStyle = homePrefs.homeStyle.trim().toLowerCase();
+    final isInstagramRows = rawHomeUiStyle == 'instagram style';
+    final isTelegramRows = rawHomeUiStyle == 'telegram style';
     final cardRows =
-        HomePresetNormalizer.homeStyle(homePrefs.homeStyle) == 'Cards';
+        HomePresetNormalizer.homeStyle(homePrefs.homeStyle) == 'Cards' ||
+        isInstagramRows;
     final effectiveDensity = density * switch (chatListTemplate.density) {
       ChatListDensity.compact => 0.92,
       ChatListDensity.regular => 1.0,
@@ -2056,10 +2060,16 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
             ? theme.accentColor.withValues(
                 alpha: theme.brightness == Brightness.dark ? 0.16 : 0.10,
               )
-            : conversation.isPinned || cardRows
+            : cardRows
+            ? theme.cardColor
+            : isTelegramRows
+            ? theme.cardColor.withValues(
+                alpha: theme.brightness == Brightness.dark ? 0.68 : 0.58,
+              )
+            : conversation.isPinned
             ? theme.cardColor
             : Colors.transparent,
-        borderRadius: BorderRadius.circular(cardRows ? 18 : 16),
+        borderRadius: BorderRadius.circular(cardRows ? 18 : isTelegramRows ? 12 : 16),
         child: Builder(
           builder: (tileContext) {
             void handleLongPress() {
