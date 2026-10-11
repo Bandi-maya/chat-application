@@ -1,7 +1,9 @@
 package com.example.chat
 
 import android.app.Notification
-import android.app.NotificationManager
+import android.app.KeyguardManager
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
@@ -42,8 +44,11 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
                 (notification.category == Notification.CATEGORY_CALL ||
                     title.contains("call", ignoreCase = true)))
         val icon = if (isCall) "☎" else "●"
-        val safeTitle = if (title.isBlank()) appLabel(sbn.packageName) else title
-        val safeBody = if (body.isBlank()) (if (isCall) "Call notification" else "New notification") else body
+        val keyguard = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        val locked = keyguard.isKeyguardLocked
+        val safeTitle = if (locked) "New notification" else if (title.isBlank()) appLabel(sbn.packageName) else title
+        val safeBody = if (locked) "Unlock your phone to view details"
+            else if (body.isBlank()) (if (isCall) "Call notification" else "New notification") else body
         val pendingIntent = notification.contentIntent
         Handler(Looper.getMainLooper()).post {
             IslandOverlay.show(
@@ -260,6 +265,9 @@ internal object IslandOverlay {
     }
 
     fun preview(context: Context) {
+        val tone = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 70)
+        tone.startTone(ToneGenerator.TONE_PROP_BEEP, 180)
+        main.postDelayed({ tone.release() }, 250)
         show(context, "Chaty Dynamic Island", "Preview notification · Tap to expand", "✦", context.packageName, false, null, emptyList())
     }
 
