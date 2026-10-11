@@ -40,7 +40,7 @@ class LockedChatsScreen extends StatefulWidget {
           reason: 'Authenticate to access your locked conversations',
         );
 
-    if (authorized && context.mounted)
+    if (authorized && context.mounted) {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => LockedChatsScreen(
