@@ -39,6 +39,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
   bool _isSearching = false;
   bool _isOpeningChat = false;
   Timer? _debounce;
+  Timer? _secretCodeDebounce;
   final SearchRequestGuard _requestGuard = SearchRequestGuard();
 
   @override
@@ -50,6 +51,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _secretCodeDebounce?.cancel();
     _searchController.removeListener(_queueSearch);
     _searchController.dispose();
     super.dispose();
