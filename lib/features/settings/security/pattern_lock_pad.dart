@@ -88,7 +88,8 @@ class PatternLockPadState extends State<PatternLockPad> {
     final muted = theme.colorScheme.onSurface.withValues(alpha: 0.35);
 
     return Semantics(
-      label: 'Pattern lock grid ${widget.gridSize == 4 ? 4 : 3} by ${widget.gridSize == 4 ? 4 : 3}',
+      label:
+          'Pattern lock grid ${widget.gridSize == 4 ? 4 : 3} by ${widget.gridSize == 4 ? 4 : 3}',
       child: SizedBox.square(
         dimension: widget.size,
         child: LayoutBuilder(
@@ -211,7 +212,11 @@ class _PatternPainter extends CustomPainter {
         final centerDot = Paint()
           ..color = (!hideTrace) ? activeColor : inactiveColor
           ..style = PaintingStyle.fill;
-        canvas.drawCircle(centers[index], (!hideTrace) ? dotRadius * 1.45 : dotRadius, centerDot);
+        canvas.drawCircle(
+          centers[index],
+          (!hideTrace) ? dotRadius * 1.45 : dotRadius,
+          centerDot,
+        );
 
         if (!hideTrace) {
           final centerCore = Paint()
