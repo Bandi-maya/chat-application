@@ -988,6 +988,9 @@ class GbLivePreviewCard extends StatelessWidget {
 /// Lively reflects chosen Home UI Style ('ONE UI', 'WhatsApp UI Stock', 'IOS STYLE', 'BUBBLES TAB STYLE', 'BASIC TAB STYLE', 'WhatsApp OLD UI'),
 /// Tab Bubble Styles, 3D Transition effects, Search Bar, Groups separation, and corresponding Bottom Navigation design.
 class GbLiveHeaderPreview extends StatelessWidget {
+  // Always resolve preview colors from the active application-wide theme.
+  dynamic get _liveTheme => locator<ThemeController>().globalTheme;
+
   final String displayName;
   final String statusText;
   final bool setMyName;
@@ -1020,18 +1023,25 @@ class GbLiveHeaderPreview extends StatelessWidget {
     final isIos = homeStyle == 'IOS STYLE';
     final isStock = homeStyle == 'WhatsApp UI Stock';
     final isBubbles = homeStyle == 'BUBBLES TAB STYLE';
+    final isBasicTabs = homeStyle == 'BASIC TAB STYLE';
+    final isInstagram = homeStyle == 'Instagram Style';
+    final isTelegram = homeStyle == 'Telegram Style';
+    final isFloatingRail = homeStyle == 'Floating Rail';
+    final isPerspectiveDrawer = homeStyle == '3D Perspective Drawer';
+    final isModernDrawer = homeStyle == 'Modern Side Menu';
+    final isCurvedRadial = homeStyle == 'Curved Radial Menu';
     final isOldUi = homeStyle == 'WhatsApp OLD UI';
 
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFF0C1014),
+        color: const _liveTheme.backgroundColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: GbColors.borderSubtle, width: 1.2),
+        border: Border.all(color: _liveTheme.cardColor, width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.4),
+            color: _liveTheme.backgroundColor.withValues(alpha: 0.4),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -1044,32 +1054,32 @@ class GbLiveHeaderPreview extends StatelessWidget {
           // Mode Indicator Header Bar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            color: const Color(0xFF161E24),
+            color: const _liveTheme.surfaceColor,
             child: Row(
               children: [
                 Container(
                   width: 8,
                   height: 8,
-                  decoration: const BoxDecoration(
-                    color: GbColors.activeGreen,
+                  decoration: BoxDecoration(
+                    color: _liveTheme.accentColor,
                     shape: BoxShape.circle,
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Text(
                   'LIVE PREVIEW • $homeStyle',
-                  style: const TextStyle(
-                    color: GbColors.activeGreen,
+                  style: TextStyle(
+                    color: _liveTheme.accentColor,
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.6,
                   ),
                 ),
-                const Spacer(),
+                Spacer(),
                 Text(
                   '3D: $pagerTransition3d',
-                  style: const TextStyle(
-                    color: Color(0xFF8696A0),
+                  style: TextStyle(
+                    color: _liveTheme.secondaryTextColor,
                     fontSize: 10.5,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1089,6 +1099,16 @@ class GbLiveHeaderPreview extends StatelessWidget {
             _buildBubblesHeader(title)
           else if (isOldUi)
             _buildOldUiHeader(title)
+          else if (isInstagram)
+            _buildInstagramHeader(title)
+          else if (isTelegram)
+            _buildTelegramHeader(title)
+          else if (isCurvedRadial)
+            _buildCurvedRadialHeader(title)
+          else if (isFloatingRail)
+            _buildFloatingRailHeader(title)
+          else if (isPerspectiveDrawer || isModernDrawer)
+            _buildDrawerHeader(title)
           else
             _buildBasicHeader(title),
 
@@ -1106,8 +1126,335 @@ class GbLiveHeaderPreview extends StatelessWidget {
             _buildBubblesBottomBar()
           else if (isOldUi)
             _buildOldUiBottomBar()
+          else if (isInstagram)
+            _buildInstagramBottomBar()
+          else if (isTelegram)
+            _buildTelegramBottomBar()
+          else if (isBasicTabs)
+            _buildBasicBottomBar()
+          else if (isFloatingRail)
+            _buildFloatingRailBottomBar()
+          else if (isCurvedRadial)
+            _buildCurvedRadialBottomBar()
+          else if (isPerspectiveDrawer || isModernDrawer)
+            _buildDrawerBottomBar()
           else
             _buildBasicBottomBar(),
+        ],
+      ),
+    );
+  }
+
+  // Each preview below mirrors the selected layout's hierarchy while using
+  // the same live theme tokens as the real application shell.
+  Widget _buildInstagramHeader(String title) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 9),
+      color: _liveTheme.backgroundColor,
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                color: _liveTheme.primaryTextColor,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          if (!disableSearchBar)
+            Icon(Icons.search_rounded, color: _liveTheme.primaryTextColor, size: 21),
+          SizedBox(width: 12),
+          Icon(Icons.favorite_border_rounded, color: _liveTheme.primaryTextColor, size: 21),
+          SizedBox(width: 10),
+          GestureDetector(
+            onTap: onThreeDotsClick,
+            child: Icon(Icons.more_horiz_rounded, color: _liveTheme.primaryTextColor, size: 22),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTelegramHeader(String title) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
+      color: _liveTheme.surfaceColor,
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(Icons.menu_rounded, color: _liveTheme.accentColor, size: 21),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: _liveTheme.primaryTextColor,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (!disableSearchBar)
+                Icon(Icons.search_rounded, color: _liveTheme.secondaryTextColor, size: 21),
+              SizedBox(width: 12),
+              GestureDetector(
+                onTap: onThreeDotsClick,
+                child: Icon(Icons.more_vert_rounded, color: _liveTheme.secondaryTextColor, size: 21),
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          if (!disableSearchBar)
+            Container(
+              height: 30,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(
+                color: _liveTheme.cardColor,
+                border: Border.all(color: _liveTheme.secondaryTextColor.withValues(alpha: 0.28)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.search_rounded, color: _liveTheme.secondaryTextColor, size: 15),
+                  SizedBox(width: 6),
+                  Text(
+                    'Search chats',
+                    style: TextStyle(color: _liveTheme.secondaryTextColor, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCurvedRadialHeader(String title) {
+    return Container(
+      color: _liveTheme.backgroundColor,
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      child: Row(
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _liveTheme.accentColor.withValues(alpha: 0.16),
+              border: Border.all(color: _liveTheme.accentColor),
+            ),
+            child: Icon(Icons.menu_rounded, color: _liveTheme.accentColor, size: 18),
+          ),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                color: _liveTheme.primaryTextColor,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: onThreeDotsClick,
+            child: Icon(Icons.more_vert_rounded, color: _liveTheme.primaryTextColor, size: 22),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFloatingRailHeader(String title) {
+    return Container(
+      color: _liveTheme.backgroundColor,
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: [
+          Container(
+            width: 30,
+            height: 54,
+            decoration: BoxDecoration(
+              color: _liveTheme.surfaceColor,
+              border: Border.all(color: _liveTheme.cardColor),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Icon(Icons.chat_bubble_rounded, color: _liveTheme.accentColor, size: 16),
+                Icon(Icons.auto_stories_rounded, color: _liveTheme.secondaryTextColor, size: 16),
+              ],
+            ),
+          ),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                color: _liveTheme.primaryTextColor,
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          Icon(Icons.search_rounded, color: _liveTheme.secondaryTextColor),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDrawerHeader(String title) {
+    return Container(
+      color: _liveTheme.backgroundColor,
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      child: Row(
+        children: [
+          Container(
+            width: 82,
+            height: 50,
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: _liveTheme.surfaceColor,
+              border: Border.all(color: _liveTheme.cardColor),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Container(height: 3, color: _liveTheme.accentColor),
+                Container(height: 2, color: _liveTheme.secondaryTextColor),
+                Container(height: 2, color: _liveTheme.secondaryTextColor.withValues(alpha: 0.55)),
+              ],
+            ),
+          ),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                color: _liveTheme.primaryTextColor,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: onThreeDotsClick,
+            child: Icon(Icons.more_vert_rounded, color: _liveTheme.primaryTextColor),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInstagramBottomBar() {
+    return Container(
+      height: 44,
+      color: _liveTheme.backgroundColor,
+      decoration: null,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          Icon(Icons.home_rounded, color: _liveTheme.primaryTextColor, size: 23),
+          Icon(Icons.search_rounded, color: _liveTheme.primaryTextColor, size: 23),
+          Icon(Icons.add_box_outlined, color: _liveTheme.primaryTextColor, size: 23),
+          Icon(Icons.play_circle_outline_rounded, color: _liveTheme.primaryTextColor, size: 23),
+          Icon(Icons.person_outline_rounded, color: _liveTheme.primaryTextColor, size: 23),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTelegramBottomBar() {
+    return Container(
+      height: 50,
+      decoration: BoxDecoration(
+        color: _liveTheme.surfaceColor,
+        border: Border(top: BorderSide(color: _liveTheme.cardColor)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _item(Icons.chat_bubble_rounded, 'Chats', null),
+          _item(Icons.contacts_rounded, 'Contacts', null),
+          _item(Icons.call_rounded, 'Calls', null),
+          _item(Icons.settings_rounded, 'Settings', null),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBasicBottomBar() {
+    return Container(
+      height: 44,
+      color: _liveTheme.surfaceColor,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _item(Icons.chat_bubble_rounded, 'Chats', null),
+          _item(Icons.auto_stories_rounded, 'Updates', null),
+          _item(Icons.call_rounded, 'Calls', null),
+          _item(Icons.settings_rounded, 'Settings', null),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFloatingRailBottomBar() {
+    return Container(
+      height: 44,
+      color: _liveTheme.backgroundColor,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _item(Icons.chat_bubble_rounded, 'Chats', null),
+          _item(Icons.auto_stories_rounded, 'Updates', null),
+          _item(Icons.call_rounded, 'Calls', null),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCurvedRadialBottomBar() {
+    return Container(
+      height: 44,
+      color: _liveTheme.surfaceColor,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          for (final icon in <IconData>[
+            Icons.chat_bubble_rounded,
+            Icons.auto_stories_rounded,
+            Icons.call_rounded,
+            Icons.settings_rounded,
+          ])
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _liveTheme.accentColor.withValues(alpha: 0.14),
+                border: Border.all(color: _liveTheme.accentColor.withValues(alpha: 0.5)),
+              ),
+              child: Icon(icon, size: 14, color: _liveTheme.accentColor),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDrawerBottomBar() {
+    return Container(
+      height: 44,
+      color: _liveTheme.surfaceColor,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _item(Icons.chat_bubble_rounded, 'Chats', null),
+          _item(Icons.auto_stories_rounded, 'Updates', null),
+          _item(Icons.call_rounded, 'Calls', null),
+          _item(Icons.settings_rounded, 'Settings', null),
         ],
       ),
     );
@@ -1117,7 +1464,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
   Widget _buildOneUiHeader(String title) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-      color: const Color(0xFF11171C),
+      color: const _liveTheme.surfaceColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1126,12 +1473,12 @@ class GbLiveHeaderPreview extends StatelessWidget {
             children: [
               if (!disableSearchBar)
                 IconButton(
-                  icon: const Icon(Icons.search_rounded, color: Colors.white, size: 21),
+                  icon: Icon(Icons.search_rounded, color: _liveTheme.primaryTextColor, size: 21),
                   onPressed: () {},
                   visualDensity: VisualDensity.compact,
                 ),
               IconButton(
-                icon: const Icon(Icons.more_vert_rounded, color: Colors.white, size: 21),
+                icon: Icon(Icons.more_vert_rounded, color: _liveTheme.primaryTextColor, size: 21),
                 onPressed: onThreeDotsClick,
                 visualDensity: VisualDensity.compact,
               ),
@@ -1144,19 +1491,19 @@ class GbLiveHeaderPreview extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: _liveTheme.primaryTextColor,
                     fontSize: 23,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.4,
                   ),
                 ),
                 if (!disableStatusUnderName && statusText.isNotEmpty) ...[
-                  const SizedBox(height: 2),
+                  SizedBox(height: 2),
                   Text(
                     statusText,
-                    style: const TextStyle(
-                      color: Color(0xFF8696A0),
+                    style: TextStyle(
+                      color: _liveTheme.secondaryTextColor,
                       fontSize: 12,
                     ),
                   ),
@@ -1164,17 +1511,17 @@ class GbLiveHeaderPreview extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           Row(
             children: [
               _buildPillTab('Chats', isSelected: true, count: '7'),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               if (separateChatsAndGroups) ...[
                 _buildPillTab('Groups'),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
               ],
               _buildPillTab('Status'),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               _buildPillTab('Calls'),
             ],
           ),
@@ -1187,23 +1534,23 @@ class GbLiveHeaderPreview extends StatelessWidget {
   Widget _buildIosHeader(String title) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-      color: const Color(0xFF121A20),
+      color: const _liveTheme.surfaceColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Text(
+              Text(
                 'Edit',
                 style: TextStyle(
-                  color: Color(0xFF38BDF8),
+                  color: _liveTheme.accentColor,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const Spacer(),
+              Spacer(),
               IconButton(
-                icon: const Icon(Icons.more_vert_rounded, color: Color(0xFF38BDF8), size: 20),
+                icon: Icon(Icons.more_vert_rounded, color: _liveTheme.accentColor, size: 20),
                 onPressed: onThreeDotsClick,
                 visualDensity: VisualDensity.compact,
               ),
@@ -1211,29 +1558,29 @@ class GbLiveHeaderPreview extends StatelessWidget {
           ),
           Text(
             title,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: _liveTheme.primaryTextColor,
               fontSize: 22,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.5,
             ),
           ),
           if (!disableSearchBar) ...[
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Container(
               height: 32,
               padding: const EdgeInsets.symmetric(horizontal: 10),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E282E),
+                color: const _liveTheme.cardColor,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.search_rounded, color: Color(0xFF8696A0), size: 16),
+                  Icon(Icons.search_rounded, color: _liveTheme.secondaryTextColor, size: 16),
                   SizedBox(width: 6),
                   Text(
                     'Search',
-                    style: TextStyle(color: Color(0xFF8696A0), fontSize: 13),
+                    style: TextStyle(color: _liveTheme.secondaryTextColor, fontSize: 13),
                   ),
                 ],
               ),
@@ -1248,27 +1595,27 @@ class GbLiveHeaderPreview extends StatelessWidget {
   Widget _buildStockHeader(String title) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-      color: const Color(0xFF0F1418),
+      color: const _liveTheme.backgroundColor,
       child: Row(
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: GbColors.activeGreen,
+            style: TextStyle(
+              color: _liveTheme.accentColor,
               fontSize: 19,
               fontWeight: FontWeight.w800,
             ),
           ),
-          const Spacer(),
-          const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 21),
-          const SizedBox(width: 14),
+          Spacer(),
+          Icon(Icons.camera_alt_outlined, color: _liveTheme.primaryTextColor, size: 21),
+          SizedBox(width: 14),
           if (!disableSearchBar) ...[
-            const Icon(Icons.search_rounded, color: Colors.white, size: 21),
-            const SizedBox(width: 14),
+            Icon(Icons.search_rounded, color: _liveTheme.primaryTextColor, size: 21),
+            SizedBox(width: 14),
           ],
           GestureDetector(
             onTap: onThreeDotsClick,
-            child: const Icon(Icons.more_vert_rounded, color: Colors.white, size: 21),
+            child: Icon(Icons.more_vert_rounded, color: _liveTheme.primaryTextColor, size: 21),
           ),
         ],
       ),
@@ -1279,40 +1626,40 @@ class GbLiveHeaderPreview extends StatelessWidget {
   Widget _buildBubblesHeader(String title) {
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-      color: const Color(0xFF10161A),
+      color: const _liveTheme.backgroundColor,
       child: Column(
         children: [
           Row(
             children: [
               Text(
                 title,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: _liveTheme.primaryTextColor,
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const Spacer(),
+              Spacer(),
               if (!disableSearchBar)
-                const Icon(Icons.search_rounded, color: Colors.white, size: 20),
-              const SizedBox(width: 12),
+                Icon(Icons.search_rounded, color: _liveTheme.primaryTextColor, size: 20),
+              SizedBox(width: 12),
               GestureDetector(
                 onTap: onThreeDotsClick,
-                child: const Icon(Icons.more_vert_rounded, color: Colors.white, size: 20),
+                child: Icon(Icons.more_vert_rounded, color: _liveTheme.primaryTextColor, size: 20),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           Row(
             children: [
               _buildBubbleTabItem('Chats', isSelected: true, count: '7'),
-              const SizedBox(width: 6),
+              SizedBox(width: 6),
               if (separateChatsAndGroups) ...[
                 _buildBubbleTabItem('Groups'),
-                const SizedBox(width: 6),
+                SizedBox(width: 6),
               ],
               _buildBubbleTabItem('Status'),
-              const SizedBox(width: 6),
+              SizedBox(width: 6),
               _buildBubbleTabItem('Calls'),
             ],
           ),
@@ -1324,7 +1671,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
   // --- WhatsApp Old UI Header ---
   Widget _buildOldUiHeader(String title) {
     return Container(
-      color: const Color(0xFF1F2C34),
+      color: const _liveTheme.surfaceColor,
       child: Column(
         children: [
           Padding(
@@ -1333,42 +1680,42 @@ class GbLiveHeaderPreview extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: _liveTheme.primaryTextColor,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const Spacer(),
+                Spacer(),
                 if (!disableSearchBar) ...[
-                  const Icon(Icons.search, color: Colors.white, size: 21),
-                  const SizedBox(width: 14),
+                  Icon(Icons.search, color: _liveTheme.primaryTextColor, size: 21),
+                  SizedBox(width: 14),
                 ],
                 GestureDetector(
                   onTap: onThreeDotsClick,
-                  child: const Icon(Icons.more_vert, color: Colors.white, size: 21),
+                  child: Icon(Icons.more_vert, color: _liveTheme.primaryTextColor, size: 21),
                 ),
               ],
             ),
           ),
           Row(
             children: [
-              const SizedBox(width: 36, child: Center(child: Icon(Icons.camera_alt, color: Color(0xFF8696A0), size: 18))),
+              SizedBox(width: 36, child: Center(child: Icon(Icons.camera_alt, color: _liveTheme.secondaryTextColor, size: 18))),
               Expanded(
                 child: Column(
                   children: [
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.symmetric(vertical: 6),
-                      child: Text('CHATS', style: TextStyle(color: GbColors.activeGreen, fontSize: 13, fontWeight: FontWeight.bold)),
+                      child: Text('CHATS', style: TextStyle(color: _liveTheme.accentColor, fontSize: 13, fontWeight: FontWeight.bold)),
                     ),
-                    Container(height: 2.5, color: GbColors.activeGreen),
+                    Container(height: 2.5, color: _liveTheme.accentColor),
                   ],
                 ),
               ),
               if (separateChatsAndGroups)
-                const Expanded(child: Center(child: Text('GROUPS', style: TextStyle(color: Color(0xFF8696A0), fontSize: 13)))),
-              const Expanded(child: Center(child: Text('STATUS', style: TextStyle(color: Color(0xFF8696A0), fontSize: 13)))),
-              const Expanded(child: Center(child: Text('CALLS', style: TextStyle(color: Color(0xFF8696A0), fontSize: 13)))),
+                Expanded(child: Center(child: Text('GROUPS', style: TextStyle(color: _liveTheme.secondaryTextColor, fontSize: 13)))),
+              Expanded(child: Center(child: Text('STATUS', style: TextStyle(color: _liveTheme.secondaryTextColor, fontSize: 13)))),
+              Expanded(child: Center(child: Text('CALLS', style: TextStyle(color: _liveTheme.secondaryTextColor, fontSize: 13)))),
             ],
           ),
         ],
@@ -1380,35 +1727,35 @@ class GbLiveHeaderPreview extends StatelessWidget {
   Widget _buildBasicHeader(String title) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-      color: const Color(0xFF0F1418),
+      color: const _liveTheme.backgroundColor,
       child: Column(
         children: [
           Row(
             children: [
               Text(
                 title,
-                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(color: _liveTheme.primaryTextColor, fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              const Spacer(),
+              Spacer(),
               if (!disableSearchBar) ...[
-                const Icon(Icons.search, color: Colors.white, size: 20),
-                const SizedBox(width: 12),
+                Icon(Icons.search, color: _liveTheme.primaryTextColor, size: 20),
+                SizedBox(width: 12),
               ],
               GestureDetector(
                 onTap: onThreeDotsClick,
-                child: const Icon(Icons.more_vert, color: Colors.white, size: 20),
+                child: Icon(Icons.more_vert, color: _liveTheme.primaryTextColor, size: 20),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              const Text('Chats (7)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+              Text('Chats (7)', style: TextStyle(color: _liveTheme.primaryTextColor, fontWeight: FontWeight.bold, fontSize: 13)),
               if (separateChatsAndGroups)
-                const Text('Groups', style: TextStyle(color: Color(0xFF8696A0), fontSize: 13)),
-              const Text('Status', style: TextStyle(color: Color(0xFF8696A0), fontSize: 13)),
-              const Text('Calls', style: TextStyle(color: Color(0xFF8696A0), fontSize: 13)),
+                Text('Groups', style: TextStyle(color: _liveTheme.secondaryTextColor, fontSize: 13)),
+              Text('Status', style: TextStyle(color: _liveTheme.secondaryTextColor, fontSize: 13)),
+              Text('Calls', style: TextStyle(color: _liveTheme.secondaryTextColor, fontSize: 13)),
             ],
           ),
         ],
@@ -1420,7 +1767,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
   Widget _buildSampleChatRow() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      color: const Color(0xFF0E1317),
+      color: const _liveTheme.backgroundColor,
       child: Row(
         children: [
           Container(
@@ -1428,18 +1775,18 @@ class GbLiveHeaderPreview extends StatelessWidget {
             height: 44,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: const Color(0xFF283842),
-              border: Border.all(color: GbColors.activeGreen.withOpacity(0.4), width: 1.5),
+              color: const _liveTheme.cardColor,
+              border: Border.all(color: _liveTheme.accentColor.withOpacity(0.4), width: 1.5),
             ),
-            child: const Center(
+            child: Center(
               child: Text(
                 'TD',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                style: TextStyle(color: _liveTheme.primaryTextColor, fontWeight: FontWeight.bold, fontSize: 15),
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          const Expanded(
+          SizedBox(width: 12),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1448,23 +1795,23 @@ class GbLiveHeaderPreview extends StatelessWidget {
                   children: [
                     Text(
                       'Tyler Durden',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14.5),
+                      style: TextStyle(color: _liveTheme.primaryTextColor, fontWeight: FontWeight.w600, fontSize: 14.5),
                     ),
                     Text(
                       '10:42 PM',
-                      style: TextStyle(color: GbColors.activeGreen, fontSize: 11, fontWeight: FontWeight.w500),
+                      style: TextStyle(color: _liveTheme.accentColor, fontSize: 11, fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
                 SizedBox(height: 3),
                 Row(
                   children: [
-                    Icon(Icons.done_all_rounded, color: Color(0xFF38BDF8), size: 15),
+                    Icon(Icons.done_all_rounded, color: _liveTheme.accentColor, size: 15),
                     SizedBox(width: 4),
                     Expanded(
                       child: Text(
                         'The things you own end up owning you.',
-                        style: TextStyle(color: Color(0xFF8696A0), fontSize: 12.5),
+                        style: TextStyle(color: _liveTheme.secondaryTextColor, fontSize: 12.5),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1472,8 +1819,8 @@ class GbLiveHeaderPreview extends StatelessWidget {
                     SizedBox(width: 6),
                     CircleAvatar(
                       radius: 9,
-                      backgroundColor: GbColors.activeGreen,
-                      child: Text('7', style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold)),
+                      backgroundColor: _liveTheme.accentColor,
+                      child: Text('7', style: TextStyle(color: _liveTheme.onAccentColor, fontSize: 10, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
@@ -1489,27 +1836,27 @@ class GbLiveHeaderPreview extends StatelessWidget {
   Widget _buildOneUiBottomBar() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      color: const Color(0xFF161E24),
+      color: const _liveTheme.surfaceColor,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
             decoration: BoxDecoration(
-              color: GbColors.activeGreen.withOpacity(0.18),
+              color: _liveTheme.accentColor.withOpacity(0.18),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.chat_bubble_rounded, color: GbColors.activeGreen, size: 18),
+                Icon(Icons.chat_bubble_rounded, color: _liveTheme.accentColor, size: 18),
                 SizedBox(width: 6),
-                Text('Chats', style: TextStyle(color: GbColors.activeGreen, fontSize: 12, fontWeight: FontWeight.bold)),
+                Text('Chats', style: TextStyle(color: _liveTheme.accentColor, fontSize: 12, fontWeight: FontWeight.bold)),
               ],
             ),
           ),
-          const Icon(Icons.update_rounded, color: Color(0xFF8696A0), size: 20),
-          const Icon(Icons.checklist_rounded, color: Color(0xFF8696A0), size: 20),
-          const Icon(Icons.call_outlined, color: Color(0xFF8696A0), size: 20),
+          Icon(Icons.update_rounded, color: _liveTheme.secondaryTextColor, size: 20),
+          Icon(Icons.checklist_rounded, color: _liveTheme.secondaryTextColor, size: 20),
+          Icon(Icons.call_outlined, color: _liveTheme.secondaryTextColor, size: 20),
         ],
       ),
     );
@@ -1519,9 +1866,9 @@ class GbLiveHeaderPreview extends StatelessWidget {
   Widget _buildIosBottomBar() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 20),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: Color(0xFF141C22),
-        border: Border(top: BorderSide(color: Color(0xFF1E282E), width: 0.8)),
+        border: Border(top: BorderSide(color: _liveTheme.cardColor, width: 0.8)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1540,9 +1887,9 @@ class GbLiveHeaderPreview extends StatelessWidget {
   Widget _buildStockBottomBar() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      decoration: const BoxDecoration(
-        color: Color(0xFF0F1418),
-        border: Border(top: BorderSide(color: Color(0xFF1E282E), width: 0.8)),
+      decoration: BoxDecoration(
+        color: _liveTheme.backgroundColor,
+        border: Border(top: BorderSide(color: _liveTheme.cardColor, width: 0.8)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -1562,9 +1909,9 @@ class GbLiveHeaderPreview extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(12, 4, 12, 8),
       padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF161E24),
+        color: const _liveTheme.surfaceColor,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: GbColors.borderSubtle, width: 1),
+        border: Border.all(color: _liveTheme.cardColor, width: 1),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -1572,20 +1919,20 @@ class GbLiveHeaderPreview extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: GbColors.activeGreen,
+              color: _liveTheme.accentColor,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.chat_bubble_rounded, color: Colors.black, size: 16),
+                Icon(Icons.chat_bubble_rounded, color: _liveTheme.onAccentColor, size: 16),
                 SizedBox(width: 4),
-                Text('Chats', style: TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.bold)),
+                Text('Chats', style: TextStyle(color: _liveTheme.onAccentColor, fontSize: 11, fontWeight: FontWeight.bold)),
               ],
             ),
           ),
-          const Icon(Icons.update_rounded, color: Color(0xFF8696A0), size: 18),
-          const Icon(Icons.checklist_rounded, color: Color(0xFF8696A0), size: 18),
-          const Icon(Icons.call_rounded, color: Color(0xFF8696A0), size: 18),
+          Icon(Icons.update_rounded, color: _liveTheme.secondaryTextColor, size: 18),
+          Icon(Icons.checklist_rounded, color: _liveTheme.secondaryTextColor, size: 18),
+          Icon(Icons.call_rounded, color: _liveTheme.secondaryTextColor, size: 18),
         ],
       ),
     );
@@ -1595,11 +1942,11 @@ class GbLiveHeaderPreview extends StatelessWidget {
   Widget _buildOldUiBottomBar() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      color: const Color(0xFF12171B),
-      child: const Center(
+      color: const _liveTheme.surfaceColor,
+      child: Center(
         child: Text(
           'Classic Full-Screen Tab View (Old UI)',
-          style: TextStyle(color: Color(0xFF8696A0), fontSize: 10.5),
+          style: TextStyle(color: _liveTheme.secondaryTextColor, fontSize: 10.5),
         ),
       ),
     );
@@ -1609,14 +1956,14 @@ class GbLiveHeaderPreview extends StatelessWidget {
   Widget _buildBasicBottomBar() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      color: const Color(0xFF11171C),
-      child: const Row(
+      color: const _liveTheme.surfaceColor,
+      child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          Icon(Icons.chat_bubble_rounded, color: GbColors.activeGreen, size: 20),
-          Icon(Icons.update_rounded, color: Color(0xFF8696A0), size: 20),
-          Icon(Icons.checklist_rounded, color: Color(0xFF8696A0), size: 20),
-          Icon(Icons.call_rounded, color: Color(0xFF8696A0), size: 20),
+          Icon(Icons.chat_bubble_rounded, color: _liveTheme.accentColor, size: 20),
+          Icon(Icons.update_rounded, color: _liveTheme.secondaryTextColor, size: 20),
+          Icon(Icons.checklist_rounded, color: _liveTheme.secondaryTextColor, size: 20),
+          Icon(Icons.call_rounded, color: _liveTheme.secondaryTextColor, size: 20),
         ],
       ),
     );
@@ -1627,7 +1974,7 @@ class GbLiveHeaderPreview extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: isSelected ? GbColors.activeGreen : const Color(0xFF1F2830),
+        color: isSelected ? _liveTheme.accentColor : const Color(0xFF1F2830),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -1636,23 +1983,23 @@ class GbLiveHeaderPreview extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: isSelected ? Colors.black : const Color(0xFF8696A0),
+              color: isSelected ? _liveTheme.onAccentColor : const _liveTheme.secondaryTextColor,
               fontSize: 11,
               fontWeight: FontWeight.bold,
             ),
           ),
           if (count != null) ...[
-            const SizedBox(width: 4),
+            SizedBox(width: 4),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
               decoration: BoxDecoration(
-                color: isSelected ? Colors.black : GbColors.activeGreen,
+                color: isSelected ? _liveTheme.onAccentColor : _liveTheme.accentColor,
                 shape: BoxShape.circle,
               ),
               child: Text(
                 count,
                 style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.black,
+                  color: isSelected ? _liveTheme.primaryTextColor : _liveTheme.onAccentColor,
                   fontSize: 9,
                   fontWeight: FontWeight.bold,
                 ),
@@ -1669,15 +2016,15 @@ class GbLiveHeaderPreview extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 5),
         decoration: BoxDecoration(
-          color: isSelected ? GbColors.activeGreen.withOpacity(0.2) : Colors.transparent,
+          color: isSelected ? _liveTheme.accentColor.withOpacity(0.2) : Colors.transparent,
           borderRadius: BorderRadius.circular(14),
-          border: isSelected ? Border.all(color: GbColors.activeGreen, width: 1.2) : null,
+          border: isSelected ? Border.all(color: _liveTheme.accentColor, width: 1.2) : null,
         ),
         child: Center(
           child: Text(
             count != null ? '$label ($count)' : label,
             style: TextStyle(
-              color: isSelected ? GbColors.activeGreen : const Color(0xFF8696A0),
+              color: isSelected ? _liveTheme.accentColor : const _liveTheme.secondaryTextColor,
               fontSize: 11,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
             ),
@@ -1688,8 +2035,8 @@ class GbLiveHeaderPreview extends StatelessWidget {
   }
 
   Widget _buildIosTabItem(IconData icon, String label, {bool isSelected = false, String? badge}) {
-    const activeColor = Color(0xFF38BDF8);
-    final color = isSelected ? activeColor : const Color(0xFF8696A0);
+    final activeColor = _liveTheme.accentColor;
+    final color = isSelected ? activeColor : const _liveTheme.secondaryTextColor;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1703,23 +2050,23 @@ class GbLiveHeaderPreview extends StatelessWidget {
                 right: -6,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFEF4444),
+                  decoration: BoxDecoration(
+                    color: _liveTheme.dangerColor,
                     shape: BoxShape.circle,
                   ),
-                  child: Text(badge, style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
+                  child: Text(badge, style: TextStyle(color: _liveTheme.primaryTextColor, fontSize: 8, fontWeight: FontWeight.bold)),
                 ),
               ),
           ],
         ),
-        const SizedBox(height: 2),
+        SizedBox(height: 2),
         Text(label, style: TextStyle(color: color, fontSize: 9.5, fontWeight: FontWeight.w600)),
       ],
     );
   }
 
   Widget _buildStockTabItem(IconData icon, String label, {bool isSelected = false, String? badge}) {
-    final color = isSelected ? GbColors.activeGreen : const Color(0xFF8696A0);
+    final color = isSelected ? _liveTheme.accentColor : const _liveTheme.secondaryTextColor;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1733,16 +2080,16 @@ class GbLiveHeaderPreview extends StatelessWidget {
                 right: -7,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                  decoration: const BoxDecoration(
-                    color: GbColors.activeGreen,
+                  decoration: BoxDecoration(
+                    color: _liveTheme.accentColor,
                     shape: BoxShape.circle,
                   ),
-                  child: Text(badge, style: const TextStyle(color: Colors.black, fontSize: 8, fontWeight: FontWeight.bold)),
+                  child: Text(badge, style: TextStyle(color: _liveTheme.onAccentColor, fontSize: 8, fontWeight: FontWeight.bold)),
                 ),
               ),
           ],
         ),
-        const SizedBox(height: 3),
+        SizedBox(height: 3),
         Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600)),
       ],
     );
