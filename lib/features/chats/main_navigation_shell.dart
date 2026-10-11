@@ -2959,8 +2959,10 @@ class _CurvedRadialDrawerScaffoldState
         builder: (context, constraints) {
           // Keep the arc compact enough to preserve visible chat context.
           // Width and height scale with the device, including older/smaller phones.
+          // Fill the viewport edge-to-edge at the top, as in the reference.
+          // Cap only wide tablet layouts so the radial menu stays compact.
           final panelWidth =
-              (constraints.maxWidth * 0.88).clamp(0.0, 330.0).toDouble();
+              constraints.maxWidth.clamp(0.0, 420.0).toDouble();
           final availableHeight = constraints.maxHeight;
           final panelHeight = availableHeight < 250
               ? availableHeight
@@ -3061,7 +3063,7 @@ class _CurvedRadialDrawerScaffoldState
       final left = (width *
               (0.20 -
                   0.09 * math.sin(math.pi * progress) +
-                  0.55 * progress * progress))
+                  0.44 * progress * progress))
           .toDouble();
       final top = (height *
               (0.04 + 0.50 * math.pow(progress, 0.95).toDouble()))
@@ -3129,39 +3131,38 @@ class _CurvedRadialDrawerScaffoldState
               Transform.rotate(
                 angle: -0.04 - progress * 0.30,
                 alignment: Alignment.centerLeft,
-                child:
-              SizedBox(
-                width: labelWidth,
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () {
-                      widget.onSelect(index);
-                      setState(() => _menuOpen = false);
-                    },
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        item.label.toUpperCase(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: onAccent,
-                          fontSize: selected ? 10.5 : 9.5,
-                          fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
-                          letterSpacing: 0.25,
-                          shadows: <Shadow>[
-                            Shadow(
-                              color: colors.shadow.withValues(alpha: 0.28),
-                              blurRadius: 2,
-                            ),
-                          ],
+                child: SizedBox(
+                  width: labelWidth,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        widget.onSelect(index);
+                        setState(() => _menuOpen = false);
+                      },
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          item.label.toUpperCase(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: onAccent,
+                            fontSize: selected ? 10.5 : 9.5,
+                            fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+                            letterSpacing: 0.25,
+                            shadows: <Shadow>[
+                              Shadow(
+                                color: colors.shadow.withValues(alpha: 0.28),
+                                blurRadius: 2,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
               ),
             ],
           ),
