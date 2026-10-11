@@ -516,7 +516,10 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
               if (_currentStep != StepState.enterCurrent) ...[
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Text('Pattern grid', style: theme.textTheme.labelLarge),
+                  child: Text(
+                    'Pattern grid',
+                    style: theme.textTheme.labelLarge,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 SegmentedButton<int>(
@@ -525,16 +528,21 @@ class _LockCredentialSetupModalState extends State<LockCredentialSetupModal> {
                     ButtonSegment<int>(value: 4, label: Text('4 × 4')),
                   ],
                   selected: <int>{_patternGridSize},
-                  onSelectionChanged: _busy ? null : (values) {
-                    if (values.isEmpty || values.first == _patternGridSize) return;
-                    setState(() {
-                      _patternGridSize = values.first;
-                      _firstPatternDrawn = null;
-                      _confirmPatternDrawn = null;
-                      _error = '';
-                    });
-                    _padKey.currentState?.reset();
-                  },
+                  onSelectionChanged: _busy
+                      ? null
+                      : (values) {
+                          if (values.isEmpty ||
+                              values.first == _patternGridSize) {
+                            return;
+                          }
+                          setState(() {
+                            _patternGridSize = values.first;
+                            _firstPatternDrawn = null;
+                            _confirmPatternDrawn = null;
+                            _error = '';
+                          });
+                          _padKey.currentState?.reset();
+                        },
                 ),
                 const SizedBox(height: 12),
               ],
