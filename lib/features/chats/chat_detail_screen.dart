@@ -134,6 +134,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
   bool get _isSelectionMode => _selectedMessageIds.isNotEmpty;
   bool _accessAuthorized = false;
   bool _accessCheckStarted = false;
+  bool _isAuthorizing = false;
 
   ChatyPreferencesController get _preferences => widget.preferencesController;
 
@@ -166,15 +167,21 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
   }
 
   Future<void> _authorizeBeforeLoading({bool isResume = false}) async {
-    if (_accessCheckStarted && !isResume) return;
+    if (_isAuthorizing || (_accessCheckStarted && !isResume)) return;
     if (!isResume) _accessCheckStarted = true;
-    final authorized = await ProtectedResourceGate.authorizeConversation(
-      context,
-      conversationId: widget.conversationId,
-      preferencesController: widget.preferencesController,
-      title: 'Locked Chat',
-      reason: 'Authenticate to open this conversation',
-    );
+    _isAuthorizing = true;
+    bool authorized;
+    try {
+      authorized = await ProtectedResourceGate.authorizeConversation(
+        context,
+        conversationId: widget.conversationId,
+        preferencesController: widget.preferencesController,
+        title: 'Locked Chat',
+        reason: 'Authenticate to open this conversation',
+      );
+    } finally {
+      _isAuthorizing = false;
+    }
     if (!mounted) return;
     if (!authorized) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -208,21 +215,21 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
-      if (widget.preferencesController.isConversationProtected(
-        widget.conversationId,
-      )) {
+      if (_accessAuthorized &&
+          widget.preferencesController.isConversationProtected(
+            widget.conversationId,
+          )) {
         ProtectedResourceGate.invalidateConversationSession(
           widget.conversationId,
         );
-        if (_accessAuthorized && mounted) {
-          setState(() => _accessAuthorized = false);
-        }
+        if (mounted) setState(() => _accessAuthorized = false);
       }
       return;
     }
 
     if (state == AppLifecycleState.resumed &&
         !_accessAuthorized &&
+        !_isAuthorizing &&
         widget.preferencesController.isConversationProtected(
           widget.conversationId,
         )) {
