@@ -46,7 +46,7 @@ class _AnimatedEmojiViewState extends State<AnimatedEmojiView>
     super.initState();
     _bounceController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 320),
+      duration: const Duration(milliseconds: 360),
     );
     _scaleAnimation = TweenSequence<double>([
       TweenSequenceItem(
@@ -102,9 +102,11 @@ class _AnimatedEmojiViewState extends State<AnimatedEmojiView>
         animatedData,
         key: ValueKey('${animatedData.id}_$_replayKey'),
         size: widget.size,
-        // Chat message emojis loop; reaction and picker previews play once.
-        // Repeating every visible picker tile overwhelms older devices.
-        repeat: widget.mode == EmojiDisplayMode.inline,
+        // Animated emoji picker tiles loop gently so the picker feels alive.
+        // The grid is lazy-built and each emoji is isolated by RepaintBoundary;
+        // off-screen grid children are disposed by GridView for low-end devices.
+        repeat: widget.mode == EmojiDisplayMode.inline ||
+            widget.mode == EmojiDisplayMode.picker,
       );
     } else {
       content = Text(
