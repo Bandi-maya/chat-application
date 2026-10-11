@@ -185,7 +185,7 @@ class _LensAnchorPainter extends CustomPainter {
 
   void _paintAviators(Canvas canvas, FacePose pose) {
     final mid = pose.eyesMidpoint;
-    final unit = pose.interocular * 2.55;
+    final unit = pose.interocular * 1.08;
     _withFaceTransform(canvas, pose, mid, unit, () {
       final fill = Paint()
         ..color = const Color(0xFF0F172A).withValues(alpha: 0.90 * opacity)
@@ -364,7 +364,7 @@ class _LensAnchorPainter extends CustomPainter {
   }
 
   void _paintDogNose(Canvas canvas, FacePose pose) {
-    _withFaceTransform(canvas, pose, pose.noseBase, pose.interocular * 0.72, () {
+    _withFaceTransform(canvas, pose, pose.noseBase, pose.interocular * 1.75, () {
       final outer = Paint()
         ..color = const Color(0xFF1F2937).withValues(alpha: 0.95 * opacity)
         ..style = PaintingStyle.fill;
@@ -396,7 +396,7 @@ class _LensAnchorPainter extends CustomPainter {
 
   void _paintGlasses(Canvas canvas, FacePose pose) {
     final mid = pose.eyesMidpoint;
-    final unit = pose.interocular * 2.4;
+    final unit = pose.interocular * 1.08;
     _withFaceTransform(canvas, pose, mid, unit, () {
       final frame = Paint()
         ..color = Colors.black.withValues(alpha: 0.85 * opacity)
