@@ -59,6 +59,8 @@ class ChatsHomeScreen extends StatefulWidget {
   final ChatyNotificationService notificationService;
   final ConversationType? forcedType;
   final String? pageTitle;
+  /// Optional navigation strip inserted directly beneath the home header.
+  final Widget? headerBottomWidget;
 
   const ChatsHomeScreen({
     super.key,
@@ -69,6 +71,7 @@ class ChatsHomeScreen extends StatefulWidget {
     required this.notificationService,
     this.forcedType,
     this.pageTitle,
+    this.headerBottomWidget,
   });
 
   @override
@@ -93,6 +96,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
   /// The Home UI selector owns its header presentation. Component templates
   /// remain the fallback for styles that do not declare a dedicated header.
   HomeHeaderStyle get _effectiveHomeHeaderStyle {
+    final rawStyle = widget.preferencesController.home.homeStyle.trim().toLowerCase();
+    if (rawStyle == 'instagram style' || rawStyle == 'ios style') {
+      return HomeHeaderStyle.storiesFirst;
+    }
+    if (rawStyle == 'telegram style') return HomeHeaderStyle.compact;
     final homeStyle =
         HomePresetNormalizer.homeStyle(widget.preferencesController.home.homeStyle);
     switch (homeStyle) {
@@ -417,30 +425,54 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         // Home Style consumers: each variant maps to REAL structural
         // differences below (filters, sections, stories strip geometry,
         // tile density, unread grouping, split view).
+        final rawHomeUiStyle = homePrefs.homeStyle.trim().toLowerCase();
         final homeStyle = HomePresetNormalizer.homeStyle(homePrefs.homeStyle);
-        final styleShowFilters =
-            homeStyle != 'Classic' && homeStyle != 'Minimal';
+        final isInstagramUi = rawHomeUiStyle == 'instagram style';
+        final isIosUi = rawHomeUiStyle == 'ios style';
+        final isTelegramUi = rawHomeUiStyle == 'telegram style';
+        // Layout presets change their visual language, not the user's feature set.
+        // Filters stay available unless explicitly hidden in Home settings.
+        final styleShowFilters = true;
         final styleShowSections = homeStyle != 'Minimal';
         final styleAlwaysLabelSections = homeStyle == 'Classic';
-        final styleStoriesFirst = homeStyle == 'Stories First';
+        final styleStoriesFirst =
+            homeStyle == 'Stories First' || isInstagramUi || isIosUi;
         final styleStoriesHidden =
             homeStyle == 'Compact' || homeStyle == 'Minimal';
-        final styleCardRows = homeStyle == 'Cards';
-        final styleStoriesHeight = styleStoriesFirst
+        final styleCardRows = homeStyle == 'Cards' || isInstagramUi;
+        final styleStoriesHeight = isInstagramUi
+            ? 118.0
+            : isIosUi
+            ? 104.0
+            : styleStoriesFirst
             ? 112.0
             : homeStyle == 'Expressive' || styleCardRows
             ? 96.0
             : 82.0;
-        final styleStoriesAvatar = styleStoriesFirst
+        final styleStoriesAvatar = isInstagramUi
+            ? 68.0
+            : isIosUi
+            ? 58.0
+            : styleStoriesFirst
             ? 64.0
             : homeStyle == 'Expressive' || styleCardRows
             ? 56.0
             : 48.0;
-        final styleTileDensity = homeStyle == 'Compact'
+        final styleTileDensity = isTelegramUi
+            ? 0.93
+            : isInstagramUi
+            ? 1.04
+            : homeStyle == 'Compact'
             ? 0.88
             : homeStyle == 'Expressive'
             ? 1.12
             : 1.0;
+        final searchPlacement = switch (homePrefs.searchPlacement.trim().toLowerCase()) {
+          'below header' => 'Below header',
+          'above chat filters' => 'Above chat filters',
+          _ => 'Header action',
+        };
+        final searchEnabled = homePrefs.showSearchBar && !homePrefs.disableSearchBar;
         final styleSplitView = homeStyle == 'Tablet Split View';
         // Stories Style consumers: each value renders the strip differently.
         final storiesStyle = homePrefs.storiesStyle;
@@ -556,6 +588,12 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   _isSelectionMode
                       ? _selectionAppBar(theme, conversations)
                       : _standardAppBar(theme, homePrefs),
+                  if (!_isSelectionMode && widget.headerBottomWidget != null)
+                    widget.headerBottomWidget!,
+                  if (!_isSelectionMode &&
+                      searchEnabled &&
+                      searchPlacement == 'Below header')
+                    _homeSearchField(theme),
                   // P4: iOS collapsing LARGE title. Shrinks away as the list
                   // scrolls; the compact bar title fades in to replace it.
                   if (!_isSelectionMode && widget.pageTitle != null)
@@ -602,57 +640,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                       ),
                     ),
                   if (!_isSelectionMode) ...[
-                    AnimatedSize(
-                      duration: const Duration(milliseconds: 180),
-                      child: _isSearchOpen &&
-                              homePrefs.showSearchBar &&
-                              !homePrefs.disableSearchBar
-                          ? Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
-                              child: TextField(
-                                controller: _searchCtrl,
-                                focusNode: _searchFocus,
-                                onChanged: (val) {
-                                  setState(() {});
-                                  _checkSecretSearchPhrase(val);
-                                },
-                                style: TextStyle(color: theme.primaryTextColor),
-                                decoration: InputDecoration(
-                                  hintText:
-                                      widget.forcedType ==
-                                          ConversationType.group
-                                      ? 'Search groups…'
-                                      : 'Search chats and messages…',
-                                  hintStyle: TextStyle(
-                                    color: theme.secondaryTextColor,
-                                  ),
-                                  prefixIcon: Icon(
-                                    Icons.search_rounded,
-                                    color: theme.secondaryTextColor,
-                                  ),
-                                  suffixIcon: _searchCtrl.text.isEmpty
-                                      ? null
-                                      : IconButton(
-                                          onPressed: () {
-                                            _searchCtrl.clear();
-                                            setState(() {});
-                                          },
-                                          icon: const Icon(Icons.close_rounded),
-                                        ),
-                                  filled: true,
-                                  fillColor: theme.cardColor,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(
-                                      theme.cornerRadius,
-                                    ),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                ),
-                              ),
-                            )
-                          : const SizedBox.shrink(),
-                    ),
-                    if ((homePrefs.enableStoriesStrip || styleStoriesFirst) &&
+                    if (searchEnabled &&
+                        searchPlacement == 'Header action' &&
+                        _isSearchOpen)
+                      _homeSearchField(theme),
+                    if ((homePrefs.enableStoriesStrip || styleStoriesFirst) &&                    if ((homePrefs.enableStoriesStrip || styleStoriesFirst) &&
                         !styleStoriesHidden &&
                         widget.forcedType != ConversationType.group)
                       SizedBox(
@@ -735,6 +727,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                           },
                         ),
                       ),
+                    if (searchEnabled &&
+                        searchPlacement == 'Above chat filters')
+                      _homeSearchField(theme),
                     if (styleShowFilters && !homePrefs.hideChatSortList)
                       Align(
                         alignment: Alignment.centerLeft,
@@ -1579,6 +1574,44 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     }
   }
 
+  Widget _homeSearchField(ThemeConfig theme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+      child: TextField(
+        controller: _searchCtrl,
+        focusNode: _searchFocus,
+        onChanged: (value) {
+          setState(() {});
+          _checkSecretSearchPhrase(value);
+        },
+        style: TextStyle(color: theme.primaryTextColor),
+        decoration: InputDecoration(
+          hintText: widget.forcedType == ConversationType.group
+              ? 'Search groups…'
+              : 'Search chats and messages…',
+          hintStyle: TextStyle(color: theme.secondaryTextColor),
+          prefixIcon: Icon(Icons.search_rounded, color: theme.secondaryTextColor),
+          suffixIcon: _searchCtrl.text.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: 'Clear search',
+                  onPressed: () {
+                    _searchCtrl.clear();
+                    setState(() {});
+                  },
+                  icon: const Icon(Icons.close_rounded),
+                ),
+          filled: true,
+          fillColor: theme.cardColor,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(theme.cornerRadius),
+            borderSide: BorderSide.none,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _standardAppBar(ThemeConfig theme, HomePreferences homePrefs) {
     final availableWidth = MediaQuery.sizeOf(context).width;
     final compactHeader = availableWidth < 390;
@@ -1591,7 +1624,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
       HomeHeaderStyle.storiesFirst => 22.0,
     };
     final effectiveShowSearch =
-        homePrefs.showSearchBar && !homePrefs.disableSearchBar;
+        homePrefs.showSearchBar &&
+        !homePrefs.disableSearchBar &&
+        homePrefs.searchPlacement.trim().toLowerCase() == 'header action';
     final userAbout = widget.dataStore.currentUser.about.isNotEmpty
         ? widget.dataStore.currentUser.about
         : 'Available';
