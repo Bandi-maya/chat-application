@@ -136,7 +136,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
       final picked = await LockMethodSelectorSheet.show(
         context,
         lockService: _lockService,
-        currentMethod: intent == SecurityIntent.enableLock ? null : current,
+        currentMethod: current,
       );
       if (picked == null || !mounted) return false;
       chosen = picked;
