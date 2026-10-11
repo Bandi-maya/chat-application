@@ -66,29 +66,14 @@ class _CallsScreenState extends State<CallsScreen> {
 
   Widget _buildCallActions(BuildContext context) {
     final colors = context.colors;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        FloatingActionButton.small(
-          heroTag: 'chaty_calls_dialpad_fab',
-          tooltip: 'Dialpad',
-          backgroundColor: colors.surfaceElevated,
-          foregroundColor: colors.primary,
-          onPressed: () => _openContactPicker(CallContactPickerMode.dialpad),
-          child: const Icon(Icons.dialpad_rounded),
-        ),
-        const SizedBox(height: 12),
-        FloatingActionButton.extended(
-          heroTag: 'chaty_calls_add_call_fab',
-          tooltip: 'Add call',
-          backgroundColor: colors.primary,
-          foregroundColor: colors.onPrimary,
-          icon: const Icon(Icons.add_ic_call_rounded),
-          label: const Text('Add call'),
-          onPressed: () => _openContactPicker(CallContactPickerMode.contacts),
-        ),
-      ],
+    return FloatingActionButton.extended(
+      heroTag: 'chaty_calls_add_call_fab',
+      tooltip: 'Add call',
+      backgroundColor: colors.primary,
+      foregroundColor: colors.onPrimary,
+      icon: const Icon(Icons.dialpad_rounded),
+      label: const Text('Add call'),
+      onPressed: () => _openContactPicker(CallContactPickerMode.dialpad),
     );
   }
 

@@ -63,7 +63,7 @@ void main() {
     },
   );
 
-  test('home overflow restores the floating modal and all legacy actions', () {
+  test('home overflow keeps essential actions and removes redundant destinations', () {
     final source = File(
       'lib/features/chats/chats_home_screen.dart',
     ).readAsStringSync();
@@ -72,19 +72,11 @@ void main() {
     expect(source, contains('showGeneralDialog('));
     expect(source, contains('onPressed: () => _openHomeThreeDotMenu('));
     expect(source, contains('title: \'Starred Messages\''));
-    expect(source, contains('title: \'Themes & Colors\''));
-    expect(source, contains('title: \'Templates & Layouts\''));
     for (final option in <String>[
       "title: 'Chaty Settings'",
       "title: 'New Group'",
-      "title: 'Camera Effects'",
-      "title: 'QR / Scan'",
       "title: 'Linked Devices'",
-      "title: 'Themes & Colors'",
-      "title: 'Templates & Layouts'",
       "title: 'Starred Messages'",
-      "title: 'Home & Navigation'",
-      "title: 'Navigation Destinations'",
       "title: 'Message Scheduler'",
       "title: 'Auto Reply'",
       "title: 'Message a Number'",
@@ -94,11 +86,19 @@ void main() {
     ]) {
       expect(source, contains(option), reason: 'Missing overflow option $option');
     }
+    for (final hiddenOption in <String>[
+      "title: 'Camera Effects'",
+      "title: 'QR / Scan'",
+      "title: 'Themes & Colors'",
+      "title: 'Templates & Layouts'",
+      "title: 'Home & Navigation'",
+      "title: 'Navigation Destinations'",
+    ]) {
+      expect(source, isNot(contains(hiddenOption)), reason: 'Removed from three-dot menu: $hiddenOption');
+    }
+    expect(source, contains(': 244,'));
+    expect(source, contains('await widget.dataStore.markAllAsRead()'));
     expect(source, contains("_handleHomeOverflowAction('starred')"));
-    expect(source, contains("_handleHomeOverflowAction('themes')"));
-    expect(source, contains("_handleHomeOverflowAction('templates')"));
-    expect(source, contains("_handleHomeOverflowAction('home')"));
-    expect(source, contains("_handleHomeOverflowAction('navigation')"));
     expect(source, contains('_openLinkedDevices();'));
     expect(source, contains('_openSettingsScreen();'));
     expect(source, isNot(contains('useOverflowSheet')));

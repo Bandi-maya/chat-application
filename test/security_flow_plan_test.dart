@@ -46,6 +46,7 @@ void main() {
         ),
         const [
           SecurityFlowStep.verifyCurrent,
+          SecurityFlowStep.chooseMethod,
           SecurityFlowStep.setupNew,
           SecurityFlowStep.apply,
         ],
@@ -62,6 +63,7 @@ void main() {
         ),
         const [
           SecurityFlowStep.verifyCurrent,
+          SecurityFlowStep.chooseMethod,
           SecurityFlowStep.preflightOsAuth,
           SecurityFlowStep.apply,
         ],

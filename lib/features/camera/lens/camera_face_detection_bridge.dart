@@ -1,9 +1,8 @@
 import 'dart:math' as math;
-import 'dart:typed_data';
-import 'dart:ui' show Offset, Rect;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
+import 'package:mediapipe_face_mesh/mediapipe_face_mesh.dart';
 
 import 'face_tracker.dart';
 
@@ -17,7 +16,222 @@ class CameraFaceDetectionBridge {
       MethodChannel('chaty/camera_face_tracking');
   static const int _longSide = 160;
 
+  FaceMeshIsolatePipeline? _meshPipeline;
+  Future<FaceMeshIsolatePipeline>? _meshPipelineCreation;
+
+  /// Uses the open-source 478-landmark MediaPipe pipeline first. If model
+  /// loading or native inference fails, it falls back to the platform detector
+  /// already wired into the app. Camera frames remain on-device.
   Future<CameraFaceDetectionResult> detect(
+    CameraImage image, {
+    required int sensorOrientation,
+  }) async {
+    try {
+      final frame = _toFaceMeshFrame(image);
+      if (frame != null) {
+        final pipeline = await _ensureMeshPipeline();
+        if (pipeline.isBusy) {
+          // Skip this camera frame instead of running the slower native
+          // fallback concurrently. FaceAnchorSolver keeps the last stable pose
+          // briefly while the worker finishes its current frame.
+          final rotated = sensorOrientation % 180 != 0;
+          return CameraFaceDetectionResult(
+            imageWidth: rotated ? image.height : image.width,
+            imageHeight: rotated ? image.width : image.height,
+            faces: const <int, RawFace>{},
+          );
+        }
+        if (!pipeline.isClosed) {
+          final result = await pipeline.processMultiFace(
+            frame,
+            maxMeshFaces: 3,
+            rotationDegrees: sensorOrientation,
+          );
+          final rotated = sensorOrientation % 180 != 0;
+          return _fromMeshResult(
+            result,
+            fallbackWidth: rotated ? image.height : image.width,
+            fallbackHeight: rotated ? image.width : image.height,
+          );
+        }
+      }
+    } catch (_) {
+      // Gracefully fall back to Vision / Android FaceDetector if the optional
+      // model can't initialize or this device can't run the native runtime.
+    }
+
+    return _detectWithNativeChannel(
+      image,
+      sensorOrientation: sensorOrientation,
+    );
+  }
+
+  Future<FaceMeshIsolatePipeline> _ensureMeshPipeline() async {
+    final current = _meshPipeline;
+    if (current != null && !current.isClosed) return current;
+
+    final pending = _meshPipelineCreation;
+    if (pending != null) return pending;
+
+    final creation = FaceMeshIsolatePipeline.spawn(
+      _createChatyFaceMeshPipeline,
+      FaceMeshModel.v2,
+      debugName: 'ChatyFaceLensMesh',
+    );
+    _meshPipelineCreation = creation;
+    try {
+      final pipeline = await creation;
+      _meshPipeline = pipeline;
+      return pipeline;
+    } finally {
+      if (identical(_meshPipelineCreation, creation)) {
+        _meshPipelineCreation = null;
+      }
+    }
+  }
+
+  Future<void> dispose() async {
+    final pipeline = _meshPipeline;
+    _meshPipeline = null;
+    if (pipeline != null) {
+      await pipeline.close();
+    }
+  }
+
+  FaceMeshFrame? _toFaceMeshFrame(CameraImage image) {
+    final planes = image.planes;
+    if (planes.isEmpty) return null;
+
+    if (image.format.group == ImageFormatGroup.bgra8888) {
+      final plane = planes.first;
+      return FaceMeshImage(
+        pixels: plane.bytes,
+        width: image.width,
+        height: image.height,
+        bytesPerRow: plane.bytesPerRow,
+        pixelFormat: FaceMeshPixelFormat.bgra,
+      );
+    }
+
+    final y = planes.first;
+    if (image.format.group == ImageFormatGroup.nv21 && planes.length == 1) {
+      return FaceMeshNv21Image.tryFromSinglePlane(
+        bytes: y.bytes,
+        width: image.width,
+        height: image.height,
+        bytesPerRow: y.bytesPerRow,
+      );
+    }
+
+    if (planes.length == 2) {
+      return FaceMeshNv21Image.tryFromYAndInterleavedVuPlanes(
+        width: image.width,
+        height: image.height,
+        yPlane: FaceMeshImagePlane(
+          bytes: planes[0].bytes,
+          bytesPerRow: planes[0].bytesPerRow,
+          bytesPerPixel: planes[0].bytesPerPixel,
+        ),
+        vuPlane: FaceMeshImagePlane(
+          bytes: planes[1].bytes,
+          bytesPerRow: planes[1].bytesPerRow,
+          bytesPerPixel: planes[1].bytesPerPixel,
+        ),
+      );
+    }
+
+    if (planes.length >= 3) {
+      return FaceMeshNv21Image.tryFromYuv420Planes(
+        width: image.width,
+        height: image.height,
+        yPlane: FaceMeshImagePlane(
+          bytes: planes[0].bytes,
+          bytesPerRow: planes[0].bytesPerRow,
+          bytesPerPixel: planes[0].bytesPerPixel,
+        ),
+        uPlane: FaceMeshImagePlane(
+          bytes: planes[1].bytes,
+          bytesPerRow: planes[1].bytesPerRow,
+          bytesPerPixel: planes[1].bytesPerPixel,
+        ),
+        vPlane: FaceMeshImagePlane(
+          bytes: planes[2].bytes,
+          bytesPerRow: planes[2].bytesPerRow,
+          bytesPerPixel: planes[2].bytesPerPixel,
+        ),
+      );
+    }
+    return null;
+  }
+
+  CameraFaceDetectionResult _fromMeshResult(
+    FaceMeshMultiInferenceResult result, {
+    required int fallbackWidth,
+    required int fallbackHeight,
+  }) {
+    final faces = <int, RawFace>{};
+    var width = result.detectionResult?.imageWidth ?? fallbackWidth;
+    var height = result.detectionResult?.imageHeight ?? fallbackHeight;
+
+    for (final tracked in result.faces) {
+      final mesh = tracked.mesh;
+      width = mesh.imageWidth;
+      height = mesh.imageHeight;
+      final points = mesh.landmarks;
+      if (points.length < 468) continue;
+
+      Offset point(int index) => Offset(
+        points[index].x * mesh.imageWidth,
+        points[index].y * mesh.imageHeight,
+      );
+
+      // Use eye-corner anchors rather than iris centers. The eye corners
+      // produce correctly sized glasses and remain stable as the pupils move.
+      final leftEye = Offset(
+        (point(33).dx + point(133).dx) / 2,
+        (point(33).dy + point(133).dy) / 2,
+      );
+      final rightEye = Offset(
+        (point(362).dx + point(263).dx) / 2,
+        (point(362).dy + point(263).dy) / 2,
+      );
+      final nose = point(2);
+      final mouth = point(13);
+      final pixelPoints = points
+          .map((landmark) => Offset(
+                landmark.x * mesh.imageWidth,
+                landmark.y * mesh.imageHeight,
+              ))
+          .toList(growable: false);
+      final left = pixelPoints.map((p) => p.dx).reduce((a, b) => a < b ? a : b);
+      final top = pixelPoints.map((p) => p.dy).reduce((a, b) => a < b ? a : b);
+      final right = pixelPoints.map((p) => p.dx).reduce((a, b) => a > b ? a : b);
+      final bottom = pixelPoints.map((p) => p.dy).reduce((a, b) => a > b ? a : b);
+      final roll = math.atan2(
+        rightEye.dy - leftEye.dy,
+        rightEye.dx - leftEye.dx,
+      );
+
+      faces[tracked.trackId] = RawFace(
+        trackingId: tracked.trackId,
+        headBounds: Rect.fromLTRB(left, top, right, bottom),
+        leftEye: leftEye,
+        rightEye: rightEye,
+        noseBase: nose,
+        mouthCenter: mouth,
+        rollRadians: roll,
+        confidence: mesh.score,
+      );
+    }
+
+    return CameraFaceDetectionResult(
+      imageWidth: width,
+      imageHeight: height,
+      faces: faces,
+    );
+  }
+
+  Future<CameraFaceDetectionResult> _detectWithNativeChannel(
     CameraImage image, {
     required int sensorOrientation,
   }) async {
@@ -73,7 +287,6 @@ class CameraFaceDetectionBridge {
         faces: faces,
       );
     } on MissingPluginException {
-      // Desktop/test targets can still use the camera's normal capture UI.
       return CameraFaceDetectionResult(
         imageWidth: frame.width,
         imageHeight: frame.height,
@@ -83,6 +296,12 @@ class CameraFaceDetectionBridge {
       return CameraFaceDetectionResult(
         imageWidth: frame.width,
         imageHeight: frame.height,
+        faces: const <int, RawFace>{},
+      );
+    } on UnsupportedError {
+      return CameraFaceDetectionResult(
+        imageWidth: image.width,
+        imageHeight: image.height,
         faces: const <int, RawFace>{},
       );
     }
@@ -99,6 +318,7 @@ class CameraFaceDetectionBridge {
     final group = image.format.group;
 
     if (group != ImageFormatGroup.yuv420 &&
+        group != ImageFormatGroup.nv21 &&
         group != ImageFormatGroup.bgra8888) {
       throw UnsupportedError('Unsupported camera frame format: $group');
     }
@@ -127,15 +347,19 @@ class CameraFaceDetectionBridge {
           image.height,
           sensorOrientation,
         );
-        final rgb = group == ImageFormatGroup.bgra8888
-            ? _readBgra(yPlane, source.$1, source.$2)
-            : _readYuv(
-                yPlane,
-                uvPlane,
-                vPlane,
-                source.$1,
-                source.$2,
-              );
+        final rgb = switch (group) {
+          ImageFormatGroup.bgra8888 =>
+            _readBgra(yPlane, source.$1, source.$2),
+          ImageFormatGroup.nv21 =>
+            _readNv21(yPlane, image.width, image.height, source.$1, source.$2),
+          _ => _readYuv(
+              yPlane,
+              uvPlane,
+              vPlane,
+              source.$1,
+              source.$2,
+            ),
+        };
         final index = (y * width + x) * 3;
         pixels[index] = rgb.$1;
         pixels[index + 1] = rgb.$2;
@@ -166,6 +390,36 @@ class CameraFaceDetectionBridge {
       default:
         return (x.clamp(0, width - 1).toInt(), y.clamp(0, height - 1).toInt());
     }
+  }
+
+  (int, int, int) _readNv21(
+    Plane plane,
+    int width,
+    int height,
+    int x,
+    int y,
+  ) {
+    final bytes = plane.bytes;
+    final yIndex = y * plane.bytesPerRow + x;
+    final uvBase = plane.bytesPerRow * height;
+    final uvIndex =
+        uvBase + (y >> 1) * plane.bytesPerRow + (x & ~1);
+    final luminance = bytes[yIndex.clamp(0, bytes.length - 1).toInt()].toDouble();
+    var v = 128.0;
+    var u = 128.0;
+    if (uvIndex + 1 < bytes.length) {
+      v = bytes[uvIndex].toDouble();
+      u = bytes[uvIndex + 1].toDouble();
+    }
+    final red = (luminance + 1.402 * (v - 128)).round().clamp(0, 255).toInt();
+    final green =
+        (luminance - 0.344136 * (u - 128) - 0.714136 * (v - 128))
+            .round()
+            .clamp(0, 255)
+            .toInt();
+    final blue =
+        (luminance + 1.772 * (u - 128)).round().clamp(0, 255).toInt();
+    return (red, green, blue);
   }
 
   (int, int, int) _readBgra(Plane plane, int x, int y) {
@@ -246,3 +500,19 @@ class _RgbFrame {
   final int height;
   final Uint8List bytes;
 }
+
+
+Future<FaceMeshInferencePipeline> _createChatyFaceMeshPipeline(
+  FaceMeshModel model,
+) async {
+  final detector = await FaceDetectorProcessor.create(
+    maxResults: 3,
+    delegate: FaceMeshDelegate.xnnpack,
+  );
+  final mesh = await FaceMeshProcessor.create(
+    model: model,
+    delegate: FaceMeshDelegate.xnnpack,
+  );
+  return FaceMeshInferencePipeline(detector: detector, mesh: mesh);
+}
+
