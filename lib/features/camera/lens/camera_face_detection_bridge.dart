@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'dart:ui' show Offset, Rect;
 
 import 'package:camera/camera.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'face_tracker.dart';
@@ -131,7 +130,6 @@ class CameraFaceDetectionBridge {
         final rgb = group == ImageFormatGroup.bgra8888
             ? _readBgra(yPlane, source.$1, source.$2)
             : _readYuv(
-                image,
                 yPlane,
                 uvPlane,
                 vPlane,
@@ -157,20 +155,20 @@ class CameraFaceDetectionBridge {
   ) {
     switch ((sensorOrientation % 360 + 360) % 360) {
       case 90:
-        return (y.clamp(0, width - 1), (height - 1 - x).clamp(0, height - 1));
+        return (y.clamp(0, width - 1).toInt(), (height - 1 - x).clamp(0, height - 1).toInt());
       case 180:
         return (
-          (width - 1 - x).clamp(0, width - 1),
-          (height - 1 - y).clamp(0, height - 1),
+          (width - 1 - x).clamp(0, width - 1).toInt(),
+          (height - 1 - y).clamp(0, height - 1).toInt(),
         );
       case 270:
-        return ((width - 1 - y).clamp(0, width - 1), x.clamp(0, height - 1));
+        return ((width - 1 - y).clamp(0, width - 1).toInt(), x.clamp(0, height - 1).toInt());
       default:
-        return (x.clamp(0, width - 1), y.clamp(0, height - 1));
+        return (x.clamp(0, width - 1).toInt(), y.clamp(0, height - 1).toInt());
     }
   }
 
-  (int, int, int) _readBgra(CameraImagePlane plane, int x, int y) {
+  (int, int, int) _readBgra(Plane plane, int x, int y) {
     final stride = plane.bytesPerPixel ?? 4;
     final index = y * plane.bytesPerRow + x * stride;
     final bytes = plane.bytes;
