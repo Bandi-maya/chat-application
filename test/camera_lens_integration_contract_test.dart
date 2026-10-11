@@ -13,7 +13,7 @@ void main() {
     expect(source, contains('LensCarousel(manager: _lensManager)'));
     expect(source, contains('LensOverlay('));
     expect(source, contains('composeLensIntoImage('));
-    expect(source, contains('ImageFormatGroup.nv21'));
+    expect(source, contains('ImageFormatGroup.yuv420'));
     expect(source, contains('ImageFormatGroup.bgra8888'));
     expect(source, contains('_faceDetection.dispose()'));
   });
