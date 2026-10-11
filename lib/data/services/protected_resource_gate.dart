@@ -5,6 +5,7 @@ import 'local_lock_service.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../features/settings/security/app_lock_overlay.dart';
+import '../../features/settings/security/lock_credential_setup_modal.dart';
 
 /// Centralized authorization and access gate for protected resources in Chaty.
 ///
