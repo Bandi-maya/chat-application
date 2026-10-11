@@ -41,6 +41,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   int _currentIndex = 0;
   String _currentDestinationId = 'chats';
   DateTime? _lastExitAttempt;
+  Offset? _rootSwipeStart;
+  int? _rootSwipePointer;
   late final PageController _pageController;
 
   @override
@@ -53,6 +55,62 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   void dispose() {
     _pageController.dispose();
     super.dispose();
+  }
+
+  /// Tracks raw touch movement above every root destination, independently of
+  /// child gesture recognizers, so all shell styles share the same direction.
+  Widget _buildSwipeableRootStack({
+    required List<Widget> screens,
+    required List<_NavDestinationItem> navItems,
+    required int selectedIndex,
+  }) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: _recordRootPointerDown,
+      onPointerUp: (event) => _handleRootPointerUp(event, navItems),
+      onPointerCancel: _recordRootPointerCancel,
+      child: IndexedStack(index: selectedIndex, children: screens),
+    );
+  }
+
+  void _recordRootPointerDown(PointerDownEvent event) {
+    if (event.kind != PointerDeviceKind.touch || _rootSwipePointer != null) {
+      return;
+    }
+    _rootSwipePointer = event.pointer;
+    _rootSwipeStart = event.position;
+  }
+
+  void _recordRootPointerCancel(PointerCancelEvent event) {
+    if (event.pointer == _rootSwipePointer) {
+      _rootSwipePointer = null;
+      _rootSwipeStart = null;
+    }
+  }
+
+  void _handleRootPointerUp(
+    PointerUpEvent event,
+    List<_NavDestinationItem> navItems,
+  ) {
+    if (event.pointer != _rootSwipePointer) return;
+    final start = _rootSwipeStart;
+    _rootSwipePointer = null;
+    _rootSwipeStart = null;
+    if (start == null) return;
+
+    final delta = event.position - start;
+    // Ignore taps, vertical scrolling, and diagonal drags.
+    if (delta.dx.abs() < 78 || delta.dx.abs() < delta.dy.abs() * 1.3) {
+      return;
+    }
+
+    // Requested direction: left -> right advances; right -> left goes back.
+    final nextIndex = _currentIndex + (delta.dx > 0 ? 1 : -1);
+    if (nextIndex < 0 || nextIndex >= navItems.length) return;
+    _selectRootDestination(
+      nextIndex,
+      destinationId: navItems[nextIndex].id,
+    );
   }
 
   void _selectRootDestination(int next, {String? destinationId}) {
@@ -359,6 +417,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   theme: theme,
                   content: PageView(
                     controller: _pageController,
+                        reverse: true,
                     onPageChanged: (idx) {
                       if (idx >= 0 && idx < allDestinations.length &&
                           (_currentIndex != idx ||
@@ -450,6 +509,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 final Widget presetContent = navMode == AppNavigationMode.gestureTabs
                     ? PageView(
                         controller: _pageController,
+                        reverse: true,
                         physics: const BouncingScrollPhysics(),
                         onPageChanged: (idx) {
                           if (idx >= 0 &&
@@ -464,7 +524,11 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                         },
                         children: screens,
                       )
-                    : IndexedStack(index: effectiveIndex, children: screens);
+                    : _buildSwipeableRootStack(
+                        screens: screens,
+                        navItems: allDestinations,
+                        selectedIndex: effectiveIndex,
+                      );
                 return _buildPresetNavigationShell(
                   mode: navMode,
                   theme: theme,
@@ -498,6 +562,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                           (layoutMode == UILayoutMode.tabletDesktop || autoRail)));
               Widget content = PageView(
                 controller: _pageController,
+                        reverse: true,
                 physics: navMode == AppNavigationMode.gestureTabs
                     ? const BouncingScrollPhysics()
                     : const PageScrollPhysics(),
@@ -594,6 +659,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     final indicatorColor = colors.onPrimary;
 
     return DefaultTabController(
+      key: ValueKey<int>(selectedIndex),
       length: navItems.length,
       initialIndex: selectedIndex,
       child: Scaffold(
@@ -638,7 +704,11 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 ),
               ),
               Expanded(
-                child: IndexedStack(index: selectedIndex, children: screens),
+                child: _buildSwipeableRootStack(
+        screens: screens,
+        navItems: navItems,
+        selectedIndex: selectedIndex,
+      ),
               ),
             ],
           ),
@@ -809,7 +879,11 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       navItems: navItems,
       floatingActionButton: floatingActionButton,
       onSelect: onSelect,
-      child: IndexedStack(index: selectedIndex, children: screens),
+      child: _buildSwipeableRootStack(
+        screens: screens,
+        navItems: navItems,
+        selectedIndex: selectedIndex,
+      ),
     );
   }
 
@@ -827,7 +901,11 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       navItems: navItems,
       floatingActionButton: floatingActionButton,
       onSelect: onSelect,
-      child: IndexedStack(index: selectedIndex, children: screens),
+      child: _buildSwipeableRootStack(
+        screens: screens,
+        navItems: navItems,
+        selectedIndex: selectedIndex,
+      ),
     );
   }
 
@@ -968,7 +1046,11 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             dividerColor: colors.border,
           ),
           Expanded(
-            child: IndexedStack(index: selectedIndex, children: screens),
+            child: _buildSwipeableRootStack(
+        screens: screens,
+        navItems: navItems,
+        selectedIndex: selectedIndex,
+      ),
           ),
         ],
       ),
@@ -2970,27 +3052,20 @@ class _CurvedRadialDrawerScaffoldState
   ) {
     if (navItems.isEmpty) return const <Widget>[];
     final count = navItems.length;
-    final iconSize = count > 7 ? 25.0 : 30.0;
-    final centerX = width * 0.06;
-    final centerY = height * 0.08;
-    final radiusX = width * 0.38;
-    final radiusY = height * 1.10;
-    final endAngle = (count > 7 ? 75.0 : 70.0) * math.pi / 180;
+    final iconSize = count > 7 ? 23.0 : 26.0;
 
-    // Position every destination on an elliptical circular arc, rather than
-    // arranging the controls along a straight diagonal. The icon itself stays
-    // circular and the label remains horizontal and readable.
+    // Match the reference's broad quarter-circle sweep: the first few icons
+    // tuck toward the left edge before the arc opens out toward the bottom-right.
     return List<Widget>.generate(count, (index) {
       final progress = count <= 1 ? 0.0 : index / (count - 1);
-      // Distribute items evenly down the arc, then derive X from the ellipse.
-      // This prevents the first few circles from bunching together near the top.
-      final cosTheta =
-          1 - progress * (1 - math.cos(endAngle));
-      final angle = math.acos(cosTheta.clamp(-1.0, 1.0));
-      // Icons progress from the upper-left toward the lower-right, following
-      // the same curved edge as the menu panel.
-      final left = centerX + radiusX * math.sin(angle);
-      final top = centerY + radiusY * (1 - math.cos(angle));
+      final left = (width *
+              (0.20 -
+                  0.09 * math.sin(math.pi * progress) +
+                  0.55 * progress * progress))
+          .toDouble();
+      final top = (height *
+              (0.04 + 0.50 * math.pow(progress, 0.95).toDouble()))
+          .toDouble();
       final item = navItems[index];
       final activeIndex = selectedIndex < 0
           ? 0
@@ -3051,6 +3126,10 @@ class _CurvedRadialDrawerScaffoldState
                 ),
               ),
               const SizedBox(width: 7),
+              Transform.rotate(
+                angle: -0.04 - progress * 0.30,
+                alignment: Alignment.centerLeft,
+                child:
               SizedBox(
                 width: labelWidth,
                 child: Material(
@@ -3083,6 +3162,7 @@ class _CurvedRadialDrawerScaffoldState
                   ),
                 ),
               ),
+              ),
             ],
           ),
         ),
@@ -3097,38 +3177,34 @@ class _CurvedRadialMenuClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
     return Path()
-      ..moveTo(0, 0)
+      // The pink shape starts inset at the top-left, like the reference.
+      ..moveTo(size.width * 0.16, 0)
       ..lineTo(size.width, 0)
+      ..lineTo(size.width, size.height * 0.62)
+      // Long outer curve forms the lower-right edge of the large circular panel.
       ..cubicTo(
-        size.width * 1.01,
-        size.height * 0.24,
-        size.width * 0.98,
-        size.height * 0.48,
-        size.width * 0.80,
-        size.height * 0.65,
+        size.width * 0.78,
+        size.height * 0.74,
+        size.width * 0.52,
+        size.height * 0.72,
+        size.width * 0.30,
+        size.height * 0.62,
       )
+      // Return around the left side to create the open, sweeping quarter-circle.
       ..cubicTo(
-        size.width * 0.62,
-        size.height * 0.84,
-        size.width * 0.39,
-        size.height * 0.94,
-        size.width * 0.20,
-        size.height * 0.84,
-      )
-      ..cubicTo(
-        -size.width * 0.02,
-        size.height * 0.73,
-        -size.width * 0.06,
-        size.height * 0.43,
         size.width * 0.08,
-        size.height * 0.18,
+        size.height * 0.51,
+        -size.width * 0.05,
+        size.height * 0.31,
+        size.width * 0.055,
+        size.height * 0.12,
       )
       ..cubicTo(
-        size.width * 0.13,
-        size.height * 0.08,
-        size.width * 0.20,
+        size.width * 0.075,
+        size.height * 0.055,
+        size.width * 0.11,
         0,
-        size.width * 0.20,
+        size.width * 0.16,
         0,
       )
       ..close();
