@@ -148,7 +148,8 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
     final sameAsCurrent = chosen == current;
     final needsCredentialSetup =
         SecurityFlowPlan.hasVerifiableSecret(chosen) &&
-        !(sameAsCurrent && verifiedCurrent && chosenHasSecret);
+        (intent == SecurityIntent.changeCredential ||
+            !(sameAsCurrent && verifiedCurrent && chosenHasSecret));
 
     if (intent != SecurityIntent.disableLock &&
         SecurityFlowPlan.hasVerifiableSecret(chosen) &&
@@ -168,7 +169,8 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
     }
 
     if (intent != SecurityIntent.disableLock &&
-        !SecurityFlowPlan.hasVerifiableSecret(chosen)) {
+        !SecurityFlowPlan.hasVerifiableSecret(chosen) &&
+        !(sameAsCurrent && verifiedCurrent)) {
       final ok = chosen == LockMethodType.biometric
           ? await _lockService.authenticateBiometric(
               reason: 'Confirm biometric unlock works for Chaty',
