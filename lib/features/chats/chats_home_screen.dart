@@ -1388,7 +1388,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               child: Material(
                 color: Colors.transparent,
                 child: Container(
-                  width: 276,
+                  width: MediaQuery.sizeOf(ctx).width < 320
+                      ? MediaQuery.sizeOf(ctx).width - 24
+                      : 276,
                   constraints: BoxConstraints(
                     maxHeight: MediaQuery.of(ctx).size.height * 0.75,
                   ),
