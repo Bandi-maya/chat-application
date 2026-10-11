@@ -49,6 +49,7 @@ import 'contact_info_screen.dart';
 import 'group_info_screen.dart';
 import '../../data/services/connection_health_service.dart';
 import '../../data/services/outgoing_message_queue_engine.dart';
+import '../../data/services/protected_resource_gate.dart';
 import '../../ui/core/connection/connection_health_indicator.dart';
 import '../../ui/core/connection/connection_detail_sheet.dart';
 import '../../ui/core/connection/global_connection_banner.dart';
@@ -131,6 +132,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   String? _editingMessageId;
 
   bool get _isSelectionMode => _selectedMessageIds.isNotEmpty;
+  bool _accessAuthorized = false;
+  bool _accessCheckStarted = false;
 
   ChatyPreferencesController get _preferences => widget.preferencesController;
 
@@ -143,7 +146,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   void initState() {
     super.initState();
     _realtime = locator<RichChatRealtimeService>();
-    _realtime.setActiveConversation(widget.conversationId);
     _relationships = locator<ContactRelationshipService>();
     _attachments = ChatAttachmentActions(
       conversationId: widget.conversationId,
@@ -154,17 +156,49 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       conversationId: widget.conversationId,
       dataStore: widget.dataStore,
     );
+
+    // Defense in depth: every route into ChatDetailScreen must pass the same
+    // authorization gate. Search, notifications, linked devices and starred
+    // messages can push this screen without using the chat-list tap handler.
+    // Do not subscribe to realtime, load messages, or render chat data first.
+    unawaited(_authorizeBeforeLoading());
+  }
+
+  Future<void> _authorizeBeforeLoading() async {
+    if (_accessCheckStarted) return;
+    _accessCheckStarted = true;
+    final authorized = await ProtectedResourceGate.authorizeConversation(
+      context,
+      conversationId: widget.conversationId,
+      preferencesController: widget.preferencesController,
+      title: 'Locked Chat',
+      reason: 'Authenticate to open this conversation',
+    );
+    if (!mounted) return;
+    if (!authorized) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+      });
+      return;
+    }
+
     final conversation = widget.dataStore.conversations
         .where((item) => item.id == widget.conversationId)
         .firstOrNull;
-    if (conversation != null && conversation.draftText.isNotEmpty)
+    if (conversation != null && conversation.draftText.isNotEmpty) {
       _textCtrl.text = conversation.draftText;
-    unawaited(_realtime.trackConversation(widget.conversationId));
-    unawaited(_loadChatWallpaperOverride());
+    }
+
+    _realtime.setActiveConversation(widget.conversationId);
     _scrollCtrl.addListener(_handleScrollChanged);
     widget.dataStore.addListener(_onDataStoreChanged);
+    setState(() => _accessAuthorized = true);
+    unawaited(_realtime.trackConversation(widget.conversationId));
+    unawaited(_loadChatWallpaperOverride());
     if (widget.initialMessageId == null) _scrollToBottom(animate: false);
-    _loadConversation();
+    unawaited(_loadConversation());
   }
 
   Future<void> _loadChatWallpaperOverride() async {
@@ -251,10 +285,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       widget.dataStore.setTyping(widget.conversationId, false);
     if (_recording)
       unawaited(_realtime.setRecording(widget.conversationId, false));
-    widget.dataStore.persistDraftSilently(
-      widget.conversationId,
-      _textCtrl.text,
-    );
+    if (_accessAuthorized) {
+      widget.dataStore.persistDraftSilently(
+        widget.conversationId,
+        _textCtrl.text,
+      );
+    }
     _scrollCtrl.removeListener(_handleScrollChanged);
     widget.dataStore.removeListener(_onDataStoreChanged);
     unawaited(_voice.dispose());
@@ -1390,6 +1426,37 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_accessAuthorized) {
+      final theme = widget.themeController?.globalTheme ?? widget.theme;
+      return Scaffold(
+        backgroundColor: theme.backgroundColor,
+        body: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 26,
+                  height: 26,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.4,
+                    color: theme.accentColor,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Verifying chat access…',
+                  style: TextStyle(
+                    color: theme.secondaryTextColor,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     return ListenableBuilder(
       listenable: Listenable.merge(<Listenable>[
         widget.dataStore,
