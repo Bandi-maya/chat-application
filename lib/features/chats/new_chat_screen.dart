@@ -14,11 +14,15 @@ class NewChatScreen extends StatefulWidget {
   final ChatyDataStore dataStore;
   final ChatyPreferencesController? preferencesController;
 
+  /// Opens directly in member-selection mode when launched from the Groups FAB.
+  final bool startInGroupMode;
+
   const NewChatScreen({
     super.key,
     required this.theme,
     required this.dataStore,
     this.preferencesController,
+    this.startInGroupMode = false,
   });
 
   @override
@@ -30,7 +34,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
   final Set<String> _selectedGroupMembers = <String>{};
   final TextEditingController _groupNameCtrl = TextEditingController();
   List<UserProfile> _results = <UserProfile>[];
-  bool _isCreatingGroup = false;
+  late bool _isCreatingGroup;
   bool _isLoading = false;
   Timer? _debounce;
   int _epoch = 0;
@@ -38,6 +42,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
   @override
   void initState() {
     super.initState();
+    _isCreatingGroup = widget.startInGroupMode;
     _results = widget.dataStore.contacts;
   }
 
