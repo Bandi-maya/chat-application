@@ -162,7 +162,9 @@ void main() {
       expect(completedPattern, isNull);
     });
 
-    testWidgets('PatternLockPad exposes a 4 by 4 grid for accessibility', (tester) async {
+    testWidgets(
+      'PatternLockPad exposes a 4 by 4 grid for accessibility',
+      (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -172,7 +174,8 @@ void main() {
           ),
         ),
       );
-      expect(find.bySemanticsLabel('Pattern lock grid 4 by 4'), findsOneWidget);
-    });
+        expect(find.bySemanticsLabel('Pattern lock grid 4 by 4'), findsOneWidget);
+      },
+    );
   });
 }
