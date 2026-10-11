@@ -120,6 +120,7 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
   Size _previewViewportSize = Size.zero;
 
   bool get _wantsFaceTracking =>
+      _capturedFile == null &&
       _captureViewMode == _CaptureViewMode.photo &&
       _lensManager.selected.requiresFaceTracking;
 
@@ -172,7 +173,14 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
     }
     final previous = _controller;
     _controller = null;
+    _faceSolver.reset();
+    _facePoses.value = const <FacePose>[];
     if (previous != null) {
+      try {
+        if (previous.value.isStreamingImages) {
+          await previous.stopImageStream();
+        }
+      } catch (_) {}
       try {
         await previous.dispose();
       } catch (_) {}
@@ -295,7 +303,7 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
   ) async {
     if (!_wantsFaceTracking || _processingFaceFrame) return;
     final nowMs = DateTime.now().millisecondsSinceEpoch;
-    if (nowMs - _lastFaceFrameMs < 90) return;
+    if (nowMs - _lastFaceFrameMs < 45) return;
     _lastFaceFrameMs = nowMs;
     _processingFaceFrame = true;
     try {
@@ -410,6 +418,7 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
       _capturedFile = XFile(selectedPath);
       _effectsOpen = false;
     });
+    unawaited(_syncFaceDetectionStream());
   }
 
   Future<void> _shutter() async {
@@ -481,6 +490,7 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
       }
       if (!mounted) return;
       setState(() => _capturedFile = XFile(capturedPath));
+      unawaited(_syncFaceDetectionStream());
     } on CameraException catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -496,6 +506,7 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
   void _discard() {
     ChatyHaptics.light();
     setState(() => _capturedFile = null);
+    unawaited(_syncFaceDetectionStream());
   }
 
   Future<void> _confirmAndSend() async {
