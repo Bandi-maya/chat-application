@@ -165,16 +165,22 @@ void main() {
     testWidgets(
       'PatternLockPad exposes a 4 by 4 grid for accessibility',
       (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Center(
-              child: PatternLockPad(onPatternComplete: (_) {}, gridSize: 4),
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: PatternLockPad(
+                  onPatternComplete: (_) {},
+                  gridSize: 4,
+                ),
+              ),
             ),
           ),
-        ),
-      );
-        expect(find.bySemanticsLabel('Pattern lock grid 4 by 4'), findsOneWidget);
+        );
+        expect(
+          find.bySemanticsLabel('Pattern lock grid 4 by 4'),
+          findsOneWidget,
+        );
       },
     );
   });
