@@ -2,6 +2,7 @@ import 'package:animated_emoji/animated_emoji.dart';
 import 'package:flutter/material.dart';
 import '../../core/emoji/emoji_registry.dart';
 import '../../core/emoji/widgets/chaty_emoji_picker.dart' as central;
+export '../../core/emoji/widgets/chaty_emoji_picker.dart' show ChatyEmojiComposerAction, ChatyEmojiComposerResult;
 
 /// Public facade for the Chaty Emoji Picker.
 class ChatyEmojiPicker {
