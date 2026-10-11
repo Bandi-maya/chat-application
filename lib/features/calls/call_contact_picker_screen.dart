@@ -272,7 +272,10 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
       ('*', ''), ('0', '+'), ('#', ''),
     ];
     return AnimatedSize(
-      duration: ChatyMotion.duration(context, preferred: ChatyMotion.standard),
+      duration: ChatyMotion.duration(
+                      context,
+                      preferred: ChatyMotion.standard,
+                    ),
       curve: ChatyMotion.enter,
       child: _isKeypadCollapsed
           ? const SizedBox.shrink()
