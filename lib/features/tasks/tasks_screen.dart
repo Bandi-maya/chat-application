@@ -526,7 +526,10 @@ class _TasksScreenState extends State<TasksScreen>
                     builder: (context, candidates, rejected) {
                       final highlighted = candidates.isNotEmpty;
                       return AnimatedContainer(
-                        duration: ChatyMotion.duration(context, preferred: ChatyMotion.standard),
+                        duration: ChatyMotion.duration(
+                            context,
+                            preferred: ChatyMotion.standard,
+                        ),
                         curve: ChatyMotion.standardEasing,
                         width: columnWidth,
                         constraints: BoxConstraints(
