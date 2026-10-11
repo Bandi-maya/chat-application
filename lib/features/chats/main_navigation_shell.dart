@@ -28,6 +28,8 @@ import '../../data/services/status_service.dart';
 import '../../data/services/call_signaling_service.dart';
 import '../calls/ongoing_call_screen.dart';
 import '../settings/settings_root_screen.dart';
+import '../settings/home/home_screen_settings_page.dart';
+import '../settings/gb_features/gb_settings_screen.dart';
 import '../tasks/task_create_edit_modal.dart';
 
 class MainNavigationShell extends StatefulWidget {
@@ -1983,7 +1985,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         ? Color(homePrefs.fabIconsColor!)
         : colors.onPrimary;
 
-    return FloatingActionButton(
+    final standardFab = FloatingActionButton(
       heroTag: 'chaty_contextual_nav_fab',
       tooltip: tooltip,
       shape: const CircleBorder(),
@@ -2048,6 +2050,115 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 color: effectiveIconColor,
               ),
       ),
+    );
+
+    if (activeItem.id != 'chats') return standardFab;
+
+    final quickActions = <_HomeSpeedDialAction>[];
+    if (!homePrefs.hideNewMessageFab) {
+      quickActions.add(
+        _HomeSpeedDialAction(
+          id: 'new-message',
+          label: 'New message',
+          icon: Icons.mark_chat_unread_rounded,
+          onPressed: action,
+        ),
+      );
+    }
+    if (!homePrefs.hideLastSeenFab) {
+      quickActions.add(
+        _HomeSpeedDialAction(
+          id: 'freeze-last-seen',
+          label: prefsController.privacy.freezeLastSeen
+              ? 'Unfreeze last seen'
+              : 'Freeze last seen',
+          icon: Icons.history_toggle_off_rounded,
+          onPressed: () {
+            final next = !prefsController.privacy.freezeLastSeen;
+            prefsController.updatePrivacy(
+              prefsController.privacy.copyWith(freezeLastSeen: next),
+              logTitle: 'Freeze Last Seen',
+            );
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(next ? 'Last seen frozen' : 'Last seen restored'),
+              ),
+            );
+          },
+        ),
+      );
+    }
+    if (!homePrefs.hideCutEditFab) {
+      quickActions.add(
+        _HomeSpeedDialAction(
+          id: 'home-tools',
+          label: 'Home tools',
+          icon: Icons.content_cut_rounded,
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => HomeScreenSettingsPage(
+                  preferencesController: prefsController,
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+    if (!homePrefs.hidePluginsList) {
+      quickActions.add(
+        _HomeSpeedDialAction(
+          id: 'features',
+          label: 'Features & plugins',
+          icon: Icons.extension_rounded,
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => SettingsRootScreen(
+                  preferencesController: prefsController,
+                  themeController: locator<ThemeController>(),
+                  dataStore: locator<ChatyDataStore>(),
+                  notificationService: locator<ChatyNotificationService>(),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+    if (!homePrefs.hideGbwaSettingsFab) {
+      quickActions.add(
+        _HomeSpeedDialAction(
+          id: 'chaty-settings',
+          label: 'Chaty Settings',
+          icon: Icons.settings_rounded,
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => GbSettingsScreen(
+                  preferencesController: prefsController,
+                  themeController: locator<ThemeController>(),
+                  dataStore: locator<ChatyDataStore>(),
+                  notificationService: locator<ChatyNotificationService>(),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+    if (quickActions.isEmpty) {
+      return homePrefs.hideNewMessageFab ? null : standardFab;
+    }
+    return _ChatyHomeSpeedDialFab(
+      actions: quickActions,
+      normalColor: effectiveFabColor,
+      pressedColor: effectiveSplashColor,
+      iconColor: effectiveIconColor,
+      surfaceColor: colors.surfaceElevated,
+      textColor: colors.foreground,
+      showMetaAiIcon: homePrefs.showMetaAiIcon,
     );
   }
 
@@ -2868,6 +2979,180 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _HomeSpeedDialAction {
+  final String id;
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  const _HomeSpeedDialAction({
+    required this.id,
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+  });
+}
+
+class _ChatyHomeSpeedDialFab extends StatefulWidget {
+  final List<_HomeSpeedDialAction> actions;
+  final Color normalColor;
+  final Color? pressedColor;
+  final Color iconColor;
+  final Color surfaceColor;
+  final Color textColor;
+  final bool showMetaAiIcon;
+
+  const _ChatyHomeSpeedDialFab({
+    required this.actions,
+    required this.normalColor,
+    required this.pressedColor,
+    required this.iconColor,
+    required this.surfaceColor,
+    required this.textColor,
+    required this.showMetaAiIcon,
+  });
+
+  @override
+  State<_ChatyHomeSpeedDialFab> createState() => _ChatyHomeSpeedDialFabState();
+}
+
+class _ChatyHomeSpeedDialFabState extends State<_ChatyHomeSpeedDialFab> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        AnimatedSize(
+          duration: const Duration(milliseconds: 230),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.bottomRight,
+          child: _expanded
+              ? Column(
+                  key: const ValueKey<String>('home-speed-dial-open'),
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: widget.actions.map((action) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 9),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Material(
+                            color: widget.surfaceColor,
+                            elevation: 3,
+                            borderRadius: BorderRadius.circular(14),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 11,
+                                vertical: 8,
+                              ),
+                              child: Text(
+                                action.label,
+                                style: TextStyle(
+                                  color: widget.textColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 9),
+                          SizedBox(
+                            width: 43,
+                            height: 43,
+                            child: FloatingActionButton(
+                              heroTag: 'chaty_home_speed_dial_${action.id}',
+                              tooltip: action.label,
+                              mini: true,
+                              backgroundColor:
+                                  widget.pressedColor ?? widget.normalColor,
+                              foregroundColor: widget.iconColor,
+                              onPressed: () {
+                                setState(() => _expanded = false);
+                                action.onPressed();
+                              },
+                              child: Icon(action.icon, size: 19),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(growable: false),
+                )
+              : const SizedBox(
+                  key: ValueKey<String>('home-speed-dial-closed'),
+                  width: 0,
+                  height: 0,
+                ),
+        ),
+        FloatingActionButton(
+          heroTag: 'chaty_contextual_nav_fab',
+          tooltip: _expanded ? 'Close quick actions' : 'Open quick actions',
+          shape: const CircleBorder(),
+          elevation: 4.5,
+          backgroundColor: widget.normalColor,
+          splashColor: widget.pressedColor,
+          foregroundColor: widget.iconColor,
+          onPressed: () => setState(() => _expanded = !_expanded),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            transitionBuilder: (child, animation) => ScaleTransition(
+              scale: animation,
+              child: RotationTransition(
+                turns: Tween<double>(begin: 0.85, end: 1.0).animate(animation),
+                child: child,
+              ),
+            ),
+            child: _expanded
+                ? Icon(
+                    Icons.close_rounded,
+                    key: const ValueKey<String>('speed-dial-close'),
+                    size: 24,
+                    color: widget.iconColor,
+                  )
+                : Stack(
+                    key: ValueKey<bool>(widget.showMetaAiIcon),
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(
+                        Icons.chat_bubble_rounded,
+                        size: 24,
+                        color: widget.iconColor,
+                      ),
+                      if (widget.showMetaAiIcon)
+                        Positioned(
+                          right: -5,
+                          top: -5,
+                          child: Container(
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: widget.normalColor,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: widget.iconColor.withValues(alpha: 0.95),
+                                width: 1,
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.auto_awesome_rounded,
+                              size: 10,
+                              color: widget.iconColor,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+        ),
+      ],
     );
   }
 }
