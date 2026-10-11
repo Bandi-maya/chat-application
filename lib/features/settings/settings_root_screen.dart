@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../../data/repositories/chaty_data_store.dart';
+import '../../data/services/profile_media_service.dart';
 import '../../data/services/contact_relationship_service.dart';
 import '../../data/services/notification_service.dart';
 import '../../domain/models/user_profile.dart';
@@ -314,64 +317,159 @@ class SettingsRootScreen extends StatelessWidget {
         body: SingleChildScrollView(
           child: Column(
             children: [
-              // Profile Header Card
-              InkWell(
-                onTap: () => _showEditProfile(context),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0xFF223038),
-                          border: Border.all(color: const Color(0xFF1E282E), width: 2),
+              // Editable account cover and overlapping avatar; all media is
+              // loaded from the user's own profile data rather than a demo asset.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                child: Column(
+                  children: [
+                    Stack(
+                      clipBehavior: Clip.none,
+                      alignment: Alignment.bottomCenter,
+                      children: [
+                        Container(
+                          height: 158,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: colors.surface,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: colors.borderSubtle),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(19),
+                            child: (user.bannerUrl ?? '').trim().isEmpty
+                                ? DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          theme.accentColor.withValues(alpha: 0.30),
+                                          colors.surface,
+                                          colors.background,
+                                        ],
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: Icon(
+                                        Icons.wallpaper_outlined,
+                                        size: 34,
+                                        color: theme.accentColor.withValues(alpha: 0.65),
+                                      ),
+                                    ),
+                                  )
+                                : _accountBannerImage(user.bannerUrl!, colors),
+                          ),
                         ),
-                        child: ClipOval(
-                          child: user.avatarUrl != null && user.avatarUrl!.isNotEmpty
-                              ? Image.network(
-                                  user.avatarUrl!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => _avatarFallback(user),
-                                )
-                              : _avatarFallback(user),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              displayName,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
+                        Positioned(
+                          right: 10,
+                          top: 10,
+                          child: Material(
+                            color: colors.surface.withValues(alpha: 0.92),
+                            shape: const CircleBorder(),
+                            child: IconButton(
+                              tooltip: 'Change account banner',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () => _editAccountBanner(context),
+                              icon: Icon(
+                                Icons.wallpaper_outlined,
+                                color: colors.foreground,
+                                size: 19,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              user.about.isNotEmpty ? user.about : handle,
-                              style: const TextStyle(
-                                color: Color(0xFF8696A0),
-                                fontSize: 13.5,
+                          ),
+                        ),
+                        Positioned(
+                          bottom: -40,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: colors.background,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: colors.borderSubtle, width: 1),
+                            ),
+                            child: ClipOval(
+                              child: user.avatarUrl != null && user.avatarUrl!.isNotEmpty
+                                  ? Image.network(
+                                      user.avatarUrl!,
+                                      width: 84,
+                                      height: 84,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => _avatarFallback(user, size: 84),
+                                    )
+                                  : SizedBox(
+                                      width: 84,
+                                      height: 84,
+                                      child: _avatarFallback(user, size: 84),
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 50),
+                    InkWell(
+                      onTap: () => _showEditProfile(context),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                displayName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: colors.foreground,
+                                  fontSize: 21,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.35,
+                                ),
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: colors.foregroundSecondary,
+                              size: 21,
                             ),
                           ],
                         ),
                       ),
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        color: Color(0xFF8696A0),
-                        size: 24,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      handle,
+                      style: TextStyle(
+                        color: colors.foregroundSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                    if (user.about.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Text(
+                          user.about,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: colors.foregroundSecondary,
+                            fontSize: 12.5,
+                          ),
+                        ),
                       ),
                     ],
-                  ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: () => _showEditProfile(context),
+                      icon: const Icon(Icons.edit_outlined, size: 16),
+                      label: const Text('Edit profile'),
+                    ),
+                  ],
                 ),
               ),
 
@@ -454,15 +552,85 @@ class SettingsRootScreen extends StatelessWidget {
     );
   }
 
-  Widget _avatarFallback(UserProfile user) {
+  Widget _accountBannerImage(String source, AppColors colors) {
+    final trimmed = source.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return Image.network(
+        trimmed,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _accountBannerFallback(colors),
+      );
+    }
+    return Image.file(
+      File(trimmed.replaceFirst('file://', '')),
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => _accountBannerFallback(colors),
+    );
+  }
+
+  Widget _accountBannerFallback(AppColors colors) => ColoredBox(
+    color: colors.surfaceElevated,
+    child: Center(
+      child: Icon(
+        Icons.wallpaper_outlined,
+        color: colors.foregroundSecondary,
+        size: 30,
+      ),
+    ),
+  );
+
+  Future<void> _editAccountBanner(BuildContext context) async {
+    final source = await showModalBottomSheet<ProfileMediaSource>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_rounded),
+              title: const Text('Take photo'),
+              onTap: () => Navigator.of(sheetContext).pop(ProfileMediaSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.of(sheetContext).pop(ProfileMediaSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !context.mounted) return;
+    try {
+      final url = await ProfileMediaService().uploadBanner(
+        source: source,
+        context: context,
+      );
+      await dataStore.updateUser(dataStore.currentUser.copyWith(bannerUrl: url));
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Banner updated.')));
+    } catch (error) {
+      if (error.toString().contains('cancelled') || !context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update banner: $error')),
+      );
+    }
+  }
+
+  Widget _avatarFallback(UserProfile user, {double size = 60}) {
     return Container(
       color: const Color(0xFF223038),
+      width: size,
+      height: size,
       child: Center(
         child: Text(
           user.avatarInitials.isNotEmpty ? user.avatarInitials : 'BM',
-          style: const TextStyle(
+          style: TextStyle(
             color: Colors.white,
-            fontSize: 28,
+            fontSize: size * 0.46,
             fontWeight: FontWeight.w700,
           ),
         ),
