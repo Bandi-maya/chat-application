@@ -5,6 +5,7 @@ import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/notification_service.dart';
 import '../../domain/models/conversation.dart';
 import '../../ui/core/controllers/appearance_variant_controller.dart';
+import '../../ui/core/controllers/home_preset_normalizer.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/gb/gb_theme_overrides.dart';
 import '../calls/calls_screen.dart';
@@ -330,7 +331,14 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 18,
               }.contains(navIndex);
               final autoRail = constraints.maxWidth >= (forceRail ? 720 : 900);
-              final navMode = themeController.navigationMode;
+              // The Home UI selection is persisted with user preferences.
+              // Resolve it before the template-owned fallback so the chosen
+              // shell survives startup template synchronization and app restart.
+              final navMode =
+                  HomePresetNormalizer.navigationMode(
+                    preferencesController.home.homeStyle,
+                  ) ??
+                  themeController.navigationMode;
 
               // 1. TOP WHATSAPP-STYLE GREEN TAB BAR (Image 1)
               if (navMode == AppNavigationMode.topWhatsAppBar) {
