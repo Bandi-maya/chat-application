@@ -644,7 +644,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                         searchPlacement == 'Header action' &&
                         _isSearchOpen)
                       _homeSearchField(theme),
-                    if ((homePrefs.enableStoriesStrip || styleStoriesFirst) &&                    if ((homePrefs.enableStoriesStrip || styleStoriesFirst) &&
+                    if ((homePrefs.enableStoriesStrip || styleStoriesFirst) &&
                         !styleStoriesHidden &&
                         widget.forcedType != ConversationType.group)
                       SizedBox(
