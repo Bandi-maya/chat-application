@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
-import 'dart:ui' show Offset, Rect;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
