@@ -92,6 +92,7 @@ class LocalLockService {
     String method,
     String secret, {
     int? pinLength,
+    int? patternGridSize,
   }) async {
     final normalized = _normalizedMethod(method);
     if (secret.isEmpty) throw ArgumentError('Credential must not be empty.');
@@ -103,8 +104,12 @@ class LocalLockService {
       }
       await setPinLength(expectedLength);
     }
-    if (normalized == 'pattern' && !_isValidPattern(secret)) {
-      throw ArgumentError('Pattern must connect at least 4 unique points.');
+    final safePatternGridSize = patternGridSize == 4 ? 4 : 3;
+    if (normalized == 'pattern' &&
+        !_isValidPattern(secret, gridSize: safePatternGridSize)) {
+      throw ArgumentError(
+        'Pattern must connect at least 4 unique points within the selected grid.',
+      );
     }
     if (normalized == 'password' && secret.length < 6) {
       throw ArgumentError('Password must contain at least 6 characters.');
@@ -124,6 +129,12 @@ class LocalLockService {
       key: _hashKey(normalized),
       value: base64Encode(bytes),
     );
+    if (normalized == 'pattern') {
+      await _secureStorage.write(
+        key: _patternGridSizeKey,
+        value: '$safePatternGridSize',
+      );
+    }
   }
 
   /// Verifies credential with brute-force rate-limiting & cooldown.
@@ -370,16 +381,29 @@ class LocalLockService {
     await clearSecretPhrase();
     await resetFailedAttempts();
     await _secureStorage.delete(key: _pinLengthKey);
+    await _secureStorage.delete(key: _patternGridSizeKey);
   }
 
-  bool _isValidPattern(String pattern) {
+  Future<int> getPatternGridSize() async {
+    try {
+      final value = int.tryParse(
+        await _secureStorage.read(key: _patternGridSizeKey) ?? '',
+      );
+      return value == 4 ? 4 : 3;
+    } catch (_) {
+      return 3;
+    }
+  }
+
+  bool _isValidPattern(String pattern, {int gridSize = 3}) {
     final values = pattern
         .split('-')
         .where((value) => value.isNotEmpty)
         .toList(growable: false);
     if (values.length < 4) return false;
     final parsed = values.map(int.tryParse).toList(growable: false);
-    if (parsed.any((value) => value == null || value < 0 || value > 8)) {
+    final maxIndex = gridSize * gridSize - 1;
+    if (parsed.any((value) => value == null || value < 0 || value > maxIndex)) {
       return false;
     }
     return parsed.toSet().length == parsed.length;
