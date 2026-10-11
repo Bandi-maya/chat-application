@@ -1,4 +1,6 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -45,6 +47,71 @@ class LensOverlay extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+
+/// Bakes an active lens onto a captured still without a third-party image
+/// package. [poses] are in the live, cover-cropped preview coordinate space;
+/// they are inverse-mapped onto the output image before painting.
+Future<Uint8List> composeLensIntoImage({
+  required Uint8List sourceBytes,
+  required Size previewSize,
+  required LensDefinition lens,
+  required List<FacePose> poses,
+}) async {
+  final codec = await ui.instantiateImageCodec(sourceBytes);
+  final frame = await codec.getNextFrame();
+  final image = frame.image;
+  try {
+    final imageSize = Size(image.width.toDouble(), image.height.toDouble());
+    final scale = math.max(
+      previewSize.width / imageSize.width,
+      previewSize.height / imageSize.height,
+    );
+    final cropLeft = (previewSize.width - imageSize.width * scale) / 2;
+    final cropTop = (previewSize.height - imageSize.height * scale) / 2;
+
+    Offset toImage(Offset point) => Offset(
+      (point.dx - cropLeft) / scale,
+      (point.dy - cropTop) / scale,
+    );
+
+    final mappedPoses = poses.map((pose) {
+      final first = toImage(pose.headBounds.topLeft);
+      final second = toImage(pose.headBounds.bottomRight);
+      return FacePose(
+        trackingId: pose.trackingId,
+        headBounds: Rect.fromPoints(first, second),
+        leftEye: toImage(pose.leftEye),
+        rightEye: toImage(pose.rightEye),
+        noseBase: toImage(pose.noseBase),
+        mouthCenter: toImage(pose.mouthCenter),
+        rollRadians: pose.rollRadians,
+        yawRadians: pose.yawRadians,
+        pitchRadians: pose.pitchRadians,
+        confidence: pose.confidence,
+      );
+    }).toList(growable: false);
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.drawImage(image, Offset.zero, Paint());
+    _LensAnchorPainter(lens: lens, poses: mappedPoses, opacity: 1).paint(
+      canvas,
+      imageSize,
+    );
+    final rendered = await recorder.endRecording().toImage(image.width, image.height);
+    try {
+      final data = await rendered.toByteData(format: ui.ImageByteFormat.png);
+      if (data == null) throw StateError('Lens image encoding failed.');
+      return data.buffer.asUint8List();
+    } finally {
+      rendered.dispose();
+    }
+  } finally {
+    image.dispose();
+    codec.dispose();
   }
 }
 
