@@ -87,6 +87,8 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
 }
 
 /** Lightweight native overlay. No notification content is persisted or uploaded. */
+internal data class IslandAction(val title: String, val pendingIntent: PendingIntent)
+
 internal object IslandOverlay {
     private val main = Handler(Looper.getMainLooper())
     private var windowManager: WindowManager? = null
