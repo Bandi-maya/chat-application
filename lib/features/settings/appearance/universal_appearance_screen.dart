@@ -7,7 +7,6 @@ import '../../../ui/core/controllers/appearance_variant_controller.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/design_system.dart';
 
-
 void _saveAppearanceChoice(
   BuildContext context,
   Future<void> Function(String) save,
