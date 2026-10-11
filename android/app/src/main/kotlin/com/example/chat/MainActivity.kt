@@ -329,11 +329,7 @@ private fun detectFacesOnDevice(
         val maxFaces = 3
         val detector = FaceDetector(width, height, maxFaces)
         val nativeFaces = arrayOfNulls<FaceDetector.Face>(maxFaces)
-        val count = try {
-            detector.findFaces(bitmap, nativeFaces)
-        } finally {
-            detector.release()
-        }
+        val count = detector.findFaces(bitmap, nativeFaces)
         val output = ArrayList<Map<String, Any>>(count)
         for (index in 0 until count) {
             val face = nativeFaces[index] ?: continue
