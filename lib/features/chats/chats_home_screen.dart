@@ -1392,6 +1392,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                     theme: widget.theme,
                                     dataStore: widget.dataStore,
                                     preferencesController: widget.preferencesController,
+                                    startInGroupMode: true,
                                   ),
                                 ),
                               );
