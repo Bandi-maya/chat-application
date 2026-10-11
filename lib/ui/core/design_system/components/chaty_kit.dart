@@ -856,7 +856,10 @@ class _ChatySearchFieldState extends State<ChatySearchField> {
     final colors = context.colors;
     final height = 44.0;
     return AnimatedContainer(
-      duration: ChatyMotion.duration(context, preferred: ChatyMotion.fast),
+      duration: ChatyMotion.duration(
+          context,
+          preferred: ChatyMotion.fast,
+      ),
       curve: ChatyMotion.enter,
       height: height,
       decoration: BoxDecoration(
