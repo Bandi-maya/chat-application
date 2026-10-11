@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/call_signaling_service.dart';
@@ -229,15 +230,32 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
                 child: InkWell(
                   customBorder: const CircleBorder(),
                   onTap: () {
-                    if (_visibleContacts.isEmpty) {
+                    final digits = _searchController.text.replaceAll(
+                      RegExp(r'[^0-9]'),
+                      '',
+                    );
+                    final matches = widget.dataStore.contacts.where((contact) {
+                      if (contact.id == widget.dataStore.currentUser.id) {
+                        return false;
+                      }
+                      final phoneDigits = contact.phone.replaceAll(
+                        RegExp(r'[^0-9]'),
+                        '',
+                      );
+                      return digits.length >= 7 &&
+                          (phoneDigits == digits || phoneDigits.endsWith(digits));
+                    }).toList(growable: false);
+                    if (matches.length != 1) {
                       ChatyToast.show(
                         context,
-                        'No registered Chaty contact matches this number.',
-                        background: colors.error,
+                        matches.isEmpty
+                            ? 'Enter a registered Chaty number to call.'
+                            : 'More than one contact matches. Choose the right contact below.',
+                        background: matches.isEmpty ? colors.error : colors.surfaceElevated,
                       );
                       return;
                     }
-                    _startCall(_visibleContacts.first, isVideo: false);
+                    _startCall(matches.single, isVideo: false);
                   },
                   child: const SizedBox(
                     width: 58,
