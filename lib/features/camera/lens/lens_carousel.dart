@@ -146,19 +146,26 @@ class _LensCarouselState extends State<LensCarousel> {
         padding: EdgeInsets.symmetric(horizontal: (viewportWidth - _slotExtent) / 2),
         itemCount: catalog.length,
         itemBuilder: (context, index) {
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => _centerOn(index),
-            child: Center(
-              child: _LensItem(
-                lens: catalog[index],
-                index: index,
-                selected: index == _currentIndex,
-                diameter: _selectedDiameter,
-                slotExtent: _slotExtent,
-                viewportWidth: viewportWidth,
-                controller: _controller,
-                runtimeState: widget.manager.runtimeState,
+          final selected = index == _currentIndex;
+          return Semantics(
+            key: ValueKey<String>('lens-semantic-${catalog[index].id}'),
+            button: true,
+            selected: selected,
+            label: '${catalog[index].name} lens',
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _centerOn(index),
+              child: Center(
+                child: _LensItem(
+                  lens: catalog[index],
+                  index: index,
+                  selected: selected,
+                  diameter: _selectedDiameter,
+                  slotExtent: _slotExtent,
+                  viewportWidth: viewportWidth,
+                  controller: _controller,
+                  runtimeState: widget.manager.runtimeState,
+                ),
               ),
             ),
           );
