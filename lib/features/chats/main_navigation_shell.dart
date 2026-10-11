@@ -2975,16 +2975,20 @@ class _CurvedRadialDrawerScaffoldState
     final centerY = height * 0.08;
     final radiusX = width * 0.38;
     final radiusY = height * 1.10;
-    final endAngle = count > 7 ? 75.0 : 70.0;
+    final endAngle = (count > 7 ? 75.0 : 70.0) * math.pi / 180;
 
     // Position every destination on an elliptical circular arc, rather than
     // arranging the controls along a straight diagonal. The icon itself stays
     // circular and the label remains horizontal and readable.
     return List<Widget>.generate(count, (index) {
       final progress = count <= 1 ? 0.0 : index / (count - 1);
-      final angle = progress * endAngle * math.pi / 180;
-      // Follow the upper-left quadrant of an ellipse: icons progress
-      // from the menu button toward the lower-right, matching the reference.
+      // Distribute items evenly down the arc, then derive X from the ellipse.
+      // This prevents the first few circles from bunching together near the top.
+      final cosTheta =
+          1 - progress * (1 - math.cos(endAngle));
+      final angle = math.acos(cosTheta.clamp(-1.0, 1.0));
+      // Icons progress from the upper-left toward the lower-right, following
+      // the same curved edge as the menu panel.
       final left = centerX + radiusX * math.sin(angle);
       final top = centerY + radiusY * (1 - math.cos(angle));
       final item = navItems[index];
