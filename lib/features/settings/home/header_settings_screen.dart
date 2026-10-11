@@ -217,11 +217,11 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
       height: previewHeight,
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(large ? 15 : 9),
+        borderRadius: BorderRadius.zero,
         border: Border.all(color: accent.withValues(alpha: 0.55)),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(large ? 14 : 8),
+        borderRadius: BorderRadius.zero,
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -677,8 +677,13 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: widget.preferencesController,
+      listenable: Listenable.merge([
+        widget.preferencesController,
+        locator<ThemeController>(),
+      ]),
       builder: (context, _) {
+        final theme = locator<ThemeController>().globalTheme;
+        final colors = context.colors;
         final home = widget.preferencesController.home;
         final currentUser = widget.dataStore?.currentUser;
         final displayName = home.myNameOverride.isNotEmpty
@@ -691,18 +696,18 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
             : 'Available';
 
         return Scaffold(
-          backgroundColor: Colors.black,
+          backgroundColor: colors.background,
           appBar: AppBar(
-            backgroundColor: Colors.black,
+            backgroundColor: colors.background,
             elevation: 0,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              icon: Icon(Icons.arrow_back, color: colors.foreground),
               onPressed: () => Navigator.of(context).pop(),
             ),
-            title: const Text(
+            title: Text(
               'Header',
               style: TextStyle(
-                color: Colors.white,
+                color: colors.foreground,
                 fontSize: 19,
                 fontWeight: FontWeight.w700,
                 letterSpacing: -0.2,
@@ -737,21 +742,21 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                   padding: const EdgeInsets.fromLTRB(14, 4, 14, 24),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: GbColors.surfaceCard,
-                      borderRadius: BorderRadius.circular(24),
+                      color: colors.surface,
+                      borderRadius: BorderRadius.zero,
                       border: Border.all(
-                        color: GbColors.borderSubtle,
+                        color: colors.borderSubtle,
                         width: 1.1,
                       ),
                     ),
-                    clipBehavior: Clip.antiAlias,
+                    clipBehavior: Clip.hardEdge,
                     child: Column(
                       children: [
                         // Home UI Style
                         GbSettingRow(
                           icon: const Icon(
                             Icons.layers_outlined,
-                            color: GbColors.activeGreen,
+                            color: colors.primary,
                             size: 21,
                           ),
                           title: 'Home UI Style',
@@ -764,7 +769,11 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                               context: context,
                               isScrollControlled: true,
                               useSafeArea: true,
-                              showDragHandle: true,
+                              showDragHandle: false,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.zero,
+                              ),
+                              clipBehavior: Clip.hardEdge,
                               backgroundColor: theme.surfaceColor,
                               builder: (sheetContext) {
                                 var draft = selected;
@@ -800,14 +809,21 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                                             ),
                                             Padding(
                                               padding: const EdgeInsets.symmetric(horizontal: 18),
-                                              child: AnimatedSwitcher(
-                                                duration: const Duration(milliseconds: 180),
-                                                child: _buildHomeUiPreview(
-                                                  draft,
-                                                  theme,
-                                                  key: ValueKey<String>(draft),
-                                                  large: true,
-                                                ),
+                                              child: ListenableBuilder(
+                                                listenable: locator<ThemeController>(),
+                                                builder: (context, _) {
+                                                  final liveTheme =
+                                                      locator<ThemeController>().globalTheme;
+                                                  return AnimatedSwitcher(
+                                                    duration: const Duration(milliseconds: 180),
+                                                    child: _buildHomeUiPreview(
+                                                      draft,
+                                                      liveTheme,
+                                                      key: ValueKey<String>(draft),
+                                                      large: true,
+                                                    ),
+                                                  );
+                                                },
                                               ),
                                             ),
                                             const SizedBox(height: 8),
@@ -823,7 +839,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                                                   final option = _homeUiStyles[index];
                                                   final isSelected = draft == option;
                                                   return InkWell(
-                                                    borderRadius: BorderRadius.circular(14),
+                                                    borderRadius: BorderRadius.zero,
                                                     onTap: () => setSheetState(() => draft = option),
                                                     child: Padding(
                                                       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 7),
@@ -922,7 +938,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                         GbSettingRow(
                           icon: const Icon(
                             Icons.chat_bubble_outline_rounded,
-                            color: GbColors.activeGreen,
+                            color: colors.primary,
                             size: 21,
                           ),
                           title: 'Tab Bubble Style',
@@ -953,7 +969,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                         GbSettingRow(
                           icon: const Icon(
                             Icons.view_in_ar_rounded,
-                            color: GbColors.activeGreen,
+                            color: colors.primary,
                             size: 21,
                           ),
                           title: '3D Pager / Slider Effect',
@@ -984,7 +1000,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                         GbSettingRow(
                           icon: const Icon(
                             Icons.donut_large_rounded,
-                            color: GbColors.activeGreen,
+                            color: colors.primary,
                             size: 21,
                           ),
                           title: 'Enable Instagram-like Stories',
@@ -1002,7 +1018,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                         GbSettingRow(
                           icon: const Icon(
                             Icons.bubble_chart_outlined,
-                            color: GbColors.activeGreen,
+                            color: colors.primary,
                             size: 21,
                           ),
                           title: 'Carousel View',
@@ -1021,7 +1037,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                         GbSettingRow(
                           icon: const Icon(
                             Icons.bubble_chart_rounded,
-                            color: GbColors.activeGreen,
+                            color: colors.primary,
                             size: 21,
                           ),
                           title: 'Stories Style',
@@ -1052,7 +1068,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                         GbSettingRow(
                           icon: const Icon(
                             Icons.alt_route_rounded,
-                            color: GbColors.activeGreen,
+                            color: colors.primary,
                             size: 21,
                           ),
                           title: 'Separate Chats/Groups',
@@ -1072,7 +1088,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                         GbSettingRow(
                           icon: const Icon(
                             Icons.badge_outlined,
-                            color: GbColors.activeGreen,
+                            color: colors.primary,
                             size: 21,
                           ),
                           title: 'Set My Name',
@@ -1092,7 +1108,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                         GbSettingRow(
                           icon: const Icon(
                             Icons.event_busy_outlined,
-                            color: GbColors.activeGreen,
+                            color: colors.primary,
                             size: 21,
                           ),
                           title: 'Disable Status under my name',
@@ -1112,7 +1128,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                         GbSettingRow(
                           icon: const Icon(
                             Icons.inbox_outlined,
-                            color: GbColors.activeGreen,
+                            color: colors.primary,
                             size: 21,
                           ),
                           title: 'Hide chat sort list',
@@ -1131,7 +1147,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                         GbSettingRow(
                           icon: const Icon(
                             Icons.saved_search_outlined,
-                            color: GbColors.activeGreen,
+                            color: colors.primary,
                             size: 21,
                           ),
                           title: 'Disable search bar',
@@ -1151,7 +1167,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                         GbSettingRow(
                           icon: const Icon(
                             Icons.palette_outlined,
-                            color: GbColors.activeGreen,
+                            color: colors.primary,
                             size: 21,
                           ),
                           title: 'Themes',
@@ -1169,7 +1185,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                         GbSettingRow(
                           icon: const Icon(
                             Icons.person_add_alt_1_outlined,
-                            color: GbColors.activeGreen,
+                            color: colors.primary,
                             size: 21,
                           ),
                           title: 'Show icon Add Account',
@@ -1199,7 +1215,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
       thickness: 0.8,
       indent: 68,
       endIndent: 16,
-      color: GbColors.divider,
+      color: colors.divider,
     );
   }
 }
