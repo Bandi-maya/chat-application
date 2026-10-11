@@ -200,7 +200,9 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
       description,
       ResolutionPreset.high,
       enableAudio: false,
-      imageFormatGroup: ImageFormatGroup.yuv420,
+      imageFormatGroup: Platform.isIOS
+          ? ImageFormatGroup.bgra8888
+          : ImageFormatGroup.nv21,
     );
     try {
       await controller.initialize();
@@ -255,6 +257,7 @@ class _ChatyCameraCaptureScreenState extends State<ChatyCameraCaptureScreen>
     _lensManager.removeListener(_onLensManagerChanged);
     _lensManager.dispose();
     _facePoses.dispose();
+    unawaited(_faceDetection.dispose());
     unawaited(_controller?.dispose());
     _engine.dispose();
     super.dispose();
