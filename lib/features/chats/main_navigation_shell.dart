@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -2876,11 +2878,11 @@ class _CurvedRadialDrawerScaffoldState
           // Keep the arc compact enough to preserve visible chat context.
           // Width and height scale with the device, including older/smaller phones.
           final panelWidth =
-              (constraints.maxWidth * 0.84).clamp(0.0, 310.0).toDouble();
+              (constraints.maxWidth * 0.88).clamp(0.0, 330.0).toDouble();
           final availableHeight = constraints.maxHeight;
           final panelHeight = availableHeight < 250
               ? availableHeight
-              : (availableHeight * 0.53).clamp(225.0, 305.0).toDouble();
+              : (availableHeight * 0.56).clamp(240.0, 330.0).toDouble();
           final accent = widget.theme.accentColor as Color;
           final onAccent = widget.theme.onAccentColor as Color;
 
@@ -2966,46 +2968,62 @@ class _CurvedRadialDrawerScaffoldState
     Color accent,
     Color onAccent,
   ) {
-    final items = navItems.take(7).toList(growable: false);
-    if (items.isEmpty) return const <Widget>[];
-    return List<Widget>.generate(items.length, (index) {
-      final progress = items.length == 1 ? 0.0 : index / (items.length - 1);
-      final left = width * (0.11 + progress * 0.38);
-      final top = height * (0.09 + progress * 0.70);
-      final item = items[index];
-      final selected = item.id == navItems[selectedIndex].id;
-      final textWidth = (width - left - 12).clamp(72.0, 180.0).toDouble();
+    if (navItems.isEmpty) return const <Widget>[];
+    final count = navItems.length;
+    final iconSize = count > 7 ? 25.0 : 30.0;
+    final centerX = width * 0.07;
+    final centerY = height * 0.08;
+    final radiusX = width * 0.33;
+    final radiusY = height * 0.68;
+    final endAngle = count > 7 ? 58.0 : 65.0;
+
+    // Position every destination on an elliptical circular arc, rather than
+    // arranging the controls along a straight diagonal. The icon itself stays
+    // circular and the label remains horizontal and readable.
+    return List<Widget>.generate(count, (index) {
+      final progress = count <= 1 ? 0.0 : index / (count - 1);
+      final angle = progress * endAngle * math.pi / 180;
+      final left = centerX + radiusX * math.cos(angle);
+      final top = centerY + radiusY * math.sin(angle);
+      final item = navItems[index];
+      final selected = item.id == navItems[selectedIndex.clamp(0, count - 1)].id;
+      final labelWidth =
+          (width - left - iconSize - 18).clamp(48.0, 180.0).toDouble();
+
       return Positioned(
         left: left,
         top: top,
-        child: Transform.rotate(
-          angle: -0.20,
-          alignment: Alignment.centerLeft,
-          child: SizedBox(
-            width: textWidth,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(22),
-              onTap: () {
-                widget.onSelect(index);
-                setState(() => _menuOpen = false);
-              },
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AnimatedContainer(
+        child: SizedBox(
+          height: iconSize + 2,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Material(
+                color: Colors.transparent,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () {
+                    widget.onSelect(index);
+                    setState(() => _menuOpen = false);
+                  },
+                  child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
-                    width: 30,
-                    height: 30,
+                    curve: Curves.easeOutCubic,
+                    width: iconSize,
+                    height: iconSize,
                     decoration: BoxDecoration(
-                      color: selected
-                          ? onAccent
-                          : onAccent.withValues(alpha: 0.88),
+                      color: selected ? onAccent : onAccent.withValues(alpha: 0.86),
                       shape: BoxShape.circle,
+                      border: Border.all(
+                        color: selected ? onAccent : onAccent.withValues(alpha: 0.7),
+                        width: selected ? 1.4 : 0.7,
+                      ),
                       boxShadow: selected
                           ? <BoxShadow>[
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.14),
-                                blurRadius: 6,
+                                color: colors.shadow.withValues(alpha: 0.34),
+                                blurRadius: 5,
                                 offset: const Offset(0, 2),
                               ),
                             ]
@@ -3014,31 +3032,47 @@ class _CurvedRadialDrawerScaffoldState
                     child: Center(
                       child: ChatyGlyphIcon(
                         glyph: selected ? item.activeIcon : item.icon,
-                        size: 15,
+                        size: iconSize * 0.52,
                         color: accent,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      item.label.toUpperCase(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: onAccent,
-                        fontSize: 10,
-                        fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
-                        letterSpacing: 0.35,
-                        shadows: const <Shadow>[
-                          Shadow(color: Color(0x33230D25), blurRadius: 2),
-                        ],
+                ),
+              ),
+              const SizedBox(width: 7),
+              SizedBox(
+                width: labelWidth,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      widget.onSelect(index);
+                      setState(() => _menuOpen = false);
+                    },
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        item.label.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: onAccent,
+                          fontSize: selected ? 10.5 : 9.5,
+                          fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+                          letterSpacing: 0.25,
+                          shadows: <Shadow>[
+                            Shadow(
+                              color: colors.shadow.withValues(alpha: 0.28),
+                              blurRadius: 2,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
         ),
       );
