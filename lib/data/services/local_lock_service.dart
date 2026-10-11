@@ -196,8 +196,10 @@ class LocalLockService {
 
   Future<void> setSecretPhrase(String rawPhrase) async {
     final normalized = normalizeSecretPhrase(rawPhrase);
-    if (normalized.isEmpty) {
-      throw ArgumentError('Secret phrase cannot be empty.');
+    if (normalized.runes.length < 8) {
+      throw ArgumentError(
+        'Secret code must contain at least 8 characters after normalization.',
+      );
     }
     final salt = List<int>.generate(_saltLength, (_) => _random.nextInt(256));
     final derived = await _pbkdf2.deriveKeyFromPassword(
@@ -217,7 +219,8 @@ class LocalLockService {
 
   Future<bool> verifySecretPhrase(String rawQuery) async {
     final normalized = normalizeSecretPhrase(rawQuery);
-    if (normalized.isEmpty) return false;
+    // Avoid expensive PBKDF2 work for empty or obviously weak search terms.
+    if (normalized.runes.length < 8) return false;
     try {
       final encodedHash = await _secureStorage.read(key: _secretPhraseHashKey);
       final encodedSalt = await _secureStorage.read(key: _secretPhraseSaltKey);
