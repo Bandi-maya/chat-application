@@ -295,6 +295,21 @@ jobs:
       - name: Resolve Flutter dependencies
         run: flutter pub get
 
+      - name: Provision OpenMLS macOS native asset for crypto tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tool
+          cat > tool/openmls_ci_probe.dart <<'DART'
+          import 'package:openmls/openmls.dart';
+          Future<void> main() async {
+            await Openmls.init();
+            Openmls.cleanup();
+          }
+          DART
+          dart run tool/openmls_ci_probe.dart
+          rm -f tool/openmls_ci_probe.dart
+
       - name: Analyze Dart source
         run: flutter analyze --no-fatal-infos
 
