@@ -49,7 +49,6 @@ import '../../data/services/chaty_share_service.dart';
 import '../settings/message_management/message_management_page.dart';
 import '../settings/privacy/privacy_center_screen.dart';
 import '../settings/security/app_lock_overlay.dart';
-import '../settings/gb_features/gb_settings_screen.dart';
 
 class ChatsHomeScreen extends StatefulWidget {
   final ThemeConfig theme;
