@@ -173,23 +173,22 @@ class CameraFaceDetectionBridge {
     final index = y * plane.bytesPerRow + x * stride;
     final bytes = plane.bytes;
     return (
-      bytes[(index + 2).clamp(0, bytes.length - 1)],
-      bytes[(index + 1).clamp(0, bytes.length - 1)],
-      bytes[index.clamp(0, bytes.length - 1)],
+      bytes[(index + 2).clamp(0, bytes.length - 1).toInt()],
+      bytes[(index + 1).clamp(0, bytes.length - 1).toInt()],
+      bytes[index.clamp(0, bytes.length - 1).toInt()],
     );
   }
 
   (int, int, int) _readYuv(
-    CameraImage image,
-    CameraImagePlane yPlane,
-    CameraImagePlane? uvPlane,
-    CameraImagePlane? vPlane,
+    Plane yPlane,
+    Plane? uvPlane,
+    Plane? vPlane,
     int x,
     int y,
   ) {
     final yIndex =
         y * yPlane.bytesPerRow + x * (yPlane.bytesPerPixel ?? 1);
-    final luminance = yPlane.bytes[yIndex].toDouble();
+    final luminance = yPlane.bytes[yIndex.clamp(0, yPlane.bytes.length - 1).toInt()].toDouble();
     var u = 128.0;
     var v = 128.0;
 
@@ -200,8 +199,8 @@ class CameraFaceDetectionBridge {
       final vIndex =
           (y >> 1) * vPlane.bytesPerRow +
           (x >> 1) * (vPlane.bytesPerPixel ?? 1);
-      u = uvPlane.bytes[uIndex].toDouble();
-      v = vPlane.bytes[vIndex].toDouble();
+      u = uvPlane.bytes[uIndex.clamp(0, uvPlane.bytes.length - 1).toInt()].toDouble();
+      v = vPlane.bytes[vIndex.clamp(0, vPlane.bytes.length - 1).toInt()].toDouble();
     } else if (uvPlane != null) {
       final uvIndex =
           (y >> 1) * uvPlane.bytesPerRow +
@@ -213,12 +212,13 @@ class CameraFaceDetectionBridge {
       }
     }
 
-    final red = (luminance + 1.402 * (v - 128)).round().clamp(0, 255);
+    final red = (luminance + 1.402 * (v - 128)).round().clamp(0, 255).toInt();
     final green =
         (luminance - 0.344136 * (u - 128) - 0.714136 * (v - 128))
             .round()
-            .clamp(0, 255);
-    final blue = (luminance + 1.772 * (u - 128)).round().clamp(0, 255);
+            .clamp(0, 255)
+            .toInt();
+    final blue = (luminance + 1.772 * (u - 128)).round().clamp(0, 255).toInt();
     return (red, green, blue);
   }
 }
