@@ -9,6 +9,10 @@ on:
       - feat/global-template-customization
   workflow_dispatch:
 
+concurrency:
+  group: chaty-native-runtime-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
