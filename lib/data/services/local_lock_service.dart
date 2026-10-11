@@ -325,6 +325,16 @@ class LocalLockService {
     }
   }
 
+  Future<bool> canUseDeviceCredential() async {
+    try {
+      return await _localAuthentication.isDeviceSupported();
+    } on PlatformException {
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<bool> authenticateDeviceCredential({
     String reason = 'Use your device lock to unlock Chaty',
   }) async {
