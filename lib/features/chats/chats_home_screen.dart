@@ -33,10 +33,6 @@ import '../calls/ongoing_call_screen.dart';
 import '../messages/starred_messages_screen.dart';
 import 'linked_devices_qr_screen.dart';
 import '../profile/profile_screen.dart';
-import '../settings/home/home_screen_settings_page.dart';
-import '../settings/theme_editor_screen.dart';
-import '../settings/templates/templates_settings_screen.dart';
-import '../settings/templates/navigation_destinations_settings_screen.dart';
 import '../settings/settings_root_screen.dart';
 import 'locked_chats_screen.dart';
 import 'new_chat_screen.dart';
@@ -1482,7 +1478,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                             title: 'Starred Messages',
                             onTap: () {
                               Navigator.pop(ctx);
-                              _handleHomeOverflowAction('starred');
+                              _openStarredMessages();
                             },
                           ),
                           _popupMenuItem(
@@ -1820,74 +1816,17 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     );
   }
 
-  void _handleHomeOverflowAction(String value) {
-    switch (value) {
-      case 'effects':
-        EffectPickerSheet.show(context);
-        break;
-      case 'qr':
-        _openQrScreen(initialIndex: 1);
-        break;
-      case 'linked':
-        _openLinkedDevices();
-        break;
-      case 'themes':
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => ThemeEditorScreen(
-              themeController: widget.themeController,
-            ),
-          ),
-        );
-        break;
-      case 'templates':
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => const TemplatesSettingsScreen(),
-          ),
-        );
-        break;
-      case 'starred':
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => StarredMessagesScreen(
-              dataStore: widget.dataStore,
-              theme: widget.themeController.globalTheme,
-              preferencesController: widget.preferencesController,
-              themeController: widget.themeController,
-            ),
-          ),
-        );
-        break;
-      case 'home':
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => HomeScreenSettingsPage(
-              preferencesController: widget.preferencesController,
-            ),
-          ),
-        );
-        break;
-      case 'navigation':
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => const NavigationDestinationsSettingsScreen(),
-          ),
-        );
-        break;
-      case 'settings':
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => SettingsRootScreen(
-              preferencesController: widget.preferencesController,
-              themeController: widget.themeController,
-              dataStore: widget.dataStore,
-              notificationService: widget.notificationService,
-            ),
-          ),
-        );
-        break;
-    }
+  void _openStarredMessages() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => StarredMessagesScreen(
+          dataStore: widget.dataStore,
+          theme: widget.themeController.globalTheme,
+          preferencesController: widget.preferencesController,
+          themeController: widget.themeController,
+        ),
+      ),
+    );
   }
 
   Widget _selectionAppBar(ThemeConfig theme, List<Conversation> visible) {
