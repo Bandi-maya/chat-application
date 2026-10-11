@@ -6,9 +6,13 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../data/services/chat_media_service.dart';
+import '../../data/services/protected_resource_gate.dart';
+import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/design_system/design_system.dart';
 
 class MediaViewerScreen extends StatefulWidget {
+  final String conversationId;
+  final ChatyPreferencesController preferencesController;
   final ThemeConfig theme;
   final String title;
   final String type;
@@ -18,6 +22,8 @@ class MediaViewerScreen extends StatefulWidget {
   const MediaViewerScreen({
     super.key,
     required this.theme,
+    required this.conversationId,
+    required this.preferencesController,
     required this.title,
     required this.type,
     required this.size,
@@ -28,20 +34,84 @@ class MediaViewerScreen extends StatefulWidget {
   State<MediaViewerScreen> createState() => _MediaViewerScreenState();
 }
 
-class _MediaViewerScreenState extends State<MediaViewerScreen> {
+class _MediaViewerScreenState extends State<MediaViewerScreen>
+    with WidgetsBindingObserver {
   final ChatMediaService _mediaService = ChatMediaService();
   String? _signedUrl;
   String? _error;
   bool _loading = true;
+  bool _authorized = false;
+  bool _authorizing = false;
   VideoPlayerController? _videoController;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    WidgetsBinding.instance.addObserver(this);
+    unawaited(_authorizeAndLoad());
   }
 
-  Future<void> _load() async {
+  Future<void> _authorizeAndLoad({bool isResume = false}) async {
+    if (_authorizing) return;
+    _authorizing = true;
+    bool authorized;
+    try {
+      authorized = await ProtectedResourceGate.authorizeConversation(
+        context,
+        conversationId: widget.conversationId,
+        preferencesController: widget.preferencesController,
+        title: 'Protected Attachment',
+        reason: 'Authenticate to view this attachment',
+      );
+    } finally {
+      _authorizing = false;
+    }
+    if (!mounted) return;
+    if (!authorized) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+      });
+      return;
+    }
+    setState(() => _authorized = true);
+    await _loadMedia();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      if (_authorized &&
+          widget.preferencesController.isConversationProtected(
+            widget.conversationId,
+          )) {
+        ProtectedResourceGate.invalidateConversationSession(
+          widget.conversationId,
+        );
+        final video = _videoController;
+        _videoController = null;
+        unawaited(video?.dispose());
+        setState(() {
+          _authorized = false;
+          _signedUrl = null;
+          _loading = true;
+        });
+      }
+      return;
+    }
+    if (state == AppLifecycleState.resumed &&
+        !_authorized &&
+        !_authorizing &&
+        widget.preferencesController.isConversationProtected(
+          widget.conversationId,
+        )) {
+      unawaited(_authorizeAndLoad(isResume: true));
+    }
+  }
+
+  Future<void> _loadMedia() async {
     final path = widget.storagePath;
     if (path == null || path.isEmpty) {
       if (mounted) {
@@ -83,13 +153,14 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     unawaited(_videoController?.dispose());
     super.dispose();
   }
 
   Future<void> _openExternally() async {
     final url = _signedUrl;
-    if (url == null) return;
+    if (!_authorized || url == null) return;
     final ok = await launchUrl(
       Uri.parse(url),
       mode: LaunchMode.externalApplication,
@@ -105,7 +176,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
   Future<void> _share() async {
     final url = _signedUrl;
-    if (url == null) return;
+    if (!_authorized || url == null) return;
     await SharePlus.instance.share(
       ShareParams(text: url, subject: widget.title),
     );
@@ -125,6 +196,28 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+
+    if (!_authorized) {
+      return Scaffold(
+        backgroundColor: colors.surfaceElevated,
+        appBar: AppBar(
+          backgroundColor: colors.surfaceElevated,
+          foregroundColor: colors.foreground,
+          leading: const ChatyBackButton(),
+          title: const Text('Protected attachment'),
+        ),
+        body: const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(strokeWidth: 2.2),
+              SizedBox(height: 14),
+              Text('Verifying access…'),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: colors.surfaceElevated,
