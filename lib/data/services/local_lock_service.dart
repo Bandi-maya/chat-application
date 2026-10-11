@@ -217,6 +217,10 @@ class LocalLockService {
   Future<bool> verifySecretPhrase(String rawQuery) async {
     final normalized = normalizeSecretPhrase(rawQuery);
     if (normalized.isEmpty) return false;
+
+    // Secret-code discovery is an authentication path too; share the same
+    // progressive cooldown so search cannot be used for unlimited guessing.
+    if (await getRemainingCooldownSeconds() > 0) return false;
     try {
       final encodedHash = await _secureStorage.read(key: _secretPhraseHashKey);
       final encodedSalt = await _secureStorage.read(key: _secretPhraseSaltKey);
@@ -229,7 +233,13 @@ class LocalLockService {
         nonce: salt,
       );
       final actual = await derived.extractBytes();
-      return _constantTimeBytesEqual(actual, expected);
+      final isMatch = _constantTimeBytesEqual(actual, expected);
+      if (isMatch) {
+        await resetFailedAttempts();
+      } else {
+        await recordFailedAttempt();
+      }
+      return isMatch;
     } catch (_) {
       return false;
     }
