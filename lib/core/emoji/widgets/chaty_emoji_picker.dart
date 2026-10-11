@@ -316,6 +316,10 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet>
                             .clamp(3, 6);
                     return GridView.builder(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      cacheExtent: 96,
+                      addAutomaticKeepAlives: false,
+                      addRepaintBoundaries: true,
+                      addSemanticIndexes: true,
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: columns,
                         mainAxisSpacing: 10,
