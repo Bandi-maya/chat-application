@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../../design_system/tokens/app_tokens.dart';
 import '../../theme/app_theme.dart';
 
+Duration _motionDuration(BuildContext context, Duration preferred) =>
+    MediaQuery.disableAnimationsOf(context) ? Duration.zero : preferred;
+
 /// Semantic navigation item model. Independent of visual variants.
 class ChatyNavItemData {
   final String id;
@@ -162,7 +165,7 @@ class ChatyNavigationRenderer extends StatelessWidget {
               return _NavItemWrapper(
                 onTap: item.onTap,
                 child: AnimatedContainer(
-                  duration: ChatyMotion.fast,
+                  duration: _motionDuration(context, ChatyMotion.fast),
                   curve: ChatyMotion.enter,
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   decoration: BoxDecoration(
@@ -210,7 +213,7 @@ class ChatyNavigationRenderer extends StatelessWidget {
             return _NavItemWrapper(
               onTap: item.onTap,
               child: AnimatedContainer(
-                duration: ChatyMotion.fast,
+                duration: _motionDuration(context, ChatyMotion.fast),
                 curve: ChatyMotion.enter,
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
                 decoration: BoxDecoration(
@@ -271,7 +274,7 @@ class ChatyNavigationRenderer extends StatelessWidget {
               child: _NavItemWrapper(
                 onTap: item.onTap,
                 child: AnimatedContainer(
-                  duration: ChatyMotion.fast,
+                  duration: _motionDuration(context, ChatyMotion.fast),
                   curve: ChatyMotion.enter,
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                   padding: const EdgeInsets.symmetric(vertical: 8),
@@ -353,7 +356,7 @@ class ChatyNavigationRenderer extends StatelessWidget {
                     onTap: item.onTap,
                     child: AnimatedScale(
                       scale: item.isSelected ? 1.08 : 1.0,
-                      duration: ChatyMotion.fast,
+                      duration: _motionDuration(context, ChatyMotion.fast),
                       curve: ChatyMotion.enter,
                       child: _BadgeAnchor(
                         count: item.badgeCount,
@@ -489,7 +492,7 @@ class ChatyNavigationRenderer extends StatelessWidget {
               child: _NavItemWrapper(
                 onTap: item.onTap,
                 child: AnimatedContainer(
-                  duration: ChatyMotion.fast,
+                  duration: _motionDuration(context, ChatyMotion.fast),
                   curve: ChatyMotion.enter,
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
@@ -548,7 +551,7 @@ class ChatyNavigationRenderer extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     AnimatedContainer(
-                      duration: ChatyMotion.fast,
+                      duration: _motionDuration(context, ChatyMotion.fast),
                       curve: ChatyMotion.enter,
                       height: 3,
                       width: item.isSelected ? 28 : 0,
@@ -625,7 +628,7 @@ class _NavItemWrapperState extends State<_NavItemWrapper> {
       onTapCancel: () => setState(() => _isPressed = false),
       child: AnimatedScale(
         scale: _isPressed ? ChatyMotion.activeScale : 1.0,
-        duration: ChatyMotion.instant,
+        duration: _motionDuration(context, ChatyMotion.instant),
         curve: ChatyMotion.enter,
         child: widget.child,
       ),
