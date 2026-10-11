@@ -59,6 +59,7 @@ class ChatyEmojiPicker {
     final result = await showModalBottomSheet<Object?>(
       context: context,
       isScrollControlled: true,
+      isDismissible: false,
       useSafeArea: true,
       enableDrag: false,
       showDragHandle: false,
