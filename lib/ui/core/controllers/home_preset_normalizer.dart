@@ -29,26 +29,21 @@ abstract final class HomePresetNormalizer {
   /// more than one navigation layout. The caller then preserves the runtime mode.
   static AppNavigationMode? navigationMode(String value) =>
       switch (value.trim().toLowerCase()) {
-        // Older persisted HomePresetNormalizer names may already be canonical.
-        'classic' ||
+        // Resolve explicit labels from the Home UI Style picker. Canonical
+        // list-only presets (Classic/Cards/Compact/etc.) return null so the
+        // existing Template Studio navigation setting remains authoritative.
         'whatsapp old ui' ||
         'whatsapp-style top bar' ||
         'whatsapp style top bar' => AppNavigationMode.topWhatsAppBar,
         'one ui' ||
         'whatsapp ui stock' ||
-        'ios style' ||
-        'chaty default' ||
-        'cards' => AppNavigationMode.bottomNav,
+        'ios style' => AppNavigationMode.bottomNav,
         'floating rail' => AppNavigationMode.floatingIslandRail,
         'modern side menu' => AppNavigationMode.modernSideMenu,
-        'bubbles tab style' ||
-        'compact' => AppNavigationMode.gestureTabs,
-        'basic tab style' ||
-        'productivity' => AppNavigationMode.compactRail,
+        'bubbles tab style' => AppNavigationMode.gestureTabs,
+        'basic tab style' => AppNavigationMode.compactRail,
         '3d perspective drawer' => AppNavigationMode.perspective3DDrawer,
         'curved radial menu' => AppNavigationMode.curvedRadialDrawer,
-        'stories first' => AppNavigationMode.bottomNav,
-        'expressive' => null,
         _ => null,
       };
 
