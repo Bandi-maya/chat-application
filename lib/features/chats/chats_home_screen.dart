@@ -59,6 +59,8 @@ class ChatsHomeScreen extends StatefulWidget {
   final ChatyNotificationService notificationService;
   final ConversationType? forcedType;
   final String? pageTitle;
+  /// Optional navigation strip inserted directly beneath the home header.
+  final Widget? headerBottomWidget;
 
   const ChatsHomeScreen({
     super.key,
@@ -69,6 +71,7 @@ class ChatsHomeScreen extends StatefulWidget {
     required this.notificationService,
     this.forcedType,
     this.pageTitle,
+    this.headerBottomWidget,
   });
 
   @override
@@ -95,6 +98,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
   /// The Home UI selector owns its header presentation. Component templates
   /// remain the fallback for styles that do not declare a dedicated header.
   HomeHeaderStyle get _effectiveHomeHeaderStyle {
+    final rawStyle = widget.preferencesController.home.homeStyle.trim().toLowerCase();
+    if (rawStyle == 'instagram style' || rawStyle == 'ios style') {
+      return HomeHeaderStyle.storiesFirst;
+    }
+    if (rawStyle == 'telegram style') return HomeHeaderStyle.compact;
     final homeStyle =
         HomePresetNormalizer.homeStyle(widget.preferencesController.home.homeStyle);
     switch (homeStyle) {
@@ -475,30 +483,61 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         // Home Style consumers: each variant maps to REAL structural
         // differences below (filters, sections, stories strip geometry,
         // tile density, unread grouping, split view).
+        final rawHomeUiStyle = homePrefs.homeStyle.trim().toLowerCase();
         final homeStyle = HomePresetNormalizer.homeStyle(homePrefs.homeStyle);
-        final styleShowFilters =
-            homeStyle != 'Classic' && homeStyle != 'Minimal';
+        final isInstagramUi = rawHomeUiStyle == 'instagram style';
+        final isIosUi = rawHomeUiStyle == 'ios style';
+        final isTelegramUi = rawHomeUiStyle == 'telegram style';
+        // Layout presets change their visual language, not the user's feature set.
+        // Filters stay available unless explicitly hidden in Home settings.
+        final styleShowFilters = true;
         final styleShowSections = homeStyle != 'Minimal';
         final styleAlwaysLabelSections = homeStyle == 'Classic';
-        final styleStoriesFirst = homeStyle == 'Stories First';
+        final styleStoriesFirst =
+            homeStyle == 'Stories First' || isInstagramUi || isIosUi;
         final styleStoriesHidden =
             homeStyle == 'Compact' || homeStyle == 'Minimal';
-        final styleCardRows = homeStyle == 'Cards';
-        final styleStoriesHeight = styleStoriesFirst
+        final styleCardRows = homeStyle == 'Cards' || isInstagramUi;
+        final styleStoriesHeight = isInstagramUi
+            ? 118.0
+            : isIosUi
+            ? 104.0
+            : styleStoriesFirst
             ? 112.0
             : homeStyle == 'Expressive' || styleCardRows
             ? 96.0
             : 82.0;
-        final styleStoriesAvatar = styleStoriesFirst
+        final styleStoriesAvatar = isInstagramUi
+            ? 68.0
+            : isIosUi
+            ? 58.0
+            : styleStoriesFirst
             ? 64.0
             : homeStyle == 'Expressive' || styleCardRows
             ? 56.0
             : 48.0;
-        final styleTileDensity = homeStyle == 'Compact'
+        final styleTileDensity = isTelegramUi
+            ? 0.93
+            : isInstagramUi
+            ? 1.04
+            : homeStyle == 'Compact'
             ? 0.88
             : homeStyle == 'Expressive'
             ? 1.12
             : 1.0;
+        final configuredSearchPlacement =
+            switch (homePrefs.searchPlacement.trim().toLowerCase()) {
+              'below header' => 'Below header',
+              'above chat filters' => 'Above chat filters',
+              _ => 'Header action',
+            };
+        // Older saved settings may have disabled only the header shortcut
+        // without a placement value. Preserve search by moving it below header.
+        final searchPlacement = homePrefs.disableSearchBar &&
+                configuredSearchPlacement == 'Header action'
+            ? 'Below header'
+            : configuredSearchPlacement;
+        final searchEnabled = homePrefs.showSearchBar;
         final styleSplitView = homeStyle == 'Tablet Split View';
         // Stories Style consumers: each value renders the strip differently.
         final storiesStyle = homePrefs.storiesStyle;
@@ -508,7 +547,8 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
           _ => 'circle',
         };
         final storyShowOnlineRing = storiesStyle != 'Minimal';
-        final storyCardWrap = storiesStyle == 'Card';
+        final storyCardWrap = storiesStyle == 'Card' || homePrefs.carouselView;
+        final showStoriesStrip = homePrefs.enableStoriesStrip || styleStoriesFirst;
         final storyCompact = storiesStyle == 'Compact';
         final storyTileWidth = storyCardWrap
             ? 74.0
@@ -611,9 +651,62 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               child: Column(
                 children: [
                   const GlobalConnectionBanner(),
-                  _isSelectionMode
-                      ? _selectionAppBar(theme, conversations)
-                      : _standardAppBar(theme, homePrefs),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 230),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    transitionBuilder: (child, animation) {
+                      final slide = Tween<Offset>(
+                        begin: const Offset(0, 0.035),
+                        end: Offset.zero,
+                      ).animate(
+                        CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOutCubic,
+                        ),
+                      );
+                      return FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(position: slide, child: child),
+                      );
+                    },
+                    child: KeyedSubtree(
+                      key: ValueKey<String>(
+                        _isSelectionMode
+                            ? 'selection-home-header'
+                            : [
+                                'home-header',
+                                homePrefs.homeStyle,
+                                homePrefs.searchPlacement,
+                                homePrefs.disableSearchBar,
+                                homePrefs.showSearchBar,
+                                homePrefs.showCameraIcon,
+                                homePrefs.showDesktopIcon,
+                                homePrefs.disableStatusUnderName,
+                                homePrefs.setMyName,
+                              ].join('|'),
+                      ),
+                      child: _isSelectionMode
+                          ? _selectionAppBar(theme, conversations)
+                          : _standardAppBar(theme, homePrefs),
+                    ),
+                  ),
+                  if (!_isSelectionMode && widget.headerBottomWidget != null)
+                    widget.headerBottomWidget!,
+                  if (!_isSelectionMode &&
+                      searchEnabled &&
+                      searchPlacement == 'Below header')
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      child: KeyedSubtree(
+                        key: ValueKey<String>(
+                          'home-search-${homePrefs.searchPlacement}-${homePrefs.showSearchBar}',
+                        ),
+                        child: _homeSearchField(theme),
+                      ),
+                    ),
                   // P4: iOS collapsing LARGE title. Shrinks away as the list
                   // scrolls; the compact bar title fades in to replace it.
                   if (!_isSelectionMode && widget.pageTitle != null)
@@ -660,57 +753,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                       ),
                     ),
                   if (!_isSelectionMode) ...[
-                    AnimatedSize(
-                      duration: const Duration(milliseconds: 180),
-                      child: _isSearchOpen &&
-                              homePrefs.showSearchBar &&
-                              !homePrefs.disableSearchBar
-                          ? Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
-                              child: TextField(
-                                controller: _searchCtrl,
-                                focusNode: _searchFocus,
-                                onChanged: (val) {
-                                  setState(() {});
-                                  _checkSecretSearchPhrase(val);
-                                },
-                                style: TextStyle(color: theme.primaryTextColor),
-                                decoration: InputDecoration(
-                                  hintText:
-                                      widget.forcedType ==
-                                          ConversationType.group
-                                      ? 'Search groups…'
-                                      : 'Search chats and messages…',
-                                  hintStyle: TextStyle(
-                                    color: theme.secondaryTextColor,
-                                  ),
-                                  prefixIcon: Icon(
-                                    Icons.search_rounded,
-                                    color: theme.secondaryTextColor,
-                                  ),
-                                  suffixIcon: _searchCtrl.text.isEmpty
-                                      ? null
-                                      : IconButton(
-                                          onPressed: () {
-                                            _searchCtrl.clear();
-                                            setState(() {});
-                                          },
-                                          icon: const Icon(Icons.close_rounded),
-                                        ),
-                                  filled: true,
-                                  fillColor: theme.cardColor,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(
-                                      theme.cornerRadius,
-                                    ),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                ),
-                              ),
-                            )
-                          : const SizedBox.shrink(),
-                    ),
-                    if ((homePrefs.enableStoriesStrip || styleStoriesFirst) &&
+                    if (searchEnabled &&
+                        searchPlacement == 'Header action' &&
+                        _isSearchOpen)
+                      _homeSearchField(theme),
+                    if (showStoriesStrip &&
                         !styleStoriesHidden &&
                         widget.forcedType != ConversationType.group)
                       SizedBox(
@@ -793,6 +840,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                           },
                         ),
                       ),
+                    if (searchEnabled &&
+                        searchPlacement == 'Above chat filters')
+                      _homeSearchField(theme),
                     if (styleShowFilters && !homePrefs.hideChatSortList)
                       Align(
                         alignment: Alignment.centerLeft,
@@ -1352,18 +1402,18 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 9),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         child: Row(
           children: [
-            Icon(icon, size: 19, color: theme.primaryTextColor.withValues(alpha: 0.82)),
-            const SizedBox(width: 13),
+            Icon(icon, size: 24, color: theme.primaryTextColor.withValues(alpha: 0.9)),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 title,
                 style: TextStyle(
                   color: theme.primaryTextColor,
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w500,
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -1371,6 +1421,25 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _markAllConversationsAsRead() async {
+    try {
+      await widget.dataStore.markAllAsRead();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Marked all chats as read')),
+        );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('Could not mark chats as read: $error')),
+        );
+    }
   }
 
   void _openHomeThreeDotMenu({
@@ -1396,7 +1465,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               child: Material(
                 color: Colors.transparent,
                 child: Container(
-                  width: 250,
+                  width: MediaQuery.sizeOf(ctx).width < 260
+                      ? MediaQuery.sizeOf(ctx).width - 24
+                      : 244,
                   constraints: BoxConstraints(
                     maxHeight: MediaQuery.of(ctx).size.height * 0.75,
                   ),
@@ -1457,22 +1528,6 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                             },
                           ),
                           _popupMenuItem(
-                              icon: Icons.camera_alt_rounded,
-                              title: 'Camera Effects',
-                              onTap: () {
-                                Navigator.pop(ctx);
-                                _handleHomeOverflowAction('effects');
-                              },
-                            ),
-                          _popupMenuItem(
-                              icon: Icons.qr_code_scanner_rounded,
-                              title: 'QR / Scan',
-                              onTap: () {
-                                Navigator.pop(ctx);
-                                _handleHomeOverflowAction('qr');
-                              },
-                            ),
-                          _popupMenuItem(
                             icon: Icons.devices_rounded,
                             title: 'Linked Devices',
                             onTap: () {
@@ -1481,43 +1536,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                             },
                           ),
                           _popupMenuItem(
-                            icon: Icons.palette_outlined,
-                            title: 'Themes & Colors',
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              _handleHomeOverflowAction('themes');
-                            },
-                          ),
-                          _popupMenuItem(
-                            icon: Icons.dashboard_customize_rounded,
-                            title: 'Templates & Layouts',
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              _handleHomeOverflowAction('templates');
-                            },
-                          ),
-                          _popupMenuItem(
                             icon: Icons.star_rounded,
                             title: 'Starred Messages',
                             onTap: () {
                               Navigator.pop(ctx);
                               _handleHomeOverflowAction('starred');
-                            },
-                          ),
-                          _popupMenuItem(
-                            icon: Icons.home_filled,
-                            title: 'Home & Navigation',
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              _handleHomeOverflowAction('home');
-                            },
-                          ),
-                          _popupMenuItem(
-                            icon: Icons.swap_horiz_rounded,
-                            title: 'Navigation Destinations',
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              _handleHomeOverflowAction('navigation');
                             },
                           ),
                           _popupMenuItem(
@@ -1563,12 +1586,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                             title: 'Mark All as Read',
                             onTap: () {
                               Navigator.pop(ctx);
-                              for (final c in widget.dataStore.conversations) {
-                                widget.dataStore.markAsRead(c.id);
-                              }
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Marked all chats as read')),
-                              );
+                              unawaited(_markAllConversationsAsRead());
                             },
                           ),
                           _popupMenuItem(
@@ -1637,9 +1655,45 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     }
   }
 
+  Widget _homeSearchField(ThemeConfig theme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+      child: TextField(
+        controller: _searchCtrl,
+        focusNode: _searchFocus,
+        onChanged: (value) {
+          setState(() {});
+          _checkSecretSearchPhrase(value);
+        },
+        style: TextStyle(color: theme.primaryTextColor),
+        decoration: InputDecoration(
+          hintText: widget.forcedType == ConversationType.group
+              ? 'Search groups…'
+              : 'Search chats and messages…',
+          hintStyle: TextStyle(color: theme.secondaryTextColor),
+          prefixIcon: Icon(Icons.search_rounded, color: theme.secondaryTextColor),
+          suffixIcon: _searchCtrl.text.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: 'Clear search',
+                  onPressed: () {
+                    _searchCtrl.clear();
+                    setState(() {});
+                  },
+                  icon: const Icon(Icons.close_rounded),
+                ),
+          filled: true,
+          fillColor: theme.cardColor,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(theme.cornerRadius),
+            borderSide: BorderSide.none,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _standardAppBar(ThemeConfig theme, HomePreferences homePrefs) {
-    final availableWidth = MediaQuery.sizeOf(context).width;
-    final compactHeader = availableWidth < 390;
     final headerStyle = _effectiveHomeHeaderStyle;
     final homeStyle = HomePresetNormalizer.homeStyle(homePrefs.homeStyle);
     final titleFontSize = switch (headerStyle) {
@@ -1649,7 +1703,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
       HomeHeaderStyle.storiesFirst => 22.0,
     };
     final effectiveShowSearch =
-        homePrefs.showSearchBar && !homePrefs.disableSearchBar;
+        homePrefs.showSearchBar &&
+        !homePrefs.disableSearchBar &&
+        homePrefs.searchPlacement.trim().toLowerCase() == 'header action';
     final userAbout = widget.dataStore.currentUser.about.isNotEmpty
         ? widget.dataStore.currentUser.about
         : 'Available';
@@ -1726,14 +1782,14 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               ],
             ),
           ),
-          if (homePrefs.showCameraIcon && !compactHeader)
+          if (homePrefs.showCameraIcon)
             IconButton(
               tooltip: 'Camera Effects',
               color: theme.primaryTextColor,
               onPressed: () => EffectPickerSheet.show(context),
               icon: const ChatyGlyphIcon(glyph: ChatyGlyph.camera, size: 20),
             ),
-          if (homePrefs.showDesktopIcon && !compactHeader)
+          if (homePrefs.showDesktopIcon)
             IconButton(
               tooltip: 'QR / Scan',
               color: theme.primaryTextColor,
@@ -1762,6 +1818,14 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                 _isSearchOpen ? Icons.close_rounded : Icons.search_rounded,
               ),
             ),
+          // Optional account shortcut controlled by Header Settings.
+          if (homePrefs.showIconAddAccount)
+            IconButton(
+              tooltip: 'Account settings',
+              color: theme.primaryTextColor,
+              onPressed: _openProfileFromHeader,
+              icon: const Icon(Icons.person_add_alt_1_rounded),
+            ),
           // Small profile avatar → Profile (real photo when uploaded).
           if (widget.forcedType == null)
             Padding(
@@ -1786,21 +1850,23 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                 ),
               ),
             ),
-          IconButton(
-            tooltip: 'Toggle light / dark',
-            color: theme.primaryTextColor,
-            onPressed: widget.themeController.toggleBrightness,
-            icon: Icon(
-              theme.brightness == Brightness.dark
-                  ? Icons.light_mode_rounded
-                  : Icons.dark_mode_rounded,
+          if (homePrefs.themesEnabled)
+            IconButton(
+              tooltip: 'Toggle light / dark',
+              color: theme.primaryTextColor,
+              onPressed: widget.themeController.toggleBrightness,
+              icon: Icon(
+                theme.brightness == Brightness.dark
+                    ? Icons.light_mode_rounded
+                    : Icons.dark_mode_rounded,
+              ),
             ),
-          ),
           IconButton(
             tooltip: 'More options',
             icon: Icon(
               Icons.more_vert_rounded,
               color: theme.primaryTextColor,
+              size: 26,
             ),
             onPressed: () => _openHomeThreeDotMenu(
               homePrefs: homePrefs,
@@ -1998,6 +2064,25 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     );
   }
 
+  String _displayConversationTitle(Conversation conversation) {
+    final title = conversation.title.trim();
+    final homePrefs = widget.preferencesController.home;
+    if (!homePrefs.hideUnsavedNumbers ||
+        conversation.type != ConversationType.direct ||
+        !RegExp(r'^\+?[\d\s().-]{7,}$').hasMatch(title)) {
+      return conversation.title;
+    }
+
+    final currentUserId = widget.dataStore.currentUser.id;
+    final otherId = conversation.participantIds.firstWhere(
+      (id) => id != currentUserId,
+      orElse: () => '',
+    );
+    final isKnownContact = otherId.isNotEmpty &&
+        widget.dataStore.contacts.any((contact) => contact.id == otherId);
+    return isKnownContact ? conversation.title : 'Unknown contact';
+  }
+
   Widget _conversationTile(
     Conversation conversation,
     ThemeConfig theme, {
@@ -2005,8 +2090,16 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
   }) {
     final homePrefs = widget.preferencesController.home;
     final chatListTemplate = locator<TemplateController>().chatList;
+    final rawHomeUiStyle = homePrefs.homeStyle.trim().toLowerCase();
+    final isInstagramRows = rawHomeUiStyle == 'instagram style';
+    final isTelegramRows = rawHomeUiStyle == 'telegram style';
     final cardRows =
-        HomePresetNormalizer.homeStyle(homePrefs.homeStyle) == 'Cards';
+        HomePresetNormalizer.homeStyle(homePrefs.homeStyle) == 'Cards' ||
+        isInstagramRows;
+    final rowRadius = theme.cornerRadius.clamp(0.0, 24.0).toDouble();
+    final tileRadius = cardRows
+        ? (rowRadius + 2).clamp(0.0, 26.0).toDouble()
+        : rowRadius;
     final effectiveDensity = density * switch (chatListTemplate.density) {
       ChatListDensity.compact => 0.92,
       ChatListDensity.regular => 1.0,
@@ -2056,6 +2149,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         ? Color(homePrefs.lastSeenColor!)
         : (widget.preferencesController.gbColor('ModlastseenColor') ??
             theme.secondaryTextColor);
+    final displayTitle = _displayConversationTitle(conversation);
     final onlineDotColor = homePrefs.onlineDotColor != null
         ? Color(homePrefs.onlineDotColor!)
         : (widget.preferencesController.gbColor('onlineDotchatColor') ??
@@ -2079,10 +2173,16 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
             ? theme.accentColor.withValues(
                 alpha: theme.brightness == Brightness.dark ? 0.16 : 0.10,
               )
-            : conversation.isPinned || cardRows
+            : cardRows
+            ? theme.cardColor
+            : isTelegramRows
+            ? theme.cardColor.withValues(
+                alpha: theme.brightness == Brightness.dark ? 0.68 : 0.58,
+              )
+            : conversation.isPinned
             ? theme.cardColor
             : Colors.transparent,
-        borderRadius: BorderRadius.circular(cardRows ? 18 : 16),
+        borderRadius: BorderRadius.circular(tileRadius),
         child: Builder(
           builder: (tileContext) {
             void handleLongPress() {
@@ -2091,7 +2191,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
             }
 
             return InkWell(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(tileRadius),
               onTap: () => _handleConversationTap(conversation),
               onLongPress: handleLongPress,
               child: ConstrainedBox(
@@ -2108,7 +2208,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                           ChatyAvatar(
                             initials:
                                 conversation.avatarInitials ??
-                                conversation.title.characters
+                                displayTitle.characters
                                     .take(2)
                                     .toString()
                                     .toUpperCase(),
@@ -2118,7 +2218,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                     int.parse(conversation.avatarColorHex!),
                                   ),
                             size: 50 * effectiveDensity,
-                            shape: chatListTemplate.avatarShape,
+                            shape: homePrefs.avatarShape == 'circle'
+                                ? chatListTemplate.avatarShape
+                                : homePrefs.avatarShape,
                           ),
                           if (selected)
                             Positioned.fill(
@@ -2185,7 +2287,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                           ],
                                           Flexible(
                                             child: Text(
-                                              conversation.title,
+                                              displayTitle,
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                               style: TextStyle(
@@ -2202,6 +2304,27 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                               ),
                                             ),
                                           ),
+                                          if (conversation.lastMessageText.contains('@')) ...[
+                                            const SizedBox(width: 4),
+                                            Container(
+                                              width: 19,
+                                              height: 19,
+                                              decoration: BoxDecoration(
+                                                color: homePrefs.mentionIndicatorBgColor != null
+                                                    ? Color(homePrefs.mentionIndicatorBgColor!)
+                                                    : theme.accentColor.withValues(alpha: 0.14),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              alignment: Alignment.center,
+                                              child: Icon(
+                                                Icons.alternate_email_rounded,
+                                                size: 12,
+                                                color: homePrefs.mentionIconColor != null
+                                                    ? Color(homePrefs.mentionIconColor!)
+                                                    : theme.accentColor,
+                                              ),
+                                            ),
+                                          ],
                                         ],
                                       ),
                                     ),
