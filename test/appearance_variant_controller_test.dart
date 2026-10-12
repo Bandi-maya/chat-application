@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../lib/ui/core/controllers/appearance_variant_controller.dart';
+import 'package:chat/ui/core/controllers/appearance_variant_controller.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
