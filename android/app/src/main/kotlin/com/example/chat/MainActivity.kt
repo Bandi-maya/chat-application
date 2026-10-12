@@ -206,6 +206,24 @@ open class MainActivity : FlutterFragmentActivity() {
                         result.success(null)
                     }
                 }
+                "openNotificationChannelSettings" -> {
+                    try {
+                        val pkg = call.argument<String>("packageName") ?: packageName
+                        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, pkg)
+                            }
+                        } else {
+                            Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.parse("package:$pkg")
+                            }
+                        }
+                        startActivity(intent)
+                        result.success(null)
+                    } catch (error: Exception) {
+                        result.error("channel_settings_failed", error.message, null)
+                    }
+                }
                 else -> result.notImplemented()
             }
         }

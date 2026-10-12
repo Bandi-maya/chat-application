@@ -260,10 +260,88 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> wit
           fallback: false,
         );
 
+        final isIslandEnabled = widget.preferencesController.gbBool(
+          'dynamic_island_notifications',
+          fallback: false,
+        );
+
+        final Widget readinessIndicator = InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () {
+            if (!isIslandEnabled) {
+              _setDynamicIslandEnabled(true);
+            } else if (!_notificationAccessGranted) {
+              _openDynamicIslandPermission(notificationAccess: true);
+            } else if (!_overlayPermissionGranted) {
+              _openDynamicIslandPermission(notificationAccess: false);
+            } else {
+              _previewDynamicIsland();
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: !isIslandEnabled
+                  ? colors.surface
+                  : (!_notificationAccessGranted || !_overlayPermissionGranted)
+                      ? colors.warning.withValues(alpha: 0.15)
+                      : colors.success.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: !isIslandEnabled
+                    ? colors.borderSubtle
+                    : (!_notificationAccessGranted || !_overlayPermissionGranted)
+                        ? colors.warning
+                        : colors.success,
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: !isIslandEnabled
+                        ? colors.foregroundSecondary
+                        : (!_notificationAccessGranted || !_overlayPermissionGranted)
+                            ? colors.warning
+                            : colors.success,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  !isIslandEnabled
+                      ? 'Island Off'
+                      : (!_notificationAccessGranted && !_overlayPermissionGranted)
+                          ? 'Missing Perms'
+                          : !_notificationAccessGranted
+                              ? 'No Access'
+                              : !_overlayPermissionGranted
+                                  ? 'No Overlay'
+                                  : 'Island Ready',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: !isIslandEnabled
+                        ? colors.foregroundSecondary
+                        : (!_notificationAccessGranted || !_overlayPermissionGranted)
+                            ? colors.warning
+                            : colors.success,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+
         return ChatySettingsPage(
           title: 'Notifications',
           subtitle:
               'In-app alerts, realtime contact events & toast notification customizations',
+          trailingHeaderWidget: readinessIndicator,
           children: [
             // 1. In-app event notifications master settings
             ChatySettingsSection(
@@ -421,10 +499,60 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> wit
                   ]),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                   child: Text(
-                    'The island shows a compact notification first. Tap to expand details; tap again to open the source notification. Call notifications stay visible longer. Android may limit sensitive content based on the source app and device settings.',
+                    'The island maintains a persistent multi-item notification stack. Tap the pill or swipe down to expand all messages. Swipe horizontally to dismiss an individual notification, or tap Clear All to clear the stack. Collapsing the island never deletes your messages.',
                     style: TextStyle(color: colors.foregroundSecondary, fontSize: 12, height: 1.35),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colors.surface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: colors.borderSubtle),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.tune_rounded, size: 18, color: colors.primary),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Reduce duplicate heads-up banners',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: colors.foreground,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'To make Dynamic Island your preferred preview without losing notification history, Android lets you set notifications to "Silent" or disable "Pop on screen" in the source app channel settings. Tap below to manage settings for Chaty or other apps.',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: colors.foregroundSecondary,
+                            height: 1.3,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            onPressed: () {
+                              _dynamicIslandChannel.invokeMethod<void>('openNotificationChannelSettings');
+                            },
+                            icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                            label: const Text('App Notification Settings'),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
