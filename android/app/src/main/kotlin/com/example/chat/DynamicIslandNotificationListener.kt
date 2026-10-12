@@ -32,21 +32,25 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.animation.OvershootInterpolator
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.ProgressBar
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.core.view.WindowInsetsCompat
 
 /**
- * Enhanced, camera-cutout aware NotificationListenerService for Chaty Dynamic Island.
- * Manages notification events, unread badge aggregation, media sessions, and direct replies.
+ * Camera-cutout aware NotificationListenerService for Chaty Dynamic Island.
+ * Manages persistent notification stack aggregation, deduplication, active notifications reconciliation,
+ * media sessions, gestures (tap to toggle/expand, vertical scroll, horizontal swipe-to-dismiss),
+ * and direct inline replies via RemoteInput.
  */
 class DynamicIslandNotificationListener : NotificationListenerService() {
     private var mediaSessionManager: MediaSessionManager? = null
@@ -74,6 +78,14 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
             mediaSessionManager?.addOnActiveSessionsChangedListener(sessionsListener, component)
             val controllers = mediaSessionManager?.getActiveSessions(component)
             updateActiveController(controllers?.firstOrNull())
+        } catch (_: Exception) {}
+
+        // Reconcile active notifications on connect
+        try {
+            val active = activeNotifications ?: emptyArray()
+            for (sbn in active) {
+                processStatusBarNotification(sbn, isInitialReconcile = true)
+            }
         } catch (_: Exception) {}
     }
 
@@ -137,6 +149,10 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         if (sbn == null || !isEnabled(this)) return
+        processStatusBarNotification(sbn, isInitialReconcile = false)
+    }
+
+    private fun processStatusBarNotification(sbn: StatusBarNotification, isInitialReconcile: Boolean) {
         val notification = sbn.notification ?: return
         if (notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
 
@@ -152,8 +168,8 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
                 (notification.category == Notification.CATEGORY_CALL ||
                     title.contains("call", ignoreCase = true)))
 
-        val keyguard = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-        val locked = keyguard.isKeyguardLocked
+        val keyguard = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+        val locked = keyguard?.isKeyguardLocked ?: false
         val safeTitle = if (locked) "New notification" else if (title.isBlank()) appLabel(sbn.packageName) else title
         val safeBody = if (locked) "Unlock your phone to view details"
             else if (body.isBlank()) (if (isCall) "Call notification" else "New notification") else body
@@ -190,6 +206,7 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
                 pendingIntent = pendingIntent,
                 actions = actions,
                 replyAction = replyAction,
+                animateArrival = !isInitialReconcile,
             )
         }
     }
@@ -255,7 +272,6 @@ internal data class IslandMediaState(
 /** State machine for the dynamic island overlay */
 internal enum class IslandVisualState {
     COMPACT,
-    PREVIEW,
     EXPANDED,
     REPLY,
     MEDIA_EXPANDED,
@@ -272,8 +288,8 @@ internal object IslandOverlay {
     private val activeNotifications = mutableListOf<IslandNotificationItem>()
     private var currentMedia: IslandMediaState? = null
 
-    private var lastPostedKey = ""
-    private var lastPostedTime = 0L
+    // Reply focus target
+    private var activeReplyItem: IslandNotificationItem? = null
 
     // Animation dimensions
     private var currentAnimator: ValueAnimator? = null
@@ -289,22 +305,16 @@ internal object IslandOverlay {
         pendingIntent: PendingIntent?,
         actions: List<IslandAction>,
         replyAction: IslandReplyAction?,
+        animateArrival: Boolean = true,
     ) {
         if (!DynamicIslandNotificationListener.isEnabled(context)) return
         val appContext = context.applicationContext ?: context
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(appContext)) return
 
-        val notifKey = "$packageName:$title:$body"
-        val now = System.currentTimeMillis()
-        if (notifKey == lastPostedKey && (now - lastPostedTime) < 1500L) {
-            return
-        }
-        lastPostedKey = notifKey
-        lastPostedTime = now
-
-        // Remove existing item with same key and insert newest on top
-        activeNotifications.removeAll { it.key == key }
-        activeNotifications.add(0, IslandNotificationItem(
+        // Stable identity deduplication & stack insertion:
+        // If an item with the same stable key exists, update in-place or move to top if new content
+        val existingIndex = activeNotifications.indexOfFirst { it.key == key }
+        val newItem = IslandNotificationItem(
             key = key,
             packageName = packageName,
             title = title,
@@ -314,24 +324,61 @@ internal object IslandOverlay {
             pendingIntent = pendingIntent,
             actions = actions,
             replyAction = replyAction,
-        ))
+        )
 
-        // Keep at most 10 active notifications
-        if (activeNotifications.size > 10) {
+        if (existingIndex >= 0) {
+            val existing = activeNotifications[existingIndex]
+            val isContentChanged = existing.title != title || existing.body != body
+            if (isContentChanged) {
+                activeNotifications.removeAt(existingIndex)
+                activeNotifications.add(0, newItem)
+            } else {
+                // Update metadata (icons/actions/intents) in-place without resetting scroll or stack order
+                activeNotifications[existingIndex] = newItem
+            }
+        } else {
+            // New entry: push to top of stack
+            activeNotifications.add(0, newItem)
+        }
+
+        // Keep at most 20 active notifications in the stack
+        while (activeNotifications.size > 20) {
             activeNotifications.removeAt(activeNotifications.lastIndex)
         }
 
-        currentState = if (isCall) IslandVisualState.PREVIEW else IslandVisualState.COMPACT
+        // If user is actively typing a reply, don't kick them out of reply state
+        if (currentState != IslandVisualState.REPLY) {
+            currentState = if (isCall) IslandVisualState.EXPANDED else IslandVisualState.COMPACT
+        }
+
         ensureWindowManager(appContext)
-        render(appContext, animate = true)
+        render(appContext, animate = animateArrival)
         scheduleDismiss(appContext, currentState)
     }
 
     fun onNotificationRemoved(key: String) {
         activeNotifications.removeAll { it.key == key }
+        if (activeReplyItem?.key == key) {
+            activeReplyItem = null
+            if (currentState == IslandVisualState.REPLY) {
+                currentState = IslandVisualState.COMPACT
+            }
+        }
+
         if (activeNotifications.isEmpty() && currentMedia == null) {
             remove()
         } else {
+            currentView?.context?.let { render(it, animate = true) }
+        }
+    }
+
+    fun clearAllNotifications() {
+        activeNotifications.clear()
+        activeReplyItem = null
+        if (currentMedia == null) {
+            remove()
+        } else {
+            currentState = IslandVisualState.COMPACT
             currentView?.context?.let { render(it, animate = true) }
         }
     }
@@ -394,16 +441,15 @@ internal object IslandOverlay {
         }
 
         val timeout = when (state) {
-            IslandVisualState.COMPACT -> 6000L
-            IslandVisualState.PREVIEW -> 10000L
-            IslandVisualState.EXPANDED -> 15000L
-            IslandVisualState.MEDIA_EXPANDED -> 15000L
-            IslandVisualState.REPLY -> 30000L
+            IslandVisualState.COMPACT -> 7000L
+            IslandVisualState.EXPANDED -> 16000L
+            IslandVisualState.MEDIA_EXPANDED -> 16000L
+            IslandVisualState.REPLY -> 35000L
         }
 
         dismissRunnable = Runnable {
             if (activeNotifications.isNotEmpty() && state != IslandVisualState.COMPACT) {
-                // Settle back to compact rather than disappearing abruptly
+                // Settle back to compact pill rather than disappearing abruptly
                 currentState = IslandVisualState.COMPACT
                 render(context, animate = true)
                 scheduleDismiss(context, IslandVisualState.COMPACT)
@@ -419,7 +465,6 @@ internal object IslandOverlay {
 
     private fun render(context: Context, animate: Boolean = true) {
         val wm = windowManager ?: return
-        val density = context.resources.displayMetrics.density
         val screenWidth = context.resources.displayMetrics.widthPixels
 
         val primaryNotif = activeNotifications.firstOrNull()
@@ -427,42 +472,48 @@ internal object IslandOverlay {
         val unreadCount = activeNotifications.size
 
         // Calculate target dimensions
-        // COMPACT: camera-aware compact pill (~126dp x 36dp)
-        // EXPANDED / PREVIEW: ~360dp max
         val targetWidth = when (currentState) {
-            IslandVisualState.COMPACT -> dp(context, 126).coerceAtLeast(dp(context, 100))
-            IslandVisualState.PREVIEW -> (screenWidth - dp(context, 32)).coerceAtMost(dp(context, 360))
-            IslandVisualState.EXPANDED -> (screenWidth - dp(context, 24)).coerceAtMost(dp(context, 360))
-            IslandVisualState.MEDIA_EXPANDED -> (screenWidth - dp(context, 24)).coerceAtMost(dp(context, 360))
-            IslandVisualState.REPLY -> (screenWidth - dp(context, 24)).coerceAtMost(dp(context, 360))
+            IslandVisualState.COMPACT -> {
+                // Slightly wider if multiple stacked cards exist to hint at stack depth
+                if (unreadCount > 1) dp(context, 142) else dp(context, 126)
+            }.coerceAtLeast(dp(context, 100))
+            IslandVisualState.EXPANDED -> (screenWidth - dp(context, 20)).coerceAtMost(dp(context, 370))
+            IslandVisualState.MEDIA_EXPANDED -> (screenWidth - dp(context, 20)).coerceAtMost(dp(context, 370))
+            IslandVisualState.REPLY -> (screenWidth - dp(context, 20)).coerceAtMost(dp(context, 370))
         }
 
         val targetHeight = when (currentState) {
             IslandVisualState.COMPACT -> dp(context, 36)
-            IslandVisualState.PREVIEW -> dp(context, 78)
-            IslandVisualState.EXPANDED -> dp(context, if (activeNotifications.size > 1) 180 else 130)
-            IslandVisualState.MEDIA_EXPANDED -> dp(context, 142)
-            IslandVisualState.REPLY -> dp(context, 130)
+            IslandVisualState.EXPANDED -> {
+                when {
+                    unreadCount > 2 -> dp(context, 260)
+                    unreadCount == 2 -> dp(context, 190)
+                    else -> dp(context, 134)
+                }
+            }
+            IslandVisualState.MEDIA_EXPANDED -> dp(context, 146)
+            IslandVisualState.REPLY -> dp(context, 136)
         }
 
         val cornerRadius = when (currentState) {
             IslandVisualState.COMPACT -> dp(context, 18).toFloat()
-            else -> dp(context, 26).toFloat()
+            else -> dp(context, 24).toFloat()
         }
 
+        // Root container with layered glassmorphism border & shadow
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(
-                if (currentState == IslandVisualState.COMPACT) dp(context, 8) else dp(context, 14),
-                if (currentState == IslandVisualState.COMPACT) dp(context, 4) else dp(context, 10),
-                if (currentState == IslandVisualState.COMPACT) dp(context, 8) else dp(context, 14),
-                if (currentState == IslandVisualState.COMPACT) dp(context, 4) else dp(context, 10),
+                if (currentState == IslandVisualState.COMPACT) dp(context, 6) else dp(context, 12),
+                if (currentState == IslandVisualState.COMPACT) dp(context, 3) else dp(context, 8),
+                if (currentState == IslandVisualState.COMPACT) dp(context, 6) else dp(context, 12),
+                if (currentState == IslandVisualState.COMPACT) dp(context, 3) else dp(context, 8),
             )
             background = GradientDrawable().apply {
-                setColor(Color.rgb(8, 9, 12)) // Obsidian black
+                setColor(Color.rgb(10, 11, 15)) // Deep Obsidian
                 this.cornerRadius = cornerRadius
-                setStroke(dp(context, 1), Color.argb(40, 255, 255, 255))
+                setStroke(dp(context, 1), Color.argb(45, 255, 255, 255))
             }
             elevation = dp(context, 12).toFloat()
         }
@@ -470,10 +521,9 @@ internal object IslandOverlay {
         // Build view content based on state
         when (currentState) {
             IslandVisualState.COMPACT -> buildCompactView(context, root, primaryNotif, media, unreadCount)
-            IslandVisualState.PREVIEW -> buildPreviewView(context, root, primaryNotif)
-            IslandVisualState.EXPANDED -> buildExpandedView(context, root, primaryNotif)
+            IslandVisualState.EXPANDED -> buildExpandedStackView(context, root, targetHeight)
             IslandVisualState.MEDIA_EXPANDED -> buildMediaExpandedView(context, root, media)
-            IslandVisualState.REPLY -> buildReplyView(context, root, primaryNotif)
+            IslandVisualState.REPLY -> buildReplyView(context, root, activeReplyItem ?: primaryNotif)
         }
 
         // Window Params
@@ -489,7 +539,6 @@ internal object IslandOverlay {
             flags = flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
         }
 
-        // Measure cutout camera offset
         val topOffset = getCutoutTopOffset(context)
 
         val params = WindowManager.LayoutParams(
@@ -504,7 +553,6 @@ internal object IslandOverlay {
             y = topOffset
         }
 
-        // Gesture handling
         setupTouchInteractions(context, root)
 
         try {
@@ -514,8 +562,8 @@ internal object IslandOverlay {
                     val initialWidth = old.width.takeIf { it > 0 } ?: targetWidth
                     currentAnimator?.cancel()
                     currentAnimator = ValueAnimator.ofInt(initialWidth, targetWidth).apply {
-                        duration = 240
-                        interpolator = OvershootInterpolator(0.7f)
+                        duration = 220
+                        interpolator = OvershootInterpolator(0.6f)
                         addUpdateListener { animator ->
                             val currentW = animator.animatedValue as Int
                             params.width = currentW
@@ -549,7 +597,27 @@ internal object IslandOverlay {
             )
         }
 
-        // Left leading side: App icon or music art
+        // Left leading side: Stack layer edge hint + App Icon or Media Art
+        val leftContainer = FrameLayout(context).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(context, if (count > 1) 28 else 24), dp(context, 24)).apply {
+                marginStart = dp(context, 2)
+            }
+        }
+
+        // If multiple notifications exist, render subtle stacked card edge behind icon
+        if (count > 1) {
+            val stackUnderlay = View(context).apply {
+                background = GradientDrawable().apply {
+                    setColor(Color.argb(80, 50, 60, 80))
+                    cornerRadius = dp(context, 6).toFloat()
+                }
+                layoutParams = FrameLayout.LayoutParams(dp(context, 18), dp(context, 18)).apply {
+                    gravity = Gravity.CENTER_VERTICAL or Gravity.START
+                }
+            }
+            leftContainer.addView(stackUnderlay)
+        }
+
         val iconView = ImageView(context).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
             if (media != null && media.art != null) {
@@ -559,12 +627,12 @@ internal object IslandOverlay {
             } else {
                 setImageResource(android.R.drawable.ic_dialog_info)
             }
+            layoutParams = FrameLayout.LayoutParams(dp(context, 22), dp(context, 22)).apply {
+                gravity = Gravity.CENTER_VERTICAL or Gravity.END
+            }
         }
-        val iconSize = dp(context, 24)
-        val iconLp = LinearLayout.LayoutParams(iconSize, iconSize).apply {
-            marginStart = dp(context, 4)
-        }
-        row.addView(iconView, iconLp)
+        leftContainer.addView(iconView)
+        row.addView(leftContainer)
 
         // Middle spacer: camera cutout area
         val spacer = View(context).apply {
@@ -572,7 +640,7 @@ internal object IslandOverlay {
         }
         row.addView(spacer)
 
-        // Right trailing side: Unread badge or Music Visualizer
+        // Right trailing side: Unread badge count or Music Visualizer
         if (media != null && media.isPlaying) {
             val visualizer = TextView(context).apply {
                 text = "ılı"
@@ -588,13 +656,13 @@ internal object IslandOverlay {
                 text = if (count > 1) "$count" else "●"
                 textSize = if (count > 1) 11f else 9f
                 typeface = Typeface.DEFAULT_BOLD
-                setTextColor(if (notif?.isCall == true) Color.rgb(74, 222, 128) else Color.rgb(120, 190, 255))
+                setTextColor(if (notif?.isCall == true) Color.rgb(74, 222, 128) else Color.rgb(130, 195, 255))
                 gravity = Gravity.CENTER
                 background = GradientDrawable().apply {
-                    setColor(if (count > 1) Color.argb(45, 120, 190, 255) else Color.TRANSPARENT)
+                    setColor(if (count > 1) Color.argb(55, 37, 99, 235) else Color.TRANSPARENT)
                     cornerRadius = dp(context, 10).toFloat()
                 }
-                setPadding(dp(context, 4), dp(context, 1), dp(context, 4), dp(context, 1))
+                setPadding(dp(context, 5), dp(context, 1), dp(context, 5), dp(context, 1))
             }
             row.addView(badge, LinearLayout.LayoutParams(-2, -2).apply {
                 marginEnd = dp(context, 4)
@@ -604,109 +672,212 @@ internal object IslandOverlay {
         root.addView(row)
     }
 
-    private fun buildPreviewView(context: Context, root: LinearLayout, notif: IslandNotificationItem?) {
-        if (notif == null) return
-        val row = LinearLayout(context).apply {
+    /**
+     * Builds the persistent multi-notification stacked scrollable view
+     */
+    private fun buildExpandedStackView(context: Context, root: LinearLayout, targetHeight: Int) {
+        if (activeNotifications.isEmpty()) return
+
+        // Header bar with unread stack count and Clear All action
+        val header = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(context, 4), 0, dp(context, 4), dp(context, 6))
+        }
+
+        val headerTitle = TextView(context).apply {
+            text = "Notifications (${activeNotifications.size})"
+            textSize = 12f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.rgb(180, 190, 210))
+        }
+        header.addView(headerTitle, LinearLayout.LayoutParams(0, -2, 1f))
+
+        val clearAllBtn = TextView(context).apply {
+            text = "Clear All"
+            textSize = 11f
+            setTextColor(Color.rgb(140, 150, 170))
+            setPadding(dp(context, 6), dp(context, 2), dp(context, 6), dp(context, 2))
+            background = GradientDrawable().apply {
+                setColor(Color.argb(30, 255, 255, 255))
+                cornerRadius = dp(context, 8).toFloat()
+            }
+            setOnClickListener {
+                clearAllNotifications()
+            }
+        }
+        header.addView(clearAllBtn)
+        root.addView(header)
+
+        // Scrollable list container for stacked cards
+        val scrollView = ScrollView(context).apply {
+            isVerticalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (targetHeight - dp(context, 48)).coerceAtLeast(dp(context, 80)),
+            )
+        }
+
+        val itemsContainer = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        // Render each notification card in stack order
+        for ((index, item) in activeNotifications.withIndex()) {
+            val card = buildNotificationCardView(context, item, isTop = index == 0)
+            itemsContainer.addView(card)
+
+            if (index < activeNotifications.size - 1) {
+                val divider = View(context).apply {
+                    setBackgroundColor(Color.argb(20, 255, 255, 255))
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        dp(context, 1),
+                    ).apply {
+                        topMargin = dp(context, 6)
+                        bottomMargin = dp(context, 6)
+                    }
+                }
+                itemsContainer.addView(divider)
+            }
+        }
+
+        scrollView.addView(itemsContainer)
+        root.addView(scrollView)
+    }
+
+    private fun buildNotificationCardView(
+        context: Context,
+        item: IslandNotificationItem,
+        isTop: Boolean,
+    ): LinearLayout {
+        val card = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(context, 6), dp(context, 6), dp(context, 6), dp(context, 6))
+            background = GradientDrawable().apply {
+                setColor(if (isTop) Color.argb(40, 30, 36, 48) else Color.argb(20, 20, 24, 32))
+                cornerRadius = dp(context, 14).toFloat()
+            }
+        }
+
+        val topRow = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
 
         val iconView = ImageView(context).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
-            if (notif.appIcon != null) setImageDrawable(notif.appIcon)
+            if (item.appIcon != null) setImageDrawable(item.appIcon)
             else setImageResource(android.R.drawable.ic_dialog_info)
         }
-        row.addView(iconView, LinearLayout.LayoutParams(dp(context, 32), dp(context, 32)))
+        topRow.addView(iconView, LinearLayout.LayoutParams(dp(context, 28), dp(context, 28)))
 
         val textCol = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(context, 10), 0, dp(context, 8), 0)
+            setPadding(dp(context, 8), 0, dp(context, 6), 0)
         }
         textCol.addView(TextView(context).apply {
-            text = notif.title
-            textSize = 13f
+            text = item.title
+            textSize = 12.5f
             maxLines = 1
             setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
         })
         textCol.addView(TextView(context).apply {
-            text = notif.body
-            textSize = 12f
-            maxLines = 1
-            setTextColor(Color.rgb(190, 195, 205))
+            text = item.body
+            textSize = 11.5f
+            maxLines = 2
+            setTextColor(Color.rgb(195, 200, 210))
         })
-        row.addView(textCol, LinearLayout.LayoutParams(0, -2, 1f))
+        topRow.addView(textCol, LinearLayout.LayoutParams(0, -2, 1f))
 
-        val hint = TextView(context).apply {
-            text = if (notif.isCall) "Call" else "now"
-            textSize = 10f
-            setTextColor(if (notif.isCall) Color.rgb(74, 222, 128) else Color.GRAY)
+        // Open source app on tap
+        topRow.setOnClickListener {
+            runCatching { item.pendingIntent?.send() }
+            onNotificationRemoved(item.key)
         }
-        row.addView(hint)
+        card.addView(topRow)
 
-        root.addView(row)
-    }
-
-    private fun buildExpandedView(context: Context, root: LinearLayout, notif: IslandNotificationItem?) {
-        if (notif == null) return
-        buildPreviewView(context, root, notif)
-
-        // Actions row (Reply / Call back / Dismiss)
+        // Actions row (Reply button + notification native actions)
         val actionsRow = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.END
-            setPadding(0, dp(context, 10), 0, 0)
+            setPadding(0, dp(context, 6), 0, 0)
         }
 
-        if (notif.replyAction != null) {
+        if (item.replyAction != null) {
             val replyBtn = Button(context).apply {
                 text = "Reply"
                 textSize = 11f
                 isAllCaps = false
                 setTextColor(Color.WHITE)
                 background = GradientDrawable().apply {
-                    setColor(Color.rgb(32, 40, 52))
-                    cornerRadius = dp(context, 14).toFloat()
+                    setColor(Color.rgb(37, 99, 235)) // Chaty Accent Blue
+                    cornerRadius = dp(context, 12).toFloat()
                 }
                 setOnClickListener {
+                    activeReplyItem = item
                     currentState = IslandVisualState.REPLY
                     render(context, animate = true)
                 }
             }
-            actionsRow.addView(replyBtn, LinearLayout.LayoutParams(-2, dp(context, 34)).apply {
+            actionsRow.addView(replyBtn, LinearLayout.LayoutParams(-2, dp(context, 32)).apply {
                 marginEnd = dp(context, 6)
             })
         }
 
-        notif.actions.forEach { action ->
+        for (action in item.actions) {
             val btn = Button(context).apply {
                 text = action.title
                 textSize = 11f
                 isAllCaps = false
                 setTextColor(Color.WHITE)
                 background = GradientDrawable().apply {
-                    setColor(Color.rgb(28, 30, 36))
-                    cornerRadius = dp(context, 14).toFloat()
+                    setColor(Color.rgb(28, 32, 40))
+                    cornerRadius = dp(context, 12).toFloat()
                 }
                 setOnClickListener {
                     runCatching { action.pendingIntent.send() }
-                    remove()
+                    onNotificationRemoved(item.key)
                 }
             }
-            actionsRow.addView(btn, LinearLayout.LayoutParams(-2, dp(context, 34)).apply {
+            actionsRow.addView(btn, LinearLayout.LayoutParams(-2, dp(context, 32)).apply {
                 marginStart = dp(context, 4)
             })
         }
 
-        root.addView(actionsRow)
+        // Dismiss single notification button
+        val dismissBtn = TextView(context).apply {
+            text = "✕"
+            textSize = 12f
+            setTextColor(Color.rgb(150, 155, 165))
+            gravity = Gravity.CENTER
+            setPadding(dp(context, 6), dp(context, 4), dp(context, 6), dp(context, 4))
+            setOnClickListener {
+                onNotificationRemoved(item.key)
+            }
+        }
+        actionsRow.addView(dismissBtn, LinearLayout.LayoutParams(dp(context, 32), dp(context, 32)).apply {
+            marginStart = dp(context, 4)
+        })
+
+        card.addView(actionsRow)
+        return card
     }
 
     private fun buildReplyView(context: Context, root: LinearLayout, notif: IslandNotificationItem?) {
-        if (notif?.replyAction == null) return
+        val targetItem = notif ?: activeNotifications.firstOrNull()
+        if (targetItem?.replyAction == null) {
+            currentState = IslandVisualState.EXPANDED
+            render(context, animate = true)
+            return
+        }
+
         val titleView = TextView(context).apply {
-            text = "Reply to ${notif.title}"
-            textSize = 12f
-            setTextColor(Color.rgb(160, 190, 240))
+            text = "Reply to ${targetItem.title}"
+            textSize = 12.5f
+            setTextColor(Color.rgb(160, 200, 255))
             typeface = Typeface.DEFAULT_BOLD
             setPadding(0, 0, 0, dp(context, 6))
         }
@@ -718,16 +889,16 @@ internal object IslandOverlay {
         }
 
         val editText = EditText(context).apply {
-            hint = "Type message..."
+            hint = "Type reply..."
             setHintTextColor(Color.DKGRAY)
             setTextColor(Color.WHITE)
             textSize = 13f
             imeOptions = EditorInfo.IME_ACTION_SEND
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
             background = GradientDrawable().apply {
-                setColor(Color.rgb(20, 22, 28))
+                setColor(Color.rgb(20, 24, 32))
                 cornerRadius = dp(context, 12).toFloat()
-                setStroke(dp(context, 1), Color.argb(50, 255, 255, 255))
+                setStroke(dp(context, 1), Color.argb(60, 255, 255, 255))
             }
             setPadding(dp(context, 10), dp(context, 6), dp(context, 10), dp(context, 6))
         }
@@ -735,17 +906,18 @@ internal object IslandOverlay {
 
         val sendBtn = Button(context).apply {
             text = "Send"
-            textSize = 11f
+            textSize = 11.5f
             setTextColor(Color.WHITE)
             background = GradientDrawable().apply {
-                setColor(Color.rgb(37, 99, 235)) // Blue primary
+                setColor(Color.rgb(37, 99, 235))
                 cornerRadius = dp(context, 12).toFloat()
             }
             setOnClickListener {
                 val replyText = editText.text.toString().trim()
                 if (replyText.isNotEmpty()) {
-                    sendDirectReply(context, notif.replyAction, replyText)
+                    sendDirectReply(context, targetItem.replyAction, replyText)
                 }
+                activeReplyItem = null
                 currentState = IslandVisualState.COMPACT
                 render(context, animate = true)
                 scheduleDismiss(context, IslandVisualState.COMPACT)
@@ -757,7 +929,7 @@ internal object IslandOverlay {
 
         root.addView(inputRow)
 
-        // Request keyboard focus
+        // Request keyboard focus smoothly
         main.postDelayed({
             editText.requestFocus()
             val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
@@ -810,7 +982,7 @@ internal object IslandOverlay {
         topRow.addView(textCol, LinearLayout.LayoutParams(0, -2, 1f))
         root.addView(topRow)
 
-        // Transport controls (Prev / Play-Pause / Next)
+        // Transport controls
         val controlsRow = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
@@ -873,8 +1045,8 @@ internal object IslandOverlay {
                         val deltaX = event.rawX - downX
                         val deltaY = event.rawY - downY
 
-                        // Swipe Down -> Expand to full view
-                        if (deltaY > dp(context, 20) && currentState == IslandVisualState.COMPACT) {
+                        // Swipe Down -> Expand to notification stack view
+                        if (deltaY > dp(context, 18) && currentState == IslandVisualState.COMPACT) {
                             currentState = if (currentMedia != null && activeNotifications.isEmpty())
                                 IslandVisualState.MEDIA_EXPANDED else IslandVisualState.EXPANDED
                             render(context, animate = true)
@@ -882,47 +1054,42 @@ internal object IslandOverlay {
                             return true
                         }
 
-                        // Swipe Up -> Collapse to compact
-                        if (deltaY < -dp(context, 20) && currentState != IslandVisualState.COMPACT) {
+                        // Swipe Up -> Collapse to compact pill (never destroys stack)
+                        if (deltaY < -dp(context, 18) && currentState != IslandVisualState.COMPACT) {
                             currentState = IslandVisualState.COMPACT
                             render(context, animate = true)
                             scheduleDismiss(context, currentState)
                             return true
                         }
 
-                        // Swipe Horizontal -> Dismiss current notification
-                        if (Math.abs(deltaX) > dp(context, 45) && Math.abs(deltaY) < dp(context, 35)) {
+                        // Swipe Horizontal -> Dismiss current top notification
+                        if (Math.abs(deltaX) > dp(context, 40) && Math.abs(deltaY) < dp(context, 35)) {
                             if (activeNotifications.isNotEmpty()) {
                                 activeNotifications.removeAt(0)
                             }
                             if (activeNotifications.isEmpty() && currentMedia == null) {
                                 remove()
                             } else {
-                                currentState = IslandVisualState.COMPACT
                                 render(context, animate = true)
                             }
                             return true
                         }
 
-                        // Simple Tap
-                        if (Math.abs(deltaX) < dp(context, 10) && Math.abs(deltaY) < dp(context, 10)) {
+                        // Simple Tap: toggle between Compact <-> Expanded stack
+                        if (Math.abs(deltaX) < dp(context, 12) && Math.abs(deltaY) < dp(context, 12)) {
                             when (currentState) {
                                 IslandVisualState.COMPACT -> {
                                     currentState = if (currentMedia != null && activeNotifications.isEmpty()) {
                                         IslandVisualState.MEDIA_EXPANDED
                                     } else {
-                                        IslandVisualState.PREVIEW
+                                        IslandVisualState.EXPANDED
                                     }
                                     render(context, animate = true)
                                     scheduleDismiss(context, currentState)
                                 }
-                                IslandVisualState.PREVIEW -> {
-                                    val notif = activeNotifications.firstOrNull()
-                                    runCatching { notif?.pendingIntent?.send() }
-                                    remove()
-                                }
                                 IslandVisualState.EXPANDED,
                                 IslandVisualState.MEDIA_EXPANDED -> {
+                                    // Tap collapses back to compact pill without wiping notifications
                                     currentState = IslandVisualState.COMPACT
                                     render(context, animate = true)
                                     scheduleDismiss(context, currentState)
@@ -940,7 +1107,6 @@ internal object IslandOverlay {
 
     private fun getCutoutTopOffset(context: Context): Int {
         val statusBar = statusBarHeight(context)
-        // Camera cutout insets: nestle island symmetrically inside top edge
         return (statusBar * 0.18f).toInt().coerceAtLeast(dp(context, 4))
     }
 
@@ -952,20 +1118,33 @@ internal object IslandOverlay {
             main.postDelayed({ runCatching { tone.release() } }, 250)
         } catch (_: Exception) {}
 
+        // Add 2 realistic sample notifications to demonstrate persistent stack behavior
         onNotificationReceived(
             context = appContext,
-            key = "preview_test_key",
+            key = "preview_test_key_1",
             packageName = appContext.packageName,
             title = "Chaty Dynamic Island",
-            body = "Compact pill active · Tap or swipe down to expand",
+            body = "Stack view ready · Tap to expand all items",
             isCall = false,
             appIcon = runCatching { appContext.packageManager.getApplicationIcon(appContext.packageName) }.getOrNull(),
             pendingIntent = null,
-            actions = listOf(IslandAction("Dismiss", PendingIntent.getBroadcast(
-                appContext, 0, Intent("chaty.island.DISMISS"),
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
-            ))),
+            actions = emptyList(),
             replyAction = null,
+            animateArrival = true,
+        )
+
+        onNotificationReceived(
+            context = appContext,
+            key = "preview_test_key_2",
+            packageName = appContext.packageName,
+            title = "Alice Morgan",
+            body = "Are we still meeting at 5 PM for the design review?",
+            isCall = false,
+            appIcon = runCatching { appContext.packageManager.getApplicationIcon(appContext.packageName) }.getOrNull(),
+            pendingIntent = null,
+            actions = emptyList(),
+            replyAction = null,
+            animateArrival = true,
         )
     }
 
