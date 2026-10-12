@@ -172,12 +172,12 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
       child: AnimatedContainer(
         duration: ChatyMotion.duration(context, preferred: const Duration(milliseconds: 260)),
         curve: ChatyMotion.curve(context, preferred: ChatyMotion.springSnappy),
-        width: expanded ? (MediaQuery.sizeOf(context).width - 36).clamp(260.0, 390.0).toDouble() : 174.0,
+        width: expanded ? (MediaQuery.sizeOf(context).width - 36).clamp(260.0, 390.0).toDouble() : 124.0,
         constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width - 28),
-        padding: EdgeInsets.symmetric(horizontal: expanded ? 16 : 13, vertical: expanded ? 13 : 9),
+        padding: EdgeInsets.symmetric(horizontal: expanded ? 16 : 10, vertical: expanded ? 13 : 6),
         decoration: BoxDecoration(
           color: const Color(0xFF08090B),
-          borderRadius: BorderRadius.circular(expanded ? 26 : 32),
+          borderRadius: BorderRadius.circular(expanded ? 24 : 18),
           border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
           boxShadow: [
             BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 22, offset: const Offset(0, 8)),
@@ -192,30 +192,40 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
               Row(
                 children: [
                   Container(
-                    width: 27,
-                    height: 27,
+                    width: 24,
+                    height: 24,
                     decoration: BoxDecoration(color: notification.color.withValues(alpha: 0.2), shape: BoxShape.circle),
-                    child: Icon(notification.icon, color: notification.color, size: 16),
+                    child: Icon(notification.icon, color: notification.color, size: 14),
                   ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(notification.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
-                        if (expanded)
+                  if (expanded) ...[
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(notification.title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
                           Padding(
                             padding: const EdgeInsets.only(top: 3),
                             child: Text(widget.concealWhileLocked ? '••••••' : notification.body, maxLines: 2, overflow: TextOverflow.ellipsis,
                               style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 12, height: 1.25)),
                           ),
-                      ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 7),
+                  ] else ...[
+                    const Spacer(),
+                  ],
+                  Container(
+                    width: expanded ? 6 : 7,
+                    height: expanded ? 6 : 7,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF48D597),
+                      shape: BoxShape.circle,
                     ),
                   ),
-                  const SizedBox(width: 7),
-                  Container(width: 5, height: 5, decoration: const BoxDecoration(color: Color(0xFF48D597), shape: BoxShape.circle)),
                 ],
               ),
               if (expanded && recent.length > 1) ...[
