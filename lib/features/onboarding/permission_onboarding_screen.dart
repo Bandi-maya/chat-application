@@ -119,7 +119,9 @@ class _PermissionOnboardingScreenState
                 children: List.generate(_steps.length, (index) {
                   final active = index == _currentStep;
                   return AnimatedContainer(
-                    duration: const Duration(milliseconds: 240),
+                    duration: MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : const Duration(milliseconds: 240),
                     margin: const EdgeInsets.symmetric(horizontal: 3),
                     width: active ? 24 : 8,
                     height: 8,

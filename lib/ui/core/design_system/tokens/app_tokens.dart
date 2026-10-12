@@ -100,6 +100,24 @@ class ChatyMotion {
   static const Curve spring = Cubic(0.34, 1.56, 0.64, 1.0);
   static const Curve sheetCurve = Cubic(0.32, 0.72, 0.0, 1.0);
 
+  /// Shared duration resolver for components using the canonical token set.
+  /// Essential state changes must remain understandable without animation.
+  static Duration duration(
+    BuildContext context, {
+    Duration preferred = standard,
+  }) =>
+      MediaQuery.maybeOf(context)?.disableAnimations == true
+          ? Duration.zero
+          : preferred;
+
+  static Curve curve(
+    BuildContext context, {
+    Curve preferred = enter,
+  }) =>
+      MediaQuery.maybeOf(context)?.disableAnimations == true
+          ? Curves.linear
+          : preferred;
+
   // Active Press Scale factors
   static const double activeScale = 0.97;
   static const double activeIconScale = 0.92;

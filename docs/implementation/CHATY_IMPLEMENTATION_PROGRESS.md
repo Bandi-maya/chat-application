@@ -65,3 +65,25 @@
 ## Release gate
 
 The feature is **in implementation**, not production-ready. Preserve MLS end-to-end encryption, Supabase RLS, existing authentication and existing working flows. Any failed validation must be fixed rather than bypassed.
+
+## Follow-up implementation batch — shared accessibility and persistence
+
+**Status:** Source changes committed on `fix/appearance-preference-persistence`; automated validation pending.
+
+- Appearance variant persistence waits for initial preference loading, serializes writes, and publishes selection only after SharedPreferences confirms the write. The Appearance screen now surfaces persistence failures.
+- System text scaling preserves an enlarged OS accessibility scale when a compact Chaty preset is selected.
+- The shared navigation renderer suppresses its animated selection transitions when the OS requests reduced motion.
+- Added a canonical reduced-motion duration/curve resolver to `ChatyMotion` in `app_tokens.dart` and applied the duration resolver to shared app controls, chat-kit components, message components and social components.
+- The shared skeleton component stops its infinite shimmer controller when reduced motion is enabled and resumes only when motion is allowed.
+- Added regression contract tests for concurrent appearance writes, unsupported settings, text scale precedence, navigation reduced motion, shared component motion tokens and skeleton shimmer lifecycle.
+
+**Verification:** Flutter formatter/analyzer/test commands have not been run in this editing environment. The branch's existing GitHub Actions runs were still in progress at the last status check; new commits must be validated before merge. This batch does not complete the remaining screen-by-screen feature-parity, security, device or release work.
+
+### Expanded reduced-motion coverage — feature and shared controls
+
+- Applied the canonical reduced-motion duration resolver to the call contact picker, task selection, message selection and attachment preview.
+- Applied reduced-motion duration handling to home navigation/tab variants, customization controls, app-icon choices, pricing selection, app-lock PIN indicators and security controls, onboarding progress, signature/profile glyph components, shared modal selection controls and the shared GB design-system switch.
+- Updated the home navigation shell's perspective drawer controller and the message swipe-to-reply controller to use zero-duration transitions when the platform requests reduced motion, including when that preference changes while the screen is mounted.
+- Expanded source-contract regression coverage to check the shared and feature-level consumers.
+
+**Validation remains pending:** the repository Actions workflow must analyze, test and build the latest branch head. This is not a claim that every screen has completed the planned feature-parity audit; media, status, calls, privacy/device flows, template adoption and device QA still require their own verified slices.

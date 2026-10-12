@@ -621,7 +621,10 @@ class _ActionBubble extends StatelessWidget {
           },
           child: Center(
             child: AnimatedSwitcher(
-              duration: ChatyMotion.fast,
+              duration: ChatyMotion.duration(
+                  context,
+                  preferred: ChatyMotion.fast,
+              ),
               child: isSend
                   ? const Icon(
                       Icons.send_rounded,

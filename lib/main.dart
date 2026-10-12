@@ -709,11 +709,16 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
           ),
           builder: (context, child) {
             final media = MediaQuery.of(context);
+            final systemTextScale = media.textScaler.scale(1.0);
+            // Appearance presets may enlarge system text, but must never
+            // shrink a user's explicitly enlarged OS accessibility text.
+            final effectiveTextScale =
+                AppearanceVariantController.resolveTextScale(
+                  systemTextScale,
+                  _appearanceController.textScale,
+                );
             final scaled = media.copyWith(
-              textScaler: TextScaler.linear(
-                (media.textScaler.scale(1.0) * _appearanceController.textScale)
-                    .clamp(0.8, 1.6),
-              ),
+              textScaler: TextScaler.linear(effectiveTextScale),
             );
             final shouldShowLock =
                 _backend.isAuthenticated &&

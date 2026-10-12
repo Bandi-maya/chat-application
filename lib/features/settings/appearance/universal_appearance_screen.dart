@@ -1,9 +1,32 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/appearance_variant_controller.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/design_system.dart';
+
+void _saveAppearanceChoice(
+  BuildContext context,
+  Future<void> Function(String) save,
+  String value,
+) {
+  unawaited(
+    save(value).catchError((Object error, StackTrace stackTrace) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not save this appearance setting. Your previous choice was kept.',
+            ),
+          ),
+        );
+    }),
+  );
+}
 
 class UniversalAppearanceScreen extends StatelessWidget {
   final ChatyPreferencesController preferencesController;
@@ -64,7 +87,11 @@ class UniversalAppearanceScreen extends StatelessWidget {
                   value: controller.typographyStyle,
                   options: AppearanceVariantController.typographyStyles,
                   icon: Icons.text_fields_rounded,
-                  onSelected: controller.setTypographyStyle,
+                  onSelected: (value) => _saveAppearanceChoice(
+                    context,
+                    controller.setTypographyStyle,
+                    value,
+                  ),
                 ),
                 _VariantSection(
                   kind: _PreviewKind.entryMotion,
@@ -74,7 +101,11 @@ class UniversalAppearanceScreen extends StatelessWidget {
                   value: controller.entryAnimation,
                   options: AppearanceVariantController.entryAnimations,
                   icon: Icons.login_rounded,
-                  onSelected: controller.setEntryAnimation,
+                  onSelected: (value) => _saveAppearanceChoice(
+                    context,
+                    controller.setEntryAnimation,
+                    value,
+                  ),
                 ),
                 _VariantSection(
                   kind: _PreviewKind.exitMotion,
@@ -84,7 +115,11 @@ class UniversalAppearanceScreen extends StatelessWidget {
                   value: controller.exitAnimation,
                   options: AppearanceVariantController.exitAnimations,
                   icon: Icons.logout_rounded,
-                  onSelected: controller.setExitAnimation,
+                  onSelected: (value) => _saveAppearanceChoice(
+                    context,
+                    controller.setExitAnimation,
+                    value,
+                  ),
                 ),
               ],
             ),

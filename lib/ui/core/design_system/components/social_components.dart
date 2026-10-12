@@ -37,7 +37,10 @@ class ChatyMomentRing extends StatelessWidget {
                 clipBehavior: Clip.none,
                 children: [
                   AnimatedContainer(
-                    duration: ChatyMotion.base,
+                    duration: ChatyMotion.duration(
+                        context,
+                        preferred: ChatyMotion.base,
+                    ),
                     width: 60,
                     height: 60,
                     padding: const EdgeInsets.all(2.5),
