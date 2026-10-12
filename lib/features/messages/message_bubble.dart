@@ -371,7 +371,9 @@ class MessageBubble extends StatelessWidget {
                       onLongPress: handleLongPress,
                       onDoubleTap: onDoubleTap,
                       child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 140),
+                        duration: MediaQuery.disableAnimationsOf(context)
+                            ? Duration.zero
+                            : const Duration(milliseconds: 140),
                         decoration: isSelected
                             ? BoxDecoration(
                                 color: theme.accentColor.withValues(
@@ -2122,6 +2124,14 @@ class _SwipeToReplyContainerState extends State<_SwipeToReplyContainer>
     _controller.addListener(() {
       setState(() => _dragOffset = _animation.value);
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _controller.duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 200);
   }
 
   @override

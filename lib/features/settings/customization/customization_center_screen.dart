@@ -339,7 +339,10 @@ class _CustomizationCenterScreenState extends State<CustomizationCenterScreen>
           },
           borderRadius: BorderRadius.circular(14),
           child: AnimatedContainer(
-            duration: ChatyMotion.fast,
+            duration: ChatyMotion.duration(
+                context,
+                preferred: ChatyMotion.fast,
+            ),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: isSelected

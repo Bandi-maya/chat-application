@@ -180,7 +180,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     if (_pageController.hasClients && _pageController.page?.round() != next) {
       _pageController.animateToPage(
         next,
-        duration: const Duration(milliseconds: 260),
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 260),
         curve: Curves.easeOutCubic,
       );
     }
@@ -850,7 +852,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                           ),
                             borderRadius: BorderRadius.circular(16),
                             child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
+                              duration: MediaQuery.disableAnimationsOf(context)
+                                  ? Duration.zero
+                                  : const Duration(milliseconds: 200),
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
                                 color: isSel
@@ -1565,7 +1569,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           child: SizedBox(
             height: barHeight,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
+              duration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 220),
               curve: Curves.easeOutCubic,
               decoration: BoxDecoration(
                 color: barBg,
@@ -2079,7 +2085,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       foregroundColor: effectiveIconColor,
       onPressed: action,
       child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 250),
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 250),
         transitionBuilder: (child, anim) {
           return ScaleTransition(
             scale: anim,
@@ -2293,7 +2301,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             child: switch (styleName) {
               // 1. ACTIVE PILL CHIP (Image 2 dark portfolio & Image 1 row 2)
               'Active Pill Chip' => AnimatedContainer(
-                duration: const Duration(milliseconds: 240),
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 240),
                 curve: Curves.easeOutCubic,
                 padding: EdgeInsets.symmetric(
                   horizontal: isSelected ? 14 : 8,
@@ -2339,7 +2349,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
+                    duration: MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : const Duration(milliseconds: 200),
                     curve: Curves.easeOutCubic,
                     width: isSelected ? 26 : 0,
                     height: 3.5,
@@ -2380,7 +2392,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   ),
                   const SizedBox(height: 4),
                   AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
+                    duration: MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : const Duration(milliseconds: 200),
                     curve: Curves.easeOutCubic,
                     width: isSelected ? 5.5 : 0,
                     height: isSelected ? 5.5 : 0,
@@ -2395,7 +2409,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               // 4. CIRCLE ACCENT POP (Image 1 bottom row, Image 4)
               'Circle Accent Pop' => AnimatedScale(
                 scale: isSelected ? 1.0 : 0.95,
-                duration: const Duration(milliseconds: 180),
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 180),
                 child: Container(
                   width: isSelected ? 42 : 36,
                   height: isSelected ? 42 : 36,
@@ -2424,7 +2440,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
+                    duration: MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : const Duration(milliseconds: 220),
                     curve: Curves.easeOutCubic,
                     width: isSelected ? 28 : 0,
                     height: 5,
@@ -2456,7 +2474,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
               // 6. FLOATING DYNAMIC ISLAND (Image 2 dark capsule)
               'Floating Dynamic Island' => AnimatedContainer(
-                duration: const Duration(milliseconds: 240),
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 240),
                 curve: Curves.easeOutCubic,
                 padding: EdgeInsets.symmetric(
                   horizontal: isSelected ? 12 : 8,
@@ -2543,7 +2563,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
               // 8. SEGMENTED GLASS DOCK (Frosted look with subtle inner border)
               'Segmented Glass Dock' => AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 200),
                 curve: Curves.easeOutCubic,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -2570,7 +2592,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               // 9. MINIMAL ICON DOCK (Image 1 top left)
               'Minimal Icon Dock' => AnimatedScale(
                 scale: isSelected ? 1.15 : 1.0,
-                duration: const Duration(milliseconds: 180),
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 180),
                 child: ChatyGlyphIcon(glyph: isSelected ? item.activeIcon : item.icon,
                   size: 22,
                   color: isSelected ? accent : unselectedFg,
@@ -2603,7 +2627,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
               // 11. SOFT SQUARE TILE (Image 3 middle row)
               'Soft Square Tile' => AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 200),
                 padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
                   color: isSelected
@@ -2635,7 +2661,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
               // 12. FLOATING PILL (Default smooth floating capsule)
               _ => AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 220),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
                   vertical: 6,
@@ -2723,7 +2751,9 @@ class _ChatyHomeSpeedDialFabState extends State<_ChatyHomeSpeedDialFab> {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         AnimatedSize(
-          duration: const Duration(milliseconds: 230),
+          duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 230),
           curve: Curves.easeOutCubic,
           alignment: Alignment.bottomRight,
           child: _expanded
@@ -2795,7 +2825,9 @@ class _ChatyHomeSpeedDialFabState extends State<_ChatyHomeSpeedDialFab> {
           foregroundColor: widget.iconColor,
           onPressed: () => setState(() => _expanded = !_expanded),
           child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
+            duration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : const Duration(milliseconds: 220),
             transitionBuilder: (child, animation) => ScaleTransition(
               scale: animation,
               child: RotationTransition(
@@ -2948,7 +2980,9 @@ class _CurvedRadialDrawerScaffoldState
                   width: panelWidth,
                   height: panelHeight,
                   child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 190),
+                    duration: MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : const Duration(milliseconds: 190),
                     curve: Curves.easeOutCubic,
                     opacity: _menuOpen ? 1 : 0,
                     child: ClipPath(
@@ -3069,7 +3103,9 @@ class _CurvedRadialDrawerScaffoldState
                     setState(() => _menuOpen = false);
                   },
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
+                    duration: MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : const Duration(milliseconds: 180),
                     curve: Curves.easeOutCubic,
                     width: iconSize,
                     height: iconSize,
@@ -3223,6 +3259,14 @@ class _PerspectiveDrawerScaffoldState extends State<_PerspectiveDrawerScaffold>
       duration: const Duration(milliseconds: 280),
     );
     _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _ctrl.duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 280);
   }
 
   @override

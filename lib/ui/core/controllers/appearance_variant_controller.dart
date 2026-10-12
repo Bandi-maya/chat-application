@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -163,9 +165,11 @@ class AppearanceVariantController extends ChangeNotifier {
   String _entryAnimation = entryAnimations.first;
   String _exitAnimation = exitAnimations.first;
   bool _loaded = false;
+  late final Future<void> _loadFuture;
+  Future<void> _writeQueue = Future<void>.value();
 
   AppearanceVariantController() {
-    _load();
+    _loadFuture = _load();
   }
 
   String get navigationStyle => _navigationStyle;
@@ -186,6 +190,17 @@ class AppearanceVariantController extends ChangeNotifier {
   int get typographyIndex => typographyStyles
       .indexOf(_typographyStyle)
       .clamp(0, typographyStyles.length - 1);
+
+  static double resolveTextScale(
+    double systemScale,
+    double appearanceScale,
+  ) {
+    final preferredScale = systemScale * appearanceScale;
+    return (systemScale > 1.0
+            ? preferredScale.clamp(systemScale, double.infinity)
+            : preferredScale.clamp(0.8, 1.6))
+        .toDouble();
+  }
 
   double get textScale {
     const scales = <double>[
@@ -307,9 +322,22 @@ class AppearanceVariantController extends ChangeNotifier {
     required ValueChanged<String> apply,
   }) async {
     if (!options.contains(value)) return;
-    apply(value);
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(key, value);
+    await _loadFuture;
+
+    // Serialize independent writes and publish only after persistence succeeds.
+    final previousWrite = _writeQueue;
+    final completed = Completer<void>();
+    _writeQueue = completed.future;
+    try {
+      await previousWrite;
+      final prefs = await SharedPreferences.getInstance();
+      if (!await prefs.setString(key, value)) {
+        throw StateError('Could not persist appearance preference: $key');
+      }
+      apply(value);
+      notifyListeners();
+    } finally {
+      completed.complete();
+    }
   }
 }

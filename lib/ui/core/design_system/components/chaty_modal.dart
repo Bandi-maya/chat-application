@@ -431,7 +431,9 @@ class ChatyRadioRow<T> extends StatelessWidget {
                 const SizedBox(width: 12),
                 // Right selection control with consistent right inset (Rule 14)
                 AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
+                  duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 180),
                   width: 22,
                   height: 22,
                   decoration: BoxDecoration(

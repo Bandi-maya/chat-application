@@ -74,7 +74,9 @@ class GbCustomSwitch extends StatelessWidget {
         onChanged(!value);
       },
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+        duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
         width: 52,
         height: 30,
@@ -88,7 +90,9 @@ class GbCustomSwitch extends StatelessWidget {
           ),
         ),
         child: AnimatedAlign(
-          duration: const Duration(milliseconds: 200),
+          duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 200),
           curve: Curves.easeInOut,
           alignment: value ? Alignment.centerRight : Alignment.centerLeft,
           child: Container(

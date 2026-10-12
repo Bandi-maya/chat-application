@@ -810,7 +810,10 @@ class _PollOptionTile extends StatelessWidget {
               Align(
                 alignment: Alignment.centerLeft,
                 child: AnimatedFractionallySizedBox(
-                  duration: ChatyMotion.base,
+                  duration: ChatyMotion.duration(
+                      context,
+                      preferred: ChatyMotion.base,
+                  ),
                   curve: ChatyMotion.enter,
                   widthFactor: ratio.clamp(0, 1),
                   child: ColoredBox(
