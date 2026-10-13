@@ -968,7 +968,6 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     required List<_NavDestinationItem> navItems,
     required int selectedIndex,
   }) {
-    final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
     final colors = context.colors;
     final prefs = locator<ChatyPreferencesController>();
     final dataStore = locator<ChatyDataStore>();
@@ -981,7 +980,6 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         : 'Chaty User';
 
     return Scaffold(
-      key: scaffoldKey,
       backgroundColor: theme.backgroundColor,
       floatingActionButton: _buildContextualFab(
         context: context,
@@ -1083,17 +1081,19 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       ),
       body: Column(
         children: [
-          TemplateShellHeader(
-            title: navItems[selectedIndex].label,
-            navigation: IconButton(
-              icon: const Icon(Icons.menu_rounded),
-              color: theme.primaryTextColor,
-              tooltip: 'Open menu',
-              onPressed: () => scaffoldKey.currentState?.openDrawer(),
+          Builder(
+            builder: (scaffoldCtx) => TemplateShellHeader(
+              title: navItems[selectedIndex].label,
+              navigation: IconButton(
+                icon: const Icon(Icons.menu_rounded),
+                color: theme.primaryTextColor,
+                tooltip: 'Open menu',
+                onPressed: () => Scaffold.of(scaffoldCtx).openDrawer(),
+              ),
+              backgroundColor: theme.surfaceColor,
+              foregroundColor: theme.primaryTextColor,
+              dividerColor: colors.border,
             ),
-            backgroundColor: theme.surfaceColor,
-            foregroundColor: theme.primaryTextColor,
-            dividerColor: colors.border,
           ),
           Expanded(
             child: _buildSwipeableRootStack(

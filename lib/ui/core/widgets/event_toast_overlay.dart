@@ -93,11 +93,27 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
         .gbString('event_toast_position', fallback: 'Top')
         .toLowerCase();
     final safe = MediaQuery.paddingOf(context);
-    if (position == 'bottom')
+    final media = MediaQuery.of(context);
+    
+    // Check for display cutout in displayFeatures (specifically vertical cutout in portrait)
+    double cutoutTop = safe.top;
+    final isPortrait = media.orientation == Orientation.portrait;
+    if (isPortrait) {
+      for (final feature in media.displayFeatures) {
+        if (feature.bounds.top <= 0 && feature.bounds.bottom > 0) {
+          cutoutTop = feature.bounds.bottom.toDouble().clamp(safe.top, safe.top + 32);
+          break;
+        }
+      }
+    }
+
+    if (position == 'bottom') {
       return EdgeInsets.fromLTRB(14, 12, 14, safe.bottom + 92);
-    if (position == 'center')
+    }
+    if (position == 'center') {
       return const EdgeInsets.symmetric(horizontal: 20, vertical: 20);
-    return EdgeInsets.fromLTRB(14, safe.top + 10, 14, 12);
+    }
+    return EdgeInsets.fromLTRB(14, cutoutTop + 2, 14, 12);
   }
 
   Color _avatarColor(ChatyEventNotification notification) {

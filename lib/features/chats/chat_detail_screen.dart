@@ -244,6 +244,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   @override
   void dispose() {
+    _messageItemKeys.clear();
+    _messageIndexById.clear();
     if (_realtime.activeConversationId == widget.conversationId) {
       _realtime.setActiveConversation(null);
     }

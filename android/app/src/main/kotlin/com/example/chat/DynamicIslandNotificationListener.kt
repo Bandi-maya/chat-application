@@ -95,6 +95,9 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
             mediaSessionManager?.removeOnActiveSessionsChangedListener(sessionsListener)
             activeMediaController?.unregisterCallback(mediaCallback)
             activeMediaController = null
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                requestRebind(ComponentName(this, DynamicIslandNotificationListener::class.java))
+            }
         } catch (_: Exception) {}
     }
 
@@ -271,6 +274,7 @@ internal data class IslandMediaState(
 
 /** State machine for the dynamic island overlay */
 internal enum class IslandVisualState {
+    IDLE,
     COMPACT,
     EXPANDED,
     REPLY,
@@ -366,7 +370,8 @@ internal object IslandOverlay {
         }
 
         if (activeNotifications.isEmpty() && currentMedia == null) {
-            remove()
+            currentState = IslandVisualState.IDLE
+            currentView?.context?.let { render(it, animate = true) }
         } else {
             currentView?.context?.let { render(it, animate = true) }
         }
@@ -376,7 +381,8 @@ internal object IslandOverlay {
         activeNotifications.clear()
         activeReplyItem = null
         if (currentMedia == null) {
-            remove()
+            currentState = IslandVisualState.IDLE
+            currentView?.context?.let { render(it, animate = true) }
         } else {
             currentState = IslandVisualState.COMPACT
             currentView?.context?.let { render(it, animate = true) }
@@ -419,7 +425,8 @@ internal object IslandOverlay {
     fun clearMedia() {
         currentMedia = null
         if (activeNotifications.isEmpty()) {
-            remove()
+            currentState = IslandVisualState.IDLE
+            currentView?.context?.let { render(it, animate = true) }
         } else {
             currentView?.context?.let { render(it, animate = true) }
         }
@@ -441,11 +448,14 @@ internal object IslandOverlay {
         }
 
         val timeout = when (state) {
+            IslandVisualState.IDLE -> 0L
             IslandVisualState.COMPACT -> 7000L
             IslandVisualState.EXPANDED -> 16000L
             IslandVisualState.MEDIA_EXPANDED -> 16000L
             IslandVisualState.REPLY -> 35000L
         }
+
+        if (timeout == 0L) return
 
         dismissRunnable = Runnable {
             if (activeNotifications.isNotEmpty() && state != IslandVisualState.COMPACT) {
@@ -457,7 +467,9 @@ internal object IslandOverlay {
                 currentState = IslandVisualState.COMPACT
                 render(context, animate = true)
             } else {
-                remove()
+                // When notifications clear, blend with camera cutout in adaptive idle state
+                currentState = IslandVisualState.IDLE
+                render(context, animate = true)
             }
         }
         main.postDelayed(dismissRunnable!!, timeout)
@@ -472,17 +484,17 @@ internal object IslandOverlay {
         val unreadCount = activeNotifications.size
 
         // Calculate target dimensions
+        val compactWidth = (if (unreadCount > 1) dp(context, 142) else dp(context, 126)).coerceAtLeast(dp(context, 100))
         val targetWidth = when (currentState) {
-            IslandVisualState.COMPACT -> {
-                // Slightly wider if multiple stacked cards exist to hint at stack depth
-                if (unreadCount > 1) dp(context, 142) else dp(context, 126)
-            }.coerceAtLeast(dp(context, 100))
+            IslandVisualState.IDLE -> dp(context, 38).coerceAtLeast(getCutoutWidth(context) + dp(context, 8))
+            IslandVisualState.COMPACT -> compactWidth
             IslandVisualState.EXPANDED -> (screenWidth - dp(context, 20)).coerceAtMost(dp(context, 370))
             IslandVisualState.MEDIA_EXPANDED -> (screenWidth - dp(context, 20)).coerceAtMost(dp(context, 370))
             IslandVisualState.REPLY -> (screenWidth - dp(context, 20)).coerceAtMost(dp(context, 370))
         }
 
         val targetHeight = when (currentState) {
+            IslandVisualState.IDLE -> dp(context, 32)
             IslandVisualState.COMPACT -> dp(context, 36)
             IslandVisualState.EXPANDED -> {
                 when {
@@ -496,43 +508,56 @@ internal object IslandOverlay {
         }
 
         val cornerRadius = when (currentState) {
+            IslandVisualState.IDLE -> dp(context, 16).toFloat()
             IslandVisualState.COMPACT -> dp(context, 18).toFloat()
             else -> dp(context, 24).toFloat()
         }
 
-        // Root container with layered glassmorphism border & shadow
+        // Root container with layered glassmorphism border & shadow adaptive to camera bezel
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(
-                if (currentState == IslandVisualState.COMPACT) dp(context, 6) else dp(context, 12),
-                if (currentState == IslandVisualState.COMPACT) dp(context, 3) else dp(context, 8),
-                if (currentState == IslandVisualState.COMPACT) dp(context, 6) else dp(context, 12),
-                if (currentState == IslandVisualState.COMPACT) dp(context, 3) else dp(context, 8),
-            )
-            background = GradientDrawable().apply {
-                setColor(Color.rgb(10, 11, 15)) // Deep Obsidian
-                this.cornerRadius = cornerRadius
-                setStroke(dp(context, 1), Color.argb(45, 255, 255, 255))
+            gravity = Gravity.CENTER
+            val hPad = when (currentState) {
+                IslandVisualState.IDLE -> dp(context, 4)
+                IslandVisualState.COMPACT -> dp(context, 6)
+                else -> dp(context, 12)
             }
-            elevation = dp(context, 12).toFloat()
+            val vPad = when (currentState) {
+                IslandVisualState.IDLE -> dp(context, 2)
+                IslandVisualState.COMPACT -> dp(context, 3)
+                else -> dp(context, 8)
+            }
+            setPadding(hPad, vPad, hPad, vPad)
+            background = GradientDrawable().apply {
+                // Adaptive deep obsidian blending seamlessly with the camera notch bezel
+                setColor(if (currentState == IslandVisualState.IDLE) Color.BLACK else Color.rgb(10, 11, 15))
+                this.cornerRadius = cornerRadius
+                setStroke(
+                    dp(context, 1),
+                    if (currentState == IslandVisualState.IDLE) Color.argb(20, 255, 255, 255) else Color.argb(45, 255, 255, 255)
+                )
+            }
+            // Elevate to maximum depth to stay above system indicators & status elements
+            elevation = dp(context, 24).toFloat()
         }
 
         // Build view content based on state
         when (currentState) {
+            IslandVisualState.IDLE -> buildIdleView(context, root)
             IslandVisualState.COMPACT -> buildCompactView(context, root, primaryNotif, media, unreadCount)
             IslandVisualState.EXPANDED -> buildExpandedStackView(context, root, targetHeight)
             IslandVisualState.MEDIA_EXPANDED -> buildMediaExpandedView(context, root, media)
             IslandVisualState.REPLY -> buildReplyView(context, root, activeReplyItem ?: primaryNotif)
         }
 
-        // Window Params
+        // Window Params - peak z-index priority over battery/time/status bar
         @Suppress("DEPRECATION")
         val windowType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         else WindowManager.LayoutParams.TYPE_PHONE
 
         var flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
 
         if (currentState != IslandVisualState.REPLY) {
@@ -551,6 +576,11 @@ internal object IslandOverlay {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
             x = 0
             y = topOffset
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
         }
 
         setupTouchInteractions(context, root)
@@ -579,6 +609,28 @@ internal object IslandOverlay {
         } catch (_: Exception) {
             currentView = null
         }
+    }
+
+    private fun buildIdleView(context: Context, root: LinearLayout) {
+        val row = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT,
+            )
+        }
+
+        // Camera dot indicator blending into hole-punch notch
+        val dot = View(context).apply {
+            background = GradientDrawable().apply {
+                setColor(Color.argb(70, 255, 255, 255))
+                shape = GradientDrawable.OVAL
+            }
+            layoutParams = LinearLayout.LayoutParams(dp(context, 7), dp(context, 7))
+        }
+        row.addView(dot)
+        root.addView(row)
     }
 
     private fun buildCompactView(
@@ -1075,9 +1127,14 @@ internal object IslandOverlay {
                             return true
                         }
 
-                        // Simple Tap: toggle between Compact <-> Expanded stack
+                        // Simple Tap: toggle between Idle / Compact <-> Expanded stack
                         if (Math.abs(deltaX) < dp(context, 12) && Math.abs(deltaY) < dp(context, 12)) {
                             when (currentState) {
+                                IslandVisualState.IDLE -> {
+                                    currentState = IslandVisualState.COMPACT
+                                    render(context, animate = true)
+                                    scheduleDismiss(context, currentState)
+                                }
                                 IslandVisualState.COMPACT -> {
                                     currentState = if (currentMedia != null && activeNotifications.isEmpty()) {
                                         IslandVisualState.MEDIA_EXPANDED
@@ -1105,9 +1162,33 @@ internal object IslandOverlay {
         })
     }
 
+    private fun getCutoutWidth(context: Context): Int {
+        val wm = windowManager ?: context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && wm != null) {
+            val metrics = wm.currentWindowMetrics
+            val cutout: android.view.DisplayCutout? = metrics.windowInsets.displayCutout
+            val rect: Rect? = cutout?.boundingRectTop ?: cutout?.boundingRects?.firstOrNull()
+            if (rect != null && !rect.isEmpty) {
+                return rect.width()
+            }
+        }
+        return dp(context, 32)
+    }
+
     private fun getCutoutTopOffset(context: Context): Int {
+        val wm = windowManager ?: context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && wm != null) {
+            val metrics = wm.currentWindowMetrics
+            val cutout: android.view.DisplayCutout? = metrics.windowInsets.displayCutout
+            val rect: Rect? = cutout?.boundingRectTop ?: cutout?.boundingRects?.firstOrNull { it.top < dp(context, 16) }
+            if (rect != null && !rect.isEmpty) {
+                val cutoutCenterY = rect.centerY()
+                val pillHalfHeight = dp(context, 36) / 2
+                return (cutoutCenterY - pillHalfHeight).coerceAtLeast(dp(context, 2))
+            }
+        }
         val statusBar = statusBarHeight(context)
-        return (statusBar * 0.18f).toInt().coerceAtLeast(dp(context, 4))
+        return ((statusBar - dp(context, 36)) / 2).coerceAtLeast(dp(context, 4))
     }
 
     fun preview(context: Context) {
