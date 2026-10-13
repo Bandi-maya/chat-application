@@ -183,7 +183,7 @@ open class MainActivity : FlutterFragmentActivity() {
                 }
                 "openNotificationAccessSettings" -> {
                     try {
-                        startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                        startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"))
                         result.success(null)
                     } catch (error: Exception) {
                         result.error("notification_access_settings_failed", error.message, null)
@@ -193,7 +193,9 @@ open class MainActivity : FlutterFragmentActivity() {
                     val enabled = call.argument<Boolean>("enabled") ?: false
                     getSharedPreferences("chaty_dynamic_island", Context.MODE_PRIVATE)
                         .edit().putBoolean("enabled", enabled).apply()
-                    if (!enabled) IslandOverlay.remove()
+                    if (!enabled) {
+                        IslandOverlay.remove()
+                    }
                     result.success(enabled)
                 }
                 "showPreview" -> {
@@ -205,6 +207,17 @@ open class MainActivity : FlutterFragmentActivity() {
                         IslandOverlay.preview(this)
                         result.success(null)
                     }
+                }
+                "clearAll" -> {
+                    IslandOverlay.clearAllNotifications()
+                    result.success(null)
+                }
+                "getCutoutInfo" -> {
+                    val controller = com.example.chat.island.IslandWindowController(this)
+                    result.success(mapOf(
+                        "topOffset" to controller.getCutoutTopOffset(),
+                        "cutoutWidth" to controller.getCutoutWidth(),
+                    ))
                 }
                 "openNotificationChannelSettings" -> {
                     try {
