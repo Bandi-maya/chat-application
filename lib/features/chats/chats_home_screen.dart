@@ -1,3 +1,5 @@
+import '../vault/hidden_vault_screen.dart';
+import '../../core/design_system/spring_interactive_scale.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -210,11 +212,14 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
   }
 
   void _openLockedChatsVault() {
-    LockedChatsScreen.open(
-      context,
-      dataStore: widget.dataStore,
-      preferencesController: widget.preferencesController,
-      themeController: widget.themeController,
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => HiddenVaultScreen(
+          dataStore: widget.dataStore,
+          preferencesController: widget.preferencesController,
+          themeController: widget.themeController,
+        ),
+      ),
     );
   }
 
@@ -579,8 +584,8 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
           entries.add(_ArchivedEntry(archivedCount: archived.length));
         }
         final filters = widget.forcedType == null
-            ? const <String>['All', 'Unread', 'Groups', 'Direct']
-            : const <String>['All', 'Unread'];
+            ? const <String>['All', 'Unread', 'Groups', 'Direct', 'Vault']
+            : const <String>['All', 'Unread', 'Vault'];
 
         return PopScope(
           canPop: !_isSelectionMode,
@@ -830,10 +835,15 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                             : FontWeight.w500,
                                       ),
                                       onSelected: (value) {
-                                        if (value)
-                                          setState(
-                                            () => _selectedFilter = filter,
-                                          );
+                                        if (value) {
+                                          if (filter == 'Vault') {
+                                            _openLockedChatsVault();
+                                          } else {
+                                            setState(
+                                              () => _selectedFilter = filter,
+                                            );
+                                          }
+                                        }
                                       },
                                     ),
                                   );
@@ -1181,7 +1191,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
       if (authorized == true && mounted) {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => LockedChatsScreen(
+            builder: (_) => HiddenVaultScreen(
               dataStore: widget.dataStore,
               preferencesController: widget.preferencesController,
               themeController: widget.themeController,
@@ -1635,6 +1645,70 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     );
   }
 
+
+  Widget _ghostModePill(ThemeConfig theme, HomePreferences homePrefs) {
+    final isGhost = homePrefs.ghostMode;
+    return Padding(
+      padding: const EdgeInsets.only(left: 6),
+      child: SpringInteractiveScale(
+        onTap: () {
+          HapticFeedback.mediumImpact();
+          widget.preferencesController.updateHome(
+            homePrefs.copyWith(ghostMode: !isGhost),
+            logTitle: 'Ghost Mode Toggle',
+          );
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                !isGhost
+                    ? 'Ghost Mode Active: Last seen frozen & receipts suppressed'
+                    : 'Ghost Mode Deactivated: Normal presence restored',
+              ),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: isGhost
+                ? const Color(0xFF6366F1).withValues(alpha: 0.2)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isGhost
+                  ? const Color(0xFF6366F1).withValues(alpha: 0.5)
+                  : theme.secondaryTextColor.withValues(alpha: 0.2),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                isGhost ? '👻' : '👁️',
+                style: const TextStyle(fontSize: 12),
+              ),
+              if (isGhost) ...[
+                const SizedBox(width: 4),
+                const Text(
+                  'Ghost',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF818CF8),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _standardAppBar(ThemeConfig theme, HomePreferences homePrefs) {
     final headerStyle = _effectiveHomeHeaderStyle;
     final homeStyle = HomePresetNormalizer.homeStyle(homePrefs.homeStyle);
@@ -1666,6 +1740,10 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                   child: InkWell(
                     borderRadius: BorderRadius.circular(8),
                     onTap: _handleTopLeftIdentityTap,
+                    onLongPress: () {
+                      HapticFeedback.heavyImpact();
+                      _openLockedChatsVault();
+                    },
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 4,
@@ -1707,6 +1785,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                     ),
                   ),
                 ),
+                _ghostModePill(theme, homePrefs),
                 const SizedBox(width: 8),
                 if (locator.isRegistered<ConnectionHealthService>())
                   ListenableBuilder(

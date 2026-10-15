@@ -1,3 +1,6 @@
+import 'package:chat/core/services/hidden_vault_service.dart';
+import 'package:chat/core/services/privacy_config_service.dart';
+import 'package:chat/features/chats/hidden_vault_controller.dart';
 import 'package:get_it/get_it.dart';
 import 'package:chat/ui/core/theme/theme_controller.dart';
 import 'package:chat/data/repositories/chaty_data_store.dart';
@@ -109,6 +112,21 @@ void setupLocator() {
     () => MessageAutomationService(
       preferencesController: locator<ChatyPreferencesController>(),
       dataStore: locator<ChatyDataStore>(),
+    ),
+  );
+  locator.registerLazySingleton<HiddenVaultService>(
+    () => HiddenVaultService(
+      lockService: locator<LocalLockService>(),
+    ),
+  );
+  locator.registerLazySingleton<HiddenVaultController>(
+    () => HiddenVaultController(
+      vaultService: locator<HiddenVaultService>(),
+    ),
+  );
+  locator.registerLazySingleton<PrivacyConfigService>(
+    () => PrivacyConfigService(
+      preferencesController: locator<ChatyPreferencesController>(),
     ),
   );
 }

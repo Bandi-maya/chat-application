@@ -1,3 +1,4 @@
+import '../settings/theme_studio_screen.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -2266,6 +2267,23 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         ),
       );
     }
+        quickActions.add(
+      _HomeSpeedDialAction(
+        id: 'theme-studio',
+        label: 'Theme Studio',
+        icon: Icons.palette_rounded,
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => ThemeStudioScreen(
+                preferencesController: prefsController,
+                themeController: locator<ThemeController>(),
+              ),
+            ),
+          );
+        },
+      ),
+    );
     quickActions.add(
       _HomeSpeedDialAction(
         id: 'direct-number',
