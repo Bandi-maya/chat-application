@@ -2,83 +2,61 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../data/services/local_lock_service.dart';
+import '../../core/services/hidden_vault_service.dart';
 
 /// Controller managing Hidden / Locked Chats Vault access and biometric authorization.
+/// Backed by HiddenVaultService.
 class HiddenVaultController extends ChangeNotifier {
   HiddenVaultController({
     LocalLockService? lockService,
     FlutterSecureStorage? secureStorage,
-  })  : _lockService = lockService ?? LocalLockService(),
-        _secureStorage = secureStorage ?? const FlutterSecureStorage() {
-    _loadLockedConversations();
+    HiddenVaultService? vaultService,
+  }) : _service = vaultService ??
+            HiddenVaultService(
+              lockService: lockService,
+              secureStorage: secureStorage,
+            ) {
+    _service.addListener(_onServiceUpdated);
   }
 
-  static const String _storageKey = 'chaty.hidden_vault.locked_conversations';
+  final HiddenVaultService _service;
 
-  final LocalLockService _lockService;
-  final FlutterSecureStorage _secureStorage;
-  final Set<String> _lockedConversationIds = <String>{};
-  bool _isUnlocked = false;
+  bool get isUnlocked => _service.isUnlocked;
+  bool get isDecoyMode => _service.isDecoyMode;
+  Set<String> get lockedConversationIds => _service.lockedConversationIds;
+  HiddenVaultService get service => _service;
 
-  bool get isUnlocked => _isUnlocked;
-  Set<String> get lockedConversationIds => Set.unmodifiable(_lockedConversationIds);
-
-  Future<void> _loadLockedConversations() async {
-    try {
-      final raw = await _secureStorage.read(key: _storageKey);
-      if (raw != null && raw.isNotEmpty) {
-        _lockedConversationIds.addAll(raw.split(',').where((s) => s.isNotEmpty));
-        notifyListeners();
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _persistLockedConversations() async {
-    try {
-      await _secureStorage.write(
-        key: _storageKey,
-        value: _lockedConversationIds.join(','),
-      );
-    } catch (_) {}
+  void _onServiceUpdated() {
+    notifyListeners();
   }
 
   bool isConversationLocked(String conversationId) {
-    return _lockedConversationIds.contains(conversationId);
+    return _service.isConversationLocked(conversationId);
   }
 
-  Future<bool> unlockVault() async {
-    try {
-      final authed = await _lockService.authenticateBiometric(
-        reason: 'Authenticate to access Hidden Vault',
-      );
-      if (authed) {
-        _isUnlocked = true;
-        notifyListeners();
-        return true;
-      }
-    } catch (e) {
-      debugPrint('Biometric unlock note: $e');
-    }
-    return false;
+  Future<bool> unlockVault() {
+    return _service.unlockWithBiometrics();
+  }
+
+  Future<bool> verifyPin(String pin) {
+    return _service.verifyPin(pin);
   }
 
   void forceUnlockForSession() {
-    _isUnlocked = true;
-    notifyListeners();
+    _service.forceUnlockForSession();
   }
 
   void lockVault() {
-    _isUnlocked = false;
-    notifyListeners();
+    _service.lockVault();
   }
 
-  Future<void> toggleConversationLock(String conversationId) async {
-    if (_lockedConversationIds.contains(conversationId)) {
-      _lockedConversationIds.remove(conversationId);
-    } else {
-      _lockedConversationIds.add(conversationId);
-    }
-    await _persistLockedConversations();
-    notifyListeners();
+  Future<void> toggleConversationLock(String conversationId) {
+    return _service.toggleConversationLock(conversationId);
+  }
+
+  @override
+  void dispose() {
+    _service.removeListener(_onServiceUpdated);
+    super.dispose();
   }
 }

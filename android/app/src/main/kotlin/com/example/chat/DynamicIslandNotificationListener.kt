@@ -197,10 +197,11 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
             IslandAction(action.title?.toString()?.take(24) ?: "Action", actionIntent)
         }
 
+        val notificationKey = sbn.key ?: "${sbn.packageName}:${sbn.id}"
         Handler(Looper.getMainLooper()).post {
             IslandOverlay.onNotificationReceived(
                 context = applicationContext,
-                key = sbn.key ?: "${sbn.packageName}:${sbn.id}",
+                key = notificationKey,
                 packageName = sbn.packageName,
                 title = safeTitle.take(90),
                 body = safeBody.take(180),
@@ -211,13 +212,22 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
                 replyAction = replyAction,
                 animateArrival = !isInitialReconcile,
             )
+            MainActivity.dispatchDynamicIslandNotification(mapOf(
+                "key" to notificationKey,
+                "packageName" to sbn.packageName,
+                "title" to safeTitle.take(90),
+                "body" to safeBody.take(180),
+                "isCall" to isCall,
+            ))
         }
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
         if (sbn == null) return
+        val notificationKey = sbn.key ?: "${sbn.packageName}:${sbn.id}"
         Handler(Looper.getMainLooper()).post {
-            IslandOverlay.onNotificationRemoved(sbn.key ?: "${sbn.packageName}:${sbn.id}")
+            IslandOverlay.onNotificationRemoved(notificationKey)
+            MainActivity.dispatchDynamicIslandRemoved(notificationKey)
         }
     }
 
