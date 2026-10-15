@@ -24,10 +24,23 @@ class ServerScheduledMessage {
 }
 
 class GbFeatureBackendService {
-  GbFeatureBackendService({SupabaseClient? client})
-    : _client = client ?? Supabase.instance.client;
+  GbFeatureBackendService({SupabaseClient? client}) : _customClient = client;
 
-  final SupabaseClient _client;
+  final SupabaseClient? _customClient;
+  bool get _isSupabaseAvailable {
+    if (_customClient != null) return true;
+    try {
+      return Supabase.instance.isInitialized;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  SupabaseClient get _client {
+    final client = _customClient;
+    if (client != null) return client;
+    return Supabase.instance.client;
+  }
   final Uuid _uuid = const Uuid();
 
   String get _userId {
@@ -37,6 +50,7 @@ class GbFeatureBackendService {
   }
 
   Future<void> synchronizeAutomation(MessageAutomationPreferences prefs) async {
+    if (!_isSupabaseAvailable) return;
     final userId = _userId;
     // The master Auto-Reply switch gates every rule. When it is off, rules are
     // persisted (so the user's list survives) but pushed as disabled so the
@@ -92,6 +106,9 @@ class GbFeatureBackendService {
     required String response,
     String scope = 'all',
   }) async {
+    if (!_isSupabaseAvailable) {
+      return 'rule_${DateTime.now().millisecondsSinceEpoch}';
+    }
     final row = await _client
         .from('auto_reply_rules')
         .insert(<String, dynamic>{
@@ -107,6 +124,7 @@ class GbFeatureBackendService {
   }
 
   Future<void> deleteAutoReplyRule(String ruleId) async {
+    if (!_isSupabaseAvailable) return;
     await _client
         .from('auto_reply_rules')
         .delete()
@@ -118,6 +136,7 @@ class GbFeatureBackendService {
     String keyword,
     String response,
   ) async {
+    if (!_isSupabaseAvailable) return;
     await _client
         .from('auto_reply_rules')
         .delete()
