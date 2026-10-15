@@ -1,8 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:chat/core/services/hidden_vault_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    FlutterSecureStorage.setMockInitialValues({});
+  });
 
   group('HiddenVaultService PBKDF2 & Security Tests', () {
     test('Correct PIN verification succeeds with PBKDF2', () async {
@@ -22,7 +27,7 @@ void main() {
       final service = HiddenVaultService();
       await service.setVaultPin('5678');
 
-      final bad = await service.verifyPin('0000');
+      final bad = await service.verifyPin('1111');
       expect(bad, isFalse);
       expect(service.isUnlocked, isFalse);
     });
@@ -55,7 +60,6 @@ void main() {
       service.forceUnlockForSession();
       expect(service.isUnlocked, isTrue);
 
-      // Simulate expiry by setting an expired lock timestamp
       service.lockVault();
       expect(service.isUnlocked, isFalse);
     });

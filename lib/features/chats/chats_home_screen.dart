@@ -40,7 +40,6 @@ import '../settings/theme_editor_screen.dart';
 import '../settings/templates/templates_settings_screen.dart';
 import '../settings/templates/navigation_destinations_settings_screen.dart';
 import '../settings/settings_root_screen.dart';
-import 'locked_chats_screen.dart';
 import 'new_chat_screen.dart';
 import '../../ui/core/connection/connection_health_indicator.dart';
 import '../../ui/core/connection/connection_detail_sheet.dart';
@@ -216,8 +215,6 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
       MaterialPageRoute<void>(
         builder: (_) => HiddenVaultScreen(
           dataStore: widget.dataStore,
-          preferencesController: widget.preferencesController,
-          themeController: widget.themeController,
         ),
       ),
     );
@@ -1193,8 +1190,6 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
           MaterialPageRoute(
             builder: (_) => HiddenVaultScreen(
               dataStore: widget.dataStore,
-              preferencesController: widget.preferencesController,
-              themeController: widget.themeController,
             ),
           ),
         );
