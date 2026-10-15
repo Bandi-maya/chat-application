@@ -88,6 +88,7 @@ class ChatMessage {
   final bool isStarred;
   final bool isDeletedForEveryone;
   final bool isDeletedForMe;
+  final bool isRevokedBySender;
 
   const ChatMessage({
     required this.id,
@@ -109,6 +110,7 @@ class ChatMessage {
     this.isStarred = false,
     this.isDeletedForEveryone = false,
     this.isDeletedForMe = false,
+    this.isRevokedBySender = false,
   });
 
   ChatMessage copyWith({
@@ -131,6 +133,7 @@ class ChatMessage {
     bool? isStarred,
     bool? isDeletedForEveryone,
     bool? isDeletedForMe,
+    bool? isRevokedBySender,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -152,6 +155,7 @@ class ChatMessage {
       isStarred: isStarred ?? this.isStarred,
       isDeletedForEveryone: isDeletedForEveryone ?? this.isDeletedForEveryone,
       isDeletedForMe: isDeletedForMe ?? this.isDeletedForMe,
+      isRevokedBySender: isRevokedBySender ?? this.isRevokedBySender,
     );
   }
 }

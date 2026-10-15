@@ -7,6 +7,8 @@ import '../controllers/preferences_controller.dart';
 import '../design_system/chaty_motion.dart';
 import '../theme/app_theme.dart';
 import '../notifications/notification_icon_preset.dart';
+import '../../../injection/locator.dart';
+import '../../../features/island/dynamic_island.dart';
 
 class ChatyEventToastOverlay extends StatefulWidget {
   final ChatyNotificationService notificationService;
@@ -67,6 +69,23 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
         _islandExpanded = false;
       });
     }
+
+    if (locator.isRegistered<DynamicIslandController>()) {
+      locator<DynamicIslandController>().postPayload(
+        DynamicIslandPayload(
+          id: latest.id,
+          type: IslandPayloadType.chatMessage,
+          title: latest.title,
+          message: widget.concealWhileLocked ? '••••••••' : latest.body,
+          timestamp: latest.timestamp,
+          iconData: latest.icon,
+          accentColor: latest.color,
+          senderInitials: latest.avatarInitials,
+          canQuickReply: true,
+        ),
+      );
+    }
+
     final seconds = widget.preferencesController
         .gbInt('event_toast_duration_seconds', fallback: 3)
         .clamp(2, 8);
@@ -154,6 +173,11 @@ class _ChatyEventToastOverlayState extends State<ChatyEventToastOverlay> {
     ChatyEventNotification notification,
     ChatyPreferencesController prefs,
   ) {
+    if (locator.isRegistered<DynamicIslandController>()) {
+      return DynamicIslandOverlayHost(
+        controller: locator<DynamicIslandController>(),
+      );
+    }
     final recent = widget.notificationService.notifications.take(3).toList();
     final expanded = _islandExpanded;
     return GestureDetector(

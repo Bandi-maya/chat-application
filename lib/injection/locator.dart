@@ -24,11 +24,16 @@ import 'package:chat/features/calls/call_presentation_controller.dart';
 import 'package:chat/features/camera/effects/effect_engine.dart';
 import 'package:chat/data/services/status_service.dart';
 import 'package:chat/ui/core/customization/customization_controller.dart';
+import 'package:chat/features/island/dynamic_island.dart';
 
 final GetIt locator = GetIt.instance;
 
 void setupLocator() {
   if (locator.isRegistered<ThemeController>()) return;
+
+  locator.registerLazySingleton<DynamicIslandController>(
+    () => DynamicIslandController(),
+  );
 
   locator.registerLazySingleton<ThemeController>(() => ThemeController());
   locator.registerLazySingleton<ConnectionHealthService>(

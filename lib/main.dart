@@ -28,6 +28,7 @@ import 'package:chat/features/calls/ongoing_call_screen.dart';
 import 'package:chat/features/calls/call_presentation_controller.dart';
 import 'package:chat/features/calls/widgets/chaty_call_island.dart';
 import 'package:chat/features/calls/widgets/in_app_call_pip.dart';
+import 'package:chat/features/island/dynamic_island.dart';
 import 'package:chat/features/settings/security/app_lock_overlay.dart';
 import 'package:chat/features/settings/security/security_center_screen.dart';
 import 'package:chat/injection/locator.dart';
@@ -769,6 +770,36 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
                 presentation.isInAppIsland &&
                 callSession != null &&
                 callSession.isActive;
+
+            if (locator.isRegistered<DynamicIslandController>()) {
+              final islandCtrl = locator<DynamicIslandController>();
+              if (callSession != null && callSession.isActive && presentation.isInAppIsland) {
+                islandCtrl.postPayload(
+                  DynamicIslandPayload(
+                    id: 'call_${callSession.callId}',
+                    type: callSession.state == CallSessionState.incoming
+                        ? IslandPayloadType.incomingCall
+                        : IslandPayloadType.ongoingCall,
+                    title: callSession.remoteDisplayName,
+                    message: callSession.isVideo ? 'Video Call' : 'Voice Call',
+                    timestamp: DateTime.now(),
+                    durationSeconds: _callService.callDurationSeconds,
+                    isVideo: callSession.isVideo,
+                    isSpeaker: callSession.audioRoute == AudioRouteType.speaker,
+                    onTap: () {
+                      if (callSession.isVideo) {
+                        presentation.expandFromIsland();
+                      } else {
+                        unawaited(_openOngoingCall(currentTheme));
+                      }
+                    },
+                    onAcceptCall: () => unawaited(_callService.acceptCall()),
+                    onDeclineCall: () => unawaited(_callService.endCall()),
+                  ),
+                  autoExpand: callSession.state == CallSessionState.incoming,
+                );
+              }
+            }
 
             final baseStack = Stack(
               fit: StackFit.expand,

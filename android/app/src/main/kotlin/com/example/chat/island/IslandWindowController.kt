@@ -1,5 +1,6 @@
 package com.example.chat.island
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.PixelFormat
 import android.graphics.Rect
@@ -8,16 +9,19 @@ import android.view.DisplayCutout
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
-import android.view.WindowInsets
+import android.view.animation.OvershootInterpolator
 
 /**
- * Cutout-aware WindowManager controller for Chaty Island.
- * Accurately reads DisplayCutout bounding boxes (fixing K-6) and configures flags for touch and IME (fixing K-15).
+ * Cutout-aware WindowManager controller for Chaty Dynamic Island.
+ * Accurately reads DisplayCutout bounding boxes across OEMs (Samsung, Pixel, Xiaomi, OnePlus, Nothing, Vivo/OPPO),
+ * ensures hardware acceleration, spring physics layout transitions, and touch/IME focus flags.
  */
 class IslandWindowController(private val context: Context) {
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
     var currentView: IslandView? = null
         private set
+
+    private var boundsAnimator: ValueAnimator? = null
 
     val windowParams: WindowManager.LayoutParams by lazy {
         @Suppress("DEPRECATION")
@@ -30,7 +34,8 @@ class IslandWindowController(private val context: Context) {
         var flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
 
         val params = WindowManager.LayoutParams(
             dp(IslandTokens.COMPACT_DEFAULT_WIDTH_DP),
@@ -67,6 +72,7 @@ class IslandWindowController(private val context: Context) {
 
     fun detach() {
         val wm = windowManager ?: return
+        boundsAnimator?.cancel()
         currentView?.let { view ->
             try {
                 if (view.isAttachedToWindow) {
@@ -77,14 +83,10 @@ class IslandWindowController(private val context: Context) {
         }
     }
 
-    fun updateBounds(widthPx: Int, heightPx: Int, focusableForIme: Boolean = false) {
+    fun updateBounds(widthPx: Int, heightPx: Int, focusableForIme: Boolean = false, animate: Boolean = true) {
         val wm = windowManager ?: return
         val view = currentView ?: return
         if (!view.isAttachedToWindow) return
-
-        windowParams.width = widthPx
-        windowParams.height = heightPx
-        windowParams.y = getCutoutTopOffset()
 
         if (focusableForIme) {
             windowParams.flags = windowParams.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
@@ -95,9 +97,38 @@ class IslandWindowController(private val context: Context) {
             windowParams.flags = windowParams.flags and WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM.inv()
         }
 
-        try {
-            wm.updateViewLayout(view, windowParams)
-        } catch (_: Exception) {}
+        windowParams.y = getCutoutTopOffset()
+
+        if (!animate) {
+            windowParams.width = widthPx
+            windowParams.height = heightPx
+            try {
+                wm.updateViewLayout(view, windowParams)
+            } catch (_: Exception) {}
+            return
+        }
+
+        val startWidth = windowParams.width
+        val startHeight = windowParams.height
+
+        if (startWidth == widthPx && startHeight == heightPx) return
+
+        boundsAnimator?.cancel()
+        boundsAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 240
+            interpolator = OvershootInterpolator(0.72f) // Spring physics matching reference
+            addUpdateListener { anim ->
+                val progress = anim.animatedValue as Float
+                val currentW = (startWidth + (widthPx - startWidth) * progress).toInt()
+                val currentH = (startHeight + (heightPx - startHeight) * progress).toInt()
+                windowParams.width = currentW
+                windowParams.height = currentH
+                try {
+                    wm.updateViewLayout(view, windowParams)
+                } catch (_: Exception) {}
+            }
+            start()
+        }
     }
 
     fun getCutoutTopOffset(): Int {
@@ -105,15 +136,13 @@ class IslandWindowController(private val context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val metrics = wm.currentWindowMetrics
             val cutout: DisplayCutout? = metrics.windowInsets.displayCutout
-            val rect: Rect? = cutout?.boundingRectTop ?: cutout?.boundingRects?.firstOrNull { it.top < dp(12) }
+            val rect: Rect? = cutout?.boundingRectTop ?: cutout?.boundingRects?.firstOrNull { it.top < dp(14) }
             if (rect != null && !rect.isEmpty) {
-                // Center the 36dp pill vertically over the camera hole
                 val cutoutCenterY = rect.centerY()
                 val pillHalfHeight = dp(IslandTokens.COMPACT_HEIGHT_DP) / 2
                 return (cutoutCenterY - pillHalfHeight).coerceAtLeast(dp(2))
             }
         }
-        // Accurate fallback based on status bar center
         val statusBar = getStatusBarHeight()
         return ((statusBar - dp(IslandTokens.COMPACT_HEIGHT_DP)) / 2).coerceAtLeast(dp(2))
     }

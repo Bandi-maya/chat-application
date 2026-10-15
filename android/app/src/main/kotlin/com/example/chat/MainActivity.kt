@@ -31,6 +31,8 @@ import android.media.FaceDetector
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -45,6 +47,27 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 open class MainActivity : FlutterFragmentActivity() {
+    companion object {
+        @Volatile
+        private var dynamicIslandMethodChannelInstance: MethodChannel? = null
+
+        fun dispatchDynamicIslandNotification(payload: Map<String, Any?>) {
+            Handler(Looper.getMainLooper()).post {
+                try {
+                    dynamicIslandMethodChannelInstance?.invokeMethod("onNativeNotificationPosted", payload)
+                } catch (_: Exception) {}
+            }
+        }
+
+        fun dispatchDynamicIslandRemoved(key: String) {
+            Handler(Looper.getMainLooper()).post {
+                try {
+                    dynamicIslandMethodChannelInstance?.invokeMethod("onNativeNotificationRemoved", key)
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
     private val launcherChannel = "chaty/launcher_icon"
     private val callPipChannel = "chaty/call_pip"
     private val dynamicIslandChannel = "chaty/dynamic_island"
@@ -159,7 +182,9 @@ open class MainActivity : FlutterFragmentActivity() {
                 else -> result.notImplemented()
             }
         }
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, dynamicIslandChannel).setMethodCallHandler { call, result ->
+        val islandChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, dynamicIslandChannel)
+        dynamicIslandMethodChannelInstance = islandChannel
+        islandChannel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "getPermissionState" -> result.success(mapOf(
                     "overlay" to (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || android.provider.Settings.canDrawOverlays(this)),
