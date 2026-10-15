@@ -26,9 +26,13 @@ import '../../ui/core/templates/template_models.dart';
 import '../camera/effects/widgets/effect_picker_sheet.dart';
 import '../camera/camera_capture_screen.dart';
 import '../../data/services/status_service.dart';
+import '../../domain/models/user_profile.dart';
+import '../automation/auto_reply_rules_screen.dart';
+import '../automation/scheduled_messages_screen.dart';
 import '../settings/settings_root_screen.dart';
 import '../settings/gb_features/gb_settings_screen.dart';
 import '../tasks/task_create_edit_modal.dart';
+import 'chat_detail_screen.dart';
 
 class MainNavigationShell extends StatefulWidget {
   const MainNavigationShell({super.key});
@@ -2262,6 +2266,42 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         ),
       );
     }
+    quickActions.add(
+      _HomeSpeedDialAction(
+        id: 'direct-number',
+        label: 'Message Unsaved Number',
+        icon: Icons.dialpad_rounded,
+        onPressed: () => _showDirectNumberDialog(context),
+      ),
+    );
+    quickActions.add(
+      _HomeSpeedDialAction(
+        id: 'scheduled-messages',
+        label: 'Message Scheduler',
+        icon: Icons.schedule_send_rounded,
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const ScheduledMessagesScreen(),
+            ),
+          );
+        },
+      ),
+    );
+    quickActions.add(
+      _HomeSpeedDialAction(
+        id: 'auto-reply-rules',
+        label: 'Auto-Reply Rules',
+        icon: Icons.reply_all_rounded,
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const AutoReplyRulesScreen(),
+            ),
+          );
+        },
+      ),
+    );
     if (quickActions.isEmpty) {
       return homePrefs.hideNewMessageFab ? null : standardFab;
     }
@@ -2273,6 +2313,82 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       surfaceColor: colors.surfaceElevated,
       textColor: colors.foreground,
       showMetaAiIcon: homePrefs.showMetaAiIcon,
+    );
+  }
+
+  void _showDirectNumberDialog(BuildContext context) {
+    final textCtrl = TextEditingController();
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Message Unsaved Number'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter a phone number or username to initiate a direct conversation without saving to contacts.',
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: textCtrl,
+              autofocus: true,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Phone or Username',
+                hintText: '+1234567890 or @user',
+                prefixIcon: Icon(Icons.person_search_rounded),
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final input = textCtrl.text.trim();
+              if (input.isEmpty) return;
+              Navigator.of(dialogContext).pop();
+              final target = UserProfile(
+                id: input.startsWith('@') ? input.substring(1) : input,
+                username: input,
+                displayName: input,
+                avatarInitials: input.isNotEmpty ? input.substring(0, 1).toUpperCase() : '?',
+                avatarColorHex: '#25D366',
+                about: '',
+                lastSeenAt: DateTime.now(),
+              );
+              try {
+                final dataStore = locator<ChatyDataStore>();
+                final conv = await dataStore.getOrCreateDirectConversation(target);
+                if (context.mounted) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => ChatDetailScreen(
+                        theme: locator<ThemeController>().globalTheme,
+                        dataStore: dataStore,
+                        conversationId: conv.id,
+                        preferencesController: locator<ChatyPreferencesController>(),
+                      ),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not start chat: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('Chat'),
+          ),
+        ],
+      ),
     );
   }
 

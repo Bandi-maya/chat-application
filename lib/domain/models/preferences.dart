@@ -29,6 +29,8 @@ class PrivacyPreferences {
   final bool deletionOfEveryone;
   final bool deletedMediaTime;
   final bool unviewedChats;
+  final bool hideOnlineStatus;
+  final bool hideSecondTick;
 
   const PrivacyPreferences({
     this.freezeLastSeen = false,
@@ -57,6 +59,8 @@ class PrivacyPreferences {
     this.deletionOfEveryone = true,
     this.deletedMediaTime = false,
     this.unviewedChats = false,
+    this.hideOnlineStatus = false,
+    this.hideSecondTick = false,
   });
 
   PrivacyPreferences copyWith({
@@ -86,6 +90,8 @@ class PrivacyPreferences {
     bool? deletionOfEveryone,
     bool? deletedMediaTime,
     bool? unviewedChats,
+    bool? hideOnlineStatus,
+    bool? hideSecondTick,
   }) {
     return PrivacyPreferences(
       freezeLastSeen: freezeLastSeen ?? this.freezeLastSeen,
@@ -119,6 +125,8 @@ class PrivacyPreferences {
       deletionOfEveryone: deletionOfEveryone ?? this.deletionOfEveryone,
       deletedMediaTime: deletedMediaTime ?? this.deletedMediaTime,
       unviewedChats: unviewedChats ?? this.unviewedChats,
+      hideOnlineStatus: hideOnlineStatus ?? this.hideOnlineStatus,
+      hideSecondTick: hideSecondTick ?? this.hideSecondTick,
     );
   }
 
@@ -149,6 +157,8 @@ class PrivacyPreferences {
     'deletionOfEveryone': deletionOfEveryone,
     'deletedMediaTime': deletedMediaTime,
     'unviewedChats': unviewedChats,
+    'hideOnlineStatus': hideOnlineStatus,
+    'hideSecondTick': hideSecondTick,
   };
 
   factory PrivacyPreferences.fromMap(Map<String, dynamic> map) =>
@@ -183,6 +193,8 @@ class PrivacyPreferences {
         deletionOfEveryone: map['deletionOfEveryone'] ?? true,
         deletedMediaTime: map['deletedMediaTime'] ?? false,
         unviewedChats: map['unviewedChats'] ?? false,
+        hideOnlineStatus: map['hideOnlineStatus'] ?? false,
+        hideSecondTick: map['hideSecondTick'] ?? false,
       );
 }
 
@@ -1360,6 +1372,7 @@ class AutoReplyRule {
   final String keyword;
   final String responseMessage;
   final String recipientFilter; // 'All', 'Contacts', 'Groups'
+  final String matchType; // 'contains', 'exact', 'starts_with'
 
   const AutoReplyRule({
     required this.id,
@@ -1367,7 +1380,26 @@ class AutoReplyRule {
     required this.keyword,
     required this.responseMessage,
     this.recipientFilter = 'All',
+    this.matchType = 'contains',
   });
+
+  AutoReplyRule copyWith({
+    String? id,
+    bool? enabled,
+    String? keyword,
+    String? responseMessage,
+    String? recipientFilter,
+    String? matchType,
+  }) {
+    return AutoReplyRule(
+      id: id ?? this.id,
+      enabled: enabled ?? this.enabled,
+      keyword: keyword ?? this.keyword,
+      responseMessage: responseMessage ?? this.responseMessage,
+      recipientFilter: recipientFilter ?? this.recipientFilter,
+      matchType: matchType ?? this.matchType,
+    );
+  }
 
   Map<String, dynamic> toMap() => {
     'id': id,
@@ -1375,14 +1407,16 @@ class AutoReplyRule {
     'keyword': keyword,
     'responseMessage': responseMessage,
     'recipientFilter': recipientFilter,
+    'matchType': matchType,
   };
 
   factory AutoReplyRule.fromMap(Map<String, dynamic> map) => AutoReplyRule(
-    id: map['id'],
+    id: map['id'] ?? '',
     enabled: map['enabled'] ?? true,
     keyword: map['keyword'] ?? '',
     responseMessage: map['responseMessage'] ?? '',
     recipientFilter: map['recipientFilter'] ?? 'All',
+    matchType: map['matchType'] ?? 'contains',
   );
 }
 
