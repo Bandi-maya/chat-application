@@ -1,3 +1,12 @@
+import 'package:chat/features/media/services/media_player_coordinator.dart';
+import 'package:chat/features/media/services/media_library_service.dart';
+import 'package:chat/features/media/services/pdf_processing_service.dart';
+import 'package:chat/core/audio/audio_capability_service.dart';
+import 'package:chat/core/audio/audio_policy_coordinator.dart';
+import 'package:chat/core/audio/call_audio_controller.dart';
+import 'package:chat/core/audio/media_audio_controller.dart';
+import 'package:chat/core/audio/notification_audio_controller.dart';
+import 'package:chat/core/audio/audio_settings_controller.dart';
 import 'package:chat/core/services/hidden_vault_service.dart';
 import 'package:chat/core/services/privacy_config_service.dart';
 import 'package:chat/features/chats/hidden_vault_controller.dart';
@@ -127,6 +136,48 @@ void setupLocator() {
   locator.registerLazySingleton<PrivacyConfigService>(
     () => PrivacyConfigService(
       preferencesController: locator<ChatyPreferencesController>(),
+    ),
+  );
+  locator.registerLazySingleton<AudioCapabilityService>(
+    () => AudioCapabilityService(),
+  );
+  locator.registerLazySingleton<AudioPolicyCoordinator>(
+    () => AudioPolicyCoordinator(
+      capabilityService: locator<AudioCapabilityService>(),
+    ),
+  );
+  locator.registerLazySingleton<CallAudioController>(
+    () => CallAudioController(
+      coordinator: locator<AudioPolicyCoordinator>(),
+      capabilityService: locator<AudioCapabilityService>(),
+      signalingService: locator<CallSignalingService>(),
+    ),
+  );
+  locator.registerLazySingleton<MediaAudioController>(
+    () => MediaAudioController(
+      coordinator: locator<AudioPolicyCoordinator>(),
+    ),
+  );
+  locator.registerLazySingleton<NotificationAudioController>(
+    () => NotificationAudioController(
+      coordinator: locator<AudioPolicyCoordinator>(),
+    ),
+  );
+  locator.registerLazySingleton<AudioSettingsController>(
+    () => AudioSettingsController(
+      capabilityService: locator<AudioCapabilityService>(),
+      coordinator: locator<AudioPolicyCoordinator>(),
+    ),
+  );
+  locator.registerLazySingleton<PdfProcessingService>(
+    () => PdfProcessingService(),
+  );
+  locator.registerLazySingleton<MediaLibraryService>(
+    () => MediaLibraryService(),
+  );
+  locator.registerLazySingleton<MediaPlayerCoordinator>(
+    () => MediaPlayerCoordinator(
+      policyCoordinator: locator<AudioPolicyCoordinator>(),
     ),
   );
 }

@@ -1,3 +1,5 @@
+import '../media/models/media_file_descriptor.dart';
+import '../media/ui/picker/custom_file_picker_screen.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -83,6 +85,39 @@ class ChatAttachmentActions {
 
   Future<void> shareMedia(BuildContext context, String type) async {
     try {
+      if (type == 'document') {
+        final List<MediaFileDescriptor>? picked = await Navigator.push<List<MediaFileDescriptor>>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const CustomFilePickerScreen(
+              initialCategory: MediaCategory.document,
+              title: 'Documents & Files',
+            ),
+          ),
+        );
+        if (picked == null || picked.isEmpty) return;
+        for (final item in picked) {
+          final attachment = await _media.uploadFile(
+            conversationId: conversationId,
+            type: 'document',
+            sourcePath: item.path,
+            displayName: item.name,
+          );
+          await dataStore.sendMessage(
+            conversationId: conversationId,
+            text: '',
+            type: MessageType.document,
+            attachment: attachment,
+          );
+        }
+        if (context.mounted) {
+          _toast(
+            context,
+            '${picked.length} ${picked.length == 1 ? 'document' : 'documents'} sent.',
+          );
+        }
+        return;
+      }
       final imageLimit = preferencesController
           .gbDouble('Img_share_limit', fallback: 30)
           .clamp(1, 100)
@@ -287,6 +322,120 @@ class ChatAttachmentActions {
       _toast(context, 'Voice note sent.');
     } catch (error) {
       _toast(context, 'Unable to send voice note: $error');
+    }
+  }
+
+  Future<void> sendDemoDocument(BuildContext context) async {
+    try {
+      const sampleAttachment = MessageAttachment(
+        id: 'demo_doc_spec',
+        type: 'document',
+        name: 'Project_Architecture_Spec.pdf',
+        size: '2.4 MB',
+        url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+      );
+      await dataStore.sendMessage(
+        conversationId: conversationId,
+        text: '',
+        type: MessageType.document,
+        attachment: sampleAttachment,
+      );
+      await dataStore.ensureConversationLoaded(conversationId);
+      _toast(context, '📄 Demo document sent.');
+    } catch (error) {
+      _toast(context, 'Unable to send demo document: $error');
+    }
+  }
+
+  Future<void> sendDemoAudio(BuildContext context) async {
+    try {
+      const sampleAttachment = MessageAttachment(
+        id: 'demo_audio_track',
+        type: 'audio',
+        name: 'Hangova - Anirudh (Audio Track).mp3',
+        size: '4.8 MB',
+        durationSeconds: 225,
+        url: 'https://actions.google.com/sounds/v1/ambiences/rain_heavy.ogg',
+      );
+      await dataStore.sendMessage(
+        conversationId: conversationId,
+        text: '',
+        type: MessageType.audio,
+        attachment: sampleAttachment,
+        extraMetadata: const <String, dynamic>{
+          'artist': 'Anirudh Ravichander',
+          'title': 'Hangova',
+          'album': 'Vettaiyan',
+          'duration': 225,
+        },
+      );
+      await dataStore.ensureConversationLoaded(conversationId);
+      _toast(context, '🎵 Demo music track sent.');
+    } catch (error) {
+      _toast(context, 'Unable to send demo audio: $error');
+    }
+  }
+
+  Future<void> sendDemoCallCard(BuildContext context) async {
+    try {
+      await dataStore.sendMessage(
+        conversationId: conversationId,
+        text: '📞 Voice call ended • 4m 12s',
+        type: MessageType.system,
+        extraMetadata: <String, dynamic>{
+          'call_id': 'demo_call_${DateTime.now().millisecondsSinceEpoch}',
+          'call_type': 'voice',
+          'direction': 'incoming',
+          'status': 'completed',
+          'duration_seconds': 252,
+        },
+      );
+      await dataStore.ensureConversationLoaded(conversationId);
+      _toast(context, '📞 Demo call card sent.');
+    } catch (error) {
+      _toast(context, 'Unable to send demo call card: $error');
+    }
+  }
+
+  Future<void> sendDemoTask(BuildContext context) async {
+    try {
+      await dataStore.sendMessage(
+        conversationId: conversationId,
+        text: 'Review Dynamic Island animations & specular shaders',
+        type: MessageType.taskCard,
+        extraMetadata: const <String, dynamic>{
+          'task_title': 'Validate Dynamic Island animations',
+          'status': 'todo',
+          'priority': 'high',
+        },
+      );
+      await dataStore.ensureConversationLoaded(conversationId);
+      _toast(context, '📋 Demo task card sent.');
+    } catch (error) {
+      _toast(context, 'Unable to send demo task: $error');
+    }
+  }
+
+  Future<void> sendDemoLocation(BuildContext context) async {
+    try {
+      const latitude = 37.7749;
+      const longitude = -122.4194;
+      const mapsUrl = 'https://maps.google.com/?q=$latitude,$longitude';
+      await dataStore.sendMessage(
+        conversationId: conversationId,
+        text: '📍 Market Street, San Francisco, CA\n$mapsUrl',
+        type: MessageType.location,
+        extraMetadata: const <String, dynamic>{
+          'latitude': latitude,
+          'longitude': longitude,
+          'accuracy_meters': 5.0,
+          'maps_url': mapsUrl,
+        },
+      );
+      await dataStore.ensureConversationLoaded(conversationId);
+      _toast(context, '📍 Demo location sent.');
+    } catch (error) {
+      _toast(context, 'Unable to send demo location: $error');
     }
   }
 

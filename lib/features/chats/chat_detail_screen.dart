@@ -1263,6 +1263,31 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           _scrollToBottom();
         },
         onTaskOption: _openCreateTaskModal,
+        onDemoDocument: () async {
+          await _attachments.sendDemoDocument(context);
+          await _realtime.trackConversation(widget.conversationId);
+          _scrollToBottom();
+        },
+        onDemoAudio: () async {
+          await _attachments.sendDemoAudio(context);
+          await _realtime.trackConversation(widget.conversationId);
+          _scrollToBottom();
+        },
+        onDemoCall: () async {
+          await _attachments.sendDemoCallCard(context);
+          await _realtime.trackConversation(widget.conversationId);
+          _scrollToBottom();
+        },
+        onDemoTask: () async {
+          await _attachments.sendDemoTask(context);
+          await _realtime.trackConversation(widget.conversationId);
+          _scrollToBottom();
+        },
+        onDemoLocation: () async {
+          await _attachments.sendDemoLocation(context);
+          await _realtime.trackConversation(widget.conversationId);
+          _scrollToBottom();
+        },
       ),
     );
   }

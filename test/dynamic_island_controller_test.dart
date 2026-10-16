@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:chat/features/island/dynamic_island.dart';
 
@@ -294,5 +295,46 @@ void main() {
 
       controller.dispose();
     });
+
+    test('Configuration methods invoke platform channel correctly', () async {
+      final controller = DynamicIslandController();
+      final log = <MethodCall>[];
+
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('chaty/dynamic_island'),
+        (MethodCall methodCall) async {
+          log.add(methodCall);
+          switch (methodCall.method) {
+            case 'setHideSystemNotifications':
+              return methodCall.arguments['hide'] as bool;
+            case 'isHideSystemNotificationsEnabled':
+              return true;
+            case 'setHeaderEnabled':
+              return methodCall.arguments['enabled'] as bool;
+            case 'isHeaderEnabled':
+              return true;
+            default:
+              return null;
+          }
+        },
+      );
+
+      final hideResult = await controller.setHideSystemNotifications(true);
+      expect(hideResult, isTrue);
+      expect(log.any((call) => call.method == 'setHideSystemNotifications' && call.arguments['hide'] == true), isTrue);
+
+      final isHidden = await controller.isHideSystemNotificationsEnabled();
+      expect(isHidden, isTrue);
+
+      final headerResult = await controller.setHeaderEnabled(true);
+      expect(headerResult, isTrue);
+      expect(log.any((call) => call.method == 'setHeaderEnabled' && call.arguments['enabled'] == true), isTrue);
+
+      final isHeader = await controller.isHeaderEnabled();
+      expect(isHeader, isTrue);
+
+      controller.dispose();
+    });
   });
 }
+

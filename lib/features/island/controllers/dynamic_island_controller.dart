@@ -15,7 +15,17 @@ class DynamicIslandController extends ChangeNotifier {
   final List<DynamicIslandPayload> _queue = [];
   List<DynamicIslandPayload> get queue => List.unmodifiable(_queue);
 
-  DynamicIslandPayload? get activePayload => _queue.isNotEmpty ? _queue.first : null;
+  int _carouselIndex = 0;
+  int get carouselIndex => _carouselIndex;
+
+  DynamicIslandPayload? get activePayload {
+    if (_queue.isEmpty) return null;
+    if (_carouselIndex < _queue.length) {
+      return _queue[_carouselIndex];
+    }
+    return _queue.first;
+  }
+
   DynamicIslandPayload? get secondaryPayload => _queue.length > 1 ? _queue[1] : null;
 
   // Sub-view toggle when expanded (matching reference repo: 'player' vs 'notifications')
@@ -26,6 +36,10 @@ class DynamicIslandController extends ChangeNotifier {
   Timer? _dismissTimer;
   bool _isPinned = false;
   bool get isPinned => _isPinned;
+
+  // OriginOS / iQOO Drag & Go drop zone state
+  bool _isDragTargetActive = false;
+  bool get isDragTargetActive => _isDragTargetActive;
 
   // Auto-collapse duration constants
   static const Duration expandedAutoCollapseDuration = Duration(milliseconds: 4500);
@@ -186,11 +200,90 @@ class DynamicIslandController extends ChangeNotifier {
   /// Dismisses the active primary payload and promotes the next in queue.
   void dismissActive() {
     if (_queue.isNotEmpty) {
-      final removed = _queue.removeAt(0);
+      final indexToRemove = _carouselIndex < _queue.length ? _carouselIndex : 0;
+      final removed = _queue.removeAt(indexToRemove);
       removed.onDismiss?.call();
+      if (_carouselIndex >= _queue.length && _queue.isNotEmpty) {
+        _carouselIndex = _queue.length - 1;
+      } else if (_queue.isEmpty) {
+        _carouselIndex = 0;
+      }
       _reconcileStateAfterRemoval();
       notifyListeners();
     }
+  }
+
+  /// Advances to the next concurrent task in the Multi-Task Carousel (OriginOS feature).
+  void nextCarouselItem() {
+    if (_queue.length <= 1) return;
+    _carouselIndex = (_carouselIndex + 1) % _queue.length;
+    _scheduleAutoCollapse();
+    notifyListeners();
+  }
+
+  /// Goes back to the previous concurrent task in the Multi-Task Carousel.
+  void prevCarouselItem() {
+    if (_queue.length <= 1) return;
+    _carouselIndex = (_carouselIndex - 1 + _queue.length) % _queue.length;
+    _scheduleAutoCollapse();
+    notifyListeners();
+  }
+
+  /// Sets the active carousel index directly.
+  void setCarouselIndex(int index) {
+    if (index >= 0 && index < _queue.length) {
+      _carouselIndex = index;
+      _scheduleAutoCollapse();
+      notifyListeners();
+    }
+  }
+
+  /// Toggles the Drag & Go target dock active state (OriginOS Atomic Island feature).
+  void setDragTargetActive(bool active) {
+    if (_isDragTargetActive == active) return;
+    _isDragTargetActive = active;
+    notifyListeners();
+  }
+
+  /// Handles content dropped into the Island's Drag & Go target zone.
+  void handleDroppedData(dynamic data) {
+    _isDragTargetActive = false;
+    postPayload(
+      DynamicIslandPayload(
+        id: 'drag_drop_${DateTime.now().millisecondsSinceEpoch}',
+        type: IslandPayloadType.systemAlert,
+        title: 'Content Attached',
+        message: 'Ready to share in active conversation',
+        timestamp: DateTime.now(),
+        accentColor: const Color(0xFF00F0FF),
+        isBandiIcon: true,
+      ),
+      autoExpand: true,
+    );
+  }
+
+  /// Posts a Smart Clipboard Intent chip (OriginOS Atomic Island feature).
+  void postClipboardIntent({
+    required String title,
+    required String message,
+    required String actionLabel,
+    required VoidCallback onAction,
+  }) {
+    postPayload(
+      DynamicIslandPayload(
+        id: 'clipboard_${DateTime.now().millisecondsSinceEpoch}',
+        type: IslandPayloadType.clipboardIntent,
+        title: title,
+        message: message,
+        clipboardContent: message,
+        clipboardActionLabel: actionLabel,
+        onClipboardAction: onAction,
+        timestamp: DateTime.now(),
+        accentColor: const Color(0xFFF59E0B),
+        isBandiIcon: true,
+      ),
+      autoExpand: false,
+    );
   }
 
   void _sortQueue() {
@@ -246,6 +339,46 @@ class DynamicIslandController extends ChangeNotifier {
   void _cancelTimers() {
     _collapseTimer?.cancel();
     _dismissTimer?.cancel();
+  }
+
+  /// Configures whether system shade notifications are hidden when Dynamic Island is active.
+  Future<bool> setHideSystemNotifications(bool hide) async {
+    try {
+      final res = await _channel.invokeMethod<bool>('setHideSystemNotifications', {'hide': hide});
+      return res ?? hide;
+    } catch (_) {
+      return hide;
+    }
+  }
+
+  /// Checks whether system shade notifications are currently suppressed.
+  Future<bool> isHideSystemNotificationsEnabled() async {
+    try {
+      final res = await _channel.invokeMethod<bool>('isHideSystemNotificationsEnabled');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Configures whether the segmented tab switcher header is displayed in the island.
+  Future<bool> setHeaderEnabled(bool enabled) async {
+    try {
+      final res = await _channel.invokeMethod<bool>('setHeaderEnabled', {'enabled': enabled});
+      return res ?? enabled;
+    } catch (_) {
+      return enabled;
+    }
+  }
+
+  /// Checks whether the segmented tab switcher header is enabled.
+  Future<bool> isHeaderEnabled() async {
+    try {
+      final res = await _channel.invokeMethod<bool>('isHeaderEnabled');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
   }
 
   @override

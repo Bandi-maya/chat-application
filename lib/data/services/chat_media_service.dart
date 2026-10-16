@@ -83,8 +83,19 @@ class ChatMediaService {
     int durationSeconds = 0,
   }) async {
     var file = File(sourcePath);
-    if (!await file.exists())
+    if (!await file.exists()) {
+      if (sourcePath.startsWith('demo/') || sourcePath.contains('demo')) {
+        return MessageAttachment(
+          id: 'demo_${DateTime.now().millisecondsSinceEpoch}',
+          type: type,
+          name: displayName ?? sourcePath.split(Platform.pathSeparator).last,
+          size: type == 'document' ? '2.4 MB' : '4.8 MB',
+          url: 'demo://$sourcePath',
+          durationSeconds: durationSeconds > 0 ? durationSeconds : (type == 'audio' ? 225 : 0),
+        );
+      }
       throw Exception('The selected file no longer exists.');
+    }
     var rawName = displayName ?? sourcePath.split(Platform.pathSeparator).last;
     var mimeType = lookupMimeType(sourcePath) ?? _fallbackMimeForType(type);
 
@@ -186,6 +197,12 @@ class ChatMediaService {
   }) async {
     if (objectPath.trim().isEmpty)
       throw Exception('Attachment path is missing.');
+    if (objectPath.startsWith('http://') || objectPath.startsWith('https://')) {
+      return objectPath;
+    }
+    if (objectPath.startsWith('demo')) {
+      return 'https://actions.google.com/sounds/v1/ambiences/rain_heavy.ogg';
+    }
     return _client.storage
         .from(bucket)
         .createSignedUrl(objectPath, expiresInSeconds);

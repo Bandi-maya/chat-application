@@ -3,10 +3,11 @@ import 'package:flutter/services.dart';
 
 import '../../ui/core/design_system/design_system.dart';
 
-/// Mixed create-dock attachment sheet.
+/// Mixed create-dock attachment sheet with an instant Demo Sandbox suite.
 ///
 /// All actions share one predictable grid so the user can scan the complete
-/// set without stepping through artificial categories.
+/// set without stepping through artificial categories. The demo sandbox allows
+/// 1-tap testing of documents, music/audio, call cards, and location previews.
 class AttachmentSheet extends StatelessWidget {
   final ThemeConfig theme;
   final ValueChanged<String> onMediaRequested;
@@ -14,6 +15,11 @@ class AttachmentSheet extends StatelessWidget {
   final VoidCallback onContactRequested;
   final VoidCallback onPollRequested;
   final VoidCallback onTaskOption;
+  final VoidCallback? onDemoDocument;
+  final VoidCallback? onDemoAudio;
+  final VoidCallback? onDemoCall;
+  final VoidCallback? onDemoTask;
+  final VoidCallback? onDemoLocation;
 
   const AttachmentSheet({
     super.key,
@@ -23,6 +29,11 @@ class AttachmentSheet extends StatelessWidget {
     required this.onContactRequested,
     required this.onPollRequested,
     required this.onTaskOption,
+    this.onDemoDocument,
+    this.onDemoAudio,
+    this.onDemoCall,
+    this.onDemoTask,
+    this.onDemoLocation,
   });
 
   @override
@@ -94,7 +105,8 @@ class AttachmentSheet extends StatelessWidget {
       ),
       child: SafeArea(
         top: false,
-        child: Padding(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(
             ChatySpacing.md,
             ChatySpacing.sm,
@@ -115,7 +127,149 @@ class AttachmentSheet extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: ChatySpacing.md),
+              const SizedBox(height: ChatySpacing.sm),
+
+              // Demo Sandbox / Instant Test dock
+              Container(
+                margin: const EdgeInsets.only(bottom: ChatySpacing.sm),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: colors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: colors.primary.withValues(alpha: 0.18),
+                    width: 1,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.science_rounded,
+                                color: Colors.white,
+                                size: 12,
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'DEMO SANDBOX',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '1-Tap test chat components & island hooks',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: colors.foregroundSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        children: [
+                          _DemoTestPill(
+                            icon: Icons.description_rounded,
+                            label: 'Test Doc (PDF)',
+                            gradient: const [
+                              Color(0xFF7F66FF),
+                              Color(0xFF5E35B1),
+                            ],
+                            onTap: () => _closeAnd(
+                              context,
+                              onDemoDocument ??
+                                  () => onMediaRequested('document'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _DemoTestPill(
+                            icon: Icons.graphic_eq_rounded,
+                            label: 'Test Music (MP3)',
+                            gradient: const [
+                              Color(0xFFFF9800),
+                              Color(0xFFF57C00),
+                            ],
+                            onTap: () => _closeAnd(
+                              context,
+                              onDemoAudio ?? () => onMediaRequested('audio'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _DemoTestPill(
+                            icon: Icons.call_end_rounded,
+                            label: 'Test Call Card',
+                            gradient: const [
+                              Color(0xFF00BFA5),
+                              Color(0xFF00897B),
+                            ],
+                            onTap: () =>
+                                _closeAnd(context, onDemoCall ?? () {}),
+                          ),
+                          const SizedBox(width: 8),
+                          _DemoTestPill(
+                            icon: Icons.task_alt_rounded,
+                            label: 'Test Task Card',
+                            gradient: const [
+                              Color(0xFF3B82F6),
+                              Color(0xFF1D4ED8),
+                            ],
+                            onTap: () => _closeAnd(
+                              context,
+                              onDemoTask ?? onTaskOption,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _DemoTestPill(
+                            icon: Icons.pin_drop_rounded,
+                            label: 'Test Location',
+                            gradient: const [
+                              Color(0xFF10B981),
+                              Color(0xFF059669),
+                            ],
+                            onTap: () => _closeAnd(
+                              context,
+                              onDemoLocation ?? onLocationRequested,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: ChatySpacing.xs),
               LayoutBuilder(
                 builder: (context, constraints) {
                   final textScale = MediaQuery.textScalerOf(context).scale(1);
@@ -169,6 +323,69 @@ void _closeAnd(BuildContext context, VoidCallback action) {
   HapticFeedback.selectionClick();
   Navigator.of(context).pop();
   WidgetsBinding.instance.addPostFrameCallback((_) => action());
+}
+
+class _DemoTestPill extends StatelessWidget {
+  const _DemoTestPill({
+    required this.icon,
+    required this.label,
+    required this.gradient,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final List<Color> gradient;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: gradient.first.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: gradient.first.withValues(alpha: 0.3),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(colors: gradient),
+                ),
+                child: Center(
+                  child: Icon(icon, color: Colors.white, size: 14),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: theme.colorScheme.onSurface,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _AttachmentItem {

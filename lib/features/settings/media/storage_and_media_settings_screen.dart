@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../media/ui/workspace/media_workspace_screen.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/design_system.dart'
     hide ChatySettingsSection;

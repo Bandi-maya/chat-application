@@ -1,9 +1,11 @@
+import '../../chats/locked_chats_screen.dart';
+import '../../../data/repositories/chaty_data_store.dart';
+import '../../../core/design_system/spring_interactive_scale.dart';
 import '../../../data/services/local_lock_service.dart';
 import '../security/app_lock_overlay.dart';
 import '../security/lock_credential_setup_modal.dart';
 import '../security/lock_method_selector_sheet.dart';
 import '../security/security_flow_plan.dart';
-import '../security/security_center_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -358,6 +360,57 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  Future<String?> _showSecretPhraseSetupDialog() async {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.key_rounded),
+            SizedBox(width: 8),
+            Text('Set Secret Search Word'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter a secret word, phrase, or emoji. Typing this in the search bar will reveal your hidden locked chats.',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Secret Word or Emoji',
+                hintText: 'e.g. sesame, vault, 🔒',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final text = controller.text.trim();
+              if (text.isNotEmpty) {
+                Navigator.of(ctx).pop(text);
+              }
+            },
+            child: const Text('Save Word'),
+          ),
+        ],
       ),
     );
   }
@@ -956,19 +1009,101 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
                         colors: colors,
                         onTap: () => _showRecoveryQuestionDialog(),
                       ),
-                      _buildChevronRow(
-                        icon: Icons.shield_rounded,
-                        title: 'Advanced Security & Trust Center',
-                        subtitle: 'Encryption verification, QR audits & locked chats',
+                      _buildSwitchRow(
+                        icon: Icons.notifications_paused_rounded,
+                        title: 'Hide Notification Content when Locked',
+                        subtitle: 'Conceal message body text while application is locked',
+                        value: currentSec.hideLockNotificationContent,
                         theme: theme,
                         colors: colors,
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => SecurityCenterScreen(
-                              preferencesController: widget.preferencesController,
-                            ),
-                          ),
+                        onChanged: (val) {
+                          widget.preferencesController.updateSecurity(
+                            currentSec.copyWith(hideLockNotificationContent: val),
+                            logTitle: 'Lock notification privacy',
+                          );
+                        },
+                      ),
+                      _buildChevronRow(
+                        icon: Icons.lock_open_rounded,
+                        title: 'Test Lock Screen',
+                        subtitle: 'Authenticate to verify your Chaty Lock configuration',
+                        theme: theme,
+                        colors: colors,
+                        onTap: () => AppLockOverlayModal.show(
+                          context,
+                          preferencesController: widget.preferencesController,
+                          lockService: _lockService,
+                          title: 'Test Chaty Lock',
+                          reason: 'Authenticate to verify your Chaty Lock configuration',
                         ),
+                      ),
+                      _buildSectionDivider(label: 'Chat Lock & Vault Security', accent: theme.accentColor),
+                      _buildChevronRow(
+                        icon: Icons.lock_outline_rounded,
+                        title: 'Open Locked & Hidden Chats',
+                        subtitle: currentSec.lockedConversationIds.isEmpty
+                            ? 'No chats protected • Tap to manage vault'
+                            : '${currentSec.lockedConversationIds.length} conversation${currentSec.lockedConversationIds.length == 1 ? '' : 's'} in secure vault',
+                        theme: theme,
+                        colors: colors,
+                        onTap: () => LockedChatsScreen.open(
+                          context,
+                          dataStore: locator<ChatyDataStore>(),
+                          preferencesController: widget.preferencesController,
+                          themeController: locator<ThemeController>(),
+                        ),
+                      ),
+                      _buildSwitchRow(
+                        icon: Icons.touch_app_rounded,
+                        title: 'Unlock via Chaty Title Tap',
+                        subtitle: 'Tap the main screen Chaty header to authenticate and open locked chats',
+                        value: currentSec.entryByAppTitle,
+                        theme: theme,
+                        colors: colors,
+                        onChanged: (val) {
+                          widget.preferencesController.updateSecurity(
+                            currentSec.copyWith(entryByAppTitle: val),
+                            logTitle: 'Title tap vault entry',
+                          );
+                        },
+                      ),
+                      _buildSwitchRow(
+                        icon: Icons.key_rounded,
+                        title: 'Secret Code Search Discovery',
+                        subtitle: 'Reveal hidden locked chats only when typing your secret word or emoji in search',
+                        value: currentSec.entryBySecretPhrase,
+                        theme: theme,
+                        colors: colors,
+                        onChanged: (val) async {
+                          if (val) {
+                            final phrase = await _showSecretPhraseSetupDialog();
+                            if (phrase == null || phrase.isEmpty || !mounted) return;
+                            await _lockService.setSecretPhrase(phrase);
+                            widget.preferencesController.updateSecurity(
+                              currentSec.copyWith(entryBySecretPhrase: true),
+                              logTitle: 'Secret search phrase entry',
+                            );
+                          } else {
+                            widget.preferencesController.updateSecurity(
+                              currentSec.copyWith(entryBySecretPhrase: false),
+                              logTitle: 'Secret search phrase disabled',
+                            );
+                          }
+                        },
+                      ),
+                      _buildSwitchRow(
+                        icon: Icons.screenshot_rounded,
+                        title: 'Protect Screen & App Previews',
+                        subtitle: 'Blank out app thumbnail in multi-tasking view and block screenshots',
+                        value: currentSec.protectFromScreenshots,
+                        theme: theme,
+                        colors: colors,
+                        onChanged: (val) {
+                          widget.preferencesController.updateSecurity(
+                            currentSec.copyWith(protectFromScreenshots: val),
+                            logTitle: 'Screen & preview security',
+                          );
+                        },
                       ),
                     ],
                     
@@ -1100,61 +1235,64 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
     required dynamic colors,
     required ValueChanged<bool> onChanged,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onChanged(!value);
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: theme.accentColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(11),
+    return SpringInteractiveScale(
+      scaleDownFactor: 0.98,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onChanged(!value);
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: theme.accentColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Icon(icon, color: theme.accentColor, size: 20),
                 ),
-                child: Icon(icon, color: theme.accentColor, size: 20),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: theme.primaryTextColor,
-                        fontSize: 14.5 * theme.fontScale,
-                        fontWeight: FontWeight.w600,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: theme.primaryTextColor,
+                          fontSize: 14.5 * theme.fontScale,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        color: theme.secondaryTextColor,
-                        fontSize: 11.5 * theme.fontScale,
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: theme.secondaryTextColor,
+                          fontSize: 11.5 * theme.fontScale,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              IgnorePointer(
-                child: Switch(
-                  value: value,
-                  activeColor: theme.accentColor,
-                  onChanged: null,
+                const SizedBox(width: 8),
+                IgnorePointer(
+                  child: Switch(
+                    value: value,
+                    activeColor: theme.accentColor,
+                    onChanged: null,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1169,58 +1307,61 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
     required dynamic colors,
     required VoidCallback onTap,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap();
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-          child: Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: theme.accentColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(11),
+    return SpringInteractiveScale(
+      scaleDownFactor: 0.98,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap();
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: theme.accentColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Icon(icon, color: theme.accentColor, size: 20),
                 ),
-                child: Icon(icon, color: theme.accentColor, size: 20),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: theme.primaryTextColor,
-                        fontSize: 14.5 * theme.fontScale,
-                        fontWeight: FontWeight.w600,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: theme.primaryTextColor,
+                          fontSize: 14.5 * theme.fontScale,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        color: theme.secondaryTextColor,
-                        fontSize: 11.5 * theme.fontScale,
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: theme.secondaryTextColor,
+                          fontSize: 11.5 * theme.fontScale,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: theme.accentColor,
-                size: 22,
-              ),
-            ],
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: theme.accentColor,
+                  size: 22,
+                ),
+              ],
+            ),
           ),
         ),
       ),
