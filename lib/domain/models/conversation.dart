@@ -86,4 +86,16 @@ class Conversation {
       draftText: draftText ?? this.draftText,
     );
   }
+
+  factory Conversation.fromApi(Map<String, dynamic> json) {
+    return Conversation(
+      id: json['uid'] ?? '',
+      type: json['room_type'] == 'group' ? ConversationType.group : ConversationType.direct,
+      title: json['name'] ?? 'Chat',
+      participantIds: json['created_by_id'] != null ? [json['created_by_id']] : [],
+      lastMessageText: '',
+      lastMessageTime: json['updated_at'] != null ? DateTime.tryParse(json['updated_at']) ?? DateTime.now() : DateTime.now(),
+      lastMessageSenderId: '',
+    );
+  }
 }

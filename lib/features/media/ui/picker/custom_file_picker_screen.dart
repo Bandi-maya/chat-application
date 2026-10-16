@@ -8,7 +8,6 @@ import '../../../../ui/core/design_system/design_system.dart';
 import '../../models/media_file_descriptor.dart';
 import '../../services/file_type_detector.dart';
 import '../../services/media_library_service.dart';
-import '../../services/thumbnail_cache_service.dart';
 import '../icons/chaty_media_icons.dart';
 import '../document/document_reader_screen.dart';
 

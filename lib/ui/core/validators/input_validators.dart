@@ -30,7 +30,7 @@ class ChatyValidators {
     return username.trim().toLowerCase().replaceAll(RegExp(r'^@+'), '');
   }
 
-  static String? validateUsername(String? value) {
+  static String? validateUsername(String? value, {bool forRegistration = true}) {
     if (value == null || value.trim().isEmpty) {
       return 'Username is required';
     }
@@ -45,7 +45,7 @@ class ChatyValidators {
     if (!RegExp(r'^[a-z0-9_]+$').hasMatch(normalized)) {
       return 'Only letters, numbers, and underscores are allowed';
     }
-    if (reservedUsernames.contains(normalized)) {
+    if (forRegistration && reservedUsernames.contains(normalized)) {
       return 'This username is reserved and cannot be registered';
     }
     return null;

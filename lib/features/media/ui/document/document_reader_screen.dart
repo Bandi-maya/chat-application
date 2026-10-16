@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -9,7 +8,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../ui/core/design_system/design_system.dart';
 import '../../models/media_file_descriptor.dart';
 import '../../models/reader_models.dart';
-import '../../services/file_type_detector.dart';
 import '../../services/pdf_processing_service.dart';
 import '../icons/chaty_media_icons.dart';
 import '../video/chaty_video_player_widget.dart';
@@ -31,13 +29,12 @@ class _DocumentReaderScreenState extends State<DocumentReaderScreen> {
   final PdfProcessingService _pdfService = PdfProcessingService();
 
   bool _isSearching = false;
-  String _searchQuery = '';
   int _currentPage = 1;
   int _totalPages = 1;
   String _textContent = '';
   bool _isLoadingContent = true;
   String? _contentError;
-  List<DocumentSearchMatch> _searchMatches = <DocumentSearchMatch>[];
+  final List<DocumentSearchMatch> _searchMatches = <DocumentSearchMatch>[];
   int _currentMatchIndex = 0;
 
   @override
@@ -92,7 +89,6 @@ class _DocumentReaderScreenState extends State<DocumentReaderScreen> {
 
   void _onSearchChanged(String query) {
     setState(() {
-      _searchQuery = query;
       _searchMatches.clear();
       _currentMatchIndex = 0;
 
@@ -326,7 +322,6 @@ class _DocumentReaderScreenState extends State<DocumentReaderScreen> {
                 _isSearching = !_isSearching;
                 if (!_isSearching) {
                   _searchController.clear();
-                  _searchQuery = '';
                   _searchMatches.clear();
                 }
               });

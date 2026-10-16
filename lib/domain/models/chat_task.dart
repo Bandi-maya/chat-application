@@ -162,4 +162,48 @@ class ChatTask {
       activities: activities ?? this.activities,
     );
   }
+
+  factory ChatTask.fromApi(Map<String, dynamic> json) {
+    TaskStatus parseStatus(String? status) {
+      switch (status) {
+        case 'assigned': return TaskStatus.assigned;
+        case 'in_progress': return TaskStatus.inProgress;
+        case 'blocked': return TaskStatus.blocked;
+        case 'completed': return TaskStatus.completed;
+        case 'archived': return TaskStatus.archived;
+        case 'todo':
+        case 'pending':
+        default:
+          return TaskStatus.inbox;
+      }
+    }
+
+    TaskPriority parsePriority(String? priority) {
+      switch (priority) {
+        case 'low': return TaskPriority.low;
+        case 'high': return TaskPriority.high;
+        case 'urgent': return TaskPriority.urgent;
+        case 'medium':
+        default:
+          return TaskPriority.medium;
+      }
+    }
+
+    return ChatTask(
+      id: json['uid'] ?? '',
+      sourceConversationId: json['chat_room_id'] ?? '',
+      sourceMessageId: null,
+      title: json['title'] ?? '',
+      description: json['description'] ?? '',
+      creatorId: json['created_by_id'] ?? '',
+      assigneeIds: List<String>.from(json['assigned_to_ids'] ?? []),
+      status: parseStatus(json['status']),
+      priority: parsePriority(json['priority']),
+      dueAt: json['due_date'] != null ? DateTime.tryParse(json['due_date']) ?? DateTime.now() : DateTime.now(),
+      createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at']) ?? DateTime.now() : DateTime.now(),
+      updatedAt: json['updated_at'] != null ? DateTime.tryParse(json['updated_at']) ?? DateTime.now() : DateTime.now(),
+      checklistItems: const [],
+      activities: const [],
+    );
+  }
 }

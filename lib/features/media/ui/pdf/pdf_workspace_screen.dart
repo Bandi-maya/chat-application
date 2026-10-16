@@ -8,7 +8,6 @@ import 'package:share_plus/share_plus.dart';
 import '../../../../ui/core/design_system/design_system.dart';
 import '../../models/conversion_models.dart';
 import '../../models/media_file_descriptor.dart';
-import '../../services/file_type_detector.dart';
 import '../../services/media_library_service.dart';
 import '../../services/pdf_processing_service.dart';
 import '../document/document_reader_screen.dart';

@@ -158,4 +158,15 @@ class ChatMessage {
       isRevokedBySender: isRevokedBySender ?? this.isRevokedBySender,
     );
   }
+
+  factory ChatMessage.fromApi(Map<String, dynamic> json) {
+    return ChatMessage(
+      id: json['uid'] ?? '',
+      conversationId: json['room_id'] ?? '',
+      senderId: json['sender_id'] ?? '',
+      text: json['content'] ?? '',
+      createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at']) ?? DateTime.now() : DateTime.now(),
+      deliveryState: DeliveryState.delivered,
+    );
+  }
 }

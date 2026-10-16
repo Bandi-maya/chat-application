@@ -87,5 +87,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(demoDocTapped, isTrue);
+    expect(demoAudioTapped, isFalse);
+    expect(demoCallTapped, isFalse);
   });
 }
