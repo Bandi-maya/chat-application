@@ -23,3 +23,4 @@ export 'chaty_haptics.dart';
 export 'chaty_adaptive.dart';
 export 'component_state.dart';
 export '../theme/app_theme.dart';
+export '../../../../core/design_system/spring_interactive_scale.dart';

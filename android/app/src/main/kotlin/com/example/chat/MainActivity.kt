@@ -190,6 +190,8 @@ open class MainActivity : FlutterFragmentActivity() {
                     "overlay" to (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || android.provider.Settings.canDrawOverlays(this)),
                     "notificationAccess" to DynamicIslandNotificationListener.hasNotificationAccess(this),
                     "enabled" to DynamicIslandNotificationListener.isEnabled(this),
+                    "hideSystemNotifications" to DynamicIslandNotificationListener.isHideSystemNotificationsEnabled(this),
+                    "headerEnabled" to DynamicIslandNotificationListener.isHeaderEnabled(this),
                 ))
                 "openOverlaySettings" -> {
                     try {
@@ -222,6 +224,22 @@ open class MainActivity : FlutterFragmentActivity() {
                         IslandOverlay.remove()
                     }
                     result.success(enabled)
+                }
+                "setHideSystemNotifications" -> {
+                    val hide = call.argument<Boolean>("hide") ?: false
+                    DynamicIslandNotificationListener.setHideSystemNotifications(this, hide)
+                    result.success(hide)
+                }
+                "isHideSystemNotificationsEnabled" -> {
+                    result.success(DynamicIslandNotificationListener.isHideSystemNotificationsEnabled(this))
+                }
+                "setHeaderEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    DynamicIslandNotificationListener.setHeaderEnabled(this, enabled)
+                    result.success(enabled)
+                }
+                "isHeaderEnabled" -> {
+                    result.success(DynamicIslandNotificationListener.isHeaderEnabled(this))
                 }
                 "showPreview" -> {
                     val hasOverlay = Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||

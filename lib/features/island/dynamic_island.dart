@@ -4,3 +4,4 @@ export 'widgets/blur_fade_switcher.dart';
 export 'widgets/cutout_anchor_resolver.dart';
 export 'widgets/dynamic_island_views.dart';
 export 'widgets/dynamic_island_overlay_host.dart';
+export 'widgets/bandi_kinetic_crest.dart';

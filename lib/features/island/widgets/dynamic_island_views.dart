@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/dynamic_island_payload.dart';
 import '../controllers/dynamic_island_controller.dart';
+import 'bandi_kinetic_crest.dart';
 
 /* ─── Helpers ──────────────────────────────────────────────────────── */
 String formatTime(int totalSeconds) {
@@ -234,12 +235,59 @@ class CollapsedIslandView extends StatelessWidget {
                   barColor: const Color(0xFF60A5FA),
                   height: 14.0,
                 ),
-              ] else ...[
-                Icon(
-                  p?.iconData ?? Icons.notifications_active_rounded,
-                  color: p?.accentColor ?? Colors.white,
+              ] else if (p?.type == IslandPayloadType.clipboardIntent) ...[
+                const BandiKineticCrest(
+                  size: 18,
+                  primaryColor: Color(0xFFF59E0B),
+                  accentColor: Color(0xFFFBBF24),
+                ),
+                const SizedBox(width: 7),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 86),
+                  child: Text(
+                    p?.clipboardActionLabel ?? p?.title ?? 'Clipboard',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFFFBBF24),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ] else if (p?.type == IslandPayloadType.dragAndGoTarget) ...[
+                const Icon(
+                  Icons.file_download_rounded,
+                  color: Color(0xFF00F0FF),
                   size: 16,
                 ),
+                const SizedBox(width: 7),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 86),
+                  child: const Text(
+                    'Drop to share',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Color(0xFF00F0FF),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ] else ...[
+                if (p?.isBandiIcon == true)
+                  BandiKineticCrest(
+                    size: 18,
+                    primaryColor: p?.accentColor ?? const Color(0xFF60A5FA),
+                    accentColor: const Color(0xFF38BDF8),
+                  )
+                else
+                  Icon(
+                    p?.iconData ?? Icons.notifications_active_rounded,
+                    color: p?.accentColor ?? Colors.white,
+                    size: 16,
+                  ),
                 const SizedBox(width: 7),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 82),
@@ -1058,6 +1106,301 @@ class ExpandedNotificationsListView extends StatelessWidget {
                 ),
               );
             }),
+        ],
+      ),
+    );
+  }
+}
+
+/* ─── Multi-Task Carousel Indicator (OriginOS Feature) ─────────────── */
+class MultiTaskCarouselIndicator extends StatelessWidget {
+  final DynamicIslandController controller;
+
+  const MultiTaskCarouselIndicator({
+    super.key,
+    required this.controller,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final count = controller.queue.length;
+    if (count <= 1) return const SizedBox.shrink();
+
+    final currentIndex = controller.carouselIndex.clamp(0, count - 1);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8.0, bottom: 2.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              controller.prevCarouselItem();
+            },
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              child: Icon(
+                Icons.chevron_left_rounded,
+                color: Colors.white.withValues(alpha: 0.4),
+                size: 16,
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(count, (index) {
+              final isCurrent = index == currentIndex;
+              return GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  controller.setCarouselIndex(index);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                  width: isCurrent ? 14.0 : 5.0,
+                  height: 5.0,
+                  decoration: BoxDecoration(
+                    color: isCurrent
+                        ? const Color(0xFF60A5FA)
+                        : Colors.white.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(2.5),
+                  ),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              controller.nextCarouselItem();
+            },
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              child: Icon(
+                Icons.chevron_right_rounded,
+                color: Colors.white.withValues(alpha: 0.4),
+                size: 16,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/* ─── Expanded Smart Clipboard Intent View (OriginOS Atomic Feature) ─ */
+class ExpandedClipboardIntentView extends StatelessWidget {
+  final DynamicIslandPayload payload;
+  final DynamicIslandController controller;
+
+  const ExpandedClipboardIntentView({
+    super.key,
+    required this.payload,
+    required this.controller,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const BandiKineticCrest(
+                size: 32,
+                primaryColor: Color(0xFFF59E0B),
+                accentColor: Color(0xFFFBBF24),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      payload.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Smart Context Detected',
+                      style: TextStyle(
+                        color: const Color(0xFFFBBF24).withValues(alpha: 0.8),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 18),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  controller.dismissActive();
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.08),
+              ),
+            ),
+            child: Text(
+              payload.clipboardContent ?? payload.message,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                    payload.onClipboardAction?.call();
+                    controller.dismissActive();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF59E0B),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        payload.clipboardActionLabel ?? 'Execute Action',
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (controller.queue.length > 1)
+            MultiTaskCarouselIndicator(controller: controller),
+        ],
+      ),
+    );
+  }
+}
+
+/* ─── Expanded Drag & Go Target View (OriginOS Atomic Feature) ─────── */
+class ExpandedDragTargetView extends StatelessWidget {
+  final DynamicIslandPayload payload;
+  final DynamicIslandController controller;
+
+  const ExpandedDragTargetView({
+    super.key,
+    required this.payload,
+    required this.controller,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF00F0FF).withValues(alpha: 0.15),
+                  border: Border.all(
+                    color: const Color(0xFF00F0FF).withValues(alpha: 0.4),
+                    width: 1.5,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.file_download_rounded,
+                  color: Color(0xFF00F0FF),
+                  size: 24,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            payload.title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            payload.message,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.65),
+              fontSize: 11,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Center(
+            child: OutlinedButton(
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                controller.setDragTargetActive(false);
+                controller.collapse();
+              },
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Dismiss', style: TextStyle(color: Colors.white70, fontSize: 11)),
+            ),
+          ),
         ],
       ),
     );

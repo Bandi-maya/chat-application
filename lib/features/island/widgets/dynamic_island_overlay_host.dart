@@ -202,9 +202,19 @@ class _DynamicIslandOverlayHostState extends State<DynamicIslandOverlayHost>
                         onHorizontalDragEnd: (details) {
                           if (details.primaryVelocity != null &&
                               details.primaryVelocity!.abs() > 140) {
-                            // Swiped left/right -> dismiss active item
-                            HapticFeedback.lightImpact();
-                            widget.controller.dismissActive();
+                            if (mode == IslandMode.expanded && widget.controller.queue.length > 1) {
+                              // In expanded mode: horizontal swipe navigates Multi-Task Carousel (OriginOS feature)
+                              HapticFeedback.lightImpact();
+                              if (details.primaryVelocity! < 0) {
+                                widget.controller.nextCarouselItem();
+                              } else {
+                                widget.controller.prevCarouselItem();
+                              }
+                            } else {
+                              // Swiped left/right in compact -> dismiss active item
+                              HapticFeedback.lightImpact();
+                              widget.controller.dismissActive();
+                            }
                           }
                         },
                         child: ClipRRect(
@@ -222,8 +232,10 @@ class _DynamicIslandOverlayHostState extends State<DynamicIslandOverlayHost>
                                 color: const Color(0xF2000000), // black/95
                                 borderRadius: BorderRadius.circular(radius),
                                 border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.08),
-                                  width: 1.0,
+                                  color: widget.controller.isDragTargetActive
+                                      ? const Color(0xFF00F0FF)
+                                      : Colors.white.withValues(alpha: 0.08),
+                                  width: widget.controller.isDragTargetActive ? 2.0 : 1.0,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
@@ -343,6 +355,18 @@ class _DynamicIslandOverlayHostState extends State<DynamicIslandOverlayHost>
         case IslandPayloadType.ongoingCall:
           return ExpandedCallView(
             key: ValueKey('expanded-call-${payload.id}'),
+            payload: payload,
+            controller: widget.controller,
+          );
+        case IslandPayloadType.clipboardIntent:
+          return ExpandedClipboardIntentView(
+            key: ValueKey('expanded-clipboard-${payload.id}'),
+            payload: payload,
+            controller: widget.controller,
+          );
+        case IslandPayloadType.dragAndGoTarget:
+          return ExpandedDragTargetView(
+            key: ValueKey('expanded-drag-${payload.id}'),
             payload: payload,
             controller: widget.controller,
           );

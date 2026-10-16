@@ -1,3 +1,7 @@
+import '../../../core/audio/audio_capability_service.dart';
+import '../../../core/audio/audio_policy_coordinator.dart';
+import '../../../core/audio/audio_settings_controller.dart';
+import '../../../core/audio/audio_settings_screen.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -199,6 +203,24 @@ class _CallSettingsScreenState extends State<CallSettingsScreen> {
             ChatySettingsSection(
               title: 'Audio & Connectivity',
               children: [
+                ChatySettingsTile(
+                  icon: Icons.speaker_group_rounded,
+                  iconColor: colors.accent,
+                  title: 'Dual-Speaker & Output Routing',
+                  subtitle: 'Configure receiver, bottom speaker, and capability routing',
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => AudioSettingsScreen(
+                          settingsController: locator<AudioSettingsController>(),
+                          capabilityService: locator<AudioCapabilityService>(),
+                          coordinator: locator<AudioPolicyCoordinator>(),
+                        ),
+                      ),
+                    );
+                  },
+                ),
                 ChatySwitchTile(
                   icon: Icons.speaker_phone_rounded,
                   iconColor: colors.success,

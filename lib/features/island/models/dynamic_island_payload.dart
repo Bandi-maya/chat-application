@@ -18,6 +18,8 @@ enum IslandPayloadType {
   systemAlert,
   contactOnline,
   ghostModeStatus,
+  clipboardIntent,
+  dragAndGoTarget,
 }
 
 /// Action item displayed within the expanded Island view.
@@ -68,6 +70,12 @@ class DynamicIslandPayload {
   final String? mediaAlbum;
   final String? audioSpeed;
 
+  // OriginOS / Hybrid capabilities
+  final String? clipboardContent;
+  final String? clipboardActionLabel;
+  final VoidCallback? onClipboardAction;
+  final bool isBandiIcon;
+
   // Interactive capabilities
   final bool canQuickReply;
   final List<DynamicIslandAction> actions;
@@ -102,6 +110,10 @@ class DynamicIslandPayload {
     this.mediaArtist,
     this.mediaAlbum,
     this.audioSpeed = '1.0x',
+    this.clipboardContent,
+    this.clipboardActionLabel,
+    this.onClipboardAction,
+    this.isBandiIcon = false,
     this.canQuickReply = false,
     this.actions = const [],
     this.onQuickReply,
@@ -117,18 +129,21 @@ class DynamicIslandPayload {
   /// Numeric priority resolution (lower value = higher priority).
   ///
   /// Priority hierarchy:
-  /// 1: Calls (incomingCall / ongoingCall)
-  /// 2: Active Media / Voice playback
+  /// 0: Calls (incomingCall) & Drag target (dragAndGoTarget)
+  /// 1: Ongoing call
+  /// 2: Active Media / Voice playback / Clipboard Intent
   /// 3: Chat messages
   /// 4: System alerts, ghost mode, presence
   int get priority {
     switch (type) {
       case IslandPayloadType.incomingCall:
+      case IslandPayloadType.dragAndGoTarget:
         return 0;
       case IslandPayloadType.ongoingCall:
         return 1;
       case IslandPayloadType.voiceNotePlayback:
       case IslandPayloadType.media:
+      case IslandPayloadType.clipboardIntent:
         return 2;
       case IslandPayloadType.chatMessage:
         return 3;
@@ -144,6 +159,7 @@ class DynamicIslandPayload {
   bool get isOngoingActivity {
     return type == IslandPayloadType.ongoingCall ||
         type == IslandPayloadType.incomingCall ||
+        type == IslandPayloadType.dragAndGoTarget ||
         (type == IslandPayloadType.media && isPlaying) ||
         (type == IslandPayloadType.voiceNotePlayback && isPlaying);
   }
@@ -170,6 +186,10 @@ class DynamicIslandPayload {
     String? mediaArtist,
     String? mediaAlbum,
     String? audioSpeed,
+    String? clipboardContent,
+    String? clipboardActionLabel,
+    VoidCallback? onClipboardAction,
+    bool? isBandiIcon,
     bool? canQuickReply,
     List<DynamicIslandAction>? actions,
     void Function(String replyText)? onQuickReply,
@@ -203,6 +223,10 @@ class DynamicIslandPayload {
       mediaArtist: mediaArtist ?? this.mediaArtist,
       mediaAlbum: mediaAlbum ?? this.mediaAlbum,
       audioSpeed: audioSpeed ?? this.audioSpeed,
+      clipboardContent: clipboardContent ?? this.clipboardContent,
+      clipboardActionLabel: clipboardActionLabel ?? this.clipboardActionLabel,
+      onClipboardAction: onClipboardAction ?? this.onClipboardAction,
+      isBandiIcon: isBandiIcon ?? this.isBandiIcon,
       canQuickReply: canQuickReply ?? this.canQuickReply,
       actions: actions ?? this.actions,
       onQuickReply: onQuickReply ?? this.onQuickReply,
