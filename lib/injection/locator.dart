@@ -1,3 +1,4 @@
+﻿import 'package:chat/data/services/api_backend_service.dart';
 import 'package:chat/features/media/services/media_player_coordinator.dart';
 import 'package:chat/features/media/services/media_library_service.dart';
 import 'package:chat/features/media/services/pdf_processing_service.dart';
@@ -52,6 +53,7 @@ void setupLocator() {
     () => ConnectionHealthService(),
   );
   locator.registerLazySingleton<MlsE2eeService>(() => MlsE2eeService());
+  locator.registerLazySingleton<ApiBackendService>(() => ApiBackendService());
   locator.registerLazySingleton<ChatyBackendService>(
     () => ChatyBackendService(),
   );

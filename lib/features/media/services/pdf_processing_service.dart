@@ -1,13 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:uuid/uuid.dart';
 import '../models/conversion_models.dart';
 import 'file_sanitization_service.dart';
 
 class PdfProcessingService {
   PdfProcessingService();
-  final Uuid _uuid = const Uuid();
 
   /// Converts multiple image files into a single, clean, valid PDF byte stream.
   Future<ConversionResult> convertImagesToPdf(ConversionRequest request) async {

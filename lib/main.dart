@@ -1,3 +1,4 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -113,6 +114,11 @@ Future<void> main() async {
     publishableKey: _supabasePublishableKey,
     debug: !kReleaseMode,
   );
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (e) {
+    debugPrint('Dotenv skipped: ');
+  }
   setupLocator();
   // Only work that shapes the very first frame blocks launch. The shell must
   // paint from local state immediately; platform services catch up right

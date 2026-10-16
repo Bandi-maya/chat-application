@@ -35,38 +35,7 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _handleDemoLogin() async {
-    if (_isLoading) return;
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final user = await _loginService.loginAsDemo();
-      await LocalPreferencesStorage.setStoredUserId(user.id);
-
-      if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const MainNavigationShell()),
-        (route) => false,
-      );
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = 'Failed to start demo session: $error';
-        _isLoading = false;
-      });
-    }
-  }
-
   Future<void> _handleLogin() async {
-    final identifier = _identifierController.text.trim();
-    if (identifier.toLowerCase().startsWith('demo')) {
-      await _handleDemoLogin();
-      return;
-    }
-
     if (!_formKey.currentState!.validate() || _isLoading) return;
     setState(() {
       _isLoading = true;
@@ -75,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final user = await _loginService.login(
-        identifier: identifier,
+        identifier: _identifierController.text.trim(),
         password: _passwordController.text,
       );
       await LocalPreferencesStorage.setStoredUserId(user.id);
@@ -110,17 +79,8 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _validateIdentifier(String? raw) {
     final value = raw?.trim() ?? '';
     if (value.isEmpty) return 'Enter your email or username';
-    if (value.toLowerCase().startsWith('demo')) return null;
     if (value.contains('@')) return ChatyValidators.validateEmail(value);
-    return ChatyValidators.validateUsername(value);
-  }
-
-  void _fillDemoCredentials() {
-    setState(() {
-      _identifierController.text = 'demo@chaty.app';
-      _passwordController.text = 'demo123456';
-      _errorMessage = null;
-    });
+    return ChatyValidators.validateUsername(value, forRegistration: false);
   }
 
   @override
@@ -130,29 +90,24 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: theme.backgroundColor,
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-              child: const AuthBackButton(),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24.0,
+              vertical: 20.0,
             ),
-            Expanded(
-              child: Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24.0,
-                    vertical: 12.0,
-                  ),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 440),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Welcome Back!',
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const AuthBackButton(),
+                    const SizedBox(height: 28),
+                    Text(
+                      'Welcome Back!',
                       style: TextStyle(
                         color: theme.primaryTextColor,
                         fontSize: 28,
@@ -200,9 +155,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       validator: (value) {
-                        if (_identifierController.text.trim().toLowerCase().startsWith('demo')) {
-                          return null;
-                        }
                         if (value == null || value.isEmpty) {
                           return 'Please enter your password';
                         }
@@ -212,32 +164,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 10),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton.icon(
-                        onPressed: _fillDemoCredentials,
-                        icon: Icon(
-                          Icons.auto_fix_high_rounded,
-                          size: 15,
-                          color: theme.accentColor,
-                        ),
-                        label: Text(
-                          'Fill demo credentials',
-                          style: TextStyle(
-                            color: theme.accentColor,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
                     if (_errorMessage != null)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 16.0),
@@ -253,16 +180,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     AuthPrimaryButton(
                       text: 'Log In',
                       onPressed: _handleLogin,
-                      isLoading: _isLoading,
-                      theme: theme,
-                    ),
-                    const SizedBox(height: 16),
-                    AuthOrDivider(theme: theme),
-                    const SizedBox(height: 16),
-                    AuthDemoButton(
-                      text: 'Demo Login',
-                      subtitle: 'Bypass login with interactive mock chats & tasks',
-                      onPressed: _handleDemoLogin,
                       isLoading: _isLoading,
                       theme: theme,
                     ),
@@ -286,7 +203,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 24),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -324,9 +241,6 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
-    ],
-  ),
-),
-);
+    );
   }
 }

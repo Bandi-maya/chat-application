@@ -1,3 +1,4 @@
+﻿import '../services/api_backend_service.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -31,6 +32,9 @@ class ChatyDataStore extends ChangeNotifier {
   Timer? _typingExpiryTimer;
 
   ChatyDataStore() {
+    if (locator.isRegistered<ApiBackendService>()) {
+      locator<ApiBackendService>().addListener(_onBackendChanged);
+    }
     _backend.addListener(_onBackendChanged);
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
       state,
@@ -107,6 +111,9 @@ class ChatyDataStore extends ChangeNotifier {
   @override
   void dispose() {
     _backend.removeListener(_onBackendChanged);
+    if (locator.isRegistered<ApiBackendService>()) {
+      locator<ApiBackendService>().removeListener(_onBackendChanged);
+    }
     _typingExpiryTimer?.cancel();
     unawaited(_typingSubscription?.cancel());
     unawaited(_authSubscription?.cancel());
@@ -156,6 +163,10 @@ class ChatyDataStore extends ChangeNotifier {
   }
 
   UserProfile get currentUser {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated && api.currentUser != null) return api.currentUser!;
+    }
     final user = currentUserOrNull;
     if (user != null) return user;
     // Return a safe placeholder profile instead of throwing during transient unmount/auth transitions
@@ -175,11 +186,23 @@ class ChatyDataStore extends ChangeNotifier {
     );
   }
 
-  bool get isAuthenticated => _backend.isAuthenticated;
+  bool get isAuthenticated => _backend.isAuthenticated || (locator.isRegistered<ApiBackendService>() && locator<ApiBackendService>().isAuthenticated);
   List<UserProfile> get contacts =>
       _backend.allUsers.where((user) => user.id != currentUser.id).toList();
-  List<Conversation> get conversations => _backend.conversations;
-  List<ChatTask> get tasks => _backend.tasks;
+  List<Conversation> get conversations {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated) return api.conversations;
+    }
+    return _backend.conversations;
+  }
+  List<ChatTask> get tasks {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated) return api.tasks;
+    }
+    return _backend.tasks;
+  }
   List<CallRecord> get calls => _backend.calls;
   List<UpdateStory> get stories => _backend.stories;
   List<LinkedDevice> get linkedDevices => _backend.currentUserDevices;
@@ -248,6 +271,13 @@ class ChatyDataStore extends ChangeNotifier {
     String? linkedTaskId,
     Map<String, dynamic>? extraMetadata,
   }) async {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated) {
+        api.sendMessage(conversationId, text);
+        return;
+      }
+    }
     await _backend.sendMessage(
       conversationId: conversationId,
       text: text,
@@ -484,16 +514,30 @@ class ChatyDataStore extends ChangeNotifier {
     required TaskPriority priority,
     required DateTime dueAt,
     List<String> labels = const <String>[],
-  }) => _backend.createTask(
-    sourceConversationId: sourceConversationId,
-    sourceMessageId: sourceMessageId,
-    title: title,
-    description: description,
-    assigneeIds: assigneeIds,
-    priority: priority,
-    dueAt: dueAt,
-    labels: labels,
-  );
+  }) {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated) {
+        return api.createTask(
+          title: title,
+          description: description,
+          assigneeIds: assigneeIds,
+          priority: priority.name,
+          dueAt: dueAt,
+        );
+      }
+    }
+    return _backend.createTask(
+      sourceConversationId: sourceConversationId,
+      sourceMessageId: sourceMessageId,
+      title: title,
+      description: description,
+      assigneeIds: assigneeIds,
+      priority: priority,
+      dueAt: dueAt,
+      labels: labels,
+    );
+  }
 
   Future<void> updateTaskAsync({
     required String taskId,
@@ -503,20 +547,50 @@ class ChatyDataStore extends ChangeNotifier {
     required TaskPriority priority,
     required DateTime dueAt,
     List<String> labels = const <String>[],
-  }) => _backend.updateTask(
-    taskId: taskId,
-    title: title,
-    description: description,
-    assigneeIds: assigneeIds,
-    priority: priority,
-    dueAt: dueAt,
-    labels: labels,
-  );
+  }) {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated) {
+        return api.updateTask(
+          taskId: taskId,
+          title: title,
+          description: description,
+          assigneeIds: assigneeIds,
+          priority: priority.name,
+          dueAt: dueAt,
+        );
+      }
+    }
+    return _backend.updateTask(
+      taskId: taskId,
+      title: title,
+      description: description,
+      assigneeIds: assigneeIds,
+      priority: priority,
+      dueAt: dueAt,
+      labels: labels,
+    );
+  }
 
-  Future<void> updateTaskStatus(String taskId, TaskStatus status) =>
-      _backend.updateTaskStatus(taskId, status);
+  Future<void> updateTaskStatus(String taskId, TaskStatus status) {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated) {
+        return api.updateTaskStatus(taskId, status);
+      }
+    }
+    return _backend.updateTaskStatus(taskId, status);
+  }
 
-  Future<void> deleteTask(String taskId) => _backend.deleteTask(taskId);
+  Future<void> deleteTask(String taskId) {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated) {
+        return api.deleteTask(taskId);
+      }
+    }
+    return _backend.deleteTask(taskId);
+  }
 
   Future<void> addStory(String content) async {
     final statusService = StatusService(

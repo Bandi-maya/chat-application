@@ -8,7 +8,6 @@ import '../../models/media_file_descriptor.dart';
 import '../../services/file_sanitization_service.dart';
 import '../../services/media_library_service.dart';
 import '../../services/media_player_coordinator.dart';
-import '../audio/chaty_audio_player_screen.dart';
 import '../audio/chaty_mini_player.dart';
 import '../document/document_reader_screen.dart';
 import '../icons/chaty_media_icons.dart';

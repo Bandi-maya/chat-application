@@ -61,4 +61,20 @@ node_modules/
 artifacts/
 qa/playwright/reports/
 *.md 
-*.csv 
+*.csv
+# Environment and sensitive secrets
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+*.env
+*.key
+*.pem
+*.keystore
+*.jks
+credentials.json
+google-services.json
+GoogleService-Info.plist

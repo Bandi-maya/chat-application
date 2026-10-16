@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import '../../../core/audio/audio_policy_coordinator.dart';
-import '../../../core/audio/audio_types.dart';
 import '../models/media_file_descriptor.dart';
 import '../models/media_playback_state.dart';
 
@@ -18,9 +17,8 @@ class MediaPlayerCoordinator extends ChangeNotifier {
 
   MediaPlayerCoordinator({
     AudioPlayer? audioPlayer,
-    AudioPolicyCoordinator? policyCoordinator,
-  }) : _audioPlayer = audioPlayer ?? AudioPlayer(),
-       _policyCoordinator = policyCoordinator {
+    this._policyCoordinator,
+  }) : _audioPlayer = audioPlayer ?? AudioPlayer() {
     _initListeners();
   }
 
@@ -64,8 +62,9 @@ class MediaPlayerCoordinator extends ChangeNotifier {
   Future<void> playTrack(MediaFileDescriptor item, {List<MediaFileDescriptor>? queue}) async {
     try {
       // 1. Check with policy coordinator before playing
-      if (_policyCoordinator != null) {
-        final acquired = await _policyCoordinator!.startMediaSession();
+      final coordinator = _policyCoordinator;
+      if (coordinator != null) {
+        final acquired = await coordinator.startMediaSession();
         if (!acquired) {
           _state = _state.copyWith(
             status: PlaybackStatus.error,
@@ -188,8 +187,9 @@ class MediaPlayerCoordinator extends ChangeNotifier {
       status: PlaybackStatus.stopped,
       position: Duration.zero,
     );
-    if (_policyCoordinator != null) {
-      await _policyCoordinator!.stopMediaSession();
+    final coordinator = _policyCoordinator;
+    if (coordinator != null) {
+      await coordinator.stopMediaSession();
     }
     notifyListeners();
   }

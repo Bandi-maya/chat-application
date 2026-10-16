@@ -1,6 +1,5 @@
 import '../../chats/locked_chats_screen.dart';
 import '../../../data/repositories/chaty_data_store.dart';
-import '../../../core/design_system/spring_interactive_scale.dart';
 import '../../../data/services/local_lock_service.dart';
 import '../security/app_lock_overlay.dart';
 import '../security/lock_credential_setup_modal.dart';
