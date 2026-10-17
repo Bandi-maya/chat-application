@@ -29,6 +29,8 @@ enum ChatyGlyph {
   calls,
   groups,
   tasks,
+  ghostActive,
+  ghostInactive,
 }
 
 const Map<ChatyGlyph, String> _chatyGlyphSvg = <ChatyGlyph, String>{
@@ -166,6 +168,17 @@ const Map<ChatyGlyph, String> _chatyGlyphSvg = <ChatyGlyph, String>{
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
   <rect x="4" y="3" width="16" height="18" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
   <path d="M 6 7 L 7 8 L 8.7 6 M 11 7 L 17.5 7 M 6 12 L 7 13 L 8.7 11 M 11 12 L 17.5 12 M 6 17 L 7 18 L 8.7 16 M 11 17 L 17.5 17" fill="none" stroke="currentColor" stroke-width="1.6"/>
+</svg>''',
+  ChatyGlyph.ghostActive: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <path d="M 12 3 C 7.5 3 5 6.5 5 11 L 5 20 L 7.5 18 L 10 20 L 12 18 L 14 20 L 16.5 18 L 19 20 L 19 11 C 19 6.5 16.5 3 12 3 Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
+  <circle cx="9.5" cy="10" r="1.5" fill="currentColor" stroke="none"/>
+  <circle cx="14.5" cy="10" r="1.5" fill="currentColor" stroke="none"/>
+</svg>''',
+  ChatyGlyph.ghostInactive: r'''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <path d="M 12 4.5 C 7.5 4.5 4 8 2 12 C 4 16 7.5 19.5 12 19.5 C 16.5 19.5 20 16 22 12 C 20 8 16.5 4.5 12 4.5 Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
+  <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/>
 </svg>''',
 };
 

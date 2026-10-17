@@ -2267,57 +2267,12 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         ),
       );
     }
-        quickActions.add(
-      _HomeSpeedDialAction(
-        id: 'theme-studio',
-        label: 'Theme Studio',
-        icon: Icons.palette_rounded,
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => ThemeStudioScreen(
-                preferencesController: prefsController,
-                themeController: locator<ThemeController>(),
-              ),
-            ),
-          );
-        },
-      ),
-    );
     quickActions.add(
       _HomeSpeedDialAction(
-        id: 'direct-number',
-        label: 'Message Unsaved Number',
-        icon: Icons.dialpad_rounded,
-        onPressed: () => _showDirectNumberDialog(context),
-      ),
-    );
-    quickActions.add(
-      _HomeSpeedDialAction(
-        id: 'scheduled-messages',
-        label: 'Message Scheduler',
-        icon: Icons.schedule_send_rounded,
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => const ScheduledMessagesScreen(),
-            ),
-          );
-        },
-      ),
-    );
-    quickActions.add(
-      _HomeSpeedDialAction(
-        id: 'auto-reply-rules',
-        label: 'Auto-Reply Rules',
-        icon: Icons.reply_all_rounded,
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => const AutoReplyRulesScreen(),
-            ),
-          );
-        },
+        id: 'more-tools',
+        label: 'More Actions & Tools',
+        icon: Icons.grid_view_rounded,
+        onPressed: () => _showFabSecondaryActionsSheet(context, prefsController),
       ),
     );
     if (quickActions.isEmpty) {
@@ -2331,6 +2286,107 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       surfaceColor: colors.surfaceElevated,
       textColor: colors.foreground,
       showMetaAiIcon: homePrefs.showMetaAiIcon,
+    );
+  }
+
+  void _showFabSecondaryActionsSheet(
+    BuildContext context,
+    ChatyPreferencesController prefsController,
+  ) {
+    final colors = context.colors;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: colors.surfaceElevated,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(sheetContext).size.height * 0.75,
+          ),
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.auto_awesome_rounded, color: colors.primary, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Quick Actions & Tools',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: colors.foreground,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: Icon(Icons.palette_rounded, color: colors.primary),
+                  title: const Text('Theme Studio'),
+                  subtitle: const Text('Live colors, gradients & presets'),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => ThemeStudioScreen(
+                          preferencesController: prefsController,
+                          themeController: locator<ThemeController>(),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.dialpad_rounded, color: colors.accent),
+                  title: const Text('Message Unsaved Number'),
+                  subtitle: const Text('Direct chat without saving contact'),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    _showDirectNumberDialog(context);
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.schedule_send_rounded, color: colors.info),
+                  title: const Text('Message Scheduler'),
+                  subtitle: const Text('Plan scheduled message deliveries'),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const ScheduledMessagesScreen(),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.reply_all_rounded, color: colors.success),
+                  title: const Text('Auto-Reply Rules'),
+                  subtitle: const Text('Keyword automated response bot'),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const AutoReplyRulesScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 

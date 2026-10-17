@@ -17,12 +17,16 @@ class NewChatScreen extends StatefulWidget {
   /// Opens directly in member-selection mode when launched from the Groups FAB.
   final bool startInGroupMode;
 
+  /// Opens directly in broadcast list mode.
+  final bool startInBroadcastMode;
+
   const NewChatScreen({
     super.key,
     required this.theme,
     required this.dataStore,
     this.preferencesController,
     this.startInGroupMode = false,
+    this.startInBroadcastMode = false,
   });
 
   @override
@@ -35,6 +39,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
   final TextEditingController _groupNameCtrl = TextEditingController();
   List<UserProfile> _results = <UserProfile>[];
   late bool _isCreatingGroup;
+  bool _isBroadcast = false;
   bool _isLoading = false;
   Timer? _debounce;
   int _epoch = 0;
@@ -42,7 +47,8 @@ class _NewChatScreenState extends State<NewChatScreen> {
   @override
   void initState() {
     super.initState();
-    _isCreatingGroup = widget.startInGroupMode;
+    _isCreatingGroup = widget.startInGroupMode || widget.startInBroadcastMode;
+    _isBroadcast = widget.startInBroadcastMode;
     _results = widget.dataStore.contacts;
   }
 
@@ -87,12 +93,18 @@ class _NewChatScreenState extends State<NewChatScreen> {
   }
 
   Future<void> _finishGroupCreation() async {
-    final title = _groupNameCtrl.text.trim();
+    var title = _groupNameCtrl.text.trim();
+    if (title.isEmpty && _isBroadcast) {
+      title = 'Broadcast (${_selectedGroupMembers.length})';
+    }
     if (title.isEmpty || _selectedGroupMembers.isEmpty || _isLoading) return;
     setState(() => _isLoading = true);
     try {
+      final finalTitle = _isBroadcast && !title.toLowerCase().startsWith('broadcast')
+          ? 'Broadcast: $title'
+          : title;
       final conversation = await widget.dataStore.createGroupAsync(
-        title: title,
+        title: finalTitle,
         memberIds: _selectedGroupMembers.toList(),
       );
       if (!mounted) return;
@@ -156,13 +168,16 @@ class _NewChatScreenState extends State<NewChatScreen> {
     return ChatyScaffold(
       appBar: ChatyAppBar(
         title: _isCreatingGroup
-            ? 'New Group (${_selectedGroupMembers.length})'
+            ? (_isBroadcast
+                ? 'New Broadcast (${_selectedGroupMembers.length})'
+                : 'New Group (${_selectedGroupMembers.length})')
             : 'New Conversation',
         leading: ChatyBackButton(
           onPressed: () {
             if (_isCreatingGroup) {
               setState(() {
                 _isCreatingGroup = false;
+                _isBroadcast = false;
                 _selectedGroupMembers.clear();
               });
             } else {
@@ -215,10 +230,14 @@ class _NewChatScreenState extends State<NewChatScreen> {
                 if (_isCreatingGroup) ...[
                   ChatyInput(
                     controller: _groupNameCtrl,
-                    hintText: 'Enter group subject...',
+                    hintText: _isBroadcast
+                        ? 'Enter broadcast list name...'
+                        : 'Enter group subject...',
                     prefixIcon: Icon(
-                      Icons.group_work_rounded,
-                      color: colors.primary,
+                      _isBroadcast
+                          ? Icons.cast_rounded
+                          : Icons.group_work_rounded,
+                      color: _isBroadcast ? colors.info : colors.primary,
                       size: 20,
                     ),
                   ),
@@ -256,7 +275,10 @@ class _NewChatScreenState extends State<NewChatScreen> {
               ),
               child: ChatyCard(
                 padding: EdgeInsets.zero,
-                onTap: () => setState(() => _isCreatingGroup = true),
+                onTap: () => setState(() {
+                  _isCreatingGroup = true;
+                  _isBroadcast = false;
+                }),
                 child: ChatyListTile(
                   leading: Container(
                     padding: const EdgeInsets.all(ChatySpacing.sm),
@@ -280,6 +302,49 @@ class _NewChatScreenState extends State<NewChatScreen> {
                   ),
                   subtitle: Text(
                     'Start an encrypted group with multiple members',
+                    style: ChatyTypography.caption(colors.foregroundSecondary),
+                  ),
+                  trailing: Icon(
+                    Icons.chevron_right_rounded,
+                    color: colors.foregroundTertiary,
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: ChatySpacing.base,
+                vertical: ChatySpacing.xs,
+              ),
+              child: ChatyCard(
+                padding: EdgeInsets.zero,
+                onTap: () => setState(() {
+                  _isCreatingGroup = true;
+                  _isBroadcast = true;
+                }),
+                child: ChatyListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(ChatySpacing.sm),
+                    decoration: BoxDecoration(
+                      color: colors.info.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.cast_rounded,
+                      color: colors.info,
+                      size: 20,
+                    ),
+                  ),
+                  title: Text(
+                    'New Broadcast List',
+                    style: TextStyle(
+                      color: colors.foreground,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Send broadcast messages to multiple contacts at once',
                     style: ChatyTypography.caption(colors.foregroundSecondary),
                   ),
                   trailing: Icon(

@@ -92,9 +92,7 @@ class DynamicIslandController extends ChangeNotifier {
     _sortQueue();
 
     // Determine state transition
-    if (_queue.length >= 2 &&
-        _queue[0].isOngoingActivity &&
-        !_queue[1].isOngoingActivity) {
+    if (_queue.length >= 2 && _queue[0].isOngoingActivity) {
       _mode = IslandMode.split;
     } else if (autoExpand) {
       _mode = IslandMode.expanded;
@@ -110,6 +108,13 @@ class DynamicIslandController extends ChangeNotifier {
   /// Removes a payload by its ID.
   void removePayload(String id) {
     _queue.removeWhere((p) => p.id == id);
+    _reconcileStateAfterRemoval();
+    notifyListeners();
+  }
+
+  /// Removes all payloads matching a predicate.
+  void removePayloadsWhere(bool Function(DynamicIslandPayload payload) test) {
+    _queue.removeWhere(test);
     _reconcileStateAfterRemoval();
     notifyListeners();
   }
@@ -146,9 +151,7 @@ class DynamicIslandController extends ChangeNotifier {
   void collapse() {
     if (_queue.isEmpty) {
       _mode = IslandMode.idle;
-    } else if (_queue.length >= 2 &&
-        _queue[0].isOngoingActivity &&
-        !_queue[1].isOngoingActivity) {
+    } else if (_queue.length >= 2 && _queue[0].isOngoingActivity) {
       _mode = IslandMode.split;
     } else {
       _mode = IslandMode.compact;
@@ -298,9 +301,7 @@ class DynamicIslandController extends ChangeNotifier {
     _cancelTimers();
     if (_queue.isEmpty) {
       _mode = IslandMode.idle;
-    } else if (_queue.length >= 2 &&
-        _queue[0].isOngoingActivity &&
-        !_queue[1].isOngoingActivity) {
+    } else if (_queue.length >= 2 && _queue[0].isOngoingActivity) {
       _mode = IslandMode.split;
     } else if (_queue.first.isOngoingActivity) {
       _mode = IslandMode.compact;

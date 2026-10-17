@@ -14,6 +14,7 @@ import '../../data/services/contact_relationship_service.dart';
 import '../../data/services/call_signaling_service.dart';
 import '../../data/services/rich_chat_realtime_service.dart';
 import '../../domain/models/conversation.dart';
+import '../../domain/models/user_profile.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/home_preset_normalizer.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
@@ -395,13 +396,49 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
           child: const Text('Cancel'),
         ),
         primaryAction: FilledButton(
-          onPressed: () {
+          onPressed: () async {
             final number = textCtrl.text.trim();
             Navigator.pop(context);
-            if (number.isNotEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Starting chat with $number...')),
-              );
+            if (number.isEmpty) return;
+            try {
+              final existing = widget.dataStore.contacts.where(
+                (c) => c.phone.trim() == number || c.username.trim() == number,
+              ).firstOrNull;
+              final target = existing ??
+                  UserProfile(
+                    id: number.replaceAll(RegExp(r'\D'), '').isNotEmpty
+                        ? 'user_${number.replaceAll(RegExp(r'\D'), '')}'
+                        : number,
+                    displayName: number,
+                    username: number,
+                    avatarInitials: number.isNotEmpty
+                        ? number.substring(0, 1).toUpperCase()
+                        : '?',
+                    avatarColorHex: '#25D366',
+                    about: 'Chaty User',
+                    lastSeenAt: DateTime.now(),
+                    phone: number,
+                  );
+              final conv =
+                  await widget.dataStore.getOrCreateDirectConversation(target);
+              if (mounted) {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ChatDetailScreen(
+                      theme: widget.theme,
+                      dataStore: widget.dataStore,
+                      conversationId: conv.id,
+                      preferencesController: widget.preferencesController,
+                    ),
+                  ),
+                );
+              }
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Could not start chat: $e')),
+                );
+              }
             }
           },
           child: const Text('Chat'),
@@ -1682,12 +1719,13 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                isGhost ? '👻' : '👁️',
-                style: const TextStyle(fontSize: 12),
+              ChatyGlyphIcon(
+                glyph: isGhost ? ChatyGlyph.ghostActive : ChatyGlyph.ghostInactive,
+                size: 14,
+                color: isGhost ? const Color(0xFF818CF8) : theme.secondaryTextColor,
               ),
               if (isGhost) ...[
-                const SizedBox(width: 4),
+                const SizedBox(width: 5),
                 const Text(
                   'Ghost',
                   style: TextStyle(

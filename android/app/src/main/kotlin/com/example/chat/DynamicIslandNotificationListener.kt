@@ -1112,28 +1112,60 @@ internal object IslandOverlay {
         val wm = windowManager ?: return
         val screenWidth = context.resources.displayMetrics.widthPixels
 
+        // Zero intrusion at rest: when IDLE, cleanly dismiss and remove overlay window
+        if (currentState == IslandVisualState.IDLE) {
+            dismissRunnable?.let(main::removeCallbacks)
+            if (persistentRoot != null && persistentRoot!!.isAttachedToWindow) {
+                if (animate) {
+                    persistentRoot?.animate()
+                        ?.alpha(0f)
+                        ?.scaleX(0.7f)
+                        ?.scaleY(0.7f)
+                        ?.setDuration(200)
+                        ?.withEndAction {
+                            runCatching {
+                                if (persistentRoot?.isAttachedToWindow == true) {
+                                    wm.removeView(persistentRoot)
+                                }
+                            }
+                            persistentRoot = null
+                            islandCard = null
+                            contentContainer = null
+                            currentWindowParams = null
+                        }
+                        ?.start()
+                } else {
+                    runCatching { wm.removeView(persistentRoot) }
+                    persistentRoot = null
+                    islandCard = null
+                    contentContainer = null
+                    currentWindowParams = null
+                }
+            }
+            return
+        }
+
         val primaryNotif = activeNotifications.firstOrNull()
         val media = currentMedia
         val unreadCount = activeNotifications.size
 
         val isSplitMode = currentState == IslandVisualState.COMPACT && media != null && media.isPlaying && unreadCount > 0
         val cutoutW = getCutoutWidth(context)
-        val splitPillW = dp(context, 54)
-        val splitSpacerW = cutoutW + dp(context, 16)
-        val splitWidth = splitPillW * 2 + splitSpacerW
+        val splitPillW = dp(context, 34)
+        val splitSpacerW = cutoutW + dp(context, 12)
+        val splitWidth = (splitPillW * 2 + splitSpacerW).coerceAtMost(dp(context, 104))
 
-        // Calculate target dimensions
+        // Calculate target dimensions: restrained to punch-hole area leaving clock and status icons clear
         val compactWidth = if (isSplitMode) {
             splitWidth
         } else when {
-            unreadCount > 1 && media != null -> dp(context, 160)
-            unreadCount > 1 -> dp(context, 142)
-            media != null -> dp(context, 134)
-            else -> dp(context, 120)
-        }.coerceAtLeast(dp(context, 106))
+            media != null && media.isPlaying -> (cutoutW + dp(context, 56)).coerceIn(dp(context, 88), dp(context, 96))
+            unreadCount > 1 -> (cutoutW + dp(context, 52)).coerceIn(dp(context, 84), dp(context, 92))
+            else -> (cutoutW + dp(context, 48)).coerceIn(dp(context, 76), dp(context, 88))
+        }
 
         val targetWidth = when (currentState) {
-            IslandVisualState.IDLE -> dp(context, 40).coerceAtLeast(cutoutW + dp(context, 10))
+            IslandVisualState.IDLE -> 0
             IslandVisualState.COMPACT -> compactWidth
             IslandVisualState.EXPANDED -> (screenWidth - dp(context, 20)).coerceAtMost(dp(context, 380))
             IslandVisualState.MEDIA_EXPANDED -> (screenWidth - dp(context, 20)).coerceAtMost(dp(context, 380))
@@ -1141,10 +1173,10 @@ internal object IslandOverlay {
             IslandVisualState.REPLY -> (screenWidth - dp(context, 20)).coerceAtMost(dp(context, 380))
         }
 
-        // Height calibrated: 38dp compact height centers cleanly on punch hole
+        // Height calibrated: 36dp compact height matches Apple & OriginOS
         val targetHeight = when (currentState) {
-            IslandVisualState.IDLE -> dp(context, 34)
-            IslandVisualState.COMPACT -> dp(context, 38)
+            IslandVisualState.IDLE -> 0
+            IslandVisualState.COMPACT -> dp(context, 36)
             IslandVisualState.EXPANDED -> {
                 if (expandedTabMode == ExpandedTabMode.MEDIA && media != null) {
                     dp(context, 236)
@@ -1160,8 +1192,8 @@ internal object IslandOverlay {
         }
 
         val targetRadius = when (currentState) {
-            IslandVisualState.IDLE -> dp(context, 17).toFloat()
-            IslandVisualState.COMPACT -> dp(context, 19).toFloat()
+            IslandVisualState.IDLE -> dp(context, 18).toFloat()
+            IslandVisualState.COMPACT -> dp(context, 18).toFloat()
             else -> dp(context, 28).toFloat()
         }
 
@@ -1621,11 +1653,11 @@ internal object IslandOverlay {
                 gravity = Gravity.CENTER_VERTICAL
                 background = GradientDrawable().apply {
                     setColor(Color.rgb(10, 11, 15))
-                    cornerRadius = dp(context, 19).toFloat()
+                    cornerRadius = dp(context, 18).toFloat()
                     setStroke(dp(context, 1), Color.argb(40, 255, 255, 255))
                 }
-                setPadding(dp(context, 5), dp(context, 4), dp(context, 5), dp(context, 4))
-                layoutParams = LinearLayout.LayoutParams(dp(context, 54), dp(context, 38))
+                setPadding(dp(context, 4), dp(context, 3), dp(context, 4), dp(context, 3))
+                layoutParams = LinearLayout.LayoutParams(dp(context, 34), dp(context, 36))
 
                 setOnTouchListener { v, ev ->
                     when (ev.action) {
@@ -1657,12 +1689,12 @@ internal object IslandOverlay {
                     setImageResource(android.R.drawable.ic_media_play)
                 }
                 background = GradientDrawable().apply {
-                    cornerRadius = dp(context, 6).toFloat()
+                    cornerRadius = dp(context, 5).toFloat()
                     setStroke(dp(context, 1), Color.argb(40, 255, 255, 255))
                 }
                 clipToOutline = true
-                layoutParams = LinearLayout.LayoutParams(dp(context, 20), dp(context, 20)).apply {
-                    marginEnd = dp(context, 4)
+                layoutParams = LinearLayout.LayoutParams(dp(context, 16), dp(context, 16)).apply {
+                    marginEnd = dp(context, 2)
                 }
             }
             leftCapsule.addView(artView)
@@ -1670,7 +1702,7 @@ internal object IslandOverlay {
             val miniWaveform = WaveformVisualizerView(context).apply {
                 setPlaying(true)
                 setWaveformColor(vibrantColor)
-                layoutParams = LinearLayout.LayoutParams(dp(context, 20), dp(context, 12))
+                layoutParams = LinearLayout.LayoutParams(dp(context, 10), dp(context, 10))
             }
             leftCapsule.addView(miniWaveform)
             row.addView(leftCapsule)
@@ -1678,24 +1710,24 @@ internal object IslandOverlay {
             // 2. CENTER GAP: Camera Cutout Clearance (100% Transparent, perfectly centered)
             val cutoutW = getCutoutWidth(context)
             val centerSpacer = View(context).apply {
-                layoutParams = LinearLayout.LayoutParams(cutoutW + dp(context, 16), 1)
+                layoutParams = LinearLayout.LayoutParams(cutoutW + dp(context, 8), 1)
                 setOnClickListener {
                     handleIslandTap(context)
                 }
             }
             row.addView(centerSpacer)
 
-            // 3. TRAILING DETACHED BUBBLE: Symmetrical (54dp) Notification Bubble
+            // 3. TRAILING DETACHED BUBBLE: Symmetrical (34dp) Notification Bubble
             val rightBubble = LinearLayout(context).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER
                 background = GradientDrawable().apply {
                     setColor(Color.rgb(10, 11, 15))
-                    cornerRadius = dp(context, 19).toFloat()
+                    cornerRadius = dp(context, 18).toFloat()
                     setStroke(dp(context, 1), Color.argb(40, 255, 255, 255))
                 }
-                setPadding(dp(context, 5), dp(context, 4), dp(context, 5), dp(context, 4))
-                layoutParams = LinearLayout.LayoutParams(dp(context, 54), dp(context, 38))
+                setPadding(dp(context, 4), dp(context, 3), dp(context, 4), dp(context, 3))
+                layoutParams = LinearLayout.LayoutParams(dp(context, 34), dp(context, 36))
 
                 setOnTouchListener { v, ev ->
                     when (ev.action) {
@@ -3486,12 +3518,12 @@ internal object IslandOverlay {
             val rect: Rect? = cutout?.boundingRectTop ?: cutout?.boundingRects?.firstOrNull { it.top < dp(context, 24) }
             if (rect != null && !rect.isEmpty) {
                 val cutoutCenterY = rect.centerY()
-                val pillHalfHeight = dp(context, 48) / 2
+                val pillHalfHeight = dp(context, 36) / 2
                 return (cutoutCenterY - pillHalfHeight).coerceAtLeast(dp(context, 4))
             }
         }
         val statusBar = statusBarHeight(context)
-        val pillHeight = dp(context, 48)
+        val pillHeight = dp(context, 36)
         return ((statusBar - pillHeight) / 2).coerceAtLeast(dp(context, 4))
     }
 
