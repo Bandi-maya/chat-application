@@ -3,7 +3,9 @@ import '../../ui/core/design_system/design_system.dart';
 import '../../ui/core/menu/app_context_menu.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../data/repositories/chaty_data_store.dart';
+import '../../data/services/contact_relationship_service.dart';
 import '../../data/services/notification_service.dart';
+import '../../injection/locator.dart';
 import 'settings_search_delegate.dart';
 import 'privacy/privacy_center_screen.dart';
 import 'security/security_center_screen.dart';
@@ -20,6 +22,9 @@ import '../messages/starred_messages_screen.dart';
 import 'effects/navigation_effects_page.dart';
 import 'permissions/system_permissions_screen.dart';
 import '../auth/welcome_screen.dart';
+import '../chats/linked_devices_qr_screen.dart';
+import '../chats/new_chat_screen.dart';
+import 'account/account_settings_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   final ChatyPreferencesController preferencesController;
@@ -545,9 +550,13 @@ class SettingsScreen extends StatelessWidget {
                     icon: Icons.currency_rupee_rounded,
                     iconColor: colors.primary,
                     title: 'Payments',
+                    subtitle: 'Chaty Pro plans, UPI & billing',
                     onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Chaty Secure UPI & Card Payments')),
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ProPricingScreen(),
+                        ),
                       );
                     },
                   ),
@@ -569,20 +578,34 @@ class SettingsScreen extends StatelessWidget {
                     icon: Icons.devices_rounded,
                     iconColor: colors.info,
                     title: 'Linked devices',
-                    subtitle: 'Use WhatsApp on other devices',
-                    onTap: () => _showExportDialog(context),
-                  ),
-                  ChatySettingsTile(
-                    icon: Icons.vpn_key_outlined,
-                    iconColor: colors.success,
-                    title: 'Account',
-                    subtitle: 'Security notifications, change number',
+                    subtitle: 'Use Chaty on web and desktop devices',
                     onTap: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => SecurityCenterScreen(
+                          builder: (_) => LinkedDevicesQrScreen(
+                            dataStore: dataStore,
+                            relationshipService: locator<ContactRelationshipService>(),
                             preferencesController: preferencesController,
+                            themeController: themeController,
+                            devicesOnly: true,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  ChatySettingsTile(
+                    icon: Icons.person_outline_rounded,
+                    iconColor: colors.success,
+                    title: 'Account',
+                    subtitle: 'Profile photo, username & details',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AccountSettingsScreen(
+                            preferencesController: preferencesController,
+                            dataStore: dataStore,
                           ),
                         ),
                       );
@@ -605,13 +628,21 @@ class SettingsScreen extends StatelessWidget {
                     },
                   ),
                   ChatySettingsTile(
-                    icon: Icons.photo_library_outlined,
+                    icon: Icons.people_outline_rounded,
                     iconColor: colors.accent,
                     title: 'Lists',
-                    subtitle: 'Manage people and groups',
+                    subtitle: 'Manage people and contact groups',
                     onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Lists: Manage people and contact groups')),
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => NewChatScreen(
+                            theme: themeController.globalTheme,
+                            dataStore: dataStore,
+                            preferencesController: preferencesController,
+                            startInGroupMode: true,
+                          ),
+                        ),
                       );
                     },
                   ),
@@ -651,9 +682,18 @@ class SettingsScreen extends StatelessWidget {
                     icon: Icons.cast_rounded,
                     iconColor: colors.primary,
                     title: 'Broadcasts',
+                    subtitle: 'Create and manage broadcast recipient lists',
                     onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Broadcast list messaging')),
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => NewChatScreen(
+                            theme: themeController.globalTheme,
+                            dataStore: dataStore,
+                            preferencesController: preferencesController,
+                            startInBroadcastMode: true,
+                          ),
+                        ),
                       );
                     },
                   ),

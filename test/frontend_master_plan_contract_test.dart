@@ -268,4 +268,45 @@ void main() {
     expect(navigation, contains('catch (error)'));
   });
 
+  test('NewChatScreen supports broadcast list mode and creation tile', () {
+    final source = File(
+      'lib/features/chats/new_chat_screen.dart',
+    ).readAsStringSync();
+    expect(source, contains('final bool startInBroadcastMode;'));
+    expect(source, contains('New Broadcast List'));
+    expect(source, contains('Broadcast:'));
+    expect(source, contains('_isBroadcast ?'));
+  });
+
+  test('chats home promptMessageNumber starts direct conversation and opens detail screen', () {
+    final source = File(
+      'lib/features/chats/chats_home_screen.dart',
+    ).readAsStringSync();
+    expect(source, contains('getOrCreateDirectConversation('));
+    expect(source, contains('builder: (_) => ChatDetailScreen('));
+    expect(source, isNot(contains("SnackBar(content: Text('Starting chat with \$number...'))")));
+  });
+
+  test('settings screen tiles navigate to real destinations without placeholder snackbars', () {
+    final source = File(
+      'lib/features/settings/settings_screen.dart',
+    ).readAsStringSync();
+    expect(source, contains('builder: (_) => const ProPricingScreen()'));
+    expect(source, contains('builder: (_) => LinkedDevicesQrScreen('));
+    expect(source, contains('builder: (_) => AccountSettingsScreen('));
+    expect(source, contains('startInBroadcastMode: true'));
+    expect(source, isNot(contains('Chaty Secure UPI & Card Payments')));
+    expect(source, isNot(contains('Use WhatsApp on other devices')));
+  });
+
+  test('connection detail sheet opens centered dialog with bounded width', () {
+    final source = File(
+      'lib/ui/core/connection/connection_detail_sheet.dart',
+    ).readAsStringSync();
+    expect(source, contains('showDialog<void>('));
+    expect(source, contains('Dialog('));
+    expect(source, contains('maxWidth: 440'));
+    expect(source, contains('SingleChildScrollView('));
+    expect(source, isNot(contains('showModalBottomSheet')));
+  });
 }

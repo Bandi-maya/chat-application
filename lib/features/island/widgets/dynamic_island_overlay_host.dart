@@ -111,19 +111,19 @@ class _DynamicIslandOverlayHostState extends State<DynamicIslandOverlayHost>
         final activePayload = widget.controller.activePayload;
         final secondaryPayload = widget.controller.secondaryPayload;
 
-        if (mode == IslandMode.idle && _springController.value <= 0.01) {
-          return content;
-        }
+        final isVisible = !(mode == IslandMode.idle && _springController.value <= 0.01);
 
         final anchor = CutoutAnchorResolver.resolve(context);
         final screenWidth = MediaQuery.of(context).size.width;
 
         final isPlayer = activePayload?.type == IslandPayloadType.media ||
             activePayload?.type == IslandPayloadType.voiceNotePlayback;
+        final isCall = activePayload?.type == IslandPayloadType.incomingCall ||
+            activePayload?.type == IslandPayloadType.ongoingCall;
 
-        // Expanded dimensions matching reference repo
-        final expandedWidth = isPlayer ? 340.0 : 360.0;
-        final compactWidth = isPlayer ? 168.0 : 148.0;
+        // Bounded compact dimensions: camera-aware and unobtrusive
+        final expandedWidth = isPlayer ? 340.0 : 356.0;
+        final compactWidth = isPlayer ? 92.0 : (isCall ? 96.0 : 84.0);
 
         // Progress between 0.0 (idle), 1.0 (compact), 2.0 (split), 3.0 (expanded)
         final t = _springController.value.clamp(0.0, 3.0);
@@ -134,21 +134,21 @@ class _DynamicIslandOverlayHostState extends State<DynamicIslandOverlayHost>
 
         if (t <= 1.0) {
           // idle -> compact
-          width = lerpDouble(38.0, compactWidth, t) ?? compactWidth;
-          radius = lerpDouble(19.0, 999.0, t) ?? 999.0;
+          width = lerpDouble(32.0, compactWidth, t) ?? compactWidth;
+          radius = lerpDouble(16.0, 999.0, t) ?? 999.0;
           opacity = lerpDouble(0.0, 1.0, t) ?? 1.0;
         } else if (t <= 2.0) {
           // compact -> split
           final splitT = t - 1.0;
-          width = lerpDouble(compactWidth, 132.0, splitT) ?? 132.0;
+          width = lerpDouble(compactWidth, 104.0, splitT) ?? 104.0;
           radius = 999.0;
           opacity = 1.0;
         } else {
           // split / compact -> expanded
           final expandT = (t - 2.0).clamp(0.0, 1.0);
-          final startW = (mode == IslandMode.split) ? 132.0 : compactWidth;
+          final startW = (mode == IslandMode.split) ? 104.0 : compactWidth;
           width = lerpDouble(startW, expandedWidth, expandT) ?? expandedWidth;
-          radius = lerpDouble(999.0, 26.0, expandT) ?? 26.0;
+          radius = lerpDouble(999.0, 28.0, expandT) ?? 28.0;
           opacity = 1.0;
         }
 
@@ -159,14 +159,28 @@ class _DynamicIslandOverlayHostState extends State<DynamicIslandOverlayHost>
         // during spring interpolation
         final targetContentWidth = mode == IslandMode.expanded
             ? expandedWidth
-            : (mode == IslandMode.idle ? 38.0 : compactWidth);
+            : (mode == IslandMode.idle ? 32.0 : (mode == IslandMode.split ? 104.0 : compactWidth));
+
+        final isHighContrast = MediaQuery.of(context).highContrast;
 
         return Stack(
           fit: StackFit.expand,
           children: [
             content,
 
-            // Floating Dynamic Island capsule
+            if (isVisible) ...[
+              // Full-screen outside-tap dismiss barrier when expanded
+              if (mode == IslandMode.expanded)
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: () {
+                      widget.controller.collapse();
+                    },
+                  ),
+                ),
+
+              // Floating Dynamic Island capsule
             Positioned(
               top: anchor.topOffset,
               left: 0,
@@ -191,6 +205,10 @@ class _DynamicIslandOverlayHostState extends State<DynamicIslandOverlayHost>
                           } else if (mode == IslandMode.expanded) {
                             widget.controller.collapse();
                           }
+                        },
+                        onLongPress: () {
+                          HapticFeedback.mediumImpact();
+                          widget.controller.expand();
                         },
                         onVerticalDragEnd: (details) {
                           if (details.primaryVelocity != null &&
@@ -223,19 +241,19 @@ class _DynamicIslandOverlayHostState extends State<DynamicIslandOverlayHost>
                             filter: widget.enableBlur
                                 ? ImageFilter.blur(sigmaX: 20, sigmaY: 20)
                                 : ImageFilter.blur(sigmaX: 0, sigmaY: 0),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              curve: Curves.easeOutCubic,
+                            child: Container(
                               width: width,
-                              constraints: const BoxConstraints(minHeight: 42.0),
+                              constraints: const BoxConstraints(minHeight: 36.0),
                               decoration: BoxDecoration(
                                 color: const Color(0xF2000000), // black/95
                                 borderRadius: BorderRadius.circular(radius),
                                 border: Border.all(
-                                  color: widget.controller.isDragTargetActive
-                                      ? const Color(0xFF00F0FF)
-                                      : Colors.white.withValues(alpha: 0.08),
-                                  width: widget.controller.isDragTargetActive ? 2.0 : 1.0,
+                                  color: isHighContrast
+                                      ? Colors.white
+                                      : (widget.controller.isDragTargetActive
+                                          ? const Color(0xFF00F0FF)
+                                          : Colors.white.withValues(alpha: 0.08)),
+                                  width: isHighContrast ? 2.0 : (widget.controller.isDragTargetActive ? 2.0 : 1.0),
                                 ),
                                 boxShadow: [
                                   BoxShadow(
@@ -267,40 +285,50 @@ class _DynamicIslandOverlayHostState extends State<DynamicIslandOverlayHost>
                       // Secondary bubble in split mode
                       if (mode == IslandMode.split && secondaryPayload != null) ...[
                         const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            widget.controller.expand(subView: 'notifications');
-                          },
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(999),
-                            child: BackdropFilter(
-                              filter: widget.enableBlur
-                                  ? ImageFilter.blur(sigmaX: 20, sigmaY: 20)
-                                  : ImageFilter.blur(sigmaX: 0, sigmaY: 0),
-                              child: Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xF2000000),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.08),
-                                    width: 1.0,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.6),
-                                      blurRadius: 20,
-                                      offset: const Offset(0, 4),
+                        Semantics(
+                          button: true,
+                          label: 'Secondary activity: ${secondaryPayload.title}',
+                          child: GestureDetector(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              widget.controller.expand(subView: 'notifications');
+                            },
+                            onLongPress: () {
+                              HapticFeedback.mediumImpact();
+                              widget.controller.expand(subView: 'notifications');
+                            },
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(999),
+                              child: BackdropFilter(
+                                filter: widget.enableBlur
+                                    ? ImageFilter.blur(sigmaX: 20, sigmaY: 20)
+                                    : ImageFilter.blur(sigmaX: 0, sigmaY: 0),
+                                child: Container(
+                                  width: 42,
+                                  height: 42,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xF2000000),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: isHighContrast
+                                          ? Colors.white
+                                          : Colors.white.withValues(alpha: 0.08),
+                                      width: isHighContrast ? 2.0 : 1.0,
                                     ),
-                                  ],
-                                ),
-                                child: Center(
-                                  child: Icon(
-                                    secondaryPayload.iconData ?? Icons.notifications_rounded,
-                                    color: secondaryPayload.accentColor,
-                                    size: 16,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.6),
+                                        blurRadius: 20,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: Icon(
+                                      secondaryPayload.iconData ?? Icons.notifications_rounded,
+                                      color: secondaryPayload.accentColor,
+                                      size: 16,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -315,7 +343,8 @@ class _DynamicIslandOverlayHostState extends State<DynamicIslandOverlayHost>
             ),
           ),
         ],
-      );
+      ],
+    );
       },
     );
   }

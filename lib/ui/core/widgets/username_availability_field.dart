@@ -44,7 +44,11 @@ class _UsernameAvailabilityFieldState extends State<UsernameAvailabilityField> {
   void initState() {
     super.initState();
     widget.controller.addListener(_onChanged);
-    _onChanged();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _onChanged();
+      }
+    });
   }
 
   @override
@@ -53,7 +57,11 @@ class _UsernameAvailabilityFieldState extends State<UsernameAvailabilityField> {
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.removeListener(_onChanged);
       widget.controller.addListener(_onChanged);
-      _onChanged();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _onChanged();
+        }
+      });
     }
   }
 
@@ -62,6 +70,14 @@ class _UsernameAvailabilityFieldState extends State<UsernameAvailabilityField> {
     _debounce?.cancel();
     widget.controller.removeListener(_onChanged);
     super.dispose();
+  }
+
+  void _notifyAvailability(bool? value) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        widget.onAvailabilityChanged?.call(value);
+      }
+    });
   }
 
   void _onChanged() {
@@ -82,7 +98,7 @@ class _UsernameAvailabilityFieldState extends State<UsernameAvailabilityField> {
         _checking = false;
         _suggestions = const <String>[];
       });
-      widget.onAvailabilityChanged?.call(null);
+      _notifyAvailability(null);
       return;
     }
     if (current.isNotEmpty && normalized == current) {
@@ -92,7 +108,7 @@ class _UsernameAvailabilityFieldState extends State<UsernameAvailabilityField> {
         _checking = false;
         _suggestions = const <String>[];
       });
-      widget.onAvailabilityChanged?.call(true);
+      _notifyAvailability(true);
       return;
     }
 
@@ -102,7 +118,7 @@ class _UsernameAvailabilityFieldState extends State<UsernameAvailabilityField> {
       _checking = true;
       _suggestions = const <String>[];
     });
-    widget.onAvailabilityChanged?.call(null);
+    _notifyAvailability(null);
     _debounce = Timer(
       const Duration(milliseconds: 420),
       () => _check(normalized, generation),
@@ -122,7 +138,7 @@ class _UsernameAvailabilityFieldState extends State<UsernameAvailabilityField> {
         _available = available;
         _suggestions = suggestions;
       });
-      widget.onAvailabilityChanged?.call(available);
+      _notifyAvailability(available);
     } catch (_) {
       if (!mounted || generation != _generation) return;
       setState(() {

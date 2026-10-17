@@ -7,9 +7,9 @@ import android.graphics.Color
  */
 object IslandTokens {
     const val COMPACT_HEIGHT_DP = 36
-    const val COMPACT_MIN_WIDTH_DP = 112
-    const val COMPACT_DEFAULT_WIDTH_DP = 126
-    const val COMPACT_STACKED_WIDTH_DP = 142
+    const val COMPACT_MIN_WIDTH_DP = 76
+    const val COMPACT_DEFAULT_WIDTH_DP = 84
+    const val COMPACT_STACKED_WIDTH_DP = 92
     const val COMPACT_CORNER_RADIUS_DP = 18f
 
     const val EXPANDED_MAX_WIDTH_DP = 384

@@ -772,6 +772,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
                 callSession != null &&
                 callSession.isActive;
             final showIsland =
+                !locator.isRegistered<DynamicIslandController>() &&
                 locator<TemplateController>().calls.enableFloatingIsland &&
                 presentation.isInAppIsland &&
                 callSession != null &&
@@ -804,6 +805,9 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
                   ),
                   autoExpand: callSession.state == CallSessionState.incoming,
                 );
+              } else {
+                // Deterministically clean up call payloads when call ends or leaves Island mode
+                islandCtrl.removePayloadsWhere((p) => p.id.startsWith('call_'));
               }
             }
 

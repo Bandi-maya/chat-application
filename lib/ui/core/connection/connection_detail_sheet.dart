@@ -10,15 +10,28 @@ import 'connection_health_indicator.dart';
 /// the application's connection health without exposing secrets or URLs.
 class ConnectionDetailSheet extends StatefulWidget {
   final ConnectionHealthService? service;
+  final bool isDialog;
 
-  const ConnectionDetailSheet({super.key, this.service});
+  const ConnectionDetailSheet({
+    super.key,
+    this.service,
+    this.isDialog = true,
+  });
 
+  /// Shows the connection diagnostics in a centered dialog modal.
   static Future<void> show(BuildContext context) {
-    return showModalBottomSheet<void>(
+    return showDialog<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => const ConnectionDetailSheet(),
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: const ConnectionDetailSheet(isDialog: true),
+        ),
+      ),
     );
   }
 
@@ -76,37 +89,44 @@ class _ConnectionDetailSheetState extends State<ConnectionDetailSheet> {
     return Container(
       decoration: BoxDecoration(
         color: appColors?.surface ?? theme.scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.circular(widget.isDialog ? 24 : 24),
+        border: widget.isDialog
+            ? Border.all(color: appColors?.borderSubtle ?? const Color(0x33FFFFFF))
+            : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 20,
-            offset: const Offset(0, -4),
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 24,
+            offset: widget.isDialog ? const Offset(0, 8) : const Offset(0, -4),
           ),
         ],
       ),
       padding: EdgeInsets.fromLTRB(
-        20,
-        12,
-        20,
-        MediaQuery.of(context).padding.bottom + 20,
+        22,
+        widget.isDialog ? 20 : 12,
+        22,
+        widget.isDialog ? 20 : MediaQuery.of(context).padding.bottom + 20,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Drag handle
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: appColors?.border ?? Colors.grey.shade400,
-                borderRadius: BorderRadius.circular(2),
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+          if (!widget.isDialog) ...[
+            // Drag handle for bottom sheet
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: appColors?.border ?? Colors.grey.shade400,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 18),
+            const SizedBox(height: 18),
+          ],
 
           // Header
           Row(
@@ -223,27 +243,49 @@ class _ConnectionDetailSheetState extends State<ConnectionDetailSheet> {
 
           const SizedBox(height: 20),
 
-          // Test connection action button
-          SizedBox(
-            height: 44,
-            child: ElevatedButton.icon(
-              onPressed: _testing ? null : _runTest,
-              icon: _testing
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.refresh_rounded, size: 18),
-              label: Text(_testing ? 'Testing…' : 'Test Connection'),
-              style: ElevatedButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          // Action buttons: Test Connection and Close (if Dialog)
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 44,
+                  child: ElevatedButton.icon(
+                    onPressed: _testing ? null : _runTest,
+                    icon: _testing
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh_rounded, size: 18),
+                    label: Text(_testing ? 'Testing…' : 'Test Connection'),
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              if (widget.isDialog) ...[
+                const SizedBox(width: 10),
+                SizedBox(
+                  height: 44,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('Dismiss'),
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
+      ),
       ),
     );
   }

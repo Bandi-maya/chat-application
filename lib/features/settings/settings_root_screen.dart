@@ -484,10 +484,118 @@ class SettingsRootScreen extends StatelessWidget {
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                   border: Border(top: BorderSide(color: colors.borderSubtle)),
                 ),
-                padding: const EdgeInsets.only(top: 8, bottom: 32),
+                padding: const EdgeInsets.only(top: 12, bottom: 36),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Customization Center
+                    // SECTION 1: ACCOUNT & PROFILE
+                    _buildSettingsSectionHeader('ACCOUNT & SECURITY', colors),
+                    _SettingsItemTile(
+                      icon: Icon(Icons.person_outline_rounded, color: colors.primary, size: 24),
+                      title: 'Account',
+                      subtitle: 'Profile details, display name, handle & account info',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => AccountSettingsScreen(
+                            preferencesController: preferencesController,
+                            dataStore: dataStore,
+                          ),
+                        ),
+                      ),
+                    ),
+                    _SettingsItemTile(
+                      icon: Icon(Icons.security_rounded, color: colors.info, size: 24),
+                      title: 'Privacy Center',
+                      subtitle: 'Last seen, online presence, anti-delete, read receipts & stealth',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => PrivacyCenterScreen(
+                            preferencesController: preferencesController,
+                          ),
+                        ),
+                      ),
+                    ),
+                    _SettingsItemTile(
+                      icon: Icon(Icons.lock_outline_rounded, color: colors.success, size: 24),
+                      title: 'Security & App Lock',
+                      subtitle: 'Biometric, PIN, Pattern protection & session security',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => SecurityCenterScreen(
+                            preferencesController: preferencesController,
+                          ),
+                        ),
+                      ),
+                    ),
+                    _SettingsItemTile(
+                      icon: Icon(Icons.devices_rounded, color: colors.foregroundSecondary, size: 24),
+                      title: 'Linked Devices',
+                      subtitle: 'Use Chaty on web and desktop, view active sessions',
+                      onTap: () => _openLinkedDevices(context),
+                    ),
+
+                    const SizedBox(height: 12),
+                    Divider(height: 1, color: colors.divider, indent: 20, endIndent: 20),
+                    const SizedBox(height: 12),
+
+                    // SECTION 2: CHATS & AUTOMATION
+                    _buildSettingsSectionHeader('CHATS & AUTOMATION', colors),
+                    _SettingsItemTile(
+                      icon: Icon(Icons.chat_bubble_outline_rounded, color: colors.success, size: 24),
+                      title: 'Conversation Customization',
+                      subtitle: 'Bubbles, ticks, contact sidebar & message appearance',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ConversationSettingsPage(
+                            preferencesController: preferencesController,
+                          ),
+                        ),
+                      ),
+                    ),
+                    _SettingsItemTile(
+                      icon: Icon(Icons.smart_toy_outlined, color: colors.info, size: 24),
+                      title: 'Message Automation & Scheduler',
+                      subtitle: 'Auto-reply rules, auto-responder bot & message scheduler',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => MessageManagementPage(
+                            preferencesController: preferencesController,
+                            dataStore: dataStore,
+                          ),
+                        ),
+                      ),
+                    ),
+                    _SettingsItemTile(
+                      icon: Icon(Icons.storage_rounded, color: colors.accent, size: 24),
+                      title: 'Storage & Media',
+                      subtitle: 'Auto-download quality, media limits & cache retention',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => StorageAndMediaSettingsScreen(
+                            preferencesController: preferencesController,
+                          ),
+                        ),
+                      ),
+                    ),
+                    _SettingsItemTile(
+                      icon: Icon(Icons.call_outlined, color: colors.warning, size: 24),
+                      title: 'Call Settings',
+                      subtitle: 'Call privacy, incoming call controls & call appearance',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => CallSettingsScreen(
+                            preferencesController: preferencesController,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+                    Divider(height: 1, color: colors.divider, indent: 20, endIndent: 20),
+                    const SizedBox(height: 12),
+
+                    // SECTION 3: APPEARANCE & THEMES
+                    _buildSettingsSectionHeader('APPEARANCE & THEMES', colors),
                     _SettingsItemTile(
                       icon: Icon(Icons.palette_outlined, color: colors.primary, size: 24),
                       title: 'Customization Center',
@@ -498,49 +606,124 @@ class SettingsRootScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-
-                    // 1. Linked devices
                     _SettingsItemTile(
-                      icon: Icon(Icons.devices_rounded, color: colors.foregroundSecondary, size: 24),
-                      title: 'Linked devices',
-                      subtitle: 'Use Chaty on other devices',
-                      onTap: () => _openLinkedDevices(context),
+                      icon: Icon(Icons.color_lens_outlined, color: colors.accent, size: 24),
+                      title: 'Theme & Color Engine',
+                      subtitle: '13+ dark & light theme presets, token editor & palette',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ThemeEditorScreen(
+                            themeController: themeController,
+                          ),
+                        ),
+                      ),
                     ),
-
-                    // 2. Share Chaty
                     _SettingsItemTile(
-                      icon: Icon(Icons.share_rounded, color: colors.foregroundSecondary, size: 24),
-                      title: 'Share Chaty',
-                      subtitle: 'Invite friends and family to join Chaty',
-                      onTap: () => ChatyShareService.shareApp(context),
+                      icon: Icon(Icons.dashboard_customize_rounded, color: colors.info, size: 24),
+                      title: 'Global Template Studio',
+                      subtitle: 'App-wide templates and independent component styles',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const TemplatesSettingsScreen(),
+                        ),
+                      ),
                     ),
-
-                    // 3. Privacy policy
                     _SettingsItemTile(
-                      icon: Icon(Icons.shield_outlined, color: colors.foregroundSecondary, size: 24),
-                      title: 'Privacy policy',
-                      subtitle: 'Read our security and data privacy policy',
-                      onTap: () => _showPrivacyPolicy(context),
-                    ),
-
-                    // 4. About
-                    _SettingsItemTile(
-                      icon: Icon(Icons.info_outline_rounded, color: colors.foregroundSecondary, size: 24),
-                      title: 'About',
-                      subtitle: 'App version, build and information',
-                      onTap: () => _showAboutDialog(context),
+                      icon: Icon(Icons.touch_app_outlined, color: colors.warning, size: 24),
+                      title: 'Navigation & Touch Effects',
+                      subtitle: 'Interactive click particles (Stars/Hearts/Bubbles), Sound FX',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => NavigationEffectsPage(
+                            preferencesController: preferencesController,
+                          ),
+                        ),
+                      ),
                     ),
 
                     const SizedBox(height: 12),
                     Divider(height: 1, color: colors.divider, indent: 20, endIndent: 20),
                     const SizedBox(height: 12),
 
-                    // 5. Log out
+                    // SECTION 4: NOTIFICATIONS & SYSTEM
+                    _buildSettingsSectionHeader('NOTIFICATIONS & PERMISSIONS', colors),
                     _SettingsItemTile(
-                      icon: Icon(Icons.logout_rounded, color: colors.error, size: 24),
-                      title: 'Log out',
-                      subtitle: 'Sign out of your session on this device',
-                      onTap: () => _logout(context),
+                      icon: Icon(Icons.notifications_none_rounded, color: colors.warning, size: 24),
+                      title: 'Notifications & Alerts',
+                      subtitle: 'Heads-up popups, notification sounds, LED & vibration',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => NotificationSettingsPage(
+                            preferencesController: preferencesController,
+                            notificationService: notificationService,
+                          ),
+                        ),
+                      ),
+                    ),
+                    _SettingsItemTile(
+                      icon: Icon(Icons.admin_panel_settings_outlined, color: colors.primary, size: 24),
+                      title: 'System Permissions & Hardware',
+                      subtitle: 'Camera, microphone, storage, battery & OS access',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => SystemPermissionsScreen(
+                            preferencesController: preferencesController,
+                            notificationService: notificationService,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+                    Divider(height: 1, color: colors.divider, indent: 20, endIndent: 20),
+                    const SizedBox(height: 12),
+
+                    // SECTION 5: APP INFORMATION & LOGOUT
+                    _buildSettingsSectionHeader('INFO & SUPPORT', colors),
+                    _SettingsItemTile(
+                      icon: Icon(Icons.share_rounded, color: colors.foregroundSecondary, size: 24),
+                      title: 'Share Chaty',
+                      subtitle: 'Invite friends and family to join Chaty',
+                      onTap: () => ChatyShareService.shareApp(context),
+                    ),
+                    _SettingsItemTile(
+                      icon: Icon(Icons.shield_outlined, color: colors.foregroundSecondary, size: 24),
+                      title: 'Privacy Policy',
+                      subtitle: 'Read our zero-telemetry security & privacy policy',
+                      onTap: () => _showPrivacyPolicy(context),
+                    ),
+                    _SettingsItemTile(
+                      icon: Icon(Icons.info_outline_rounded, color: colors.foregroundSecondary, size: 24),
+                      title: 'About Chaty',
+                      subtitle: 'App version, build information and licenses',
+                      onTap: () => _showAboutDialog(context),
+                    ),
+
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _logout(context),
+                          icon: Icon(Icons.logout_rounded, color: colors.error, size: 20),
+                          label: Text(
+                            'Log Out of Chaty',
+                            style: TextStyle(
+                              color: colors.error,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: colors.error.withValues(alpha: 0.8), width: 1.2),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -550,6 +733,21 @@ class SettingsRootScreen extends StatelessWidget {
         ),
         );
       },
+    );
+  }
+
+  Widget _buildSettingsSectionHeader(String title, AppColors colors) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 20, right: 20, top: 8, bottom: 6),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w800,
+          color: colors.primary,
+          letterSpacing: 0.9,
+        ),
+      ),
     );
   }
 
