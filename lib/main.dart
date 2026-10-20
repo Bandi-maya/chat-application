@@ -8,6 +8,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:chat/core/emoji/emoji_registry.dart';
 import 'package:chat/core/emoji/services/emoji_recent_cache.dart';
+import 'package:chat/data/services/api_backend_service.dart';
+import 'package:chat/data/services/backend_config.dart';
+import 'package:chat/data/repositories/chaty_data_store.dart';
 import 'package:chat/data/services/backend_service.dart';
 import 'package:chat/data/services/auth_bootstrap_policy.dart';
 import 'package:chat/data/services/call_signaling_service.dart';
@@ -116,8 +119,18 @@ Future<void> main() async {
   );
   try {
     await dotenv.load(fileName: '.env');
+    if (dotenv.isInitialized) {
+      final apiUrl = dotenv.maybeGet('REST_API_BASE_URL');
+      if (apiUrl != null && apiUrl.isNotEmpty) {
+        ApiBackendConfig.customBaseUrl = apiUrl;
+      }
+      final tId = dotenv.maybeGet('TENANT_ID');
+      if (tId != null && tId.isNotEmpty) {
+        ApiBackendConfig.customTenantId = tId;
+      }
+    }
   } catch (e) {
-    debugPrint('Dotenv skipped: ');
+    debugPrint('Dotenv skipped: $e');
   }
   setupLocator();
   // Only work that shapes the very first frame blocks launch. The shell must
@@ -231,6 +244,8 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
       locator<ChatyPreferencesController>(),
       locator<AppearanceVariantController>(),
       locator<ChatyBackendService>(),
+      locator<ApiBackendService>(),
+      locator<ChatyDataStore>(),
       locator<RichChatRealtimeService>(),
       locator<CallSignalingService>(),
       locator<CallPresentationController>(),
@@ -275,6 +290,9 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
       setState(() => _backendBootstrapError = null);
     }
     try {
+      if (locator.isRegistered<ApiBackendService>()) {
+        unawaited(locator<ApiBackendService>().initialize());
+      }
       await _backend.initialize();
       if (!mounted) return;
       _applyPresenceOverrideOnPreferenceChange();
@@ -912,8 +930,12 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
             );
           },
           home: switch (resolveAuthBootstrapDestination(
-            isInitialized: _backend.isInitialized,
-            isAuthenticated: _backend.isAuthenticated,
+            isInitialized: _backend.isInitialized ||
+                (locator.isRegistered<ApiBackendService>() &&
+                    locator<ApiBackendService>().isInitialized),
+            isAuthenticated: _backend.isAuthenticated ||
+                (locator.isRegistered<ApiBackendService>() &&
+                    locator<ApiBackendService>().isAuthenticated),
           )) {
             AuthBootstrapDestination.loading => _AuthBootstrapScreen(
               error: _backendBootstrapError,

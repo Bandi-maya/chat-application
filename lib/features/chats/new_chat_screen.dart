@@ -51,6 +51,23 @@ class _NewChatScreenState extends State<NewChatScreen> {
     _isCreatingGroup = widget.startInGroupMode || widget.startInBroadcastMode;
     _isBroadcast = widget.startInBroadcastMode;
     _results = widget.dataStore.contacts;
+    if (_results.isEmpty) {
+      unawaited(_loadInitialUsers());
+    }
+  }
+
+  Future<void> _loadInitialUsers() async {
+    setState(() => _isLoading = true);
+    try {
+      final users = await widget.dataStore.searchUsersRemote('');
+      if (!mounted) return;
+      setState(() {
+        _results = users;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override

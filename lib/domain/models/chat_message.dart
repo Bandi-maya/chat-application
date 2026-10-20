@@ -160,13 +160,19 @@ class ChatMessage {
   }
 
   factory ChatMessage.fromApi(Map<String, dynamic> json) {
+    final senderName = json['sender_name']?.toString() ?? '';
     return ChatMessage(
-      id: json['uid'] ?? '',
-      conversationId: json['room_id'] ?? '',
-      senderId: json['sender_id'] ?? '',
-      text: json['content'] ?? '',
-      createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at']) ?? DateTime.now() : DateTime.now(),
+      id: json['uid']?.toString() ?? json['id']?.toString() ?? '',
+      conversationId: json['room_id']?.toString() ?? '',
+      senderId: json['sender_id']?.toString() ?? '',
+      text: json['content']?.toString() ?? '',
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
       deliveryState: DeliveryState.delivered,
+      metadata: senderName.isNotEmpty
+          ? <String, dynamic>{'sender_name': senderName}
+          : const <String, dynamic>{},
     );
   }
 }
