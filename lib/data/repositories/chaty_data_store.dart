@@ -1,4 +1,4 @@
-﻿import '../services/api_backend_service.dart';
+import '../services/api_backend_service.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -132,10 +132,15 @@ class ChatyDataStore extends ChangeNotifier {
   }
 
   bool get hasAuthenticatedUser =>
+      (locator.isRegistered<ApiBackendService>() && locator<ApiBackendService>().isAuthenticated) ||
       _backend.currentUser != null ||
       Supabase.instance.client.auth.currentUser != null;
 
   UserProfile? get currentUserOrNull {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated && api.currentUser != null) return api.currentUser!;
+    }
     final hydrated = _backend.currentUser;
     if (hydrated != null) return hydrated;
 
@@ -198,8 +203,15 @@ class ChatyDataStore extends ChangeNotifier {
   }
 
   bool get isAuthenticated => _backend.isAuthenticated || (locator.isRegistered<ApiBackendService>() && locator<ApiBackendService>().isAuthenticated);
-  List<UserProfile> get contacts =>
-      _backend.allUsers.where((user) => user.id != currentUser.id).toList();
+  List<UserProfile> get contacts {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated && api.users.isNotEmpty) {
+        return api.users.where((user) => user.id != currentUser.id).toList();
+      }
+    }
+    return _backend.allUsers.where((user) => user.id != currentUser.id).toList();
+  }
   List<Conversation> get conversations {
     if (locator.isRegistered<ApiBackendService>()) {
       final api = locator<ApiBackendService>();
@@ -219,6 +231,14 @@ class ChatyDataStore extends ChangeNotifier {
   List<LinkedDevice> get linkedDevices => _backend.currentUserDevices;
 
   UserProfile? getUser(String userId) {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated) {
+        if (api.currentUser?.id == userId) return api.currentUser;
+        final found = api.users.where((u) => u.id == userId).firstOrNull;
+        if (found != null) return found;
+      }
+    }
     if (_backend.currentUser?.id == userId) return _backend.currentUser;
     return _backend.getUserById(userId);
   }
@@ -226,19 +246,49 @@ class ChatyDataStore extends ChangeNotifier {
   UserProfile? getUserById(String userId) => getUser(userId);
   UserProfile? getContact(String userId) => getUser(userId);
 
-  List<ChatMessage> getMessages(String conversationId) =>
-      _backend.getMessages(conversationId);
+  List<ChatMessage> getMessages(String conversationId) {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated) {
+        return api.getMessages(conversationId);
+      }
+    }
+    return _backend.getMessages(conversationId);
+  }
 
-  Future<void> ensureConversationLoaded(String conversationId) =>
-      _backend.ensureConversationLoaded(conversationId);
+  Future<void> ensureConversationLoaded(String conversationId) async {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated) {
+        await api.loadMessages(conversationId);
+        return;
+      }
+    }
+    await _backend.ensureConversationLoaded(conversationId);
+  }
 
   Future<List<UserProfile>> searchUsersRemote(
     String query, {
     bool includeSelf = false,
-  }) => _backend.searchUsersRemote(query, includeSelf: includeSelf);
+  }) async {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated) {
+        return api.searchUsers(query, includeSelf: includeSelf);
+      }
+    }
+    return _backend.searchUsersRemote(query, includeSelf: includeSelf);
+  }
 
-  Future<Conversation> getOrCreateDirectConversation(UserProfile user) =>
-      _backend.getOrCreateDirectConversationAsync(user);
+  Future<Conversation> getOrCreateDirectConversation(UserProfile user) async {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated) {
+        return api.createOrGetDirectConversation(user.id);
+      }
+    }
+    return _backend.getOrCreateDirectConversationAsync(user);
+  }
 
   bool isTypingInChat(String conversationId) {
     final currentId = _backend.currentUser?.id;
@@ -269,7 +319,12 @@ class ChatyDataStore extends ChangeNotifier {
     unawaited(_gbBackend.setTyping(conversationId, shouldPublish));
   }
 
-  void logout() => unawaited(_backend.logout());
+  void logout() {
+    if (locator.isRegistered<ApiBackendService>()) {
+      locator<ApiBackendService>().signOut();
+    }
+    unawaited(_backend.logout());
+  }
 
   Future<void> sendMessage({
     required String conversationId,

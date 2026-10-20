@@ -274,7 +274,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   String _senderName(String senderId) {
     if (senderId == widget.dataStore.currentUser.id) return 'You';
-    return widget.dataStore.getUser(senderId)?.displayName ?? 'Chaty user';
+    final user = widget.dataStore.getUser(senderId);
+    if (user != null && user.displayName.isNotEmpty) return user.displayName;
+    return 'Team Member';
   }
 
   String _lastSeen(String userId) {

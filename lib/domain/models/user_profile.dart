@@ -70,4 +70,44 @@ class UserProfile {
       bannerUrl: bannerUrl ?? this.bannerUrl,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'displayName': displayName,
+    'username': username,
+    'avatarInitials': avatarInitials,
+    'avatarColorHex': avatarColorHex,
+    'about': about,
+    'presence': presence.name,
+    'lastSeenAt': lastSeenAt.toIso8601String(),
+    'isVerified': isVerified,
+    'email': email,
+    'phone': phone,
+    'safetyNumber': safetyNumber,
+    'avatarUrl': avatarUrl,
+    'bannerUrl': bannerUrl,
+  };
+
+  factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
+    id: json['id']?.toString() ?? '',
+    displayName: json['displayName']?.toString() ?? '',
+    username: json['username']?.toString() ?? '',
+    avatarInitials: json['avatarInitials']?.toString() ?? 'U',
+    avatarColorHex: json['avatarColorHex']?.toString() ?? '0xFF6366F1',
+    about: json['about']?.toString() ?? '',
+    presence: PresenceState.values.firstWhere(
+      (p) => p.name == json['presence'],
+      orElse: () => PresenceState.offline,
+    ),
+    lastSeenAt: json['lastSeenAt'] != null
+        ? DateTime.tryParse(json['lastSeenAt'].toString()) ?? DateTime.now()
+        : DateTime.now(),
+    isVerified: json['isVerified'] == true,
+    email: json['email']?.toString() ?? '',
+    phone: json['phone']?.toString() ?? '',
+    safetyNumber: json['safetyNumber']?.toString() ?? '',
+    avatarUrl: json['avatarUrl']?.toString(),
+    bannerUrl: json['bannerUrl']?.toString(),
+  );
 }
+

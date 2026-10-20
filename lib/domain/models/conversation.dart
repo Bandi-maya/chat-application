@@ -88,14 +88,51 @@ class Conversation {
   }
 
   factory Conversation.fromApi(Map<String, dynamic> json) {
+    String lastText = '';
+    DateTime lastTime = json['updated_at'] != null
+        ? DateTime.tryParse(json['updated_at'].toString()) ?? DateTime.now()
+        : DateTime.now();
+    String lastSender = '';
+
+    final lastMsg = json['last_message'];
+    if (lastMsg is Map<String, dynamic>) {
+      lastText = lastMsg['content']?.toString() ?? '';
+      if (lastMsg['created_at'] != null) {
+        lastTime = DateTime.tryParse(lastMsg['created_at'].toString()) ?? lastTime;
+      }
+      lastSender = lastMsg['sender_name']?.toString() ?? '';
+    }
+
+    final otherUser = json['other_user'];
+    final participantIds = <String>[];
+    if (json['created_by_id'] != null) {
+      participantIds.add(json['created_by_id'].toString());
+    }
+    if (otherUser is Map && otherUser['id'] != null) {
+      final otherId = otherUser['id'].toString();
+      if (!participantIds.contains(otherId)) {
+        participantIds.add(otherId);
+      }
+    }
+
+    final rawTitle = json['display_name']?.toString() ?? json['name']?.toString() ?? 'Chat';
+    final effectiveTitle = rawTitle.trim().isNotEmpty ? rawTitle.trim() : 'Chat';
+    final compact = effectiveTitle.replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
+    final initials = compact.isEmpty
+        ? 'C'
+        : compact.substring(0, compact.length.clamp(1, 2)).toUpperCase();
+
     return Conversation(
-      id: json['uid'] ?? '',
+      id: json['uid']?.toString() ?? json['id']?.toString() ?? '',
       type: json['room_type'] == 'group' ? ConversationType.group : ConversationType.direct,
-      title: json['name'] ?? 'Chat',
-      participantIds: json['created_by_id'] != null ? [json['created_by_id']] : [],
-      lastMessageText: '',
-      lastMessageTime: json['updated_at'] != null ? DateTime.tryParse(json['updated_at']) ?? DateTime.now() : DateTime.now(),
-      lastMessageSenderId: '',
+      title: effectiveTitle,
+      participantIds: participantIds,
+      avatarInitials: initials,
+      avatarColorHex: '0xFF6366F1',
+      lastMessageText: lastText,
+      lastMessageTime: lastTime,
+      lastMessageSenderId: lastSender,
     );
   }
 }
+

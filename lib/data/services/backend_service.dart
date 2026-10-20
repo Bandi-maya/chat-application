@@ -16,6 +16,7 @@ import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/persistence/preferences_storage.dart';
 import '../../ui/core/realtime/realtime_event_bus.dart';
 import '../../ui/core/validators/input_validators.dart';
+import 'api_backend_service.dart';
 import 'contact_relationship_service.dart';
 import 'connection_health_service.dart';
 import 'local_snapshot_cache_service.dart';
@@ -103,8 +104,16 @@ class ChatyBackendService extends ChangeNotifier {
   bool get isDemoMode => _isDemoMode;
   bool get isInitialized => _isInitialized;
   bool get isAuthenticated =>
-      _isDemoMode || (_client.auth.currentSession != null && _currentUser != null);
-  UserProfile? get currentUser => _currentUser;
+      _isDemoMode ||
+      (_client.auth.currentSession != null && _currentUser != null) ||
+      (locator.isRegistered<ApiBackendService>() && locator<ApiBackendService>().isAuthenticated);
+  UserProfile? get currentUser {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated && api.currentUser != null) return api.currentUser;
+    }
+    return _currentUser;
+  }
   AuthSession? get currentSession => _currentSession;
   List<UserProfile> get allUsers =>
       List<UserProfile>.unmodifiable(_usersById.values);
@@ -2535,6 +2544,13 @@ class ChatyBackendService extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    if (locator.isRegistered<ApiBackendService>()) {
+      try {
+        await locator<ApiBackendService>().signOut();
+      } catch (e) {
+        debugPrint('Error signing out of ApiBackendService: $e');
+      }
+    }
     if (_isDemoMode) {
       _isDemoMode = false;
       try {
