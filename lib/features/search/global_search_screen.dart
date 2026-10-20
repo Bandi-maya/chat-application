@@ -6,6 +6,7 @@ import '../../data/repositories/chaty_data_store.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/user_profile.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
+import '../../ui/core/icons/chaty_icon_registry.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../../data/services/local_lock_service.dart';
@@ -205,7 +206,7 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
             )
           else if (_searchController.text.isNotEmpty)
             ChatyIconButton(
-              icon: Icons.clear_rounded,
+              icon: ChatyIconId.clear,
               tooltip: 'Clear',
               onPressed: _searchController.clear,
             ),

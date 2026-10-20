@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -57,7 +58,17 @@ class ChatyDataStore extends ChangeNotifier {
     );
   }
 
-  void _onBackendChanged() => notifyListeners();
+  void _onBackendChanged() {
+    // ponytail: defer to post-frame when a notification would land mid-build
+    // (e.g. conversations loading synchronously from initState). Upgrade to an
+    // explicit result-surfacing API if more callers need deterministic frames.
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    if (phase == SchedulerPhase.persistentCallbacks) {
+      SchedulerBinding.instance.addPostFrameCallback((_) => notifyListeners());
+      return;
+    }
+    notifyListeners();
+  }
 
   void _startTypingWatch() {
     unawaited(_typingSubscription?.cancel());

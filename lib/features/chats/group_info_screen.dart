@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../data/repositories/chaty_data_store.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/design_system/design_system.dart';
+import '../../ui/core/icons/chaty_icon_registry.dart';
 
 class GroupInfoScreen extends StatelessWidget {
   final ThemeConfig theme;
@@ -35,7 +36,7 @@ class GroupInfoScreen extends StatelessWidget {
         leading: const ChatyBackButton(),
         actions: [
           ChatyIconButton(
-            icon: Icons.edit_outlined,
+            icon: ChatyIconId.editOutline,
             tooltip: 'Edit group info',
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(

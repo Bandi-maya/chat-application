@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../../ui/core/icons/chaty_icon_registry.dart';
 import '../models/dynamic_island_payload.dart';
 import '../controllers/dynamic_island_controller.dart';
 import 'bandi_kinetic_crest.dart';
@@ -508,8 +509,8 @@ class ExpandedMediaView extends StatelessWidget {
                     color: Colors.white,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    payload.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                  child: ChatyIcon(
+                    payload.isPlaying ? ChatyIconId.pause : ChatyIconId.playArrow,
                     color: Colors.black,
                     size: 26,
                   ),

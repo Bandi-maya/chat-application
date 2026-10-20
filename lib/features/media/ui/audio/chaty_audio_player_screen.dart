@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../ui/core/design_system/design_system.dart';
+import '../../../../ui/core/icons/chaty_icon_registry.dart';
 import '../../models/media_playback_state.dart';
 import '../../services/media_player_coordinator.dart';
 import '../icons/chaty_media_icons.dart';
@@ -380,8 +381,8 @@ class _ChatyAudioPlayerScreenState extends State<ChatyAudioPlayerScreen>
                     final item = state.queue[index];
                     final isCurrent = index == state.queueIndex;
                     return ListTile(
-                      leading: Icon(
-                        isCurrent ? Icons.play_arrow_rounded : Icons.music_note_rounded,
+                      leading: ChatyIcon(
+                        isCurrent ? ChatyIconId.playArrow : ChatyIconId.musicNote,
                         color: isCurrent ? Theme.of(sheetContext).colorScheme.primary : null,
                       ),
                       title: Text(

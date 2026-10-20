@@ -32,6 +32,7 @@ import '../../ui/core/design_system/components/chaty_glyph.dart';
 import '../../ui/core/design_system/components/app_components.dart';
 import '../../ui/core/design_system/components/composer_components.dart';
 import '../../ui/core/gb/gb_theme_overrides.dart';
+import '../../ui/core/icons/chaty_canonical_overflow_button.dart';
 import '../../core/emoji/widgets/animated_emoji_text.dart';
 import '../../ui/core/menu/app_context_menu.dart';
 import '../../ui/core/widgets/app_avatar.dart';
@@ -1877,13 +1878,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   ),
                 // Chat overflow menu: wallpaper, mute, clear, block and more.
                 Builder(
-                  builder: (btnCtx) => IconButton(
+                  builder: (btnCtx) => ChatyCanonicalOverflowButton(
                     tooltip: 'Chat options',
-                    icon: ChatyGlyphIcon(
-                      glyph: ChatyGlyph.more,
-                      color: theme.primaryTextColor,
-                      size: 22,
-                    ),
+                    color: theme.primaryTextColor,
+                    size: 22,
                     onPressed: () =>
                         _openChatMenu(btnCtx, conversation, otherUser),
                   ),

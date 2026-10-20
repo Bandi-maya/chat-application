@@ -44,13 +44,6 @@ class _FakeAudioCapabilityService extends Fake with ChangeNotifier implements Au
     notifyListeners();
   }
 
-  @override
-  Future<bool> setDualOutputEnabled(bool enabled) async => false;
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
 }
 
 void main() {

@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/models/chat_task.dart';
 import '../../domain/models/task_workflow.dart';
 import '../../data/repositories/chaty_data_store.dart';
+import '../../ui/core/icons/chaty_icon_registry.dart';
 import '../../ui/core/widgets/status_badge.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/design_system/design_system.dart';
@@ -234,7 +235,7 @@ class _TasksScreenState extends State<TasksScreen>
                   ),
                 ),
                 ChatyIconButton(
-                  icon: Icons.add_task_rounded,
+                  icon: ChatyIconId.addTask,
                   tooltip: 'Create task',
                   backgroundColor: colors.surfaceSecondary,
                   color: colors.primary,
@@ -671,7 +672,7 @@ class _TasksScreenState extends State<TasksScreen>
                         iconSize: 18,
                         tooltip: 'Move back',
                         onPressed: () => _moveTask(task, previous),
-                        icon: Icons.chevron_left_rounded,
+                        icon: ChatyIconId.chevronRight,
                         color: context.colors.primary,
                       ),
                     if (next != null)
@@ -680,7 +681,7 @@ class _TasksScreenState extends State<TasksScreen>
                         iconSize: 18,
                         tooltip: 'Move forward',
                         onPressed: () => _moveTask(task, next),
-                        icon: Icons.chevron_right_rounded,
+                        icon: ChatyIconId.chevronRight,
                         color: context.colors.primary,
                       ),
                   ],

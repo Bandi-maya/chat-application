@@ -194,7 +194,10 @@ class AuthSecondaryButton extends StatelessWidget {
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           foregroundColor: theme.primaryTextColor,
-          side: BorderSide(color: context.colors.border, width: 1.5),
+          side: BorderSide(
+            color: context.colors.border.withValues(alpha: 0.65),
+            width: 1.5,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -282,6 +285,7 @@ class AuthIllustration extends StatelessWidget {
       height: height,
       width: double.infinity,
       margin: const EdgeInsets.symmetric(vertical: 12),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: context.colors.surfaceSecondary.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(24),

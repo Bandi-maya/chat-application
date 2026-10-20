@@ -4,6 +4,7 @@ import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/design_system.dart';
 import '../../../ui/core/design_system/gb_design_system.dart';
+import '../../../ui/core/icons/chaty_icon_registry.dart';
 
 class ConversationMoreOptionsScreen extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
@@ -100,7 +101,11 @@ class _ConversationMoreOptionsScreenState extends State<ConversationMoreOptionsS
                                   backgroundColor: prefs.voiceNotePlayButtonColor != null
                                       ? Color(prefs.voiceNotePlayButtonColor!)
                                       : theme.accentColor,
-                                  child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20),
+                                  child: ChatyIcon(
+                                    ChatyIconId.playArrow,
+                                    size: 20,
+                                    color: Colors.white,
+                                  ),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(

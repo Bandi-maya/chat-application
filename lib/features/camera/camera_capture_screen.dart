@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../ui/core/design_system/chaty_haptics.dart';
+import '../../ui/core/icons/chaty_icon_registry.dart';
 import 'effects/effect_engine.dart';
 import 'effects/effect_model.dart';
 import 'effects/effect_registry.dart';
@@ -1362,10 +1363,23 @@ class _CameraGlyph extends StatelessWidget {
   final double size;
 
   @override
-  Widget build(BuildContext context) => CustomPaint(
-    size: Size.square(size),
-    painter: _CameraGlyphPainter(kind: kind, color: color),
-  );
+  Widget build(BuildContext context) {
+    final iconId = switch (kind) {
+      'gallery' => ChatyIconId.gallery,
+      'flip' => ChatyIconId.cameraFlip,
+      'flash' => ChatyIconId.cameraFlashOn,
+      'camera' => ChatyIconId.camera,
+      'close' => ChatyIconId.close,
+      _ => null,
+    };
+    if (iconId != null) {
+      return ChatyIcon(iconId, size: size, color: color);
+    }
+    return CustomPaint(
+      size: Size.square(size),
+      painter: _CameraGlyphPainter(kind: kind, color: color),
+    );
+  }
 }
 
 class _CameraGlyphPainter extends CustomPainter {

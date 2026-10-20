@@ -5,6 +5,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../../core/emoji/chaty_emoji_style.dart';
+import '../../../core/emoji/chaty_motion_emoji.dart';
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/app_icon_controller.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
@@ -119,15 +121,6 @@ class _UniversalStylesScreenState extends State<UniversalStylesScreen>
       'color': Color(0xFFEF5AB7),
       'icon': Icons.layers_rounded,
     },
-  ];
-
-  final List<String> _emojiVariants = [
-    'WhatsApp',
-    'iOS NEW 2025',
-    'One',
-    'Facebook',
-    'Android O',
-    'System Emoji (BETA)',
   ];
 
   final List<Map<String, dynamic>> _notificationIcons =
@@ -454,21 +447,131 @@ class _UniversalStylesScreenState extends State<UniversalStylesScreen>
                 ),
                 const SizedBox(height: 14),
 
-                // SECTION 2: EMOJI VARIANT
+                // SECTION 2: EMOJI STYLES (10 SELECTABLE STYLES)
                 GbCardContainer(
-                  headerText: 'EMOJI VARIANT',
-                  children: _emojiVariants.map((variant) {
-                    final isSelected = prefs.emojiVariant == variant;
+                  headerText: 'EMOJI STYLES (10 SELECTABLE STYLES)',
+                  children: ChatyEmojiStyleId.values.map((style) {
+                    final currentStyleId = ChatyEmojiStyleId.fromString(prefs.emojiStyle);
+                    final isSelected = currentStyleId == style;
                     return InkWell(
                       onTap: () {
                         widget.preferencesController.updateUniversal(
-                          prefs.copyWith(emojiVariant: variant),
+                          prefs.copyWith(
+                            emojiStyle: style.title,
+                            emojiVariant: style.title,
+                          ),
                         );
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            SnackBar(
+                              content: Text('Emoji style set to ${style.title}'),
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
                       },
-                      child: Padding(
+                      child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? theme.accentColor.withValues(alpha: 0.08)
+                              : Colors.transparent,
+                          border: Border(
+                            bottom: BorderSide(
+                              color: colors.border.withValues(alpha: 0.5),
+                              width: 0.5,
+                            ),
+                          ),
+                        ),
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? theme.accentColor.withValues(alpha: 0.15)
+                                    : colors.surfaceSecondary,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? theme.accentColor
+                                      : colors.border.withValues(alpha: 0.6),
+                                  width: isSelected ? 1.8 : 1.0,
+                                ),
+                              ),
+                              child: Center(
+                                child: ChatyMotionEmoji(
+                                  unicode: '😂',
+                                  size: 32,
+                                  style: style,
+                                  animate: isSelected && style.isAnimated,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        style.title,
+                                        style: TextStyle(
+                                          color: theme.primaryTextColor,
+                                          fontSize: 15,
+                                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      if (style.isAnimated)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: theme.accentColor.withValues(alpha: 0.16),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            'ANIMATED',
+                                            style: TextStyle(
+                                              color: theme.accentColor,
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 0.5,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    style.description,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: colors.foregroundSecondary,
+                                      fontSize: 12,
+                                      height: 1.25,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      ChatyMotionEmoji(unicode: '😂', size: 20, style: style, animate: false),
+                                      const SizedBox(width: 6),
+                                      ChatyMotionEmoji(unicode: '❤️', size: 20, style: style, animate: false),
+                                      const SizedBox(width: 6),
+                                      ChatyMotionEmoji(unicode: '🔥', size: 20, style: style, animate: false),
+                                      const SizedBox(width: 6),
+                                      ChatyMotionEmoji(unicode: '👍', size: 20, style: style, animate: false),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
                             Container(
                               width: 22,
                               height: 22,
@@ -492,23 +595,6 @@ class _UniversalStylesScreenState extends State<UniversalStylesScreen>
                                     )
                                   : null,
                             ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Text(
-                                variant,
-                                style: TextStyle(
-                                  color: theme.primaryTextColor,
-                                  fontSize: 15,
-                                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                            if (variant != 'WhatsApp' && variant != 'System Emoji (BETA)')
-                              Icon(
-                                Icons.download_rounded,
-                                color: theme.accentColor,
-                                size: 20,
-                              ),
                           ],
                         ),
                       ),

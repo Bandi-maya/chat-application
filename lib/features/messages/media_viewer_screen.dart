@@ -7,6 +7,7 @@ import 'package:video_player/video_player.dart';
 
 import '../../data/services/chat_media_service.dart';
 import '../../ui/core/design_system/design_system.dart';
+import '../../ui/core/icons/chaty_icon_registry.dart';
 
 class MediaViewerScreen extends StatefulWidget {
   final ThemeConfig theme;
@@ -158,13 +159,13 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         actions: [
           ChatyIconButton(
             tooltip: 'Open with app',
-            icon: Icons.open_in_new_rounded,
+            icon: ChatyIconId.openInNew,
             color: colors.foreground,
             onPressed: _signedUrl == null ? null : _openExternally,
           ),
           ChatyIconButton(
             tooltip: 'Share file link',
-            icon: Icons.share_rounded,
+            icon: ChatyIconId.share,
             color: colors.foreground,
             onPressed: _signedUrl == null ? null : _share,
           ),
@@ -252,8 +253,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                                 color: colors.surface.withValues(alpha: 0.7),
                                 shape: BoxShape.circle,
                               ),
-                              child: Icon(
-                                Icons.play_arrow_rounded,
+                              child: ChatyIcon(
+                                ChatyIconId.playArrow,
                                 color: colors.foreground,
                                 size: 54,
                               ),
@@ -273,8 +274,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                   ChatyIconButton(
                     onPressed: _toggleVideo,
                     icon: controller.value.isPlaying
-                        ? Icons.pause_rounded
-                        : Icons.play_arrow_rounded,
+                        ? ChatyIconId.pause
+                        : ChatyIconId.playArrow,
                     color: colors.foreground,
                   ),
                   const SizedBox(width: ChatySpacing.sm),

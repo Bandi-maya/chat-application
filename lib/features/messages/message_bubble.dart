@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../ui/core/icons/chaty_icon_registry.dart';
+import '../../ui/core/design_system/tokens/app_tokens.dart';
 import '../camera/effects/effect_registry.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:just_audio/just_audio.dart';
@@ -280,6 +282,7 @@ class MessageBubble extends StatelessWidget {
               enableAnimatedEmojis
                   ? AnimatedEmojiText(
                       text: message.text,
+                      messageId: message.id,
                       style: TextStyle(
                         fontSize: emojiInfo.fontSize(messageTextSize * theme.fontScale),
                         height: 1.25,
@@ -1093,6 +1096,7 @@ class MessageBubble extends StatelessWidget {
                                             final textWidget = enableAnimatedEmojis
                                                 ? AnimatedEmojiText(
                                                     text: message.text,
+                                                    messageId: message.id,
                                                     style: textStyle,
                                                   )
                                                 : Text(
@@ -1432,11 +1436,12 @@ class _SignedVideoPreviewState extends State<_SignedVideoPreview> {
                 foregroundColor: Colors.white,
               ),
               onPressed: controller == null ? null : _toggle,
-              icon: Icon(
+              icon: ChatyIcon(
                 controller?.value.isPlaying == true
-                    ? Icons.pause_rounded
-                    : Icons.play_arrow_rounded,
+                    ? ChatyIconId.pause
+                    : ChatyIconId.playArrow,
                 size: 30,
+                color: Colors.white,
               ),
             ),
           ),
@@ -1679,8 +1684,10 @@ class _VoiceNotePlayerState extends State<_VoiceNotePlayer> {
                       color: Colors.white,
                     ),
                   )
-                : Icon(
-                    _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                : ChatyIcon(
+                    _playing ? ChatyIconId.pause : ChatyIconId.playArrow,
+                    size: ChatyIconSize.md,
+                    color: Colors.white,
                   ),
           ),
           const SizedBox(width: 8),

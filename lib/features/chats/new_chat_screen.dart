@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../data/repositories/chaty_data_store.dart';
 import '../../domain/models/user_profile.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
+import '../../ui/core/icons/chaty_icon_registry.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/design_system/design_system.dart';
 import 'chat_detail_screen.dart';
@@ -254,7 +255,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
                   ),
                   suffixIcon: _searchCtrl.text.isNotEmpty
                       ? ChatyIconButton(
-                          icon: Icons.close_rounded,
+                          icon: ChatyIconId.close,
                           size: 32,
                           iconSize: 18,
                           onPressed: () {

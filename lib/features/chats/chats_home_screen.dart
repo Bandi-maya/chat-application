@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../domain/models/preferences.dart';
+import '../../ui/core/icons/chaty_canonical_overflow_button.dart';
 import '../../ui/core/formatting/chat_formatters.dart';
 import '../../ui/core/theme/app_theme.dart';
 import '../../data/repositories/chaty_data_store.dart';
@@ -1915,13 +1916,10 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                     : Icons.dark_mode_rounded,
               ),
             ),
-          IconButton(
+          ChatyCanonicalOverflowButton(
             tooltip: 'More options',
-            icon: Icon(
-              Icons.more_vert_rounded,
-              color: theme.primaryTextColor,
-              size: 26,
-            ),
+            color: theme.primaryTextColor,
+            size: 24,
             onPressed: () => _openHomeThreeDotMenu(
               homePrefs: homePrefs,
               theme: theme,
