@@ -1641,6 +1641,8 @@ class UniversalPreferences {
   final String emojiVariant;
   final String notificationIcon;
   final String fontStyle;
+  final String iconTheme;
+  final String emojiStyle;
   final bool loadFontEnabled;
   bool get loadFontCustom => loadFontEnabled;
 
@@ -1687,6 +1689,8 @@ class UniversalPreferences {
     this.emojiVariant = 'WhatsApp',
     this.notificationIcon = 'White',
     this.fontStyle = 'Default',
+    this.iconTheme = 'Chaty Orbit',
+    this.emojiStyle = 'Chaty Motion',
     this.loadFontEnabled = false,
     this.hidePhotosFromGallery = false,
     this.hideVideosFromGallery = false,
@@ -1715,6 +1719,8 @@ class UniversalPreferences {
     String? emojiVariant,
     String? notificationIcon,
     String? fontStyle,
+    String? iconTheme,
+    String? emojiStyle,
     bool? loadFontEnabled,
     bool? loadFontCustom,
     bool? hidePhotosFromGallery,
@@ -1752,6 +1758,8 @@ class UniversalPreferences {
       emojiVariant: emojiVariant ?? this.emojiVariant,
       notificationIcon: notificationIcon ?? this.notificationIcon,
       fontStyle: fontStyle ?? this.fontStyle,
+      iconTheme: iconTheme ?? this.iconTheme,
+      emojiStyle: emojiStyle ?? this.emojiStyle,
       loadFontEnabled:
           loadFontCustom ?? loadFontEnabled ?? this.loadFontEnabled,
       hidePhotosFromGallery:
@@ -1793,6 +1801,8 @@ class UniversalPreferences {
     'emojiVariant': emojiVariant,
     'notificationIcon': notificationIcon,
     'fontStyle': fontStyle,
+    'iconTheme': iconTheme,
+    'emojiStyle': emojiStyle,
     'loadFontEnabled': loadFontEnabled,
     'hidePhotosFromGallery': hidePhotosFromGallery,
     'hideVideosFromGallery': hideVideosFromGallery,
@@ -1823,6 +1833,8 @@ class UniversalPreferences {
         emojiVariant: map['emojiVariant'] ?? 'WhatsApp',
         notificationIcon: map['notificationIcon'] ?? 'White',
         fontStyle: map['fontStyle'] ?? 'Default',
+        iconTheme: map['iconTheme'] ?? 'Chaty Orbit',
+        emojiStyle: map['emojiStyle'] ?? 'Chaty Motion',
         loadFontEnabled: map['loadFontEnabled'] ?? false,
         hidePhotosFromGallery: map['hidePhotosFromGallery'] ?? false,
         hideVideosFromGallery: map['hideVideosFromGallery'] ?? false,

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../chaty_haptics.dart';
 import '../chaty_motion.dart';
 import '../component_state.dart';
+import '../../icons/chaty_icon_registry.dart';
 
 class ChatyConversationTile extends StatelessWidget {
   const ChatyConversationTile({
@@ -904,22 +905,22 @@ class _DeliveryGlyph extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final (icon, color) = switch (state) {
       ChatyDeliveryState.local => (
-        Icons.schedule_rounded,
+        ChatyIconId.schedule,
         scheme.onSurfaceVariant,
       ),
       ChatyDeliveryState.queued => (
-        Icons.schedule_send_rounded,
+        ChatyIconId.scheduleSend,
         scheme.onSurfaceVariant,
       ),
-      ChatyDeliveryState.sending => (Icons.sync_rounded, scheme.primary),
-      ChatyDeliveryState.sent => (Icons.check_rounded, scheme.onSurfaceVariant),
+      ChatyDeliveryState.sending => (ChatyIconId.sync, scheme.primary),
+      ChatyDeliveryState.sent => (ChatyIconId.checkSingle, scheme.onSurfaceVariant),
       ChatyDeliveryState.delivered => (
-        Icons.done_all_rounded,
+        ChatyIconId.checkDouble,
         scheme.onSurfaceVariant,
       ),
-      ChatyDeliveryState.read => (Icons.done_all_rounded, scheme.primary),
-      ChatyDeliveryState.failed => (Icons.error_outline_rounded, scheme.error),
+      ChatyDeliveryState.read => (ChatyIconId.checkDouble, scheme.primary),
+      ChatyDeliveryState.failed => (ChatyIconId.errorOutline, scheme.error),
     };
-    return Icon(icon, size: 15, color: color);
+    return ChatyIcon(icon, size: 15, color: color);
   }
 }

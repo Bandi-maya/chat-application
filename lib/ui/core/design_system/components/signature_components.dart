@@ -1,6 +1,8 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import '../../icons/chaty_icon_registry.dart';
+import '../tokens/app_tokens.dart';
 
 /// Signature Chaty surfaces. These are intentionally brand-specific rather
 /// than imitations of another messenger's chrome.
@@ -491,8 +493,9 @@ class ChatyMiniPlayer extends StatelessWidget {
         children: [
           IconButton.filledTonal(
             onPressed: onPlayPause,
-            icon: Icon(
-              playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+            icon: ChatyIcon(
+              playing ? ChatyIconId.pause : ChatyIconId.playArrow,
+              size: ChatyIconSize.md,
             ),
           ),
           Expanded(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../icons/chaty_icon_registry.dart';
 import '../tokens/app_tokens.dart';
 import '../../theme/app_theme.dart';
 
@@ -473,7 +474,7 @@ class _ChatySecondaryButtonState extends State<ChatySecondaryButton> {
 }
 
 class ChatyIconButton extends StatefulWidget {
-  final IconData icon;
+  final ChatyIconId icon;
   final VoidCallback? onPressed;
   final String? tooltip;
   final Color? color;
@@ -534,7 +535,7 @@ class _ChatyIconButtonState extends State<ChatyIconButton> {
                 preferred: ChatyMotion.instant,
             ),
             curve: ChatyMotion.enter,
-            child: Icon(
+            child: ChatyIcon(
               widget.icon,
               size: widget.iconSize,
               color: widget.onPressed != null

@@ -9,6 +9,7 @@ import '../../data/services/contact_relationship_service.dart';
 import '../../domain/models/other_models.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/design_system/design_system.dart';
+import '../../ui/core/icons/chaty_icon_registry.dart';
 import '../../ui/core/widgets/app_brand_icon.dart';
 import 'chat_detail_screen.dart';
 
@@ -323,7 +324,7 @@ class _LinkedDevicesQrScreenState extends State<LinkedDevicesQrScreen>
                         )
                       : ChatyIconButton(
                           tooltip: 'Log out device',
-                          icon: Icons.logout_rounded,
+                          icon: ChatyIconId.logout,
                           color: context.colors.error,
                           onPressed: () => _revoke(device),
                         ),

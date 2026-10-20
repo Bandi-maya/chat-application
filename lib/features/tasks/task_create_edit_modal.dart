@@ -4,6 +4,7 @@ import '../../data/repositories/chaty_data_store.dart';
 import '../../domain/models/chat_task.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/user_profile.dart';
+import '../../ui/core/icons/chaty_icon_registry.dart';
 import '../../ui/core/design_system/design_system.dart';
 
 class TaskCreateEditModal extends StatefulWidget {
@@ -223,7 +224,7 @@ class _TaskCreateEditModalState extends State<TaskCreateEditModal> {
                     style: ChatyTypography.headline(colors.foreground),
                   ),
                   ChatyIconButton(
-                    icon: Icons.close_rounded,
+                    icon: ChatyIconId.close,
                     tooltip: 'Close',
                     onPressed: _isSaving ? null : () => Navigator.pop(context),
                   ),

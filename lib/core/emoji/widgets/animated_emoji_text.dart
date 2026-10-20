@@ -14,6 +14,7 @@ class AnimatedEmojiText extends StatelessWidget {
   final int? maxLines;
   final TextOverflow overflow;
   final VoidCallback? onEmojiTap;
+  final String? messageId;
 
   const AnimatedEmojiText({
     super.key,
@@ -25,6 +26,7 @@ class AnimatedEmojiText extends StatelessWidget {
     this.maxLines,
     this.overflow = TextOverflow.clip,
     this.onEmojiTap,
+    this.messageId,
   });
 
   @override
@@ -46,6 +48,7 @@ class AnimatedEmojiText extends StatelessWidget {
     // Standard inline parsing with proportional emoji height
     final spans = ChatyEmojiParser.parse(text);
     final inlineSize = (fontSize * 1.35).clamp(16.0, 36.0);
+    int emojiIdx = 0;
 
     return RichText(
       textAlign: textAlign,
@@ -58,6 +61,7 @@ class AnimatedEmojiText extends StatelessWidget {
               if (!span.isEmoji) {
                 return TextSpan(text: span.rawText);
               }
+              final currentIndex = emojiIdx++;
               return WidgetSpan(
                 alignment: PlaceholderAlignment.middle,
                 baseline: TextBaseline.alphabetic,
@@ -70,6 +74,8 @@ class AnimatedEmojiText extends StatelessWidget {
                     mode: EmojiDisplayMode.inline,
                     interactive: true,
                     onTap: onEmojiTap,
+                    messageId: messageId,
+                    emojiIndex: currentIndex,
                   ),
                 ),
               );
@@ -102,18 +108,19 @@ class AnimatedEmojiText extends StatelessWidget {
         crossAxisAlignment: WrapCrossAlignment.center,
         spacing: 6,
         runSpacing: 6,
-        children: spans
-            .map((span) {
-              return AnimatedEmojiView(
-                unicode: span.normalizedUnicode,
-                size: emojiSize,
-                animate: animate,
-                mode: mode,
-                interactive: true,
-                onTap: onEmojiTap,
-              );
-            })
-            .toList(growable: false),
+        children: List.generate(spans.length, (index) {
+          final span = spans[index];
+          return AnimatedEmojiView(
+            unicode: span.normalizedUnicode,
+            size: emojiSize,
+            animate: animate,
+            mode: mode,
+            interactive: true,
+            onTap: onEmojiTap,
+            messageId: messageId,
+            emojiIndex: index,
+          );
+        }),
       ),
     );
   }

@@ -6,6 +6,7 @@ import '../../../ui/core/design_system/design_system.dart';
 import '../../../ui/core/design_system/gb_design_system.dart';
 import 'universal_colors_screen.dart';
 import 'universal_styles_screen.dart';
+import 'universal_chaty_icons_screen.dart';
 import 'hide_media_screen.dart';
 import 'backup_and_restore_screen.dart';
 import 'universal_general_settings_screen.dart';
@@ -76,6 +77,16 @@ class UniversalScreen extends StatelessWidget {
                       onTap: () => _navigate(
                         context,
                         UniversalStylesScreen(preferencesController: preferencesController),
+                      ),
+                    ),
+                    GbSettingRow(
+                      icon: Icons.auto_awesome_mosaic_rounded,
+                      title: 'Universal Chaty Icons',
+                      subtitle: '10 custom icon themes, live preview, individual catalogue',
+                      hasSubScreen: true,
+                      onTap: () => _navigate(
+                        context,
+                        UniversalChatyIconsScreen(preferencesController: preferencesController),
                       ),
                     ),
                     GbSettingRow(

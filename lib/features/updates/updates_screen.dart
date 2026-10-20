@@ -9,6 +9,7 @@ import '../../data/services/status_service.dart';
 import '../camera/camera_capture_screen.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
+import '../../ui/core/icons/chaty_icon_registry.dart';
 import '../../ui/core/templates/template_controller.dart';
 import '../../ui/core/templates/template_models.dart';
 import '../../ui/core/widgets/app_avatar.dart';
@@ -346,7 +347,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                       ),
                       if (status.userId == widget.dataStore.currentUser.id) ...[
                         ChatyIconButton(
-                          icon: Icons.delete_outline_rounded,
+                          icon: ChatyIconId.deleteOutline,
                           tooltip: 'Delete status',
                           color: context.colors.error,
                           onPressed: () async {
@@ -1351,7 +1352,10 @@ class _StatusAudioPlayerState extends State<_StatusAudioPlayer> {
                     : Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(_player.playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                          ChatyIcon(
+                            _player.playing ? ChatyIconId.pause : ChatyIconId.playArrow,
+                            size: ChatyIconSize.md,
+                          ),
                           const SizedBox(width: 8),
                           Text(_player.playing ? 'Pause audio' : 'Play audio'),
                         ],

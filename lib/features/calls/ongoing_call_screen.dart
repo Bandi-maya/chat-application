@@ -10,6 +10,7 @@ import '../../features/camera/effects/effect_engine.dart';
 import '../../features/camera/effects/effect_registry.dart';
 import '../settings/calls/call_presentation_preferences.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
+import '../../ui/core/icons/chaty_icon_registry.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../../ui/core/templates/template_controller.dart';
@@ -436,7 +437,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                         ),
                         if (session.isVideo)
                           ChatyIconButton(
-                            icon: Icons.picture_in_picture_alt_rounded,
+                            icon: ChatyIconId.pictureInPicture,
                             tooltip: 'Picture-in-picture',
                             color: _callIconColor,
                             backgroundColor: Colors.black.withValues(
@@ -448,7 +449,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                           ),
                         if (session.isVideo)
                           ChatyIconButton(
-                            icon: Icons.auto_awesome_rounded,
+                            icon: ChatyIconId.autoAwesome,
                             tooltip: 'Call filter',
                             color: _callIconColor,
                             backgroundColor:
@@ -461,8 +462,8 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                           ),
                         ChatyIconButton(
                           icon: _focusMode
-                              ? Icons.fullscreen_exit_rounded
-                              : Icons.fullscreen_rounded,
+                              ? ChatyIconId.fullscreenExit
+                              : ChatyIconId.fullscreen,
                           tooltip: _focusMode
                               ? 'Exit focus mode'
                               : 'Focus mode',
@@ -508,6 +509,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                           icon: session.isMuted
                               ? Icons.mic_off_rounded
                               : Icons.mic_rounded,
+                          chatyIconId: session.isMuted ? null : ChatyIconId.microphone,
                           isActive: session.isMuted,
                           activeColor: colors.error,
                           onTap: (_callService.hasLocalMedia || session.isDemo)
@@ -522,6 +524,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                             icon: session.isCameraOff
                                 ? Icons.videocam_off_rounded
                                 : Icons.videocam_rounded,
+                            chatyIconId: session.isCameraOff ? null : ChatyIconId.callVideo,
                             isActive: session.isCameraOff,
                             activeColor: colors.error,
                             onTap: (_callService.hasLocalMedia || session.isDemo)
@@ -531,6 +534,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                           _buildCallButton(
                             label: 'Switch camera',
                             icon: Icons.cameraswitch_rounded,
+                            chatyIconId: ChatyIconId.cameraFlip,
                             isActive: false,
                             activeColor: colors.primary,
                             onTap:
@@ -563,6 +567,9 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                           icon: session.audioRoute == AudioRouteType.speaker
                               ? Icons.volume_up_rounded
                               : Icons.hearing_rounded,
+                          chatyIconId: session.audioRoute == AudioRouteType.speaker
+                              ? ChatyIconId.speaker
+                              : null,
                           isActive:
                               session.audioRoute == AudioRouteType.speaker,
                           activeColor: colors.primary,
@@ -593,8 +600,8 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                                 shape: BoxShape.circle,
                               ),
                               alignment: Alignment.center,
-                              child: Icon(
-                                Icons.call_end_rounded,
+                              child: ChatyIcon(
+                                ChatyIconId.callEnd,
                                 color: colors.onError,
                                 size: 28,
                               ),
@@ -816,6 +823,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
   Widget _buildCallButton({
     required String label,
     required IconData icon,
+    ChatyIconId? chatyIconId,
     required bool isActive,
     required Color activeColor,
     required VoidCallback? onTap,
@@ -845,11 +853,17 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
               ),
             ),
             alignment: Alignment.center,
-            child: Icon(
-              icon,
-              color: isActive ? activeColor : _callIconColor,
-              size: 23,
-            ),
+            child: chatyIconId != null
+                ? ChatyIcon(
+                    chatyIconId,
+                    color: isActive ? activeColor : _callIconColor,
+                    size: 23,
+                  )
+                : Icon(
+                    icon,
+                    color: isActive ? activeColor : _callIconColor,
+                    size: 23,
+                  ),
           ),
         ),
       ),

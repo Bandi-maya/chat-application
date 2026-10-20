@@ -8,6 +8,7 @@ import '../../data/services/call_signaling_service.dart';
 import '../../domain/models/other_models.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/design_system/design_system.dart';
+import '../../ui/core/icons/chaty_icon_registry.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import 'call_contact_picker_screen.dart';
 import 'ongoing_call_screen.dart';
@@ -266,8 +267,8 @@ class _CallsScreenState extends State<CallsScreen> {
                               ),
                               trailing: ChatyIconButton(
                                 icon: isVideo
-                                    ? Icons.videocam_rounded
-                                    : Icons.call_rounded,
+                                    ? ChatyIconId.videoCam
+                                    : ChatyIconId.voiceCall,
                                 tooltip: isVideo ? 'Video call' : 'Voice call',
                                 size: 44,
                                 iconSize: 20,
