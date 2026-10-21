@@ -765,9 +765,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                     children: [
                                       ChatyAvatar(
                                         initials: contact.avatarInitials,
-                                        color: Color(
-                                          int.parse(contact.avatarColorHex),
-                                        ),
+                                        color: ChatyAvatarCore.parseColorHex(contact.avatarColorHex),
                                         size: storyCompact
                                             ? styleStoriesAvatar * 0.82
                                             : styleStoriesAvatar,
@@ -2264,11 +2262,10 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                     .take(2)
                                     .toString()
                                     .toUpperCase(),
-                            color: conversation.avatarColorHex == null
-                                ? theme.accentColor
-                                : Color(
-                                    int.parse(conversation.avatarColorHex!),
-                                  ),
+                            color: ChatyAvatarCore.parseColorHex(
+                              conversation.avatarColorHex,
+                              fallback: theme.accentColor,
+                            ),
                             size: 50 * effectiveDensity,
                             shape: homePrefs.avatarShape == 'circle'
                                 ? chatListTemplate.avatarShape
@@ -2789,11 +2786,10 @@ class _ArchivedChatsScreenState extends State<_ArchivedChatsScreen> {
                                       .take(2)
                                       .toString()
                                       .toUpperCase(),
-                              color: conversation.avatarColorHex == null
-                                  ? theme.accentColor
-                                  : Color(
-                                      int.parse(conversation.avatarColorHex!),
-                                    ),
+                              color: ChatyAvatarCore.parseColorHex(
+                                conversation.avatarColorHex,
+                                fallback: theme.accentColor,
+                              ),
                               size: 48,
                               shape:
                                   widget.preferencesController.home.avatarShape,
@@ -2976,9 +2972,10 @@ class _SplitQuickPane extends StatelessWidget {
                           .take(2)
                           .toString()
                           .toUpperCase(),
-                  color: conversation.avatarColorHex == null
-                      ? theme.accentColor
-                      : Color(int.parse(conversation.avatarColorHex!)),
+                  color: ChatyAvatarCore.parseColorHex(
+                    conversation.avatarColorHex,
+                    fallback: theme.accentColor,
+                  ),
                   size: 34,
                   shape: 'circle',
                 ),

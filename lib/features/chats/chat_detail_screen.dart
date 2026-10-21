@@ -2227,7 +2227,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         textStyle: TextStyle(color: sidebarTextColor, fontSize: 12),
                         child: ChatyAvatar(
                           initials: contact.avatarInitials,
-                          color: Color(int.parse(contact.avatarColorHex)),
+                          color: ChatyAvatarCore.parseColorHex(contact.avatarColorHex),
                           size: 38,
                           shape: widget.preferencesController.home.avatarShape,
                         ),

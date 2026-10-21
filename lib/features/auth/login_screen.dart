@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/services/username_login_service.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/persistence/preferences_storage.dart';
+import '../../ui/core/theme/theme_config.dart';
 import '../../ui/core/theme/theme_controller.dart';
 import '../../ui/core/validators/input_validators.dart';
 import '../chats/main_navigation_shell.dart';
@@ -65,6 +66,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String _friendlyError(Object error) {
     final value = error.toString().replaceFirst('Exception: ', '');
+    if (value.toLowerCase().contains('connection refused') ||
+        value.toLowerCase().contains('socketexception') ||
+        value.toLowerCase().contains('failed host lookup') ||
+        value.toLowerCase().contains('clientexception')) {
+      return 'Unable to connect to server. Please ensure the backend is running.';
+    }
     if (value.toLowerCase().contains('invalid') ||
         value.contains('Incorrect') ||
         value.contains('401')) {
@@ -251,7 +258,7 @@ class _LoginScreenState extends State<LoginScreen> {
     _handleLogin();
   }
 
-  Widget _buildQuickDemoAccounts(dynamic theme) {
+  Widget _buildQuickDemoAccounts(ThemeConfig theme) {
     final demoUsers = [
       {'name': 'Alex Rivera', 'user': 'alex_rivera', 'role': 'Engineer', 'color': 0xFF3B82F6},
       {'name': 'Sarah Connor', 'user': 'sarah_connor', 'role': 'Product', 'color': 0xFFEC4899},

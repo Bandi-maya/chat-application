@@ -769,13 +769,16 @@ class ChatyNetworkAvatar extends StatelessWidget {
     return ClipRRect(borderRadius: _radius, child: image);
   }
 
-  static Color _parseColor(String? hex, {required Color fallback}) {
+  static Color parseColorHex(String? hex, {Color fallback = const Color(0xFF6366F1)}) {
     if (hex == null || hex.isEmpty) return fallback;
     final normalized = hex.replaceFirst('0x', '').replaceFirst('#', '');
     final value = int.tryParse(normalized, radix: 16);
     if (value == null) return fallback;
     return normalized.length <= 6 ? Color(0xFF000000 | value) : Color(value);
   }
+
+  static Color _parseColor(String? hex, {required Color fallback}) =>
+      parseColorHex(hex, fallback: fallback);
 }
 
 /// ---------------------------------------------------------------------------
