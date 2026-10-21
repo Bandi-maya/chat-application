@@ -34,6 +34,8 @@ import 'settings_search_delegate.dart';
 import 'templates/templates_settings_screen.dart';
 import 'theme_editor_screen.dart';
 import 'customization/customization_center_screen.dart';
+import '../../data/services/api_backend_service.dart';
+import '../subscription/plan_subscription_screen.dart';
 
 class SettingsRootScreen extends StatelessWidget {
   final ChatyPreferencesController preferencesController;
@@ -502,6 +504,29 @@ class SettingsRootScreen extends StatelessWidget {
                           ),
                         ),
                       ),
+                    ),
+                    _SettingsItemTile(
+                      icon: const Icon(Icons.workspace_premium_rounded, color: Color(0xFF10B981), size: 24),
+                      title: 'Subscription & Plans',
+                      subtitle: 'Manage workspace billing, upgrade plan & usage limits',
+                      onTap: () {
+                        final backend = locator<ApiBackendService>();
+                        final org = backend.currentOrg;
+                        final orgId = org?['uid']?.toString() ??
+                            org?['tenantId']?.toString() ??
+                            ApiBackendConfig.tenantId;
+                        final orgName = org?['name']?.toString() ??
+                            ApiBackendConfig.tenantId;
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => PlanSubscriptionScreen(
+                              organizationId: orgId,
+                              organizationName: orgName,
+                              isNewRegistration: false,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                     _SettingsItemTile(
                       icon: Icon(Icons.security_rounded, color: colors.info, size: 24),

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../../data/repositories/chaty_data_store.dart';
+import '../../../data/services/api_backend_service.dart';
+import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/design_system.dart'
     hide ChatySettingsSection;
 import '../../../ui/core/design_system/settings_primitives.dart';
 import '../../profile/profile_actions.dart';
+import '../../subscription/plan_subscription_screen.dart';
 
 /// Dedicated canonical settings screen for Account & Profile details.
 class AccountSettingsScreen extends StatelessWidget {
@@ -54,7 +57,39 @@ class AccountSettingsScreen extends StatelessWidget {
               ],
             ),
 
-            // 2. ACCOUNT SECURITY
+            // 2. WORKSPACE & SUBSCRIPTION
+            ChatySettingsSection(
+              title: 'Workspace & Subscription',
+              children: [
+                ChatySettingsTile(
+                  icon: Icons.workspace_premium_rounded,
+                  iconColor: const Color(0xFF10B981),
+                  title: 'Subscription & Plans',
+                  subtitle: 'Manage workspace plan, billing & feature limits',
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () {
+                    final backend = locator<ApiBackendService>();
+                    final org = backend.currentOrg;
+                    final orgId = org?['uid']?.toString() ??
+                        org?['tenantId']?.toString() ??
+                        ApiBackendConfig.tenantId;
+                    final orgName = org?['name']?.toString() ??
+                        ApiBackendConfig.tenantId;
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => PlanSubscriptionScreen(
+                          organizationId: orgId,
+                          organizationName: orgName,
+                          isNewRegistration: false,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+
+            // 3. ACCOUNT ACTIONS
             ChatySettingsSection(
               title: 'Account Actions',
               children: [

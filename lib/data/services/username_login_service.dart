@@ -15,9 +15,17 @@ class UsernameLoginService {
   Future<UserProfile> login({
     required String identifier,
     required String password,
+    String? tenantId,
+    bool isDefaultTenant = false,
   }) async {
     final value = identifier.trim().replaceFirst(RegExp(r'^@+'), '');
     
+    if (isDefaultTenant) {
+      await ApiBackendConfig.setTenantId(null, useDefault: true);
+    } else if (tenantId != null && tenantId.trim().isNotEmpty) {
+      await ApiBackendConfig.setTenantId(tenantId.trim(), useDefault: false);
+    }
+
     // Delegate entirely to ApiBackendService
     final profile = await _apiBackend.login(identifier: value, password: password);
     return profile;
