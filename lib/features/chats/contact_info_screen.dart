@@ -213,8 +213,8 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                       children: [
                         CircleAvatar(
                           radius: 46,
-                          backgroundColor: Color(
-                            int.parse(widget.contact.avatarColorHex),
+                          backgroundColor: ChatyAvatarCore.parseColorHex(
+                            widget.contact.avatarColorHex,
                           ),
                           child: Text(
                             widget.contact.avatarInitials,

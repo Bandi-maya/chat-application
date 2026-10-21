@@ -201,6 +201,8 @@ class ThemeConfig {
       : const Color(0xFFFFFFFF);
   Color get onSurfaceColor => primaryTextColor;
   Color get onBackgroundColor => primaryTextColor;
+  Color get dividerColor => secondaryTextColor.withValues(alpha: 0.2);
+  Color get scaffoldBackgroundColor => backgroundColor;
 
   /// Dynamically inverts brightness and adapts all colors without hardcoding presets.
   ThemeConfig toggleBrightness() {
