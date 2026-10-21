@@ -132,6 +132,7 @@ Future<void> main() async {
   } catch (e) {
     debugPrint('Dotenv skipped: $e');
   }
+  await ApiBackendConfig.init();
   setupLocator();
   // Only work that shapes the very first frame blocks launch. The shell must
   // paint from local state immediately; platform services catch up right

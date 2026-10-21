@@ -53,6 +53,8 @@ import '../settings/message_management/message_management_page.dart';
 import '../settings/privacy/privacy_center_screen.dart';
 import '../settings/security/app_lock_overlay.dart';
 import '../settings/gb_features/gb_settings_screen.dart';
+import '../../data/services/api_backend_service.dart';
+import '../subscription/plan_subscription_screen.dart';
 
 class ChatsHomeScreen extends StatefulWidget {
   final ThemeConfig theme;
@@ -633,6 +635,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               child: Column(
                 children: [
                   const GlobalConnectionBanner(),
+                  _buildSubscriptionRequiredBanner(context, theme),
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 230),
                     switchInCurve: Curves.easeOutCubic,
@@ -2879,6 +2882,96 @@ class _ArchivedChatsScreenState extends State<_ArchivedChatsScreen> {
                     );
                   },
                 ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSubscriptionRequiredBanner(BuildContext context, ThemeConfig theme) {
+    final backend = locator<ApiBackendService>();
+    return ListenableBuilder(
+      listenable: backend,
+      builder: (context, _) {
+        if (!backend.requiresSubscription) return const SizedBox.shrink();
+
+        return Container(
+          width: double.infinity,
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.workspace_premium_rounded,
+                color: Color(0xFFD97706),
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Workspace Activation Required',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFB45309),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      backend.subscriptionErrorMessage ??
+                          'Please subscribe to a plan to start messaging.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.secondaryTextColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () {
+                  final org = backend.currentOrg;
+                  final orgId = org?['uid']?.toString() ??
+                      org?['tenantId']?.toString() ??
+                      ApiBackendConfig.tenantId;
+                  final orgName = org?['name']?.toString() ??
+                      ApiBackendConfig.tenantId;
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => PlanSubscriptionScreen(
+                        organizationId: orgId,
+                        organizationName: orgName,
+                        isNewRegistration: false,
+                      ),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD97706),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Select Plan',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
         );
       },
     );

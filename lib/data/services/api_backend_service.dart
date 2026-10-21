@@ -10,6 +10,20 @@ import '../../domain/models/conversation.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/chat_task.dart';
 
+class OrganizationRegistrationResult {
+  final UserProfile user;
+  final String organizationId;
+  final String organizationName;
+  final String tenantId;
+
+  const OrganizationRegistrationResult({
+    required this.user,
+    required this.organizationId,
+    required this.organizationName,
+    required this.tenantId,
+  });
+}
+
 class ApiBackendService extends ChangeNotifier {
   static final ApiBackendService _instance = ApiBackendService._internal();
   factory ApiBackendService() => _instance;
@@ -17,6 +31,7 @@ class ApiBackendService extends ChangeNotifier {
 
   bool _isInitialized = false;
   UserProfile? _currentUser;
+  Map<String, dynamic>? _currentOrg;
   String? _token;
   WebSocketChannel? _channel;
   Timer? _reconnectTimer;
@@ -25,9 +40,16 @@ class ApiBackendService extends ChangeNotifier {
   List<UserProfile> _users = [];
   final Map<String, List<ChatMessage>> _messages = {};
 
+  bool _requiresSubscription = false;
+  String? _subscriptionErrorMessage;
+
   bool get isInitialized => _isInitialized;
   bool get isAuthenticated => _token != null && _currentUser != null;
+  bool get requiresSubscription => _requiresSubscription;
+  String? get subscriptionErrorMessage => _subscriptionErrorMessage;
   UserProfile? get currentUser => _currentUser;
+  Map<String, dynamic>? get currentOrg => _currentOrg;
+  Map<String, dynamic>? get currentOrganization => _currentOrg;
   List<Conversation> get conversations => _conversations;
   List<UserProfile> get users => _users;
 
@@ -45,9 +67,15 @@ class ApiBackendService extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final savedToken = prefs.getString('api_hub_token');
       final savedUserJson = prefs.getString('api_hub_user');
+      final savedOrgJson = prefs.getString('api_hub_org');
       if (savedToken != null && savedUserJson != null) {
         _token = savedToken;
         _currentUser = UserProfile.fromJson(jsonDecode(savedUserJson));
+        if (savedOrgJson != null) {
+          try {
+            _currentOrg = Map<String, dynamic>.from(jsonDecode(savedOrgJson));
+          } catch (_) {}
+        }
         debugPrint('[ApiBackendService] Restored authenticated session for ${_currentUser?.displayName}');
         _connectWebSocket();
         unawaited(loadConversations());
@@ -73,6 +101,241 @@ class ApiBackendService extends ChangeNotifier {
       body: jsonEncode({'username': identifier, 'password': password}),
     );
     return _parseAuthResponse(response);
+  }
+
+  Future<OrganizationRegistrationResult> registerOrganization({
+    required String tenantId,
+    required String organizationName,
+    required String adminUsername,
+    required String adminEmail,
+    required String adminPassword,
+    required String adminFullName,
+    String tenantType = 'chat',
+  }) async {
+    final payload = {
+      'tenant_id': tenantId.trim(),
+      'name': organizationName.trim(),
+      'admin_username': adminUsername.trim(),
+      'admin_email': adminEmail.trim(),
+      'admin_password': adminPassword,
+      'admin_full_name': adminFullName.trim(),
+      'tenant_type': tenantType,
+    };
+
+    final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/organization/admin/create');
+    http.Response response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    );
+
+    if (response.statusCode == 404) {
+      final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/organization/admin/create');
+      response = await http.post(
+        fallbackUri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
+      );
+    }
+
+    String orgId = tenantId.trim();
+    String resolvedOrgName = organizationName.trim();
+
+    if (response.statusCode == 200) {
+      await ApiBackendConfig.setTenantId(tenantId.trim());
+      try {
+        final body = jsonDecode(response.body);
+        final data = body['data'] ?? body;
+        if (data['org'] is Map) {
+          _currentOrg = Map<String, dynamic>.from(data['org']);
+          orgId = (_currentOrg!['uid'] ?? _currentOrg!['tenantId'] ?? orgId).toString();
+          resolvedOrgName = (_currentOrg!['name'] ?? resolvedOrgName).toString();
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('api_hub_org', jsonEncode(_currentOrg!));
+        }
+      } catch (_) {}
+    }
+
+    final user = _parseAuthResponse(response);
+    return OrganizationRegistrationResult(
+      user: user,
+      organizationId: orgId,
+      organizationName: resolvedOrgName,
+      tenantId: tenantId.trim(),
+    );
+  }
+
+  /// Check organization existence and configuration flags (including allow_user_registration).
+  Future<Map<String, dynamic>> checkOrganization(String tenantId) async {
+    final clean = tenantId.trim();
+    if (clean.isEmpty) {
+      throw Exception('Organization ID cannot be empty');
+    }
+
+    final primaryUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/organization/check/$clean');
+    http.Response? response;
+    try {
+      response = await http.get(primaryUri);
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/tenants/config?tenant_id=$clean');
+        response = await http.get(fallbackUri, headers: {'x-tenant-id': clean});
+      }
+    } catch (e) {
+      try {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/tenants/config?tenant_id=$clean');
+        response = await http.get(fallbackUri, headers: {'x-tenant-id': clean});
+      } catch (_) {
+        throw Exception('Unable to reach server to check organization: $e');
+      }
+    }
+
+    if (response != null && response.statusCode == 200) {
+      final body = jsonDecode(response.body);
+      final data = body['data'] ?? body;
+      return Map<String, dynamic>.from(data);
+    } else if (response != null && response.statusCode == 404) {
+      throw Exception('Organization "$clean" not found. Please verify the ID or register a new organization.');
+    } else {
+      String detail = 'Organization check failed (${response?.statusCode ?? 'No response'})';
+      try {
+        if (response != null) {
+          final body = jsonDecode(response.body);
+          detail = body['detail'] ?? body['message'] ?? detail;
+        }
+      } catch (_) {}
+      throw Exception(detail);
+    }
+  }
+
+  /// Checks if regular user registration is supported for the specified tenant.
+  /// Returns true if self-registration is enabled, false if disabled.
+  Future<bool> checkUserRegistrationSupported(String tenantId) async {
+    try {
+      final data = await checkOrganization(tenantId);
+      final dynamic flag = data['allow_user_registration'] ?? data['user_registration_enabled'];
+      if (flag is bool) return flag;
+      if (flag is String) return flag.toLowerCase() == 'true';
+      return true; // Default to true if not explicitly disabled
+    } catch (_) {
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getAvailablePlans({String? organizationId}) async {
+    final headers = {
+      'Content-Type': 'application/json',
+      'x-tenant-id': ApiBackendConfig.tenantId,
+      if (_token != null) 'Authorization': 'Bearer $_token',
+    };
+
+    http.Response response;
+    final primaryUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/organization/subscription/products');
+    try {
+      response = await http.get(primaryUri, headers: headers);
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/organization/subscription/products');
+        response = await http.get(fallbackUri, headers: headers);
+      }
+    } catch (e) {
+      debugPrint('[ApiBackendService] Error fetching subscription plans from API: $e');
+      throw Exception('Unable to reach server to fetch subscription plans: $e');
+    }
+
+    if (response.statusCode == 200) {
+      final body = jsonDecode(response.body);
+      final data = body['data'] ?? body;
+      final List<Map<String, dynamic>> extracted = [];
+
+      if (data is List) {
+        for (final item in data) {
+          if (item is Map) {
+            final plans = item['plans'];
+            final productName = (item['name'] ?? item['title'] ?? '').toString();
+            final productCategory = (item['category'] ?? '').toString();
+            final defaultTenantType = (item['default_tenant_type'] ?? '').toString();
+
+            if (plans is List && plans.isNotEmpty) {
+              for (final p in plans) {
+                if (p is Map) {
+                  final planMap = Map<String, dynamic>.from(p);
+                  if (productName.isNotEmpty) planMap.putIfAbsent('product_name', () => productName);
+                  if (productCategory.isNotEmpty) planMap.putIfAbsent('product_category', () => productCategory);
+                  if (defaultTenantType.isNotEmpty) planMap.putIfAbsent('default_tenant_type', () => defaultTenantType);
+                  extracted.add(planMap);
+                }
+              }
+            } else {
+              extracted.add(Map<String, dynamic>.from(item));
+            }
+          }
+        }
+      } else if (data is Map) {
+        final plans = data['plans'];
+        if (plans is List) {
+          for (final p in plans) {
+            if (p is Map) extracted.add(Map<String, dynamic>.from(p));
+          }
+        } else {
+          extracted.add(Map<String, dynamic>.from(data));
+        }
+      }
+
+      return extracted;
+    } else {
+      String errorMsg = 'Failed to load subscription plans (${response.statusCode})';
+      try {
+        final body = jsonDecode(response.body);
+        errorMsg = (body['detail'] ?? body['message'] ?? errorMsg).toString();
+      } catch (_) {}
+      throw Exception(errorMsg);
+    }
+  }
+
+  Future<bool> subscribeToPlan({
+    required String organizationId,
+    required String planId,
+    int durationMonths = 1,
+    bool isTrial = false,
+  }) async {
+    final payload = {
+      'organization_id': organizationId.trim(),
+      'plan_type': planId.trim(),
+      'duration_months': durationMonths,
+      'is_trial': isTrial,
+    };
+
+    final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/organization/subscription/create-order');
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-tenant-id': ApiBackendConfig.tenantId,
+        if (_token != null) 'Authorization': 'Bearer $_token',
+      },
+      body: jsonEncode(payload),
+    );
+
+    if (response.statusCode == 200) {
+      _requiresSubscription = false;
+      _subscriptionErrorMessage = null;
+      debugPrint('[ApiBackendService] Subscription order completed for $organizationId');
+      if (_currentOrg != null) {
+        _currentOrg!['plan_type'] = planId.trim();
+      }
+      notifyListeners();
+      unawaited(loadConversations());
+      unawaited(loadUsers());
+      return true;
+    } else {
+      try {
+        final body = jsonDecode(response.body);
+        final detail = body['detail'] ?? body['message'] ?? 'Subscription failed (${response.statusCode})';
+        throw Exception(detail);
+      } catch (e) {
+        if (e is Exception && !e.toString().contains('FormatException')) rethrow;
+        throw Exception('Failed to activate subscription (${response.statusCode})');
+      }
+    }
   }
 
   Future<UserProfile> register({
@@ -146,7 +409,7 @@ class ApiBackendService extends ChangeNotifier {
       final userObj = data['user'] ?? {};
 
       final userId = (userObj['id'] ?? userObj['uid'] ?? payload['uid'] ?? '').toString();
-      final fullName = (userObj['full_name'] ?? userObj['name'] ?? payload['sub'] ?? 'User').toString();
+      final fullName = (userObj['full_name'] ?? userObj['display_name'] ?? userObj['name'] ?? payload['sub'] ?? 'User').toString();
       final username = (userObj['username'] ?? payload['sub'] ?? '').toString();
       final initials = fullName.isNotEmpty ? fullName.substring(0, 1).toUpperCase() : 'U';
 
@@ -185,7 +448,14 @@ class ApiBackendService extends ChangeNotifier {
     } else {
       try {
         final body = jsonDecode(response.body);
-        final msg = body['error']?['message'] ?? body['message'] ?? 'Authentication failed (${response.statusCode})';
+        final detail = body['detail'];
+        String? detailMsg;
+        if (detail is String) {
+          detailMsg = detail;
+        } else if (detail is List && detail.isNotEmpty) {
+          detailMsg = detail.map((e) => e['msg'] ?? e.toString()).join(', ');
+        }
+        final msg = detailMsg ?? body['error']?['message'] ?? body['message'] ?? 'Authentication failed (${response.statusCode})';
         throw Exception(msg);
       } catch (e) {
         if (e is Exception && !e.toString().contains('FormatException')) rethrow;
@@ -274,8 +544,14 @@ class ApiBackendService extends ChangeNotifier {
         },
       );
       if (response.statusCode == 200) {
+        _requiresSubscription = false;
+        _subscriptionErrorMessage = null;
         final data = jsonDecode(response.body)['data'] as List;
         _conversations = data.map((json) => Conversation.fromApi(json)).toList();
+        notifyListeners();
+      } else if (response.statusCode == 402) {
+        _requiresSubscription = true;
+        _subscriptionErrorMessage = 'Workspace subscription required. Please select a plan.';
         notifyListeners();
       }
     } catch (e) {
@@ -386,6 +662,12 @@ class ApiBackendService extends ChangeNotifier {
       }
       notifyListeners();
       return conv;
+    }
+    if (response.statusCode == 402) {
+      _requiresSubscription = true;
+      _subscriptionErrorMessage = 'Workspace subscription required. Please choose a plan to chat.';
+      notifyListeners();
+      throw Exception('No active subscription plan found. Please enroll in a product plan to continue.');
     }
     throw Exception('Failed to start chat (${response.statusCode})');
   }
