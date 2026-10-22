@@ -340,7 +340,14 @@ class ChatyDataStore extends ChangeNotifier {
     if (locator.isRegistered<ApiBackendService>()) {
       final api = locator<ApiBackendService>();
       if (api.isAuthenticated) {
-        api.sendMessage(conversationId, text);
+        await api.sendMessage(
+          conversationId,
+          text,
+          type: type,
+          attachment: attachment,
+          extraMetadata: extraMetadata,
+        );
+        notifyListeners();
         return;
       }
     }
@@ -694,9 +701,24 @@ class ChatyDataStore extends ChangeNotifier {
   Future<void> revokeLinkedDevice(String deviceId) =>
       _backend.revokeLinkedDevice(deviceId);
 
-  void updateProfile(UserProfile updated) =>
-      unawaited(_backend.updateCurrentUser(updated));
-  void updateCurrentUser(UserProfile updated) => updateProfile(updated);
-  Future<void> updateUser(UserProfile updated) =>
-      _backend.updateCurrentUser(updated);
+  Future<void> updateProfile(UserProfile updated) async {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated) {
+        await api.updateProfile(
+          displayName: updated.displayName,
+          about: updated.about,
+          username: updated.username,
+          avatarUrl: updated.avatarUrl,
+        );
+        notifyListeners();
+        return;
+      }
+    }
+    await _backend.updateCurrentUser(updated);
+    notifyListeners();
+  }
+
+  void updateCurrentUser(UserProfile updated) => unawaited(updateProfile(updated));
+  Future<void> updateUser(UserProfile updated) => updateProfile(updated);
 }

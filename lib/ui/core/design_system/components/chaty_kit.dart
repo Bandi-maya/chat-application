@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'chaty_glyph.dart';
 import 'package:flutter/material.dart';
+import '../../../../data/services/backend_config.dart';
 import '../tokens/app_tokens.dart';
 import '../../theme/theme_extensions.dart';
 import '../../menu/app_context_menu.dart';
@@ -309,6 +310,7 @@ class ChatyAvatarCore extends StatelessWidget {
   final String initials;
   final Color color;
   final double size;
+  final String? imageUrl;
 
   /// 'circle' | 'squircle' | 'roundedSquare'
   final String shape;
@@ -318,6 +320,7 @@ class ChatyAvatarCore extends StatelessWidget {
     required this.initials,
     required this.color,
     required this.size,
+    this.imageUrl,
     this.shape = 'circle',
   });
 
@@ -332,12 +335,25 @@ class ChatyAvatarCore extends StatelessWidget {
     }
   }
 
+  String? _resolveUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return null;
+    final clean = url.trim();
+    if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:')) {
+      return clean;
+    }
+    if (clean.startsWith('/')) {
+      return '${ApiBackendConfig.restApiBaseUrl}$clean';
+    }
+    return clean;
+  }
+
   @override
   Widget build(BuildContext context) {
     final initialText = initials.trim().isEmpty
         ? '?'
         : initials.trim().characters.take(2).toString().toUpperCase();
-    return Container(
+
+    final fallback = Container(
       width: size,
       height: size,
       decoration: BoxDecoration(color: color, borderRadius: _radius),
@@ -354,6 +370,22 @@ class ChatyAvatarCore extends StatelessWidget {
         ),
       ),
     );
+
+    final resolved = _resolveUrl(imageUrl);
+    if (resolved != null) {
+      return ClipRRect(
+        borderRadius: _radius,
+        child: Image.network(
+          resolved,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => fallback,
+        ),
+      );
+    }
+
+    return fallback;
   }
 }
 

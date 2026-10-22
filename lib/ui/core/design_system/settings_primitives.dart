@@ -895,6 +895,7 @@ class ChatyAvatar extends StatelessWidget {
   final Color color;
   final double size;
   final String shape; // 'circle', 'squircle', 'roundedSquare'
+  final String? imageUrl;
 
   const ChatyAvatar({
     super.key,
@@ -902,6 +903,7 @@ class ChatyAvatar extends StatelessWidget {
     required this.color,
     this.size = 42,
     this.shape = 'circle',
+    this.imageUrl,
   });
 
   @override
@@ -911,6 +913,7 @@ class ChatyAvatar extends StatelessWidget {
       color: color,
       size: size,
       shape: shape,
+      imageUrl: imageUrl,
     );
   }
 }

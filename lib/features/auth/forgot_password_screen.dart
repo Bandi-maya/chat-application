@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../data/services/api_backend_service.dart';
 import '../../data/services/backend_service.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/theme/theme_controller.dart';
@@ -33,9 +34,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     });
 
     try {
-      await locator<ChatyBackendService>().resetPassword(
-        _emailController.text.trim(),
-      );
+      if (locator.isRegistered<ApiBackendService>()) {
+        await locator<ApiBackendService>().forgotPassword(
+          _emailController.text.trim(),
+        );
+      } else {
+        await locator<ChatyBackendService>().resetPassword(
+          _emailController.text.trim(),
+        );
+      }
       if (!mounted) return;
       setState(() {
         _isLoading = false;
@@ -141,6 +148,32 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       isLoading: _isLoading,
                       theme: theme,
                     ),
+                    if (_emailSent) ...[
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                              color: theme.primaryColor.withOpacity(0.5),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: Text(
+                            'Back to Sign In',
+                            style: TextStyle(
+                              color: theme.primaryTextColor,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

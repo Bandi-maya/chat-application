@@ -96,7 +96,16 @@ class Conversation {
 
     final lastMsg = json['last_message'];
     if (lastMsg is Map<String, dynamic>) {
-      lastText = lastMsg['content']?.toString() ?? '';
+      final raw = lastMsg['content']?.toString() ?? '';
+      if (raw.startsWith('{') && raw.contains('"image"')) {
+        lastText = '📷 Photo';
+      } else if (raw.startsWith('{') && raw.contains('"type"')) {
+        lastText = '📎 Attachment';
+      } else if (raw.startsWith('http') && (raw.endsWith('.jpg') || raw.endsWith('.png') || raw.endsWith('.jpeg') || raw.endsWith('.webp'))) {
+        lastText = '📷 Photo';
+      } else {
+        lastText = raw;
+      }
       if (lastMsg['created_at'] != null) {
         lastTime = DateTime.tryParse(lastMsg['created_at'].toString()) ?? lastTime;
       }
