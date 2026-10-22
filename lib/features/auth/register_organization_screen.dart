@@ -33,6 +33,7 @@ class _RegisterOrganizationScreenState
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _hasManuallyEditedSlug = false;
+  bool _allowUserRegistration = true;
   String? _errorMessage;
 
   @override
@@ -80,6 +81,7 @@ class _RegisterOrganizationScreenState
         adminPassword: adminPassword,
         adminFullName: adminFullName,
         tenantType: 'chat',
+        allowUserRegistration: _allowUserRegistration,
       );
 
       await LocalPreferencesStorage.setStoredUserId(regResult.user.id);
@@ -352,6 +354,10 @@ class _RegisterOrganizationScreenState
                         return null;
                       },
                     ),
+                    const SizedBox(height: 18),
+
+                    // Section 3: Workspace Access Setting
+                    _buildAllowRegistrationCard(theme),
                     const SizedBox(height: 24),
 
                     if (_errorMessage != null)
@@ -419,6 +425,70 @@ class _RegisterOrganizationScreenState
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildAllowRegistrationCard(ThemeConfig theme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.surfaceColor.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.dividerColor.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: (_allowUserRegistration ? theme.accentColor : theme.secondaryTextColor)
+                  .withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              Icons.group_add_rounded,
+              color: _allowUserRegistration ? theme.accentColor : theme.secondaryTextColor,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Allow Member Self-Registration',
+                  style: TextStyle(
+                    color: theme.primaryTextColor,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _allowUserRegistration
+                      ? 'Team members can join this workspace with the Workspace ID.'
+                      : 'Self-registration disabled (only admins can invite members).',
+                  style: TextStyle(
+                    color: theme.secondaryTextColor.withValues(alpha: 0.8),
+                    fontSize: 11.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Switch.adaptive(
+            value: _allowUserRegistration,
+            activeColor: theme.accentColor,
+            onChanged: (val) {
+              setState(() => _allowUserRegistration = val);
+            },
+          ),
+        ],
       ),
     );
   }
