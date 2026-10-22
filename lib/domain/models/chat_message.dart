@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 enum MessageType {
   text,
   image,
@@ -161,11 +163,53 @@ class ChatMessage {
 
   factory ChatMessage.fromApi(Map<String, dynamic> json) {
     final senderName = json['sender_name']?.toString() ?? '';
+    final rawContent = json['content']?.toString() ?? '';
+    MessageType parsedType = MessageType.text;
+    MessageAttachment? parsedAttachment;
+    String effectiveText = rawContent;
+
+    if (rawContent.startsWith('{') && rawContent.endsWith('}')) {
+      try {
+        final decoded = jsonDecode(rawContent);
+        if (decoded is Map<String, dynamic> && decoded.containsKey('url')) {
+          final t = decoded['type']?.toString();
+          parsedType = messageTypeFromDatabase(t);
+          effectiveText = decoded['text']?.toString() ?? '';
+          parsedAttachment = MessageAttachment(
+            id: json['uid']?.toString() ?? json['id']?.toString() ?? '',
+            type: t ?? 'image',
+            name: decoded['name']?.toString() ?? 'attachment',
+            size: decoded['size']?.toString() ?? '',
+            url: decoded['url']?.toString(),
+          );
+        }
+      } catch (_) {}
+    } else if (rawContent.startsWith('http') || rawContent.startsWith('/static/uploads/')) {
+      final lower = rawContent.toLowerCase();
+      if (lower.endsWith('.jpg') ||
+          lower.endsWith('.jpeg') ||
+          lower.endsWith('.png') ||
+          lower.endsWith('.webp') ||
+          lower.endsWith('.gif')) {
+        parsedType = MessageType.image;
+        parsedAttachment = MessageAttachment(
+          id: json['uid']?.toString() ?? json['id']?.toString() ?? '',
+          type: 'image',
+          name: 'Photo',
+          size: '',
+          url: rawContent,
+        );
+        effectiveText = '';
+      }
+    }
+
     return ChatMessage(
       id: json['uid']?.toString() ?? json['id']?.toString() ?? '',
       conversationId: json['room_id']?.toString() ?? '',
       senderId: json['sender_id']?.toString() ?? '',
-      text: json['content']?.toString() ?? '',
+      type: parsedType,
+      text: effectiveText,
+      attachment: parsedAttachment,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
           : DateTime.now(),

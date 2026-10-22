@@ -11,6 +11,8 @@ import 'package:uuid/uuid.dart';
 import '../../domain/models/chat_message.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
+import 'api_backend_service.dart';
+import 'backend_config.dart';
 
 class ChatMediaService {
   ChatMediaService({
@@ -139,6 +141,21 @@ class ChatMediaService {
       throw Exception('This $type exceeds the $limitMb MB storage limit.');
     }
 
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated) {
+        final uploaded = await api.uploadMedia(file);
+        return MessageAttachment(
+          id: _uuid.v4(),
+          type: type,
+          name: rawName,
+          size: _formatBytes(size),
+          url: uploaded['url']?.toString() ?? '',
+          durationSeconds: durationSeconds,
+        );
+      }
+    }
+
     final authUser = _client.auth.currentUser;
     if (authUser == null) throw Exception('Authentication required.');
     final safeName = _safeFileName(rawName);
@@ -199,6 +216,12 @@ class ChatMediaService {
       throw Exception('Attachment path is missing.');
     if (objectPath.startsWith('http://') || objectPath.startsWith('https://')) {
       return objectPath;
+    }
+    if (objectPath.startsWith('data:')) {
+      return objectPath;
+    }
+    if (objectPath.startsWith('/')) {
+      return '${ApiBackendConfig.restApiBaseUrl}$objectPath';
     }
     if (objectPath.startsWith('demo')) {
       return 'https://actions.google.com/sounds/v1/ambiences/rain_heavy.ogg';

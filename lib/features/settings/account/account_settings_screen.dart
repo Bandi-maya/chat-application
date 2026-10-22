@@ -1,7 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../data/repositories/chaty_data_store.dart';
 import '../../../data/services/api_backend_service.dart';
 import '../../../data/services/backend_config.dart';
+import '../../../domain/models/user_profile.dart';
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/design_system.dart'
@@ -20,6 +23,255 @@ class AccountSettingsScreen extends StatelessWidget {
     required this.preferencesController,
     required this.dataStore,
   });
+
+  void _showEditProfileSheet(BuildContext context, UserProfile user) {
+    final colors = context.colors;
+    final nameCtrl = TextEditingController(text: user.displayName);
+    final aboutCtrl = TextEditingController(text: user.about);
+    bool isSaving = false;
+    bool isUploadingPhoto = false;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            final currentUserState = dataStore.currentUser;
+
+            Future<void> pickAndUploadPhoto() async {
+              final picker = ImagePicker();
+              final picked = await picker.pickImage(
+                source: ImageSource.gallery,
+                maxWidth: 1024,
+                maxHeight: 1024,
+                imageQuality: 85,
+              );
+              if (picked == null) return;
+
+              setSheetState(() => isUploadingPhoto = true);
+              try {
+                if (locator.isRegistered<ApiBackendService>()) {
+                  final avatarUrl = await locator<ApiBackendService>().uploadProfilePhoto(File(picked.path));
+                  await dataStore.updateProfile(currentUserState.copyWith(avatarUrl: avatarUrl));
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Profile photo updated!'),
+                        backgroundColor: Color(0xFF10B981),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                }
+              } catch (e) {
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to upload photo: ${e.toString().replaceFirst('Exception: ', '')}'),
+                      backgroundColor: Colors.redAccent,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              } finally {
+                setSheetState(() => isUploadingPhoto = false);
+              }
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Edit Profile',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: colors.foreground,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Avatar with camera badge
+                    GestureDetector(
+                      onTap: isUploadingPhoto ? null : pickAndUploadPhoto,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          ChatyAvatar(
+                            initials: currentUserState.avatarInitials,
+                            imageUrl: currentUserState.avatarUrl,
+                            color: colors.primary,
+                            size: 80,
+                          ),
+                          if (isUploadingPhoto)
+                            Container(
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
+                                color: Colors.black45,
+                                borderRadius: BorderRadius.circular(40),
+                              ),
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: colors.primary,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: colors.surface, width: 2),
+                                ),
+                                child: const Icon(
+                                  Icons.camera_alt_rounded,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: isUploadingPhoto ? null : pickAndUploadPhoto,
+                      child: Text(
+                        'Change Profile Photo',
+                        style: TextStyle(
+                          color: colors.primary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13.5,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: nameCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Display Name',
+                        prefixIcon: const Icon(Icons.person_outline_rounded),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: aboutCtrl,
+                      maxLines: 2,
+                      decoration: InputDecoration(
+                        labelText: 'About / Bio',
+                        prefixIcon: const Icon(Icons.info_outline_rounded),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: isSaving
+                            ? null
+                            : () async {
+                                setSheetState(() => isSaving = true);
+                                try {
+                                  final updated = currentUserState.copyWith(
+                                    displayName: nameCtrl.text.trim(),
+                                    about: aboutCtrl.text.trim(),
+                                  );
+                                  await dataStore.updateProfile(updated);
+                                  if (ctx.mounted) {
+                                    Navigator.pop(ctx);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Profile updated successfully!'),
+                                        backgroundColor: Color(0xFF10B981),
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (ctx.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Failed to update: ${e.toString().replaceFirst('Exception: ', '')}'),
+                                        backgroundColor: Colors.redAccent,
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  }
+                                } finally {
+                                  setSheetState(() => isSaving = false);
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: colors.primary,
+                          foregroundColor: colors.onPrimary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: isSaving
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Save Profile',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,19 +293,24 @@ class AccountSettingsScreen extends StatelessWidget {
                 ChatySettingsTile(
                   leading: ChatyAvatar(
                     initials: user.avatarInitials,
+                    imageUrl: user.avatarUrl,
                     color: colors.primary,
-                    size: 40,
+                    size: 42,
                   ),
                   title: user.displayName.isNotEmpty
                       ? user.displayName
                       : 'Display Name',
                   subtitle: '@${user.username}',
+                  trailing: const Icon(Icons.edit_outlined, size: 20),
+                  onTap: () => _showEditProfileSheet(context, user),
                 ),
                 ChatySettingsTile(
                   icon: Icons.info_outline_rounded,
                   iconColor: colors.primary,
                   title: 'About / Bio',
-                  subtitle: user.about.isNotEmpty ? user.about : 'No bio set',
+                  subtitle: user.about.isNotEmpty ? user.about : 'No bio set (Tap to edit)',
+                  trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                  onTap: () => _showEditProfileSheet(context, user),
                 ),
               ],
             ),

@@ -128,6 +128,10 @@ Future<void> main() async {
       if (tId != null && tId.isNotEmpty) {
         ApiBackendConfig.customTenantId = tId;
       }
+      final wsUrl = dotenv.maybeGet('WEBSOCKET_URL');
+      if (wsUrl != null && wsUrl.isNotEmpty) {
+        ApiBackendConfig.customWebSocketUrl = wsUrl;
+      }
     }
   } catch (e) {
     debugPrint('Dotenv skipped: $e');

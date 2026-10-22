@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -92,14 +93,31 @@ class ApiBackendService extends ChangeNotifier {
     required String identifier,
     required String password,
   }) async {
-    final response = await http.post(
-      Uri.parse('${ApiBackendConfig.restApiBaseUrl}/auth/token'),
-      headers: {
-        'Content-Type': 'application/json',
-        'x-tenant-id': ApiBackendConfig.tenantId,
-      },
-      body: jsonEncode({'username': identifier, 'password': password}),
-    );
+    final primaryUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/auth/token');
+    http.Response response;
+    try {
+      response = await http.post(
+        primaryUri,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': ApiBackendConfig.tenantId,
+        },
+        body: jsonEncode({'username': identifier, 'password': password}),
+      );
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/auth/token');
+        response = await http.post(
+          fallbackUri,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-tenant-id': ApiBackendConfig.tenantId,
+          },
+          body: jsonEncode({'username': identifier, 'password': password}),
+        );
+      }
+    } catch (e) {
+      throw Exception('Unable to reach server. Please check your internet connection.');
+    }
     return _parseAuthResponse(response);
   }
 
@@ -366,18 +384,39 @@ class ApiBackendService extends ChangeNotifier {
     required String username,
     required String password,
   }) async {
-    final response = await http.post(
-      Uri.parse('${ApiBackendConfig.restApiBaseUrl}/auth/register'),
-      headers: {
-        'Content-Type': 'application/json',
-        'x-tenant-id': ApiBackendConfig.tenantId,
-      },
-      body: jsonEncode({
-        'email': email,
-        'username': username,
-        'password': password,
-      }),
-    );
+    final primaryUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/auth/register');
+    http.Response response;
+    try {
+      response = await http.post(
+        primaryUri,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': ApiBackendConfig.tenantId,
+        },
+        body: jsonEncode({
+          'email': email,
+          'username': username,
+          'password': password,
+        }),
+      );
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/auth/register');
+        response = await http.post(
+          fallbackUri,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-tenant-id': ApiBackendConfig.tenantId,
+          },
+          body: jsonEncode({
+            'email': email,
+            'username': username,
+            'password': password,
+          }),
+        );
+      }
+    } catch (e) {
+      throw Exception('Unable to reach server. Please check your internet connection.');
+    }
     return _parseAuthResponse(response);
   }
 
@@ -435,6 +474,11 @@ class ApiBackendService extends ChangeNotifier {
       final fullName = (userObj['full_name'] ?? userObj['display_name'] ?? userObj['name'] ?? payload['sub'] ?? 'User').toString();
       final username = (userObj['username'] ?? payload['sub'] ?? '').toString();
       final initials = fullName.isNotEmpty ? fullName.substring(0, 1).toUpperCase() : 'U';
+      final photo = (userObj['photo'] ??
+              userObj['avatar_url'] ??
+              userObj['avatarUrl'] ??
+              (userObj['public_profile'] is Map ? userObj['public_profile']['avatarUrl'] : null))
+          ?.toString();
 
       _currentUser = UserProfile(
         id: userId,
@@ -442,13 +486,14 @@ class ApiBackendService extends ChangeNotifier {
         username: username,
         avatarInitials: initials,
         avatarColorHex: '0xFF6366F1',
-        about: (userObj['role'] ?? payload['role'] ?? '').toString(),
+        about: (userObj['about'] ?? userObj['role'] ?? payload['role'] ?? '').toString(),
         presence: PresenceState.online,
         lastSeenAt: DateTime.now(),
         isVerified: false,
         email: (userObj['email'] ?? '').toString(),
-        phone: '',
+        phone: (userObj['mobile'] ?? userObj['phone'] ?? '').toString(),
         safetyNumber: '',
+        avatarUrl: photo,
       );
 
       // Persist session to SharedPreferences
@@ -604,6 +649,11 @@ class ApiBackendService extends ChangeNotifier {
           final username = (json['username'] ?? '').toString();
           final displayName = fullName.isNotEmpty ? fullName : (username.isNotEmpty ? username : 'User');
           final initials = displayName.isNotEmpty ? displayName.substring(0, 1).toUpperCase() : 'U';
+          final photo = (json['photo'] ??
+                  json['avatar_url'] ??
+                  json['avatarUrl'] ??
+                  (json['publicProfile'] is Map ? json['publicProfile']['avatarUrl'] : null))
+              ?.toString();
 
           return UserProfile(
             id: uid,
@@ -611,25 +661,27 @@ class ApiBackendService extends ChangeNotifier {
             username: username,
             avatarInitials: initials,
             avatarColorHex: '0xFF6366F1',
-            about: (json['role'] ?? '').toString(),
+            about: (json['about'] ?? json['role'] ?? '').toString(),
             presence: PresenceState.online,
             lastSeenAt: DateTime.now(),
             isVerified: false,
             email: (json['email'] ?? '').toString(),
-            phone: (json['mobile'] ?? '').toString(),
+            phone: (json['mobile'] ?? json['phone'] ?? '').toString(),
             safetyNumber: '',
+            avatarUrl: photo,
           );
         }).toList();
 
-        // Enrich current user display name and initials if found in users list
+        // Enrich current user display name, initials, and photo if found in users list
         if (_currentUser != null) {
           final me = _users.where((u) => u.id == _currentUser!.id).firstOrNull;
-          if (me != null && (me.displayName.isNotEmpty && me.displayName != _currentUser!.displayName)) {
+          if (me != null) {
             _currentUser = _currentUser!.copyWith(
-              displayName: me.displayName,
+              displayName: me.displayName.isNotEmpty ? me.displayName : _currentUser!.displayName,
               avatarInitials: me.avatarInitials,
               about: me.about.isNotEmpty ? me.about : _currentUser!.about,
               email: me.email.isNotEmpty ? me.email : _currentUser!.email,
+              avatarUrl: me.avatarUrl ?? _currentUser!.avatarUrl,
             );
             unawaited(() async {
               try {
@@ -719,44 +771,351 @@ class ApiBackendService extends ChangeNotifier {
     }
   }
 
-  Future<void> sendMessage(String chatId, String content) async {
-    final payload = {
-      'type': 'send_message',
-      'room_id': chatId,
-      'content': content,
-    };
+  Future<ChatMessage?> sendMessage(
+    String chatId,
+    String content, {
+    MessageType type = MessageType.text,
+    MessageAttachment? attachment,
+    Map<String, dynamic>? extraMetadata,
+  }) async {
+    final effectiveContent = attachment != null
+        ? jsonEncode({
+            'type': type.name,
+            'url': attachment.url,
+            'name': attachment.name,
+            'size': attachment.size,
+            'text': content,
+            'duration': attachment.durationSeconds,
+            if (extraMetadata != null) ...extraMetadata,
+          })
+        : content;
 
-    // Optimistic message append
+    final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
     final tempMsg = ChatMessage(
-      id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+      id: tempId,
       conversationId: chatId,
       senderId: _currentUser?.id ?? '',
+      type: type,
       text: content,
+      attachment: attachment,
       createdAt: DateTime.now(),
       deliveryState: DeliveryState.sending,
     );
+
     final list = _messages.putIfAbsent(chatId, () => []);
     list.add(tempMsg);
     notifyListeners();
 
-    if (_channel != null) {
-      _channel!.sink.add(jsonEncode(payload));
-    } else if (_token != null) {
-      // Fallback via HTTP REST
+    ChatMessage? confirmedMsg;
+
+    // 1. Send via HTTP POST to persist message to database
+    if (_token != null) {
       try {
-        await http.post(
-          Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/rooms/$chatId/messages'),
+        final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/rooms/$chatId/messages');
+        http.Response response = await http.post(
+          uri,
           headers: {
             'Authorization': 'Bearer $_token',
             'Content-Type': 'application/json',
             'x-tenant-id': ApiBackendConfig.tenantId,
           },
-          body: jsonEncode({'content': content}),
+          body: jsonEncode({'content': effectiveContent}),
         );
-        await loadMessages(chatId);
+
+        if (response.statusCode == 404) {
+          final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/chat/rooms/$chatId/messages');
+          response = await http.post(
+            fallbackUri,
+            headers: {
+              'Authorization': 'Bearer $_token',
+              'Content-Type': 'application/json',
+              'x-tenant-id': ApiBackendConfig.tenantId,
+            },
+            body: jsonEncode({'content': effectiveContent}),
+          );
+        }
+
+        if (response.statusCode == 200) {
+          final body = jsonDecode(response.body);
+          final rawMsg = body['data'] ?? body;
+          confirmedMsg = ChatMessage.fromApi(rawMsg);
+
+          final idx = list.indexWhere((m) => m.id == tempId);
+          if (idx != -1) {
+            list[idx] = confirmedMsg;
+          } else {
+            list.add(confirmedMsg);
+          }
+          list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+          final convIdx = _conversations.indexWhere((c) => c.id == chatId);
+          if (convIdx != -1) {
+            final oldConv = _conversations[convIdx];
+            _conversations.removeAt(convIdx);
+            _conversations.insert(
+              0,
+              oldConv.copyWith(
+                lastMessageText: confirmedMsg.text.isNotEmpty
+                    ? confirmedMsg.text
+                    : (confirmedMsg.type == MessageType.image ? '📷 Photo' : '📎 Attachment'),
+                lastMessageTime: confirmedMsg.createdAt,
+                lastMessageSenderId: confirmedMsg.senderId,
+              ),
+            );
+          }
+          notifyListeners();
+        } else {
+          debugPrint('[ApiBackendService] sendMessage failed: ${response.statusCode} ${response.body}');
+        }
       } catch (e) {
-        debugPrint('[ApiBackendService] Error in sendMessage fallback: $e');
+        debugPrint('[ApiBackendService] Error in HTTP sendMessage: $e');
       }
+    }
+
+    // 2. Also notify WebSocket channel if connected
+    if (_channel != null) {
+      try {
+        final payload = {
+          'type': 'send_message',
+          'room_id': chatId,
+          'content': effectiveContent,
+        };
+        _channel!.sink.add(jsonEncode(payload));
+      } catch (e) {
+        debugPrint('[ApiBackendService] Error pushing message to websocket: $e');
+      }
+    }
+
+    return confirmedMsg;
+  }
+
+  /// Upload chat media/photo directly to backend server static storage
+  Future<Map<String, dynamic>> uploadMedia(File file) async {
+    if (_token == null) throw Exception('Not authenticated');
+    final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/upload');
+    final length = await file.length();
+    final filename = file.path.split(RegExp(r'[/\\]')).last;
+
+    Future<http.Response> doUpload(Uri targetUri) async {
+      final request = http.MultipartRequest('POST', targetUri);
+      request.headers['Authorization'] = 'Bearer $_token';
+      request.headers['x-tenant-id'] = ApiBackendConfig.tenantId;
+      request.files.add(
+        http.MultipartFile(
+          'file',
+          file.openRead(),
+          length,
+          filename: filename,
+        ),
+      );
+      final streamedResponse = await request.send();
+      return http.Response.fromStream(streamedResponse);
+    }
+
+    http.Response response;
+    try {
+      response = await doUpload(uri);
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/chat/upload');
+        response = await doUpload(fallbackUri);
+      }
+    } catch (e) {
+      throw Exception('Failed to connect to upload server: $e');
+    }
+
+    if (response.statusCode == 200) {
+      final body = jsonDecode(response.body);
+      final data = body['data'] ?? body;
+      return Map<String, dynamic>.from(data);
+    } else {
+      String detail = 'Failed to upload media (${response.statusCode})';
+      try {
+        final body = jsonDecode(response.body);
+        detail = body['detail'] ?? body['message'] ?? detail;
+      } catch (_) {}
+      throw Exception(detail);
+    }
+  }
+
+  /// Send password reset recovery link
+  Future<String> forgotPassword(String email, {String? tenantId}) async {
+    final cleanEmail = email.trim();
+    final cleanTenant = (tenantId ?? ApiBackendConfig.tenantId).trim();
+    final primaryUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/auth/forgot-password');
+    http.Response response;
+    try {
+      response = await http.post(
+        primaryUri,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': cleanTenant,
+        },
+        body: jsonEncode({'email': cleanEmail}),
+      );
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/auth/forgot-password');
+        response = await http.post(
+          fallbackUri,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-tenant-id': cleanTenant,
+          },
+          body: jsonEncode({'email': cleanEmail}),
+        );
+      }
+    } catch (e) {
+      throw Exception('Unable to reach server. Please check your internet connection.');
+    }
+
+    if (response.statusCode == 200) {
+      try {
+        final body = jsonDecode(response.body);
+        final data = body['data'] ?? body;
+        return (data['message'] ?? 'If an account exists with this email, a reset link has been sent.').toString();
+      } catch (_) {
+        return 'If an account exists with this email, a reset link has been sent.';
+      }
+    } else {
+      String errorMsg = 'Failed to request password reset (${response.statusCode})';
+      try {
+        final body = jsonDecode(response.body);
+        final detail = body['detail'] ?? body['message'] ?? errorMsg;
+        if (detail is List && detail.isNotEmpty) {
+          errorMsg = detail.map((e) => e['msg'] ?? e.toString()).join(', ');
+        } else {
+          errorMsg = detail.toString();
+        }
+      } catch (_) {}
+      throw Exception(errorMsg);
+    }
+  }
+
+  /// Update current user profile details
+  Future<UserProfile> updateProfile({
+    String? displayName,
+    String? about,
+    String? username,
+    String? avatarUrl,
+  }) async {
+    if (_token == null || _currentUser == null) throw Exception('Not authenticated');
+
+    final payload = <String, dynamic>{
+      if (displayName != null) 'full_name': displayName.trim(),
+      if (about != null) 'about': about.trim(),
+      if (username != null) 'username': username.trim(),
+      'publicProfile': <String, dynamic>{
+        if (about != null) 'about': about.trim(),
+        if (avatarUrl != null) 'avatarUrl': avatarUrl.trim(),
+      },
+    };
+
+    final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/app-users/profile');
+    http.Response response;
+    try {
+      response = await http.put(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'Content-Type': 'application/json',
+          'x-tenant-id': ApiBackendConfig.tenantId,
+        },
+        body: jsonEncode(payload),
+      );
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/app-users/profile');
+        response = await http.put(
+          fallbackUri,
+          headers: {
+            'Authorization': 'Bearer $_token',
+            'Content-Type': 'application/json',
+            'x-tenant-id': ApiBackendConfig.tenantId,
+          },
+          body: jsonEncode(payload),
+        );
+      }
+    } catch (e) {
+      throw Exception('Unable to reach server to update profile: $e');
+    }
+
+    if (response.statusCode == 200) {
+      final effectiveName = displayName?.trim().isNotEmpty == true ? displayName!.trim() : _currentUser!.displayName;
+      final initials = effectiveName.isNotEmpty ? effectiveName.substring(0, 1).toUpperCase() : _currentUser!.avatarInitials;
+
+      _currentUser = _currentUser!.copyWith(
+        displayName: effectiveName,
+        username: username?.trim().isNotEmpty == true ? username!.trim() : _currentUser!.username,
+        about: about?.trim() ?? _currentUser!.about,
+        avatarUrl: avatarUrl?.trim() ?? _currentUser!.avatarUrl,
+        avatarInitials: initials,
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('api_hub_user', jsonEncode(_currentUser!.toJson()));
+      notifyListeners();
+      return _currentUser!;
+    } else {
+      String detail = 'Failed to update profile (${response.statusCode})';
+      try {
+        final body = jsonDecode(response.body);
+        detail = body['detail'] ?? body['message'] ?? detail;
+      } catch (_) {}
+      throw Exception(detail);
+    }
+  }
+
+  /// Upload avatar/profile photo
+  Future<String> uploadProfilePhoto(File file) async {
+    if (_token == null) throw Exception('Not authenticated');
+    final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/app-users/upload-photo');
+
+    final length = await file.length();
+    final filename = file.path.split(RegExp(r'[/\\]')).last;
+
+    Future<http.Response> doUpload(Uri targetUri) async {
+      final request = http.MultipartRequest('POST', targetUri);
+      request.headers['Authorization'] = 'Bearer $_token';
+      request.headers['x-tenant-id'] = ApiBackendConfig.tenantId;
+      request.files.add(
+        http.MultipartFile(
+          'file',
+          file.openRead(),
+          length,
+          filename: filename,
+        ),
+      );
+      final streamedResponse = await request.send();
+      return http.Response.fromStream(streamedResponse);
+    }
+
+    http.Response response;
+    try {
+      response = await doUpload(uri);
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/app-users/upload-photo');
+        response = await doUpload(fallbackUri);
+      }
+    } catch (e) {
+      throw Exception('Unable to reach server to upload photo: $e');
+    }
+
+    if (response.statusCode == 200) {
+      final body = jsonDecode(response.body);
+      final data = body['data'] ?? body;
+      final avatarUrl = (data['avatarUrl'] ?? data['url'] ?? '').toString();
+      if (avatarUrl.isNotEmpty && _currentUser != null) {
+        _currentUser = _currentUser!.copyWith(avatarUrl: avatarUrl);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('api_hub_user', jsonEncode(_currentUser!.toJson()));
+        notifyListeners();
+      }
+      return avatarUrl;
+    } else {
+      String detail = 'Failed to upload profile photo (${response.statusCode})';
+      try {
+        final body = jsonDecode(response.body);
+        detail = body['detail'] ?? body['message'] ?? detail;
+      } catch (_) {}
+      throw Exception(detail);
     }
   }
 
