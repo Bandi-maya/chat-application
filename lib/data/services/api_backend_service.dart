@@ -111,6 +111,7 @@ class ApiBackendService extends ChangeNotifier {
     required String adminPassword,
     required String adminFullName,
     String tenantType = 'chat',
+    bool allowUserRegistration = true,
   }) async {
     final payload = {
       'tenant_id': tenantId.trim(),
@@ -120,6 +121,7 @@ class ApiBackendService extends ChangeNotifier {
       'admin_password': adminPassword,
       'admin_full_name': adminFullName.trim(),
       'tenant_type': tenantType,
+      'allow_user_registration': allowUserRegistration,
     };
 
     final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/organization/admin/create');
@@ -219,6 +221,27 @@ class ApiBackendService extends ChangeNotifier {
     } catch (_) {
       rethrow;
     }
+  }
+
+  /// Update organization user self-registration support flag.
+  Future<bool> updateOrganizationRegistrationSupport({
+    required String organizationIdOrTenantId,
+    required bool allowUserRegistration,
+  }) async {
+    final clean = organizationIdOrTenantId.trim();
+    final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/organization/$clean/registration');
+    final response = await http.patch(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-tenant-id': ApiBackendConfig.tenantId,
+        if (_token != null) 'Authorization': 'Bearer $_token',
+      },
+      body: jsonEncode({
+        'allow_user_registration': allowUserRegistration,
+      }),
+    );
+    return response.statusCode == 200;
   }
 
   Future<List<Map<String, dynamic>>> getAvailablePlans({String? organizationId}) async {
