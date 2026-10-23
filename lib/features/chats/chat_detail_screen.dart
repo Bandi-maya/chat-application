@@ -777,7 +777,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       }
       if (_isNearBottom) {
         _scrollToBottom();
-        if (_pendingBelowCount != 0) setState(() => _pendingBelowCount = 0);
+        setState(() {
+          _pendingBelowCount = 0;
+        });
       } else {
         setState(() => _pendingBelowCount += count - previous);
       }
