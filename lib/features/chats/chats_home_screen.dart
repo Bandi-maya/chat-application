@@ -53,7 +53,6 @@ import '../../data/services/chaty_share_service.dart';
 import '../settings/message_management/message_management_page.dart';
 import '../settings/privacy/privacy_center_screen.dart';
 import '../settings/security/app_lock_overlay.dart';
-import '../settings/gb_features/gb_settings_screen.dart';
 import '../../data/services/api_backend_service.dart';
 import '../../data/services/backend_config.dart';
 import '../subscription/plan_subscription_screen.dart';
@@ -1443,12 +1442,12 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                         children: [
                           _popupMenuItem(
                             icon: Icons.tune_rounded,
-                            title: 'Chaty Settings',
+                            title: 'Settings',
                             onTap: () {
                               Navigator.pop(ctx);
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) => GbSettingsScreen(
+                                  builder: (_) => SettingsRootScreen(
                                     preferencesController: widget.preferencesController,
                                     themeController: widget.themeController,
                                     dataStore: widget.dataStore,
