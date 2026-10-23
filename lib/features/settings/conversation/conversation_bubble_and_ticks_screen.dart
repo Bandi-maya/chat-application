@@ -6,6 +6,9 @@ import '../../../ui/core/design_system/design_system.dart';
 import '../../../ui/core/design_system/gb_design_system.dart';
 import '../../../ui/core/design_system/components/adaptive_selection_panel.dart';
 import '../../../ui/core/bubbles/bubble_style_id.dart';
+import '../../../ui/core/ticks/delivery_icon_style.dart';
+import '../../../ui/core/ticks/delivery_status_icon_painter.dart';
+import '../../../domain/models/chat_message.dart';
 import '../../../ui/core/bubbles/bubble_style_preview.dart';
 
 class ConversationBubbleAndTicksScreen extends StatefulWidget {
@@ -21,19 +24,8 @@ class ConversationBubbleAndTicksScreen extends StatefulWidget {
 }
 
 class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAndTicksScreen> {
-  final List<String> _tickStyles = [
-    'Default',
-    'iOS Ticks',
-    'Wings',
-    'Traffic Lights',
-    'Circles',
-    'Stars',
-    'Hearts',
-    'Batman',
-    'Double Sword',
-    'Glowing Dots',
-    'Material 3 Rounded',
-  ];
+  /// Every tick style Chaty already draws, Stock first (stored as display name).
+  final List<DeliveryIconStyle> _tickStyleIds = DeliveryIconStyle.values;
 
   /// Every bubble geometry Chaty already ships, Stock first. Stored values are
   /// the display names, which BubbleStyleId.fromString resolves back to the
@@ -66,14 +58,14 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
     AdaptiveSelectionPanel.show<String>(
       context: context,
       title: 'Choose your Ticks style',
-      selectedValue: prefs.tickStyle,
+      selectedValue: DeliveryIconStyleExtension.fromString(prefs.tickStyle).displayName,
       showApplyButton: true,
       preferCenteredDialog: true,
-      options: _tickStyles
-          .map((item) => SelectionOptionItem<String>(
-                value: item,
-                title: item,
-                preview: _buildTickIcon(item, theme.accentColor),
+      options: _tickStyleIds
+          .map((id) => SelectionOptionItem<String>(
+                value: id.displayName,
+                title: id.displayName,
+                preview: _buildTickPreview(id, theme.accentColor),
               ))
           .toList(),
     ).then((val) {
@@ -132,6 +124,21 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
         child: const Text(
           'Hi',
           style: TextStyle(color: Colors.white, fontSize: 11),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTickPreview(DeliveryIconStyle id, Color color) {
+    return SizedBox(
+      width: 22,
+      height: 16,
+      child: CustomPaint(
+        painter: DeliveryStatusIconPainter(
+          style: id,
+          state: DeliveryState.read,
+          unreadColor: color,
+          readColor: color,
         ),
       ),
     );
@@ -399,7 +406,7 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
                                         style: TextStyle(color: rightTimeCol, fontSize: 10),
                                       ),
                                       const SizedBox(width: 4),
-                                      _buildTickIcon(prefs.tickStyle, rightTimeCol),
+                                      _buildTickPreview(DeliveryIconStyleExtension.fromString(prefs.tickStyle), rightTimeCol),
                                     ],
                                   ),
                                 ],
