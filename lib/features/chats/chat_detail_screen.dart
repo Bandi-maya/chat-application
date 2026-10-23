@@ -3607,3 +3607,8 @@ class _ComposerState extends State<_Composer>
     );
   }
 }
+
+/// Test-only handle to the private composer so a widget test can render it.
+// ignore: library_private_types_in_public_api
+@visibleForTesting
+typedef ChatComposerForTest = _Composer;
