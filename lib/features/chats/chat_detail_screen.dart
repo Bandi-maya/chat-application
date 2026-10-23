@@ -147,6 +147,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     super.initState();
     _realtime = locator<RichChatRealtimeService>();
     _realtime.setActiveConversation(widget.conversationId);
+    widget.dataStore.setActiveConversation(widget.conversationId);
     _relationships = locator<ContactRelationshipService>();
     _attachments = ChatAttachmentActions(
       conversationId: widget.conversationId,
@@ -247,6 +248,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   void dispose() {
     _messageItemKeys.clear();
     _messageIndexById.clear();
+    widget.dataStore.setActiveConversation(null);
     if (_realtime.activeConversationId == widget.conversationId) {
       _realtime.setActiveConversation(null);
     }

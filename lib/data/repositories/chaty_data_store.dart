@@ -256,6 +256,12 @@ class ChatyDataStore extends ChangeNotifier {
     return _backend.getMessages(conversationId);
   }
 
+  void setActiveConversation(String? conversationId) {
+    if (locator.isRegistered<ApiBackendService>()) {
+      locator<ApiBackendService>().setActiveConversation(conversationId);
+    }
+  }
+
   Future<void> ensureConversationLoaded(String conversationId) async {
     if (locator.isRegistered<ApiBackendService>()) {
       final api = locator<ApiBackendService>();
