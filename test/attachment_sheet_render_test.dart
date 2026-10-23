@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:chat/core/emoji/widgets/chaty_emoji_picker.dart';
 import 'package:chat/features/messages/attachment_sheet.dart';
 import 'package:chat/ui/core/theme/theme_controller.dart';
@@ -30,7 +31,8 @@ void main() {
     await _loadFont('MaterialIcons', 'MaterialIcons-Regular.otf');
   });
   for (final custom in [false, true]) {
-    testWidgets('emoji picker ${custom ? "custom colours" : "defaults"}', skip: true /* render evidence captured in CI run 39989612203; leaves a pending picker timer */, (tester) async {
+    testWidgets('emoji picker ${custom ? "custom colours" : "defaults"}', (tester) async {
+      SharedPreferences.setMockInitialValues({});
       tester.view.physicalSize = const Size(800, 1400);
       tester.view.devicePixelRatio = 2;
       addTearDown(tester.view.reset);
@@ -63,9 +65,11 @@ void main() {
         ),
       );
       await tester.tap(find.text('open'));
-      for (var i = 0; i < 12; i++) {
+      for (var i = 0; i < 6; i++) {
         await tester.pump(const Duration(milliseconds: 100));
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 700)));
       }
+      await tester.pump(const Duration(milliseconds: 300));
       await tester.runAsync(() async {
         final boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary;
         final image = await boundary.toImage(pixelRatio: 1);
