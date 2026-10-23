@@ -3531,7 +3531,11 @@ class _ComposerState extends State<_Composer>
             ),
             decoration: InputDecoration(
               hintText: 'Message…  /task or #reply',
-              hintStyle: TextStyle(color: theme.secondaryTextColor),
+              hintMaxLines: 1,
+              hintStyle: TextStyle(
+                color: theme.secondaryTextColor,
+                overflow: TextOverflow.ellipsis,
+              ),
               filled: true,
               fillColor: inputBg,
               prefixIcon: IconButton(
