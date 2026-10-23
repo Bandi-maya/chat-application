@@ -668,6 +668,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                                 homePrefs.showSearchBar,
                                 homePrefs.showCameraIcon,
                                 homePrefs.showDesktopIcon,
+                                homePrefs.showGhostPill,
                                 homePrefs.disableStatusUnderName,
                                 homePrefs.setMyName,
                               ].join('|'),
@@ -1821,7 +1822,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                     ),
                   ),
                 ),
-                _ghostModePill(theme, homePrefs),
+                if (homePrefs.showGhostPill) _ghostModePill(theme, homePrefs),
                 const SizedBox(width: 8),
                 if (locator.isRegistered<ConnectionHealthService>())
                   ListenableBuilder(
