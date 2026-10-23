@@ -22,6 +22,7 @@ import 'calls/call_settings_screen.dart';
 import 'conversation/conversation_settings_page.dart';
 import 'effects/navigation_effects_page.dart';
 import 'home/header_settings_screen.dart';
+import 'home/home_screen_settings_page.dart';
 import 'media/storage_and_media_settings_screen.dart';
 import 'message_management/message_management_page.dart';
 import 'notifications/notification_settings_page.dart';
@@ -601,6 +602,18 @@ class SettingsRootScreen extends StatelessWidget {
                     ),
                     ]),
                     _GbGroup(children: [
+                    _SettingsItemTile(
+                      icon: Icon(Icons.home_outlined, color: colors.accent, size: 24),
+                      title: 'Home Screen',
+                      subtitle: 'Header, chat rows, floating button & status',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => HomeScreenSettingsPage(
+                            preferencesController: preferencesController,
+                          ),
+                        ),
+                      ),
+                    ),
                     _SettingsItemTile(
                       icon: Icon(Icons.chat_bubble_outline_rounded, color: colors.success, size: 24),
                       title: 'Conversation Customization',
