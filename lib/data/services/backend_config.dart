@@ -78,21 +78,33 @@ class ApiBackendConfig {
   }
 
   static String getWebSocketUrl(String userId) {
-    if (customWebSocketUrl != null && customWebSocketUrl!.isNotEmpty) {
-      return customWebSocketUrl!
-          .replaceAll('{userId}', userId)
-          .replaceAll('\$userId', userId);
+    final cleanUserId = userId.trim();
+    if (customWebSocketUrl != null &&
+        customWebSocketUrl!.isNotEmpty &&
+        !customWebSocketUrl!.contains('/ws/school')) {
+      final ws = customWebSocketUrl!.trim();
+      if (ws.contains('{userId}') || ws.contains('\$userId')) {
+        return ws
+            .replaceAll('{userId}', cleanUserId)
+            .replaceAll('\$userId', cleanUserId);
+      }
+      return '${ws.replaceAll(RegExp(r'/+$'), '')}/chat/ws/$cleanUserId';
     }
     const envWs = String.fromEnvironment('WEBSOCKET_URL');
-    if (envWs.isNotEmpty) {
-      return envWs
-          .replaceAll('{userId}', userId)
-          .replaceAll('\$userId', userId);
+    if (envWs.isNotEmpty && !envWs.contains('/ws/school')) {
+      if (envWs.contains('{userId}') || envWs.contains('\$userId')) {
+        return envWs
+            .replaceAll('{userId}', cleanUserId)
+            .replaceAll('\$userId', cleanUserId);
+      }
+      return '${envWs.replaceAll(RegExp(r'/+$'), '')}/chat/ws/$cleanUserId';
     }
     final base = restApiBaseUrl
         .replaceFirst('https://', 'wss://')
-        .replaceFirst('http://', 'ws://');
-    return '$base/chat/ws/$userId';
+        .replaceFirst('http://', 'ws://')
+        .replaceAll(RegExp(r'/api/v[0-9]+/?$'), '')
+        .replaceAll(RegExp(r'/+$'), '');
+    return '$base/chat/ws/$cleanUserId';
   }
 }
 

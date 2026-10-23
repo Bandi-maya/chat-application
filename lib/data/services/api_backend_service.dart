@@ -64,7 +64,11 @@ class ApiBackendService extends ChangeNotifier {
   void setActiveConversation(String? conversationId) {
     _activeConversationId = conversationId;
     if (conversationId != null && conversationId.isNotEmpty) {
+      _startBackgroundSync();
       loadMessages(conversationId);
+      if (_channel == null && !_isConnecting) {
+        _connectWebSocket();
+      }
     }
   }
 
@@ -92,7 +96,17 @@ class ApiBackendService extends ChangeNotifier {
           } catch (_) {}
         }
         debugPrint('[ApiBackendService] Restored authenticated session for ${_currentUser?.displayName}');
+        if (_currentUser != null && _currentUser!.id.trim().isEmpty) {
+          try {
+            final jwt = _decodeJwt(_token!);
+            final uid = (jwt['uid'] ?? jwt['sub'] ?? '').toString();
+            if (uid.isNotEmpty) {
+              _currentUser = _currentUser!.copyWith(id: uid);
+            }
+          } catch (_) {}
+        }
         _connectWebSocket();
+        _startBackgroundSync();
         unawaited(loadConversations());
         unawaited(loadUsers());
         unawaited(loadTasks());
@@ -568,6 +582,16 @@ class ApiBackendService extends ChangeNotifier {
 
   void _connectWebSocket() {
     if (_token == null || _currentUser == null || _isConnecting) return;
+    if (_currentUser!.id.trim().isEmpty) {
+      try {
+        final jwt = _decodeJwt(_token!);
+        final uid = (jwt['uid'] ?? jwt['sub'] ?? '').toString();
+        if (uid.isNotEmpty) {
+          _currentUser = _currentUser!.copyWith(id: uid);
+        }
+      } catch (_) {}
+    }
+    if (_currentUser!.id.trim().isEmpty) return;
     _reconnectTimer?.cancel();
     _cleanupWebSocket();
     _isConnecting = true;
@@ -696,13 +720,24 @@ class ApiBackendService extends ChangeNotifier {
   Future<void> _syncActiveRoomMessages(String chatId) async {
     if (_token == null) return;
     try {
-      final response = await http.get(
-        Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/rooms/$chatId/messages'),
+      final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/rooms/$chatId/messages');
+      http.Response response = await http.get(
+        uri,
         headers: {
           'Authorization': 'Bearer $_token',
           'x-tenant-id': ApiBackendConfig.tenantId,
         },
       );
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/chat/rooms/$chatId/messages');
+        response = await http.get(
+          fallbackUri,
+          headers: {
+            'Authorization': 'Bearer $_token',
+            'x-tenant-id': ApiBackendConfig.tenantId,
+          },
+        );
+      }
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body)['data'] as List;
         final remote = data.map((json) => ChatMessage.fromApi(json)).toList();
@@ -711,14 +746,14 @@ class ApiBackendService extends ChangeNotifier {
             .where((m) => m.deliveryState == DeliveryState.sending || m.id.startsWith('temp_'))
             .toList();
 
-        final remoteIds = remote.map((m) => m.id).toSet();
-        final currentIds = currentList
-            .where((m) => !m.id.startsWith('temp_'))
-            .map((m) => m.id)
-            .toSet();
+        // Check if remote has any messages not in currentList or different count
+        bool hasChanges = remote.length != currentList.length;
+        if (!hasChanges && remote.isNotEmpty && currentList.isNotEmpty) {
+          hasChanges = remote.last.id != currentList.last.id ||
+              remote.first.id != currentList.first.id;
+        }
 
-        // Only update state if remote list differs from current list
-        if (remoteIds.length != currentIds.length || !remoteIds.containsAll(currentIds)) {
+        if (hasChanges) {
           final merged = <ChatMessage>[...remote];
           for (final p in pending) {
             if (!remote.any((r) => r.text == p.text)) {
@@ -727,6 +762,23 @@ class ApiBackendService extends ChangeNotifier {
           }
           merged.sort((a, b) => a.createdAt.compareTo(b.createdAt));
           _messages[chatId] = merged;
+
+          // Update conversation snippet in list
+          if (remote.isNotEmpty) {
+            final lastMsg = remote.last;
+            final convIdx = _conversations.indexWhere((c) => c.id == chatId);
+            if (convIdx != -1) {
+              final oldConv = _conversations[convIdx];
+              _conversations[convIdx] = oldConv.copyWith(
+                lastMessageText: lastMsg.text.isNotEmpty
+                    ? lastMsg.text
+                    : (lastMsg.type == MessageType.image ? '📷 Photo' : '📎 Attachment'),
+                lastMessageTime: lastMsg.createdAt,
+                lastMessageSenderId: lastMsg.senderId,
+              );
+            }
+          }
+
           notifyListeners();
         }
       }
@@ -747,13 +799,24 @@ class ApiBackendService extends ChangeNotifier {
   Future<void> loadConversations() async {
     if (_token == null) return;
     try {
-      final response = await http.get(
-        Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/rooms'),
+      final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/rooms');
+      http.Response response = await http.get(
+        uri,
         headers: {
           'Authorization': 'Bearer $_token',
           'x-tenant-id': ApiBackendConfig.tenantId,
         },
       );
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/chat/rooms');
+        response = await http.get(
+          fallbackUri,
+          headers: {
+            'Authorization': 'Bearer $_token',
+            'x-tenant-id': ApiBackendConfig.tenantId,
+          },
+        );
+      }
       if (response.statusCode == 200) {
         _requiresSubscription = false;
         _subscriptionErrorMessage = null;
@@ -893,15 +956,24 @@ class ApiBackendService extends ChangeNotifier {
   Future<void> loadMessages(String chatId) async {
     if (_token == null) return;
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${ApiBackendConfig.restApiBaseUrl}/chat/rooms/$chatId/messages',
-        ),
+      final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/rooms/$chatId/messages');
+      http.Response response = await http.get(
+        uri,
         headers: {
           'Authorization': 'Bearer $_token',
           'x-tenant-id': ApiBackendConfig.tenantId,
         },
       );
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/chat/rooms/$chatId/messages');
+        response = await http.get(
+          fallbackUri,
+          headers: {
+            'Authorization': 'Bearer $_token',
+            'x-tenant-id': ApiBackendConfig.tenantId,
+          },
+        );
+      }
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body)['data'] as List;
         final parsed = data.map((json) => ChatMessage.fromApi(json)).toList();
