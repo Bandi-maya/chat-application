@@ -63,7 +63,9 @@ void main() {
         ),
       );
       await tester.tap(find.text('open'));
-      await tester.pump(const Duration(milliseconds: 600));
+      for (var i = 0; i < 12; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
       await tester.runAsync(() async {
         final boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary;
         final image = await boundary.toImage(pixelRatio: 1);
@@ -71,6 +73,8 @@ void main() {
         final dir = Directory('build/ui_renders')..createSync(recursive: true);
         File('${dir.path}/emoji_picker_${custom ? "custom" : "default"}.png').writeAsBytesSync(data!.buffer.asUint8List());
       });
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(seconds: 5));
     });
   }
 
