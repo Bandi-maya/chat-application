@@ -5,7 +5,7 @@ void main() {
   test('every bubble display name round-trips to the same id', () {
     final names = <String>{};
     for (final id in BubbleStyleId.values) {
-      expect(BubbleStyleId.fromString(id.displayName), id,
+      expect(BubbleStyleIdExtension.fromString(id.displayName), id,
           reason: id.displayName);
       names.add(id.displayName);
     }
@@ -14,9 +14,9 @@ void main() {
   });
 
   test('legacy picker labels still resolve and Stock is the default', () {
-    expect(BubbleStyleId.fromString('Stock'), BubbleStyleId.stock);
-    expect(BubbleStyleId.fromString(null), BubbleStyleId.stock);
-    expect(BubbleStyleId.fromString('WhatsApp Default'), BubbleStyleId.stock);
-    expect(BubbleStyleId.fromString('Telegram Arc'), BubbleStyleId.telegram);
+    expect(BubbleStyleIdExtension.fromString('Stock'), BubbleStyleId.stock);
+    expect(BubbleStyleIdExtension.fromString(null), BubbleStyleId.stock);
+    expect(BubbleStyleIdExtension.fromString('WhatsApp Default'), BubbleStyleId.stock);
+    expect(BubbleStyleIdExtension.fromString('Telegram Arc'), BubbleStyleId.telegram);
   });
 }
