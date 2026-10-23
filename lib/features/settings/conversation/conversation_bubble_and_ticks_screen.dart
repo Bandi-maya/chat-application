@@ -144,43 +144,6 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
     );
   }
 
-  Widget _buildTickIcon(String tickStyle, Color color) {
-    if (tickStyle.contains('Star')) {
-      return Icon(Icons.star, size: 14, color: color);
-    } else if (tickStyle.contains('Heart')) {
-      return Icon(Icons.favorite, size: 13, color: color);
-    } else if (tickStyle.contains('Circle')) {
-      return Icon(Icons.radio_button_checked, size: 13, color: color);
-    } else if (tickStyle.contains('Traffic')) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, color: color)),
-          const SizedBox(width: 2),
-          Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, color: color)),
-        ],
-      );
-    } else if (tickStyle.contains('Batman') || tickStyle.contains('Wings')) {
-      return Icon(Icons.flight, size: 14, color: color);
-    } else if (tickStyle.contains('Double Sword')) {
-      return Icon(Icons.close_rounded, size: 14, color: color);
-    } else if (tickStyle.contains('Glowing Dots')) {
-      return Icon(Icons.more_horiz_rounded, size: 15, color: color);
-    } else if (tickStyle.contains('Material 3 Rounded')) {
-      return Icon(Icons.check_circle_rounded, size: 14, color: color);
-    }
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.check, size: 14, color: color),
-        Transform.translate(
-          offset: const Offset(-8, 0),
-          child: Icon(Icons.check, size: 14, color: color),
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final themeController = locator<ThemeController>();
