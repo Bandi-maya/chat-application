@@ -28,7 +28,7 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
   final List<DeliveryIconStyle> _tickStyleIds = DeliveryIconStyle.values;
 
   /// Every bubble geometry Chaty already ships, Stock first. Stored values are
-  /// the display names, which BubbleStyleId.fromString resolves back to the
+  /// the display names, which BubbleStyleIdExtension.fromString resolves back to the
   /// same id; older saved labels still resolve through its legacy aliases.
   final List<BubbleStyleId> _bubbleStyleIds = <BubbleStyleId>[
     BubbleStyleId.stock,
@@ -83,7 +83,7 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
     AdaptiveSelectionPanel.show<String>(
       context: context,
       title: 'Choose your Bubbles style',
-      selectedValue: BubbleStyleId.fromString(prefs.bubbleStyle).displayName,
+      selectedValue: BubbleStyleIdExtension.fromString(prefs.bubbleStyle).displayName,
       showApplyButton: true,
       preferCenteredDialog: true,
       options: _bubbleStyleIds
