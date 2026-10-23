@@ -44,6 +44,24 @@ class DeliveryStatusIconPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     switch (style) {
+      // Stock: classic messaging ticks. One check when sent, two overlapping
+      // checks when delivered or read (Chaty-drawn vector, not GB art).
+      case DeliveryIconStyle.stock:
+        paint.strokeWidth = 1.5;
+        final stP1 = Path()
+          ..moveTo(size.width * 0.10, size.height * 0.54)
+          ..lineTo(size.width * 0.30, size.height * 0.72)
+          ..lineTo(size.width * 0.66, size.height * 0.30);
+        canvas.drawPath(stP1, paint);
+        if (isDelivered || isRead) {
+          final stP2 = Path()
+            ..moveTo(size.width * 0.44, size.height * 0.64)
+            ..lineTo(size.width * 0.50, size.height * 0.72)
+            ..lineTo(size.width * 0.90, size.height * 0.30);
+          canvas.drawPath(stP2, paint);
+        }
+        break;
+
       // 1. Sticker: Solid rounded badge with check
       case DeliveryIconStyle.sticker:
         canvas.drawCircle(
