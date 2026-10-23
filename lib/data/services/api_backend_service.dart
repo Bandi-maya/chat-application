@@ -36,6 +36,11 @@ class ApiBackendService extends ChangeNotifier {
   String? _token;
   WebSocketChannel? _channel;
   Timer? _reconnectTimer;
+  Timer? _pingTimer;
+  Timer? _syncTimer;
+  String? _activeConversationId;
+  int _syncTicks = 0;
+  bool _isConnecting = false;
 
   List<Conversation> _conversations = [];
   List<UserProfile> _users = [];
@@ -46,6 +51,8 @@ class ApiBackendService extends ChangeNotifier {
 
   bool get isInitialized => _isInitialized;
   bool get isAuthenticated => _token != null && _currentUser != null;
+  bool get isConnected => _channel != null;
+  String? get activeConversationId => _activeConversationId;
   bool get requiresSubscription => _requiresSubscription;
   String? get subscriptionErrorMessage => _subscriptionErrorMessage;
   UserProfile? get currentUser => _currentUser;
@@ -53,6 +60,13 @@ class ApiBackendService extends ChangeNotifier {
   Map<String, dynamic>? get currentOrganization => _currentOrg;
   List<Conversation> get conversations => _conversations;
   List<UserProfile> get users => _users;
+
+  void setActiveConversation(String? conversationId) {
+    _activeConversationId = conversationId;
+    if (conversationId != null && conversationId.isNotEmpty) {
+      loadMessages(conversationId);
+    }
+  }
 
   UserProfile? getUser(String userId) {
     if (_currentUser?.id == userId) return _currentUser;
@@ -532,9 +546,31 @@ class ApiBackendService extends ChangeNotifier {
     }
   }
 
-  void _connectWebSocket() {
-    if (_token == null || _currentUser == null) return;
+  void _cleanupWebSocket() {
+    _pingTimer?.cancel();
+    _pingTimer = null;
+    try {
+      _channel?.sink.close();
+    } catch (_) {}
+    _channel = null;
+    _isConnecting = false;
+  }
+
+  void _scheduleReconnect() {
+    if (_token == null) return;
     _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(const Duration(seconds: 4), () {
+      if (_token != null && _channel == null) {
+        _connectWebSocket();
+      }
+    });
+  }
+
+  void _connectWebSocket() {
+    if (_token == null || _currentUser == null || _isConnecting) return;
+    _reconnectTimer?.cancel();
+    _cleanupWebSocket();
+    _isConnecting = true;
 
     try {
       final wsUrl = Uri.parse(
@@ -542,21 +578,47 @@ class ApiBackendService extends ChangeNotifier {
       );
       debugPrint('[ApiBackendService] Connecting WebSocket to: $wsUrl');
       _channel = WebSocketChannel.connect(wsUrl);
+      _isConnecting = false;
+
+      // Start ping heartbeat timer every 25 seconds to keep connection alive
+      _pingTimer?.cancel();
+      _pingTimer = Timer.periodic(const Duration(seconds: 25), (timer) {
+        if (_channel != null && _token != null) {
+          try {
+            _channel!.sink.add(jsonEncode({'type': 'ping'}));
+          } catch (e) {
+            debugPrint('[ApiBackendService] Ping failed: $e');
+            _cleanupWebSocket();
+            _scheduleReconnect();
+          }
+        } else {
+          timer.cancel();
+        }
+      });
 
       _channel?.stream.listen((message) {
-        debugPrint('[ApiBackendService] Received message: $message');
         try {
           final payload = jsonDecode(message);
-          if (payload['type'] == 'new_message') {
+          final eventType = payload['type'];
+
+          if (eventType == 'pong') {
+            // Heartbeat response from backend
+            return;
+          }
+
+          if (eventType == 'new_message') {
             final rawData = payload['data'] ?? payload['message'];
             if (rawData != null) {
               final chatMsg = ChatMessage.fromApi(rawData);
               final roomId = chatMsg.conversationId;
               final list = _messages.putIfAbsent(roomId, () => []);
 
-              // Replace optimistic sending message if matching content
+              // Replace optimistic sending message if matching content or temp ID
               final optIdx = list.indexWhere(
-                (m) => m.deliveryState == DeliveryState.sending && m.text == chatMsg.text,
+                (m) =>
+                    (m.deliveryState == DeliveryState.sending || m.id.startsWith('temp_')) &&
+                    m.text == chatMsg.text &&
+                    (m.senderId == chatMsg.senderId || m.senderId == _currentUser?.id),
               );
               if (optIdx != -1) {
                 list[optIdx] = chatMsg;
@@ -573,7 +635,9 @@ class ApiBackendService extends ChangeNotifier {
                 _conversations.insert(
                   0,
                   oldConv.copyWith(
-                    lastMessageText: chatMsg.text,
+                    lastMessageText: chatMsg.text.isNotEmpty
+                        ? chatMsg.text
+                        : (chatMsg.type == MessageType.image ? '📷 Photo' : '📎 Attachment'),
                     lastMessageTime: chatMsg.createdAt,
                     lastMessageSenderId: chatMsg.senderId,
                   ),
@@ -590,14 +654,93 @@ class ApiBackendService extends ChangeNotifier {
         }
       }, onError: (error) {
         debugPrint('[ApiBackendService] WebSocket Error: $error');
+        _cleanupWebSocket();
+        _scheduleReconnect();
       }, onDone: () {
         debugPrint('[ApiBackendService] WebSocket Disconnected. Reconnecting in 4s...');
-        _reconnectTimer = Timer(const Duration(seconds: 4), () {
-          if (_token != null) _connectWebSocket();
-        });
+        _cleanupWebSocket();
+        _scheduleReconnect();
       });
+
+      _startBackgroundSync();
     } catch (e) {
       debugPrint('[ApiBackendService] Error connecting to WebSocket: $e');
+      _cleanupWebSocket();
+      _scheduleReconnect();
+    }
+  }
+
+  void _startBackgroundSync() {
+    _syncTimer?.cancel();
+    _syncTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (_token == null) {
+        timer.cancel();
+        return;
+      }
+      _syncTicks++;
+      // Active conversation polling sync (runs every 4 seconds when in a room)
+      if (_activeConversationId != null && _activeConversationId!.isNotEmpty) {
+        _syncActiveRoomMessages(_activeConversationId!);
+      }
+      // Periodically refresh conversation list every ~12 seconds
+      if (_syncTicks % 3 == 0) {
+        loadConversations();
+      }
+      // Re-establish WebSocket connection if dropped without reconnect
+      if (_channel == null && !_isConnecting) {
+        _connectWebSocket();
+      }
+    });
+  }
+
+  Future<void> _syncActiveRoomMessages(String chatId) async {
+    if (_token == null) return;
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/rooms/$chatId/messages'),
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'x-tenant-id': ApiBackendConfig.tenantId,
+        },
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body)['data'] as List;
+        final remote = data.map((json) => ChatMessage.fromApi(json)).toList();
+        final currentList = _messages[chatId] ?? [];
+        final pending = currentList
+            .where((m) => m.deliveryState == DeliveryState.sending || m.id.startsWith('temp_'))
+            .toList();
+
+        final remoteIds = remote.map((m) => m.id).toSet();
+        final currentIds = currentList
+            .where((m) => !m.id.startsWith('temp_'))
+            .map((m) => m.id)
+            .toSet();
+
+        // Only update state if remote list differs from current list
+        if (remoteIds.length != currentIds.length || !remoteIds.containsAll(currentIds)) {
+          final merged = <ChatMessage>[...remote];
+          for (final p in pending) {
+            if (!remote.any((r) => r.text == p.text)) {
+              merged.add(p);
+            }
+          }
+          merged.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          _messages[chatId] = merged;
+          notifyListeners();
+        }
+      }
+    } catch (_) {}
+  }
+
+  void onAppResumed() {
+    if (_token == null) return;
+    if (_channel == null && !_isConnecting) {
+      _connectWebSocket();
+    }
+    loadConversations();
+    if (_activeConversationId != null && _activeConversationId!.isNotEmpty) {
+      loadMessages(_activeConversationId!);
     }
   }
 
@@ -762,8 +905,13 @@ class ApiBackendService extends ChangeNotifier {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body)['data'] as List;
         final parsed = data.map((json) => ChatMessage.fromApi(json)).toList();
-        parsed.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-        _messages[chatId] = parsed;
+        
+        final currentList = _messages[chatId] ?? [];
+        final pending = currentList
+            .where((m) => (m.deliveryState == DeliveryState.sending || m.id.startsWith('temp_')) && !parsed.any((p) => p.text == m.text))
+            .toList();
+        final merged = [...parsed, ...pending]..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        _messages[chatId] = merged;
         notifyListeners();
       }
     } catch (e) {
@@ -872,8 +1020,8 @@ class ApiBackendService extends ChangeNotifier {
       }
     }
 
-    // 2. Also notify WebSocket channel if connected
-    if (_channel != null) {
+    // 2. Fallback to WebSocket only if HTTP send did not succeed
+    if (confirmedMsg == null && _channel != null) {
       try {
         final payload = {
           'type': 'send_message',
@@ -1269,8 +1417,11 @@ class ApiBackendService extends ChangeNotifier {
     _token = null;
     _currentUser = null;
     _reconnectTimer?.cancel();
-    _channel?.sink.close();
-    _channel = null;
+    _reconnectTimer = null;
+    _syncTimer?.cancel();
+    _syncTimer = null;
+    _activeConversationId = null;
+    _cleanupWebSocket();
     _conversations.clear();
     _users.clear();
     _messages.clear();

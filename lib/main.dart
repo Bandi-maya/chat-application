@@ -676,6 +676,9 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
       _freshLoginSession = false;
       _applyAutoLockOnResume();
       if (_backend.isAuthenticated) unawaited(_registerCurrentDevice());
+      if (locator.isRegistered<ApiBackendService>()) {
+        locator<ApiBackendService>().onAppResumed();
+      }
     }
 
     if (!_backend.isAuthenticated) return;
