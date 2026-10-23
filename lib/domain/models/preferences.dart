@@ -328,6 +328,8 @@ class HomePreferences {
   /// Header action, Below header, or Above chat filters.
   final String searchPlacement;
   final bool showCameraIcon;
+  /// Show the ghost mode pill in the home header (off by default).
+  final bool showGhostPill;
   final bool showDesktopIcon;
 
   final bool carouselView;
@@ -386,13 +388,14 @@ class HomePreferences {
     this.showSearchBar = true,
     this.searchPlacement = 'Header action',
     this.showCameraIcon = false,
-    this.showDesktopIcon = true,
+    this.showGhostPill = false,
+    this.showDesktopIcon = false,
     this.carouselView = false,
     this.setMyName = true,
     this.disableStatusUnderName = false,
     this.hideChatSortList = false,
     this.disableSearchBar = false,
-    this.themesEnabled = true,
+    this.themesEnabled = false,
     this.showIconAddAccount = false,
     this.hideChatsDivider = false,
     this.hideUnsavedNumbers = false,
@@ -442,6 +445,7 @@ class HomePreferences {
     bool? showSearchBar,
     String? searchPlacement,
     bool? showCameraIcon,
+    bool? showGhostPill,
     bool? showDesktopIcon,
     bool? carouselView,
     bool? setMyName,
@@ -498,6 +502,7 @@ class HomePreferences {
       showSearchBar: showSearchBar ?? this.showSearchBar,
       searchPlacement: searchPlacement ?? this.searchPlacement,
       showCameraIcon: showCameraIcon ?? this.showCameraIcon,
+      showGhostPill: showGhostPill ?? this.showGhostPill,
       showDesktopIcon: showDesktopIcon ?? this.showDesktopIcon,
       carouselView: carouselView ?? this.carouselView,
       setMyName: setMyName ?? this.setMyName,
@@ -565,6 +570,7 @@ class HomePreferences {
     'showSearchBar': showSearchBar,
     'searchPlacement': searchPlacement,
     'showCameraIcon': showCameraIcon,
+    'showGhostPill': showGhostPill,
     'showDesktopIcon': showDesktopIcon,
     'carouselView': carouselView,
     'setMyName': setMyName,
@@ -619,13 +625,14 @@ class HomePreferences {
     showSearchBar: map['showSearchBar'] ?? true,
     searchPlacement: map['searchPlacement'] as String? ?? 'Header action',
     showCameraIcon: map['showCameraIcon'] ?? false,
-    showDesktopIcon: map['showDesktopIcon'] ?? true,
+    showGhostPill: map['showGhostPill'] ?? false,
+    showDesktopIcon: map['showDesktopIcon'] ?? false,
     carouselView: map['carouselView'] ?? false,
     setMyName: map['setMyName'] ?? true,
     disableStatusUnderName: map['disableStatusUnderName'] ?? false,
     hideChatSortList: map['hideChatSortList'] ?? false,
     disableSearchBar: map['disableSearchBar'] ?? false,
-    themesEnabled: map['themesEnabled'] ?? true,
+    themesEnabled: map['themesEnabled'] ?? false,
     showIconAddAccount: map['showIconAddAccount'] ?? false,
     hideChatsDivider: map['hideChatsDivider'] ?? false,
     hideUnsavedNumbers: map['hideUnsavedNumbers'] ?? false,
