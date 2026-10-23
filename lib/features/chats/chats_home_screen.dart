@@ -23,6 +23,7 @@ import '../../ui/core/templates/template_controller.dart';
 import '../../ui/core/templates/template_models.dart';
 import '../../ui/core/design_system/settings_primitives.dart';
 import '../../ui/core/design_system/components/chaty_kit.dart';
+import '../../ui/core/design_system/components/chaty_story_tile.dart';
 import '../../ui/core/design_system/components/chaty_glyph.dart';
 import '../../ui/core/design_system/components/app_components.dart';
 import '../../core/emoji/widgets/animated_emoji_text.dart';
@@ -526,13 +527,9 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         final styleSplitView = homeStyle == 'Tablet Split View';
         // Stories Style consumers: each value renders the strip differently.
         final storiesStyle = homePrefs.storiesStyle;
-        final storyShape = switch (storiesStyle) {
-          'Squircle' => 'squircle',
-          'Card' => 'roundedSquare',
-          _ => 'circle',
-        };
+        final storyLook = chatyStoryLookFor(storiesStyle);
         final storyShowOnlineRing = storiesStyle != 'Minimal';
-        final storyCardWrap = storiesStyle == 'Card' || homePrefs.carouselView;
+        final storyCardWrap = storiesStyle == 'Card' || storiesStyle == 'Card View' || homePrefs.carouselView;
         final showStoriesStrip = homePrefs.enableStoriesStrip || styleStoriesFirst;
         final storyCompact = storiesStyle == 'Compact';
         final storyTileWidth = storyCardWrap
@@ -748,7 +745,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                         !styleStoriesHidden &&
                         widget.forcedType != ConversationType.group)
                       SizedBox(
-                        height: styleStoriesHeight,
+                        height: chatyStoryStripHeight(storyLook, styleStoriesHeight),
                         child: ListView.separated(
                           scrollDirection: Axis.horizontal,
                           padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -760,67 +757,30 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                             final online =
                                 _realtime.isOnline(contact.id) &&
                                 storyShowOnlineRing;
-                            Widget entry = SizedBox(
-                              width: storyCardWrap
-                                  ? storyTileWidth - 8
-                                  : storyTileWidth,
-                              child: Column(
-                                children: [
-                                  Stack(
-                                    children: [
-                                      ChatyAvatar(
-                                        initials: contact.avatarInitials,
-                                        color: ChatyAvatarCore.parseColorHex(contact.avatarColorHex),
-                                        size: storyCompact
-                                            ? styleStoriesAvatar * 0.82
-                                            : styleStoriesAvatar,
-                                        shape: storyShape,
-                                      ),
-                                      if (online)
-                                        Positioned(
-                                          right: -1,
-                                          bottom: -1,
-                                          child: ChatyOnlineDot(
-                                            active: true,
-                                            avatarSize: storyCompact
-                                                ? styleStoriesAvatar * 0.82
-                                                : styleStoriesAvatar,
-                                            color: theme.successColor,
-                                            ringColor: theme.backgroundColor,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    contact.displayName.split(' ').first,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: storiesStyle == 'Minimal'
-                                          ? theme.secondaryTextColor.withValues(
-                                              alpha: 0.55,
-                                            )
-                                          : theme.secondaryTextColor,
-                                      fontSize: storyNameFontSize,
-                                    ),
-                                  ),
-                                ],
+                            return ChatyStoryTile(
+                              look: storyLook,
+                              initials: contact.avatarInitials,
+                              avatarColor: ChatyAvatarCore.parseColorHex(
+                                contact.avatarColorHex,
                               ),
-                            );
-                            // 'Card' style wraps every story in a small
-                            // surface card; other styles stay bare.
-                            if (!storyCardWrap) return entry;
-                            return Container(
-                              width: storyTileWidth,
-                              margin: const EdgeInsets.symmetric(vertical: 2),
-                              padding: const EdgeInsets.fromLTRB(4, 6, 4, 6),
-                              decoration: BoxDecoration(
-                                color: theme.cardColor,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: theme.surfaceColor),
-                              ),
-                              child: entry,
+                              name: contact.displayName.split(' ').first,
+                              online: online,
+                              avatarSize: storyCompact
+                                  ? styleStoriesAvatar * 0.82
+                                  : styleStoriesAvatar,
+                              baseWidth: storyTileWidth,
+                              nameFontSize: storyNameFontSize,
+                              wrapInCard: storyCardWrap,
+                              accent: theme.accentColor,
+                              cardColor: theme.cardColor,
+                              borderColor: theme.surfaceColor,
+                              nameColor: storiesStyle == 'Minimal'
+                                  ? theme.secondaryTextColor.withValues(
+                                      alpha: 0.55,
+                                    )
+                                  : theme.secondaryTextColor,
+                              onlineColor: theme.successColor,
+                              backgroundColor: theme.backgroundColor,
                             );
                           },
                         ),
