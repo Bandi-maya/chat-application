@@ -1,6 +1,7 @@
 /// The complete catalog of discrete Delivery Tick Styles in Chaty, including
 /// the dedicated styles offered by Conversation > Ticks Style.
 enum DeliveryIconStyle {
+  stock,
   sticker,
   rcIos11,
   bbmV2,
@@ -30,6 +31,8 @@ enum DeliveryIconStyle {
 extension DeliveryIconStyleExtension on DeliveryIconStyle {
   String get displayName {
     switch (this) {
+      case DeliveryIconStyle.stock:
+        return 'Stock';
       case DeliveryIconStyle.sticker:
         return 'Sticker';
       case DeliveryIconStyle.rcIos11:
@@ -83,7 +86,7 @@ extension DeliveryIconStyleExtension on DeliveryIconStyle {
 
   /// Safe deserialization with legacy aliases migration
   static DeliveryIconStyle fromString(String? key) {
-    if (key == null || key.isEmpty) return DeliveryIconStyle.rcIos11;
+    if (key == null || key.isEmpty) return DeliveryIconStyle.stock;
     final normalized = key.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
 
     for (final style in DeliveryIconStyle.values) {
