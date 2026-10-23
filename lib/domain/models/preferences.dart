@@ -755,7 +755,7 @@ class ConversationPreferences {
 
   const ConversationPreferences({
     this.bubbleStyle = 'Stock',
-    this.tickStyle = 'RC iOS 11',
+    this.tickStyle = 'Stock',
     this.enableQuickContactSidebar = false,
     this.sidebarPosition = 'Right',
     this.sidebarOpacity = 0.9,
@@ -1211,7 +1211,7 @@ class ConversationPreferences {
   factory ConversationPreferences.fromMap(Map<String, dynamic> map) =>
       ConversationPreferences(
         bubbleStyle: map['bubbleStyle'] ?? map['bubbleShape'] ?? map['conversation_style_row'] ?? 'Stock',
-        tickStyle: map['tickStyle'] ?? 'RC iOS 11',
+        tickStyle: map['tickStyle'] ?? 'Stock',
         enableQuickContactSidebar: map['enableQuickContactSidebar'] ??
             (map['abu_saleh_quickcontact'] != null &&
                 map['abu_saleh_quickcontact'] != 'Off'),
