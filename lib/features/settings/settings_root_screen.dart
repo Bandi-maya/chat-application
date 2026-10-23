@@ -10,7 +10,6 @@ import '../../domain/models/user_profile.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/app_icon_controller.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
-import '../../ui/core/design_system/gb_design_system.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../../ui/core/settings/settings_registry.dart';
 import '../chats/linked_devices_qr_screen.dart';
@@ -757,21 +756,6 @@ class SettingsRootScreen extends StatelessWidget {
         ),
         );
       },
-    );
-  }
-
-  Widget _buildSettingsSectionHeader(String title, AppColors colors) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 20, right: 20, top: 8, bottom: 6),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 11.5,
-          fontWeight: FontWeight.w800,
-          color: colors.primary,
-          letterSpacing: 0.9,
-        ),
-      ),
     );
   }
 
