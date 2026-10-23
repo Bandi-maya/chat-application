@@ -73,7 +73,6 @@ void main() {
     expect(source, contains('onPressed: () => _openHomeThreeDotMenu('));
     expect(source, contains('title: \'Starred Messages\''));
     for (final option in <String>[
-      "title: 'Chaty Settings'",
       "title: 'New Group'",
       "title: 'Linked Devices'",
       "title: 'Starred Messages'",
@@ -87,6 +86,7 @@ void main() {
       expect(source, contains(option), reason: 'Missing overflow option $option');
     }
     for (final hiddenOption in <String>[
+      "title: 'Chaty Settings'",
       "title: 'Camera Effects'",
       "title: 'QR / Scan'",
       "title: 'Themes & Colors'",
