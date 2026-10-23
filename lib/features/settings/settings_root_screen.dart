@@ -190,80 +190,86 @@ class SettingsRootScreen extends StatelessWidget {
   void _showPrivacyPolicy(BuildContext context) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E282E),
-        title: const Row(
-          children: [
-            Icon(Icons.shield_outlined, color: GbColors.activeGreen),
-            SizedBox(width: 8),
-            Text('Privacy Policy', style: TextStyle(color: Colors.white, fontSize: 18)),
-          ],
-        ),
-        content: const SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
+      builder: (ctx) {
+        final colors = ctx.colors;
+        return AlertDialog(
+          backgroundColor: colors.surfaceElevated,
+          title: Row(
             children: [
-              Text(
-                'Your Privacy is Our Priority',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-              SizedBox(height: 8),
-              Text(
-                '• Local End-to-End Encryption:\nYour messages and calls are encrypted and stored safely on your device.\n\n'
-                '• No Remote Telemetry:\nChaty never tracks your browsing, locations, or personal data.\n\n'
-                '• Security & App Lock:\nLocal PIN, Pattern, and Biometric lock protect your messages completely offline.\n\n'
-                '• Full Data Ownership:\nYou can clear chat histories, media caches, and revoke device links at any time.',
-                style: TextStyle(color: Color(0xFF8696A0), fontSize: 13, height: 1.4),
-              ),
+              Icon(Icons.shield_outlined, color: colors.accent),
+              const SizedBox(width: 8),
+              Text('Privacy Policy', style: TextStyle(color: colors.foreground, fontSize: 18)),
             ],
           ),
-        ),
-        actions: [
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: GbColors.activeGreen),
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('I Understand', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Your Privacy is Our Priority',
+                  style: TextStyle(color: colors.foreground, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '• Local End-to-End Encryption:\nYour messages and calls are encrypted and stored safely on your device.\n\n'
+                  '• No Remote Telemetry:\nChaty never tracks your browsing, locations, or personal data.\n\n'
+                  '• Security & App Lock:\nLocal PIN, Pattern, and Biometric lock protect your messages completely offline.\n\n'
+                  '• Full Data Ownership:\nYou can clear chat histories, media caches, and revoke device links at any time.',
+                  style: TextStyle(color: colors.foregroundSecondary, fontSize: 13, height: 1.4),
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
+          actions: [
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: colors.accent),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('I Understand', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
     );
   }
 
   void _showAboutDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E282E),
-        title: const Row(
-          children: [
-            Icon(Icons.info_outline_rounded, color: GbColors.activeGreen),
-            SizedBox(width: 8),
-            Text('About Chaty', style: TextStyle(color: Colors.white, fontSize: 18)),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Chaty Messenger Pro', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            SizedBox(height: 4),
-            Text('Version 2.4.0 (Build 2026.10)', style: TextStyle(color: Color(0xFF8696A0), fontSize: 12)),
-            SizedBox(height: 12),
-            Text(
-              'A modern, privacy-first messaging platform with advanced personalization, rich customization, and offline security.',
-              style: TextStyle(color: Color(0xFFD1D7DB), fontSize: 13, height: 1.3),
+      builder: (ctx) {
+        final colors = ctx.colors;
+        return AlertDialog(
+          backgroundColor: colors.surfaceElevated,
+          title: Row(
+            children: [
+              Icon(Icons.info_outline_rounded, color: colors.accent),
+              const SizedBox(width: 8),
+              Text('About Chaty', style: TextStyle(color: colors.foreground, fontSize: 18)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Chaty Messenger Pro', style: TextStyle(color: colors.foreground, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text('Version 2.4.0 (Build 2026.10)', style: TextStyle(color: colors.foregroundSecondary, fontSize: 12)),
+              const SizedBox(height: 12),
+              Text(
+                'A modern, privacy-first messaging platform with advanced personalization, rich customization, and offline security.',
+                style: TextStyle(color: colors.foregroundSecondary, fontSize: 13, height: 1.3),
+              ),
+            ],
+          ),
+          actions: [
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: colors.accent),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ],
-        ),
-        actions: [
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: GbColors.activeGreen),
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -507,7 +513,7 @@ class SettingsRootScreen extends StatelessWidget {
                       ),
                     ),
                     _SettingsItemTile(
-                      icon: const Icon(Icons.workspace_premium_rounded, color: Color(0xFF10B981), size: 24),
+                      icon: Icon(Icons.workspace_premium_rounded, color: context.colors.accent, size: 24),
                       title: 'Subscription & Plans',
                       subtitle: 'Manage workspace billing, upgrade plan & usage limits',
                       onTap: () {
@@ -948,4 +954,3 @@ class _PreferencesReactiveRoute extends StatelessWidget {
     );
   }
 }
-
