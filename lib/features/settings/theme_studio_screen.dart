@@ -83,6 +83,7 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
 
   late Color _gradientStart;
   late Color _gradientEnd;
+  bool _tickChanged = false;
 
   @override
   void initState() {
@@ -173,6 +174,15 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
       accentColor: _gradientEnd,
     );
     _themeCtrl.updateThemeConfig(updatedTheme);
+
+    // Keep the typed Conversation tick id in step with the chosen theme tick.
+    if (_tickChanged &&
+        _prefsCtrl.conversation.tickStyle != updatedTheme.tickStyle) {
+      _prefsCtrl.updateConversation(
+        _prefsCtrl.conversation.copyWith(tickStyle: updatedTheme.tickStyle),
+        logTitle: 'Ticks Style',
+      );
+    }
 
     final fx = _prefsCtrl.effects;
     _prefsCtrl.updateEffects(
@@ -793,6 +803,7 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
             return SpringInteractiveScale(
               onTap: () {
                 setState(() {
+                  _tickChanged = true;
                   _current = _current.copyWith(
                     deliveryTickStyle: style,
                     tickStyle: style.displayName,
