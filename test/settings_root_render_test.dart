@@ -39,6 +39,9 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async {
     await _loadFont('Roboto', 'Roboto-Regular.ttf');
+    for (final fam in ['sans-serif', 'sans-serif-medium', 'sans-serif-rounded', 'sans-serif-condensed']) {
+      await _loadFont(fam, 'Roboto-Regular.ttf');
+    }
     await _loadFont('MaterialIcons', 'MaterialIcons-Regular.otf');
   });
   for (final b in [Brightness.light, Brightness.dark]) {
