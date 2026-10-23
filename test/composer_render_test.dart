@@ -36,7 +36,7 @@ void main() {
       if (!locator.isRegistered<TemplateController>()) {
         locator.registerSingleton<TemplateController>(TemplateController());
       }
-      tester.view.physicalSize = const Size(720, 600);
+      tester.view.physicalSize = const Size(720, 900);
       tester.view.devicePixelRatio = 2;
       addTearDown(tester.view.reset);
       final theme = ThemeController()..syncWithSystem(b);
@@ -75,7 +75,7 @@ void main() {
               backgroundColor: b == Brightness.dark ? const Color(0xFF0B0B0C) : Colors.white,
               body: Column(
                 mainAxisAlignment: MainAxisAlignment.end,
-                children: [composer(''), const SizedBox(height: 24), composer('Hello there')],
+                children: [composer(''), const SizedBox(height: 24), composer('Hello there'), const SizedBox(height: 24), MediaQuery(data: MediaQueryData(size: const Size(320, 900), textScaler: const TextScaler.linear(1.6)), child: SizedBox(width: 320, child: composer('A longer message to check large text'))), const SizedBox(height: 24), MediaQuery(data: MediaQueryData(size: const Size(320, 900), textScaler: const TextScaler.linear(1.6)), child: SizedBox(width: 320, child: composer('')))],
               ),
             ),
           ),
