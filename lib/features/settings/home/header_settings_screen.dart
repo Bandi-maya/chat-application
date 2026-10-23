@@ -1329,6 +1329,27 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                         ),
                         _divider(),
 
+                        // Ghost mode pill
+                        GbSettingRow(
+                          icon: Icon(
+                            Icons.visibility_off_outlined,
+                            color: colors.primary,
+                            size: 21,
+                          ),
+                          title: 'Ghost mode',
+                          subtitle: 'Show the ghost mode pill in the header.',
+                          switchValue: home.showGhostPill,
+                          onSwitchChanged: (val) {
+                            _updateHome(
+                              home.copyWith(showGhostPill: val),
+                              logTitle: val
+                                  ? 'Show Ghost Pill'
+                                  : 'Hide Ghost Pill',
+                            );
+                          },
+                        ),
+                        _divider(),
+
                         // Show icon Add Account
                         GbSettingRow(
                           icon: Icon(
