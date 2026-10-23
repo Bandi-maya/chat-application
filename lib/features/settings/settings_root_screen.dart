@@ -33,6 +33,8 @@ import 'security/security_center_screen.dart';
 import 'settings_search_delegate.dart';
 import 'templates/templates_settings_screen.dart';
 import 'theme_editor_screen.dart';
+import 'gb_features/gb_settings_screen.dart';
+import 'universal/universal_screen.dart';
 import 'customization/customization_center_screen.dart';
 import '../../data/services/api_backend_service.dart';
 import '../../data/services/backend_config.dart';
@@ -272,6 +274,13 @@ class SettingsRootScreen extends StatelessWidget {
       },
     );
   }
+
+  GbSettingsScreen _chatyExtras() => GbSettingsScreen(
+        preferencesController: preferencesController,
+        themeController: themeController,
+        dataStore: dataStore,
+        notificationService: notificationService,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -699,6 +708,44 @@ class SettingsRootScreen extends StatelessWidget {
                           ),
                         ),
                       ),
+                    ),
+                    ]),
+                    _GbGroup(children: [
+                    _SettingsItemTile(
+                      icon: Icon(Icons.palette_outlined, color: colors.accent, size: 24),
+                      title: 'Universal',
+                      subtitle: 'Colors, icons and fonts, language & other',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => UniversalScreen(
+                            preferencesController: preferencesController,
+                          ),
+                        ),
+                      ),
+                    ),
+                    _SettingsItemTile(
+                      icon: Icon(Icons.backup_outlined, color: colors.info, size: 24),
+                      title: 'Backup and restore',
+                      subtitle: 'Export and restore Chaty settings safely',
+                      onTap: () => _chatyExtras().openBackupRestore(context),
+                    ),
+                    _SettingsItemTile(
+                      icon: Icon(Icons.widgets_outlined, color: colors.accent, size: 24),
+                      title: 'Home shortcuts',
+                      subtitle: 'Configure in-app home layout and shortcuts',
+                      onTap: () => _chatyExtras().openHomeShortcuts(context),
+                    ),
+                    _SettingsItemTile(
+                      icon: Icon(Icons.cleaning_services_outlined, color: colors.foregroundSecondary, size: 24),
+                      title: 'Waste cleaning',
+                      subtitle: 'Remove expired generated image cache files',
+                      onTap: () => _chatyExtras().openWasteCleaning(context),
+                    ),
+                    _SettingsItemTile(
+                      icon: Icon(Icons.system_update_outlined, color: colors.foregroundSecondary, size: 24),
+                      title: 'Updates',
+                      subtitle: 'Open Chaty release notes and versions',
+                      onTap: () => _chatyExtras().openUpdates(context),
                     ),
                     ]),
                     _GbGroup(children: [
