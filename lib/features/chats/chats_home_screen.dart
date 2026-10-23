@@ -1441,20 +1441,11 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           _popupMenuItem(
-                            icon: Icons.tune_rounded,
+                            icon: Icons.settings_rounded,
                             title: 'Settings',
                             onTap: () {
                               Navigator.pop(ctx);
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => SettingsRootScreen(
-                                    preferencesController: widget.preferencesController,
-                                    themeController: widget.themeController,
-                                    dataStore: widget.dataStore,
-                                    notificationService: widget.notificationService,
-                                  ),
-                                ),
-                              );
+                              _openSettingsScreen();
                             },
                           ),
                           _popupMenuItem(
