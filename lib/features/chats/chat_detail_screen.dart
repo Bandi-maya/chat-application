@@ -3514,10 +3514,10 @@ class _ComposerState extends State<_Composer>
         if (template.actionPlacement == ComposerActionPlacement.split) ...[
           if (cameraAction != null) cameraAction,
           attachAction,
-        ] else ...[
-          attachAction,
-          if (cameraAction != null) cameraAction,
         ],
+        // Integrated placement follows the GB Stock entry arrangement: emoji
+        // inside the pill on the left, attach and camera inside it on the
+        // right, and the mic/send circle outside. Same callbacks as before.
         Expanded(
           child: TextField(
             controller: widget.controller,
@@ -3542,6 +3542,16 @@ class _ComposerState extends State<_Composer>
                   color: emojiIconColor,
                 ),
               ),
+              suffixIcon: template.actionPlacement ==
+                      ComposerActionPlacement.split
+                  ? null
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        attachAction,
+                        if (cameraAction != null) cameraAction,
+                      ],
+                    ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(template.cornerRadius),
                 borderSide: BorderSide.none,
