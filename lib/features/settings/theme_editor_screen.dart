@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../injection/locator.dart';
+import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../messages/message_bubble.dart';
 import '../../domain/models/chat_message.dart';
@@ -477,6 +479,18 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
                                 );
                               });
                               widget.themeController.updateThemeConfig(_current);
+                              // Keep the typed Conversation tick id in step with
+                              // the theme, otherwise the preference-derived theme
+                              // would revert this selection.
+                              final prefsCtrl = locator<ChatyPreferencesController>();
+                              if (prefsCtrl.conversation.tickStyle != newStyle.displayName) {
+                                prefsCtrl.updateConversation(
+                                  prefsCtrl.conversation.copyWith(
+                                    tickStyle: newStyle.displayName,
+                                  ),
+                                  logTitle: 'Ticks Style',
+                                );
+                              }
                             },
                           ),
                         ],
