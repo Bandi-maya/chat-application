@@ -410,6 +410,32 @@ class GbSettingsScreen extends StatelessWidget {
     );
   }
 
+  /// Entry points used by the merged main Settings screen so the
+  /// former "Chaty Settings" extras live in one place.
+  void openBackupRestore(BuildContext context) => _showBackupRestoreSheet(
+        context,
+        themeController.globalTheme,
+        context.colors,
+      );
+
+  void openWasteCleaning(BuildContext context) => _showWasteCleaningSheet(
+        context,
+        themeController.globalTheme,
+        context.colors,
+      );
+
+  void openHomeShortcuts(BuildContext context) => _showWidgetSettingsSheet(
+        context,
+        themeController.globalTheme,
+        context.colors,
+      );
+
+  void openUpdates(BuildContext context) => _showUpdatesDialog(
+        context,
+        themeController.globalTheme,
+        context.colors,
+      );
+
   Widget _buildGroupCard({
     required dynamic theme,
     required dynamic colors,
