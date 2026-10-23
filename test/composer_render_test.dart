@@ -36,7 +36,7 @@ void main() {
       if (!locator.isRegistered<TemplateController>()) {
         locator.registerSingleton<TemplateController>(TemplateController());
       }
-      tester.view.physicalSize = const Size(720, 900);
+      tester.view.physicalSize = const Size(720, 2000);
       tester.view.devicePixelRatio = 2;
       addTearDown(tester.view.reset);
       final theme = ThemeController()..syncWithSystem(b);
