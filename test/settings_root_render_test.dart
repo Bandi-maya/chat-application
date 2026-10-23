@@ -1,11 +1,14 @@
-// Render harness: pumps the REAL SettingsRootScreen. Flutter test uses the
-// block "Ahem" font, so text appears as solid blocks: layout is real, glyphs
-// are not. Not a device screenshot.
+// Render harness: pumps the REAL SettingsRootScreen. Fonts are the Roboto and
+// MaterialIcons files bundled with the Flutter SDK (loaded via FontLoader),
+// so glyphs are readable. Not a device screenshot: weights are approximate
+// (single Roboto face), no device fonts, no real data.
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -17,8 +20,22 @@ import 'package:chat/ui/core/controllers/app_icon_controller.dart';
 import 'package:chat/ui/core/controllers/preferences_controller.dart';
 import 'package:chat/ui/core/theme/theme_controller.dart';
 
+Future<void> _loadFont(String family, String file) async {
+  final root = Platform.environment['FLUTTER_ROOT'] ?? '';
+  final f = File('$root/bin/cache/artifacts/material_fonts/$file');
+  if (!f.existsSync()) return;
+  final bytes = await f.readAsBytes();
+  final loader = FontLoader(family)
+    ..addFont(Future<ByteData>.value(ByteData.sublistView(Uint8List.fromList(bytes))));
+  await loader.load();
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    await _loadFont('Roboto', 'Roboto-Regular.ttf');
+    await _loadFont('MaterialIcons', 'MaterialIcons-Regular.otf');
+  });
   for (final b in [Brightness.light, Brightness.dark]) {
     testWidgets('settings root ${b.name}', (tester) async {
       SharedPreferences.setMockInitialValues({});
@@ -32,6 +49,9 @@ void main() {
       tester.view.devicePixelRatio = 2;
       addTearDown(tester.view.reset);
       final theme = ThemeController()..syncWithSystem(b);
+      final prefs = ChatyPreferencesController();
+      final store = ChatyDataStore();
+      final notifications = ChatyNotificationService();
       final key = GlobalKey();
       await tester.pumpWidget(
         RepaintBoundary(
@@ -40,10 +60,10 @@ void main() {
             debugShowCheckedModeBanner: false,
             theme: theme.globalTheme.toThemeData(),
             home: SettingsRootScreen(
-              preferencesController: ChatyPreferencesController(),
+              preferencesController: prefs,
               themeController: theme,
-              dataStore: ChatyDataStore(),
-              notificationService: ChatyNotificationService(),
+              dataStore: store,
+              notificationService: notifications,
             ),
           ),
         ),
@@ -56,6 +76,8 @@ void main() {
         final dir = Directory('build/settings_render')..createSync(recursive: true);
         File('${dir.path}/chaty_settings_${b.name}.png').writeAsBytesSync(data!.buffer.asUint8List());
       });
+      await tester.pumpWidget(const SizedBox.shrink());
+      store.dispose();
     });
   }
 }
