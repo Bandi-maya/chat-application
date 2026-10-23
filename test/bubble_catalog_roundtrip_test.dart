@@ -1,0 +1,22 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:chat/ui/core/bubbles/bubble_style_id.dart';
+
+void main() {
+  test('every bubble display name round-trips to the same id', () {
+    final names = <String>{};
+    for (final id in BubbleStyleId.values) {
+      expect(BubbleStyleId.fromString(id.displayName), id,
+          reason: id.displayName);
+      names.add(id.displayName);
+    }
+    expect(names.length, BubbleStyleId.values.length,
+        reason: 'display names must be unique so the picker value is unambiguous');
+  });
+
+  test('legacy picker labels still resolve and Stock is the default', () {
+    expect(BubbleStyleId.fromString('Stock'), BubbleStyleId.stock);
+    expect(BubbleStyleId.fromString(null), BubbleStyleId.stock);
+    expect(BubbleStyleId.fromString('WhatsApp Default'), BubbleStyleId.stock);
+    expect(BubbleStyleId.fromString('Telegram Arc'), BubbleStyleId.telegram);
+  });
+}
