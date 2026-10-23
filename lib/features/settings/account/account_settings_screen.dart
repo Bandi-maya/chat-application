@@ -60,9 +60,9 @@ class AccountSettingsScreen extends StatelessWidget {
                   await dataStore.updateProfile(currentUserState.copyWith(avatarUrl: avatarUrl));
                   if (ctx.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Profile photo updated!'),
-                        backgroundColor: Color(0xFF10B981),
+                      SnackBar(
+                        content: const Text('Profile photo updated!'),
+                        backgroundColor: context.colors.accent,
                         behavior: SnackBarBehavior.floating,
                       ),
                     );
@@ -217,9 +217,9 @@ class AccountSettingsScreen extends StatelessWidget {
                                   if (ctx.mounted) {
                                     Navigator.pop(ctx);
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Profile updated successfully!'),
-                                        backgroundColor: Color(0xFF10B981),
+                                      SnackBar(
+                                        content: const Text('Profile updated successfully!'),
+                                        backgroundColor: context.colors.accent,
                                         behavior: SnackBarBehavior.floating,
                                       ),
                                     );
@@ -321,7 +321,7 @@ class AccountSettingsScreen extends StatelessWidget {
               children: [
                 ChatySettingsTile(
                   icon: Icons.workspace_premium_rounded,
-                  iconColor: const Color(0xFF10B981),
+                  iconColor: context.colors.accent,
                   title: 'Subscription & Plans',
                   subtitle: 'Manage workspace plan, billing & feature limits',
                   trailing: const Icon(Icons.chevron_right_rounded),
@@ -440,7 +440,7 @@ class _WorkspaceRegistrationToggleState
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            backgroundColor: const Color(0xFF10B981),
+            backgroundColor: context.colors.accent,
             behavior: SnackBarBehavior.floating,
             content: Text(
               val
