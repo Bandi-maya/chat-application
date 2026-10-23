@@ -42,6 +42,8 @@ double chatyStoryStripHeight(ChatyStoryLook look, double base) {
       return base < 118 ? 118 : base;
     case ChatyStoryLook.wideCard:
       return base < 76 ? 76 : base;
+    case ChatyStoryLook.card:
+      return base < 88 ? 88 : base;
     default:
       return base;
   }
