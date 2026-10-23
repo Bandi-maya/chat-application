@@ -536,6 +536,14 @@ class SettingsRootScreen extends StatelessWidget {
                       },
                     ),
                     _SettingsItemTile(
+                      icon: Icon(Icons.devices_rounded, color: colors.foregroundSecondary, size: 24),
+                      title: 'Linked Devices',
+                      subtitle: 'Use Chaty on web and desktop, view active sessions',
+                      onTap: () => _openLinkedDevices(context),
+                    ),
+                    ]),
+                    _GbGroup(children: [
+                    _SettingsItemTile(
                       icon: Icon(Icons.security_rounded, color: colors.info, size: 24),
                       title: 'Privacy Center',
                       subtitle: 'Last seen, online presence, anti-delete, read receipts & stealth',
@@ -560,15 +568,38 @@ class SettingsRootScreen extends StatelessWidget {
                       ),
                     ),
                     _SettingsItemTile(
-                      icon: Icon(Icons.devices_rounded, color: colors.foregroundSecondary, size: 24),
-                      title: 'Linked Devices',
-                      subtitle: 'Use Chaty on web and desktop, view active sessions',
-                      onTap: () => _openLinkedDevices(context),
+                      icon: Icon(Icons.color_lens_outlined, color: colors.accent, size: 24),
+                      title: 'Theme & Color Engine',
+                      subtitle: '13+ dark & light theme presets, token editor & palette',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ThemeEditorScreen(
+                            themeController: themeController,
+                          ),
+                        ),
+                      ),
                     ),
-
+                    _SettingsItemTile(
+                      icon: Icon(Icons.palette_outlined, color: colors.primary, size: 24),
+                      title: 'Customization Center',
+                      subtitle: 'Visual dialects, headers, bubbles, ticks, composers & motion',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const CustomizationCenterScreen(),
+                        ),
+                      ),
+                    ),
+                    _SettingsItemTile(
+                      icon: Icon(Icons.dashboard_customize_rounded, color: colors.info, size: 24),
+                      title: 'Global Template Studio',
+                      subtitle: 'App-wide templates and independent component styles',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const TemplatesSettingsScreen(),
+                        ),
+                      ),
+                    ),
                     ]),
-
-                    // SECTION 2: CHATS & AUTOMATION
                     _GbGroup(children: [
                     _SettingsItemTile(
                       icon: Icon(Icons.chat_bubble_outline_rounded, color: colors.success, size: 24),
@@ -578,6 +609,19 @@ class SettingsRootScreen extends StatelessWidget {
                         MaterialPageRoute(
                           builder: (_) => ConversationSettingsPage(
                             preferencesController: preferencesController,
+                          ),
+                        ),
+                      ),
+                    ),
+                    _SettingsItemTile(
+                      icon: Icon(Icons.notifications_none_rounded, color: colors.warning, size: 24),
+                      title: 'Notifications & Alerts',
+                      subtitle: 'Heads-up popups, notification sounds, LED & vibration',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => NotificationSettingsPage(
+                            preferencesController: preferencesController,
+                            notificationService: notificationService,
                           ),
                         ),
                       ),
@@ -608,55 +652,6 @@ class SettingsRootScreen extends StatelessWidget {
                       ),
                     ),
                     _SettingsItemTile(
-                      icon: Icon(Icons.call_outlined, color: colors.warning, size: 24),
-                      title: 'Call Settings',
-                      subtitle: 'Call privacy, incoming call controls & call appearance',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => CallSettingsScreen(
-                            preferencesController: preferencesController,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    ]),
-
-                    // SECTION 3: APPEARANCE & THEMES
-                    _GbGroup(children: [
-                    _SettingsItemTile(
-                      icon: Icon(Icons.palette_outlined, color: colors.primary, size: 24),
-                      title: 'Customization Center',
-                      subtitle: 'Visual dialects, headers, bubbles, ticks, composers & motion',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const CustomizationCenterScreen(),
-                        ),
-                      ),
-                    ),
-                    _SettingsItemTile(
-                      icon: Icon(Icons.color_lens_outlined, color: colors.accent, size: 24),
-                      title: 'Theme & Color Engine',
-                      subtitle: '13+ dark & light theme presets, token editor & palette',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ThemeEditorScreen(
-                            themeController: themeController,
-                          ),
-                        ),
-                      ),
-                    ),
-                    _SettingsItemTile(
-                      icon: Icon(Icons.dashboard_customize_rounded, color: colors.info, size: 24),
-                      title: 'Global Template Studio',
-                      subtitle: 'App-wide templates and independent component styles',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const TemplatesSettingsScreen(),
-                        ),
-                      ),
-                    ),
-                    _SettingsItemTile(
                       icon: Icon(Icons.touch_app_outlined, color: colors.warning, size: 24),
                       title: 'Navigation & Touch Effects',
                       subtitle: 'Interactive click particles (Stars/Hearts/Bubbles), Sound FX',
@@ -668,20 +663,14 @@ class SettingsRootScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-
-                    ]),
-
-                    // SECTION 4: NOTIFICATIONS & SYSTEM
-                    _GbGroup(children: [
                     _SettingsItemTile(
-                      icon: Icon(Icons.notifications_none_rounded, color: colors.warning, size: 24),
-                      title: 'Notifications & Alerts',
-                      subtitle: 'Heads-up popups, notification sounds, LED & vibration',
+                      icon: Icon(Icons.call_outlined, color: colors.warning, size: 24),
+                      title: 'Call Settings',
+                      subtitle: 'Call privacy, incoming call controls & call appearance',
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => NotificationSettingsPage(
+                          builder: (_) => CallSettingsScreen(
                             preferencesController: preferencesController,
-                            notificationService: notificationService,
                           ),
                         ),
                       ),
@@ -699,16 +688,13 @@ class SettingsRootScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-
                     ]),
-
-                    // SECTION 5: APP INFORMATION & LOGOUT
                     _GbGroup(children: [
                     _SettingsItemTile(
-                      icon: Icon(Icons.share_rounded, color: colors.foregroundSecondary, size: 24),
-                      title: 'Share Chaty',
-                      subtitle: 'Invite friends and family to join Chaty',
-                      onTap: () => ChatyShareService.shareApp(context),
+                      icon: Icon(Icons.info_outline_rounded, color: colors.foregroundSecondary, size: 24),
+                      title: 'About Chaty',
+                      subtitle: 'App version, build information and licenses',
+                      onTap: () => _showAboutDialog(context),
                     ),
                     _SettingsItemTile(
                       icon: Icon(Icons.shield_outlined, color: colors.foregroundSecondary, size: 24),
@@ -717,13 +703,13 @@ class SettingsRootScreen extends StatelessWidget {
                       onTap: () => _showPrivacyPolicy(context),
                     ),
                     _SettingsItemTile(
-                      icon: Icon(Icons.info_outline_rounded, color: colors.foregroundSecondary, size: 24),
-                      title: 'About Chaty',
-                      subtitle: 'App version, build information and licenses',
-                      onTap: () => _showAboutDialog(context),
+                      icon: Icon(Icons.share_rounded, color: colors.foregroundSecondary, size: 24),
+                      title: 'Share Chaty',
+                      subtitle: 'Invite friends and family to join Chaty',
+                      onTap: () => ChatyShareService.shareApp(context),
                     ),
-
                     ]),
+
                     const SizedBox(height: 16),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
