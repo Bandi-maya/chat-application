@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:chat/core/emoji/widgets/chaty_emoji_picker.dart';
 import 'package:chat/features/messages/attachment_sheet.dart';
 import 'package:chat/ui/core/theme/theme_controller.dart';
 
@@ -28,6 +29,51 @@ void main() {
     }
     await _loadFont('MaterialIcons', 'MaterialIcons-Regular.otf');
   });
+  for (final custom in [false, true]) {
+    testWidgets('emoji picker ${custom ? "custom colours" : "defaults"}', (tester) async {
+      tester.view.physicalSize = const Size(800, 1400);
+      tester.view.devicePixelRatio = 2;
+      addTearDown(tester.view.reset);
+      final theme = ThemeController()..syncWithSystem(Brightness.light);
+      final key = GlobalKey();
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: key,
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: theme.globalTheme.toThemeData().copyWith(
+              textTheme: theme.globalTheme.toThemeData().textTheme.apply(fontFamily: 'Roboto'),
+            ),
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: Center(
+                  child: TextButton(
+                    onPressed: () => ChatyEmojiPicker.show(
+                      context,
+                      headerColor: custom ? const Color(0xFF7B1FA2) : null,
+                      headerIconsColor: custom ? Colors.white : null,
+                      backgroundColor: custom ? const Color(0xFFFFF3E0) : null,
+                    ),
+                    child: const Text('open'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.runAsync(() async {
+        final boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary;
+        final image = await boundary.toImage(pixelRatio: 1);
+        final data = await image.toByteData(format: ui.ImageByteFormat.png);
+        final dir = Directory('build/ui_renders')..createSync(recursive: true);
+        File('${dir.path}/emoji_picker_${custom ? "custom" : "default"}.png').writeAsBytesSync(data!.buffer.asUint8List());
+      });
+    });
+  }
+
   for (final b in [Brightness.light, Brightness.dark]) {
     testWidgets('attachment sheet ${b.name}', (tester) async {
       tester.view.physicalSize = const Size(800, 1400);
