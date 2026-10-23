@@ -82,6 +82,66 @@ void main() {
     });
   }
 
+  testWidgets('emoji picker category switch and tap selects an emoji', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    final theme = ThemeController()..syncWithSystem(Brightness.light);
+    final key = GlobalKey();
+    String? picked;
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: key,
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: theme.globalTheme.toThemeData().copyWith(
+            textTheme: theme.globalTheme.toThemeData().textTheme.apply(fontFamily: 'Roboto'),
+          ),
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: TextButton(
+                  onPressed: () async => picked = await ChatyEmojiPicker.show(context),
+                  child: const Text('open'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 700)));
+    }
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tapAt(const Offset(67, 505));
+    for (var i = 0; i < 4; i++) {
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 500)));
+    }
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.runAsync(() async {
+      final boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary;
+      final image = await boundary.toImage(pixelRatio: 1);
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      final dir = Directory('build/ui_renders')..createSync(recursive: true);
+      File('${dir.path}/emoji_picker_smileys_tab.png').writeAsBytesSync(data!.buffer.asUint8List());
+    });
+    await tester.tapAt(const Offset(30, 575));
+    for (var i = 0; i < 4; i++) {
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+    }
+    await tester.pump(const Duration(seconds: 1));
+    expect(picked, isNotNull);
+    expect(picked, isNotEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 5));
+  });
+
   for (final b in [Brightness.light, Brightness.dark]) {
     testWidgets('attachment sheet ${b.name}', (tester) async {
       tester.view.physicalSize = const Size(800, 1400);
