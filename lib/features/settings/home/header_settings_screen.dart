@@ -65,6 +65,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
     'Circular',
     'Squircle',
     'Card',
+    'Wide Card',
   ];
 
   static const List<String> _pager3dStyles = [
