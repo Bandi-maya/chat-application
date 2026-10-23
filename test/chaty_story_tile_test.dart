@@ -36,11 +36,11 @@ Widget _strip(Brightness b, String style, Color accent) {
             ),
           ),
         ),
-        SizedBox(
+        Expanded(
+          child: SizedBox(
           height: chatyStoryStripHeight(look, 82),
           child: ListView(
             scrollDirection: Axis.horizontal,
-            shrinkWrap: true,
             children: [
               for (var i = 0; i < 4; i++)
                 Padding(
@@ -63,6 +63,7 @@ Widget _strip(Brightness b, String style, Color accent) {
                   ),
                 ),
             ],
+          ),
           ),
         ),
       ],
@@ -94,7 +95,7 @@ void main() {
 
   for (final b in [Brightness.light, Brightness.dark]) {
     testWidgets('renders all story looks ${b.name}', (tester) async {
-      tester.view.physicalSize = const Size(900, 1000);
+      tester.view.physicalSize = const Size(900, 2000);
       tester.view.devicePixelRatio = 2;
       addTearDown(tester.view.reset);
       final accent = b == Brightness.dark ? const Color(0xFF00C49A) : const Color(0xFF00A884);
@@ -103,7 +104,7 @@ void main() {
         Directionality(
           textDirection: TextDirection.ltr,
           child: MediaQuery(
-            data: const MediaQueryData(size: Size(450, 500)),
+            data: const MediaQueryData(size: Size(450, 1000)),
             child: RepaintBoundary(
               key: key,
               child: Material(
