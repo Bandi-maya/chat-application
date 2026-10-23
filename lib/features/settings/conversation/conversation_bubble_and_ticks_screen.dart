@@ -5,6 +5,8 @@ import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/design_system.dart';
 import '../../../ui/core/design_system/gb_design_system.dart';
 import '../../../ui/core/design_system/components/adaptive_selection_panel.dart';
+import '../../../ui/core/bubbles/bubble_style_id.dart';
+import '../../../ui/core/bubbles/bubble_style_preview.dart';
 
 class ConversationBubbleAndTicksScreen extends StatefulWidget {
   final ChatyPreferencesController preferencesController;
@@ -33,19 +35,12 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
     'Material 3 Rounded',
   ];
 
-  final List<String> _bubbleStyles = [
-    'WhatsApp Default',
-    'Rounded Pill',
-    'Chaty Modern',
-    'Squircle Soft',
-    'Paper Chat',
-    'Glassmorphic',
-    'iOS Flat',
-    'Telegram Arc',
-    '3D Shadow',
-    'Minimal Border',
-    'Retro Bubble',
-    'Futuristic Clip',
+  /// Every bubble geometry Chaty already ships, Stock first. Stored values are
+  /// the display names, which BubbleStyleId.fromString resolves back to the
+  /// same id; older saved labels still resolve through its legacy aliases.
+  final List<BubbleStyleId> _bubbleStyleIds = <BubbleStyleId>[
+    BubbleStyleId.stock,
+    ...BubbleStyleId.values.where((id) => id != BubbleStyleId.stock),
   ];
 
   void _pickColor({
@@ -96,14 +91,14 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
     AdaptiveSelectionPanel.show<String>(
       context: context,
       title: 'Choose your Bubbles style',
-      selectedValue: prefs.bubbleStyle,
+      selectedValue: BubbleStyleId.fromString(prefs.bubbleStyle).displayName,
       showApplyButton: true,
       preferCenteredDialog: true,
-      options: _bubbleStyles
-          .map((item) => SelectionOptionItem<String>(
-                value: item,
-                title: item,
-                preview: _buildBubblePreview(item, theme.accentColor),
+      options: _bubbleStyleIds
+          .map((id) => SelectionOptionItem<String>(
+                value: id.displayName,
+                title: id.displayName,
+                preview: _buildBubblePreview(id, theme.accentColor),
               ))
           .toList(),
     ).then((val) {
@@ -126,35 +121,18 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
     });
   }
 
-  Widget _buildBubblePreview(String bubbleStyle, Color color) {
-    BorderRadius radius = BorderRadius.circular(10);
-    if (bubbleStyle.contains('Pill')) {
-      radius = BorderRadius.circular(16);
-    } else if (bubbleStyle.contains('Squircle')) {
-      radius = BorderRadius.circular(8);
-    } else if (bubbleStyle.contains('Arc')) {
-      radius = const BorderRadius.only(
-        topLeft: Radius.circular(12),
-        topRight: Radius.circular(12),
-        bottomLeft: Radius.circular(2),
-        bottomRight: Radius.circular(12),
-      );
-    } else if (bubbleStyle.contains('Futuristic')) {
-      radius = const BorderRadius.only(
-        topLeft: Radius.circular(14),
-        bottomRight: Radius.circular(14),
-      );
-    }
-    return Container(
-      width: 34,
-      height: 24,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.18),
-        borderRadius: radius,
-        border: Border.all(color: color, width: 1.2),
-      ),
-      child: Center(
-        child: Icon(Icons.chat_bubble_outline_rounded, size: 13, color: color),
+  Widget _buildBubblePreview(BubbleStyleId id, Color color) {
+    return SizedBox(
+      width: 64,
+      child: ChatyBubbleContainer(
+        styleId: id,
+        isMe: true,
+        fillColor: color.withValues(alpha: 0.85),
+        accentColor: color,
+        child: const Text(
+          'Hi',
+          style: TextStyle(color: Colors.white, fontSize: 11),
+        ),
       ),
     );
   }
