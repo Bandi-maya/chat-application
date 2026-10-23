@@ -498,7 +498,7 @@ class SettingsRootScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // SECTION 1: ACCOUNT & PROFILE
-                    _buildSettingsSectionHeader('ACCOUNT & SECURITY', colors),
+                    _GbGroup(children: [
                     _SettingsItemTile(
                       icon: Icon(Icons.person_outline_rounded, color: colors.primary, size: 24),
                       title: 'Account',
@@ -566,12 +566,10 @@ class SettingsRootScreen extends StatelessWidget {
                       onTap: () => _openLinkedDevices(context),
                     ),
 
-                    const SizedBox(height: 12),
-                    Divider(height: 1, color: colors.divider, indent: 20, endIndent: 20),
-                    const SizedBox(height: 12),
+                    ]),
 
                     // SECTION 2: CHATS & AUTOMATION
-                    _buildSettingsSectionHeader('CHATS & AUTOMATION', colors),
+                    _GbGroup(children: [
                     _SettingsItemTile(
                       icon: Icon(Icons.chat_bubble_outline_rounded, color: colors.success, size: 24),
                       title: 'Conversation Customization',
@@ -622,12 +620,10 @@ class SettingsRootScreen extends StatelessWidget {
                       ),
                     ),
 
-                    const SizedBox(height: 12),
-                    Divider(height: 1, color: colors.divider, indent: 20, endIndent: 20),
-                    const SizedBox(height: 12),
+                    ]),
 
                     // SECTION 3: APPEARANCE & THEMES
-                    _buildSettingsSectionHeader('APPEARANCE & THEMES', colors),
+                    _GbGroup(children: [
                     _SettingsItemTile(
                       icon: Icon(Icons.palette_outlined, color: colors.primary, size: 24),
                       title: 'Customization Center',
@@ -673,12 +669,10 @@ class SettingsRootScreen extends StatelessWidget {
                       ),
                     ),
 
-                    const SizedBox(height: 12),
-                    Divider(height: 1, color: colors.divider, indent: 20, endIndent: 20),
-                    const SizedBox(height: 12),
+                    ]),
 
                     // SECTION 4: NOTIFICATIONS & SYSTEM
-                    _buildSettingsSectionHeader('NOTIFICATIONS & PERMISSIONS', colors),
+                    _GbGroup(children: [
                     _SettingsItemTile(
                       icon: Icon(Icons.notifications_none_rounded, color: colors.warning, size: 24),
                       title: 'Notifications & Alerts',
@@ -706,12 +700,10 @@ class SettingsRootScreen extends StatelessWidget {
                       ),
                     ),
 
-                    const SizedBox(height: 12),
-                    Divider(height: 1, color: colors.divider, indent: 20, endIndent: 20),
-                    const SizedBox(height: 12),
+                    ]),
 
                     // SECTION 5: APP INFORMATION & LOGOUT
-                    _buildSettingsSectionHeader('INFO & SUPPORT', colors),
+                    _GbGroup(children: [
                     _SettingsItemTile(
                       icon: Icon(Icons.share_rounded, color: colors.foregroundSecondary, size: 24),
                       title: 'Share Chaty',
@@ -731,6 +723,7 @@ class SettingsRootScreen extends StatelessWidget {
                       onTap: () => _showAboutDialog(context),
                     ),
 
+                    ]),
                     const SizedBox(height: 16),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -889,19 +882,24 @@ class _SettingsItemTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            SizedBox(
-              width: 32,
-              height: 32,
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: colors.primary, width: 1.5),
+              ),
               child: Center(child: icon),
             ),
-            const SizedBox(width: 20),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -910,18 +908,17 @@ class _SettingsItemTile extends StatelessWidget {
                   Text(
                     title,
                     style: TextStyle(
-                      color: context.colors.foreground,
+                      color: colors.foreground,
                       fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: -0.1,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   if (subtitle != null && subtitle!.isNotEmpty) ...[
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 2),
                     Text(
                       subtitle!,
                       style: TextStyle(
-                        color: context.colors.foregroundSecondary,
+                        color: colors.foregroundSecondary,
                         fontSize: 13,
                         height: 1.25,
                       ),
@@ -930,7 +927,48 @@ class _SettingsItemTile extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(width: 8),
+            Icon(Icons.chevron_right_rounded,
+                color: colors.foregroundSecondary, size: 20),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Rounded group card with inset dividers between rows (GB-style grouping).
+class _GbGroup extends StatelessWidget {
+  final List<Widget> children;
+  const _GbGroup({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final rows = <Widget>[];
+    for (var i = 0; i < children.length; i++) {
+      rows.add(children[i]);
+      if (i < children.length - 1) {
+        rows.add(Divider(
+          height: 1,
+          thickness: 1,
+          color: colors.divider,
+          indent: 68,
+          endIndent: 16,
+        ));
+      }
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: colors.borderSubtle),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Column(children: rows),
         ),
       ),
     );
