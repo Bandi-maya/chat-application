@@ -31,7 +31,6 @@ import '../../domain/models/user_profile.dart';
 import '../automation/auto_reply_rules_screen.dart';
 import '../automation/scheduled_messages_screen.dart';
 import '../settings/settings_root_screen.dart';
-import '../settings/gb_features/gb_settings_screen.dart';
 import '../tasks/task_create_edit_modal.dart';
 import 'chat_detail_screen.dart';
 
@@ -2250,12 +2249,12 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       quickActions.add(
         _HomeSpeedDialAction(
           id: 'chaty-settings',
-          label: 'Chaty Settings',
+          label: 'Settings',
           icon: Icons.settings_rounded,
           onPressed: () {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
-                builder: (_) => GbSettingsScreen(
+                builder: (_) => SettingsRootScreen(
                   preferencesController: prefsController,
                   themeController: locator<ThemeController>(),
                   dataStore: locator<ChatyDataStore>(),
