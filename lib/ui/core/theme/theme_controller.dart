@@ -15,7 +15,7 @@ import 'theme_presets.dart';
 /// per user. All mutators persist their result.
 class ThemeController extends ChangeNotifier {
   /// Bump when the persisted theme-state shape changes.
-  static const int _stateVersion = 1;
+  static const int _stateVersion = 2;
 
   ThemeConfig _globalTheme = ThemePresets.getSystemDefaultTheme();
   final Map<String, ThemeConfig> _perChatThemes = {};
@@ -25,6 +25,23 @@ class ThemeController extends ChangeNotifier {
   double _fontScale = 1.0;
   double _density = 1.0;
   bool _initialized = false;
+
+  /// When true (default) the app tracks the phone's light/dark setting using
+  /// the default light/dark presets. Picking another theme or manually
+  /// toggling brightness turns this off until [resetToDefaults].
+  bool _followSystem = true;
+  bool get followSystem => _followSystem;
+
+  static bool _isDefaultId(String id) =>
+      id == 'warm_neutral' || id == 'warm_neutral_dark';
+
+  /// Re-applies the system default theme when following the system.
+  void syncWithSystem([Brightness? platformBrightness]) {
+    if (!_followSystem) return;
+    final target = ThemePresets.getSystemDefaultTheme(platformBrightness);
+    if (_globalTheme.id == target.id) return;
+    setGlobalTheme(target, followSystem: true);
+  }
 
   ThemeConfig get globalTheme => _globalTheme;
   UILayoutMode get layoutMode => _layoutMode;
@@ -56,7 +73,8 @@ class ThemeController extends ChangeNotifier {
     return _perChatThemes[conversationId] ?? _globalTheme;
   }
 
-  void setGlobalTheme(ThemeConfig newTheme) {
+  void setGlobalTheme(ThemeConfig newTheme, {bool followSystem = false}) {
+    _followSystem = followSystem && _isDefaultId(newTheme.id);
     _globalTheme = newTheme.copyWith(
       layoutMode: _layoutMode,
       navigationMode: _navigationMode,
@@ -69,6 +87,7 @@ class ThemeController extends ChangeNotifier {
   }
 
   void updateThemeConfig(ThemeConfig customConfig) {
+    _followSystem = false;
     _globalTheme = customConfig;
     // Keep the standalone display fields consistent with the incoming config so
     // a later setGlobalTheme does not clobber the user's customization.
@@ -127,6 +146,7 @@ class ThemeController extends ChangeNotifier {
   }
 
   void toggleBrightness() {
+    // Manual choice overrides system-follow (setGlobalTheme below clears it).
     final currentId = _globalTheme.id.toLowerCase();
     if (currentId == 'warm_neutral') {
       setGlobalTheme(ThemePresets.warmNeutralDark);
@@ -157,6 +177,7 @@ class ThemeController extends ChangeNotifier {
 
   void resetToDefaults() {
     _globalTheme = ThemePresets.getSystemDefaultTheme();
+    _followSystem = true;
     _perChatThemes.clear();
     _layoutMode = UILayoutMode.classic;
     _navigationMode = AppNavigationMode.bottomNav;
@@ -187,6 +208,7 @@ class ThemeController extends ChangeNotifier {
       'globalTheme': _globalTheme.toMap(),
       'perChatThemes': perChat,
       'useReducedMotion': _useReducedMotion,
+      'followSystem': _followSystem,
     };
   }
 
@@ -204,6 +226,16 @@ class ThemeController extends ChangeNotifier {
           'ThemeController: failed to decode global theme (keeping default)',
         );
       }
+    }
+
+    // Migration: installs that saved the old (brown) default keep following the
+    // system with the new default light/dark presets unless they opted out.
+    final storedFollow = state['followSystem'];
+    _followSystem = storedFollow is bool
+        ? storedFollow
+        : _isDefaultId(_globalTheme.id);
+    if (_followSystem) {
+      _globalTheme = ThemePresets.getSystemDefaultTheme();
     }
 
     _layoutMode = _globalTheme.layoutMode;
