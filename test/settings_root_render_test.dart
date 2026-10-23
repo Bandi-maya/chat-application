@@ -30,6 +30,11 @@ Future<void> _loadFont(String family, String file) async {
   await loader.load();
 }
 
+ThemeData _withFont(ThemeData t) => t.copyWith(
+  textTheme: t.textTheme.apply(fontFamily: 'Roboto'),
+  primaryTextTheme: t.primaryTextTheme.apply(fontFamily: 'Roboto'),
+);
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async {
@@ -58,7 +63,7 @@ void main() {
           key: key,
           child: MaterialApp(
             debugShowCheckedModeBanner: false,
-            theme: theme.globalTheme.toThemeData(),
+            theme: _withFont(theme.globalTheme.toThemeData()),
             home: SettingsRootScreen(
               preferencesController: prefs,
               themeController: theme,
