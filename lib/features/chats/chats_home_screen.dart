@@ -1593,15 +1593,6 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                               unawaited(_restartChaty());
                             },
                           ),
-                          const Divider(height: 8, indent: 12, endIndent: 12),
-                          _popupMenuItem(
-                            icon: Icons.settings_rounded,
-                            title: 'Settings',
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              _openSettingsScreen();
-                            },
-                          ),
                         ],
                       ),
                     ),
@@ -1891,7 +1882,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
               child: Center(
                 child: InkWell(
                   borderRadius: BorderRadius.circular(20),
-                  onTap: _openProfileFromHeader,
+                  onTap: _openSettingsScreen,
                   child: Container(
                     padding: const EdgeInsets.all(1.8),
                     decoration: BoxDecoration(
