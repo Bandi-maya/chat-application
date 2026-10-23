@@ -4,12 +4,12 @@ import 'package:image_picker/image_picker.dart';
 import '../../../data/repositories/chaty_data_store.dart';
 import '../../../data/services/api_backend_service.dart';
 import '../../../data/services/backend_config.dart';
-import '../../../domain/models/user_profile.dart';
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/design_system.dart'
     hide ChatySettingsSection;
 import '../../../ui/core/design_system/settings_primitives.dart';
+import '../../../domain/models/user_profile.dart';
 import '../../profile/profile_actions.dart';
 import '../../subscription/plan_subscription_screen.dart';
 

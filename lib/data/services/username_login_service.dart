@@ -2,6 +2,7 @@ import 'dart:async';
 
 import '../../domain/models/user_profile.dart';
 import 'api_backend_service.dart';
+import 'backend_config.dart';
 import '../../injection/locator.dart';
 
 /// Authenticates with either the registered email address or the public Chaty

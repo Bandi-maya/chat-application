@@ -452,7 +452,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
       ),
-    );
+    ],
+  ),
+),
+);
   }
 
   Widget _buildOrganizationStatusBanner(ThemeConfig theme) {

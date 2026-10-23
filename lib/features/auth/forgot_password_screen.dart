@@ -157,7 +157,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           onPressed: () => Navigator.of(context).pop(),
                           style: OutlinedButton.styleFrom(
                             side: BorderSide(
-                              color: theme.primaryColor.withOpacity(0.5),
+                              color: theme.accentColor.withValues(alpha: 0.5),
                             ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),

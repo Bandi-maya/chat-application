@@ -35,6 +35,7 @@ import 'templates/templates_settings_screen.dart';
 import 'theme_editor_screen.dart';
 import 'customization/customization_center_screen.dart';
 import '../../data/services/api_backend_service.dart';
+import '../../data/services/backend_config.dart';
 import '../subscription/plan_subscription_screen.dart';
 
 class SettingsRootScreen extends StatelessWidget {
