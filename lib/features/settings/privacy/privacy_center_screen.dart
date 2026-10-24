@@ -894,62 +894,34 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
     required String label,
     required Color accent,
   }) {
+    // GB-style category heading: centered, 16sp bold accent title with an
+    // accent divider line underneath.
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: Container(
-              height: 1.2,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    accent.withValues(alpha: 0.0),
-                    accent.withValues(alpha: 0.7),
-                  ],
-                ),
-              ),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: accent,
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 5,
-                  height: 5,
-                  decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: accent,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Container(
-                  width: 5,
-                  height: 5,
-                  decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Container(
-              height: 1.2,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    accent.withValues(alpha: 0.7),
-                    accent.withValues(alpha: 0.0),
-                  ],
-                ),
+          const SizedBox(height: 6),
+          Container(
+            height: 1.2,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  accent.withValues(alpha: 0.0),
+                  accent.withValues(alpha: 0.7),
+                  accent.withValues(alpha: 0.0),
+                ],
               ),
             ),
           ),
