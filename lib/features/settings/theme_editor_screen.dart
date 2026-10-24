@@ -10,6 +10,8 @@ import '../messages/message_bubble.dart';
 import '../../domain/models/chat_message.dart';
 import '../../ui/core/theme/chaty_theme_manager.dart';
 import '../../ui/core/theme/image_theme_generator.dart';
+import '../../ui/core/templates/applied_preview_model.dart';
+import '../../ui/core/templates/template_controller.dart';
 import '../../ui/core/theme/theme_preview_card.dart';
 import '../../ui/core/ticks/delivery_icon_style.dart';
 
@@ -260,6 +262,9 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
                 final isSelected = preset.id == _current.id;
                 return ThemePreviewCard(
                   themeConfig: preset,
+                  layout: PreviewLayout.resolve(
+                    locator<TemplateController>().config,
+                  ),
                   isSelected: isSelected,
                   onTap: () {
                     setState(() => _current = preset);
@@ -564,6 +569,14 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
 
             const SizedBox(height: ChatySpacing.md),
 
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: ChatySpacing.sm),
+              child: Text(
+                'Each preview shows that theme\'s colours on your current layout, including component overrides.',
+                style: TextStyle(color: context.colors.foregroundSecondary),
+              ),
+            ),
+            const SizedBox(height: ChatySpacing.sm),
             // Presets, grouped as Light and Dark so people compare like with like.
             ..._buildPresetSections(),
 
