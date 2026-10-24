@@ -1,5 +1,5 @@
 {
- "name": "Diagnostics v28",
+ "name": "Diagnostics v29",
  "on": {
   "workflow_dispatch": {},
   "push": {
@@ -32,12 +32,12 @@
     {
      "name": "Analyze touched files",
      "continue-on-error": true,
-     "run": "touch .env; flutter pub get >/dev/null; flutter analyze --no-fatal-infos lib/features/chats/chat_detail_screen.dart lib/features/messages/attachment_sheet.dart lib/core/emoji lib/ui/core/ticks lib/ui/core/bubbles lib/features/settings/settings_root_screen.dart lib/features/settings/conversation/conversation_bubble_and_ticks_screen.dart lib/features/settings lib/features/chats lib/ui/core/gb lib/domain/models/preferences.dart > an.txt 2>&1 || true; { echo '## ANALYZE'; grep -E '(error|warning) \u2022|issues found|No issues' an.txt | head -40; } >> $GITHUB_STEP_SUMMARY\n{ echo; echo ANALYZE-RAW; tail -c 700 an.txt; } >> $GITHUB_STEP_SUMMARY"
+     "run": "touch .env; flutter pub get >/dev/null; flutter analyze --no-fatal-infos lib/features/chats/chat_detail_screen.dart lib/features/messages/attachment_sheet.dart lib/core/emoji lib/ui/core/ticks lib/ui/core/bubbles lib/features/settings/settings_root_screen.dart lib/features/settings/conversation/conversation_bubble_and_ticks_screen.dart lib/features/settings lib/features/chats lib/ui/core/gb lib/ui/core/design_system/components/option_cards.dart lib/domain/models/preferences.dart > an.txt 2>&1 || true; { echo '## ANALYZE'; grep -E '(error|warning) \u2022|issues found|No issues' an.txt | head -40; } >> $GITHUB_STEP_SUMMARY\n{ echo; echo ANALYZE-RAW; tail -c 700 an.txt; } >> $GITHUB_STEP_SUMMARY"
     },
     {
      "name": "Story look tests and render",
      "continue-on-error": true,
-     "run": "export FLUTTER_ROOT=$(dirname $(dirname $(readlink -f $(which flutter)))); touch .env; flutter test test/chaty_story_tile_test.dart test/bubble_catalog_roundtrip_test.dart test/tick_catalog_roundtrip_test.dart test/attachment_sheet_render_test.dart test/composer_render_test.dart test/frontend_master_plan_contract_test.dart test/settings_registry_deduplication_test.dart test/settings_interaction_test.dart test/conversation_settings_wiring_test.dart test/home_settings_wiring_test.dart test/theme_component_id_test.dart test/template_system_test.dart test/theme_system_gbthemes_test.dart test/universal_settings_test.dart test/requested_ux_regression_contract_test.dart test/settings_registry_test.dart > tt.txt 2>&1 || true; { echo '## TESTS'; echo '```'; { grep -E 'overflowed by|test/.*dart:[0-9]+' tt.txt | sort | uniq -c; grep -a -A14 -E '\u274c|::error' tt.txt | head -40; echo ---FAILDETAIL; grep -a -E 'overflowed|RenderFlex|Expected|Actual|Bad state|Null check|type .* is not|setState|Unsupported|No element|not found|Could not|root_render' tt.txt | grep -v app_links | sort | uniq -c | head -30; tail -c 400 tt.txt; } | sed 's/\\x1b\\[[0-9;]*[A-Za-z]//g'; echo '```'; } >> $GITHUB_STEP_SUMMARY; true"
+     "run": "export FLUTTER_ROOT=$(dirname $(dirname $(readlink -f $(which flutter)))); touch .env; flutter test test/chaty_story_tile_test.dart test/bubble_catalog_roundtrip_test.dart test/tick_catalog_roundtrip_test.dart test/attachment_sheet_render_test.dart test/composer_render_test.dart test/frontend_master_plan_contract_test.dart test/settings_registry_deduplication_test.dart test/settings_interaction_test.dart test/conversation_settings_wiring_test.dart test/home_settings_wiring_test.dart test/theme_component_id_test.dart test/template_system_test.dart test/theme_system_gbthemes_test.dart test/universal_settings_test.dart test/requested_ux_regression_contract_test.dart test/settings_registry_test.dart test/bubbles_ticks_selection_test.dart > tt.txt 2>&1 || true; { echo '## TESTS'; echo '```'; { grep -E 'overflowed by|test/.*dart:[0-9]+' tt.txt | sort | uniq -c; grep -a -A14 -E '\u274c|::error' tt.txt | head -40; echo ---FAILDETAIL; grep -a -E 'overflowed|RenderFlex|Expected|Actual|Bad state|Null check|type .* is not|setState|Unsupported|No element|not found|Could not|root_render' tt.txt | grep -v app_links | sort | uniq -c | head -30; tail -c 400 tt.txt; } | sed 's/\\x1b\\[[0-9;]*[A-Za-z]//g'; echo '```'; } >> $GITHUB_STEP_SUMMARY; true"
     },
     {
      "name": "b64",
