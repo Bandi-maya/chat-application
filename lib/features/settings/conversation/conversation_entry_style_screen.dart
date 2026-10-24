@@ -14,12 +14,38 @@ class ConversationEntryStyleScreen extends StatefulWidget {
   });
 
   @override
-  State<ConversationEntryStyleScreen> createState() => _ConversationEntryStyleScreenState();
+  State<ConversationEntryStyleScreen> createState() =>
+      _ConversationEntryStyleScreenState();
 }
 
-class _ConversationEntryStyleScreenState extends State<ConversationEntryStyleScreen> {
+class _ConversationEntryStyleScreenState
+    extends State<ConversationEntryStyleScreen> {
+  // GB reference entry styles (GBWhatsApp ConvoEntry picker, 23 designs in
+  // the APK's original order) followed by Chaty's own added styles.
   static const List<String> _entryStyles = [
-    'Stock (Chaty Default)',
+    'Stock',
+    'YOWA Style',
+    'WAMOD',
+    'Hangouts',
+    'Simple',
+    'Aran V2',
+    'Mood',
+    'WANH',
+    'Hangouts V2',
+    'Dribble',
+    'Dribble V2',
+    'Allo',
+    'Rounded',
+    'Old Stock (2016)',
+    'RC-MSG Google',
+    'RC-Telegram X iOS',
+    'RC-IOS 11',
+    'RC-Line',
+    'Concept',
+    'Instagram',
+    'iOS 14',
+    'FB Messenger',
+    'RC Mess',
     'Telegram Modern',
     'iOS Clean Rounded',
     'Hangouts Minimal',
@@ -35,7 +61,9 @@ class _ConversationEntryStyleScreenState extends State<ConversationEntryStyleScr
     required ValueChanged<int?> onColorSelected,
   }) {
     final theme = locator<ThemeController>().globalTheme;
-    final initial = currentColor != null ? Color(currentColor) : theme.accentColor;
+    final initial = currentColor != null
+        ? Color(currentColor)
+        : theme.accentColor;
     GbColorPickerModal.show(
       context,
       title: title,
@@ -73,7 +101,9 @@ class _ConversationEntryStyleScreenState extends State<ConversationEntryStyleScr
   /// current stock option so the radio selection and preview agree.
   static String _normalizeStyle(String raw) {
     final v = raw.trim();
-    if (v.isEmpty || v == 'Stock') return 'Stock (Chaty Default)';
+    // Legacy names unify on the GB 'Stock' entry, which renders Chaty's
+    // stock integrated layout.
+    if (v.isEmpty || v == 'Stock (Chaty Default)') return 'Stock';
     return v;
   }
 
@@ -81,7 +111,10 @@ class _ConversationEntryStyleScreenState extends State<ConversationEntryStyleScr
   Widget build(BuildContext context) {
     final themeController = locator<ThemeController>();
     return ListenableBuilder(
-      listenable: Listenable.merge([widget.preferencesController, themeController]),
+      listenable: Listenable.merge([
+        widget.preferencesController,
+        themeController,
+      ]),
       builder: (context, _) {
         final theme = themeController.globalTheme;
         final colors = context.colors;
@@ -136,12 +169,18 @@ class _ConversationEntryStyleScreenState extends State<ConversationEntryStyleScr
                 // Top Live Entry Bar Preview - mirrors the arrangement the
                 // selected Conversation Entry style applies in the chat screen.
                 GbLivePreviewCard(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 16,
+                  ),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
-                       color: uiEntryBg,
-                       borderRadius: BorderRadius.circular(24),
+                      color: uiEntryBg,
+                      borderRadius: BorderRadius.circular(24),
                     ),
                     child: _buildStylePreview(
                       _normalizeStyle(prefs.entryStyle),
@@ -162,7 +201,8 @@ class _ConversationEntryStyleScreenState extends State<ConversationEntryStyleScr
                     GbSettingRow(
                       icon: Icons.style_rounded,
                       title: 'Conversation Entry style',
-                      subtitle: 'Change the style of the Bottom Entry in Conversation screen\nSelected: ${_normalizeStyle(prefs.entryStyle)}',
+                      subtitle:
+                          'Change the style of the Bottom Entry in Conversation screen\nSelected: ${_normalizeStyle(prefs.entryStyle)}',
                       hasSubScreen: true,
                       onTap: _showEntryStyleModal,
                     ),
@@ -229,7 +269,8 @@ class _ConversationEntryStyleScreenState extends State<ConversationEntryStyleScr
                     GbSettingRow(
                       icon: Icons.radio_button_checked_rounded,
                       title: 'Mic/Send Background circle',
-                      subtitle: 'Change the color of the circle behind Send/Mic',
+                      subtitle:
+                          'Change the color of the circle behind Send/Mic',
                       colorHex: prefs.micSendBgCircleColor,
                       onColorTap: () => _pickColor(
                         title: 'Mic/Send Circle Color',
@@ -299,11 +340,11 @@ class _ConversationEntryStyleScreenState extends State<ConversationEntryStyleScr
     Widget cameraI({double size = 20}) =>
         Icon(Icons.camera_alt_outlined, color: buttonsCol, size: size);
     Widget micCircle() => Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(color: micCircleCol, shape: BoxShape.circle),
-          child: Icon(Icons.mic_rounded, color: sendCol, size: 22),
-        );
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(color: micCircleCol, shape: BoxShape.circle),
+      child: Icon(Icons.mic_rounded, color: sendCol, size: 22),
+    );
 
     Widget field({
       List<Widget> leading = const [],
@@ -353,7 +394,190 @@ class _ConversationEntryStyleScreenState extends State<ConversationEntryStyleScr
       );
     }
 
+    Widget miniDots(int n) => SizedBox(
+      height: 22,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          for (var k = 0; k < n; k++)
+            Icon(
+              k == 0 ? Icons.emoji_emotions_outlined : Icons.circle,
+              size: k == 0 ? 16 : 5,
+              color: k == 0 ? emojiCol : buttonsCol.withValues(alpha: 0.7),
+            ),
+        ],
+      ),
+    );
+    Widget twoRow(Widget top) =>
+        Column(children: [top, const SizedBox(height: 4), miniDots(6)]);
+
     switch (style) {
+      // GB reference style previews (schematic mini-mocks).
+      case 'WAMOD':
+      case 'Hangouts':
+      case 'Rounded':
+        return twoRow(
+          Row(
+            children: [
+              Expanded(
+                child: field(
+                  radius: 16,
+                  leading: [emojiI(size: 18)],
+                  trailing: [attachI(size: 18)],
+                ),
+              ),
+              const SizedBox(width: 8),
+              micCircle(),
+            ],
+          ),
+        );
+      case 'Hangouts V2':
+      case 'Dribble':
+      case 'Dribble V2':
+        return Column(
+          children: [
+            miniDots(6),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(child: field(radius: 14)),
+                const SizedBox(width: 8),
+                micCircle(),
+              ],
+            ),
+          ],
+        );
+      case 'Aran V2':
+      case 'WANH':
+        return Row(
+          children: [
+            attachI(size: 20),
+            const SizedBox(width: 6),
+            emojiI(size: 20),
+            const SizedBox(width: 6),
+            Expanded(child: field(radius: 16)),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'Allo':
+        return Row(
+          children: [
+            Expanded(
+              child: field(
+                radius: 20,
+                leading: [attachI(size: 18)],
+                trailing: [emojiI(size: 18)],
+              ),
+            ),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'RC-Telegram X iOS':
+      case 'iOS 14':
+        return Row(
+          children: [
+            attachI(size: 20),
+            const SizedBox(width: 6),
+            Expanded(child: field(radius: 18, trailing: [emojiI(size: 18)])),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'RC-IOS 11':
+        return Row(
+          children: [
+            emojiI(size: 20),
+            const SizedBox(width: 6),
+            Expanded(child: field(radius: 18, trailing: [attachI(size: 18)])),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'RC-Line':
+      case 'FB Messenger':
+      case 'RC Mess':
+      case 'Instagram':
+        return Row(
+          children: [
+            attachI(size: 20),
+            const SizedBox(width: 4),
+            cameraI(size: 20),
+            const SizedBox(width: 6),
+            Expanded(child: field(radius: 18)),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'Concept':
+        return Row(
+          children: [
+            Expanded(
+              child: field(
+                radius: 18,
+                trailing: [
+                  cameraI(size: 18),
+                  const SizedBox(width: 4),
+                  emojiI(size: 18),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'YOWA Style':
+      case 'Mood':
+        return Row(
+          children: [
+            Expanded(
+              child: field(
+                radius: 22,
+                leading: [emojiI(size: 18)],
+                trailing: [attachI(size: 18)],
+              ),
+            ),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'Simple':
+        return Row(
+          children: [
+            Expanded(child: field(radius: 22, trailing: [attachI(size: 18)])),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'Old Stock (2016)':
+        return Row(
+          children: [
+            Expanded(
+              child: field(
+                radius: 8,
+                leading: [emojiI(size: 18)],
+                trailing: [attachI(size: 18)],
+              ),
+            ),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'RC-MSG Google':
+      case 'Stock':
+        return Row(
+          children: [
+            Expanded(
+              child: field(
+                leading: [emojiI()],
+                trailing: [attachI(), const SizedBox(width: 8), cameraI()],
+              ),
+            ),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
       case 'Telegram Modern':
         return Row(
           children: [
@@ -370,10 +594,15 @@ class _ConversationEntryStyleScreenState extends State<ConversationEntryStyleScr
             Container(
               width: 36,
               height: 36,
-              decoration:
-                  BoxDecoration(color: buttonsCol, shape: BoxShape.circle),
-              child: const Icon(Icons.add_rounded,
-                  color: Colors.white, size: 22),
+              decoration: BoxDecoration(
+                color: buttonsCol,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.add_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
             ),
             const SizedBox(width: 8),
             Expanded(child: field(radius: 22)),
@@ -441,11 +670,7 @@ class _ConversationEntryStyleScreenState extends State<ConversationEntryStyleScr
                 radius: 22,
                 shadow: true,
                 leading: [emojiI(size: 20)],
-                trailing: [
-                  attachI(),
-                  const SizedBox(width: 8),
-                  cameraI(),
-                ],
+                trailing: [attachI(), const SizedBox(width: 8), cameraI()],
               ),
             ),
             const SizedBox(width: 8),
@@ -460,16 +685,14 @@ class _ConversationEntryStyleScreenState extends State<ConversationEntryStyleScr
             micCircle(),
           ],
         );
-      case 'Stock (Chaty Default)':
       default:
         return Row(
           children: [
             Expanded(
-              child: field(leading: [emojiI()], trailing: [
-                attachI(),
-                const SizedBox(width: 8),
-                cameraI(),
-              ]),
+              child: field(
+                leading: [emojiI()],
+                trailing: [attachI(), const SizedBox(width: 8), cameraI()],
+              ),
             ),
             const SizedBox(width: 8),
             micCircle(),
