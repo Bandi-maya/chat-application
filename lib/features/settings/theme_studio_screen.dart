@@ -15,6 +15,7 @@ import 'templates/template_preview_widget.dart';
 import '../../ui/core/templates/template_controller.dart';
 import '../../ui/core/templates/template_registry.dart';
 import '../../ui/core/theme/chaty_theme_manager.dart';
+import '../../ui/core/theme/theme_pair_preview.dart';
 import '../../ui/core/ticks/delivery_icon_style.dart';
 import '../../ui/core/ticks/delivery_status_icon.dart';
 
@@ -365,7 +366,7 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
-            'Home and header preview',
+            'Home and conversation preview',
             style: TextStyle(
               color: colors.foreground,
               fontSize: 15,
@@ -373,7 +374,20 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
             ),
           ),
         ),
-        TemplateCompositePreview(template: template, height: 190),
+        TemplatePairPreview(template: template),
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            'Your theme: home and conversation',
+            style: TextStyle(
+              color: colors.foreground,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Center(child: ThemePairPreview(themeConfig: _themeCtrl.globalTheme)),
       ],
     );
   }
