@@ -410,17 +410,19 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
         child: Container(
-          height: 185,
+          // Grows with large text instead of overflowing.
+          constraints: const BoxConstraints(minHeight: 185),
           color: _current.backgroundColor,
           child: Stack(
             children: [
               // Canvas particle layer
               if (_activeParticleEffect != 'None')
-                CustomPaint(
-                  size: const Size(double.infinity, 185),
-                  painter: _LiveParticleCanvasPainter(
-                    particles: _particles,
-                    effect: _activeParticleEffect,
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: _LiveParticleCanvasPainter(
+                      particles: _particles,
+                      effect: _activeParticleEffect,
+                    ),
                   ),
                 ),
 
