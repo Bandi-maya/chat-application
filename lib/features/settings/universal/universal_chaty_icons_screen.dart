@@ -786,7 +786,7 @@ class _UniversalChatyIconsScreenState extends State<UniversalChatyIconsScreen> {
                   onChanged: (_) => setState(() {}),
                   style: TextStyle(color: theme.primaryTextColor),
                   decoration: InputDecoration(
-                    hintText: 'Search icons by name (e.g. camera, calls)â¦',
+                    hintText: 'Search icons by name (e.g. camera, calls)…',
                     hintStyle: TextStyle(color: theme.secondaryTextColor),
                     prefixIcon: Icon(
                       Icons.search_rounded,
