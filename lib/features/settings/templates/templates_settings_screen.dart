@@ -167,12 +167,12 @@ class _TemplatesSettingsScreenState extends State<TemplatesSettingsScreen> {
                       const SizedBox(height: 14),
                       AppliedPairPreview(
                         palette: locator<ThemeController>().globalTheme,
-                        config: config,
+                        layout: currentSetupLayout(),
                         applyTemplateConversation: false,
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Your current setup with your colours, including component overrides. Bottom bar style, Home UI preset and wallpaper are not drawn.',
+                        'Your current setup with your colours, including component overrides. Wallpaper and the finer Home UI styling are not drawn.',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colors.foregroundSecondary,
@@ -285,15 +285,12 @@ class _TemplatesSettingsScreenState extends State<TemplatesSettingsScreen> {
                         const SizedBox(height: 14),
                         AppliedPairPreview(
                           palette: locator<ThemeController>().globalTheme,
-                          config: UserTemplateConfiguration(
-                            baseTemplate: tmpl.id,
-                            componentOverrides: const {},
-                          ),
+                          layout: appliedTemplateLayout(tmpl.id),
                           applyTemplateConversation: true,
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'After Apply Complete Template: this layout with your current colours. Component overrides are cleared. Bottom bar style, Home UI preset and wallpaper are not drawn.',
+                          'After Apply Complete Template: this layout with your current colours. Component overrides are cleared. Wallpaper and the finer Home UI styling are not drawn.',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colors.foregroundSecondary,
