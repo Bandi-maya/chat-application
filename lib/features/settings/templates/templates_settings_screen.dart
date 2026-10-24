@@ -183,7 +183,7 @@ class _TemplatesSettingsScreenState extends State<TemplatesSettingsScreen> {
                   textInputAction: TextInputAction.search,
                   decoration: InputDecoration(
                     hintText: 'Search templates and components',
-                    prefixIcon: ChatyGlyphIcon(glyph: ChatyGlyph.search, color: colors.foregroundSecondary, size: 16),
+                    prefixIcon: Icon(Icons.search_rounded, color: colors.foregroundSecondary, size: 20),
                     suffixIcon: _query.isEmpty
                         ? null
                         : IconButton(
