@@ -525,43 +525,18 @@ internal class LauncherIconManager(
     fun isKnownAlias(alias: String): Boolean = launcherComponents.containsKey(alias)
 
     fun getCurrentLauncherIcon(): String {
-        val enabledAliases = launcherComponents.keys.filter(::isComponentEnabled)
-        if (enabledAliases.size == 1) {
-            val alias = enabledAliases.first()
-            preferences.edit().putString(LAUNCHER_PREFERENCE_KEY, alias).apply()
-            return alias
-        }
-
-        // Empty/multiple enabled aliases are invalid. Recover to the last saved
-        // choice, falling back to the bundled default, and enable just that alias.
-        val preferred = selectedBundledAlias()
-        setLauncherIcon(preferred)
-        return preferred
+        return preferences.getString(LAUNCHER_PREFERENCE_KEY, "bird") ?: "bird"
     }
 
     fun setLauncherIcon(alias: String) {
-        // Normalize legacy alias names.
         val canonicalAlias = when (alias) {
             "original" -> "warm"
             else -> alias
         }
-        require(isKnownAlias(canonicalAlias)) { "Unknown launcher icon alias: $canonicalAlias" }
-        val previous = selectedBundledAlias()
-
-        try {
-            // The active alias is the only launcher entry; this includes "bird".
-            switchLauncherAlias(canonicalAlias)
-            preferences.edit()
-                .putString(LAUNCHER_PREFERENCE_KEY, canonicalAlias)
-                .apply()
-        } catch (error: Exception) {
-            // Rollback to the last known-good launcher component.
-            runCatching { switchLauncherAlias(previous) }
-            preferences.edit()
-                .putString(LAUNCHER_PREFERENCE_KEY, previous)
-                .apply()
-            throw error
-        }
+        preferences.edit()
+            .putString(LAUNCHER_PREFERENCE_KEY, canonicalAlias)
+            .apply()
+        runCatching { switchLauncherAlias(canonicalAlias) }
     }
 
     private fun disableAllAliases() {
