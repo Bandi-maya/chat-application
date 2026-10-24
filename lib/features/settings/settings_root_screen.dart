@@ -560,16 +560,6 @@ class SettingsRootScreen extends StatelessWidget {
                       ),
                     ),
                     _SettingsItemTile(
-                      icon: Icon(Icons.palette_outlined, color: colors.primary, size: 24),
-                      title: 'Customization Center',
-                      subtitle: 'Visual dialects, headers, bubbles, ticks, composers & motion',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const CustomizationCenterScreen(),
-                        ),
-                      ),
-                    ),
-                    _SettingsItemTile(
                       icon: Icon(Icons.dashboard_customize_rounded, color: colors.info, size: 24),
                       title: 'Global Template Studio',
                       subtitle: 'App-wide templates and independent component styles',
