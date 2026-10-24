@@ -79,6 +79,8 @@ void main() {
       "title: 'Message Scheduler'",
       "title: 'Auto Reply'",
       "title: 'Message a Number'",
+      "title: 'Mass Message'",
+      "title: 'Who can call me?'",
       "title: 'Mark All as Read'",
       "title: 'Share Chaty'",
     ]) {
