@@ -58,7 +58,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = applicationIdOverride ?: "com.example.chat"
+        applicationId = applicationIdOverride ?: "com.qbits.chaty"
         // mediapipe_face_mesh's bundled native runtime requires Android API 24+.
         minSdk = maxOf(flutter.minSdkVersion, 24)
         targetSdk = 36
