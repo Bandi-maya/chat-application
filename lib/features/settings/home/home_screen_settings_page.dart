@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/design_system.dart';
+import '../../../ui/core/design_system/gb_design_system.dart';
 import 'header_settings_screen.dart';
 import 'home_rows_settings_screen.dart';
 import 'home_fab_settings_screen.dart';
@@ -73,6 +74,11 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                 return ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   children: [
+                    // Preview of the tabs that stay in the bottom bar.
+                    GbLivePreviewCard(
+                      label: 'BOTTOM NAVIGATION PREVIEW',
+                      child: _buildNavPreview(colors),
+                    ),
                     // Bottom navigation: choose which tabs are shown.
                     _buildCardContainer(
                       theme: theme,
@@ -261,6 +267,36 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildNavPreview(dynamic colors) {
+    final prefs = widget.preferencesController;
+    final items = <(IconData, String)>[
+      (Icons.chat_bubble_outline_rounded, 'Chats'),
+      if (!prefs.gbBool('nav_hide_updates')) (Icons.update_rounded, 'Updates'),
+      if (!prefs.gbBool('nav_hide_tasks')) (Icons.task_alt_rounded, 'Tasks'),
+      (Icons.call_outlined, 'Calls'),
+    ];
+    return Row(
+      children: [
+        for (final item in items)
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(item.$1, color: colors.primary, size: 24),
+                const SizedBox(height: 4),
+                Text(
+                  item.$2,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: colors.foregroundSecondary, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 
