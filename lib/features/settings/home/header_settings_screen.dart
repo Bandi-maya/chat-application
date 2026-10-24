@@ -987,7 +987,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                         // Tab Bubble Style (tap a card; the pinned preview updates)
                         ChatyOptionGallery<String>(
                           title: 'Tab Bubble Style',
-                          subtitle: 'Tap a style. The header preview above updates right away.',
+                          subtitle: 'Cards show a generic icon. Tap a style and the header preview above shows the one selected.',
                           values: _tabBubbleStyles,
                           selected: home.tabBubbleStyle.isNotEmpty
                               ? home.tabBubbleStyle
@@ -1008,7 +1008,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                         // 3D Pager / Slider Transition (tap a card to select)
                         ChatyOptionGallery<String>(
                           title: '3D Pager / Slider Effect',
-                          subtitle: 'Tap an effect to use it when swiping between tabs.',
+                          subtitle: 'Cards show a generic icon. Tap an effect to use it when swiping between tabs.',
                           values: _pager3dStyles,
                           selected: home.pagerTransition3d.isNotEmpty
                               ? home.pagerTransition3d
