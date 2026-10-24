@@ -41,6 +41,7 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(MethodChannel(name), (call) async => null);
     }
+    SharedPreferences.setMockInitialValues({});
     // Initialise outside the fake-async test zone so its refresh timer is not
     // reported as a pending test timer.
     try {
