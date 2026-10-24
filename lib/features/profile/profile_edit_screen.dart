@@ -290,8 +290,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                       // Banner
                       Container(
                         height: 160,
-                        width: double.infinity,
+                        margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        clipBehavior: Clip.antiAlias,
                         decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
                           color: colorScheme.surfaceContainerHighest,
                           image: activeBannerUrl != null && activeBannerUrl.isNotEmpty
                               ? DecorationImage(
@@ -316,7 +318,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                             padding: const EdgeInsets.all(10),
                             child: IconButton.filledTonal(
                               tooltip: 'Change banner photo',
-                              icon: const Icon(Icons.camera_alt_outlined, size: 20),
+                              icon: const Icon(Icons.wallpaper_outlined, size: 20),
                               onPressed: _pickBanner,
                             ),
                           ),
