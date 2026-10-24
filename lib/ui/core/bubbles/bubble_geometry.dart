@@ -411,6 +411,249 @@ class BubbleGeometry {
           ),
         );
         break;
+
+      // --- Set D: GB reference styles (vector interpretations grounded in
+      // the reference APK's bubble shape assets) ---
+
+      // Textra SMS: capsule with a centered stem tail at the bottom.
+      case BubbleStyleId.textra:
+        final r = Radius.circular(math.min(24.0, height / 2));
+        path.addRRect(RRect.fromRectAndRadius(rect, r));
+        break;
+
+      // Go SMS / Rc Go SMS: rounded bubble with a curved tail sweeping out
+      // at the bottom corner.
+      case BubbleStyleId.goSms:
+      case BubbleStyleId.rcGoSms:
+        final r = Radius.circular(math.min(16.0, height / 2));
+        if (isMe) {
+          path.addRRect(
+            RRect.fromRectAndCorners(
+              rect,
+              topLeft: r,
+              topRight: r,
+              bottomLeft: r,
+              bottomRight: const Radius.circular(4),
+            ),
+          );
+          path.moveTo(right - 10, bottom - 8);
+          path.quadraticBezierTo(
+            right + 8,
+            bottom - 2,
+            right + 12,
+            bottom - 14,
+          );
+          path.quadraticBezierTo(
+            right + 2,
+            bottom - 16,
+            right - 2,
+            bottom - 16,
+          );
+          path.close();
+        } else {
+          path.addRRect(
+            RRect.fromRectAndCorners(
+              rect,
+              topLeft: r,
+              topRight: r,
+              bottomLeft: const Radius.circular(4),
+              bottomRight: r,
+            ),
+          );
+          path.moveTo(left + 10, bottom - 8);
+          path.quadraticBezierTo(left - 8, bottom - 2, left - 12, bottom - 14);
+          path.quadraticBezierTo(left - 2, bottom - 16, left + 2, bottom - 16);
+          path.close();
+        }
+        break;
+
+      // CV ios: iOS-like rounded bubble with a small swept tail.
+      case BubbleStyleId.cvIos:
+        final r = Radius.circular(math.min(18.0, height / 2));
+        path.addRRect(
+          RRect.fromRectAndCorners(
+            rect,
+            topLeft: r,
+            topRight: r,
+            bottomLeft: isMe ? r : const Radius.circular(4),
+            bottomRight: isMe ? const Radius.circular(4) : r,
+          ),
+        );
+        break;
+
+      // Rc Pal / Rc Imess: dome (semicircular top), flat sides and bottom.
+      case BubbleStyleId.rcPal:
+      case BubbleStyleId.rcImess:
+        // Centered dome whose apex sits exactly at the top edge. Flutter
+        // scales an arc radius UP when it cannot span its endpoints, so the
+        // arc must be drawn between cx-r..cx+r with r clamped to both the
+        // half-width and the available headroom; otherwise the dome paints
+        // above the widget bounds and overwrites the previous message.
+        final domeR = math.min(rect.width / 2, 26.0);
+        final cx = rect.center.dx;
+        path.moveTo(left, bottom);
+        path.lineTo(left, top + domeR);
+        path.lineTo(cx - domeR, top + domeR);
+        path.arcToPoint(
+          Offset(cx + domeR, top + domeR),
+          radius: Radius.circular(domeR),
+          clockwise: true,
+        );
+        path.lineTo(right, top + domeR);
+        path.lineTo(right, bottom);
+        path.close();
+        break;
+
+      // Rc ios Line: rounded-rect outline with a corner tail.
+      case BubbleStyleId.rcIosLine:
+        final r = Radius.circular(math.min(18.0, height / 2));
+        if (isMe) {
+          path.addRRect(
+            RRect.fromRectAndCorners(
+              rect,
+              topLeft: r,
+              topRight: r,
+              bottomLeft: r,
+              bottomRight: const Radius.circular(6),
+            ),
+          );
+          path.moveTo(right - 4, bottom - 12);
+          path.quadraticBezierTo(right + 8, bottom - 2, right + 2, bottom + 6);
+          path.quadraticBezierTo(right - 4, bottom - 2, right - 12, bottom - 4);
+          path.close();
+        } else {
+          path.addRRect(
+            RRect.fromRectAndCorners(
+              rect,
+              topLeft: r,
+              topRight: r,
+              bottomLeft: const Radius.circular(6),
+              bottomRight: r,
+            ),
+          );
+          path.moveTo(left + 4, bottom - 12);
+          path.quadraticBezierTo(left - 8, bottom - 2, left - 2, bottom + 6);
+          path.quadraticBezierTo(left + 4, bottom - 2, left + 12, bottom - 4);
+          path.close();
+        }
+        break;
+
+      // Rc IM Line: open top semicircle ring with flat base.
+      case BubbleStyleId.rcImLine:
+        // See rcPal: clamped centered dome, apex at the top edge.
+        final domeR = math.min(rect.width / 2, 22.0);
+        final cx = rect.center.dx;
+        path.moveTo(left, bottom);
+        path.lineTo(left, top + domeR);
+        path.lineTo(cx - domeR, top + domeR);
+        path.arcToPoint(
+          Offset(cx + domeR, top + domeR),
+          radius: Radius.circular(domeR),
+          clockwise: true,
+        );
+        path.lineTo(right, top + domeR);
+        path.lineTo(right, bottom);
+        path.close();
+        break;
+
+      // Rc tran Line: half-circle dome with a ring (outline handled by painter).
+      case BubbleStyleId.rcTranLine:
+        // See rcPal: clamped centered dome, apex at the top edge.
+        final domeR = math.min(rect.width / 2, 24.0);
+        final cx = rect.center.dx;
+        path.moveTo(left, bottom);
+        path.lineTo(left, top + domeR);
+        path.lineTo(cx - domeR, top + domeR);
+        path.arcToPoint(
+          Offset(cx + domeR, top + domeR),
+          radius: Radius.circular(domeR),
+          clockwise: true,
+        );
+        path.lineTo(right, top + domeR);
+        path.lineTo(right, bottom);
+        path.close();
+        break;
+
+      // Gabi Mess: boxy outline bubble with a rounded top and corner tail.
+      case BubbleStyleId.gabiMess:
+        if (isMe) {
+          path.addRRect(
+            RRect.fromRectAndCorners(
+              rect,
+              topLeft: const Radius.circular(20),
+              topRight: const Radius.circular(20),
+              bottomLeft: const Radius.circular(4),
+              bottomRight: const Radius.circular(4),
+            ),
+          );
+          path.moveTo(right - 8, bottom - 6);
+          path.quadraticBezierTo(
+            right + 10,
+            bottom - 4,
+            right + 14,
+            bottom - 18,
+          );
+          path.quadraticBezierTo(
+            right + 4,
+            bottom - 14,
+            right - 4,
+            bottom - 14,
+          );
+          path.close();
+        } else {
+          path.addRRect(
+            RRect.fromRectAndCorners(
+              rect,
+              topLeft: const Radius.circular(20),
+              topRight: const Radius.circular(20),
+              bottomLeft: const Radius.circular(4),
+              bottomRight: const Radius.circular(4),
+            ),
+          );
+          path.moveTo(left + 8, bottom - 6);
+          path.quadraticBezierTo(left - 10, bottom - 4, left - 14, bottom - 18);
+          path.quadraticBezierTo(left - 4, bottom - 14, left + 4, bottom - 14);
+          path.close();
+        }
+        break;
+
+      // Rc Fancy: pinched-waist double-bulge silhouette.
+      case BubbleStyleId.rcFancy:
+        path.moveTo(left + 14, top);
+        path.quadraticBezierTo(
+          left + 2,
+          top + height * 0.22,
+          left + 10,
+          top + height * 0.34,
+        );
+        path.quadraticBezierTo(
+          left - 6,
+          height * 0.5,
+          left + 10,
+          top + height * 0.66,
+        );
+        path.quadraticBezierTo(
+          left + 2,
+          bottom - height * 0.22,
+          left + 14,
+          bottom,
+        );
+        path.lineTo(right - 14, bottom);
+        path.quadraticBezierTo(
+          right - 2,
+          bottom - height * 0.22,
+          right - 10,
+          top + height * 0.66,
+        );
+        path.quadraticBezierTo(
+          right + 6,
+          height * 0.5,
+          right - 10,
+          top + height * 0.34,
+        );
+        path.quadraticBezierTo(right - 2, top + height * 0.22, right - 14, top);
+        path.close();
+        break;
     }
 
     return path;
