@@ -11,11 +11,9 @@ import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/theme/app_theme.dart';
 import 'appearance/component_styles_screen.dart';
-import 'templates/template_preview_widget.dart';
 import '../../ui/core/templates/template_controller.dart';
-import '../../ui/core/templates/template_registry.dart';
 import '../../ui/core/theme/chaty_theme_manager.dart';
-import '../../ui/core/theme/theme_pair_preview.dart';
+import '../../ui/core/templates/applied_pair_preview.dart';
 import '../../ui/core/ticks/delivery_icon_style.dart';
 import '../../ui/core/ticks/delivery_status_icon.dart';
 
@@ -357,16 +355,13 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
   /// template layout, not a screenshot of the live home screen.
   Widget _buildHomePreview() {
     final colors = context.colors;
-    final template = ChatyTemplateRegistry.get(
-      locator<TemplateController>().config.baseTemplate,
-    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
-            'Template layout preview',
+            'Home and conversation preview',
             style: TextStyle(
               color: colors.foreground,
               fontSize: 15,
@@ -374,20 +369,19 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
             ),
           ),
         ),
-        TemplatePairPreview(template: template),
-        const SizedBox(height: 16),
+        AppliedPairPreview(
+          palette: _themeCtrl.globalTheme,
+          config: locator<TemplateController>().config,
+          applyTemplateConversation: false,
+        ),
         Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          padding: const EdgeInsets.only(top: 6),
           child: Text(
-            'Your palette preview (colours only)',
-            style: TextStyle(
-              color: colors.foreground,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-            ),
+            'Your current colours on your current layout, including component overrides. Bottom bar style, Home UI preset and wallpaper are not drawn.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: colors.foregroundSecondary, fontSize: 12),
           ),
         ),
-        Center(child: ThemePairPreview(themeConfig: _themeCtrl.globalTheme)),
       ],
     );
   }
