@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'theme_config.dart';
-import '../bubbles/bubble_painter.dart';
-import '../ticks/delivery_status_icon.dart';
-import '../../../domain/models/chat_message.dart';
+import 'theme_pair_preview.dart';
 
 /// Interactive token-driven mini theme preview card.
 /// Accurately renders runtime theme tokens without instantiating heavy state or streams.
@@ -20,8 +18,6 @@ class ThemePreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bubbleStyle = themeConfig.bubbleStyle;
-    final tickStyle = themeConfig.deliveryTickStyle;
 
     return Container(
       decoration: BoxDecoration(
@@ -140,143 +136,8 @@ class ThemePreviewCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
 
-                // Mini App Canvas Preview
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: themeConfig.surfaceColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: themeConfig.secondaryTextColor.withValues(
-                        alpha: 0.15,
-                      ),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      // Header simulated bar
-                      Row(
-                        children: [
-                          Container(
-                            width: 16,
-                            height: 16,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: themeConfig.cardColor,
-                            ),
-                            child: Center(
-                              child: Text(
-                                'M',
-                                style: TextStyle(
-                                  color: themeConfig.primaryTextColor,
-                                  fontSize: 8.5,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            'Maya',
-                            style: TextStyle(
-                              color: themeConfig.primaryTextColor,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const Spacer(),
-                          Container(
-                            width: 5,
-                            height: 5,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: themeConfig.successColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-
-                      // Incoming message preview
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: CustomPaint(
-                          painter: BubblePainter(
-                            styleId: bubbleStyle,
-                            isMe: false,
-                            fillColor: themeConfig.incomingBubbleColor,
-                            strokeColor: themeConfig.secondaryTextColor
-                                .withValues(alpha: 0.1),
-                            accentColor: themeConfig.accentColor,
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            child: Text(
-                              'Sounds good! 9:41',
-                              style: TextStyle(
-                                color: themeConfig.incomingTextColor,
-                                fontSize: 10.5,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-
-                      // Outgoing message preview with real tick
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: CustomPaint(
-                          painter: BubblePainter(
-                            styleId: bubbleStyle,
-                            isMe: true,
-                            fillColor: themeConfig.outgoingBubbleColor,
-                            strokeColor: themeConfig.accentColor.withValues(
-                              alpha: 0.2,
-                            ),
-                            accentColor: themeConfig.accentColor,
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'Sure 👍',
-                                  style: TextStyle(
-                                    color: themeConfig.outgoingTextColor,
-                                    fontSize: 10.5,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                DeliveryStatusIcon(
-                                  style: tickStyle,
-                                  state: DeliveryState.read,
-                                  unreadColor: themeConfig.outgoingTextColor
-                                      .withValues(alpha: 0.6),
-                                  readColor:
-                                      themeConfig.brightness == Brightness.dark
-                                      ? themeConfig.accentColor
-                                      : Colors.white,
-                                  size: 11.5,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                // Home + Conversation as they look once this theme is applied
+                Center(child: ThemePairPreview(themeConfig: themeConfig)),
                 const SizedBox(height: 8),
 
                 // Palette Swatches Footer
