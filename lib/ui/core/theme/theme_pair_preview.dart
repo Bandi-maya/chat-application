@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../domain/models/chat_message.dart';
 import '../bubbles/bubble_painter.dart';
 import '../ticks/delivery_status_icon.dart';
+import '../templates/applied_preview_model.dart';
+import '../templates/template_models.dart';
 import 'theme_config.dart';
 
 /// Two miniature phones side by side: the Home (chat list) screen and an open
@@ -18,10 +20,15 @@ class ThemePairPreview extends StatelessWidget {
   const ThemePairPreview({
     super.key,
     required this.themeConfig,
+    this.layout,
     this.phoneHeight = 176,
   });
 
   final ThemeConfig themeConfig;
+
+  /// Resolved template specs (header, chat list, navigation, composer). When
+  /// null the miniatures use one neutral layout and only the palette varies.
+  final PreviewLayout? layout;
   final double phoneHeight;
 
   @override
@@ -42,7 +49,7 @@ class ThemePairPreview extends StatelessWidget {
               themeConfig: themeConfig,
               width: phoneWidth,
               height: phoneHeight,
-              child: _HomeScreenMini(themeConfig: themeConfig),
+              child: _HomeScreenMini(themeConfig: themeConfig, layout: layout),
             ),
           ),
           _Labeled(
@@ -52,7 +59,7 @@ class ThemePairPreview extends StatelessWidget {
               themeConfig: themeConfig,
               width: phoneWidth,
               height: phoneHeight,
-              child: _ConversationMini(themeConfig: themeConfig),
+              child: _ConversationMini(themeConfig: themeConfig, layout: layout),
             ),
           ),
         ],
@@ -136,56 +143,126 @@ Widget _line(Color color, double width, double height) => Container(
 );
 
 class _HomeScreenMini extends StatelessWidget {
-  const _HomeScreenMini({required this.themeConfig});
+  const _HomeScreenMini({required this.themeConfig, this.layout});
 
   final ThemeConfig themeConfig;
+  final PreviewLayout? layout;
 
   @override
   Widget build(BuildContext context) {
     final t = themeConfig;
+    final l = layout;
+    final prominent = l?.home.headerStyle == HomeHeaderStyle.prominentIdentity;
+    final searchForward = l?.home.headerStyle == HomeHeaderStyle.searchForward;
+    final showStories = l?.home.showStoriesStrip ?? false;
+    final rowCount = switch (l?.chatList.density) {
+      ChatListDensity.compact => 6,
+      ChatListDensity.comfortable => 4,
+      _ => 5,
+    };
+    final roundAvatar = (l?.chatList.avatarShape ?? 'circle') == 'circle';
+    final navLayout = l?.navigation.layout ?? NavigationLayoutType.flatTabs;
+    BoxDecoration avatar(Color color) => BoxDecoration(
+      color: color,
+      shape: roundAvatar ? BoxShape.circle : BoxShape.rectangle,
+      borderRadius: roundAvatar ? null : BorderRadius.circular(4),
+    );
     return Column(
       children: [
         Container(
-          height: 22,
+          height: prominent ? 28 : 22,
           color: t.surfaceColor,
           padding: const EdgeInsets.symmetric(horizontal: 6),
           child: Row(
             children: [
-              Expanded(
-                child: Text(
-                  'Chats',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textScaler: TextScaler.noScaling,
-                  style: TextStyle(
-                    color: t.primaryTextColor,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
+              if (prominent) ...[
+                Container(
+                  width: 14,
+                  height: 14,
+                  decoration: avatar(t.accentColor.withValues(alpha: 0.6)),
+                ),
+                const SizedBox(width: 4),
+              ],
+              if (searchForward)
+                Expanded(
+                  child: Container(
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: t.cardColor,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Icon(
+                      Icons.search_rounded,
+                      size: 9,
+                      color: t.secondaryTextColor,
+                    ),
+                  ),
+                )
+              else ...[
+                Expanded(
+                  child: Text(
+                    'Chats',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textScaler: TextScaler.noScaling,
+                    style: TextStyle(
+                      color: t.primaryTextColor,
+                      fontSize: prominent ? 10.5 : 9,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
-              ),
-              Icon(Icons.search_rounded, size: 10, color: t.secondaryTextColor),
+                Icon(
+                  Icons.search_rounded,
+                  size: 10,
+                  color: t.secondaryTextColor,
+                ),
+              ],
             ],
           ),
         ),
+        if (showStories)
+          Container(
+            height: 16,
+            color: t.surfaceColor,
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Row(
+              children: [
+                for (var i = 0; i < 5; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Container(
+                      width: 11,
+                      height: 11,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: i < 2 ? t.accentColor : t.cardColor,
+                          width: 1.2,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         Expanded(
           child: Stack(
             children: [
               Column(
                 children: [
-                  for (var i = 0; i < 5; i++)
+                  for (var i = 0; i < rowCount; i++)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(6, 5, 6, 0),
+                      padding: const EdgeInsets.fromLTRB(6, 4, 6, 0),
                       child: Row(
                         children: [
                           Container(
-                            width: 14,
-                            height: 14,
-                            decoration: BoxDecoration(
-                              color: i == 0
+                            width: 13,
+                            height: 13,
+                            decoration: avatar(
+                              i == 0
                                   ? t.accentColor.withValues(alpha: 0.85)
                                   : t.cardColor,
-                              shape: BoxShape.circle,
                             ),
                           ),
                           const SizedBox(width: 5),
@@ -198,7 +275,7 @@ class _HomeScreenMini extends StatelessWidget {
                                   24.0 + (i % 3) * 6,
                                   3,
                                 ),
-                                const SizedBox(height: 3),
+                                const SizedBox(height: 2.5),
                                 _line(
                                   t.secondaryTextColor.withValues(alpha: 0.55),
                                   36.0 - (i % 2) * 8,
@@ -209,8 +286,8 @@ class _HomeScreenMini extends StatelessWidget {
                           ),
                           if (i < 2)
                             Container(
-                              width: 7,
-                              height: 7,
+                              width: 6,
+                              height: 6,
                               decoration: BoxDecoration(
                                 color: t.accentColor,
                                 shape: BoxShape.circle,
@@ -223,17 +300,17 @@ class _HomeScreenMini extends StatelessWidget {
               ),
               Positioned(
                 right: 6,
-                bottom: 6,
+                bottom: 5,
                 child: Container(
-                  width: 15,
-                  height: 15,
+                  width: 14,
+                  height: 14,
                   decoration: BoxDecoration(
                     color: t.accentColor,
                     borderRadius: BorderRadius.circular(5),
                   ),
                   child: Icon(
                     Icons.add_rounded,
-                    size: 11,
+                    size: 10,
                     color: t.outgoingTextColor,
                   ),
                 ),
@@ -243,16 +320,42 @@ class _HomeScreenMini extends StatelessWidget {
         ),
         Container(
           height: 18,
-          color: t.surfaceColor,
+          margin: navLayout == NavigationLayoutType.floatingPill
+              ? const EdgeInsets.fromLTRB(10, 0, 10, 3)
+              : EdgeInsets.zero,
+          decoration: BoxDecoration(
+            color: t.surfaceColor,
+            borderRadius: navLayout == NavigationLayoutType.floatingPill
+                ? BorderRadius.circular(9)
+                : null,
+            border: navLayout == NavigationLayoutType.floatingPill
+                ? Border.all(color: t.cardColor, width: 0.8)
+                : null,
+          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              for (var i = 0; i < 3; i++)
+              for (var i = 0;
+                  i <
+                      (navLayout == NavigationLayoutType.utilityBar ||
+                              navLayout == NavigationLayoutType.identityBar
+                          ? 4
+                          : 3);
+                  i++)
                 Container(
-                  width: 8,
-                  height: 8,
+                  width: navLayout == NavigationLayoutType.centerActionDock &&
+                          i == 1
+                      ? 12
+                      : 7,
+                  height: navLayout == NavigationLayoutType.centerActionDock &&
+                          i == 1
+                      ? 12
+                      : 7,
                   decoration: BoxDecoration(
-                    color: i == 0
+                    color: i == 0 ||
+                            (navLayout ==
+                                    NavigationLayoutType.centerActionDock &&
+                                i == 1)
                         ? t.accentColor
                         : t.secondaryTextColor.withValues(alpha: 0.5),
                     shape: BoxShape.circle,
@@ -267,9 +370,10 @@ class _HomeScreenMini extends StatelessWidget {
 }
 
 class _ConversationMini extends StatelessWidget {
-  const _ConversationMini({required this.themeConfig});
+  const _ConversationMini({required this.themeConfig, this.layout});
 
   final ThemeConfig themeConfig;
+  final PreviewLayout? layout;
 
   Widget _bubble({
     required bool isMe,
@@ -396,29 +500,68 @@ class _ConversationMini extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 0, 4, 5),
-          child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: Container(
-                  height: 13,
-                  decoration: BoxDecoration(
-                    color: t.surfaceColor,
-                    borderRadius: BorderRadius.circular(7),
-                    border: Border.all(
-                      color: t.secondaryTextColor.withValues(alpha: 0.25),
-                      width: 0.7,
-                    ),
+              if (layout?.composer.actionPlacement ==
+                  ComposerActionPlacement.powerRow)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 3),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      for (var i = 0; i < 4; i++)
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: t.secondaryTextColor.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(width: 3),
-              Container(
-                width: 13,
-                height: 13,
-                decoration: BoxDecoration(
-                  color: t.accentColor,
-                  shape: BoxShape.circle,
-                ),
+              Row(
+                children: [
+                  if (layout?.composer.actionPlacement ==
+                      ComposerActionPlacement.split) ...[
+                    Container(
+                      width: 13,
+                      height: 13,
+                      decoration: BoxDecoration(
+                        color: t.cardColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 3),
+                  ],
+                  Expanded(
+                    child: Container(
+                      height: 13,
+                      decoration: BoxDecoration(
+                        color: t.surfaceColor,
+                        borderRadius: BorderRadius.circular(
+                          ((layout?.composer.cornerRadius ?? 24) / 24 * 7)
+                              .clamp(3.0, 7.0),
+                        ),
+                        border: Border.all(
+                          color: t.secondaryTextColor.withValues(alpha: 0.25),
+                          width: 0.7,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  Container(
+                    width: 13,
+                    height: 13,
+                    decoration: BoxDecoration(
+                      color: t.accentColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
