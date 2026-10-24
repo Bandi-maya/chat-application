@@ -13,13 +13,22 @@ import 'template_models.dart';
 /// (with component overrides) plus the user's saved bottom bar style, Home UI
 /// preset, stories choice and hidden Tasks/Updates tabs. Read-only.
 PreviewLayout currentSetupLayout() {
-  final prefs = locator<ChatyPreferencesController>();
+  final config = locator.isRegistered<TemplateController>()
+      ? locator<TemplateController>().config
+      : const UserTemplateConfiguration();
+  final prefs = locator.isRegistered<ChatyPreferencesController>()
+      ? locator<ChatyPreferencesController>()
+      : null;
   return PreviewLayout.resolve(
-    locator<TemplateController>().config,
-    bottomBarStyle: locator<AppearanceVariantController>().bottomBarStyle,
-    hiddenDestinationIds: _hiddenDestinations(prefs),
-    homeStylePreset: prefs.home.homeStyle,
-    showStories: prefs.home.enableStoriesStrip,
+    config,
+    bottomBarStyle: locator.isRegistered<AppearanceVariantController>()
+        ? locator<AppearanceVariantController>().bottomBarStyle
+        : null,
+    hiddenDestinationIds: prefs == null
+        ? const <String>{}
+        : _hiddenDestinations(prefs),
+    homeStylePreset: prefs?.home.homeStyle,
+    showStories: prefs?.home.enableStoriesStrip,
   );
 }
 
@@ -29,9 +38,9 @@ PreviewLayout currentSetupLayout() {
 PreviewLayout appliedTemplateLayout(ChatyTemplateId id) {
   return PreviewLayout.resolve(
     UserTemplateConfiguration(baseTemplate: id, componentOverrides: const {}),
-    hiddenDestinationIds: _hiddenDestinations(
-      locator<ChatyPreferencesController>(),
-    ),
+    hiddenDestinationIds: locator.isRegistered<ChatyPreferencesController>()
+        ? _hiddenDestinations(locator<ChatyPreferencesController>())
+        : const <String>{},
   );
 }
 
