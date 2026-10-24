@@ -142,6 +142,34 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                       children: [
                         _buildSectionDivider(label: 'Mods', accent: theme.accentColor),
                         _buildSwitchRow(
+                          icon: Icons.task_alt_rounded,
+                          title: 'Hide Tasks tab',
+                          subtitle: 'Remove Tasks from the bottom navigation',
+                          value: widget.preferencesController.gbBool('nav_hide_tasks'),
+                          theme: theme,
+                          colors: colors,
+                          onChanged: (val) {
+                            widget.preferencesController.updateGbFeatures(
+                              {'nav_hide_tasks': val},
+                              logTitle: 'Hide Tasks tab',
+                            );
+                          },
+                        ),
+                        _buildSwitchRow(
+                          icon: Icons.update_rounded,
+                          title: 'Hide Updates tab',
+                          subtitle: 'Remove Updates from the bottom navigation',
+                          value: widget.preferencesController.gbBool('nav_hide_updates'),
+                          theme: theme,
+                          colors: colors,
+                          onChanged: (val) {
+                            widget.preferencesController.updateGbFeatures(
+                              {'nav_hide_updates': val},
+                              logTitle: 'Hide Updates tab',
+                            );
+                          },
+                        ),
+                        _buildSwitchRow(
                           icon: Icons.horizontal_rule_rounded,
                           title: 'Hide Chats Divider',
                           subtitle: 'Removes grey line between chats in Main Screen',
