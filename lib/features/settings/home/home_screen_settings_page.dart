@@ -73,6 +73,44 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                 return ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   children: [
+                    // Bottom navigation: choose which tabs are shown.
+                    _buildCardContainer(
+                      theme: theme,
+                      colors: colors,
+                      isDark: isDark,
+                      children: [
+                        _buildSectionDivider(label: 'Bottom navigation', accent: theme.accentColor),
+                        _buildSwitchRow(
+                          icon: Icons.task_alt_rounded,
+                          title: 'Hide Tasks tab',
+                          subtitle: 'Remove Tasks from the bottom navigation',
+                          value: widget.preferencesController.gbBool('nav_hide_tasks'),
+                          theme: theme,
+                          colors: colors,
+                          onChanged: (val) {
+                            widget.preferencesController.updateGbFeatures(
+                              {'nav_hide_tasks': val},
+                              logTitle: 'Hide Tasks tab',
+                            );
+                          },
+                        ),
+                        _buildSwitchRow(
+                          icon: Icons.update_rounded,
+                          title: 'Hide Updates tab',
+                          subtitle: 'Remove Updates from the bottom navigation',
+                          value: widget.preferencesController.gbBool('nav_hide_updates'),
+                          theme: theme,
+                          colors: colors,
+                          onChanged: (val) {
+                            widget.preferencesController.updateGbFeatures(
+                              {'nav_hide_updates': val},
+                              logTitle: 'Hide Updates tab',
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
                     // Card 1: Sub-screens (Header, Rows, Floating Action Button, Status)
                     _buildCardContainer(
                       theme: theme,
@@ -141,34 +179,6 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                       isDark: isDark,
                       children: [
                         _buildSectionDivider(label: 'Mods', accent: theme.accentColor),
-                        _buildSwitchRow(
-                          icon: Icons.task_alt_rounded,
-                          title: 'Hide Tasks tab',
-                          subtitle: 'Remove Tasks from the bottom navigation',
-                          value: widget.preferencesController.gbBool('nav_hide_tasks'),
-                          theme: theme,
-                          colors: colors,
-                          onChanged: (val) {
-                            widget.preferencesController.updateGbFeatures(
-                              {'nav_hide_tasks': val},
-                              logTitle: 'Hide Tasks tab',
-                            );
-                          },
-                        ),
-                        _buildSwitchRow(
-                          icon: Icons.update_rounded,
-                          title: 'Hide Updates tab',
-                          subtitle: 'Remove Updates from the bottom navigation',
-                          value: widget.preferencesController.gbBool('nav_hide_updates'),
-                          theme: theme,
-                          colors: colors,
-                          onChanged: (val) {
-                            widget.preferencesController.updateGbFeatures(
-                              {'nav_hide_updates': val},
-                              logTitle: 'Hide Updates tab',
-                            );
-                          },
-                        ),
                         _buildSwitchRow(
                           icon: Icons.horizontal_rule_rounded,
                           title: 'Hide Chats Divider',
