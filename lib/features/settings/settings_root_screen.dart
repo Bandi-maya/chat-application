@@ -36,9 +36,6 @@ import 'theme_editor_screen.dart';
 import 'gb_features/gb_settings_screen.dart';
 import 'universal/universal_screen.dart';
 import 'customization/customization_center_screen.dart';
-import '../../data/services/api_backend_service.dart';
-import '../../data/services/backend_config.dart';
-import '../subscription/plan_subscription_screen.dart';
 
 class SettingsRootScreen extends StatelessWidget {
   final ChatyPreferencesController preferencesController;
@@ -310,13 +307,19 @@ class SettingsRootScreen extends StatelessWidget {
               fontSize: 20,
             ),
           ),
+          automaticallyImplyLeading: false,
           leading: Navigator.of(context).canPop()
-              ? IconButton(
-                  icon: Icon(Icons.arrow_back, color: colors.foreground, size: 24),
-                  onPressed: () => Navigator.of(context).pop(),
+              ? const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: ChatyBackButton(),
                 )
               : null,
           actions: [
+            IconButton(
+              icon: Icon(Icons.edit_outlined, color: colors.foreground, size: 24),
+              tooltip: 'Edit profile',
+              onPressed: () => _showEditProfile(context),
+            ),
             IconButton(
               icon: Icon(Icons.search_rounded, color: colors.foreground, size: 24),
               tooltip: 'Search settings',
@@ -399,7 +402,12 @@ class SettingsRootScreen extends StatelessWidget {
                         ),
                         Positioned(
                           bottom: -40,
-                          child: Container(
+                          child: GestureDetector(
+                            onTap: () => _editAccountAvatar(context),
+                            child: Semantics(
+                              button: true,
+                              label: 'Change profile photo',
+                              child: Container(
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
                               color: colors.background,
@@ -421,6 +429,8 @@ class SettingsRootScreen extends StatelessWidget {
                                       child: _avatarFallback(user, size: 84, colors: colors),
                                     ),
                             ),
+                          ),
+                          ),
                           ),
                         ),
                       ],
@@ -481,12 +491,6 @@ class SettingsRootScreen extends StatelessWidget {
                         ),
                       ),
                     ],
-                    const SizedBox(height: 10),
-                    OutlinedButton.icon(
-                      onPressed: () => _showEditProfile(context),
-                      icon: const Icon(Icons.edit_outlined, size: 16),
-                      label: const Text('Edit profile'),
-                    ),
                   ],
                 ),
               ),
@@ -508,42 +512,8 @@ class SettingsRootScreen extends StatelessWidget {
                   children: [
                     // SECTION 1: ACCOUNT & PROFILE
                     _GbGroup(children: [
-                    _SettingsItemTile(
-                      icon: Icon(Icons.person_outline_rounded, color: colors.primary, size: 24),
-                      title: 'Account',
-                      subtitle: 'Profile details, display name, handle & account info',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => AccountSettingsScreen(
-                            preferencesController: preferencesController,
-                            dataStore: dataStore,
-                          ),
-                        ),
-                      ),
-                    ),
-                    _SettingsItemTile(
-                      icon: Icon(Icons.workspace_premium_rounded, color: context.colors.accent, size: 24),
-                      title: 'Subscription & Plans',
-                      subtitle: 'Manage workspace billing, upgrade plan & usage limits',
-                      onTap: () {
-                        final backend = locator<ApiBackendService>();
-                        final org = backend.currentOrg;
-                        final orgId = org?['uid']?.toString() ??
-                            org?['tenantId']?.toString() ??
-                            ApiBackendConfig.tenantId;
-                        final orgName = org?['name']?.toString() ??
-                            ApiBackendConfig.tenantId;
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => PlanSubscriptionScreen(
-                              organizationId: orgId,
-                              organizationName: orgName,
-                              isNewRegistration: false,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+                    // Account and Subscription & Plans rows are hidden by request
+                    // (their screens and data are untouched).
                     _SettingsItemTile(
                       icon: Icon(Icons.devices_rounded, color: colors.foregroundSecondary, size: 24),
                       title: 'Linked Devices',
@@ -741,12 +711,6 @@ class SettingsRootScreen extends StatelessWidget {
                       subtitle: 'Remove expired generated image cache files',
                       onTap: () => _chatyExtras().openWasteCleaning(context),
                     ),
-                    _SettingsItemTile(
-                      icon: Icon(Icons.system_update_outlined, color: colors.foregroundSecondary, size: 24),
-                      title: 'Updates',
-                      subtitle: 'Open Chaty release notes and versions',
-                      onTap: () => _chatyExtras().openUpdates(context),
-                    ),
                     ]),
                     _GbGroup(children: [
                     _SettingsItemTile(
@@ -832,6 +796,47 @@ class SettingsRootScreen extends StatelessWidget {
       ),
     ),
   );
+
+  Future<void> _editAccountAvatar(BuildContext context) async {
+    final source = await showModalBottomSheet<ProfileMediaSource>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_rounded),
+              title: const Text('Take photo'),
+              onTap: () => Navigator.of(sheetContext).pop(ProfileMediaSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.of(sheetContext).pop(ProfileMediaSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !context.mounted) return;
+    try {
+      final url = await ProfileMediaService().uploadAvatar(
+        source: source,
+        context: context,
+      );
+      await dataStore.updateUser(dataStore.currentUser.copyWith(avatarUrl: url));
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Profile photo updated.')));
+    } catch (error) {
+      if (error.toString().contains('cancelled') || !context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update profile photo: $error')),
+      );
+    }
+  }
 
   Future<void> _editAccountBanner(BuildContext context) async {
     final source = await showModalBottomSheet<ProfileMediaSource>(
@@ -923,10 +928,6 @@ class _SettingsItemTile extends StatelessWidget {
             Container(
               width: 44,
               height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: colors.primary, width: 1.5),
-              ),
               child: Center(child: icon),
             ),
             const SizedBox(width: 12),
