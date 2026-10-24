@@ -511,10 +511,7 @@ class SettingsRootScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // SECTION 1: ACCOUNT & PROFILE
-                    _GbGroup(children: [
-                    // Account and Subscription & Plans rows are hidden by request
-                    // (their screens and data are untouched).
+                    _GbGroup(title: 'Account and devices', children: [
                     _SettingsItemTile(
                       icon: Icon(Icons.devices_rounded, color: colors.foregroundSecondary, size: 24),
                       title: 'Linked Devices',
@@ -522,7 +519,7 @@ class SettingsRootScreen extends StatelessWidget {
                       onTap: () => _openLinkedDevices(context),
                     ),
                     ]),
-                    _GbGroup(children: [
+                    _GbGroup(title: 'Privacy and security', children: [
                     _SettingsItemTile(
                       icon: Icon(Icons.security_rounded, color: colors.info, size: 24),
                       title: 'Privacy Center',
@@ -547,6 +544,8 @@ class SettingsRootScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+                    ]),
+                    _GbGroup(title: 'Look and feel', children: [
                     _SettingsItemTile(
                       icon: Icon(Icons.color_lens_outlined, color: colors.accent, size: 24),
                       title: 'Theme & Color Engine',
@@ -569,8 +568,6 @@ class SettingsRootScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                    ]),
-                    _GbGroup(children: [
                     _SettingsItemTile(
                       icon: Icon(Icons.home_outlined, color: colors.accent, size: 24),
                       title: 'Home Screen',
@@ -595,6 +592,38 @@ class SettingsRootScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+                    _SettingsItemTile(
+                      icon: Icon(Icons.touch_app_outlined, color: colors.warning, size: 24),
+                      title: 'Navigation & Touch Effects',
+                      subtitle: 'Interactive click particles (Stars/Hearts/Bubbles), Sound FX',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => NavigationEffectsPage(
+                            preferencesController: preferencesController,
+                          ),
+                        ),
+                      ),
+                    ),
+                    _SettingsItemTile(
+                      icon: Icon(Icons.palette_outlined, color: colors.accent, size: 24),
+                      title: 'Universal',
+                      subtitle: 'Colors, icons and fonts, language & other',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => UniversalScreen(
+                            preferencesController: preferencesController,
+                          ),
+                        ),
+                      ),
+                    ),
+                    _SettingsItemTile(
+                      icon: Icon(Icons.widgets_outlined, color: colors.accent, size: 24),
+                      title: 'Home shortcuts',
+                      subtitle: 'Configure in-app home layout and shortcuts',
+                      onTap: () => _chatyExtras().openHomeShortcuts(context),
+                    ),
+                    ]),
+                    _GbGroup(title: 'Messages and calls', children: [
                     _SettingsItemTile(
                       icon: Icon(Icons.notifications_none_rounded, color: colors.warning, size: 24),
                       title: 'Notifications & Alerts',
@@ -622,36 +651,26 @@ class SettingsRootScreen extends StatelessWidget {
                       ),
                     ),
                     _SettingsItemTile(
-                      icon: Icon(Icons.storage_rounded, color: colors.accent, size: 24),
-                      title: 'Storage & Media',
-                      subtitle: 'Auto-download quality, media limits & cache retention',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => StorageAndMediaSettingsScreen(
-                            preferencesController: preferencesController,
-                          ),
-                        ),
-                      ),
-                    ),
-                    _SettingsItemTile(
-                      icon: Icon(Icons.touch_app_outlined, color: colors.warning, size: 24),
-                      title: 'Navigation & Touch Effects',
-                      subtitle: 'Interactive click particles (Stars/Hearts/Bubbles), Sound FX',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => NavigationEffectsPage(
-                            preferencesController: preferencesController,
-                          ),
-                        ),
-                      ),
-                    ),
-                    _SettingsItemTile(
                       icon: Icon(Icons.call_outlined, color: colors.warning, size: 24),
                       title: 'Call Settings',
                       subtitle: 'Call privacy, incoming call controls & call appearance',
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => CallSettingsScreen(
+                            preferencesController: preferencesController,
+                          ),
+                        ),
+                      ),
+                    ),
+                    ]),
+                    _GbGroup(title: 'Storage and system', children: [
+                    _SettingsItemTile(
+                      icon: Icon(Icons.storage_rounded, color: colors.accent, size: 24),
+                      title: 'Storage & Media',
+                      subtitle: 'Auto-download quality, media limits & cache retention',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => StorageAndMediaSettingsScreen(
                             preferencesController: preferencesController,
                           ),
                         ),
@@ -670,31 +689,11 @@ class SettingsRootScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                    ]),
-                    _GbGroup(children: [
-                    _SettingsItemTile(
-                      icon: Icon(Icons.palette_outlined, color: colors.accent, size: 24),
-                      title: 'Universal',
-                      subtitle: 'Colors, icons and fonts, language & other',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => UniversalScreen(
-                            preferencesController: preferencesController,
-                          ),
-                        ),
-                      ),
-                    ),
                     _SettingsItemTile(
                       icon: Icon(Icons.backup_outlined, color: colors.info, size: 24),
                       title: 'Backup and restore',
                       subtitle: 'Export and restore Chaty settings safely',
                       onTap: () => _chatyExtras().openBackupRestore(context),
-                    ),
-                    _SettingsItemTile(
-                      icon: Icon(Icons.widgets_outlined, color: colors.accent, size: 24),
-                      title: 'Home shortcuts',
-                      subtitle: 'Configure in-app home layout and shortcuts',
-                      onTap: () => _chatyExtras().openHomeShortcuts(context),
                     ),
                     _SettingsItemTile(
                       icon: Icon(Icons.cleaning_services_outlined, color: colors.foregroundSecondary, size: 24),
@@ -703,7 +702,7 @@ class SettingsRootScreen extends StatelessWidget {
                       onTap: () => _chatyExtras().openWasteCleaning(context),
                     ),
                     ]),
-                    _GbGroup(children: [
+                    _GbGroup(title: 'About', children: [
                     _SettingsItemTile(
                       icon: Icon(Icons.info_outline_rounded, color: colors.foregroundSecondary, size: 24),
                       title: 'About Chaty',
@@ -723,7 +722,6 @@ class SettingsRootScreen extends StatelessWidget {
                       onTap: () => ChatyShareService.shareApp(context),
                     ),
                     ]),
-
                     const SizedBox(height: 16),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -961,8 +959,9 @@ class _SettingsItemTile extends StatelessWidget {
 
 /// Rounded group card with inset dividers between rows (GB-style grouping).
 class _GbGroup extends StatelessWidget {
+  final String? title;
   final List<Widget> children;
-  const _GbGroup({required this.children});
+  const _GbGroup({this.title, required this.children});
 
   @override
   Widget build(BuildContext context) {
@@ -982,16 +981,34 @@ class _GbGroup extends StatelessWidget {
     }
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colors.surface,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: colors.borderSubtle),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: Column(children: rows),
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (title != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+              child: Text(
+                title!,
+                semanticsLabel: title,
+                style: TextStyle(
+                  color: colors.primary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: colors.borderSubtle),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Column(children: rows),
+            ),
+          ),
+        ],
       ),
     );
   }
