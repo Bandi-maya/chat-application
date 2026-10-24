@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:chat/features/settings/conversation/conversation_bubble_and_ticks_screen.dart';
 import 'package:chat/features/settings/appearance/component_styles_screen.dart';
+import 'package:chat/features/settings/home/header_settings_screen.dart';
 import 'package:chat/features/settings/home/home_screen_settings_page.dart';
 import 'package:chat/features/settings/templates/templates_settings_screen.dart';
 import 'package:chat/features/settings/theme_editor_screen.dart';
@@ -60,6 +61,7 @@ void main() {
     'home': (t, p) => HomeScreenSettingsPage(preferencesController: p),
     'bubbles_ticks': (t, p) => ConversationBubbleAndTicksScreen(preferencesController: p),
     'component_styles': (t, p) => const ComponentStylesScreen(),
+    'header': (t, p) => HeaderSettingsScreen(preferencesController: p),
   };
 
   for (final entry in screens.entries) {
