@@ -32,6 +32,10 @@ class PreviewLayout {
     required this.chatList,
     required this.conversation,
     required this.composer,
+    required this.bottomBarStyle,
+    required this.destinationIds,
+    required this.homeStylePreset,
+    required this.showStories,
   });
 
   final NavigationTemplate navigation;
@@ -40,15 +44,48 @@ class PreviewLayout {
   final ConversationTemplate conversation;
   final ComposerTemplate composer;
 
-  factory PreviewLayout.resolve(UserTemplateConfiguration config) {
+  /// Name of the bottom bar style (see AppearanceVariantController).
+  final String bottomBarStyle;
+
+  /// Destination IDs shown in the bottom bar, after the user's hidden tabs
+  /// (for example Tasks and Updates) are removed.
+  final List<String> destinationIds;
+
+  /// Home UI preset name and whether the stories strip is shown.
+  final String homeStylePreset;
+  final bool showStories;
+
+  /// Resolves specs with the app's precedence. Optional values describe saved
+  /// user state that the template does not own: pass the saved bottom bar
+  /// style, Home UI preset and stories choice to preview the current setup;
+  /// leave them null to preview what a template would write.
+  factory PreviewLayout.resolve(
+    UserTemplateConfiguration config, {
+    String? bottomBarStyle,
+    Set<String> hiddenDestinationIds = const <String>{},
+    String? homeStylePreset,
+    bool? showStories,
+  }) {
     ChatyTemplateDefinition of(TemplateComponentType c) =>
         ChatyTemplateRegistry.get(config.resolveFor(c));
+    final navigation = of(TemplateComponentType.navigation).navigation;
+    final home = of(TemplateComponentType.home).home;
+    final ids = <String>[
+      for (final id
+          in config.navigationPrimaryDestinationIds ??
+              navigation.primaryDestinationIds)
+        if (!hiddenDestinationIds.contains(id)) id,
+    ];
     return PreviewLayout(
-      navigation: of(TemplateComponentType.navigation).navigation,
-      home: of(TemplateComponentType.home).home,
+      navigation: navigation,
+      home: home,
       chatList: of(TemplateComponentType.chatList).chatList,
       conversation: of(TemplateComponentType.conversation).conversation,
       composer: of(TemplateComponentType.composer).composer,
+      bottomBarStyle: bottomBarStyle ?? navigation.bottomBarStyleName,
+      destinationIds: ids.take(5).toList(),
+      homeStylePreset: homeStylePreset ?? home.homeStylePreset,
+      showStories: showStories ?? home.showStoriesStrip,
     );
   }
 }
