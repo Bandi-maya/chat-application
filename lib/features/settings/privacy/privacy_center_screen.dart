@@ -1058,7 +1058,7 @@ const List<String> _whoCanCallAudienceOptions = <String>[
 /// Same options and the same privacy preference update as Privacy Center.
 Future<void> showWhoCanCallMeDialog(
   BuildContext context,
-  PreferencesController preferencesController,
+  ChatyPreferencesController preferencesController,
 ) {
   final prefs = preferencesController.privacy;
   return showDialog<void>(
