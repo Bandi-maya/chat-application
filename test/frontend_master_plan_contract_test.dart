@@ -81,11 +81,11 @@ void main() {
       "title: 'Message a Number'",
       "title: 'Mark All as Read'",
       "title: 'Share Chaty'",
-      "title: 'Settings'",
     ]) {
       expect(source, contains(option), reason: 'Missing overflow option $option');
     }
     for (final hiddenOption in <String>[
+      "title: 'Settings'",
       "title: 'Chaty Settings'",
       "title: 'Camera Effects'",
       "title: 'QR / Scan'",
@@ -100,7 +100,6 @@ void main() {
     expect(source, contains('await widget.dataStore.markAllAsRead()'));
     expect(source, contains("_handleHomeOverflowAction('starred')"));
     expect(source, contains('_openLinkedDevices();'));
-    expect(source, contains('_openSettingsScreen();'));
     expect(source, isNot(contains('useOverflowSheet')));
     expect(source, isNot(contains('_showHomeOverflowSheet')));
     for (final route in <String>[
