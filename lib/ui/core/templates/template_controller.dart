@@ -4,8 +4,7 @@ import '../controllers/preferences_controller.dart';
 import '../persistence/preferences_storage.dart';
 import '../theme/theme_controller.dart';
 import '../theme/theme_config.dart';
-import '../bubbles/bubble_style_id.dart';
-import '../ticks/delivery_icon_style.dart';
+import 'applied_preview_model.dart';
 import 'template_models.dart';
 import 'template_registry.dart';
 
@@ -311,12 +310,7 @@ class TemplateController extends ChangeNotifier {
     if (applyTheme && themeController != null) {
       final c = conversation;
       final current = themeController.globalTheme;
-      final next = current.copyWith(
-        bubbleStyle: BubbleStyleIdExtension.fromString(c.bubbleStyle),
-        deliveryTickStyle: DeliveryIconStyleExtension.fromString(c.tickStyle),
-        tickStyle: c.tickStyle,
-        cornerRadius: c.bubbleCornerRadius,
-      );
+      final next = themeWithTemplateConversation(current, c);
       if (next.bubbleStyle != current.bubbleStyle ||
           next.deliveryTickStyle != current.deliveryTickStyle ||
           next.tickStyle != current.tickStyle ||
