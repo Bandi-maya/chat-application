@@ -9,6 +9,7 @@ import '../../domain/models/call_state.dart';
 import '../../features/camera/effects/effect_engine.dart';
 import '../../features/camera/effects/effect_registry.dart';
 import '../settings/calls/call_presentation_preferences.dart';
+import 'call_screen_template.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/icons/chaty_icon_registry.dart';
 import '../../injection/locator.dart';
@@ -223,7 +224,10 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
     return ListenableBuilder(
-      listenable: _callService,
+      listenable: Listenable.merge(<Listenable>[
+        _callService,
+        CallPresentationPreferencesStore.instance,
+      ]),
       builder: (context, _) {
         _syncRenderers();
         final session = _callService.currentSession;
@@ -245,6 +249,10 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
             ),
           );
         }
+
+        final template = _ongoingTemplate;
+        final topInset = MediaQuery.of(context).padding.top;
+        final bottomInset = MediaQuery.of(context).padding.bottom;
 
         return Scaffold(
           backgroundColor: _callBackgroundColor(Colors.black),
@@ -387,22 +395,9 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                   left: 0,
                   right: 0,
                   child: Container(
-                    padding: EdgeInsets.fromLTRB(
-                      ChatySpacing.md,
-                      MediaQuery.of(context).padding.top + ChatySpacing.sm,
-                      ChatySpacing.md,
-                      ChatySpacing.md,
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: <Color>[
-                          Colors.black.withValues(alpha: 0.76),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
+                    margin: _topPanelMargin(template, topInset),
+                    padding: _topPanelPadding(template, topInset),
+                    decoration: _topPanelDecoration(template),
                     child: Row(
                       children: [
                         ChatyBackButton(
@@ -485,22 +480,9 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                   left: 0,
                   right: 0,
                   child: Container(
-                    padding: EdgeInsets.fromLTRB(
-                      ChatySpacing.lg,
-                      ChatySpacing.lg,
-                      ChatySpacing.lg,
-                      MediaQuery.of(context).padding.bottom + ChatySpacing.lg,
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                        colors: <Color>[
-                          Colors.black.withValues(alpha: 0.84),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
+                    margin: _bottomPanelMargin(template, bottomInset),
+                    padding: _bottomPanelPadding(template, bottomInset),
+                    decoration: _bottomPanelDecoration(template),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
@@ -619,6 +601,99 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
       },
     );
   }
+
+  /// Selected Chaty design for this screen (Settings > Calls > Call Screen
+  /// Style). Templates are original Chaty layouts; GB color mods apply on
+  /// top of every one of them.
+  CallScreenTemplate get _ongoingTemplate => CallScreenTemplate.fromName(
+    CallPresentationPreferencesStore.instance.value.ongoingCallTemplate,
+  );
+
+  EdgeInsets _topPanelMargin(CallScreenTemplate t, double topInset) =>
+      t == CallScreenTemplate.card
+      ? EdgeInsets.fromLTRB(16, topInset + 8, 16, 0)
+      : EdgeInsets.zero;
+
+  EdgeInsets _topPanelPadding(CallScreenTemplate t, double topInset) =>
+      t == CallScreenTemplate.card
+      ? const EdgeInsets.all(ChatySpacing.sm)
+      : EdgeInsets.fromLTRB(
+          ChatySpacing.md,
+          topInset + ChatySpacing.sm,
+          ChatySpacing.md,
+          ChatySpacing.md,
+        );
+
+  Decoration? _topPanelDecoration(CallScreenTemplate t) => switch (t) {
+    CallScreenTemplate.card => BoxDecoration(
+      color: Colors.black.withValues(alpha: 0.55),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+    ),
+    CallScreenTemplate.edge => null,
+    _ => BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: <Color>[
+          Colors.black.withValues(alpha: 0.76),
+          Colors.transparent,
+        ],
+      ),
+    ),
+  };
+
+  EdgeInsets _bottomPanelMargin(CallScreenTemplate t, double bottomInset) =>
+      t == CallScreenTemplate.card
+      ? EdgeInsets.fromLTRB(20, 0, 20, bottomInset + 12)
+      : EdgeInsets.zero;
+
+  EdgeInsets _bottomPanelPadding(CallScreenTemplate t, double bottomInset) {
+    return switch (t) {
+      CallScreenTemplate.card => const EdgeInsets.all(ChatySpacing.md),
+      CallScreenTemplate.sheet => EdgeInsets.fromLTRB(
+        ChatySpacing.lg,
+        ChatySpacing.lg,
+        ChatySpacing.lg,
+        bottomInset + ChatySpacing.xl,
+      ),
+      CallScreenTemplate.edge => EdgeInsets.fromLTRB(
+        ChatySpacing.sm,
+        ChatySpacing.sm,
+        ChatySpacing.sm,
+        bottomInset + ChatySpacing.sm,
+      ),
+      CallScreenTemplate.chatyClassic => EdgeInsets.fromLTRB(
+        ChatySpacing.lg,
+        ChatySpacing.lg,
+        ChatySpacing.lg,
+        bottomInset + ChatySpacing.lg,
+      ),
+    };
+  }
+
+  Decoration? _bottomPanelDecoration(CallScreenTemplate t) => switch (t) {
+    CallScreenTemplate.sheet => const BoxDecoration(
+      color: Color(0xF2141414),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+    ),
+    CallScreenTemplate.card => BoxDecoration(
+      color: Colors.black.withValues(alpha: 0.6),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+    ),
+    CallScreenTemplate.edge => null,
+    CallScreenTemplate.chatyClassic => BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.bottomCenter,
+        end: Alignment.topCenter,
+        colors: <Color>[
+          Colors.black.withValues(alpha: 0.84),
+          Colors.transparent,
+        ],
+      ),
+    ),
+  };
 
   Widget _buildRemoteVideo(ChatyCallSession session) {
     if (!_renderersReady || _callService.remoteStream == null) {
