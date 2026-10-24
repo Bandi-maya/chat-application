@@ -56,6 +56,7 @@ flutter:
     - .env
     - assets/
     - assets/app_icon.png
+    - assets/emoji/ios_animated/
 
 dependency_overrides:
   # Repository-owned OpenMLS fork: Rust std file locking is unsupported on
