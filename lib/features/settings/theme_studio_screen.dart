@@ -11,6 +11,9 @@ import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/theme/app_theme.dart';
 import 'appearance/component_styles_screen.dart';
+import 'templates/template_preview_widget.dart';
+import '../../ui/core/templates/template_controller.dart';
+import '../../ui/core/templates/template_registry.dart';
 import '../../ui/core/theme/chaty_theme_manager.dart';
 import '../../ui/core/ticks/delivery_icon_style.dart';
 import '../../ui/core/ticks/delivery_status_icon.dart';
@@ -331,6 +334,8 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
                   children: [
                     _buildActiveTabContent(),
                     const SizedBox(height: 16),
+                    _buildHomePreview(),
+                    const SizedBox(height: 16),
                     _buildComponentStylesEntry(),
                   ],
                 ),
@@ -346,6 +351,33 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
   /// Entry to the component style editor (navigation, header, composer,
   /// overlays, motion and density). It replaces the old Customization Center
   /// row in the Settings list.
+  /// Representative home and header preview for the active template, so the
+  /// theme can be judged on the screen people see most. It is a preview of the
+  /// template layout, not a screenshot of the live home screen.
+  Widget _buildHomePreview() {
+    final colors = context.colors;
+    final template = ChatyTemplateRegistry.get(
+      locator<TemplateController>().config.baseTemplate,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            'Home and header preview',
+            style: TextStyle(
+              color: colors.foreground,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        TemplateCompositePreview(template: template, height: 190),
+      ],
+    );
+  }
+
   Widget _buildComponentStylesEntry() {
     final colors = context.colors;
     return Material(
