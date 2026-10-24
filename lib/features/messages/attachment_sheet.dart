@@ -274,9 +274,7 @@ class AttachmentSheet extends StatelessWidget {
                 builder: (context, constraints) {
                   final textScale = MediaQuery.textScalerOf(context).scale(1);
                   final columns =
-                      constraints.maxWidth >= 320 && textScale <= 1.3
-                      ? 4
-                      : constraints.maxWidth >= 220
+                      constraints.maxWidth >= 220 && textScale <= 1.6
                       ? 3
                       : 2;
                   const spacing = 8.0;
@@ -347,6 +345,8 @@ class _DemoTestPill extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Container(
+          constraints: const BoxConstraints(minHeight: 48),
+          alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: gradient.first.withValues(alpha: 0.12),
@@ -435,21 +435,10 @@ class _AttachmentGridTile extends StatelessWidget {
                     height: 54,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: item.gradient,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: item.gradient.last.withValues(alpha: 0.3),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                      color: colors.primary.withValues(alpha: 0.12),
                     ),
                     child: Center(
-                      child: Icon(item.icon, color: Colors.white, size: 26),
+                      child: Icon(item.icon, color: colors.primary, size: 28),
                     ),
                   ),
                   const SizedBox(height: 7),
@@ -459,9 +448,9 @@ class _AttachmentGridTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: colors.foreground.withValues(alpha: 0.85),
+                      color: colors.foreground,
                       fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w700,
                       letterSpacing: -0.1,
                     ),
                   ),

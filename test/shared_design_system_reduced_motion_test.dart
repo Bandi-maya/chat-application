@@ -33,7 +33,7 @@ void main() {
       'lib/features/messages/message_bubble.dart',
       'lib/features/messages/chat_attachment_actions.dart',
       'lib/features/chats/main_navigation_shell.dart',
-      'lib/features/settings/customization/customization_center_screen.dart',
+      'lib/features/settings/appearance/component_styles_screen.dart',
       'lib/features/settings/appearance/app_icon_settings_screen.dart',
       'lib/features/settings/pro_pricing_screen.dart',
       'lib/features/settings/security/app_lock_overlay.dart',

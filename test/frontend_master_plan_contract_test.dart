@@ -73,20 +73,22 @@ void main() {
     expect(source, contains('onPressed: () => _openHomeThreeDotMenu('));
     expect(source, contains('title: \'Starred Messages\''));
     for (final option in <String>[
-      "title: 'Chaty Settings'",
       "title: 'New Group'",
       "title: 'Linked Devices'",
       "title: 'Starred Messages'",
       "title: 'Message Scheduler'",
       "title: 'Auto Reply'",
       "title: 'Message a Number'",
+      "title: 'Mass Message'",
+      "title: 'Who can call me?'",
       "title: 'Mark All as Read'",
       "title: 'Share Chaty'",
-      "title: 'Settings'",
     ]) {
       expect(source, contains(option), reason: 'Missing overflow option $option');
     }
     for (final hiddenOption in <String>[
+      "title: 'Settings'",
+      "title: 'Chaty Settings'",
       "title: 'Camera Effects'",
       "title: 'QR / Scan'",
       "title: 'Themes & Colors'",
@@ -100,7 +102,6 @@ void main() {
     expect(source, contains('await widget.dataStore.markAllAsRead()'));
     expect(source, contains("_handleHomeOverflowAction('starred')"));
     expect(source, contains('_openLinkedDevices();'));
-    expect(source, contains('_openSettingsScreen();'));
     expect(source, isNot(contains('useOverflowSheet')));
     expect(source, isNot(contains('_showHomeOverflowSheet')));
     for (final route in <String>[

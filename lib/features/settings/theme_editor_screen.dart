@@ -3,11 +3,14 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../injection/locator.dart';
+import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../messages/message_bubble.dart';
 import '../../domain/models/chat_message.dart';
 import '../../ui/core/theme/chaty_theme_manager.dart';
 import '../../ui/core/theme/image_theme_generator.dart';
+import '../../ui/core/templates/applied_pair_preview.dart';
 import '../../ui/core/theme/theme_preview_card.dart';
 import '../../ui/core/ticks/delivery_icon_style.dart';
 
@@ -228,6 +231,66 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
     );
   }
 
+  List<Widget> _buildPresetSections() {
+    final light = ThemePresets.all
+        .where((p) => p.brightness == Brightness.light)
+        .toList();
+    final dark = ThemePresets.all
+        .where((p) => p.brightness != Brightness.light)
+        .toList();
+    Widget grid(List<dynamic> presets) {
+      return Padding(
+        padding: const EdgeInsets.all(ChatySpacing.md),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 600;
+            final crossAxisCount =
+                isWide ? (constraints.maxWidth >= 900 ? 3 : 2) : 1;
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: presets.length,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                mainAxisExtent: 284 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6),
+              ),
+              itemBuilder: (context, index) {
+                final preset = presets[index];
+                final isSelected = preset.id == _current.id;
+                return ThemePreviewCard(
+                  themeConfig: preset,
+                  layout: currentSetupLayout(),
+                  isSelected: isSelected,
+                  onTap: () {
+                    setState(() => _current = preset);
+                    widget.themeController.updateThemeConfig(preset);
+                  },
+                );
+              },
+            );
+          },
+        ),
+      );
+    }
+
+    return [
+      if (light.isNotEmpty)
+        ChatyGroupedSection(
+          title: 'Light themes (${light.length})',
+          children: [grid(light)],
+        ),
+      if (light.isNotEmpty && dark.isNotEmpty)
+        const SizedBox(height: ChatySpacing.md),
+      if (dark.isNotEmpty)
+        ChatyGroupedSection(
+          title: 'Dark themes (${dark.length})',
+          children: [grid(dark)],
+        ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     return ChatyScaffold(
@@ -443,15 +506,17 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
                       // Delivery Tick Selector
                       Row(
                         children: [
-                          Text(
-                            'Tick Indicator Style',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: context.colors.foreground,
+                          Expanded(
+                            child: Text(
+                              'Tick Indicator Style',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: context.colors.foreground,
+                              ),
                             ),
                           ),
-                          const Spacer(),
+                          const SizedBox(width: 8),
                           DropdownButton<DeliveryIconStyle>(
                             value: _current.deliveryTickStyle,
                             underline: const SizedBox.shrink(),
@@ -477,6 +542,18 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
                                 );
                               });
                               widget.themeController.updateThemeConfig(_current);
+                              // Keep the typed Conversation tick id in step with
+                              // the theme, otherwise the preference-derived theme
+                              // would revert this selection.
+                              final prefsCtrl = locator<ChatyPreferencesController>();
+                              if (prefsCtrl.conversation.tickStyle != newStyle.displayName) {
+                                prefsCtrl.updateConversation(
+                                  prefsCtrl.conversation.copyWith(
+                                    tickStyle: newStyle.displayName,
+                                  ),
+                                  logTitle: 'Ticks Style',
+                                );
+                              }
                             },
                           ),
                         ],
@@ -489,48 +566,16 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
 
             const SizedBox(height: ChatySpacing.md),
 
-            // Presets Header & Grid
-            ChatyGroupedSection(
-              title: 'Theme Presets (${ThemePresets.all.length})',
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(ChatySpacing.md),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final isWide = constraints.maxWidth >= 600;
-                      final crossAxisCount = isWide
-                          ? 3
-                          : (constraints.maxWidth >= 380 ? 2 : 1);
-
-                      return GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: ThemePresets.all.length,
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount,
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          mainAxisExtent: 240,
-                        ),
-                        itemBuilder: (context, index) {
-                          final preset = ThemePresets.all[index];
-                          final isSelected = preset.id == _current.id;
-
-                          return ThemePreviewCard(
-                            themeConfig: preset,
-                            isSelected: isSelected,
-                            onTap: () {
-                              setState(() => _current = preset);
-                              widget.themeController.updateThemeConfig(preset);
-                            },
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ],
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: ChatySpacing.sm),
+              child: Text(
+                'Each preview shows that theme\'s colours on your current layout, including component overrides.',
+                style: TextStyle(color: context.colors.foregroundSecondary),
+              ),
             ),
+            const SizedBox(height: ChatySpacing.sm),
+            // Presets, grouped as Light and Dark so people compare like with like.
+            ..._buildPresetSections(),
 
             const SizedBox(height: ChatySpacing.md),
 

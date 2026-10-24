@@ -13,6 +13,8 @@ enum ChatyIconId {
   calls,
   profile,
   tasks,
+  groups,
+  desktop,
 
   // Overflow & General Controls
   more,
@@ -27,6 +29,7 @@ enum ChatyIconId {
 
   // Messaging Actions
   send,
+  emoji,
   attachment,
   attachmentPlus,
   microphone,
@@ -252,6 +255,11 @@ class _ChatyIconVectorPainter extends CustomPainter {
     final scale = s / 24.0;
     canvas.save();
     canvas.scale(scale, scale);
+    // Optical padding: draw artwork inside the central 80% of the 24-unit
+    // box so icons keep comfortable internal spacing and a consistent
+    // optical weight next to text fields and circular action buttons.
+    canvas.translate(2.4, 2.4);
+    canvas.scale(0.8, 0.8);
 
     final strokeCap = switch (theme) {
       ChatyIconThemeId.precisionContour || ChatyIconThemeId.pixelPrecision || ChatyIconThemeId.technicalBlueprint => StrokeCap.square,
@@ -352,6 +360,15 @@ class _ChatyIconVectorPainter extends CustomPainter {
         break;
       case ChatyIconId.send:
         _paintSend(canvas, strokePaint, fillPaint);
+        break;
+      case ChatyIconId.emoji:
+        _paintEmoji(canvas, strokePaint, fillPaint, secondaryFillPaint);
+        break;
+      case ChatyIconId.groups:
+        _paintGroups(canvas, strokePaint, fillPaint, secondaryFillPaint);
+        break;
+      case ChatyIconId.desktop:
+        _paintDesktop(canvas, strokePaint, fillPaint, secondaryFillPaint);
         break;
       case ChatyIconId.attachment:
         _paintAttachment(canvas, strokePaint, fillPaint);
@@ -877,6 +894,314 @@ class _ChatyIconVectorPainter extends CustomPainter {
   }
 
   // 4. CAMERA
+  void _paintEmoji(Canvas canvas, Paint stroke, Paint fill, Paint secondary) {
+    switch (theme) {
+      case ChatyIconThemeId.chatySigil:
+        // Signature smooth face with orbital halo dot
+        canvas.drawCircle(const Offset(12, 12), 8.0, stroke);
+        canvas.drawCircle(const Offset(9.2, 10.2), 1.1, fill);
+        canvas.drawCircle(const Offset(14.8, 10.2), 1.1, fill);
+        canvas.drawArc(const Rect.fromLTWH(7.6, 10.6, 8.8, 6.4), 0.35, 2.45, false, stroke);
+        canvas.drawCircle(const Offset(19.0, 5.4), 1.0, fill);
+        break;
+
+      case ChatyIconThemeId.precisionContour:
+        // Hairline open-contour face
+        canvas.drawArc(const Rect.fromLTWH(4.0, 4.0, 16.0, 16.0), 0.5, 5.3, false, stroke..strokeWidth = 1.2);
+        canvas.drawCircle(const Offset(9.2, 10.2), 0.9, stroke..strokeWidth = 1.0);
+        canvas.drawCircle(const Offset(14.8, 10.2), 0.9, stroke..strokeWidth = 1.0);
+        canvas.drawArc(const Rect.fromLTWH(7.8, 10.8, 8.4, 6.0), 0.4, 2.3, false, stroke..strokeWidth = 1.0);
+        break;
+
+      case ChatyIconThemeId.monolithicCutout:
+        // Solid disc with negative-space eyes and smile
+        canvas.drawCircle(const Offset(12, 12), 8.2, fill);
+        final cut = Paint()..color = Colors.white..style = PaintingStyle.fill;
+        canvas.drawCircle(const Offset(9.2, 10.0), 1.2, cut);
+        canvas.drawCircle(const Offset(14.8, 10.0), 1.2, cut);
+        final smile = Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 1.6..strokeCap = StrokeCap.round;
+        canvas.drawArc(const Rect.fromLTWH(7.6, 10.4, 8.8, 6.6), 0.35, 2.45, false, smile);
+        break;
+
+      case ChatyIconThemeId.origamiGeometry:
+        // Faceted hexagonal face with diamond eyes
+        final face = Path()
+          ..moveTo(12, 3.6)..lineTo(19.2, 7.8)..lineTo(19.2, 16.2)
+          ..lineTo(12, 20.4)..lineTo(4.8, 16.2)..lineTo(4.8, 7.8)..close();
+        canvas.drawPath(face, stroke);
+        final eyeL = Path()
+          ..moveTo(9.2, 9.0)..lineTo(10.2, 10.2)..lineTo(9.2, 11.4)..lineTo(8.2, 10.2)..close();
+        final eyeR = Path()
+          ..moveTo(14.8, 9.0)..lineTo(15.8, 10.2)..lineTo(14.8, 11.4)..lineTo(13.8, 10.2)..close();
+        canvas.drawPath(eyeL, stroke);
+        canvas.drawPath(eyeR, stroke);
+        final smile = Path()
+          ..moveTo(8.6, 14.2)..lineTo(12, 16.2)..lineTo(15.4, 14.2);
+        canvas.drawPath(smile, stroke);
+        break;
+
+      case ChatyIconThemeId.organicMotion:
+        // Pebble blob face with soft oval eyes
+        final blob = Path()
+          ..moveTo(12, 4.0)
+          ..cubicTo(18.5, 3.5, 20.4, 9.0, 19.6, 13.0)
+          ..cubicTo(18.8, 17.5, 14.5, 20.6, 10.2, 19.8)
+          ..cubicTo(5.6, 19.0, 3.6, 14.8, 4.4, 10.4)
+          ..cubicTo(5.2, 6.2, 8.0, 4.3, 12, 4.0);
+        canvas.drawPath(blob, stroke);
+        canvas.drawOval(const Rect.fromLTWH(8.0, 9.2, 2.2, 2.8), fill);
+        canvas.drawOval(const Rect.fromLTWH(13.6, 9.2, 2.2, 2.8), fill);
+        canvas.drawArc(const Rect.fromLTWH(7.8, 11.2, 8.4, 6.2), 0.4, 2.35, false, stroke);
+        break;
+
+      case ChatyIconThemeId.pixelPrecision:
+        // 8-bit stepped face
+        canvas.drawRect(const Rect.fromLTWH(5, 5, 14, 14), stroke..strokeWidth = 1.8);
+        canvas.drawRect(const Rect.fromLTWH(8, 9, 2.4, 2.4), fill);
+        canvas.drawRect(const Rect.fromLTWH(13.6, 9, 2.4, 2.4), fill);
+        canvas.drawRect(const Rect.fromLTWH(8.6, 14.6, 6.8, 1.8), fill);
+        canvas.drawRect(const Rect.fromLTWH(7.4, 13.4, 1.4, 1.4), fill);
+        canvas.drawRect(const Rect.fromLTWH(15.2, 13.4, 1.4, 1.4), fill);
+        break;
+
+      case ChatyIconThemeId.technicalBlueprint:
+        // CAD face with datum crosshair and corner ticks
+        canvas.drawCircle(const Offset(12, 12), 8.0, stroke..strokeWidth = 1.2);
+        final tick = Paint()..color = stroke.color..strokeWidth = 0.8;
+        canvas.drawLine(const Offset(12, 1.2), const Offset(12, 4.4), tick);
+        canvas.drawLine(const Offset(12, 19.6), const Offset(12, 22.8), tick);
+        canvas.drawLine(const Offset(1.2, 12), const Offset(4.4, 12), tick);
+        canvas.drawLine(const Offset(19.6, 12), const Offset(22.8, 12), tick);
+        canvas.drawCircle(const Offset(9.2, 10.2), 1.0, stroke..strokeWidth = 1.0);
+        canvas.drawCircle(const Offset(14.8, 10.2), 1.0, stroke..strokeWidth = 1.0);
+        canvas.drawArc(const Rect.fromLTWH(7.8, 10.6, 8.4, 6.2), 0.4, 2.35, false, stroke..strokeWidth = 1.0);
+        break;
+
+      case ChatyIconThemeId.sculptedVolume:
+        // Layered dimensional face
+        canvas.drawCircle(const Offset(12, 12), 8.2, fill);
+        canvas.drawCircle(const Offset(10.6, 10.6), 6.4, secondary);
+        final cut = Paint()..color = Colors.white..style = PaintingStyle.fill;
+        canvas.drawCircle(const Offset(9.4, 9.8), 1.2, cut);
+        canvas.drawCircle(const Offset(14.6, 9.8), 1.2, cut);
+        final smile = Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 1.5..strokeCap = StrokeCap.round;
+        canvas.drawArc(const Rect.fromLTWH(7.8, 10.4, 8.4, 6.4), 0.4, 2.35, false, smile);
+        break;
+
+      case ChatyIconThemeId.expressiveInk:
+        // Bold open brushstroke face
+        canvas.drawArc(const Rect.fromLTWH(3.8, 4.2, 16.4, 16.0), 0.7, 5.0, false, stroke..strokeWidth = 2.6);
+        canvas.drawCircle(const Offset(9.0, 10.0), 1.5, fill);
+        canvas.drawCircle(const Offset(15.0, 9.6), 1.3, fill);
+        canvas.drawArc(const Rect.fromLTWH(7.4, 10.8, 9.2, 6.6), 0.3, 2.6, false, stroke..strokeWidth = 2.2);
+        break;
+
+      case ChatyIconThemeId.signalLanguage:
+        // Face with radiating signal waves
+        canvas.drawCircle(const Offset(12, 12), 7.4, stroke);
+        canvas.drawCircle(const Offset(9.4, 10.4), 1.1, fill);
+        canvas.drawCircle(const Offset(14.6, 10.4), 1.1, fill);
+        canvas.drawArc(const Rect.fromLTWH(8.0, 10.8, 8.0, 5.8), 0.4, 2.35, false, stroke..strokeWidth = 1.1);
+        canvas.drawArc(const Rect.fromLTWH(16.8, 1.6, 5.2, 5.2), -0.6, 2.2, false, stroke..strokeWidth = 1.0);
+        canvas.drawArc(const Rect.fromLTWH(15.2, 3.4, 3.4, 3.4), -0.6, 2.2, false, stroke..strokeWidth = 1.0);
+        break;
+    }
+  }
+
+  void _paintGroups(Canvas canvas, Paint stroke, Paint fill, Paint secondary) {
+    // Two-person group mark, drawn per theme grammar.
+    switch (theme) {
+      case ChatyIconThemeId.chatySigil:
+        canvas.drawCircle(const Offset(9.2, 9.0), 3.0, stroke);
+        canvas.drawCircle(const Offset(15.4, 9.6), 2.4, stroke);
+        canvas.drawArc(const Rect.fromLTWH(3.6, 12.6, 11.2, 8.6), 3.4, 2.9, false, stroke);
+        canvas.drawArc(const Rect.fromLTWH(11.6, 13.4, 8.6, 6.8), 3.5, 2.7, false, stroke);
+        canvas.drawCircle(const Offset(19.4, 5.2), 0.9, fill);
+        break;
+      case ChatyIconThemeId.precisionContour:
+        canvas.drawCircle(const Offset(9.2, 9.0), 3.0, stroke..strokeWidth = 1.2);
+        canvas.drawCircle(const Offset(15.4, 9.6), 2.4, stroke..strokeWidth = 1.2);
+        canvas.drawArc(const Rect.fromLTWH(3.6, 12.6, 11.2, 8.6), 3.4, 2.9, false, stroke..strokeWidth = 1.1);
+        canvas.drawArc(const Rect.fromLTWH(11.6, 13.4, 8.6, 6.8), 3.5, 2.7, false, stroke..strokeWidth = 1.1);
+        break;
+      case ChatyIconThemeId.monolithicCutout:
+        canvas.drawCircle(const Offset(9.2, 8.8), 3.2, fill);
+        canvas.drawCircle(const Offset(15.8, 9.6), 2.5, fill);
+        final body = Path()
+          ..moveTo(3.2, 20.0)
+          ..cubicTo(3.2, 14.6, 15.2, 14.6, 15.2, 20.0)
+          ..close();
+        canvas.drawPath(body, fill);
+        final body2 = Path()
+          ..moveTo(14.4, 20.0)
+          ..cubicTo(14.8, 16.0, 21.0, 16.2, 21.0, 20.0)
+          ..close();
+        canvas.drawPath(body2, fill);
+        break;
+      case ChatyIconThemeId.origamiGeometry:
+        final h1 = Path()
+          ..moveTo(9.2, 5.6)..lineTo(12.0, 9.0)..lineTo(9.2, 12.4)..lineTo(6.4, 9.0)..close();
+        final h2 = Path()
+          ..moveTo(15.6, 7.0)..lineTo(17.8, 9.8)..lineTo(15.6, 12.6)..lineTo(13.4, 9.8)..close();
+        canvas.drawPath(h1, stroke);
+        canvas.drawPath(h2, stroke);
+        final b1 = Path()
+          ..moveTo(4.0, 19.6)..lineTo(9.2, 13.8)..lineTo(14.4, 19.6);
+        final b2 = Path()
+          ..moveTo(12.0, 19.6)..lineTo(15.6, 14.8)..lineTo(19.6, 19.6);
+        canvas.drawPath(b1, stroke);
+        canvas.drawPath(b2, stroke);
+        break;
+      case ChatyIconThemeId.organicMotion:
+        canvas.drawOval(const Rect.fromLTWH(6.0, 5.6, 6.4, 6.8), stroke);
+        canvas.drawOval(const Rect.fromLTWH(13.2, 7.0, 5.0, 5.4), stroke);
+        final b = Path()
+          ..moveTo(3.4, 19.6)
+          ..cubicTo(3.8, 14.2, 14.8, 14.0, 15.0, 19.6);
+        canvas.drawPath(b, stroke);
+        final b2 = Path()
+          ..moveTo(13.6, 19.6)
+          ..cubicTo(14.2, 15.8, 20.6, 16.0, 20.8, 19.6);
+        canvas.drawPath(b2, stroke);
+        break;
+      case ChatyIconThemeId.pixelPrecision:
+        canvas.drawRect(const Rect.fromLTWH(6.6, 5.6, 5.2, 5.2), stroke..strokeWidth = 1.7);
+        canvas.drawRect(const Rect.fromLTWH(13.6, 7.2, 4.0, 4.0), stroke..strokeWidth = 1.6);
+        canvas.drawRect(const Rect.fromLTWH(4.0, 14.0, 10.4, 6.0), stroke..strokeWidth = 1.7);
+        canvas.drawRect(const Rect.fromLTWH(13.0, 15.2, 7.4, 4.8), stroke..strokeWidth = 1.6);
+        break;
+      case ChatyIconThemeId.technicalBlueprint:
+        canvas.drawCircle(const Offset(9.2, 9.0), 3.0, stroke..strokeWidth = 1.2);
+        canvas.drawCircle(const Offset(15.4, 9.6), 2.4, stroke..strokeWidth = 1.2);
+        final tick = Paint()..color = stroke.color..strokeWidth = 0.8;
+        canvas.drawLine(const Offset(9.2, 4.4), const Offset(9.2, 6.0), tick);
+        canvas.drawLine(const Offset(4.6, 9.0), const Offset(6.2, 9.0), tick);
+        canvas.drawArc(const Rect.fromLTWH(3.6, 12.6, 11.2, 8.6), 3.4, 2.9, false, stroke..strokeWidth = 1.1);
+        canvas.drawArc(const Rect.fromLTWH(11.6, 13.4, 8.6, 6.8), 3.5, 2.7, false, stroke..strokeWidth = 1.1);
+        break;
+      case ChatyIconThemeId.sculptedVolume:
+        canvas.drawCircle(const Offset(9.2, 9.0), 3.2, fill);
+        canvas.drawCircle(const Offset(9.2, 9.0), 2.0, secondary);
+        canvas.drawCircle(const Offset(15.6, 9.8), 2.5, fill);
+        final body = Path()
+          ..moveTo(3.4, 20.0)
+          ..cubicTo(3.4, 14.8, 15.0, 14.8, 15.0, 20.0)
+          ..close();
+        canvas.drawPath(body, fill);
+        final body2 = Path()
+          ..moveTo(14.2, 20.0)
+          ..cubicTo(14.6, 16.2, 20.8, 16.4, 20.8, 20.0)
+          ..close();
+        canvas.drawPath(body2, secondary);
+        break;
+      case ChatyIconThemeId.expressiveInk:
+        canvas.drawArc(const Rect.fromLTWH(6.0, 5.4, 6.6, 6.8), -0.4, 5.6, false, stroke..strokeWidth = 2.4);
+        canvas.drawArc(const Rect.fromLTWH(13.2, 6.8, 5.2, 5.4), -0.4, 5.6, false, stroke..strokeWidth = 2.2);
+        final b = Path()
+          ..moveTo(3.2, 19.8)
+          ..quadraticBezierTo(9.0, 13.2, 15.2, 19.4);
+        canvas.drawPath(b, stroke..strokeWidth = 2.6);
+        final b2 = Path()
+          ..moveTo(13.8, 19.8)
+          ..quadraticBezierTo(17.4, 15.4, 21.0, 19.4);
+        canvas.drawPath(b2, stroke..strokeWidth = 2.2);
+        break;
+      case ChatyIconThemeId.signalLanguage:
+        canvas.drawCircle(const Offset(9.2, 9.0), 3.0, stroke);
+        canvas.drawCircle(const Offset(15.4, 9.6), 2.4, stroke);
+        canvas.drawArc(const Rect.fromLTWH(3.6, 12.6, 11.2, 8.6), 3.4, 2.9, false, stroke..strokeWidth = 1.1);
+        canvas.drawArc(const Rect.fromLTWH(11.6, 13.4, 8.6, 6.8), 3.5, 2.7, false, stroke..strokeWidth = 1.1);
+        canvas.drawArc(const Rect.fromLTWH(15.6, 2.4, 6.0, 6.0), -0.6, 2.2, false, stroke..strokeWidth = 1.0);
+        break;
+    }
+  }
+
+  void _paintDesktop(Canvas canvas, Paint stroke, Paint fill, Paint secondary) {
+    // Desktop monitor with stand, drawn per theme grammar.
+    switch (theme) {
+      case ChatyIconThemeId.chatySigil:
+        canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(3.4, 4.6, 17.2, 11.6), const Radius.circular(2.4)), stroke);
+        canvas.drawLine(const Offset(12, 16.2), const Offset(12, 19.0), stroke);
+        canvas.drawLine(const Offset(8.0, 19.4), const Offset(16.0, 19.4), stroke);
+        canvas.drawCircle(const Offset(17.6, 7.4), 0.9, fill);
+        break;
+      case ChatyIconThemeId.precisionContour:
+        final m = Path()
+          ..moveTo(4.6, 4.6)..lineTo(19.4, 4.6)..lineTo(20.6, 5.8)..lineTo(20.6, 15.0)
+          ..lineTo(19.4, 16.2)..lineTo(4.6, 16.2)..lineTo(3.4, 15.0)..lineTo(3.4, 5.8)..close();
+        canvas.drawPath(m, stroke..strokeWidth = 1.2);
+        canvas.drawLine(const Offset(12, 16.2), const Offset(12, 19.0), stroke..strokeWidth = 1.1);
+        canvas.drawLine(const Offset(8.0, 19.4), const Offset(16.0, 19.4), stroke..strokeWidth = 1.1);
+        break;
+      case ChatyIconThemeId.monolithicCutout:
+        canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(3.2, 4.4, 17.6, 12.0), const Radius.circular(1.6)), fill);
+        canvas.drawRect(const Rect.fromLTWH(5.0, 6.2, 14.0, 8.4), Paint()..color = Colors.white..style = PaintingStyle.fill);
+        canvas.drawRect(const Rect.fromLTWH(11.0, 16.4, 2.0, 2.6), fill);
+        canvas.drawRect(const Rect.fromLTWH(7.6, 19.0, 8.8, 1.4), fill);
+        break;
+      case ChatyIconThemeId.origamiGeometry:
+        final m = Path()
+          ..moveTo(3.6, 4.6)..lineTo(20.4, 4.6)..lineTo(19.2, 16.2)..lineTo(4.8, 16.2)..close();
+        canvas.drawPath(m, stroke);
+        canvas.drawLine(const Offset(4.4, 13.2), const Offset(19.8, 13.2), stroke);
+        canvas.drawLine(const Offset(12, 16.2), const Offset(12, 19.0), stroke);
+        final stand = Path()
+          ..moveTo(8.2, 19.4)..lineTo(12, 16.8)..lineTo(15.8, 19.4);
+        canvas.drawPath(stand, stroke);
+        break;
+      case ChatyIconThemeId.organicMotion:
+        final m = Path()
+          ..moveTo(4.0, 5.2)
+          ..cubicTo(6.0, 3.8, 18.4, 3.8, 20.2, 5.4)
+          ..cubicTo(21.0, 9.0, 20.8, 13.4, 19.6, 15.6)
+          ..cubicTo(15.2, 17.0, 8.4, 17.0, 4.4, 15.4)
+          ..cubicTo(3.2, 12.0, 3.2, 8.2, 4.0, 5.2);
+        canvas.drawPath(m, stroke);
+        canvas.drawLine(const Offset(12, 16.6), const Offset(12, 19.2), stroke);
+        canvas.drawOval(const Rect.fromLTWH(8.0, 18.6, 8.0, 1.8), stroke);
+        break;
+      case ChatyIconThemeId.pixelPrecision:
+        canvas.drawRect(const Rect.fromLTWH(3.6, 4.6, 16.8, 11.6), stroke..strokeWidth = 1.8);
+        canvas.drawRect(const Rect.fromLTWH(6.0, 7.0, 12.0, 6.8), stroke..strokeWidth = 1.4);
+        canvas.drawRect(const Rect.fromLTWH(10.8, 16.2, 2.4, 2.4), fill);
+        canvas.drawRect(const Rect.fromLTWH(7.6, 18.6, 8.8, 1.6), fill);
+        break;
+      case ChatyIconThemeId.technicalBlueprint:
+        canvas.drawRect(const Rect.fromLTWH(3.4, 4.6, 17.2, 11.6), stroke..strokeWidth = 1.2);
+        final tick = Paint()..color = stroke.color..strokeWidth = 0.8;
+        canvas.drawLine(const Offset(1.6, 4.6), const Offset(5.0, 4.6), tick);
+        canvas.drawLine(const Offset(3.4, 2.8), const Offset(3.4, 6.2), tick);
+        canvas.drawLine(const Offset(3.4, 10.4), const Offset(20.6, 10.4), tick);
+        canvas.drawLine(const Offset(12, 16.2), const Offset(12, 19.0), stroke..strokeWidth = 1.1);
+        canvas.drawLine(const Offset(8.0, 19.4), const Offset(16.0, 19.4), stroke..strokeWidth = 1.1);
+        break;
+      case ChatyIconThemeId.sculptedVolume:
+        canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(3.4, 4.6, 17.2, 11.6), const Radius.circular(2.0)), fill);
+        canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(5.0, 6.2, 14.4, 8.4), const Radius.circular(1.2)), secondary);
+        canvas.drawRect(const Rect.fromLTWH(11.0, 16.2, 2.0, 2.8), fill);
+        canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(7.6, 19.0, 8.8, 1.4), const Radius.circular(0.7)), fill);
+        break;
+      case ChatyIconThemeId.expressiveInk:
+        final m = Path()
+          ..moveTo(3.6, 15.6)..lineTo(3.9, 5.2)
+          ..quadraticBezierTo(12.0, 3.8, 20.4, 5.4)..lineTo(20.2, 15.8)
+          ..quadraticBezierTo(12.0, 17.0, 3.6, 15.6);
+        canvas.drawPath(m, stroke..strokeWidth = 2.2);
+        final st = Path()
+          ..moveTo(12, 16.4)..lineTo(11.6, 19.2);
+        canvas.drawPath(st, stroke..strokeWidth = 2.2);
+        canvas.drawArc(const Rect.fromLTWH(7.4, 18.2, 9.2, 2.6), 3.3, 2.9, false, stroke..strokeWidth = 2.2);
+        break;
+      case ChatyIconThemeId.signalLanguage:
+        canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(3.4, 4.6, 17.2, 11.6), const Radius.circular(2.0)), stroke);
+        canvas.drawLine(const Offset(12, 16.2), const Offset(12, 19.0), stroke);
+        canvas.drawLine(const Offset(8.0, 19.4), const Offset(16.0, 19.4), stroke);
+        canvas.drawArc(const Rect.fromLTWH(8.0, 6.6, 8.0, 8.0), -2.4, 1.6, false, stroke..strokeWidth = 1.0);
+        canvas.drawArc(const Rect.fromLTWH(10.4, 8.4, 3.2, 3.2), -2.4, 1.6, false, stroke..strokeWidth = 1.0);
+        break;
+    }
+  }
+
   void _paintCamera(Canvas canvas, Paint stroke, Paint fill, Paint secondary) {
     switch (theme) {
       case ChatyIconThemeId.chatySigil:
@@ -2173,8 +2498,13 @@ class _ChatyIconVectorPainter extends CustomPainter {
   }
 
   void _paintCallEnd(Canvas canvas, Paint stroke, Paint fill) {
-    final endColor = Colors.redAccent;
-    final endPaint = Paint()..color = endColor..style = PaintingStyle.fill..isAntiAlias = true;
+    // Honor the caller's color like every other glyph: the end-call button
+    // paints this white-on-error-red, and a hardcoded redAccent glyph was
+    // invisible on that red fill.
+    final endPaint = Paint()
+      ..color = fill.color
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
     canvas.save();
     canvas.translate(12, 12);
     canvas.rotate(math.pi * 0.75);

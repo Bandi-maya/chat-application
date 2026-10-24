@@ -11,21 +11,21 @@ import '../../../ui/core/components/overlays/chaty_overlay_renderer.dart';
 import '../../../ui/core/design_system/chaty_haptics.dart';
 import '../../../ui/core/theme/app_theme.dart';
 
-class CustomizationCenterScreen extends StatefulWidget {
+class ComponentStylesScreen extends StatefulWidget {
   final String? conversationId;
   final String? conversationTitle;
 
-  const CustomizationCenterScreen({
+  const ComponentStylesScreen({
     super.key,
     this.conversationId,
     this.conversationTitle,
   });
 
   @override
-  State<CustomizationCenterScreen> createState() => _CustomizationCenterScreenState();
+  State<ComponentStylesScreen> createState() => _ComponentStylesScreenState();
 }
 
-class _CustomizationCenterScreenState extends State<CustomizationCenterScreen>
+class _ComponentStylesScreenState extends State<ComponentStylesScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   final TextEditingController _dummyComposerText = TextEditingController(text: 'Hey! Check out this new skin ✨');
@@ -71,11 +71,11 @@ class _CustomizationCenterScreenState extends State<CustomizationCenterScreen>
           backgroundColor: colors.background,
           appBar: ChatyAppBar(
             title: widget.conversationId != null
-                ? 'Customize (${widget.conversationTitle ?? 'Chat'})'
-                : 'Customization Center',
+                ? 'Chat appearance (${widget.conversationTitle ?? 'Chat'})'
+                : 'Component styles',
             subtitle: widget.conversationId != null
                 ? 'Per-conversation visual overrides'
-                : 'Deep visual dialect customizer',
+                : 'Navigation, header, bubbles, ticks, composer and more',
             actions: [
               if (customCtrl.canUndo)
                 IconButton(

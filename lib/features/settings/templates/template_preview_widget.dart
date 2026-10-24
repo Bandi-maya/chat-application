@@ -629,14 +629,20 @@ class TemplateCompositePreview extends StatelessWidget {
         borderRadius: BorderRadius.circular(tall ? 12 : 9),
         border: Border.all(color: accent.withValues(alpha: .25)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: tall ? 17 : 13, color: accent),
-          const Spacer(),
-          Text(label, style: TextStyle(fontSize: tall ? 9 : 7,
-              color: colors.foreground, fontWeight: FontWeight.w800)),
-        ],
+      // Scale the content down instead of overflowing when the tile is short.
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.topLeft,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: tall ? 17 : 13, color: accent),
+            const SizedBox(height: 4),
+            Text(label, style: TextStyle(fontSize: tall ? 9 : 7,
+                color: colors.foreground, fontWeight: FontWeight.w800)),
+          ],
+        ),
       ),
     );
   }

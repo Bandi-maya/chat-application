@@ -295,10 +295,14 @@ class _ChatyEmojiPickerSheetState extends State<_ChatyEmojiPickerSheet> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final primary = theme.colorScheme.primary;
-    final surfaceColor = theme.colorScheme.surface;
-    final iconColor = isDark
-        ? theme.colorScheme.onSurface.withValues(alpha: 0.65)
-        : theme.colorScheme.onSurface.withValues(alpha: 0.7);
+    // GB's three emoji-popup colours (background, header icons) are user prefs;
+    // honour them in the grid itself, not only the outer sheet. Unset prefs keep
+    // the theme defaults exactly as before.
+    final surfaceColor = widget.backgroundColor ?? theme.colorScheme.surface;
+    final iconColor = widget.headerIconsColor ??
+        (isDark
+            ? theme.colorScheme.onSurface.withValues(alpha: 0.65)
+            : theme.colorScheme.onSurface.withValues(alpha: 0.7));
 
     return Container(
       color: surfaceColor,

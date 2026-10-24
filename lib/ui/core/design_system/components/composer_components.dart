@@ -11,6 +11,7 @@ class ChatyComposerActionButton extends StatefulWidget {
     required this.semanticsLabel,
     this.tooltip,
     this.icon,
+    this.iconWidget,
     this.iconColor,
     this.fillColor,
     this.onTap,
@@ -25,6 +26,10 @@ class ChatyComposerActionButton extends StatefulWidget {
   final String semanticsLabel;
   final String? tooltip;
   final IconData? icon;
+  /// Custom glyph rendered in place of [icon]. Used to render registry
+  /// [ChatyIcon] vectors so the Universal Chaty Icons theme selection
+  /// updates this button wherever it is displayed.
+  final Widget? iconWidget;
   final Color? iconColor;
   final Color? fillColor;
   final VoidCallback? onTap;
@@ -73,7 +78,8 @@ class _ChatyComposerActionButtonState extends State<ChatyComposerActionButton> {
                   color: widget.iconColor,
                 ),
               )
-            : Icon(widget.icon, size: 22, color: widget.iconColor),
+            : (widget.iconWidget ??
+                Icon(widget.icon, size: 22, color: widget.iconColor)),
       ),
     );
 

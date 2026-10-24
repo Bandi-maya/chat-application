@@ -101,14 +101,23 @@ class MessageBubble extends StatelessWidget {
     return theme.accentColor;
   }
 
-  Widget _deliveryIcon({bool onLightSurface = false}) {
+  Widget _deliveryIcon({Color? surface}) {
     final style = theme.deliveryTickStyle;
+    // Sent/delivered ticks must contrast with the ACTUAL bubble fill they
+    // sit on: a light-theme secondary text color is invisible on dark
+    // outgoing fills (e.g. monochromeLight's black), and white70 disappears
+    // on light fills. Derive from the surface luminance instead of the
+    // message direction or the global theme brightness. The read-state
+    // colour stays the user's accent.
+    final unreadColor = surface != null
+        ? (ThemeData.estimateBrightnessForColor(surface) == Brightness.dark
+              ? Colors.white70
+              : theme.secondaryTextColor)
+        : theme.secondaryTextColor;
     final icon = DeliveryStatusIcon(
       style: style,
       state: message.deliveryState,
-      // On outgoing colored surfaces the ticks are light; on incoming light
-      // surfaces they must use the secondary text color to stay visible.
-      unreadColor: onLightSurface ? theme.secondaryTextColor : Colors.white70,
+      unreadColor: unreadColor,
       readColor: _tickReadColor(),
       size: 15,
     );
@@ -315,7 +324,7 @@ class MessageBubble extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    _deliveryIcon(onLightSurface: !isMe),
+                    _deliveryIcon(surface: bubbleBg),
                   ],
                 ),
               ),
@@ -1080,9 +1089,7 @@ class MessageBubble extends StatelessWidget {
                                                 ),
                                                 if (isMe) ...[
                                                   const SizedBox(width: 4),
-                                                  _deliveryIcon(
-                                                    onLightSurface: false,
-                                                  ),
+                                                  _deliveryIcon(surface: bubbleBg),
                                                 ],
                                               ],
                                             );
@@ -1175,9 +1182,7 @@ class MessageBubble extends StatelessWidget {
                                             ),
                                             if (isMe) ...[
                                               const SizedBox(width: 4),
-                                              _deliveryIcon(
-                                                onLightSurface: false,
-                                              ),
+                                              _deliveryIcon(surface: bubbleBg),
                                             ],
                                           ],
                                         ),

@@ -59,9 +59,12 @@ class _UniversalChatyIconsScreenState extends State<UniversalChatyIconsScreen> {
       ChatyIconId.calls,
       ChatyIconId.profile,
       ChatyIconId.tasks,
+      ChatyIconId.groups,
+      ChatyIconId.desktop,
     ],
     'Messaging': [
       ChatyIconId.send,
+      ChatyIconId.emoji,
       ChatyIconId.attachment,
       ChatyIconId.attachmentPlus,
       ChatyIconId.microphone,
@@ -195,7 +198,15 @@ class _UniversalChatyIconsScreenState extends State<UniversalChatyIconsScreen> {
                           ),
                         ),
                         Text(
-                          'Side-by-side preview across all 10 distinct icon themes',
+                          'Unique ID: ChatyIconId.${iconId.name}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: gbTheme.colorScheme.primary,
+                          ),
+                        ),
+                        Text(
+                          'Side-by-side preview across all 10 distinct icon themes. Applying a theme updates this icon everywhere it is displayed.',
                           style: TextStyle(
                             fontSize: 12.5,
                             color: gbTheme.colorScheme.onSurfaceVariant,

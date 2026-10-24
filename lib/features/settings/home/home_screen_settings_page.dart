@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/design_system.dart';
+import '../../../ui/core/design_system/gb_design_system.dart';
 import 'header_settings_screen.dart';
 import 'home_rows_settings_screen.dart';
 import 'home_fab_settings_screen.dart';
@@ -73,6 +74,49 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
                 return ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   children: [
+                    // Preview of the tabs that stay in the bottom bar.
+                    GbLivePreviewCard(
+                      label: 'BOTTOM NAVIGATION PREVIEW',
+                      child: _buildNavPreview(colors),
+                    ),
+                    // Bottom navigation: choose which tabs are shown.
+                    _buildCardContainer(
+                      theme: theme,
+                      colors: colors,
+                      isDark: isDark,
+                      children: [
+                        _buildSectionDivider(label: 'Bottom navigation', accent: theme.accentColor),
+                        _buildSwitchRow(
+                          icon: Icons.task_alt_rounded,
+                          title: 'Hide Tasks tab',
+                          subtitle: 'Remove Tasks from the bottom navigation',
+                          value: widget.preferencesController.gbBool('nav_hide_tasks'),
+                          theme: theme,
+                          colors: colors,
+                          onChanged: (val) {
+                            widget.preferencesController.updateGbFeatures(
+                              {'nav_hide_tasks': val},
+                              logTitle: 'Hide Tasks tab',
+                            );
+                          },
+                        ),
+                        _buildSwitchRow(
+                          icon: Icons.update_rounded,
+                          title: 'Hide Updates tab',
+                          subtitle: 'Remove Updates from the bottom navigation',
+                          value: widget.preferencesController.gbBool('nav_hide_updates'),
+                          theme: theme,
+                          colors: colors,
+                          onChanged: (val) {
+                            widget.preferencesController.updateGbFeatures(
+                              {'nav_hide_updates': val},
+                              logTitle: 'Hide Updates tab',
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
                     // Card 1: Sub-screens (Header, Rows, Floating Action Button, Status)
                     _buildCardContainer(
                       theme: theme,
@@ -226,6 +270,36 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
     );
   }
 
+  Widget _buildNavPreview(dynamic colors) {
+    final prefs = widget.preferencesController;
+    final items = <(IconData, String)>[
+      (Icons.chat_bubble_outline_rounded, 'Chats'),
+      if (!prefs.gbBool('nav_hide_updates')) (Icons.update_rounded, 'Updates'),
+      if (!prefs.gbBool('nav_hide_tasks')) (Icons.task_alt_rounded, 'Tasks'),
+      (Icons.call_outlined, 'Calls'),
+    ];
+    return Row(
+      children: [
+        for (final item in items)
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(item.$1, color: colors.primary, size: 24),
+                const SizedBox(height: 4),
+                Text(
+                  item.$2,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: colors.foregroundSecondary, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildCardContainer({
     required dynamic theme,
     required dynamic colors,
@@ -272,62 +346,34 @@ class _HomeScreenSettingsPageState extends State<HomeScreenSettingsPage> {
     required String label,
     required Color accent,
   }) {
+    // GB-style category heading: centered, 16sp bold accent title with an
+    // accent divider line underneath.
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: Container(
-              height: 1.2,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    accent.withValues(alpha: 0.0),
-                    accent.withValues(alpha: 0.7),
-                  ],
-                ),
-              ),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: accent,
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 5,
-                  height: 5,
-                  decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: accent,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Container(
-                  width: 5,
-                  height: 5,
-                  decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Container(
-              height: 1.2,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    accent.withValues(alpha: 0.7),
-                    accent.withValues(alpha: 0.0),
-                  ],
-                ),
+          const SizedBox(height: 6),
+          Container(
+            height: 1.2,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  accent.withValues(alpha: 0.0),
+                  accent.withValues(alpha: 0.7),
+                  accent.withValues(alpha: 0.0),
+                ],
               ),
             ),
           ),

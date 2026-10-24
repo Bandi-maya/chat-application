@@ -10,7 +10,9 @@ import '../../domain/models/chat_message.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/theme/app_theme.dart';
+import 'appearance/component_styles_screen.dart';
 import '../../ui/core/theme/chaty_theme_manager.dart';
+import '../../ui/core/templates/applied_pair_preview.dart';
 import '../../ui/core/ticks/delivery_icon_style.dart';
 import '../../ui/core/ticks/delivery_status_icon.dart';
 
@@ -83,6 +85,7 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
 
   late Color _gradientStart;
   late Color _gradientEnd;
+  bool _tickChanged = false;
 
   @override
   void initState() {
@@ -173,6 +176,15 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
       accentColor: _gradientEnd,
     );
     _themeCtrl.updateThemeConfig(updatedTheme);
+
+    // Keep the typed Conversation tick id in step with the chosen theme tick.
+    if (_tickChanged &&
+        _prefsCtrl.conversation.tickStyle != updatedTheme.tickStyle) {
+      _prefsCtrl.updateConversation(
+        _prefsCtrl.conversation.copyWith(tickStyle: updatedTheme.tickStyle),
+        logTitle: 'Ticks Style',
+      );
+    }
 
     final fx = _prefsCtrl.effects;
     _prefsCtrl.updateEffects(
@@ -315,13 +327,86 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                child: _buildActiveTabContent(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildActiveTabContent(),
+                    const SizedBox(height: 16),
+                    _buildHomePreview(),
+                    const SizedBox(height: 16),
+                    _buildComponentStylesEntry(),
+                  ],
+                ),
               ),
             ),
           ],
         ),
       ),
       bottomSheet: _buildBottomActionBar(),
+    );
+  }
+
+  /// Entry to the component style editor (navigation, header, composer,
+  /// overlays, motion and density). It replaces the old Customization Center
+  /// row in the Settings list.
+  /// Representative home and header preview for the active template, so the
+  /// theme can be judged on the screen people see most. It is a preview of the
+  /// template layout, not a screenshot of the live home screen.
+  Widget _buildHomePreview() {
+    final colors = context.colors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            'Home and conversation preview',
+            style: TextStyle(
+              color: colors.foreground,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        AppliedPairPreview(
+          palette: _themeCtrl.globalTheme,
+          layout: currentSetupLayout(),
+          applyTemplateConversation: false,
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            'Your current colours on your current layout, including component overrides. Wallpaper and the finer Home UI styling are not drawn.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: colors.foregroundSecondary, fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildComponentStylesEntry() {
+    final colors = context.colors;
+    return Material(
+      color: colors.surfaceSecondary,
+      borderRadius: BorderRadius.circular(16),
+      child: ListTile(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        minVerticalPadding: 12,
+        leading: Icon(Icons.dashboard_customize_outlined, color: colors.primary),
+        title: Text(
+          'Component styles',
+          style: TextStyle(color: colors.foreground, fontWeight: FontWeight.w700),
+        ),
+        subtitle: Text(
+          'Navigation, header, composer, overlays, motion and density',
+          style: TextStyle(color: colors.foregroundSecondary, fontSize: 12),
+        ),
+        trailing: Icon(Icons.chevron_right_rounded, color: colors.foregroundSecondary),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const ComponentStylesScreen()),
+        ),
+      ),
     );
   }
 
@@ -332,17 +417,19 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
         child: Container(
-          height: 185,
+          // Grows with large text instead of overflowing.
+          constraints: const BoxConstraints(minHeight: 185),
           color: _current.backgroundColor,
           child: Stack(
             children: [
               // Canvas particle layer
               if (_activeParticleEffect != 'None')
-                CustomPaint(
-                  size: const Size(double.infinity, 185),
-                  painter: _LiveParticleCanvasPainter(
-                    particles: _particles,
-                    effect: _activeParticleEffect,
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: _LiveParticleCanvasPainter(
+                      particles: _particles,
+                      effect: _activeParticleEffect,
+                    ),
                   ),
                 ),
 
@@ -547,7 +634,8 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
                 min: 6.0,
                 max: 32.0,
                 divisions: 13,
-                activeColor: _gradientStart,
+                activeColor: context.colors.primary,
+                inactiveColor: context.colors.border,
                 onChanged: (v) {
                   setState(() => _current = _current.copyWith(cornerRadius: v));
                 },
@@ -566,7 +654,8 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
                 min: 0.85,
                 max: 1.3,
                 divisions: 9,
-                activeColor: _gradientStart,
+                activeColor: context.colors.primary,
+                inactiveColor: context.colors.border,
                 onChanged: (v) {
                   setState(() => _current = _current.copyWith(fontScale: v));
                 },
@@ -793,6 +882,7 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
             return SpringInteractiveScale(
               onTap: () {
                 setState(() {
+                  _tickChanged = true;
                   _current = _current.copyWith(
                     deliveryTickStyle: style,
                     tickStyle: style.displayName,

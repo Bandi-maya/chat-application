@@ -124,6 +124,34 @@ class BubblePainter extends CustomPainter {
         }
         break;
 
+      // Textra SMS: stem tail below the capsule (mushroom silhouette).
+      case BubbleStyleId.textra:
+        final stemPaint = Paint()
+          ..color = fillColor
+          ..style = PaintingStyle.fill;
+        final cx = isMe ? rect.right - 26 : rect.left + 26;
+        final stemPath = Path()
+          ..moveTo(cx - 4, rect.bottom - 6)
+          ..lineTo(cx - 4, rect.bottom + 4)
+          ..quadraticBezierTo(cx, rect.bottom + 7, cx + 4, rect.bottom + 4)
+          ..lineTo(cx + 4, rect.bottom - 6)
+          ..close();
+        canvas.drawPath(stemPath, stemPaint);
+        break;
+
+      // Gabi Mess: double accent line across the top.
+      case BubbleStyleId.gabiMess:
+        final linePaint = Paint()
+          ..color = strokeColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2;
+        canvas.drawLine(
+          Offset(rect.left + 8, rect.top + 4),
+          Offset(rect.right - 8, rect.top + 4),
+          linePaint,
+        );
+        break;
+
       default:
         break;
     }

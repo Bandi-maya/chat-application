@@ -10,6 +10,7 @@ export 'components/media_draft_tray.dart';
 export 'components/composer_components.dart';
 export 'components/social_components.dart';
 export 'components/settings_components.dart';
+export 'components/option_cards.dart';
 export 'settings_primitives.dart' hide ChatySettingsSection;
 export 'components/single_choice_modal.dart';
 export 'components/chaty_modal.dart';

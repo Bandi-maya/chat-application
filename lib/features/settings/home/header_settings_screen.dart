@@ -65,6 +65,7 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
     'Circular',
     'Squircle',
     'Card',
+    'Wide Card',
   ];
 
   static const List<String> _pager3dStyles = [
@@ -986,65 +987,45 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                         ),
                         _divider(),
 
-                        // Tab Bubble Style
-                        GbSettingRow(
-                          icon: Icon(
-                            Icons.chat_bubble_outline_rounded,
-                            color: colors.primary,
-                            size: 21,
-                          ),
+                        // Tab Bubble Style (tap a card; the pinned preview updates)
+                        ChatyOptionGallery<String>(
                           title: 'Tab Bubble Style',
-                          subtitle: home.tabBubbleStyle.isNotEmpty
+                          subtitle: 'Cards show a generic icon. Tap a style and the header preview above shows the one selected.',
+                          values: _tabBubbleStyles,
+                          selected: home.tabBubbleStyle.isNotEmpty
                               ? home.tabBubbleStyle
                               : 'Capsule Pill',
-                          showChevron: true,
-                          onTap: () async {
-                            final chosen = await GbRadioSelectionDialog.show(
-                              context: context,
-                              title: 'Tab Bubble Style',
-                              options: _tabBubbleStyles,
-                              selectedOption: home.tabBubbleStyle.isNotEmpty
-                                  ? home.tabBubbleStyle
-                                  : 'Capsule Pill',
-                            );
-                            if (chosen != null && mounted) {
-                              _updateHome(
-                                home.copyWith(tabBubbleStyle: chosen),
-                                logTitle: 'Tab Bubble Style',
-                              );
-                            }
-                          },
+                          labelOf: (v) => v,
+                          previewOf: (v) => Icon(
+                            Icons.chat_bubble_outline_rounded,
+                            color: colors.primary,
+                            size: 26,
+                          ),
+                          onSelected: (v) => _updateHome(
+                            home.copyWith(tabBubbleStyle: v),
+                            logTitle: 'Tab Bubble Style',
+                          ),
                         ),
                         _divider(),
 
-                        // 3D Pager / Slider Transition (5 options)
-                        GbSettingRow(
-                          icon: Icon(
-                            Icons.view_in_ar_rounded,
-                            color: colors.primary,
-                            size: 21,
-                          ),
+                        // 3D Pager / Slider Transition (tap a card to select)
+                        ChatyOptionGallery<String>(
                           title: '3D Pager / Slider Effect',
-                          subtitle: home.pagerTransition3d.isNotEmpty
+                          subtitle: 'Cards show a generic icon. Tap an effect to use it when swiping between tabs.',
+                          values: _pager3dStyles,
+                          selected: home.pagerTransition3d.isNotEmpty
                               ? home.pagerTransition3d
                               : 'Cube 3D',
-                          showChevron: true,
-                          onTap: () async {
-                            final chosen = await GbRadioSelectionDialog.show(
-                              context: context,
-                              title: '3D Slider Transition',
-                              options: _pager3dStyles,
-                              selectedOption: home.pagerTransition3d.isNotEmpty
-                                  ? home.pagerTransition3d
-                                  : 'Cube 3D',
-                            );
-                            if (chosen != null && mounted) {
-                              _updateHome(
-                                home.copyWith(pagerTransition3d: chosen),
-                                logTitle: '3D Slider Effect',
-                              );
-                            }
-                          },
+                          labelOf: (v) => v,
+                          previewOf: (v) => Icon(
+                            Icons.view_in_ar_rounded,
+                            color: colors.primary,
+                            size: 26,
+                          ),
+                          onSelected: (v) => _updateHome(
+                            home.copyWith(pagerTransition3d: v),
+                            logTitle: '3D Slider Effect',
+                          ),
                         ),
                         _divider(),
 
@@ -1327,6 +1308,27 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
                             _updateHome(
                               home.copyWith(themesEnabled: val),
                               logTitle: 'Themes Enabled',
+                            );
+                          },
+                        ),
+                        _divider(),
+
+                        // Ghost mode pill
+                        GbSettingRow(
+                          icon: Icon(
+                            Icons.visibility_off_outlined,
+                            color: colors.primary,
+                            size: 21,
+                          ),
+                          title: 'Ghost mode',
+                          subtitle: 'Show the ghost mode pill in the header.',
+                          switchValue: home.showGhostPill,
+                          onSwitchChanged: (val) {
+                            _updateHome(
+                              home.copyWith(showGhostPill: val),
+                              logTitle: val
+                                  ? 'Show Ghost Pill'
+                                  : 'Hide Ghost Pill',
                             );
                           },
                         ),

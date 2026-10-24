@@ -148,8 +148,9 @@ void main() {
       expect(find.text('FINE-TUNING & GEOMETRY'), findsOneWidget);
       expect(find.byType(Slider), findsNWidgets(3)); // corner radius, font scale, density
 
-      // Preset grid exists
-      expect(find.textContaining('THEME PRESETS'), findsOneWidget);
+      // Preset grids exist, grouped as light and dark themes
+      expect(find.textContaining('LIGHT THEMES'), findsOneWidget);
+      expect(find.textContaining('DARK THEMES'), findsOneWidget);
       expect(find.text('Reset to Default System Theme'), findsOneWidget);
     });
   });

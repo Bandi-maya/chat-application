@@ -14,12 +14,38 @@ class ConversationEntryStyleScreen extends StatefulWidget {
   });
 
   @override
-  State<ConversationEntryStyleScreen> createState() => _ConversationEntryStyleScreenState();
+  State<ConversationEntryStyleScreen> createState() =>
+      _ConversationEntryStyleScreenState();
 }
 
-class _ConversationEntryStyleScreenState extends State<ConversationEntryStyleScreen> {
+class _ConversationEntryStyleScreenState
+    extends State<ConversationEntryStyleScreen> {
+  // GB reference entry styles (GBWhatsApp ConvoEntry picker, 23 designs in
+  // the APK's original order) followed by Chaty's own added styles.
   static const List<String> _entryStyles = [
-    'Stock (Chaty Default)',
+    'Stock',
+    'YOWA Style',
+    'WAMOD',
+    'Hangouts',
+    'Simple',
+    'Aran V2',
+    'Mood',
+    'WANH',
+    'Hangouts V2',
+    'Dribble',
+    'Dribble V2',
+    'Allo',
+    'Rounded',
+    'Old Stock (2016)',
+    'RC-MSG Google',
+    'RC-Telegram X iOS',
+    'RC-IOS 11',
+    'RC-Line',
+    'Concept',
+    'Instagram',
+    'iOS 14',
+    'FB Messenger',
+    'RC Mess',
     'Telegram Modern',
     'iOS Clean Rounded',
     'Hangouts Minimal',
@@ -35,7 +61,9 @@ class _ConversationEntryStyleScreenState extends State<ConversationEntryStyleScr
     required ValueChanged<int?> onColorSelected,
   }) {
     final theme = locator<ThemeController>().globalTheme;
-    final initial = currentColor != null ? Color(currentColor) : theme.accentColor;
+    final initial = currentColor != null
+        ? Color(currentColor)
+        : theme.accentColor;
     GbColorPickerModal.show(
       context,
       title: title,
@@ -52,20 +80,41 @@ class _ConversationEntryStyleScreenState extends State<ConversationEntryStyleScr
       context: context,
       title: 'Conversation Entry style',
       options: _entryStyles,
-      selectedOption: prefs.entryStyle,
+      selectedOption: _normalizeStyle(prefs.entryStyle),
       onSelected: (val) {
         widget.preferencesController.updateConversation(
           prefs.copyWith(entryStyle: val),
         );
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              duration: const Duration(seconds: 2),
+              content: Text('$val applied to the conversation entry bar'),
+            ),
+          );
       },
     );
+  }
+
+  /// Older saves stored the bare value 'Stock'; map it onto the picker's
+  /// current stock option so the radio selection and preview agree.
+  static String _normalizeStyle(String raw) {
+    final v = raw.trim();
+    // Legacy names unify on the GB 'Stock' entry, which renders Chaty's
+    // stock integrated layout.
+    if (v.isEmpty || v == 'Stock (Chaty Default)') return 'Stock';
+    return v;
   }
 
   @override
   Widget build(BuildContext context) {
     final themeController = locator<ThemeController>();
     return ListenableBuilder(
-      listenable: Listenable.merge([widget.preferencesController, themeController]),
+      listenable: Listenable.merge([
+        widget.preferencesController,
+        themeController,
+      ]),
       builder: (context, _) {
         final theme = themeController.globalTheme;
         final colors = context.colors;
@@ -117,55 +166,30 @@ class _ConversationEntryStyleScreenState extends State<ConversationEntryStyleScr
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               children: [
-                // Top Live Entry Bar Preview (Matching Image 4)
+                // Top Live Entry Bar Preview - mirrors the arrangement the
+                // selected Conversation Entry style applies in the chat screen.
                 GbLivePreviewCard(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 16,
+                  ),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                       color: uiEntryBg,
-                       borderRadius: BorderRadius.circular(24),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
                     ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: textEntryBg,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.emoji_emotions_outlined, color: emojiCol, size: 22),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Message',
-                                    style: TextStyle(
-                                      color: textEntryCol.withValues(alpha: 0.6),
-                                      fontSize: 15,
-                                    ),
-                                  ),
-                                ),
-                                Icon(Icons.attach_file_rounded, color: buttonsCol, size: 20),
-                                const SizedBox(width: 8),
-                                Icon(Icons.camera_alt_outlined, color: buttonsCol, size: 20),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: micCircleCol,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(Icons.mic_rounded, color: sendCol, size: 22),
-                        ),
-                      ],
+                    decoration: BoxDecoration(
+                      color: uiEntryBg,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: _buildStylePreview(
+                      _normalizeStyle(prefs.entryStyle),
+                      buttonsCol: buttonsCol,
+                      emojiCol: emojiCol,
+                      sendCol: sendCol,
+                      micCircleCol: micCircleCol,
+                      textEntryBg: textEntryBg,
+                      textEntryCol: textEntryCol,
                     ),
                   ),
                 ),
@@ -177,7 +201,8 @@ class _ConversationEntryStyleScreenState extends State<ConversationEntryStyleScr
                     GbSettingRow(
                       icon: Icons.style_rounded,
                       title: 'Conversation Entry style',
-                      subtitle: 'Change the style of the Bottom Entry in Conversation screen\nSelected: ${prefs.entryStyle}',
+                      subtitle:
+                          'Change the style of the Bottom Entry in Conversation screen\nSelected: ${_normalizeStyle(prefs.entryStyle)}',
                       hasSubScreen: true,
                       onTap: _showEntryStyleModal,
                     ),
@@ -244,7 +269,8 @@ class _ConversationEntryStyleScreenState extends State<ConversationEntryStyleScr
                     GbSettingRow(
                       icon: Icons.radio_button_checked_rounded,
                       title: 'Mic/Send Background circle',
-                      subtitle: 'Change the color of the circle behind Send/Mic',
+                      subtitle:
+                          'Change the color of the circle behind Send/Mic',
                       colorHex: prefs.micSendBgCircleColor,
                       onColorTap: () => _pickColor(
                         title: 'Mic/Send Circle Color',
@@ -294,5 +320,384 @@ class _ConversationEntryStyleScreenState extends State<ConversationEntryStyleScr
         );
       },
     );
+  }
+
+  /// Schematic preview of how the selected Conversation Entry style arranges
+  /// the bottom entry bar in the conversation screen.
+  Widget _buildStylePreview(
+    String style, {
+    required Color buttonsCol,
+    required Color emojiCol,
+    required Color sendCol,
+    required Color micCircleCol,
+    required Color textEntryBg,
+    required Color textEntryCol,
+  }) {
+    Widget emojiI({double size = 22}) =>
+        Icon(Icons.emoji_emotions_outlined, color: emojiCol, size: size);
+    Widget attachI({double size = 20}) =>
+        Icon(Icons.attach_file_rounded, color: buttonsCol, size: size);
+    Widget cameraI({double size = 20}) =>
+        Icon(Icons.camera_alt_outlined, color: buttonsCol, size: size);
+    Widget micCircle() => Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(color: micCircleCol, shape: BoxShape.circle),
+      child: Icon(Icons.mic_rounded, color: sendCol, size: 22),
+    );
+
+    Widget field({
+      List<Widget> leading = const [],
+      List<Widget> trailing = const [],
+      double radius = 20,
+      bool transparent = false,
+      bool border = false,
+      bool shadow = false,
+    }) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: transparent ? Colors.transparent : textEntryBg,
+          borderRadius: BorderRadius.circular(radius),
+          border: border
+              ? Border.all(color: textEntryCol.withValues(alpha: 0.3))
+              : null,
+          boxShadow: shadow
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.16),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          children: [
+            ...leading,
+            if (leading.isNotEmpty) const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Message',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: textEntryCol.withValues(alpha: 0.6),
+                  fontSize: 15,
+                ),
+              ),
+            ),
+            if (trailing.isNotEmpty) const SizedBox(width: 8),
+            ...trailing,
+          ],
+        ),
+      );
+    }
+
+    Widget miniDots(int n) => SizedBox(
+      height: 22,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          for (var k = 0; k < n; k++)
+            Icon(
+              k == 0 ? Icons.emoji_emotions_outlined : Icons.circle,
+              size: k == 0 ? 16 : 5,
+              color: k == 0 ? emojiCol : buttonsCol.withValues(alpha: 0.7),
+            ),
+        ],
+      ),
+    );
+    Widget twoRow(Widget top) =>
+        Column(children: [top, const SizedBox(height: 4), miniDots(6)]);
+
+    switch (style) {
+      // GB reference style previews (schematic mini-mocks).
+      case 'WAMOD':
+      case 'Hangouts':
+      case 'Rounded':
+        return twoRow(
+          Row(
+            children: [
+              Expanded(
+                child: field(
+                  radius: 16,
+                  leading: [emojiI(size: 18)],
+                  trailing: [attachI(size: 18)],
+                ),
+              ),
+              const SizedBox(width: 8),
+              micCircle(),
+            ],
+          ),
+        );
+      case 'Hangouts V2':
+      case 'Dribble':
+      case 'Dribble V2':
+        return Column(
+          children: [
+            miniDots(6),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(child: field(radius: 14)),
+                const SizedBox(width: 8),
+                micCircle(),
+              ],
+            ),
+          ],
+        );
+      case 'Aran V2':
+      case 'WANH':
+        return Row(
+          children: [
+            attachI(size: 20),
+            const SizedBox(width: 6),
+            emojiI(size: 20),
+            const SizedBox(width: 6),
+            Expanded(child: field(radius: 16)),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'Allo':
+        return Row(
+          children: [
+            Expanded(
+              child: field(
+                radius: 20,
+                leading: [attachI(size: 18)],
+                trailing: [emojiI(size: 18)],
+              ),
+            ),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'RC-Telegram X iOS':
+      case 'iOS 14':
+        return Row(
+          children: [
+            attachI(size: 20),
+            const SizedBox(width: 6),
+            Expanded(child: field(radius: 18, trailing: [emojiI(size: 18)])),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'RC-IOS 11':
+        return Row(
+          children: [
+            emojiI(size: 20),
+            const SizedBox(width: 6),
+            Expanded(child: field(radius: 18, trailing: [attachI(size: 18)])),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'RC-Line':
+      case 'FB Messenger':
+      case 'RC Mess':
+      case 'Instagram':
+        return Row(
+          children: [
+            attachI(size: 20),
+            const SizedBox(width: 4),
+            cameraI(size: 20),
+            const SizedBox(width: 6),
+            Expanded(child: field(radius: 18)),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'Concept':
+        return Row(
+          children: [
+            Expanded(
+              child: field(
+                radius: 18,
+                trailing: [
+                  cameraI(size: 18),
+                  const SizedBox(width: 4),
+                  emojiI(size: 18),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'YOWA Style':
+      case 'Mood':
+        return Row(
+          children: [
+            Expanded(
+              child: field(
+                radius: 22,
+                leading: [emojiI(size: 18)],
+                trailing: [attachI(size: 18)],
+              ),
+            ),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'Simple':
+        return Row(
+          children: [
+            Expanded(child: field(radius: 22, trailing: [attachI(size: 18)])),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'Old Stock (2016)':
+        return Row(
+          children: [
+            Expanded(
+              child: field(
+                radius: 8,
+                leading: [emojiI(size: 18)],
+                trailing: [attachI(size: 18)],
+              ),
+            ),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'RC-MSG Google':
+      case 'Stock':
+        return Row(
+          children: [
+            Expanded(
+              child: field(
+                leading: [emojiI()],
+                trailing: [attachI(), const SizedBox(width: 8), cameraI()],
+              ),
+            ),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'Telegram Modern':
+        return Row(
+          children: [
+            Icon(Icons.attach_file_rounded, color: buttonsCol, size: 24),
+            const SizedBox(width: 8),
+            Expanded(child: field(radius: 14, trailing: [emojiI(size: 20)])),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'iOS Clean Rounded':
+        return Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: buttonsCol,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.add_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: field(radius: 22)),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'Hangouts Minimal':
+        return Row(
+          children: [
+            emojiI(),
+            const SizedBox(width: 8),
+            Expanded(child: field(radius: 8, transparent: true, border: true)),
+            const SizedBox(width: 8),
+            attachI(size: 22),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'Simple Pill':
+        return Row(
+          children: [
+            Expanded(child: field(radius: 24, leading: [emojiI(size: 20)])),
+            const SizedBox(width: 8),
+            attachI(size: 22),
+            const SizedBox(width: 6),
+            cameraI(size: 22),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'RC-Flat Floating':
+        return Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: textEntryBg,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.18),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: field(
+                  radius: 12,
+                  transparent: true,
+                  leading: [emojiI(size: 20)],
+                  trailing: [attachI()],
+                ),
+              ),
+              micCircle(),
+            ],
+          ),
+        );
+      case 'WhatsApp Classic 3D':
+        return Row(
+          children: [
+            Expanded(
+              child: field(
+                radius: 22,
+                shadow: true,
+                leading: [emojiI(size: 20)],
+                trailing: [attachI(), const SizedBox(width: 8), cameraI()],
+              ),
+            ),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      case 'Signal Compact Bubble':
+        return Row(
+          children: [
+            Expanded(child: field(radius: 18, trailing: [attachI()])),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+      default:
+        return Row(
+          children: [
+            Expanded(
+              child: field(
+                leading: [emojiI()],
+                trailing: [attachI(), const SizedBox(width: 8), cameraI()],
+              ),
+            ),
+            const SizedBox(width: 8),
+            micCircle(),
+          ],
+        );
+    }
   }
 }

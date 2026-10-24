@@ -283,15 +283,18 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               children: [
                 // Banner & Overlapping Avatar section (Rule 20)
                 SizedBox(
-                  height: 220,
+                  height: (MediaQuery.of(context).size.width - 32) * 9 / 16 + 12 + 60,
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
                       // Banner
                       Container(
-                        height: 160,
-                        width: double.infinity,
+                        // 16:9, the same frame the banner crop dialog uses.
+                        height: (MediaQuery.of(context).size.width - 32) * 9 / 16,
+                        margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        clipBehavior: Clip.antiAlias,
                         decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
                           color: colorScheme.surfaceContainerHighest,
                           image: activeBannerUrl != null && activeBannerUrl.isNotEmpty
                               ? DecorationImage(
@@ -316,7 +319,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                             padding: const EdgeInsets.all(10),
                             child: IconButton.filledTonal(
                               tooltip: 'Change banner photo',
-                              icon: const Icon(Icons.camera_alt_outlined, size: 20),
+                              icon: const Icon(Icons.wallpaper_outlined, size: 20),
                               onPressed: _pickBanner,
                             ),
                           ),

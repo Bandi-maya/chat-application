@@ -1,3 +1,4 @@
+// ignore_for_file: unused_import, unused_field, unused_element, unused_local_variable
 import '../../chats/locked_chats_screen.dart';
 import '../../../data/repositories/chaty_data_store.dart';
 import '../../../data/services/local_lock_service.dart';
@@ -264,35 +265,8 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
     'Nobody',
   ];
 
-  void _showWhoCanCallMeDialog() {
-    final prefs = widget.preferencesController.privacy;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Who can call me?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: _audienceOptions.map((opt) {
-            return RadioListTile<String>(
-              title: Text(opt),
-              value: opt,
-              groupValue: prefs.whoCanCallMe,
-              activeColor: Theme.of(context).colorScheme.primary,
-              onChanged: (val) {
-                if (val != null) {
-                  widget.preferencesController.updatePrivacy(
-                    prefs.copyWith(whoCanCallMe: val),
-                    logTitle: 'Who can call me',
-                  );
-                  Navigator.pop(ctx);
-                }
-              },
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
+  void _showWhoCanCallMeDialog() =>
+      showWhoCanCallMeDialog(context, widget.preferencesController);
 
   void _showCustomPrivacyDialog(String title) {
     showDialog(
@@ -829,282 +803,14 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
                   colors: colors,
                   isDark: isDark,
                   children: [
-                    _buildSectionDivider(label: 'Security', accent: theme.accentColor),
-                    _buildSwitchRow(
-                      icon: Icons.lock_rounded,
-                      title: 'Chaty App Lock',
-                      subtitle: currentSec.isAppLockEnabled
-                          ? 'Protected with '
-                          : 'Enable lock screen security',
-                      value: currentSec.isAppLockEnabled,
+                    _buildChevronRow(
+                      icon: Icons.help_outline_rounded,
+                      title: 'Recovery Question',
+                      subtitle: 'Set secret question for password reset',
                       theme: theme,
                       colors: colors,
-                      onChanged: (val) => _runFlow(
-                        intent: val ? SecurityIntent.enableLock : SecurityIntent.disableLock,
-                      ),
+                      onTap: () => _showRecoveryQuestionDialog(),
                     ),
-                    if (currentSec.isAppLockEnabled) ...[
-                      _buildChevronRow(
-                        icon: Icons.style_rounded,
-                        title: 'Lock Type',
-                        subtitle: ' • tap to change',
-                        theme: theme,
-                        colors: colors,
-                        onTap: () => _runFlow(intent: SecurityIntent.changeMethod),
-                      ),
-                      if (currentSec.lockMethod == 'PIN') ...[
-                        _buildChevronRow(
-                          icon: Icons.pin_rounded,
-                          title: 'Change PIN Code',
-                          subtitle: '-digit PIN stored securely on this device',
-                          theme: theme,
-                          colors: colors,
-                          onTap: () => _runFlow(
-                            intent: SecurityIntent.changeCredential,
-                            target: LockMethodType.pin,
-                            setupPinLength: _pinLength,
-                          ),
-                        ),
-                        _buildChevronRow(
-                          icon: Icons.dialpad_rounded,
-                          title: 'PIN Length',
-                          subtitle: _pinLength == 6 ? '6 digits' : '4 digits',
-                          theme: theme,
-                          colors: colors,
-                          onTap: () async {
-                            final chosen = await showDialog<String>(
-                              context: context,
-                              builder: (ctx) => SimpleDialog(
-                                title: const Text('Choose PIN Length'),
-                                children: [
-                                  SimpleDialogOption(
-                                    onPressed: () => Navigator.pop(ctx, '4 digits'),
-                                    child: const Text('4 digits'),
-                                  ),
-                                  SimpleDialogOption(
-                                    onPressed: () => Navigator.pop(ctx, '6 digits'),
-                                    child: const Text('6 digits'),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (chosen != null) {
-                              _runFlow(
-                                intent: SecurityIntent.changeCredential,
-                                target: LockMethodType.pin,
-                                setupPinLength: chosen == '6 digits' ? 6 : 4,
-                              );
-                            }
-                          },
-                        ),
-                      ],
-                      if (currentSec.lockMethod == 'Pattern') ...[
-                        _buildChevronRow(
-                          icon: Icons.pattern_rounded,
-                          title: 'Change Pattern',
-                          subtitle: 'Configure gesture unlock pattern',
-                          theme: theme,
-                          colors: colors,
-                          onTap: () => _runFlow(
-                            intent: SecurityIntent.changeCredential,
-                            target: LockMethodType.pattern,
-                          ),
-                        ),
-                        _buildSwitchRow(
-                          icon: Icons.visibility_off_rounded,
-                          title: 'Make Pattern Invisible',
-                          subtitle: 'Hide trail when drawing pattern',
-                          value: currentSec.makePatternInvisible,
-                          theme: theme,
-                          colors: colors,
-                          onChanged: (val) {
-                            widget.preferencesController.updateSecurity(
-                              currentSec.copyWith(makePatternInvisible: val),
-                              logTitle: 'Make Pattern Invisible',
-                            );
-                          },
-                        ),
-                        _buildSwitchRow(
-                          icon: Icons.vibration_rounded,
-                          title: 'Disable pattern vibration',
-                          subtitle: 'Suppress haptic vibration on pattern touch',
-                          value: currentSec.disablePatternVibration,
-                          theme: theme,
-                          colors: colors,
-                          onChanged: (val) {
-                            widget.preferencesController.updateSecurity(
-                              currentSec.copyWith(disablePatternVibration: val),
-                              logTitle: 'Disable pattern vibration',
-                            );
-                          },
-                        ),
-                      ],
-                      if (currentSec.lockMethod == 'Password') ...[
-                        _buildChevronRow(
-                          icon: Icons.password_rounded,
-                          title: 'Change Password',
-                          subtitle: 'Set a new alphanumeric password',
-                          theme: theme,
-                          colors: colors,
-                          onTap: () => _runFlow(
-                            intent: SecurityIntent.changeCredential,
-                            target: LockMethodType.password,
-                          ),
-                        ),
-                      ],
-                      if (currentSec.lockMethod == 'Biometric')
-                        _buildChevronRow(
-                          icon: Icons.fingerprint_rounded,
-                          title: 'Test Biometrics',
-                          subtitle: _biometricAvailable
-                              ? 'Enrolled biometric available'
-                              : 'No biometric enrolled on device',
-                          theme: theme,
-                          colors: colors,
-                          onTap: () async {
-                            final ok = await _lockService.authenticateBiometric(
-                              reason: 'Test biometric unlock for Chaty',
-                            );
-                            if (!mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(ok ? 'Biometric unlock verified.' : 'Biometric failed or cancelled.'),
-                              ),
-                            );
-                          },
-                        ),
-                      _buildChevronRow(
-                        icon: Icons.timer_outlined,
-                        title: 'Auto-Lock Timeout',
-                        subtitle: currentSec.autoLockTimeout,
-                        theme: theme,
-                        colors: colors,
-                        onTap: () async {
-                          final picked = await showDialog<String>(
-                            context: context,
-                            builder: (ctx) => SimpleDialog(
-                              title: const Text('Auto-Lock Timeout'),
-                              children: ['Immediately', '15s', '30s', '1m', '5m', '15m'].map((opt) {
-                                return SimpleDialogOption(
-                                  onPressed: () => Navigator.pop(ctx, opt),
-                                  child: Text(opt),
-                                );
-                              }).toList(),
-                            ),
-                          );
-                          if (picked != null) {
-                            widget.preferencesController.updateSecurity(
-                              currentSec.copyWith(autoLockTimeout: picked),
-                              logTitle: 'Auto-Lock Timeout ()',
-                            );
-                          }
-                        },
-                      ),
-                      _buildChevronRow(
-                        icon: Icons.help_outline_rounded,
-                        title: 'Recovery Question',
-                        subtitle: 'Set secret question for password reset',
-                        theme: theme,
-                        colors: colors,
-                        onTap: () => _showRecoveryQuestionDialog(),
-                      ),
-                      _buildSwitchRow(
-                        icon: Icons.notifications_paused_rounded,
-                        title: 'Hide Notification Content when Locked',
-                        subtitle: 'Conceal message body text while application is locked',
-                        value: currentSec.hideLockNotificationContent,
-                        theme: theme,
-                        colors: colors,
-                        onChanged: (val) {
-                          widget.preferencesController.updateSecurity(
-                            currentSec.copyWith(hideLockNotificationContent: val),
-                            logTitle: 'Lock notification privacy',
-                          );
-                        },
-                      ),
-                      _buildChevronRow(
-                        icon: Icons.lock_open_rounded,
-                        title: 'Test Lock Screen',
-                        subtitle: 'Authenticate to verify your Chaty Lock configuration',
-                        theme: theme,
-                        colors: colors,
-                        onTap: () => AppLockOverlayModal.show(
-                          context,
-                          preferencesController: widget.preferencesController,
-                          lockService: _lockService,
-                          title: 'Test Chaty Lock',
-                          reason: 'Authenticate to verify your Chaty Lock configuration',
-                        ),
-                      ),
-                      _buildSectionDivider(label: 'Chat Lock & Vault Security', accent: theme.accentColor),
-                      _buildChevronRow(
-                        icon: Icons.lock_outline_rounded,
-                        title: 'Open Locked & Hidden Chats',
-                        subtitle: currentSec.lockedConversationIds.isEmpty
-                            ? 'No chats protected • Tap to manage vault'
-                            : '${currentSec.lockedConversationIds.length} conversation${currentSec.lockedConversationIds.length == 1 ? '' : 's'} in secure vault',
-                        theme: theme,
-                        colors: colors,
-                        onTap: () => LockedChatsScreen.open(
-                          context,
-                          dataStore: locator<ChatyDataStore>(),
-                          preferencesController: widget.preferencesController,
-                          themeController: locator<ThemeController>(),
-                        ),
-                      ),
-                      _buildSwitchRow(
-                        icon: Icons.touch_app_rounded,
-                        title: 'Unlock via Chaty Title Tap',
-                        subtitle: 'Tap the main screen Chaty header to authenticate and open locked chats',
-                        value: currentSec.entryByAppTitle,
-                        theme: theme,
-                        colors: colors,
-                        onChanged: (val) {
-                          widget.preferencesController.updateSecurity(
-                            currentSec.copyWith(entryByAppTitle: val),
-                            logTitle: 'Title tap vault entry',
-                          );
-                        },
-                      ),
-                      _buildSwitchRow(
-                        icon: Icons.key_rounded,
-                        title: 'Secret Code Search Discovery',
-                        subtitle: 'Reveal hidden locked chats only when typing your secret word or emoji in search',
-                        value: currentSec.entryBySecretPhrase,
-                        theme: theme,
-                        colors: colors,
-                        onChanged: (val) async {
-                          if (val) {
-                            final phrase = await _showSecretPhraseSetupDialog();
-                            if (phrase == null || phrase.isEmpty || !mounted) return;
-                            await _lockService.setSecretPhrase(phrase);
-                            widget.preferencesController.updateSecurity(
-                              currentSec.copyWith(entryBySecretPhrase: true),
-                              logTitle: 'Secret search phrase entry',
-                            );
-                          } else {
-                            widget.preferencesController.updateSecurity(
-                              currentSec.copyWith(entryBySecretPhrase: false),
-                              logTitle: 'Secret search phrase disabled',
-                            );
-                          }
-                        },
-                      ),
-                      _buildSwitchRow(
-                        icon: Icons.screenshot_rounded,
-                        title: 'Protect Screen & App Previews',
-                        subtitle: 'Blank out app thumbnail in multi-tasking view and block screenshots',
-                        value: currentSec.protectFromScreenshots,
-                        theme: theme,
-                        colors: colors,
-                        onChanged: (val) {
-                          widget.preferencesController.updateSecurity(
-                            currentSec.copyWith(protectFromScreenshots: val),
-                            logTitle: 'Screen & preview security',
-                          );
-                        },
-                      ),
-                    ],
                     
                     _buildChevronRow(
                       icon: Icons.restart_alt_rounded,
@@ -1161,62 +867,34 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
     required String label,
     required Color accent,
   }) {
+    // GB-style category heading: centered, 16sp bold accent title with an
+    // accent divider line underneath.
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: Container(
-              height: 1.2,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    accent.withValues(alpha: 0.0),
-                    accent.withValues(alpha: 0.7),
-                  ],
-                ),
-              ),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: accent,
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 5,
-                  height: 5,
-                  decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: accent,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Container(
-                  width: 5,
-                  height: 5,
-                  decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Container(
-              height: 1.2,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    accent.withValues(alpha: 0.7),
-                    accent.withValues(alpha: 0.0),
-                  ],
-                ),
+          const SizedBox(height: 6),
+          Container(
+            height: 1.2,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  accent.withValues(alpha: 0.0),
+                  accent.withValues(alpha: 0.7),
+                  accent.withValues(alpha: 0.0),
+                ],
               ),
             ),
           ),
@@ -1366,4 +1044,47 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
       ),
     );
   }
+}
+
+
+const List<String> _whoCanCallAudienceOptions = <String>[
+  'Everyone',
+  'My Contacts',
+  'My Contacts Except…',
+  'Nobody',
+];
+
+/// The existing "Who can call me?" dialog, reusable from other screens.
+/// Same options and the same privacy preference update as Privacy Center.
+Future<void> showWhoCanCallMeDialog(
+  BuildContext context,
+  ChatyPreferencesController preferencesController,
+) {
+  final prefs = preferencesController.privacy;
+  return showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Who can call me?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: _whoCanCallAudienceOptions.map((opt) {
+          return RadioListTile<String>(
+            title: Text(opt),
+            value: opt,
+            groupValue: prefs.whoCanCallMe,
+            activeColor: Theme.of(ctx).colorScheme.primary,
+            onChanged: (val) {
+              if (val != null) {
+                preferencesController.updatePrivacy(
+                  prefs.copyWith(whoCanCallMe: val),
+                  logTitle: 'Who can call me',
+                );
+                Navigator.pop(ctx);
+              }
+            },
+          );
+        }).toList(),
+      ),
+    ),
+  );
 }

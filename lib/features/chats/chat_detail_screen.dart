@@ -33,6 +33,7 @@ import '../../ui/core/design_system/components/app_components.dart';
 import '../../ui/core/design_system/components/composer_components.dart';
 import '../../ui/core/gb/gb_theme_overrides.dart';
 import '../../ui/core/icons/chaty_canonical_overflow_button.dart';
+import '../../ui/core/icons/chaty_icon_registry.dart';
 import '../../core/emoji/widgets/animated_emoji_text.dart';
 import '../../ui/core/menu/app_context_menu.dart';
 import '../../ui/core/widgets/app_avatar.dart';
@@ -53,12 +54,13 @@ import '../../data/services/outgoing_message_queue_engine.dart';
 import '../../ui/core/connection/connection_health_indicator.dart';
 import '../../ui/core/connection/connection_detail_sheet.dart';
 import '../../ui/core/connection/global_connection_banner.dart';
-import '../settings/customization/customization_center_screen.dart';
+import '../settings/appearance/component_styles_screen.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final ThemeConfig theme;
   final ChatyDataStore dataStore;
   final String conversationId;
+
   /// Optional message to reveal after the conversation has loaded.
   final String? initialMessageId;
   final ChatyPreferencesController preferencesController;
@@ -221,7 +223,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final lower = rawError.toLowerCase();
     return rawError.contains(ChatyBackendService.secureSetupPendingCode) ||
         lower.contains('mls group is not initialized') ||
-        lower.contains('every conversation member must register an mls device') ||
+        lower.contains(
+          'every conversation member must register an mls device',
+        ) ||
         lower.contains('must register an mls device') ||
         lower.contains('no key packages available') ||
         rawError.contains('MlsMembershipPendingException');
@@ -437,7 +441,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         await _realtime.trackConversation(widget.conversationId);
         if (!mounted) return;
         _scrollToBottom();
-        final bgColor = _preferences.gbColor('abu_saleh_toast_status_bc') ??
+        final bgColor =
+            _preferences.gbColor('abu_saleh_toast_status_bc') ??
             const Color(0xFF6366F1);
         ChatyToast.show(
           context,
@@ -446,19 +451,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         );
       } else {
         _textCtrl.text = text;
-        String userFriendlyMsg = 'Could not send message. Please check your connection.';
+        String userFriendlyMsg =
+            'Could not send message. Please check your connection.';
         if (raw.contains('Authentication required')) {
           userFriendlyMsg = 'Session expired. Please re-open or log in.';
         } else if (raw.contains('Conversation not found')) {
           userFriendlyMsg = 'Conversation could not be loaded.';
         }
-        final bgColor = _preferences.gbColor('abu_saleh_toast_status_bc') ??
+        final bgColor =
+            _preferences.gbColor('abu_saleh_toast_status_bc') ??
             const Color(0xFFEF4444);
-        ChatyToast.show(
-          context,
-          userFriendlyMsg,
-          background: bgColor,
-        );
+        ChatyToast.show(context, userFriendlyMsg, background: bgColor);
       }
       if (mounted) setState(() {});
     }
@@ -671,14 +674,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           _highlightedSearchMessageId = messageId;
           _initialPositionApplied = true;
         });
-        unawaited(Scrollable.ensureVisible(
-          targetContext,
-          alignment: 0.35,
-          duration: MediaQuery.of(context).disableAnimations
-              ? Duration.zero
-              : const Duration(milliseconds: 260),
-          curve: Curves.easeOutCubic,
-        ));
+        unawaited(
+          Scrollable.ensureVisible(
+            targetContext,
+            alignment: 0.35,
+            duration: MediaQuery.of(context).disableAnimations
+                ? Duration.zero
+                : const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+          ),
+        );
         _searchHighlightTimer = Timer(const Duration(seconds: 3), () {
           if (mounted && _highlightedSearchMessageId == messageId) {
             setState(() => _highlightedSearchMessageId = null);
@@ -691,11 +696,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       final maxExtent = position.maxScrollExtent;
       final laidOut = _messageItemKeys.entries
           .where((entry) => entry.value.currentContext != null)
-          .map((entry) => (
-                id: entry.key,
-                index: _messageIndexById[entry.key],
-                context: entry.value.currentContext!,
-              ))
+          .map(
+            (entry) => (
+              id: entry.key,
+              index: _messageIndexById[entry.key],
+              context: entry.value.currentContext!,
+            ),
+          )
           .where((entry) => entry.index != null)
           .toList(growable: false);
 
@@ -711,7 +718,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         final viewport = RenderAbstractViewport.maybeOf(renderObject!);
         final reveal = viewport?.getOffsetToReveal(renderObject, 0).offset;
         final averageExtent = maxExtent / (messages.length - 1);
-        estimate = (reveal ?? position.pixels) +
+        estimate =
+            (reveal ?? position.pixels) +
             (targetIndex - nearest.index!) * averageExtent;
       } else {
         estimate = messages.length <= 1
@@ -726,12 +734,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         _jumpToMessage(messageId, attempt: attempt + 1);
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not locate this message in the timeline.')),
+          const SnackBar(
+            content: Text('Could not locate this message in the timeline.'),
+          ),
         );
       }
     });
   }
-
 
   /// Scroll listener: tracks whether the newest message is on screen. This is
   /// what makes the down-arrow button appear/disappear and decides whether
@@ -849,9 +858,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         final emoji = await ChatyEmojiPicker.show(
           context,
           reactionMode: true,
-          headerColor: conv.emojiHeaderColor != null ? Color(conv.emojiHeaderColor!) : null,
-          headerIconsColor: conv.emojiHeaderIconsColor != null ? Color(conv.emojiHeaderIconsColor!) : null,
-          backgroundColor: conv.emojiPickerBgColor != null ? Color(conv.emojiPickerBgColor!) : null,
+          headerColor: conv.emojiHeaderColor != null
+              ? Color(conv.emojiHeaderColor!)
+              : null,
+          headerIconsColor: conv.emojiHeaderIconsColor != null
+              ? Color(conv.emojiHeaderIconsColor!)
+              : null,
+          backgroundColor: conv.emojiPickerBgColor != null
+              ? Color(conv.emojiPickerBgColor!)
+              : null,
         );
         if (emoji != null && emoji.isNotEmpty && mounted) {
           widget.dataStore.toggleReaction(
@@ -1091,12 +1106,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       case MessageActionType.translate:
         if (mounted) {
           final mode = widget.preferencesController.universal.translateOption;
-          final lang = widget.preferencesController.universal.translationLanguage;
+          final lang =
+              widget.preferencesController.universal.translationLanguage;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                'Translation ($lang via $mode): ${message.text}',
-              ),
+              content: Text('Translation ($lang via $mode): ${message.text}'),
             ),
           );
         }
@@ -1530,26 +1544,18 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final convPrefs = widget.preferencesController.conversation;
     // Real consumers for the 'Conversation header' controls.
     // Typed ConversationPreferences takes precedence, then legacy GB keys, defaulting to visible.
-    final showHeaderAvatar = !convPrefs.hideProfilePicture &&
-        widget.preferencesController.gbBool(
-          'PicProf',
-          fallback: true,
-        );
-    final showHeaderName = !convPrefs.hideContactName &&
-        widget.preferencesController.gbBool(
-          'NameProf',
-          fallback: true,
-        );
-    final showHeaderCalls = !convPrefs.hideCallButton &&
-        widget.preferencesController.gbBool(
-          'Conv_call_btn',
-          fallback: true,
-        );
-    final showPresenceLine = !convPrefs.disableContactStatus &&
-        widget.preferencesController.gbBool(
-          'statuschat',
-          fallback: true,
-        );
+    final showHeaderAvatar =
+        !convPrefs.hideProfilePicture &&
+        widget.preferencesController.gbBool('PicProf', fallback: true);
+    final showHeaderName =
+        !convPrefs.hideContactName &&
+        widget.preferencesController.gbBool('NameProf', fallback: true);
+    final showHeaderCalls =
+        !convPrefs.hideCallButton &&
+        widget.preferencesController.gbBool('Conv_call_btn', fallback: true);
+    final showPresenceLine =
+        !convPrefs.disableContactStatus &&
+        widget.preferencesController.gbBool('statuschat', fallback: true);
     final presencePillColor = convPrefs.contactStatusBgColor != null
         ? Color(convPrefs.contactStatusBgColor!)
         : widget.preferencesController.gbColor('ModChatGStatusB');
@@ -1590,7 +1596,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   icon: const Icon(Icons.copy_outlined),
                   tooltip: 'Copy',
                   onPressed: () async {
-                    final hideDateAndName = widget.preferencesController.conversation.hideDateAndName;
+                    final hideDateAndName = widget
+                        .preferencesController
+                        .conversation
+                        .hideDateAndName;
                     final msgs = widget.dataStore
                         .getMessages(widget.conversationId)
                         .where((m) => _selectedMessageIds.contains(m.id))
@@ -1872,7 +1881,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       child: ListenableBuilder(
                         listenable: locator<ConnectionHealthService>(),
                         builder: (context, _) {
-                          final health = locator<ConnectionHealthService>().health;
+                          final health =
+                              locator<ConnectionHealthService>().health;
                           return ConnectionHealthIndicator(
                             health: health,
                             size: 15,
@@ -2156,6 +2166,26 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               focusNode: _composerFocusNode,
               emojiPickerOpen: _emojiPickerOpen,
               onAttach: _openAttachmentSheet,
+              onGalleryTap: () async {
+                await _attachments.shareMedia(context, 'image');
+                await _realtime.trackConversation(widget.conversationId);
+                _scrollToBottom();
+              },
+              onAudioTap: () async {
+                await _attachments.shareMedia(context, 'audio');
+                await _realtime.trackConversation(widget.conversationId);
+                _scrollToBottom();
+              },
+              onLocationTap: () async {
+                await _attachments.shareLocation(context);
+                await _realtime.trackConversation(widget.conversationId);
+                _scrollToBottom();
+              },
+              onContactTap: () async {
+                await _attachments.shareContact(context);
+                await _realtime.trackConversation(widget.conversationId);
+                _scrollToBottom();
+              },
               onCameraTap: _captureAndSendPhoto,
               onEmoji: _pickComposerEmoji,
               onSend: _sendMessage,
@@ -2184,20 +2214,24 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final contacts = dataStore.contacts;
     final sidebarBg = conversationPrefs.quickContactBgColor != 0xFF000000
         ? Color(conversationPrefs.quickContactBgColor)
-        : theme.surfaceColor.withValues(alpha: conversationPrefs.sidebarOpacity);
+        : theme.surfaceColor.withValues(
+            alpha: conversationPrefs.sidebarOpacity,
+          );
     final sidebarTextColor = Color(conversationPrefs.quickContactTextColor);
 
     Widget sidebar() => Container(
       width: 62,
       color: sidebarBg,
       child: Column(
-        mainAxisAlignment: conversationPrefs.quickContactSidebarPosition == 'Bottom'
+        mainAxisAlignment:
+            conversationPrefs.quickContactSidebarPosition == 'Bottom'
             ? MainAxisAlignment.end
             : MainAxisAlignment.start,
         children: [
           Expanded(
             child: ListView.builder(
-              reverse: conversationPrefs.quickContactSidebarPosition == 'Bottom',
+              reverse:
+                  conversationPrefs.quickContactSidebarPosition == 'Bottom',
               padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: contacts.length,
               itemBuilder: (context, index) {
@@ -2208,9 +2242,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     borderRadius: BorderRadius.circular(30),
                     onTap: () async {
                       try {
-                        final next = await dataStore.getOrCreateDirectConversation(
-                          contact,
-                        );
+                        final next = await dataStore
+                            .getOrCreateDirectConversation(contact);
                         if (!mounted) return;
                         Navigator.of(context).pushReplacement(
                           MaterialPageRoute(
@@ -2218,7 +2251,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                               conversationId: next.id,
                               theme: theme,
                               dataStore: dataStore,
-                              preferencesController: widget.preferencesController,
+                              preferencesController:
+                                  widget.preferencesController,
                               themeController: widget.themeController,
                             ),
                           ),
@@ -2228,10 +2262,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     child: Center(
                       child: Tooltip(
                         message: contact.displayName,
-                        textStyle: TextStyle(color: sidebarTextColor, fontSize: 12),
+                        textStyle: TextStyle(
+                          color: sidebarTextColor,
+                          fontSize: 12,
+                        ),
                         child: ChatyAvatar(
                           initials: contact.avatarInitials,
-                          color: ChatyAvatarCore.parseColorHex(contact.avatarColorHex),
+                          color: ChatyAvatarCore.parseColorHex(
+                            contact.avatarColorHex,
+                          ),
                           size: 38,
                           shape: widget.preferencesController.home.avatarShape,
                         ),
@@ -2253,7 +2292,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       ],
     );
 
-    final disableSwipe = widget.preferencesController.universal.disableSwipeToExit;
+    final disableSwipe =
+        widget.preferencesController.universal.disableSwipeToExit;
     if (disableSwipe) {
       return chatContent;
     }
@@ -2296,7 +2336,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   /// baked into the forwarded copy's metadata.
   Future<void> _openForwardSheet(ChatMessage message) async {
     final theme = _theme;
-    final maxForwardChats = widget.preferencesController.universal.increaseForwardLimit ? 250 : 5;
+    final maxForwardChats =
+        widget.preferencesController.universal.increaseForwardLimit ? 250 : 5;
     final homePrefs = widget.preferencesController.home;
     final allTargets = widget.dataStore.conversations
         .where((c) => c.id != widget.conversationId)
@@ -2304,15 +2345,18 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final targets = allTargets.take(maxForwardChats).toList(growable: false);
     final recentOrdered = [...targets]
       ..sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
-    final directByFrequency = targets
-        .where((conversation) => conversation.type == ConversationType.direct)
-        .toList()
-      ..sort(
-        (a, b) => widget.dataStore
-            .getMessages(b.id)
-            .length
-            .compareTo(widget.dataStore.getMessages(a.id).length),
-      );
+    final directByFrequency =
+        targets
+            .where(
+              (conversation) => conversation.type == ConversationType.direct,
+            )
+            .toList()
+          ..sort(
+            (a, b) => widget.dataStore
+                .getMessages(b.id)
+                .length
+                .compareTo(widget.dataStore.getMessages(a.id).length),
+          );
     final frequentTargets = directByFrequency.take(5).toList(growable: false);
     final frequentIds = frequentTargets.map((item) => item.id).toSet();
     final recentPool = recentOrdered
@@ -2341,6 +2385,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         forwardItems.add((section: title, conversation: item));
       }
     }
+
     if (!homePrefs.hideFrequentlyContacted) {
       addSection('Frequently contacted', frequentTargets);
     }
@@ -2434,7 +2479,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                                     .take(2)
                                     .toString()
                                     .toUpperCase(),
-                            colorHex: conversation.avatarColorHex ?? '0xFF6366F1',
+                            colorHex:
+                                conversation.avatarColorHex ?? '0xFF6366F1',
                             size: 36,
                           ),
                           title: Text(
@@ -2538,7 +2584,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => CustomizationCenterScreen(
+                builder: (_) => ComponentStylesScreen(
                   conversationId: widget.conversationId,
                   conversationTitle: conversation.title,
                 ),
@@ -2867,8 +2913,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             onRetry: isMine && message.deliveryState == DeliveryState.failed
                 ? () async {
                     if (locator.isRegistered<OutgoingMessageQueueEngine>()) {
-                      final success = await locator<OutgoingMessageQueueEngine>()
-                          .retryMessage(message.id);
+                      final success =
+                          await locator<OutgoingMessageQueueEngine>()
+                              .retryMessage(message.id);
                       if (!success && mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
@@ -2884,11 +2931,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             senderName: conversation.type == ConversationType.group && !isMine
                 ? _senderName(message.senderId)
                 : null,
-            isSenderAdmin: conversation.type == ConversationType.group &&
+            isSenderAdmin:
+                conversation.type == ConversationType.group &&
                 conversation.adminIds.contains(message.senderId),
-            showGroupAvatar: locator<TemplateController>()
-                .conversation
-                .showAvatarInGroup,
+            showGroupAvatar:
+                locator<TemplateController>().conversation.showAvatarInGroup,
             onLongPress: () => _onMessageLongPress(message),
             onLongPressWithRect: (rect) =>
                 _onMessageLongPressWithRect(message, rect),
@@ -2903,12 +2950,19 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             ),
             onReactionBadgeTap: (reaction) =>
                 _showReactionDetailsSheet(message, reaction),
-            onDoubleTap: widget.preferencesController.conversation.disableDoubleTapReaction
+            onDoubleTap:
+                widget
+                    .preferencesController
+                    .conversation
+                    .disableDoubleTapReaction
                 ? null
                 : () => widget.dataStore.toggleReaction(
                     conversation.id,
                     message.id,
-                    widget.preferencesController.conversation.doubleTapReactionEmoji,
+                    widget
+                        .preferencesController
+                        .conversation
+                        .doubleTapReactionEmoji,
                   ),
             voicePlaybackSpeed:
                 widget.preferencesController.conversation.voicePlaybackSpeed,
@@ -3069,6 +3123,12 @@ class _Composer extends StatefulWidget {
   final VoidCallback onVoiceCancel;
   final VoidCallback onVoiceSend;
   final Future<double> Function()? amplitudeProvider;
+  // Dedicated quick actions used by the GB two-row entry styles. When a
+  // callback is null the quick button falls back to the attachment sheet.
+  final VoidCallback? onGalleryTap;
+  final VoidCallback? onAudioTap;
+  final VoidCallback? onLocationTap;
+  final VoidCallback? onContactTap;
 
   const _Composer({
     required this.theme,
@@ -3092,6 +3152,10 @@ class _Composer extends StatefulWidget {
     required this.onVoiceCancel,
     required this.onVoiceSend,
     this.amplitudeProvider,
+    this.onGalleryTap,
+    this.onAudioTap,
+    this.onLocationTap,
+    this.onContactTap,
   });
 
   @override
@@ -3203,7 +3267,9 @@ class _ComposerState extends State<_Composer>
     final conv = widget.convPrefs;
     final micSendFill = conv.micSendBgCircleColor != null
         ? Color(conv.micSendBgCircleColor!)
-        : (conv.sendButtonColor != null ? Color(conv.sendButtonColor!) : theme.accentColor);
+        : (conv.sendButtonColor != null
+              ? Color(conv.sendButtonColor!)
+              : theme.accentColor);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -3280,7 +3346,11 @@ class _ComposerState extends State<_Composer>
                     ),
                     if (widget.recordLocked) ...[
                       const SizedBox(width: 4),
-                      Icon(Icons.lock_rounded, size: 12, color: theme.successColor),
+                      Icon(
+                        Icons.lock_rounded,
+                        size: 12,
+                        color: theme.successColor,
+                      ),
                     ],
                     const SizedBox(width: 8),
                     Expanded(
@@ -3365,13 +3435,17 @@ class _ComposerState extends State<_Composer>
     final reduceMotion = MediaQuery.of(context).disableAnimations;
     final emojiIconColor = conv.emojiButtonColor != null
         ? Color(conv.emojiButtonColor!)
-        : (conv.uiButtonsColor != null ? Color(conv.uiButtonsColor!) : theme.secondaryTextColor);
+        : (conv.uiButtonsColor != null
+              ? Color(conv.uiButtonsColor!)
+              : theme.secondaryTextColor);
     final sendFill = conv.sendButtonColor != null
         ? Color(conv.sendButtonColor!)
         : theme.accentColor;
     final micFill = conv.micSendBgCircleColor != null
         ? Color(conv.micSendBgCircleColor!)
-        : (conv.sendButtonColor != null ? Color(conv.sendButtonColor!) : theme.accentColor);
+        : (conv.sendButtonColor != null
+              ? Color(conv.sendButtonColor!)
+              : theme.accentColor);
     final inputBg = conv.textEntryBackgroundColor != null
         ? Color(conv.textEntryBackgroundColor!)
         : theme.cardColor;
@@ -3389,8 +3463,9 @@ class _ComposerState extends State<_Composer>
             IconButton(
               tooltip: widget.emojiPickerOpen ? 'Return to keyboard' : 'Emoji',
               onPressed: widget.onEmoji,
-              icon: Icon(
-                Icons.emoji_emotions_outlined,
+              icon: ChatyIcon(
+                ChatyIconId.emoji,
+                size: 24,
                 color: emojiIconColor,
               ),
             ),
@@ -3411,7 +3486,11 @@ class _ComposerState extends State<_Composer>
                           theme: theme,
                           semanticsLabel: 'Send message',
                           tooltip: 'Send',
-                          icon: Icons.send_rounded,
+                          iconWidget: ChatyIcon(
+                            ChatyIconId.send,
+                            size: 22,
+                            color: theme.onAccentColor,
+                          ),
                           fillColor: sendFill,
                           iconColor: theme.onAccentColor,
                           emphasized: true,
@@ -3420,7 +3499,11 @@ class _ComposerState extends State<_Composer>
                       : ChatyComposerActionButton(
                           key: const ValueKey<String>('power-voice-action'),
                           theme: theme,
-                          icon: Icons.mic_rounded,
+                          iconWidget: ChatyIcon(
+                            ChatyIconId.microphone,
+                            size: 22,
+                            color: theme.onAccentColor,
+                          ),
                           fillColor: micFill,
                           iconColor: theme.onAccentColor,
                           semanticsLabel:
@@ -3468,16 +3551,22 @@ class _ComposerState extends State<_Composer>
 
   Widget _buildInputRow(ThemeConfig theme, ComposerTemplate template) {
     final conv = widget.convPrefs;
-    final uiBtnColor = conv.uiButtonsColor != null ? Color(conv.uiButtonsColor!) : theme.accentColor;
+    final uiBtnColor = conv.uiButtonsColor != null
+        ? Color(conv.uiButtonsColor!)
+        : theme.accentColor;
     final emojiIconColor = conv.emojiButtonColor != null
         ? Color(conv.emojiButtonColor!)
-        : (conv.uiButtonsColor != null ? Color(conv.uiButtonsColor!) : theme.secondaryTextColor);
+        : (conv.uiButtonsColor != null
+              ? Color(conv.uiButtonsColor!)
+              : theme.secondaryTextColor);
     final sendFill = conv.sendButtonColor != null
         ? Color(conv.sendButtonColor!)
         : theme.accentColor;
     final micFill = conv.micSendBgCircleColor != null
         ? Color(conv.micSendBgCircleColor!)
-        : (conv.sendButtonColor != null ? Color(conv.sendButtonColor!) : theme.accentColor);
+        : (conv.sendButtonColor != null
+              ? Color(conv.sendButtonColor!)
+              : theme.accentColor);
     final inputBg = conv.textEntryBackgroundColor != null
         ? Color(conv.textEntryBackgroundColor!)
         : theme.cardColor;
@@ -3489,7 +3578,11 @@ class _ComposerState extends State<_Composer>
       theme: theme,
       semanticsLabel: 'Attach',
       tooltip: 'Attach',
-      icon: Icons.add_circle_outline_rounded,
+      iconWidget: ChatyIcon(
+        ChatyIconId.attachmentPlus,
+        size: 22,
+        color: uiBtnColor,
+      ),
       iconColor: uiBtnColor,
       onTap: widget.onAttach,
     );
@@ -3498,11 +3591,20 @@ class _ComposerState extends State<_Composer>
             theme: theme,
             semanticsLabel: 'Camera',
             tooltip: 'Camera',
-            icon: Icons.photo_camera_rounded,
+            iconWidget: ChatyIcon(
+              ChatyIconId.camera,
+              size: 22,
+              color: uiBtnColor,
+            ),
             iconColor: uiBtnColor,
             onTap: widget.onCameraTap,
           )
         : null;
+
+    final entryStyle = _normalizeEntryStyle(conv.entryStyle);
+    if (entryStyle != _kStockEntryStyle) {
+      return _buildStyledEntryRow(entryStyle, theme, template);
+    }
 
     if (template.actionPlacement == ComposerActionPlacement.powerRow) {
       return _buildPowerRow(theme, template, attachAction, cameraAction);
@@ -3514,10 +3616,10 @@ class _ComposerState extends State<_Composer>
         if (template.actionPlacement == ComposerActionPlacement.split) ...[
           if (cameraAction != null) cameraAction,
           attachAction,
-        ] else ...[
-          attachAction,
-          if (cameraAction != null) cameraAction,
         ],
+        // Integrated placement follows the GB Stock entry arrangement: emoji
+        // inside the pill on the left, attach and camera inside it on the
+        // right, and the mic/send circle outside. Same callbacks as before.
         Expanded(
           child: TextField(
             controller: widget.controller,
@@ -3531,17 +3633,34 @@ class _ComposerState extends State<_Composer>
             ),
             decoration: InputDecoration(
               hintText: 'Message…  /task or #reply',
-              hintStyle: TextStyle(color: theme.secondaryTextColor),
+              hintMaxLines: 1,
+              hintStyle: TextStyle(
+                color: theme.secondaryTextColor,
+                overflow: TextOverflow.ellipsis,
+              ),
               filled: true,
               fillColor: inputBg,
               prefixIcon: IconButton(
-                tooltip: widget.emojiPickerOpen ? 'Return to keyboard' : 'Emoji',
+                tooltip: widget.emojiPickerOpen
+                    ? 'Return to keyboard'
+                    : 'Emoji',
                 onPressed: widget.onEmoji,
-                icon: Icon(
-                  Icons.emoji_emotions_outlined,
+                icon: ChatyIcon(
+                  ChatyIconId.emoji,
+                  size: 22,
                   color: emojiIconColor,
                 ),
               ),
+              suffixIcon:
+                  template.actionPlacement == ComposerActionPlacement.split
+                  ? null
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        attachAction,
+                        if (cameraAction != null) cameraAction,
+                      ],
+                    ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(template.cornerRadius),
                 borderSide: BorderSide.none,
@@ -3571,7 +3690,11 @@ class _ComposerState extends State<_Composer>
                       theme: theme,
                       semanticsLabel: 'Send message',
                       tooltip: 'Send',
-                      icon: Icons.send_rounded,
+                      iconWidget: ChatyIcon(
+                        ChatyIconId.send,
+                        size: 22,
+                        color: theme.onAccentColor,
+                      ),
                       fillColor: sendFill,
                       iconColor: theme.onAccentColor,
                       emphasized: true,
@@ -3580,7 +3703,11 @@ class _ComposerState extends State<_Composer>
                   : ChatyComposerActionButton(
                       key: const ValueKey<String>('voice-action'),
                       theme: theme,
-                      icon: Icons.mic_rounded,
+                      iconWidget: ChatyIcon(
+                        ChatyIconId.microphone,
+                        size: 22,
+                        color: theme.onAccentColor,
+                      ),
                       fillColor: micFill,
                       iconColor: theme.onAccentColor,
                       semanticsLabel:
@@ -3596,4 +3723,688 @@ class _ComposerState extends State<_Composer>
       ],
     );
   }
+  // --- Conversation Entry Style (GB-style bottom entry designs) ------------
+
+  static const String _kStockEntryStyle = 'Stock';
+
+  /// Normalizes the saved Conversation Entry style preference. Older saves
+  /// stored the bare value 'Stock'; the picker lists 'Stock (Chaty Default)'.
+  String _normalizeEntryStyle(String raw) {
+    final v = raw.trim();
+    if (v.isEmpty || v == 'Stock (Chaty Default)' || v == _kStockEntryStyle) {
+      return _kStockEntryStyle;
+    }
+    return v;
+  }
+
+  /// Shared send/voice morph action used by the styled entry layouts.
+  /// Identical callbacks to the stock composer: only the arrangement differs.
+  Widget _buildSendMicMorph(
+    ThemeConfig theme,
+    ComposerTemplate template, {
+    required Color sendFill,
+    required Color micFill,
+  }) {
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: widget.controller,
+      builder: (context, value, _) {
+        final hasText = value.text.trim().isNotEmpty;
+        return AnimatedSwitcher(
+          duration: template.enableSendMorph
+              ? const Duration(milliseconds: 180)
+              : Duration.zero,
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          child: hasText
+              ? ChatyComposerActionButton(
+                  key: const ValueKey<String>('styled-send-action'),
+                  theme: theme,
+                  semanticsLabel: 'Send message',
+                  tooltip: 'Send',
+                  iconWidget: ChatyIcon(
+                    ChatyIconId.send,
+                    size: 22,
+                    color: theme.onAccentColor,
+                  ),
+                  fillColor: sendFill,
+                  iconColor: theme.onAccentColor,
+                  emphasized: true,
+                  onTap: widget.onSend,
+                )
+              : ChatyComposerActionButton(
+                  key: const ValueKey<String>('styled-voice-action'),
+                  theme: theme,
+                  iconWidget: ChatyIcon(
+                    ChatyIconId.microphone,
+                    size: 22,
+                    color: theme.onAccentColor,
+                  ),
+                  fillColor: micFill,
+                  iconColor: theme.onAccentColor,
+                  semanticsLabel:
+                      'Voice note. Tap to start locked recording, or hold to record and slide.',
+                  onTap: widget.onVoiceTap,
+                  onLongPressStart: (_) => widget.onVoiceHoldStart(),
+                  onLongPressMoveUpdate: widget.onVoiceMove,
+                  onLongPressEnd: (_) => widget.onVoiceHoldEnd(),
+                ),
+        );
+      },
+    );
+  }
+
+  /// Renders the composer input row for a non-stock Conversation Entry style.
+  /// Selected in Settings > Conversation > Conversation Entry style; choosing
+  /// a style applies that design here, like GB's Chat Entry Style setting.
+  Widget _buildStyledEntryRow(
+    String style,
+    ThemeConfig theme,
+    ComposerTemplate template,
+  ) {
+    final conv = widget.convPrefs;
+    final uiBtnColor = conv.uiButtonsColor != null
+        ? Color(conv.uiButtonsColor!)
+        : theme.accentColor;
+    final emojiIconColor = conv.emojiButtonColor != null
+        ? Color(conv.emojiButtonColor!)
+        : (conv.uiButtonsColor != null
+              ? Color(conv.uiButtonsColor!)
+              : theme.secondaryTextColor);
+    final sendFill = conv.sendButtonColor != null
+        ? Color(conv.sendButtonColor!)
+        : theme.accentColor;
+    final micFill = conv.micSendBgCircleColor != null
+        ? Color(conv.micSendBgCircleColor!)
+        : (conv.sendButtonColor != null
+              ? Color(conv.sendButtonColor!)
+              : theme.accentColor);
+    final inputBg = conv.textEntryBackgroundColor != null
+        ? Color(conv.textEntryBackgroundColor!)
+        : theme.cardColor;
+    final inputTextColor = conv.textEntryColor != null
+        ? Color(conv.textEntryColor!)
+        : theme.primaryTextColor;
+
+    Widget emojiBtn({double size = 22}) => IconButton(
+      tooltip: widget.emojiPickerOpen ? 'Return to keyboard' : 'Emoji',
+      onPressed: widget.onEmoji,
+      icon: ChatyIcon(ChatyIconId.emoji, size: size, color: emojiIconColor),
+    );
+
+    Widget attachBtn() => ChatyComposerActionButton(
+      theme: theme,
+      semanticsLabel: 'Attach',
+      tooltip: 'Attach',
+      iconWidget: ChatyIcon(
+        ChatyIconId.attachmentPlus,
+        size: 22,
+        color: uiBtnColor,
+      ),
+      iconColor: uiBtnColor,
+      onTap: widget.onAttach,
+    );
+
+    final cameraBtn = template.showCameraShortcut
+        ? ChatyComposerActionButton(
+            theme: theme,
+            semanticsLabel: 'Camera',
+            tooltip: 'Camera',
+            iconWidget: ChatyIcon(
+              ChatyIconId.camera,
+              size: 22,
+              color: uiBtnColor,
+            ),
+            iconColor: uiBtnColor,
+            onTap: widget.onCameraTap,
+          )
+        : null;
+
+    final sendMic = _buildSendMicMorph(
+      theme,
+      template,
+      sendFill: sendFill,
+      micFill: micFill,
+    );
+
+    Widget textField({
+      Widget? prefix,
+      Widget? suffix,
+      double radius = 24,
+      bool transparent = false,
+      Color? borderColor,
+      EdgeInsetsGeometry? padding,
+    }) {
+      final border = OutlineInputBorder(
+        borderRadius: BorderRadius.circular(radius),
+        borderSide: borderColor != null
+            ? BorderSide(color: borderColor)
+            : BorderSide.none,
+      );
+      return TextField(
+        controller: widget.controller,
+        focusNode: widget.focusNode,
+        minLines: 1,
+        maxLines: 5,
+        onChanged: widget.onChanged,
+        style: TextStyle(color: inputTextColor, fontSize: 14 * theme.fontScale),
+        decoration: InputDecoration(
+          hintText: 'Message…  /task or #reply',
+          hintMaxLines: 1,
+          hintStyle: TextStyle(
+            color: theme.secondaryTextColor,
+            overflow: TextOverflow.ellipsis,
+          ),
+          filled: !transparent,
+          fillColor: transparent ? null : inputBg,
+          prefixIcon: prefix,
+          suffixIcon: suffix,
+          border: border,
+          enabledBorder: border,
+          isDense: true,
+          contentPadding:
+              padding ??
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        ),
+      );
+    }
+
+    // --- GB reference entry styles (GBWhatsApp ConvoEntry, 23 designs) ------
+    // Structures recovered from the user-supplied GB APK's layout resources
+    // (res/layout/*conversation_entry*.xml). Extra quick buttons (gallery,
+    // audio, location, contact, more) open the existing attachment sheet,
+    // which offers those exact choices; camera/emoji use their real callbacks.
+    Widget gbQa(
+      ChatyIconId id,
+      String tooltip,
+      VoidCallback onTap, {
+      Color? color,
+    }) => IconButton(
+      tooltip: tooltip,
+      onPressed: onTap,
+      icon: ChatyIcon(id, size: 22, color: color ?? uiBtnColor),
+    );
+    Widget gbGallery() => gbQa(
+      ChatyIconId.gallery,
+      'Gallery',
+      widget.onGalleryTap ?? widget.onAttach,
+    );
+    Widget gbAudio() => gbQa(
+      ChatyIconId.microphone,
+      'Audio',
+      widget.onAudioTap ?? widget.onAttach,
+    );
+    Widget gbLocation() => gbQa(
+      ChatyIconId.pin,
+      'Location',
+      widget.onLocationTap ?? widget.onAttach,
+    );
+    Widget gbContact() => gbQa(
+      ChatyIconId.profile,
+      'Contact',
+      widget.onContactTap ?? widget.onAttach,
+    );
+    Widget gbMore() =>
+        gbQa(ChatyIconId.moreOptions, 'More attachments', widget.onAttach);
+    Widget gbCamera() => cameraBtn ?? gbGallery();
+    Widget gbQuickRow(List<Widget> btns) => SizedBox(
+      height: 46,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: btns,
+      ),
+    );
+    Widget gbFieldRow({
+      Widget? prefix,
+      Widget? suffix,
+      double radius = 24,
+      bool transparent = false,
+      Color? borderColor,
+    }) => Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: textField(
+            radius: radius,
+            transparent: transparent,
+            borderColor: borderColor,
+            prefix: prefix,
+            suffix: suffix,
+          ),
+        ),
+        const SizedBox(width: 6),
+        sendMic,
+      ],
+    );
+
+    switch (style) {
+      case 'YOWA Style':
+        return gbFieldRow(prefix: emojiBtn(size: 20), suffix: attachBtn());
+      case 'WAMOD':
+        return Column(
+          children: [
+            gbFieldRow(prefix: emojiBtn(size: 20), suffix: attachBtn()),
+            gbQuickRow([
+              gbGallery(),
+              gbCamera(),
+              gbAudio(),
+              gbLocation(),
+              gbContact(),
+              gbMore(),
+            ]),
+          ],
+        );
+      case 'Hangouts':
+        return Column(
+          children: [
+            gbFieldRow(radius: 12, prefix: emojiBtn(size: 20)),
+            gbQuickRow([
+              emojiBtn(),
+              gbGallery(),
+              gbCamera(),
+              gbAudio(),
+              gbLocation(),
+              gbContact(),
+              gbMore(),
+            ]),
+          ],
+        );
+      case 'Simple':
+        // GB Simple has no emoji button (keyboard emoji); field + attach only.
+        return gbFieldRow(suffix: attachBtn());
+      case 'Aran V2':
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            attachBtn(),
+            emojiBtn(),
+            Expanded(child: textField(radius: 20)),
+            const SizedBox(width: 6),
+            sendMic,
+          ],
+        );
+      case 'Mood':
+        return gbFieldRow(
+          radius: 28,
+          prefix: emojiBtn(size: 20),
+          suffix: attachBtn(),
+        );
+      case 'WANH':
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            attachBtn(),
+            emojiBtn(),
+            Expanded(child: textField(radius: 20)),
+            const SizedBox(width: 6),
+            sendMic,
+          ],
+        );
+      case 'Hangouts V2':
+        return Column(
+          children: [
+            gbQuickRow([
+              gbGallery(),
+              gbCamera(),
+              gbLocation(),
+              gbContact(),
+              gbAudio(),
+              gbMore(),
+            ]),
+            gbFieldRow(radius: 12, prefix: emojiBtn(size: 20)),
+          ],
+        );
+      case 'Dribble':
+        return Column(
+          children: [
+            gbQuickRow([
+              emojiBtn(),
+              gbGallery(),
+              gbCamera(),
+              gbAudio(),
+              gbLocation(),
+              gbMore(),
+            ]),
+            gbFieldRow(),
+          ],
+        );
+      case 'Dribble V2':
+        return Column(
+          children: [
+            gbQuickRow([
+              emojiBtn(),
+              gbGallery(),
+              gbCamera(),
+              gbAudio(),
+              gbLocation(),
+              gbMore(),
+            ]),
+            gbFieldRow(
+              radius: 16,
+              transparent: true,
+              borderColor: theme.secondaryTextColor.withValues(alpha: 0.3),
+            ),
+          ],
+        );
+      case 'Allo':
+        return gbFieldRow(prefix: attachBtn(), suffix: emojiBtn(size: 20));
+      case 'Rounded':
+        return Column(
+          children: [
+            gbFieldRow(prefix: emojiBtn(size: 20), suffix: attachBtn()),
+            gbQuickRow([
+              gbGallery(),
+              gbCamera(),
+              gbLocation(),
+              gbContact(),
+              gbAudio(),
+              gbMore(),
+            ]),
+          ],
+        );
+      case 'Old Stock (2016)':
+        return gbFieldRow(
+          radius: 8,
+          prefix: emojiBtn(size: 20),
+          suffix: attachBtn(),
+        );
+      case 'RC-MSG Google':
+        // The reference APK itself ships no msggoogle layout and falls back
+        // to its Stock entry; mirror that fallback exactly.
+        return gbFieldRow(prefix: emojiBtn(size: 20), suffix: attachBtn());
+      case 'RC-Telegram X iOS':
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            attachBtn(),
+            Expanded(child: textField(radius: 20, suffix: emojiBtn(size: 20))),
+            const SizedBox(width: 6),
+            sendMic,
+          ],
+        );
+      case 'RC-IOS 11':
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            emojiBtn(),
+            Expanded(child: textField(radius: 20, suffix: attachBtn())),
+            if (cameraBtn != null) cameraBtn,
+            const SizedBox(width: 6),
+            sendMic,
+          ],
+        );
+      case 'RC-Line':
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            attachBtn(),
+            if (cameraBtn != null) cameraBtn,
+            Expanded(child: textField(radius: 20, suffix: emojiBtn(size: 20))),
+            const SizedBox(width: 6),
+            sendMic,
+          ],
+        );
+      case 'Concept':
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: textField(
+                radius: 20,
+                suffix: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (cameraBtn != null) cameraBtn,
+                    emojiBtn(size: 20),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            sendMic,
+            attachBtn(),
+          ],
+        );
+      case 'Instagram':
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (cameraBtn != null) cameraBtn,
+            Expanded(
+              child: textField(
+                radius: 20,
+                suffix: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [emojiBtn(size: 20), gbGallery(), attachBtn()],
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            sendMic,
+          ],
+        );
+      case 'iOS 14':
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            attachBtn(),
+            Expanded(child: textField(radius: 22, suffix: emojiBtn(size: 20))),
+            const SizedBox(width: 6),
+            sendMic,
+          ],
+        );
+      case 'FB Messenger':
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            attachBtn(),
+            if (cameraBtn != null) cameraBtn,
+            gbGallery(),
+            Expanded(child: textField(radius: 22, suffix: emojiBtn(size: 20))),
+            const SizedBox(width: 6),
+            sendMic,
+          ],
+        );
+      case 'RC Mess':
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            attachBtn(),
+            if (cameraBtn != null) cameraBtn,
+            Expanded(child: textField(radius: 22)),
+            const SizedBox(width: 6),
+            sendMic,
+          ],
+        );
+
+      case 'Telegram Modern':
+        // Attach button outside on the left, compact rounded field with the
+        // emoji button inside on the right, send/voice outside on the right.
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            attachBtn(),
+            const SizedBox(width: 2),
+            Expanded(child: textField(radius: 18, suffix: emojiBtn(size: 20))),
+            const SizedBox(width: 6),
+            sendMic,
+          ],
+        );
+
+      case 'iOS Clean Rounded':
+        // Filled plus button outside left, clean pill field, send/voice right.
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            ChatyComposerActionButton(
+              theme: theme,
+              semanticsLabel: 'Attach',
+              tooltip: 'Attach',
+              iconWidget: ChatyIcon(
+                ChatyIconId.attachmentPlus,
+                size: 22,
+                color: theme.onAccentColor,
+              ),
+              fillColor: uiBtnColor,
+              iconColor: theme.onAccentColor,
+              onTap: widget.onAttach,
+            ),
+            const SizedBox(width: 6),
+            Expanded(child: textField(radius: 26)),
+            const SizedBox(width: 6),
+            sendMic,
+          ],
+        );
+
+      case 'Hangouts Minimal':
+        // Flat minimal bar: emoji left, transparent underlined field, attach
+        // and send/voice as plain actions on the right.
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            emojiBtn(),
+            Expanded(
+              child: textField(
+                radius: 10,
+                transparent: true,
+                borderColor: theme.secondaryTextColor.withValues(alpha: 0.3),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 10,
+                ),
+              ),
+            ),
+            attachBtn(),
+            const SizedBox(width: 2),
+            sendMic,
+          ],
+        );
+
+      case 'Simple Pill':
+        // Plain pill with only the emoji inside; attach, camera and
+        // send/voice sit outside on the right.
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(child: textField(radius: 26, prefix: emojiBtn(size: 20))),
+            attachBtn(),
+            if (cameraBtn != null) cameraBtn,
+            const SizedBox(width: 2),
+            sendMic,
+          ],
+        );
+
+      case 'RC-Flat Floating':
+        // Raised floating card: the whole entry sits in one elevated,
+        // rounded container above the conversation.
+        return Container(
+          margin: const EdgeInsets.fromLTRB(4, 0, 4, 6),
+          decoration: BoxDecoration(
+            color: inputBg,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.18),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.fromLTRB(2, 2, 6, 2),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: textField(
+                  radius: 14,
+                  transparent: true,
+                  prefix: emojiBtn(size: 20),
+                  suffix: attachBtn(),
+                ),
+              ),
+              sendMic,
+            ],
+          ),
+        );
+
+      case 'WhatsApp Classic 3D':
+        // Classic raised pill with a soft drop shadow, emoji inside left,
+        // attach and camera inside right, send/voice circle outside.
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: inputBg,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.16),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: textField(
+                  radius: 24,
+                  transparent: true,
+                  prefix: emojiBtn(size: 20),
+                  suffix: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [attachBtn(), if (cameraBtn != null) cameraBtn],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            sendMic,
+          ],
+        );
+
+      case 'Signal Compact Bubble':
+        // Compact bubble field with attach inside and tighter padding.
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: textField(
+                radius: 20,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                suffix: attachBtn(),
+              ),
+            ),
+            const SizedBox(width: 6),
+            sendMic,
+          ],
+        );
+
+      default:
+        // Unknown saved value: fall back to the stock integrated layout.
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: textField(
+                radius: template.cornerRadius,
+                prefix: emojiBtn(size: 22),
+                suffix: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [attachBtn(), if (cameraBtn != null) cameraBtn],
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            sendMic,
+          ],
+        );
+    }
+  }
 }
+
+/// Test-only handle to the private composer so a widget test can render it.
+// ignore: library_private_types_in_public_api
+@visibleForTesting
+typedef ChatComposerForTest = _Composer;
