@@ -511,7 +511,7 @@ class SettingsRootScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _GbGroup(title: 'Account and devices', children: [
+                    _GbGroup(title: 'Devices', children: [
                     _SettingsItemTile(
                       icon: Icon(Icons.devices_rounded, color: colors.foregroundSecondary, size: 24),
                       title: 'Linked Devices',
