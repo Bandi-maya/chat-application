@@ -19,7 +19,9 @@ Future<void> _loadFont(String family, String file) async {
   if (!f.existsSync()) return;
   final bytes = await f.readAsBytes();
   final loader = FontLoader(family)
-    ..addFont(Future<ByteData>.value(ByteData.sublistView(Uint8List.fromList(bytes))));
+    ..addFont(
+      Future<ByteData>.value(ByteData.sublistView(Uint8List.fromList(bytes))),
+    );
   await loader.load();
 }
 
@@ -36,7 +38,29 @@ void main() {
   });
 
   const styles = [
-    'Stock (Chaty Default)',
+    'Stock',
+    'YOWA Style',
+    'WAMOD',
+    'Hangouts',
+    'Simple',
+    'Aran V2',
+    'Mood',
+    'WANH',
+    'Hangouts V2',
+    'Dribble',
+    'Dribble V2',
+    'Allo',
+    'Rounded',
+    'Old Stock (2016)',
+    'RC-MSG Google',
+    'RC-Telegram X iOS',
+    'RC-IOS 11',
+    'RC-Line',
+    'Concept',
+    'Instagram',
+    'iOS 14',
+    'FB Messenger',
+    'RC Mess',
     'Telegram Modern',
     'iOS Clean Rounded',
     'Hangouts Minimal',
@@ -48,14 +72,17 @@ void main() {
 
   for (final b in [Brightness.light, Brightness.dark]) {
     testWidgets('entry styles ${b.name}', (tester) async {
-      tester.view.physicalSize = const Size(720, 3200);
+      tester.view.physicalSize = const Size(720, 12000);
       tester.view.devicePixelRatio = 2;
       addTearDown(tester.view.reset);
       final theme = ThemeController()..syncWithSystem(b);
       final key = GlobalKey();
-      Widget composer(String style, [String text = 'Hello there']) => ChatComposerForTest(
+      Widget composer(String style, [String text = 'Hello there']) =>
+          ChatComposerForTest(
             theme: theme.globalTheme,
-            convPrefs: const ConversationPreferences().copyWith(entryStyle: style),
+            convPrefs: const ConversationPreferences().copyWith(
+              entryStyle: style,
+            ),
             controller: TextEditingController(text: text),
             focusNode: FocusNode(),
             emojiPickerOpen: false,
@@ -81,10 +108,14 @@ void main() {
           child: MaterialApp(
             debugShowCheckedModeBanner: false,
             theme: theme.globalTheme.toThemeData().copyWith(
-              textTheme: theme.globalTheme.toThemeData().textTheme.apply(fontFamily: 'Roboto'),
+              textTheme: theme.globalTheme.toThemeData().textTheme.apply(
+                fontFamily: 'Roboto',
+              ),
             ),
             home: Scaffold(
-              backgroundColor: b == Brightness.dark ? const Color(0xFF0B0B0C) : Colors.white,
+              backgroundColor: b == Brightness.dark
+                  ? const Color(0xFF0B0B0C)
+                  : Colors.white,
               body: Column(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -109,11 +140,14 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       expect(tester.takeException(), isNull);
       await tester.runAsync(() async {
-        final boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary;
+        final boundary =
+            key.currentContext!.findRenderObject() as RenderRepaintBoundary;
         final image = await boundary.toImage(pixelRatio: 1);
         final data = await image.toByteData(format: ui.ImageByteFormat.png);
         final dir = Directory('build/ui_renders')..createSync(recursive: true);
-        File('${dir.path}/entry_styles_${b.name}.png').writeAsBytesSync(data!.buffer.asUint8List());
+        File(
+          '${dir.path}/entry_styles_${b.name}.png',
+        ).writeAsBytesSync(data!.buffer.asUint8List());
       });
     });
   }
