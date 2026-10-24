@@ -67,9 +67,6 @@ void main() {
         try {
           await Supabase.initialize(url: 'http://localhost:54321', anonKey: 'x');
         } catch (_) {}
-        if (!locator.isRegistered<ThemeController>()) {
-          locator.registerLazySingleton<ThemeController>(() => ThemeController());
-        }
         if (!locator.isRegistered<AppearanceVariantController>()) {
           locator.registerLazySingleton<AppearanceVariantController>(() => AppearanceVariantController());
         }
@@ -82,7 +79,13 @@ void main() {
         tester.view.physicalSize = const Size(800, 3000);
         tester.view.devicePixelRatio = 2;
         addTearDown(tester.view.reset);
+        // The app resolves its theme through the locator, so register the same
+        // brightness-synced controller the MaterialApp uses.
+        if (locator.isRegistered<ThemeController>()) {
+          await locator.unregister<ThemeController>();
+        }
         final theme = ThemeController()..syncWithSystem(b);
+        locator.registerSingleton<ThemeController>(theme);
         final prefs = ChatyPreferencesController();
         final key = GlobalKey();
         try {
