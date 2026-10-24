@@ -11,6 +11,7 @@ import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/design_system.dart'
     hide ChatySettingsSection;
 import '../../../ui/core/design_system/settings_primitives.dart';
+import '../../calls/call_screen_template.dart';
 import 'call_presentation_preferences.dart';
 
 /// Dedicated canonical settings screen for Audio/Video Calls, privacy exceptions, and island controls.
@@ -170,7 +171,73 @@ class _CallSettingsScreenState extends State<CallSettingsScreen> {
               ],
             ),
 
-            // 2. CALL PRESENTATION & CONTROLS
+            // 2. CALL SCREEN TEMPLATES (CHATY DESIGNS)
+            ChatySettingsSection(
+              title: 'Call Screen Style',
+              description:
+                  'Chaty-designed screen layouts. GB WhatsApp customizes call '
+                  'colors (see GB Features) but ships no screen templates.',
+              children: [
+                ChatySettingsTile(
+                  icon: Icons.call_received_rounded,
+                  iconColor: colors.primary,
+                  title: 'Incoming Call Screen',
+                  subtitle: CallScreenTemplate.fromName(
+                    callPreferences.incomingCallTemplate,
+                  ).displayName,
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () async {
+                    final chosen = await ChatySingleChoiceModal.show<String>(
+                      context: context,
+                      title: 'Incoming Call Screen',
+                      description:
+                          'Chaty design applied to the incoming call UI.',
+                      value: callPreferences.incomingCallTemplate,
+                      options: CallScreenTemplate.all
+                          .map((t) => t.name)
+                          .toList(growable: false),
+                      labelBuilder: (name) =>
+                          CallScreenTemplate.fromName(name).displayName,
+                    );
+                    if (chosen != null) {
+                      unawaited(
+                        _callPreferences.setIncomingCallTemplate(chosen),
+                      );
+                    }
+                  },
+                ),
+                ChatySettingsTile(
+                  icon: Icons.call_made_rounded,
+                  iconColor: colors.primary,
+                  title: 'Ongoing Call Screen',
+                  subtitle: CallScreenTemplate.fromName(
+                    callPreferences.ongoingCallTemplate,
+                  ).displayName,
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () async {
+                    final chosen = await ChatySingleChoiceModal.show<String>(
+                      context: context,
+                      title: 'Ongoing Call Screen',
+                      description:
+                          'Chaty design applied while a call is active.',
+                      value: callPreferences.ongoingCallTemplate,
+                      options: CallScreenTemplate.all
+                          .map((t) => t.name)
+                          .toList(growable: false),
+                      labelBuilder: (name) =>
+                          CallScreenTemplate.fromName(name).displayName,
+                    );
+                    if (chosen != null) {
+                      unawaited(
+                        _callPreferences.setOutgoingCallTemplate(chosen),
+                      );
+                    }
+                  },
+                ),
+              ],
+            ),
+
+            // 3. CALL PRESENTATION & CONTROLS
             ChatySettingsSection(
               title: 'In-App Call Presentation',
               children: [
