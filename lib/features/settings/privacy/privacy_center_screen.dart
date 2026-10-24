@@ -265,35 +265,8 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
     'Nobody',
   ];
 
-  void _showWhoCanCallMeDialog() {
-    final prefs = widget.preferencesController.privacy;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Who can call me?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: _audienceOptions.map((opt) {
-            return RadioListTile<String>(
-              title: Text(opt),
-              value: opt,
-              groupValue: prefs.whoCanCallMe,
-              activeColor: Theme.of(context).colorScheme.primary,
-              onChanged: (val) {
-                if (val != null) {
-                  widget.preferencesController.updatePrivacy(
-                    prefs.copyWith(whoCanCallMe: val),
-                    logTitle: 'Who can call me',
-                  );
-                  Navigator.pop(ctx);
-                }
-              },
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
+  void _showWhoCanCallMeDialog() =>
+      showWhoCanCallMeDialog(context, widget.preferencesController);
 
   void _showCustomPrivacyDialog(String title) {
     showDialog(
@@ -1071,4 +1044,47 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
       ),
     );
   }
+}
+
+
+const List<String> _whoCanCallAudienceOptions = <String>[
+  'Everyone',
+  'My Contacts',
+  'My Contacts Except…',
+  'Nobody',
+];
+
+/// The existing "Who can call me?" dialog, reusable from other screens.
+/// Same options and the same privacy preference update as Privacy Center.
+Future<void> showWhoCanCallMeDialog(
+  BuildContext context,
+  PreferencesController preferencesController,
+) {
+  final prefs = preferencesController.privacy;
+  return showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Who can call me?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: _whoCanCallAudienceOptions.map((opt) {
+          return RadioListTile<String>(
+            title: Text(opt),
+            value: opt,
+            groupValue: prefs.whoCanCallMe,
+            activeColor: Theme.of(ctx).colorScheme.primary,
+            onChanged: (val) {
+              if (val != null) {
+                preferencesController.updatePrivacy(
+                  prefs.copyWith(whoCanCallMe: val),
+                  logTitle: 'Who can call me',
+                );
+                Navigator.pop(ctx);
+              }
+            },
+          );
+        }).toList(),
+      ),
+    ),
+  );
 }
