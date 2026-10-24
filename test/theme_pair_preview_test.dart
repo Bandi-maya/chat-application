@@ -64,4 +64,28 @@ void main() {
     );
     expect(active.theme.cornerRadius, palette.cornerRadius);
   });
+
+  test('preview layout filters hidden tabs and resolves bottom bar and preset', () {
+    const config = UserTemplateConfiguration(
+      baseTemplate: ChatyTemplateId.messageFirst,
+    );
+    final all = PreviewLayout.resolve(config);
+    final hidden = PreviewLayout.resolve(
+      config,
+      hiddenDestinationIds: const {'tasks', 'updates'},
+      bottomBarStyle: 'Raised Center Action',
+      homeStylePreset: 'Custom',
+      showStories: true,
+    );
+    expect(hidden.destinationIds.contains('tasks'), isFalse);
+    expect(hidden.destinationIds.contains('updates'), isFalse);
+    for (final id in hidden.destinationIds) {
+      expect(all.destinationIds.contains(id) || all.destinationIds.length == 5,
+          isTrue);
+    }
+    expect(hidden.bottomBarStyle, 'Raised Center Action');
+    expect(hidden.homeStylePreset, 'Custom');
+    expect(hidden.showStories, isTrue);
+    expect(all.bottomBarStyle, isNotEmpty);
+  });
 }
