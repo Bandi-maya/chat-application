@@ -295,10 +295,14 @@ class _ConversationMini extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                text,
-                textScaler: TextScaler.noScaling,
-                style: TextStyle(color: textColor, fontSize: 7.5),
+              Flexible(
+                child: Text(
+                  text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textScaler: TextScaler.noScaling,
+                  style: TextStyle(color: textColor, fontSize: 7.5),
+                ),
               ),
               if (tick) ...[
                 const SizedBox(width: 3),
@@ -364,7 +368,7 @@ class _ConversationMini extends StatelessWidget {
               children: [
                 _bubble(
                   isMe: false,
-                  text: 'Lunch today?',
+                  text: 'Lunch?',
                   fill: t.incomingBubbleColor,
                   textColor: t.incomingTextColor,
                   stroke: t.secondaryTextColor.withValues(alpha: 0.12),
@@ -381,7 +385,7 @@ class _ConversationMini extends StatelessWidget {
                 const SizedBox(height: 4),
                 _bubble(
                   isMe: false,
-                  text: 'See you at 1',
+                  text: 'At 1?',
                   fill: t.incomingBubbleColor,
                   textColor: t.incomingTextColor,
                   stroke: t.secondaryTextColor.withValues(alpha: 0.12),
