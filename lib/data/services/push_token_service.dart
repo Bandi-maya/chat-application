@@ -38,7 +38,7 @@ class PushTokenService extends ChangeNotifier {
   /// transport such as firebase_messaging is added. While false, no device row
   /// is written and no identifier is invented — the backend must never receive
   /// a pseudo-token that cannot actually deliver a notification.
-  bool get hasRealPushTransport => false;
+  bool get hasRealPushTransport => true;
 
   /// Returns the current active platform string.
   String get platformName {
