@@ -10,8 +10,7 @@ import '../messages/message_bubble.dart';
 import '../../domain/models/chat_message.dart';
 import '../../ui/core/theme/chaty_theme_manager.dart';
 import '../../ui/core/theme/image_theme_generator.dart';
-import '../../ui/core/templates/applied_preview_model.dart';
-import '../../ui/core/templates/template_controller.dart';
+import '../../ui/core/templates/applied_pair_preview.dart';
 import '../../ui/core/theme/theme_preview_card.dart';
 import '../../ui/core/ticks/delivery_icon_style.dart';
 
@@ -262,9 +261,7 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
                 final isSelected = preset.id == _current.id;
                 return ThemePreviewCard(
                   themeConfig: preset,
-                  layout: PreviewLayout.resolve(
-                    locator<TemplateController>().config,
-                  ),
+                  layout: currentSetupLayout(),
                   isSelected: isSelected,
                   onTap: () {
                     setState(() => _current = preset);
