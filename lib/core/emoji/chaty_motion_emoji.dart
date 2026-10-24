@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'chaty_emoji_style.dart';
-import 'chaty_ios_animated_emoji.dart';
 
 /// High-performance, offline-first vector animated emoji engine for Chaty.
 /// Renders 10 genuinely distinct emoji visual styles with 60/120fps procedural
@@ -87,21 +86,6 @@ class _ChatyMotionEmojiState extends State<ChatyMotionEmoji>
   Widget build(BuildContext context) {
     final clean = widget.unicode.replaceAll('\uFE0F', '').replaceAll('\uFE0E', '').trim();
 
-    // iOS Animated (Drive) style renders its bundled WebP pack when the
-    // emoji is covered; anything outside the 50-emoji pack falls back to the
-    // Chaty Motion procedural art so it never paints blank.
-    if (widget.style == ChatyEmojiStyleId.iosAnimated &&
-        ChatyIosAnimatedEmoji.isSupported(clean)) {
-      return IosAnimatedEmojiView(
-        unicode: clean,
-        size: widget.size,
-        animate: widget.animate,
-      );
-    }
-    final effectiveStyle = widget.style == ChatyEmojiStyleId.iosAnimated
-        ? ChatyEmojiStyleId.chatyMotion
-        : widget.style;
-
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
@@ -113,7 +97,7 @@ class _ChatyMotionEmojiState extends State<ChatyMotionEmoji>
               unicode: clean,
               progress: _controller.value,
               animate: widget.animate,
-              style: effectiveStyle,
+              style: widget.style,
             ),
           ),
         );
@@ -192,7 +176,6 @@ class _ChatyMotionEmojiPainter extends CustomPainter {
     final center = Offset(32, 32 + nod);
 
     switch (style) {
-      case ChatyEmojiStyleId.iosAnimated:
       case ChatyEmojiStyleId.chatyMotion:
         // Original Chaty Motion: vibrant yellow with animated spurting teardrops
         final facePaint = Paint()..color = const Color(0xFFFFCC4D);
@@ -441,7 +424,6 @@ class _ChatyMotionEmojiPainter extends CustomPainter {
       ..close();
 
     switch (style) {
-      case ChatyEmojiStyleId.iosAnimated:
       case ChatyEmojiStyleId.chatyPixel:
         // 8-bit stepped pixel heart
         final red = Paint()..color = const Color(0xFFFF0044);
