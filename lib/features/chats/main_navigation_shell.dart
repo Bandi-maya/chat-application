@@ -326,7 +326,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           ),
         ];
 
-        // Resolve the selected template's destination order without changi        // User-selectable nav tabs: Tasks and Updates can be hidden from the
+        // User-selectable nav tabs: Tasks and Updates can be hidden from the
         // bottom navigation (Settings > Home screen). Default is shown.
         if (preferencesController.gbBool('nav_hide_tasks')) {
           destinationCatalog.removeWhere((item) => item.id == 'tasks');
@@ -334,7 +334,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         if (preferencesController.gbBool('nav_hide_updates')) {
           destinationCatalog.removeWhere((item) => item.id == 'updates');
         }
-ng
+
+        // Resolve the selected template's destination order without changing
         // destination identity. Keeping a stable ID means applying a layout
         // while Settings is open never sends the user to an unrelated screen.
         final navigationTemplate = templateController.navigation;
