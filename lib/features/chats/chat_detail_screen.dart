@@ -33,6 +33,7 @@ import '../../ui/core/design_system/components/app_components.dart';
 import '../../ui/core/design_system/components/composer_components.dart';
 import '../../ui/core/gb/gb_theme_overrides.dart';
 import '../../ui/core/icons/chaty_canonical_overflow_button.dart';
+import '../../ui/core/icons/chaty_icon_registry.dart';
 import '../../core/emoji/widgets/animated_emoji_text.dart';
 import '../../ui/core/menu/app_context_menu.dart';
 import '../../ui/core/widgets/app_avatar.dart';
@@ -3389,8 +3390,9 @@ class _ComposerState extends State<_Composer>
             IconButton(
               tooltip: widget.emojiPickerOpen ? 'Return to keyboard' : 'Emoji',
               onPressed: widget.onEmoji,
-              icon: Icon(
-                Icons.emoji_emotions_outlined,
+              icon: ChatyIcon(
+                ChatyIconId.emoji,
+                size: 24,
                 color: emojiIconColor,
               ),
             ),
@@ -3411,7 +3413,11 @@ class _ComposerState extends State<_Composer>
                           theme: theme,
                           semanticsLabel: 'Send message',
                           tooltip: 'Send',
-                          icon: Icons.send_rounded,
+                          iconWidget: ChatyIcon(
+                            ChatyIconId.send,
+                            size: 22,
+                            color: theme.onAccentColor,
+                          ),
                           fillColor: sendFill,
                           iconColor: theme.onAccentColor,
                           emphasized: true,
@@ -3420,7 +3426,11 @@ class _ComposerState extends State<_Composer>
                       : ChatyComposerActionButton(
                           key: const ValueKey<String>('power-voice-action'),
                           theme: theme,
-                          icon: Icons.mic_rounded,
+                          iconWidget: ChatyIcon(
+                            ChatyIconId.microphone,
+                            size: 22,
+                            color: theme.onAccentColor,
+                          ),
                           fillColor: micFill,
                           iconColor: theme.onAccentColor,
                           semanticsLabel:
@@ -3489,7 +3499,11 @@ class _ComposerState extends State<_Composer>
       theme: theme,
       semanticsLabel: 'Attach',
       tooltip: 'Attach',
-      icon: Icons.add_circle_outline_rounded,
+      iconWidget: ChatyIcon(
+        ChatyIconId.attachmentPlus,
+        size: 22,
+        color: uiBtnColor,
+      ),
       iconColor: uiBtnColor,
       onTap: widget.onAttach,
     );
@@ -3498,11 +3512,20 @@ class _ComposerState extends State<_Composer>
             theme: theme,
             semanticsLabel: 'Camera',
             tooltip: 'Camera',
-            icon: Icons.photo_camera_rounded,
+            iconWidget: ChatyIcon(
+              ChatyIconId.camera,
+              size: 22,
+              color: uiBtnColor,
+            ),
             iconColor: uiBtnColor,
             onTap: widget.onCameraTap,
           )
         : null;
+
+    final entryStyle = _normalizeEntryStyle(conv.entryStyle);
+    if (entryStyle != _kStockEntryStyle) {
+      return _buildStyledEntryRow(entryStyle, theme, template);
+    }
 
     if (template.actionPlacement == ComposerActionPlacement.powerRow) {
       return _buildPowerRow(theme, template, attachAction, cameraAction);
@@ -3541,8 +3564,9 @@ class _ComposerState extends State<_Composer>
               prefixIcon: IconButton(
                 tooltip: widget.emojiPickerOpen ? 'Return to keyboard' : 'Emoji',
                 onPressed: widget.onEmoji,
-                icon: Icon(
-                  Icons.emoji_emotions_outlined,
+                icon: ChatyIcon(
+                  ChatyIconId.emoji,
+                  size: 22,
                   color: emojiIconColor,
                 ),
               ),
@@ -3585,7 +3609,11 @@ class _ComposerState extends State<_Composer>
                       theme: theme,
                       semanticsLabel: 'Send message',
                       tooltip: 'Send',
-                      icon: Icons.send_rounded,
+                      iconWidget: ChatyIcon(
+                        ChatyIconId.send,
+                        size: 22,
+                        color: theme.onAccentColor,
+                      ),
                       fillColor: sendFill,
                       iconColor: theme.onAccentColor,
                       emphasized: true,
@@ -3594,7 +3622,11 @@ class _ComposerState extends State<_Composer>
                   : ChatyComposerActionButton(
                       key: const ValueKey<String>('voice-action'),
                       theme: theme,
-                      icon: Icons.mic_rounded,
+                      iconWidget: ChatyIcon(
+                        ChatyIconId.microphone,
+                        size: 22,
+                        color: theme.onAccentColor,
+                      ),
                       fillColor: micFill,
                       iconColor: theme.onAccentColor,
                       semanticsLabel:
@@ -3609,6 +3641,393 @@ class _ComposerState extends State<_Composer>
         ),
       ],
     );
+  }
+  // --- Conversation Entry Style (GB-style bottom entry designs) ------------
+
+  static const String _kStockEntryStyle = 'Stock (Chaty Default)';
+
+  /// Normalizes the saved Conversation Entry style preference. Older saves
+  /// stored the bare value 'Stock'; the picker lists 'Stock (Chaty Default)'.
+  String _normalizeEntryStyle(String raw) {
+    final v = raw.trim();
+    if (v.isEmpty || v == 'Stock' || v == _kStockEntryStyle) {
+      return _kStockEntryStyle;
+    }
+    return v;
+  }
+
+  /// Shared send/voice morph action used by the styled entry layouts.
+  /// Identical callbacks to the stock composer: only the arrangement differs.
+  Widget _buildSendMicMorph(
+    ThemeConfig theme,
+    ComposerTemplate template, {
+    required Color sendFill,
+    required Color micFill,
+  }) {
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: widget.controller,
+      builder: (context, value, _) {
+        final hasText = value.text.trim().isNotEmpty;
+        return AnimatedSwitcher(
+          duration: template.enableSendMorph
+              ? const Duration(milliseconds: 180)
+              : Duration.zero,
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          child: hasText
+              ? ChatyComposerActionButton(
+                  key: const ValueKey<String>('styled-send-action'),
+                  theme: theme,
+                  semanticsLabel: 'Send message',
+                  tooltip: 'Send',
+                  iconWidget: ChatyIcon(
+                    ChatyIconId.send,
+                    size: 22,
+                    color: theme.onAccentColor,
+                  ),
+                  fillColor: sendFill,
+                  iconColor: theme.onAccentColor,
+                  emphasized: true,
+                  onTap: widget.onSend,
+                )
+              : ChatyComposerActionButton(
+                  key: const ValueKey<String>('styled-voice-action'),
+                  theme: theme,
+                  iconWidget: ChatyIcon(
+                    ChatyIconId.microphone,
+                    size: 22,
+                    color: theme.onAccentColor,
+                  ),
+                  fillColor: micFill,
+                  iconColor: theme.onAccentColor,
+                  semanticsLabel:
+                      'Voice note. Tap to start locked recording, or hold to record and slide.',
+                  onTap: widget.onVoiceTap,
+                  onLongPressStart: (_) => widget.onVoiceHoldStart(),
+                  onLongPressMoveUpdate: widget.onVoiceMove,
+                  onLongPressEnd: (_) => widget.onVoiceHoldEnd(),
+                ),
+        );
+      },
+    );
+  }
+
+  /// Renders the composer input row for a non-stock Conversation Entry style.
+  /// Selected in Settings > Conversation > Conversation Entry style; choosing
+  /// a style applies that design here, like GB's Chat Entry Style setting.
+  Widget _buildStyledEntryRow(
+    String style,
+    ThemeConfig theme,
+    ComposerTemplate template,
+  ) {
+    final conv = widget.convPrefs;
+    final uiBtnColor = conv.uiButtonsColor != null
+        ? Color(conv.uiButtonsColor!)
+        : theme.accentColor;
+    final emojiIconColor = conv.emojiButtonColor != null
+        ? Color(conv.emojiButtonColor!)
+        : (conv.uiButtonsColor != null
+            ? Color(conv.uiButtonsColor!)
+            : theme.secondaryTextColor);
+    final sendFill = conv.sendButtonColor != null
+        ? Color(conv.sendButtonColor!)
+        : theme.accentColor;
+    final micFill = conv.micSendBgCircleColor != null
+        ? Color(conv.micSendBgCircleColor!)
+        : (conv.sendButtonColor != null
+            ? Color(conv.sendButtonColor!)
+            : theme.accentColor);
+    final inputBg = conv.textEntryBackgroundColor != null
+        ? Color(conv.textEntryBackgroundColor!)
+        : theme.cardColor;
+    final inputTextColor = conv.textEntryColor != null
+        ? Color(conv.textEntryColor!)
+        : theme.primaryTextColor;
+
+    Widget emojiBtn({double size = 22}) => IconButton(
+          tooltip: widget.emojiPickerOpen ? 'Return to keyboard' : 'Emoji',
+          onPressed: widget.onEmoji,
+          icon: ChatyIcon(
+            ChatyIconId.emoji,
+            size: size,
+            color: emojiIconColor,
+          ),
+        );
+
+    Widget attachBtn() => ChatyComposerActionButton(
+          theme: theme,
+          semanticsLabel: 'Attach',
+          tooltip: 'Attach',
+          iconWidget: ChatyIcon(
+            ChatyIconId.attachmentPlus,
+            size: 22,
+            color: uiBtnColor,
+          ),
+          iconColor: uiBtnColor,
+          onTap: widget.onAttach,
+        );
+
+    final cameraBtn = template.showCameraShortcut
+        ? ChatyComposerActionButton(
+            theme: theme,
+            semanticsLabel: 'Camera',
+            tooltip: 'Camera',
+            iconWidget: ChatyIcon(
+              ChatyIconId.camera,
+              size: 22,
+              color: uiBtnColor,
+            ),
+            iconColor: uiBtnColor,
+            onTap: widget.onCameraTap,
+          )
+        : null;
+
+    final sendMic = _buildSendMicMorph(
+      theme,
+      template,
+      sendFill: sendFill,
+      micFill: micFill,
+    );
+
+    Widget textField({
+      Widget? prefix,
+      Widget? suffix,
+      double radius = 24,
+      bool transparent = false,
+      Color? borderColor,
+      EdgeInsetsGeometry? padding,
+    }) {
+      final border = OutlineInputBorder(
+        borderRadius: BorderRadius.circular(radius),
+        borderSide: borderColor != null
+            ? BorderSide(color: borderColor)
+            : BorderSide.none,
+      );
+      return TextField(
+        controller: widget.controller,
+        focusNode: widget.focusNode,
+        minLines: 1,
+        maxLines: 5,
+        onChanged: widget.onChanged,
+        style: TextStyle(
+          color: inputTextColor,
+          fontSize: 14 * theme.fontScale,
+        ),
+        decoration: InputDecoration(
+          hintText: 'Message…  /task or #reply',
+          hintMaxLines: 1,
+          hintStyle: TextStyle(
+            color: theme.secondaryTextColor,
+            overflow: TextOverflow.ellipsis,
+          ),
+          filled: !transparent,
+          fillColor: transparent ? null : inputBg,
+          prefixIcon: prefix,
+          suffixIcon: suffix,
+          border: border,
+          enabledBorder: border,
+          isDense: true,
+          contentPadding: padding ??
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        ),
+      );
+    }
+
+    switch (style) {
+      case 'Telegram Modern':
+        // Attach button outside on the left, compact rounded field with the
+        // emoji button inside on the right, send/voice outside on the right.
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            attachBtn(),
+            const SizedBox(width: 2),
+            Expanded(child: textField(radius: 18, suffix: emojiBtn(size: 20))),
+            const SizedBox(width: 6),
+            sendMic,
+          ],
+        );
+
+      case 'iOS Clean Rounded':
+        // Filled plus button outside left, clean pill field, send/voice right.
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            ChatyComposerActionButton(
+              theme: theme,
+              semanticsLabel: 'Attach',
+              tooltip: 'Attach',
+              iconWidget: ChatyIcon(
+                ChatyIconId.attachmentPlus,
+                size: 22,
+                color: theme.onAccentColor,
+              ),
+              fillColor: uiBtnColor,
+              iconColor: theme.onAccentColor,
+              onTap: widget.onAttach,
+            ),
+            const SizedBox(width: 6),
+            Expanded(child: textField(radius: 26)),
+            const SizedBox(width: 6),
+            sendMic,
+          ],
+        );
+
+      case 'Hangouts Minimal':
+        // Flat minimal bar: emoji left, transparent underlined field, attach
+        // and send/voice as plain actions on the right.
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            emojiBtn(),
+            Expanded(
+              child: textField(
+                radius: 10,
+                transparent: true,
+                borderColor:
+                    theme.secondaryTextColor.withValues(alpha: 0.3),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 10,
+                ),
+              ),
+            ),
+            attachBtn(),
+            const SizedBox(width: 2),
+            sendMic,
+          ],
+        );
+
+      case 'Simple Pill':
+        // Plain pill with only the emoji inside; attach, camera and
+        // send/voice sit outside on the right.
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: textField(radius: 26, prefix: emojiBtn(size: 20)),
+            ),
+            attachBtn(),
+            if (cameraBtn != null) cameraBtn,
+            const SizedBox(width: 2),
+            sendMic,
+          ],
+        );
+
+      case 'RC-Flat Floating':
+        // Raised floating card: the whole entry sits in one elevated,
+        // rounded container above the conversation.
+        return Container(
+          margin: const EdgeInsets.fromLTRB(4, 0, 4, 6),
+          decoration: BoxDecoration(
+            color: inputBg,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.18),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.fromLTRB(2, 2, 6, 2),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: textField(
+                  radius: 14,
+                  transparent: true,
+                  prefix: emojiBtn(size: 20),
+                  suffix: attachBtn(),
+                ),
+              ),
+              sendMic,
+            ],
+          ),
+        );
+
+      case 'WhatsApp Classic 3D':
+        // Classic raised pill with a soft drop shadow, emoji inside left,
+        // attach and camera inside right, send/voice circle outside.
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: inputBg,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.16),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: textField(
+                  radius: 24,
+                  transparent: true,
+                  prefix: emojiBtn(size: 20),
+                  suffix: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      attachBtn(),
+                      if (cameraBtn != null) cameraBtn,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            sendMic,
+          ],
+        );
+
+      case 'Signal Compact Bubble':
+        // Compact bubble field with attach inside and tighter padding.
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: textField(
+                radius: 20,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                suffix: attachBtn(),
+              ),
+            ),
+            const SizedBox(width: 6),
+            sendMic,
+          ],
+        );
+
+      default:
+        // Unknown saved value: fall back to the stock integrated layout.
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: textField(
+                radius: template.cornerRadius,
+                prefix: emojiBtn(size: 22),
+                suffix: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    attachBtn(),
+                    if (cameraBtn != null) cameraBtn,
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            sendMic,
+          ],
+        );
+    }
   }
 }
 
