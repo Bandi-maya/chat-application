@@ -20,19 +20,177 @@ class ConversationBubbleAndTicksScreen extends StatefulWidget {
   });
 
   @override
-  State<ConversationBubbleAndTicksScreen> createState() => _ConversationBubbleAndTicksScreenState();
+  State<ConversationBubbleAndTicksScreen> createState() =>
+      _ConversationBubbleAndTicksScreenState();
 }
 
-class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAndTicksScreen> {
+class _ConversationBubbleAndTicksScreenState
+    extends State<ConversationBubbleAndTicksScreen> {
   /// Every tick style Chaty already draws, Stock first (stored as display name).
-  final List<DeliveryIconStyle> _tickStyleIds = DeliveryIconStyle.values;
+  // GB reference picker order (all 87 styles) followed by Chaty's own extras.
+  final List<DeliveryIconStyle> _tickStyleIds = <DeliveryIconStyle>[
+    DeliveryIconStyle.stock,
+    DeliveryIconStyle.allo,
+    DeliveryIconStyle.alien,
+    DeliveryIconStyle.altCrayonV2,
+    DeliveryIconStyle.altCrayon,
+    DeliveryIconStyle.aran,
+    DeliveryIconStyle.bar,
+    DeliveryIconStyle.bat,
+    DeliveryIconStyle.bbm,
+    DeliveryIconStyle.blend,
+    DeliveryIconStyle.ngAndroidBot,
+    DeliveryIconStyle.bpgCircle,
+    DeliveryIconStyle.gbCircles,
+    DeliveryIconStyle.samyadeepCircles,
+    DeliveryIconStyle.coalfield,
+    DeliveryIconStyle.colorSimple,
+    DeliveryIconStyle.ctoon,
+    DeliveryIconStyle.eclipsis,
+    DeliveryIconStyle.faceSwitch,
+    DeliveryIconStyle.feet,
+    DeliveryIconStyle.flatCircles,
+    DeliveryIconStyle.gifcon,
+    DeliveryIconStyle.googleV2,
+    DeliveryIconStyle.google,
+    DeliveryIconStyle.grw,
+    DeliveryIconStyle.sidzyHd,
+    DeliveryIconStyle.svHeart,
+    DeliveryIconStyle.hike,
+    DeliveryIconStyle.inbox,
+    DeliveryIconStyle.insect,
+    DeliveryIconStyle.gbIos,
+    DeliveryIconStyle.jalopy,
+    DeliveryIconStyle.jessy,
+    DeliveryIconStyle.joaquins,
+    DeliveryIconStyle.jokerTraffic,
+    DeliveryIconStyle.letter,
+    DeliveryIconStyle.like,
+    DeliveryIconStyle.loveSwitch,
+    DeliveryIconStyle.materialV2,
+    DeliveryIconStyle.materialSwitch,
+    DeliveryIconStyle.messenger,
+    DeliveryIconStyle.mickeyHands,
+    DeliveryIconStyle.minions,
+    DeliveryIconStyle.newWaca,
+    DeliveryIconStyle.neyHeart,
+    DeliveryIconStyle.nhsc,
+    DeliveryIconStyle.nazaNh,
+    DeliveryIconStyle.nlCircle,
+    DeliveryIconStyle.oldWaca,
+    DeliveryIconStyle.pacman,
+    DeliveryIconStyle.pixelated,
+    DeliveryIconStyle.pokemon,
+    DeliveryIconStyle.quinn,
+    DeliveryIconStyle.snapChat,
+    DeliveryIconStyle.sDot,
+    DeliveryIconStyle.seasons,
+    DeliveryIconStyle.smile,
+    DeliveryIconStyle.star,
+    DeliveryIconStyle.flatSwitch,
+    DeliveryIconStyle.timeBomb,
+    DeliveryIconStyle.jokerTraffic2,
+    DeliveryIconStyle.treble,
+    DeliveryIconStyle.twitterConcept,
+    DeliveryIconStyle.wbg,
+    DeliveryIconStyle.x,
+    DeliveryIconStyle.pointer,
+    DeliveryIconStyle.ticTicCircle2,
+    DeliveryIconStyle.iceCream,
+    DeliveryIconStyle.pony,
+    DeliveryIconStyle.kitty,
+    DeliveryIconStyle.flower,
+    DeliveryIconStyle.sticker,
+    DeliveryIconStyle.rcIos11,
+    DeliveryIconStyle.bbmV2,
+    DeliveryIconStyle.bwTicks,
+    DeliveryIconStyle.cirCheck,
+    DeliveryIconStyle.circlePrint,
+    DeliveryIconStyle.gabCircle,
+    DeliveryIconStyle.gabFace,
+    DeliveryIconStyle.gabIflo,
+    DeliveryIconStyle.greenTick,
+    DeliveryIconStyle.ios2,
+    DeliveryIconStyle.letterCircle,
+    DeliveryIconStyle.rcAlo,
+    DeliveryIconStyle.rcTick,
+    DeliveryIconStyle.triangle,
+    DeliveryIconStyle.vantCircle,
+    // Chaty's own styles (not part of the GB catalog).
+    DeliveryIconStyle.wings,
+    DeliveryIconStyle.trafficLights,
+    DeliveryIconStyle.stars,
+    DeliveryIconStyle.hearts,
+    DeliveryIconStyle.batman,
+    DeliveryIconStyle.doubleSword,
+    DeliveryIconStyle.glowingDots,
+    DeliveryIconStyle.material3Rounded,
+  ];
 
   /// Every bubble geometry Chaty already ships, Stock first. Stored values are
   /// the display names, which BubbleStyleIdExtension.fromString resolves back to the
   /// same id; older saved labels still resolve through its legacy aliases.
+  // Exact GB reference picker order (all 59 styles).
   final List<BubbleStyleId> _bubbleStyleIds = <BubbleStyleId>[
     BubbleStyleId.stock,
-    ...BubbleStyleId.values.where((id) => id != BubbleStyleId.stock),
+    BubbleStyleId.facebookMessenger,
+    BubbleStyleId.oldHangouts,
+    BubbleStyleId.threeD,
+    BubbleStyleId.rounded,
+    BubbleStyleId.materialized,
+    BubbleStyleId.md,
+    BubbleStyleId.samyadeepCrayonAlt,
+    BubbleStyleId.newHangouts4,
+    BubbleStyleId.waPaperRedesigned,
+    BubbleStyleId.transparent,
+    BubbleStyleId.twitter,
+    BubbleStyleId.whatsappLb,
+    BubbleStyleId.bbm,
+    BubbleStyleId.ios,
+    BubbleStyleId.hike,
+    BubbleStyleId.textra,
+    BubbleStyleId.goSms,
+    BubbleStyleId.bubbleDrop,
+    BubbleStyleId.samyadeepDual,
+    BubbleStyleId.plusMessengerEd,
+    BubbleStyleId.waChatOn,
+    BubbleStyleId.telegram,
+    BubbleStyleId.inBubble,
+    BubbleStyleId.bryed,
+    BubbleStyleId.fold,
+    BubbleStyleId.foldV2,
+    BubbleStyleId.ilkhang,
+    BubbleStyleId.line,
+    BubbleStyleId.popzup,
+    BubbleStyleId.doodleHang,
+    BubbleStyleId.aranbor,
+    BubbleStyleId.win,
+    BubbleStyleId.mood,
+    BubbleStyleId.crMessenger,
+    BubbleStyleId.rcBurbuja2,
+    BubbleStyleId.rcBurbuja5,
+    BubbleStyleId.threeDV2,
+    BubbleStyleId.kitty,
+    BubbleStyleId.amor,
+    BubbleStyleId.rcSamsBord,
+    BubbleStyleId.rcIos11,
+    BubbleStyleId.rcGoogleAssistan,
+    BubbleStyleId.gabiOutline,
+    BubbleStyleId.gabiSqua,
+    BubbleStyleId.gabiDot,
+    BubbleStyleId.rcLine,
+    BubbleStyleId.gabiDot2,
+    BubbleStyleId.roundle,
+    BubbleStyleId.gabyRon,
+    BubbleStyleId.cvIos,
+    BubbleStyleId.rcPal,
+    BubbleStyleId.rcIosLine,
+    BubbleStyleId.rcImLine,
+    BubbleStyleId.rcGoSms,
+    BubbleStyleId.rcTranLine,
+    BubbleStyleId.rcImess,
+    BubbleStyleId.gabiMess,
+    BubbleStyleId.rcFancy,
   ];
 
   void _pickColor({
@@ -41,7 +199,9 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
     required ValueChanged<int?> onColorSelected,
   }) {
     final theme = locator<ThemeController>().globalTheme;
-    final initial = currentColor != null ? Color(currentColor) : theme.accentColor;
+    final initial = currentColor != null
+        ? Color(currentColor)
+        : theme.accentColor;
     GbColorPickerModal.show(
       context,
       title: title,
@@ -54,8 +214,16 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
 
   void _setTickStyle(DeliveryIconStyle id) {
     final prefs = widget.preferencesController.conversation;
+    // gbIos/gbCircles share display names with legacy Chaty aliases
+    // ('iOS' -> RC iOS 11, 'Circles' -> CirCheck). Persist those two by
+    // enum name so the new GB styles survive a save/load round trip
+    // without stealing the legacy meaning of the saved string.
+    final key = (id == DeliveryIconStyle.gbIos ||
+            id == DeliveryIconStyle.gbCircles)
+        ? id.name
+        : id.displayName;
     widget.preferencesController.updateConversation(
-      prefs.copyWith(tickStyle: id.displayName),
+      prefs.copyWith(tickStyle: key),
     );
   }
 
@@ -69,10 +237,9 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
     widget.preferencesController.updateConversation(
       prefs.copyWith(bubbleStyle: val, bubbleShape: val),
     );
-    widget.preferencesController.updateGbFeatures(
-      <String, Object?>{'bubble_style': val},
-      logTitle: 'Bubbles Style',
-    );
+    widget.preferencesController.updateGbFeatures(<String, Object?>{
+      'bubble_style': val,
+    }, logTitle: 'Bubbles Style');
   }
 
   Widget _buildBubblePreview(BubbleStyleId id, Color color) {
@@ -110,7 +277,10 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
   Widget build(BuildContext context) {
     final themeController = locator<ThemeController>();
     return ListenableBuilder(
-      listenable: Listenable.merge([widget.preferencesController, themeController]),
+      listenable: Listenable.merge([
+        widget.preferencesController,
+        themeController,
+      ]),
       builder: (context, _) {
         final theme = themeController.globalTheme;
         final colors = context.colors;
@@ -194,7 +364,10 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
                             alignment: Alignment.centerLeft,
                             child: Container(
                               margin: const EdgeInsets.only(bottom: 6),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
                               constraints: const BoxConstraints(maxWidth: 240),
                               decoration: BoxDecoration(
                                 color: leftBubbleBg,
@@ -221,7 +394,8 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
                                     'Hello, I am Tyler Durden',
                                     style: TextStyle(
                                       color: leftTextCol,
-                                      fontSize: prefs.messageTextSize.toDouble(),
+                                      fontSize: prefs.messageTextSize
+                                          .toDouble(),
                                     ),
                                   ),
                                 ],
@@ -234,7 +408,10 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
                             alignment: Alignment.centerLeft,
                             child: Container(
                               margin: const EdgeInsets.only(bottom: 6),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
                               constraints: const BoxConstraints(maxWidth: 240),
                               decoration: BoxDecoration(
                                 color: leftBubbleBg,
@@ -253,14 +430,18 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
                                       'Do you like my theme?',
                                       style: TextStyle(
                                         color: leftTextCol,
-                                        fontSize: prefs.messageTextSize.toDouble(),
+                                        fontSize: prefs.messageTextSize
+                                            .toDouble(),
                                       ),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
                                     '07:11 PM',
-                                    style: TextStyle(color: leftTimeCol, fontSize: 10),
+                                    style: TextStyle(
+                                      color: leftTimeCol,
+                                      fontSize: 10,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -273,67 +454,82 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
                             child: ConstrainedBox(
                               constraints: const BoxConstraints(maxWidth: 250),
                               child: ChatyBubbleContainer(
-                                styleId: BubbleStyleIdExtension.fromString(prefs.bubbleStyle),
+                                styleId: BubbleStyleIdExtension.fromString(
+                                  prefs.bubbleStyle,
+                                ),
                                 isMe: true,
                                 fillColor: rightBubbleBg,
                                 accentColor: theme.accentColor,
                                 child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  // Quoted message snippet
-                                  Container(
-                                    padding: const EdgeInsets.all(6),
-                                    margin: const EdgeInsets.only(bottom: 4),
-                                    decoration: BoxDecoration(
-                                      color: quotedBg,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border(
-                                        left: BorderSide(color: quotedDivider, width: 3.5),
-                                      ),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Tyler Durden',
-                                          style: TextStyle(
-                                            color: quotedName,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    // Quoted message snippet
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      margin: const EdgeInsets.only(bottom: 4),
+                                      decoration: BoxDecoration(
+                                        color: quotedBg,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border(
+                                          left: BorderSide(
+                                            color: quotedDivider,
+                                            width: 3.5,
                                           ),
                                         ),
-                                        Text(
-                                          'Do you like my theme?',
-                                          style: TextStyle(
-                                            color: quotedMsg,
-                                            fontSize: 11,
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Tyler Durden',
+                                            style: TextStyle(
+                                              color: quotedName,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
+                                          Text(
+                                            'Do you like my theme?',
+                                            style: TextStyle(
+                                              color: quotedMsg,
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Text(
+                                      'Yes, your theme looks awesome!',
+                                      style: TextStyle(
+                                        color: rightTextCol,
+                                        fontSize: prefs.messageTextSize
+                                            .toDouble(),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          '07:11 PM',
+                                          style: TextStyle(
+                                            color: rightTimeCol,
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        _buildTickPreview(
+                                          DeliveryIconStyleExtension.fromString(
+                                            prefs.tickStyle,
+                                          ),
+                                          rightTimeCol,
                                         ),
                                       ],
                                     ),
-                                  ),
-                                  Text(
-                                    'Yes, your theme looks awesome!',
-                                    style: TextStyle(
-                                      color: rightTextCol,
-                                      fontSize: prefs.messageTextSize.toDouble(),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        '07:11 PM',
-                                        style: TextStyle(color: rightTimeCol, fontSize: 10),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      _buildTickPreview(DeliveryIconStyleExtension.fromString(prefs.tickStyle), rightTimeCol),
-                                    ],
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
                             ),
                           ),
                         ],
@@ -344,263 +540,289 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
                 // Bottom content scrolls underneath the pinned live preview
                 Expanded(
                   child: ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
                     children: [
+                      // SECTION 1: Styles (Look and feel)
+                      GbCardContainer(
+                        headerText: 'Styles (Look and feel)',
+                        children: [
+                          ChatyOptionGallery<DeliveryIconStyle>(
+                            title: 'Ticks style',
+                            subtitle:
+                                'Tap a style. The preview above updates right away.',
+                            values: _tickStyleIds,
+                            selected: DeliveryIconStyleExtension.fromString(
+                              prefs.tickStyle,
+                            ),
+                            labelOf: (id) =>
+                                DeliveryIconStyleExtension
+                                        .gbVectorInterpretations
+                                        .contains(id)
+                                    ? '${id.displayName} (vector redraw)'
+                                    : id.displayName,
+                            previewOf: (id) =>
+                                _buildTickPreview(id, theme.accentColor),
+                            onSelected: _setTickStyle,
+                          ),
+                          ChatyOptionGallery<BubbleStyleId>(
+                            title: 'Bubbles style',
+                            subtitle:
+                                'Tap a shape to preview it in the conversation.',
+                            values: _bubbleStyleIds,
+                            selected: BubbleStyleIdExtension.fromString(
+                              prefs.bubbleStyle,
+                            ),
+                            labelOf: (id) =>
+                                BubbleStyleIdExtension.gbVectorInterpretations
+                                        .contains(id)
+                                    ? '${id.displayName} (vector redraw)'
+                                    : id.displayName,
+                            previewOf: (id) =>
+                                _buildBubblePreview(id, theme.accentColor),
+                            onSelected: _setBubbleStyle,
+                          ),
+                          GbSliderTile(
+                            title: 'Message Text Size',
+                            subtitle: 'Set chat text font size in points',
+                            value: prefs.messageTextSize.toDouble(),
+                            min: 10,
+                            max: 26,
+                            divisions: 16,
+                            onChanged: (val) {
+                              widget.preferencesController.updateConversation(
+                                prefs.copyWith(messageTextSize: val.toDouble()),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
 
-                // SECTION 1: Styles (Look and feel)
-                GbCardContainer(
-                  headerText: 'Styles (Look and feel)',
-                  children: [
-                    ChatyOptionGallery<DeliveryIconStyle>(
-                      title: 'Ticks style',
-                      subtitle: 'Tap a style. The preview above updates right away.',
-                      values: _tickStyleIds,
-                      selected: DeliveryIconStyleExtension.fromString(prefs.tickStyle),
-                      labelOf: (id) => id.displayName,
-                      previewOf: (id) => _buildTickPreview(id, theme.accentColor),
-                      onSelected: _setTickStyle,
-                    ),
-                    ChatyOptionGallery<BubbleStyleId>(
-                      title: 'Bubbles style',
-                      subtitle: 'Tap a shape to preview it in the conversation.',
-                      values: _bubbleStyleIds,
-                      selected: BubbleStyleIdExtension.fromString(prefs.bubbleStyle),
-                      labelOf: (id) => id.displayName,
-                      previewOf: (id) => _buildBubblePreview(id, theme.accentColor),
-                      onSelected: _setBubbleStyle,
-                    ),
-                    GbSliderTile(
-                      title: 'Message Text Size',
-                      subtitle: 'Set chat text font size in points',
-                      value: prefs.messageTextSize.toDouble(),
-                      min: 10,
-                      max: 26,
-                      divisions: 16,
-                      onChanged: (val) {
-                        widget.preferencesController.updateConversation(
-                          prefs.copyWith(messageTextSize: val.toDouble()),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-
-                // SECTION 2: Colors
-                GbCardContainer(
-                  headerText: 'Colors',
-                  children: [
-                    GbSettingRow(
-                      icon: Icons.wallpaper_rounded,
-                      title: 'Conversation Background Color',
-                      subtitle: 'Change background color of conversation, when set to "no wallpaper"',
-                      colorValue: prefs.conversationBackgroundColor,
-                      onColorTap: () => _pickColor(
-                        title: 'Conversation Background Color',
-                        currentColor: prefs.conversationBackgroundColor,
-                        onColorSelected: (val) {
-                          widget.preferencesController.updateConversation(
-                            prefs.copyWith(conversationBackgroundColor: val),
-                          );
-                        },
+                      // SECTION 2: Colors
+                      GbCardContainer(
+                        headerText: 'Colors',
+                        children: [
+                          GbSettingRow(
+                            icon: Icons.wallpaper_rounded,
+                            title: 'Conversation Background Color',
+                            subtitle:
+                                'Change background color of conversation, when set to "no wallpaper"',
+                            colorValue: prefs.conversationBackgroundColor,
+                            onColorTap: () => _pickColor(
+                              title: 'Conversation Background Color',
+                              currentColor: prefs.conversationBackgroundColor,
+                              onColorSelected: (val) {
+                                widget.preferencesController.updateConversation(
+                                  prefs.copyWith(
+                                    conversationBackgroundColor: val,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          GbSettingRow(
+                            icon: Icons.chat_bubble_rounded,
+                            title: 'Right Bubble Color',
+                            subtitle: 'Change right chat bubble color',
+                            colorValue: prefs.rightBubbleColor,
+                            onColorTap: () => _pickColor(
+                              title: 'Right Bubble Color',
+                              currentColor: prefs.rightBubbleColor,
+                              onColorSelected: (val) {
+                                widget.preferencesController.updateConversation(
+                                  prefs.copyWith(rightBubbleColor: val),
+                                );
+                              },
+                            ),
+                          ),
+                          GbSettingRow(
+                            icon: Icons.format_color_text_rounded,
+                            title: 'Right Chat Bubble Text Color',
+                            subtitle: 'Sets Right chat bubble text color',
+                            colorValue: prefs.rightChatBubbleTextColor,
+                            onColorTap: () => _pickColor(
+                              title: 'Right Bubble Text Color',
+                              currentColor: prefs.rightChatBubbleTextColor,
+                              onColorSelected: (val) {
+                                widget.preferencesController.updateConversation(
+                                  prefs.copyWith(rightChatBubbleTextColor: val),
+                                );
+                              },
+                            ),
+                          ),
+                          GbSettingRow(
+                            icon: Icons.access_time_rounded,
+                            title: 'Right Bubble time color',
+                            subtitle:
+                                'Change the color of the time inside the right bubble',
+                            colorValue: prefs.rightBubbleTimeColor,
+                            onColorTap: () => _pickColor(
+                              title: 'Right Bubble Time Color',
+                              currentColor: prefs.rightBubbleTimeColor,
+                              onColorSelected: (val) {
+                                widget.preferencesController.updateConversation(
+                                  prefs.copyWith(rightBubbleTimeColor: val),
+                                );
+                              },
+                            ),
+                          ),
+                          GbSettingRow(
+                            icon: Icons.chat_bubble_outline_rounded,
+                            title: 'Left Bubble Color',
+                            subtitle: 'Change left chat bubble color',
+                            colorValue: prefs.leftBubbleColor,
+                            onColorTap: () => _pickColor(
+                              title: 'Left Bubble Color',
+                              currentColor: prefs.leftBubbleColor,
+                              onColorSelected: (val) {
+                                widget.preferencesController.updateConversation(
+                                  prefs.copyWith(leftBubbleColor: val),
+                                );
+                              },
+                            ),
+                          ),
+                          GbSettingRow(
+                            icon: Icons.format_color_text_rounded,
+                            title: 'Left Chat Bubble Text Color',
+                            subtitle: 'Sets Left chat bubble text color',
+                            colorValue: prefs.leftChatBubbleTextColor,
+                            onColorTap: () => _pickColor(
+                              title: 'Left Bubble Text Color',
+                              currentColor: prefs.leftChatBubbleTextColor,
+                              onColorSelected: (val) {
+                                widget.preferencesController.updateConversation(
+                                  prefs.copyWith(leftChatBubbleTextColor: val),
+                                );
+                              },
+                            ),
+                          ),
+                          GbSettingRow(
+                            icon: Icons.access_time_rounded,
+                            title: 'Left Bubble time color',
+                            subtitle:
+                                'Change the color of the time inside the left bubble',
+                            colorValue: prefs.leftBubbleTimeColor,
+                            onColorTap: () => _pickColor(
+                              title: 'Left Bubble Time Color',
+                              currentColor: prefs.leftBubbleTimeColor,
+                              onColorSelected: (val) {
+                                widget.preferencesController.updateConversation(
+                                  prefs.copyWith(leftBubbleTimeColor: val),
+                                );
+                              },
+                            ),
+                          ),
+                          GbSettingRow(
+                            icon: Icons.delete_outline_rounded,
+                            title: 'Deleted Message Icon Color',
+                            subtitle:
+                                'Change the color of the revoked icon on deleted messages',
+                            colorValue: prefs.deletedMessageIconColor,
+                            onColorTap: () => _pickColor(
+                              title: 'Deleted Message Icon Color',
+                              currentColor: prefs.deletedMessageIconColor,
+                              onColorSelected: (val) {
+                                widget.preferencesController.updateConversation(
+                                  prefs.copyWith(deletedMessageIconColor: val),
+                                );
+                              },
+                            ),
+                          ),
+                          GbSettingRow(
+                            icon: Icons.vertical_split_rounded,
+                            title: 'Quoted Divider Color',
+                            subtitle: 'Color of the vertical bar beside quote',
+                            colorValue: prefs.quotedDividerColor,
+                            onColorTap: () => _pickColor(
+                              title: 'Quoted Divider Color',
+                              currentColor: prefs.quotedDividerColor,
+                              onColorSelected: (val) {
+                                widget.preferencesController.updateConversation(
+                                  prefs.copyWith(quotedDividerColor: val),
+                                );
+                              },
+                            ),
+                          ),
+                          GbSettingRow(
+                            icon: Icons.person_pin_rounded,
+                            title: 'Quoted Name Color',
+                            subtitle: 'Sender name color inside quoted reply',
+                            colorValue: prefs.quotedNameColor,
+                            onColorTap: () => _pickColor(
+                              title: 'Quoted Name Color',
+                              currentColor: prefs.quotedNameColor,
+                              onColorSelected: (val) {
+                                widget.preferencesController.updateConversation(
+                                  prefs.copyWith(quotedNameColor: val),
+                                );
+                              },
+                            ),
+                          ),
+                          GbSettingRow(
+                            icon: Icons.notes_rounded,
+                            title: 'Quoted Message Color',
+                            subtitle: 'Quoted body text color',
+                            colorValue: prefs.quotedMessageColor,
+                            onColorTap: () => _pickColor(
+                              title: 'Quoted Message Color',
+                              currentColor: prefs.quotedMessageColor,
+                              onColorSelected: (val) {
+                                widget.preferencesController.updateConversation(
+                                  prefs.copyWith(quotedMessageColor: val),
+                                );
+                              },
+                            ),
+                          ),
+                          GbSettingRow(
+                            icon: Icons.layers_rounded,
+                            title: 'Quoted Background Color',
+                            subtitle: 'Background of quote container',
+                            colorValue: prefs.quotedBackgroundColor,
+                            onColorTap: () => _pickColor(
+                              title: 'Quoted Background Color',
+                              currentColor: prefs.quotedBackgroundColor,
+                              onColorSelected: (val) {
+                                widget.preferencesController.updateConversation(
+                                  prefs.copyWith(quotedBackgroundColor: val),
+                                );
+                              },
+                            ),
+                          ),
+                          GbSwitchTile(
+                            icon: Icons.select_all_rounded,
+                            title: 'Make Text Selectable',
+                            subtitle: 'Enable chat bubble text selection',
+                            value: prefs.makeTextSelectable,
+                            onChanged: (val) {
+                              widget.preferencesController.updateConversation(
+                                prefs.copyWith(makeTextSelectable: val),
+                              );
+                            },
+                          ),
+                          GbSwitchTile(
+                            icon: Icons.read_more_rounded,
+                            title: 'Remove Read more...',
+                            subtitle:
+                                'Remove the Read more... button and display full long text',
+                            value: prefs.removeReadMore,
+                            onChanged: (val) {
+                              widget.preferencesController.updateConversation(
+                                prefs.copyWith(removeReadMore: val),
+                              );
+                            },
+                          ),
+                        ],
                       ),
-                    ),
-                    GbSettingRow(
-                      icon: Icons.chat_bubble_rounded,
-                      title: 'Right Bubble Color',
-                      subtitle: 'Change right chat bubble color',
-                      colorValue: prefs.rightBubbleColor,
-                      onColorTap: () => _pickColor(
-                        title: 'Right Bubble Color',
-                        currentColor: prefs.rightBubbleColor,
-                        onColorSelected: (val) {
-                          widget.preferencesController.updateConversation(
-                            prefs.copyWith(rightBubbleColor: val),
-                          );
-                        },
-                      ),
-                    ),
-                    GbSettingRow(
-                      icon: Icons.format_color_text_rounded,
-                      title: 'Right Chat Bubble Text Color',
-                      subtitle: 'Sets Right chat bubble text color',
-                      colorValue: prefs.rightChatBubbleTextColor,
-                      onColorTap: () => _pickColor(
-                        title: 'Right Bubble Text Color',
-                        currentColor: prefs.rightChatBubbleTextColor,
-                        onColorSelected: (val) {
-                          widget.preferencesController.updateConversation(
-                            prefs.copyWith(rightChatBubbleTextColor: val),
-                          );
-                        },
-                      ),
-                    ),
-                    GbSettingRow(
-                      icon: Icons.access_time_rounded,
-                      title: 'Right Bubble time color',
-                      subtitle: 'Change the color of the time inside the right bubble',
-                      colorValue: prefs.rightBubbleTimeColor,
-                      onColorTap: () => _pickColor(
-                        title: 'Right Bubble Time Color',
-                        currentColor: prefs.rightBubbleTimeColor,
-                        onColorSelected: (val) {
-                          widget.preferencesController.updateConversation(
-                            prefs.copyWith(rightBubbleTimeColor: val),
-                          );
-                        },
-                      ),
-                    ),
-                    GbSettingRow(
-                      icon: Icons.chat_bubble_outline_rounded,
-                      title: 'Left Bubble Color',
-                      subtitle: 'Change left chat bubble color',
-                      colorValue: prefs.leftBubbleColor,
-                      onColorTap: () => _pickColor(
-                        title: 'Left Bubble Color',
-                        currentColor: prefs.leftBubbleColor,
-                        onColorSelected: (val) {
-                          widget.preferencesController.updateConversation(
-                            prefs.copyWith(leftBubbleColor: val),
-                          );
-                        },
-                      ),
-                    ),
-                    GbSettingRow(
-                      icon: Icons.format_color_text_rounded,
-                      title: 'Left Chat Bubble Text Color',
-                      subtitle: 'Sets Left chat bubble text color',
-                      colorValue: prefs.leftChatBubbleTextColor,
-                      onColorTap: () => _pickColor(
-                        title: 'Left Bubble Text Color',
-                        currentColor: prefs.leftChatBubbleTextColor,
-                        onColorSelected: (val) {
-                          widget.preferencesController.updateConversation(
-                            prefs.copyWith(leftChatBubbleTextColor: val),
-                          );
-                        },
-                      ),
-                    ),
-                    GbSettingRow(
-                      icon: Icons.access_time_rounded,
-                      title: 'Left Bubble time color',
-                      subtitle: 'Change the color of the time inside the left bubble',
-                      colorValue: prefs.leftBubbleTimeColor,
-                      onColorTap: () => _pickColor(
-                        title: 'Left Bubble Time Color',
-                        currentColor: prefs.leftBubbleTimeColor,
-                        onColorSelected: (val) {
-                          widget.preferencesController.updateConversation(
-                            prefs.copyWith(leftBubbleTimeColor: val),
-                          );
-                        },
-                      ),
-                    ),
-                    GbSettingRow(
-                      icon: Icons.delete_outline_rounded,
-                      title: 'Deleted Message Icon Color',
-                      subtitle: 'Change the color of the revoked icon on deleted messages',
-                      colorValue: prefs.deletedMessageIconColor,
-                      onColorTap: () => _pickColor(
-                        title: 'Deleted Message Icon Color',
-                        currentColor: prefs.deletedMessageIconColor,
-                        onColorSelected: (val) {
-                          widget.preferencesController.updateConversation(
-                            prefs.copyWith(deletedMessageIconColor: val),
-                          );
-                        },
-                      ),
-                    ),
-                    GbSettingRow(
-                      icon: Icons.vertical_split_rounded,
-                      title: 'Quoted Divider Color',
-                      subtitle: 'Color of the vertical bar beside quote',
-                      colorValue: prefs.quotedDividerColor,
-                      onColorTap: () => _pickColor(
-                        title: 'Quoted Divider Color',
-                        currentColor: prefs.quotedDividerColor,
-                        onColorSelected: (val) {
-                          widget.preferencesController.updateConversation(
-                            prefs.copyWith(quotedDividerColor: val),
-                          );
-                        },
-                      ),
-                    ),
-                    GbSettingRow(
-                      icon: Icons.person_pin_rounded,
-                      title: 'Quoted Name Color',
-                      subtitle: 'Sender name color inside quoted reply',
-                      colorValue: prefs.quotedNameColor,
-                      onColorTap: () => _pickColor(
-                        title: 'Quoted Name Color',
-                        currentColor: prefs.quotedNameColor,
-                        onColorSelected: (val) {
-                          widget.preferencesController.updateConversation(
-                            prefs.copyWith(quotedNameColor: val),
-                          );
-                        },
-                      ),
-                    ),
-                    GbSettingRow(
-                      icon: Icons.notes_rounded,
-                      title: 'Quoted Message Color',
-                      subtitle: 'Quoted body text color',
-                      colorValue: prefs.quotedMessageColor,
-                      onColorTap: () => _pickColor(
-                        title: 'Quoted Message Color',
-                        currentColor: prefs.quotedMessageColor,
-                        onColorSelected: (val) {
-                          widget.preferencesController.updateConversation(
-                            prefs.copyWith(quotedMessageColor: val),
-                          );
-                        },
-                      ),
-                    ),
-                    GbSettingRow(
-                      icon: Icons.layers_rounded,
-                      title: 'Quoted Background Color',
-                      subtitle: 'Background of quote container',
-                      colorValue: prefs.quotedBackgroundColor,
-                      onColorTap: () => _pickColor(
-                        title: 'Quoted Background Color',
-                        currentColor: prefs.quotedBackgroundColor,
-                        onColorSelected: (val) {
-                          widget.preferencesController.updateConversation(
-                            prefs.copyWith(quotedBackgroundColor: val),
-                          );
-                        },
-                      ),
-                    ),
-                    GbSwitchTile(
-                      icon: Icons.select_all_rounded,
-                      title: 'Make Text Selectable',
-                      subtitle: 'Enable chat bubble text selection',
-                      value: prefs.makeTextSelectable,
-                      onChanged: (val) {
-                        widget.preferencesController.updateConversation(
-                          prefs.copyWith(makeTextSelectable: val),
-                        );
-                      },
-                    ),
-                    GbSwitchTile(
-                      icon: Icons.read_more_rounded,
-                      title: 'Remove Read more...',
-                      subtitle: 'Remove the Read more... button and display full long text',
-                      value: prefs.removeReadMore,
-                      onChanged: (val) {
-                        widget.preferencesController.updateConversation(
-                          prefs.copyWith(removeReadMore: val),
-                        );
-                      },
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-        ],
-      ),
-    ),
-  );
+        );
       },
     );
   }
