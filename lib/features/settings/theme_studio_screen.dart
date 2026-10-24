@@ -371,13 +371,13 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
         ),
         AppliedPairPreview(
           palette: _themeCtrl.globalTheme,
-          config: locator<TemplateController>().config,
+          layout: currentSetupLayout(),
           applyTemplateConversation: false,
         ),
         Padding(
           padding: const EdgeInsets.only(top: 6),
           child: Text(
-            'Your current colours on your current layout, including component overrides. Bottom bar style, Home UI preset and wallpaper are not drawn.',
+            'Your current colours on your current layout, including component overrides. Wallpaper and the finer Home UI styling are not drawn.',
             textAlign: TextAlign.center,
             style: TextStyle(color: colors.foregroundSecondary, fontSize: 12),
           ),
