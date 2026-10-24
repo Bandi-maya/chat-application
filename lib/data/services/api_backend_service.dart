@@ -519,13 +519,24 @@ class ApiBackendService extends ChangeNotifier {
               (userObj['public_profile'] is Map ? userObj['public_profile']['avatarUrl'] : null))
           ?.toString();
 
+      String extractedAbout = '';
+      if (userObj['about'] != null && userObj['about'].toString().trim().isNotEmpty) {
+        extractedAbout = userObj['about'].toString().trim();
+      } else if (userObj['public_profile'] is Map && userObj['public_profile']['about'] != null) {
+        extractedAbout = userObj['public_profile']['about'].toString().trim();
+      } else if (userObj['publicProfile'] is Map && userObj['publicProfile']['about'] != null) {
+        extractedAbout = userObj['publicProfile']['about'].toString().trim();
+      } else if (userObj['designation'] != null && userObj['designation'].toString().trim().isNotEmpty) {
+        extractedAbout = userObj['designation'].toString().trim();
+      }
+
       _currentUser = UserProfile(
         id: userId,
         displayName: extractedName,
         username: username,
         avatarInitials: initials,
         avatarColorHex: '0xFF6366F1',
-        about: (userObj['about'] ?? userObj['role'] ?? payload['role'] ?? '').toString(),
+        about: extractedAbout,
         presence: PresenceState.online,
         lastSeenAt: DateTime.now(),
         isVerified: false,
@@ -681,6 +692,75 @@ class ApiBackendService extends ChangeNotifier {
                 loadConversations();
               }
 
+              notifyListeners();
+            }
+          }
+
+          if (eventType == 'message_edited') {
+            final rawData = payload['data'] ?? payload['message'];
+            if (rawData != null) {
+              final msgId = rawData['uid']?.toString() ?? rawData['id']?.toString() ?? '';
+              final roomId = rawData['room_id']?.toString() ?? '';
+              final newContent = rawData['content']?.toString() ?? '';
+              final list = _messages[roomId];
+              if (list != null) {
+                final idx = list.indexWhere((m) => m.id == msgId);
+                if (idx != -1) {
+                  list[idx] = list[idx].copyWith(
+                    text: newContent,
+                    editedAt: DateTime.tryParse(rawData['updated_at']?.toString() ?? '') ?? DateTime.now(),
+                  );
+                  // Update conversation preview if latest message
+                  if (idx == list.length - 1) {
+                    final convIdx = _conversations.indexWhere((c) => c.id == roomId);
+                    if (convIdx != -1) {
+                      _conversations[convIdx] = _conversations[convIdx].copyWith(
+                        lastMessageText: newContent,
+                      );
+                    }
+                  }
+                  notifyListeners();
+                }
+              }
+            }
+          }
+
+          if (eventType == 'message_deleted') {
+            final rawData = payload['data'] ?? payload['message'];
+            if (rawData != null) {
+              final msgId = rawData['uid']?.toString() ?? rawData['id']?.toString() ?? '';
+              final roomId = rawData['room_id']?.toString() ?? '';
+              final list = _messages[roomId];
+              if (list != null) {
+                list.removeWhere((m) => m.id == msgId);
+                final convIdx = _conversations.indexWhere((c) => c.id == roomId);
+                if (convIdx != -1) {
+                  final lastMsg = list.isNotEmpty ? list.last : null;
+                  _conversations[convIdx] = _conversations[convIdx].copyWith(
+                    lastMessageText: lastMsg != null
+                        ? (lastMsg.text.isNotEmpty
+                            ? lastMsg.text
+                            : (lastMsg.type == MessageType.image ? '📷 Photo' : '📎 Attachment'))
+                        : '',
+                    lastMessageTime: lastMsg?.createdAt ?? _conversations[convIdx].lastMessageTime,
+                  );
+                }
+                notifyListeners();
+              }
+            }
+          }
+
+          if (eventType == 'messages_cleared') {
+            final rawData = payload['data'] ?? payload['message'];
+            final roomId = rawData?['room_id']?.toString() ?? '';
+            if (roomId.isNotEmpty) {
+              _messages[roomId]?.clear();
+              final convIdx = _conversations.indexWhere((c) => c.id == roomId);
+              if (convIdx != -1) {
+                _conversations[convIdx] = _conversations[convIdx].copyWith(
+                  lastMessageText: '',
+                );
+              }
               notifyListeners();
             }
           }
@@ -928,6 +1008,57 @@ class ApiBackendService extends ChangeNotifier {
     }
   }
 
+  /// Edit an existing message in a conversation
+  Future<void> editMessage(String chatId, String messageId, String newText) async {
+    final list = _messages[chatId];
+    if (list != null) {
+      final idx = list.indexWhere((m) => m.id == messageId);
+      if (idx != -1) {
+        list[idx] = list[idx].copyWith(
+          text: newText,
+          editedAt: DateTime.now(),
+        );
+        if (idx == list.length - 1) {
+          final convIdx = _conversations.indexWhere((c) => c.id == chatId);
+          if (convIdx != -1) {
+            _conversations[convIdx] = _conversations[convIdx].copyWith(
+              lastMessageText: newText,
+            );
+          }
+        }
+        notifyListeners();
+      }
+    }
+
+    if (_token == null) return;
+    try {
+      final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/rooms/$chatId/messages/$messageId');
+      http.Response response = await http.put(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'Content-Type': 'application/json',
+          'x-tenant-id': ApiBackendConfig.tenantId,
+        },
+        body: jsonEncode({'content': newText}),
+      );
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/chat/rooms/$chatId/messages/$messageId');
+        await http.put(
+          fallbackUri,
+          headers: {
+            'Authorization': 'Bearer $_token',
+            'Content-Type': 'application/json',
+            'x-tenant-id': ApiBackendConfig.tenantId,
+          },
+          body: jsonEncode({'content': newText}),
+        );
+      }
+    } catch (e) {
+      debugPrint('[ApiBackendService] Error editing message: $e');
+    }
+  }
+
   /// Delete a conversation room entirely
   Future<void> deleteConversation(String chatId) async {
     _conversations.removeWhere((c) => c.id == chatId);
@@ -1074,13 +1205,24 @@ class ApiBackendService extends ChangeNotifier {
                   (json['publicProfile'] is Map ? json['publicProfile']['avatarUrl'] : null))
               ?.toString();
 
+          String userAbout = '';
+          if (json['about'] != null && json['about'].toString().trim().isNotEmpty) {
+            userAbout = json['about'].toString().trim();
+          } else if (json['public_profile'] is Map && json['public_profile']['about'] != null) {
+            userAbout = json['public_profile']['about'].toString().trim();
+          } else if (json['publicProfile'] is Map && json['publicProfile']['about'] != null) {
+            userAbout = json['publicProfile']['about'].toString().trim();
+          } else if (json['designation'] != null && json['designation'].toString().trim().isNotEmpty) {
+            userAbout = json['designation'].toString().trim();
+          }
+
           return UserProfile(
             id: uid,
             displayName: displayName,
             username: username,
             avatarInitials: initials,
             avatarColorHex: '0xFF6366F1',
-            about: (json['about'] ?? json['designation'] ?? json['role'] ?? '').toString(),
+            about: userAbout,
             presence: PresenceState.online,
             lastSeenAt: DateTime.now(),
             isVerified: false,

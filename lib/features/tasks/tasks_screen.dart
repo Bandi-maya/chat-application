@@ -145,6 +145,23 @@ class _TasksScreenState extends State<TasksScreen>
         ),
       ),
     );
+    if (mounted) setState(() {});
+  }
+
+  void _editTask(ChatTask task) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => TaskCreateEditModal(
+        theme: widget.theme,
+        dataStore: widget.dataStore,
+        sourceConversationId: task.sourceConversationId,
+        existingTask: task,
+      ),
+    ).then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   void _createTask(ThemeConfig theme) {
@@ -395,9 +412,56 @@ class _TasksScreenState extends State<TasksScreen>
                       ),
                     ),
                   const SizedBox(width: 4),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: context.colors.foregroundSecondary,
+                  PopupMenuButton<String>(
+                    icon: Icon(
+                      Icons.more_vert_rounded,
+                      size: 20,
+                      color: context.colors.foregroundSecondary,
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onSelected: (val) {
+                      if (val == 'edit') {
+                        _editTask(task);
+                      } else if (val == 'details') {
+                        _openTask(task, theme);
+                      } else if (val == 'delete') {
+                        widget.dataStore.deleteTask(task.id);
+                        setState(() {});
+                      }
+                    },
+                    itemBuilder: (ctx) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_outlined, size: 18),
+                            SizedBox(width: 8),
+                            Text('Edit Task'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'details',
+                        child: Row(
+                          children: [
+                            Icon(Icons.open_in_new_rounded, size: 18),
+                            SizedBox(width: 8),
+                            Text('View Details'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline_rounded, size: 18, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Delete Task', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -654,8 +718,16 @@ class _TasksScreenState extends State<TasksScreen>
                   children: [
                     PriorityBadge(priority: task.priority),
                     const Spacer(),
-                    // Task tree: every stage change is recorded and
-                    // viewable here.
+                    IconButton(
+                      tooltip: 'Edit task',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => _editTask(task),
+                      icon: Icon(
+                        Icons.edit_outlined,
+                        size: 18,
+                        color: context.colors.primary,
+                      ),
+                    ),
                     IconButton(
                       tooltip: 'History',
                       visualDensity: VisualDensity.compact,

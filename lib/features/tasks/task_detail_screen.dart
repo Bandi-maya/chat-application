@@ -7,6 +7,7 @@ import '../../domain/models/user_profile.dart';
 import '../../ui/core/widgets/app_avatar.dart';
 import '../../ui/core/widgets/status_badge.dart';
 import '../../ui/core/design_system/design_system.dart';
+import 'task_create_edit_modal.dart';
 
 class TaskDetailScreen extends StatefulWidget {
   final ChatTask task;
@@ -25,24 +26,30 @@ class TaskDetailScreen extends StatefulWidget {
 }
 
 class _TaskDetailScreenState extends State<TaskDetailScreen> {
+  late ChatTask _currentTask;
   late Future<List<Map<String, dynamic>>> _activityFuture;
 
   @override
   void initState() {
     super.initState();
+    _currentTask = widget.task;
     _activityFuture = _loadActivity();
   }
 
   Future<List<Map<String, dynamic>>> _loadActivity() async {
-    final rows = await Supabase.instance.client
-        .from('task_activity')
-        .select('id,user_id,action,created_at')
-        .eq('task_id', widget.task.id)
-        .order('created_at', ascending: false);
-    return (rows as List)
-        .whereType<Map>()
-        .map((row) => Map<String, dynamic>.from(row))
-        .toList(growable: false);
+    try {
+      final rows = await Supabase.instance.client
+          .from('task_activity')
+          .select('id,user_id,action,created_at')
+          .eq('task_id', _currentTask.id)
+          .order('created_at', ascending: false);
+      return (rows as List)
+          .whereType<Map>()
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList(growable: false);
+    } catch (_) {
+      return const <Map<String, dynamic>>[];
+    }
   }
 
   UserProfile? _user(String id) {
@@ -60,16 +67,123 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     return '$d/$m/${date.year} $h:$min';
   }
 
+  Future<void> _updateStatus(TaskStatus newStatus) async {
+    if (_currentTask.status == newStatus) return;
+    setState(() {
+      _currentTask = _currentTask.copyWith(status: newStatus);
+    });
+    try {
+      await widget.dataStore.updateTaskStatus(_currentTask.id, newStatus);
+      if (mounted) {
+        setState(() {
+          _activityFuture = _loadActivity();
+        });
+      }
+    } catch (e) {
+      debugPrint('[TaskDetailScreen] Error updating task status: $e');
+    }
+  }
+
+  Future<void> _openEditTask() async {
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => TaskCreateEditModal(
+        theme: widget.theme,
+        dataStore: widget.dataStore,
+        sourceConversationId: _currentTask.sourceConversationId,
+        existingTask: _currentTask,
+      ),
+    );
+    final updated = widget.dataStore.tasks.firstWhere(
+      (t) => t.id == _currentTask.id,
+      orElse: () => _currentTask,
+    );
+    if (mounted) {
+      setState(() {
+        _currentTask = updated;
+        _activityFuture = _loadActivity();
+      });
+    }
+  }
+
+  Future<void> _confirmDeleteTask() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Task'),
+        content: const Text(
+          'Are you sure you want to delete this task? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await widget.dataStore.deleteTask(_currentTask.id);
+      if (mounted) Navigator.pop(context, true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final task = widget.task;
+    final task = _currentTask;
     final creator = _user(task.creatorId);
     final themeData = Theme.of(context);
 
     return ChatyScaffold(
-      appBar: const ChatyAppBar(
+      appBar: ChatyAppBar(
         title: 'Task Details',
-        leading: ChatyBackButton(),
+        leading: const ChatyBackButton(),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Edit Task',
+            onPressed: _openEditTask,
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded),
+            onSelected: (val) {
+              if (val == 'edit') {
+                _openEditTask();
+              } else if (val == 'delete') {
+                _confirmDeleteTask();
+              }
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit_outlined, size: 20),
+                    SizedBox(width: 8),
+                    Text('Edit Task'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_outline_rounded, size: 20, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Delete Task', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: SafeArea(
         child: ListView(
@@ -86,8 +200,61 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   Wrap(
                     spacing: ChatySpacing.sm,
                     runSpacing: ChatySpacing.sm,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      StatusBadge(status: task.status),
+                      PopupMenuButton<TaskStatus>(
+                        tooltip: 'Change Status',
+                        onSelected: _updateStatus,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: themeData.colorScheme.primary.withValues(
+                              alpha: 0.08,
+                            ),
+                            borderRadius: BorderRadius.circular(
+                              ChatyRadius.full,
+                            ),
+                            border: Border.all(
+                              color: themeData.colorScheme.primary.withValues(
+                                alpha: 0.25,
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              StatusBadge(status: task.status),
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.arrow_drop_down_rounded,
+                                size: 18,
+                                color: themeData.colorScheme.primary,
+                              ),
+                            ],
+                          ),
+                        ),
+                        itemBuilder: (context) => TaskStatus.values.map((s) {
+                          final isCurrent = s == task.status;
+                          return PopupMenuItem(
+                            value: s,
+                            child: Row(
+                              children: [
+                                StatusBadge(status: s),
+                                const Spacer(),
+                                if (isCurrent)
+                                  Icon(
+                                    Icons.check_rounded,
+                                    size: 18,
+                                    color: themeData.colorScheme.primary,
+                                  ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
                       PriorityBadge(priority: task.priority),
                     ],
                   ),
@@ -127,13 +294,15 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                 task.status == TaskStatus.completed
                                 ? TaskStatus.inbox
                                 : TaskStatus.completed;
-                            widget.dataStore.updateTaskStatus(
-                              task.id,
-                              nextStatus,
-                            );
-                            setState(() {});
+                            _updateStatus(nextStatus);
                           },
                         ),
+                      ),
+                      const SizedBox(width: ChatySpacing.sm),
+                      IconButton.filledTonal(
+                        tooltip: 'Edit Task',
+                        onPressed: _openEditTask,
+                        icon: const Icon(Icons.edit_outlined),
                       ),
                     ],
                   ),
