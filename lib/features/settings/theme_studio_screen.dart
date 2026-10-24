@@ -625,7 +625,8 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
                 min: 6.0,
                 max: 32.0,
                 divisions: 13,
-                activeColor: _gradientStart,
+                activeColor: context.colors.primary,
+                inactiveColor: context.colors.border,
                 onChanged: (v) {
                   setState(() => _current = _current.copyWith(cornerRadius: v));
                 },
@@ -644,7 +645,8 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
                 min: 0.85,
                 max: 1.3,
                 divisions: 9,
-                activeColor: _gradientStart,
+                activeColor: context.colors.primary,
+                inactiveColor: context.colors.border,
                 onChanged: (v) {
                   setState(() => _current = _current.copyWith(fontScale: v));
                 },
