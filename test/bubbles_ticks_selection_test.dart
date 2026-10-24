@@ -88,8 +88,10 @@ void main() {
     final prefs = await pumpScreen(tester);
     final gallery = find.byType(ChatyOptionGallery<DeliveryIconStyle>);
     expect(gallery, findsOneWidget);
-    final target = DeliveryIconStyle.values[1];
-    final item = find.descendant(of: gallery, matching: find.text(target.displayName));
+    // Near the top of the GB-ordered gallery so it is built without a long
+    // scroll through 95 options.
+    final target = DeliveryIconStyle.allo;
+    final item = find.descendant(of: gallery, matching: find.textContaining(target.displayName));
     await tester.scrollUntilVisible(
       item,
       100,
@@ -107,7 +109,7 @@ void main() {
     final gallery = find.byType(ChatyOptionGallery<BubbleStyleId>);
     expect(gallery, findsOneWidget);
     final target = BubbleStyleId.values.firstWhere((id) => id != BubbleStyleId.stock);
-    final item = find.descendant(of: gallery, matching: find.text(target.displayName));
+    final item = find.descendant(of: gallery, matching: find.textContaining(target.displayName));
     await tester.scrollUntilVisible(
       item,
       100,
