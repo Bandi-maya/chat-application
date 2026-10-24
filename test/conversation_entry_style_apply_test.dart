@@ -47,8 +47,33 @@ void main() {
   }
 
   const styles = [
+    // Legacy aliases that must normalize to 'Stock'.
     'Stock (Chaty Default)',
     'Stock',
+    // GB reference entry styles.
+    'YOWA Style',
+    'WAMOD',
+    'Hangouts',
+    'Simple',
+    'Aran V2',
+    'Mood',
+    'WANH',
+    'Hangouts V2',
+    'Dribble',
+    'Dribble V2',
+    'Allo',
+    'Rounded',
+    'Old Stock (2016)',
+    'RC-MSG Google',
+    'RC-Telegram X iOS',
+    'RC-IOS 11',
+    'RC-Line',
+    'Concept',
+    'Instagram',
+    'iOS 14',
+    'FB Messenger',
+    'RC Mess',
+    // Chaty's own styles.
     'Telegram Modern',
     'iOS Clean Rounded',
     'Hangouts Minimal',
@@ -59,11 +84,15 @@ void main() {
   ];
 
   for (final style in styles) {
-    testWidgets('composer renders without exception for "$style"', (tester) async {
-      await tester.pumpWidget(buildComposer(
-        const ConversationPreferences().copyWith(entryStyle: style),
-        Brightness.light,
-      ));
+    testWidgets('composer renders without exception for "$style"', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildComposer(
+          const ConversationPreferences().copyWith(entryStyle: style),
+          Brightness.light,
+        ),
+      );
       await tester.pump();
       expect(tester.takeException(), isNull);
       expect(find.byType(TextField), findsOneWidget);
@@ -75,10 +104,14 @@ void main() {
   testWidgets('styled layouts differ from stock arrangement', (tester) async {
     // iOS style: filled attach button sits outside the field, so the field
     // has neither prefix nor suffix icons.
-    await tester.pumpWidget(buildComposer(
-      const ConversationPreferences().copyWith(entryStyle: 'iOS Clean Rounded'),
-      Brightness.light,
-    ));
+    await tester.pumpWidget(
+      buildComposer(
+        const ConversationPreferences().copyWith(
+          entryStyle: 'iOS Clean Rounded',
+        ),
+        Brightness.light,
+      ),
+    );
     await tester.pump();
     expect(tester.takeException(), isNull);
     final field = tester.widget<TextField>(find.byType(TextField));
@@ -86,10 +119,9 @@ void main() {
     expect(field.decoration?.suffixIcon, isNull);
 
     // Stock keeps the emoji prefix inside the field.
-    await tester.pumpWidget(buildComposer(
-      const ConversationPreferences(),
-      Brightness.light,
-    ));
+    await tester.pumpWidget(
+      buildComposer(const ConversationPreferences(), Brightness.light),
+    );
     await tester.pump();
     final stockField = tester.widget<TextField>(find.byType(TextField));
     expect(stockField.decoration?.prefixIcon, isNotNull);
