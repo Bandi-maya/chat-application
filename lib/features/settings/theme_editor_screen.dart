@@ -253,7 +253,7 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
                 crossAxisCount: crossAxisCount,
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
-                mainAxisExtent: 268 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6),
+                mainAxisExtent: 284 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6),
               ),
               itemBuilder: (context, index) {
                 final preset = presets[index];
