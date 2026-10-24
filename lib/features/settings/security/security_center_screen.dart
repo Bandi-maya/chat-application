@@ -1,3 +1,4 @@
+// ignore_for_file: unused_element
 import 'package:flutter/material.dart';
 
 import '../../../data/repositories/chaty_data_store.dart';
@@ -346,29 +347,6 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
       title: 'Security & App Lock',
       subtitle: 'Encryption Status, Authentication & Chaty Lock',
       children: [
-        ChatySettingsSection(
-          title: 'Encryption & Trust Model',
-          description:
-              'All conversations in Chaty utilize local end-to-end encryption simulation.',
-          children: [
-            ChatySettingsTile(
-              icon: Icons.shield_rounded,
-              iconColor: colors.success,
-              title: 'Demo Security Model',
-              subtitle: 'Double-ratchet session status: Active & Verified',
-              badgeText: 'ENCRYPTED',
-              badgeColor: colors.success,
-              onTap: _showSafetyNumberDialog,
-            ),
-            ChatySettingsTile(
-              icon: Icons.qr_code_2_rounded,
-              iconColor: colors.info,
-              title: 'Verify Safety Number QR',
-              subtitle: 'Simulate key fingerprints for security auditing',
-              onTap: _showSafetyNumberDialog,
-            ),
-          ],
-        ),
         ChatySettingsSection(
           title: 'Chaty App Lock',
           description:
