@@ -349,7 +349,8 @@ class SettingsRootScreen extends StatelessWidget {
                       alignment: Alignment.bottomCenter,
                       children: [
                         Container(
-                          height: 158,
+                          // 16:9, the same frame the banner crop dialog uses.
+                          height: (MediaQuery.of(context).size.width - 32) * 9 / 16,
                           width: double.infinity,
                           decoration: BoxDecoration(
                             color: colors.surface,
