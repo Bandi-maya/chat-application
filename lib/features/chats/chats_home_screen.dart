@@ -1512,6 +1512,34 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                             },
                           ),
                           _popupMenuItem(
+                            icon: Icons.campaign_rounded,
+                            title: 'Mass Message',
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => NewChatScreen(
+                                    theme: widget.theme,
+                                    dataStore: widget.dataStore,
+                                    preferencesController: widget.preferencesController,
+                                    startInBroadcastMode: true,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          _popupMenuItem(
+                            icon: Icons.call_outlined,
+                            title: 'Who can call me?',
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              showWhoCanCallMeDialog(
+                                context,
+                                widget.preferencesController,
+                              );
+                            },
+                          ),
+                          _popupMenuItem(
                             icon: Icons.done_all_rounded,
                             title: 'Mark All as Read',
                             onTap: () {
