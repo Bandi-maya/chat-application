@@ -827,9 +827,11 @@ class TemplatePairPreview extends StatelessWidget {
       ),
     );
     return Semantics(
-      label: '${template.name}: home screen and conversation preview',
+      label: '${template.name}: home screen and conversation layout preview',
       excludeSemantics: true,
-      child: Row(
+      child: Column(
+        children: [
+          Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           labeled(
@@ -850,6 +852,17 @@ class TemplatePairPreview extends StatelessWidget {
                 template: template,
                 isSelected: isSelected,
               ),
+            ),
+          ),
+        ],
+      ),
+          const SizedBox(height: 6),
+          Text(
+            'Layout preview only. Surfaces follow your theme, the accent is the template's own, and component overrides are not shown.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: colors.foregroundSecondary,
+              fontSize: 11,
             ),
           ),
         ],
