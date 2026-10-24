@@ -707,11 +707,14 @@ class _HeaderSettingsScreenState extends State<HeaderSettingsScreen> {
         final colors = context.colors;
         final home = widget.preferencesController.home;
         final currentUser = widget.dataStore?.currentUser;
-        final displayName = home.myNameOverride.isNotEmpty
-            ? home.myNameOverride
-            : (currentUser?.displayName.isNotEmpty == true
-                ? currentUser!.displayName
-                : 'Bandi Maya');
+        final override = home.myNameOverride.trim();
+        final effectiveOverride = (override.isNotEmpty && override != 'Alex Rivera' && override != 'Bandi Maya') ? override : '';
+        final rawName = currentUser?.displayName.trim() ?? '';
+        final displayName = effectiveOverride.isNotEmpty
+            ? effectiveOverride
+            : (rawName.isNotEmpty && rawName != 'Bandi Maya' && rawName != 'Chaty User'
+                ? rawName
+                : (currentUser?.username.isNotEmpty == true ? currentUser!.username : 'User'));
         final statusText = currentUser?.about.isNotEmpty == true
             ? currentUser!.about
             : 'Available';

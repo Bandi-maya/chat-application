@@ -491,7 +491,11 @@ class SettingsScreen extends StatelessWidget {
                         radius: 40,
                         backgroundColor: colors.surfaceSecondary,
                         child: Text(
-                          user.avatarInitials.isNotEmpty ? user.avatarInitials : 'BM',
+                          user.avatarInitials.isNotEmpty && user.avatarInitials != 'BM'
+                              ? user.avatarInitials
+                              : (user.displayName.isNotEmpty
+                                  ? user.displayName.substring(0, 1).toUpperCase()
+                                  : 'U'),
                           style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.w800,
@@ -509,7 +513,9 @@ class SettingsScreen extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            user.displayName.isNotEmpty ? user.displayName : 'Bandi Maya',
+                            user.displayName.isNotEmpty && user.displayName != 'Bandi Maya'
+                                ? user.displayName
+                                : (user.username.isNotEmpty ? user.username : 'User'),
                             style: TextStyle(
                               color: theme.primaryTextColor,
                               fontSize: 20,
@@ -529,13 +535,14 @@ class SettingsScreen extends StatelessWidget {
                     const SizedBox(height: 3),
 
                     // Username Handle
-                    Text(
-                      '@${user.username.isNotEmpty ? user.username : 'bandi_maya'}',
-                      style: TextStyle(
-                        color: theme.secondaryTextColor,
-                        fontSize: 13.5,
+                    if (user.username.isNotEmpty)
+                      Text(
+                        '@${user.username}',
+                        style: TextStyle(
+                          color: theme.secondaryTextColor,
+                          fontSize: 13.5,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),

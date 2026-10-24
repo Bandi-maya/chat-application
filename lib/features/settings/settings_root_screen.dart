@@ -276,10 +276,15 @@ class SettingsRootScreen extends StatelessWidget {
         // and banners refresh without leaving Settings and reopening it.
         final user = dataStore.currentUser;
         final homePrefs = preferencesController.home;
-        final displayName = homePrefs.myNameOverride.isNotEmpty
-            ? homePrefs.myNameOverride
-            : (user.displayName.isNotEmpty ? user.displayName : 'Bandi Maya');
-        final handle = user.username.isNotEmpty ? '@${user.username}' : '@bandi_maya';
+        final override = homePrefs.myNameOverride.trim();
+        final effectiveOverride = (override.isNotEmpty && override != 'Alex Rivera' && override != 'Bandi Maya') ? override : '';
+        final rawName = user.displayName.trim();
+        final displayName = effectiveOverride.isNotEmpty
+            ? effectiveOverride
+            : (rawName.isNotEmpty && rawName != 'Bandi Maya' && rawName != 'Chaty User'
+                ? rawName
+                : (user.username.isNotEmpty ? user.username : 'User'));
+        final handle = user.username.isNotEmpty ? '@${user.username}' : '';
         final colors = context.colors;
         final theme = themeController.globalTheme;
         return Scaffold(

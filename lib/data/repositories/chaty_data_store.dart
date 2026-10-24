@@ -206,28 +206,28 @@ class ChatyDataStore extends ChangeNotifier {
   List<UserProfile> get contacts {
     if (locator.isRegistered<ApiBackendService>()) {
       final api = locator<ApiBackendService>();
-      if (api.isAuthenticated && api.users.isNotEmpty) {
+      if (api.isAuthenticated) {
         return api.users.where((user) => user.id != currentUser.id).toList();
       }
     }
-    return _backend.allUsers.where((user) => user.id != currentUser.id).toList();
+    return const [];
   }
   List<Conversation> get conversations {
     if (locator.isRegistered<ApiBackendService>()) {
       final api = locator<ApiBackendService>();
       if (api.isAuthenticated) return api.conversations;
     }
-    return _backend.conversations;
+    return const [];
   }
   List<ChatTask> get tasks {
     if (locator.isRegistered<ApiBackendService>()) {
       final api = locator<ApiBackendService>();
       if (api.isAuthenticated) return api.tasks;
     }
-    return _backend.tasks;
+    return const [];
   }
-  List<CallRecord> get calls => _backend.calls;
-  List<UpdateStory> get stories => _backend.stories;
+  List<CallRecord> get calls => const [];
+  List<UpdateStory> get stories => const [];
   List<LinkedDevice> get linkedDevices => _backend.currentUserDevices;
 
   UserProfile? getUser(String userId) {
@@ -240,7 +240,7 @@ class ChatyDataStore extends ChangeNotifier {
       }
     }
     if (_backend.currentUser?.id == userId) return _backend.currentUser;
-    return _backend.getUserById(userId);
+    return null;
   }
 
   UserProfile? getUserById(String userId) => getUser(userId);
@@ -253,7 +253,7 @@ class ChatyDataStore extends ChangeNotifier {
         return api.getMessages(conversationId);
       }
     }
-    return _backend.getMessages(conversationId);
+    return const [];
   }
 
   void setActiveConversation(String? conversationId) {
@@ -270,7 +270,6 @@ class ChatyDataStore extends ChangeNotifier {
         return;
       }
     }
-    await _backend.ensureConversationLoaded(conversationId);
   }
 
   Future<List<UserProfile>> searchUsersRemote(
@@ -283,7 +282,7 @@ class ChatyDataStore extends ChangeNotifier {
         return api.searchUsers(query, includeSelf: includeSelf);
       }
     }
-    return _backend.searchUsersRemote(query, includeSelf: includeSelf);
+    return const [];
   }
 
   Future<Conversation> getOrCreateDirectConversation(UserProfile user) async {
@@ -553,12 +552,20 @@ class ChatyDataStore extends ChangeNotifier {
     required List<String> memberIds,
     String? avatarInitials,
     String? avatarColorHex,
-  }) => _backend.createGroup(
-    title: title,
-    memberUserIds: memberIds,
-    avatarInitials: avatarInitials,
-    avatarColorHex: avatarColorHex,
-  );
+  }) {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated) {
+        return api.createGroupRoom(title, memberIds);
+      }
+    }
+    return _backend.createGroup(
+      title: title,
+      memberUserIds: memberIds,
+      avatarInitials: avatarInitials,
+      avatarColorHex: avatarColorHex,
+    );
+  }
 
   void createTask({
     required String sourceConversationId,
@@ -570,6 +577,21 @@ class ChatyDataStore extends ChangeNotifier {
     required DateTime dueAt,
     List<String> labels = const <String>[],
   }) {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated) {
+        unawaited(
+          api.createTask(
+            title: title,
+            description: description,
+            assigneeIds: assigneeIds,
+            priority: priority.name,
+            dueAt: dueAt,
+          ),
+        );
+        return;
+      }
+    }
     unawaited(
       _backend.createTask(
         sourceConversationId: sourceConversationId,

@@ -978,11 +978,14 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     final dataStore = locator<ChatyDataStore>();
     final user = dataStore.currentUser;
 
-    final displayName = prefs.home.myNameOverride.isNotEmpty
-        ? prefs.home.myNameOverride
-        : user.displayName.isNotEmpty
-        ? user.displayName
-        : 'Chaty User';
+    final override = prefs.home.myNameOverride.trim();
+    final effectiveOverride = (override.isNotEmpty && override != 'Alex Rivera' && override != 'Bandi Maya') ? override : '';
+    final rawName = user.displayName.trim();
+    final displayName = effectiveOverride.isNotEmpty
+        ? effectiveOverride
+        : (rawName.isNotEmpty && rawName != 'Chaty User' && rawName != 'Bandi Maya'
+            ? rawName
+            : (user.username.isNotEmpty ? user.username : 'User'));
 
     return Scaffold(
       backgroundColor: theme.backgroundColor,

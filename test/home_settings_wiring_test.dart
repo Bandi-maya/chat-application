@@ -154,7 +154,7 @@ void main() {
         enableStoriesStrip: true,
         storiesStyle: 'Squircle',
         separateChatsAndGroups: true,
-        myNameOverride: 'Bandi Maya',
+        myNameOverride: 'Custom Alias',
         avatarShape: 'squircle',
         ghostMode: true,
         airplaneModeSimulator: true,

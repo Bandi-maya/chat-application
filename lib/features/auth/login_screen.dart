@@ -288,7 +288,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     _buildRegisterOrgCard(theme),
 
                     const SizedBox(height: 8),
-                    _buildQuickDemoAccounts(theme),
                     Center(
                       child: TextButton(
                         onPressed: () {
@@ -524,118 +523,5 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _quickLogin(String username) {
-    _identifierController.text = username;
-    _passwordController.text = 'Password123!';
-    _handleLogin();
-  }
-
-  Widget _buildQuickDemoAccounts(ThemeConfig theme) {
-    final demoUsers = [
-      {'name': 'Alex Rivera', 'user': 'alex_rivera', 'role': 'Engineer', 'color': 0xFF3B82F6},
-      {'name': 'Sarah Connor', 'user': 'sarah_connor', 'role': 'Product', 'color': 0xFFEC4899},
-      {'name': 'Chat Admin', 'user': 'chat_admin', 'role': 'Admin', 'color': 0xFF8B5CF6},
-      {'name': 'David Kim', 'user': 'david_kim', 'role': 'Design', 'color': 0xFF10B981},
-      {'name': 'Michael Scott', 'user': 'michael_scott', 'role': 'Lead', 'color': 0xFFF59E0B},
-      {'name': 'Elena Rostova', 'user': 'elena_rostova', 'role': 'Ops', 'color': 0xFF06B6D4},
-    ];
-
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 14),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: theme.surfaceColor.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.dividerColor.withValues(alpha: 0.25),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.bolt_rounded, size: 16, color: theme.accentColor),
-              const SizedBox(width: 6),
-              Text(
-                'Quick Demo Accounts',
-                style: TextStyle(
-                  color: theme.primaryTextColor,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.2,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '1-Tap Login',
-                style: TextStyle(
-                  color: theme.secondaryTextColor.withValues(alpha: 0.7),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: demoUsers.map((u) {
-              final name = (u['name'] ?? '').toString();
-              final username = (u['user'] ?? '').toString();
-              final colorVal = (u['color'] as int?) ?? 0xFF3B82F6;
-              final parts = name.split(' ');
-              final initials = parts.isNotEmpty
-                  ? parts.map((e) => e.isNotEmpty ? e[0] : '').take(2).join()
-                  : 'U';
-              return Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: _isLoading ? null : () => _quickLogin(username),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: Color(colorVal).withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: Color(colorVal).withValues(alpha: 0.35),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CircleAvatar(
-                          radius: 9,
-                          backgroundColor: Color(colorVal),
-                          child: Text(
-                            initials,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 8.5,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          name,
-                          style: TextStyle(
-                            color: theme.primaryTextColor,
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
+}
 }
