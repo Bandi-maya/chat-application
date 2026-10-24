@@ -22,6 +22,7 @@ import 'package:chat/domain/models/chat_message.dart';
 import 'package:chat/features/messages/message_bubble.dart';
 import 'package:chat/features/settings/universal/universal_styles_screen.dart';
 import 'package:chat/ui/core/controllers/preferences_controller.dart';
+import 'package:chat/ui/core/theme/theme_controller.dart';
 import 'package:chat/ui/core/theme/theme_presets.dart';
 
 Future<void> _loadFont(String family, String file) async {
@@ -153,6 +154,12 @@ void main() {
       final dark = b == Brightness.dark;
       final base = dark ? ThemePresets.midnight : ThemePresets.monochromeLight;
 
+      // Drive the REAL ThemeController through its production switch path, so
+      // the screen's ThemeConfig (colors, surfaces, text) is internally
+      // consistent - exactly what main.dart mounts via toThemeData().
+      final themeController = locator<ThemeController>();
+      themeController.setGlobalTheme(base);
+
       // A) REAL settings picker screen, scrolled to the emoji styles section.
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 2;
@@ -163,7 +170,7 @@ void main() {
           key: pickerKey,
           child: MaterialApp(
             debugShowCheckedModeBanner: false,
-            theme: ThemeData(brightness: b, fontFamily: 'Roboto'),
+            theme: themeController.globalTheme.toThemeData(),
             home: UniversalStylesScreen(
               preferencesController: locator<ChatyPreferencesController>(),
             ),
@@ -176,6 +183,9 @@ void main() {
         400,
         scrollable: find.byType(Scrollable).first,
       );
+      // Nudge back up so the section header and full row are in frame,
+      // not clipped under the app bar.
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, 220));
       await tester.pump(const Duration(milliseconds: 200));
       // Let real async asset loading + WebP decode complete, then rebuild.
       await tester.runAsync(
