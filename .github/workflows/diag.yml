@@ -1,5 +1,5 @@
 {
- "name": "Diagnostics v35",
+ "name": "Diagnostics v36",
  "on": {
   "workflow_dispatch": {},
   "push": {
