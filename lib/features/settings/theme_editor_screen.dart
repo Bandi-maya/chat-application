@@ -230,6 +230,65 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
     );
   }
 
+  List<Widget> _buildPresetSections() {
+    final light = ThemePresets.all
+        .where((p) => p.brightness == Brightness.light)
+        .toList();
+    final dark = ThemePresets.all
+        .where((p) => p.brightness != Brightness.light)
+        .toList();
+    Widget grid(List<dynamic> presets) {
+      return Padding(
+        padding: const EdgeInsets.all(ChatySpacing.md),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 600;
+            final crossAxisCount =
+                isWide ? 3 : (constraints.maxWidth >= 380 ? 2 : 1);
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: presets.length,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                mainAxisExtent: 240,
+              ),
+              itemBuilder: (context, index) {
+                final preset = presets[index];
+                final isSelected = preset.id == _current.id;
+                return ThemePreviewCard(
+                  themeConfig: preset,
+                  isSelected: isSelected,
+                  onTap: () {
+                    setState(() => _current = preset);
+                    widget.themeController.updateThemeConfig(preset);
+                  },
+                );
+              },
+            );
+          },
+        ),
+      );
+    }
+
+    return [
+      if (light.isNotEmpty)
+        ChatyGroupedSection(
+          title: 'Light themes (${light.length})',
+          children: [grid(light)],
+        ),
+      if (light.isNotEmpty && dark.isNotEmpty)
+        const SizedBox(height: ChatySpacing.md),
+      if (dark.isNotEmpty)
+        ChatyGroupedSection(
+          title: 'Dark themes (${dark.length})',
+          children: [grid(dark)],
+        ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     return ChatyScaffold(
@@ -505,48 +564,8 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
 
             const SizedBox(height: ChatySpacing.md),
 
-            // Presets Header & Grid
-            ChatyGroupedSection(
-              title: 'Theme Presets (${ThemePresets.all.length})',
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(ChatySpacing.md),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final isWide = constraints.maxWidth >= 600;
-                      final crossAxisCount = isWide
-                          ? 3
-                          : (constraints.maxWidth >= 380 ? 2 : 1);
-
-                      return GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: ThemePresets.all.length,
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount,
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          mainAxisExtent: 240,
-                        ),
-                        itemBuilder: (context, index) {
-                          final preset = ThemePresets.all[index];
-                          final isSelected = preset.id == _current.id;
-
-                          return ThemePreviewCard(
-                            themeConfig: preset,
-                            isSelected: isSelected,
-                            onTap: () {
-                              setState(() => _current = preset);
-                              widget.themeController.updateThemeConfig(preset);
-                            },
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
+            // Presets, grouped as Light and Dark so people compare like with like.
+            ..._buildPresetSections(),
 
             const SizedBox(height: ChatySpacing.md),
 
