@@ -1,3 +1,4 @@
+// ignore_for_file: unused_import, unused_field, unused_element, unused_local_variable
 import '../../chats/locked_chats_screen.dart';
 import '../../../data/repositories/chaty_data_store.dart';
 import '../../../data/services/local_lock_service.dart';
