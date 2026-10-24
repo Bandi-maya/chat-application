@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:chat/features/settings/conversation/conversation_bubble_and_ticks_screen.dart';
+import 'package:chat/features/settings/home/home_screen_settings_page.dart';
 import 'package:chat/ui/core/design_system/design_system.dart';
 import 'package:chat/ui/core/bubbles/bubble_style_id.dart';
 import 'package:chat/ui/core/ticks/delivery_icon_style.dart';
@@ -51,7 +52,7 @@ void main() {
     await _loadFont('MaterialIcons', 'MaterialIcons-Regular.otf');
   });
 
-  Future<ChatyPreferencesController> pumpScreen(WidgetTester tester) async {
+  Future<ChatyPreferencesController> pumpScreen(WidgetTester tester, {bool home = false}) async {
     SharedPreferences.setMockInitialValues({});
     if (!locator.isRegistered<AppearanceVariantController>()) {
       locator.registerLazySingleton<AppearanceVariantController>(() => AppearanceVariantController());
@@ -74,7 +75,9 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: _withFont(theme.globalTheme.toThemeData()),
-        home: ConversationBubbleAndTicksScreen(preferencesController: prefs),
+        home: home
+            ? HomeScreenSettingsPage(preferencesController: prefs)
+            : ConversationBubbleAndTicksScreen(preferencesController: prefs),
       ),
     );
     await tester.pump(const Duration(milliseconds: 400));
@@ -113,6 +116,21 @@ void main() {
     await tester.tap(item);
     await tester.pump();
     expect(BubbleStyleIdExtension.fromString(prefs.conversation.bubbleStyle), target);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  testWidgets('hide Tasks and Updates switches save and update the nav preview', (tester) async {
+    final prefs = await pumpScreen(tester, home: true);
+    expect(find.text('Tasks'), findsOneWidget);
+    expect(find.text('Updates'), findsOneWidget);
+    await tester.tap(find.byType(Switch).at(0));
+    await tester.pump();
+    expect(prefs.gbBool('nav_hide_tasks'), isTrue);
+    expect(find.text('Tasks'), findsNothing);
+    await tester.tap(find.byType(Switch).at(1));
+    await tester.pump();
+    expect(prefs.gbBool('nav_hide_updates'), isTrue);
+    expect(find.text('Updates'), findsNothing);
     await tester.pump(const Duration(seconds: 1));
     await tester.pumpWidget(const SizedBox.shrink());
   });
