@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../data/services/backend_service.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/app_icon_controller.dart';
-import '../../ui/core/persistence/preferences_storage.dart';
 import '../../ui/core/theme/theme_controller.dart';
 import '../../ui/core/widgets/app_brand_icon.dart';
-import '../chats/main_navigation_shell.dart';
 import 'login_screen.dart';
 import 'register_screen.dart';
 import 'widgets/auth_components.dart';

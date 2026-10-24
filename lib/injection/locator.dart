@@ -1,4 +1,4 @@
-﻿import 'package:chat/data/services/api_backend_service.dart';
+import 'package:chat/data/services/api_backend_service.dart';
 import 'package:chat/features/media/services/media_player_coordinator.dart';
 import 'package:chat/features/media/services/media_library_service.dart';
 import 'package:chat/features/media/services/pdf_processing_service.dart';
@@ -11,6 +11,7 @@ import 'package:chat/core/audio/audio_settings_controller.dart';
 import 'package:chat/core/services/hidden_vault_service.dart';
 import 'package:chat/core/services/privacy_config_service.dart';
 import 'package:chat/features/chats/hidden_vault_controller.dart';
+import 'package:chat/core/services/firebase_notification_service.dart';
 import 'package:get_it/get_it.dart';
 import 'package:chat/ui/core/theme/theme_controller.dart';
 import 'package:chat/data/repositories/chaty_data_store.dart';
@@ -78,6 +79,9 @@ void setupLocator() {
     () => ChatyNotificationService(),
   );
   locator.registerLazySingleton<PushTokenService>(() => PushTokenService());
+  locator.registerLazySingleton<FirebaseNotificationService>(
+    () => FirebaseNotificationService(),
+  );
   locator.registerLazySingleton<NotificationChannelManager>(
     () => NotificationChannelManager(
       preferences: locator<ChatyPreferencesController>(),

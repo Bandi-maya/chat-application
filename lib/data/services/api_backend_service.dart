@@ -10,6 +10,8 @@ import '../../domain/models/user_profile.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/chat_task.dart';
+import '../../injection/locator.dart';
+import '../../core/services/firebase_notification_service.dart';
 
 class OrganizationRegistrationResult {
   final UserProfile user;
@@ -41,6 +43,10 @@ class ApiBackendService extends ChangeNotifier {
   String? _activeConversationId;
   int _syncTicks = 0;
   bool _isConnecting = false;
+
+  final StreamController<Map<String, dynamic>> _callSignalController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  Stream<Map<String, dynamic>> get onCallSignal => _callSignalController.stream;
 
   List<Conversation> _conversations = [];
   List<UserProfile> _users = [];
@@ -110,6 +116,7 @@ class ApiBackendService extends ChangeNotifier {
         unawaited(loadConversations());
         unawaited(loadUsers());
         unawaited(loadTasks());
+        _syncFcmToken();
       }
     } catch (e) {
       debugPrint('[ApiBackendService] Error restoring session: $e');
@@ -561,6 +568,7 @@ class ApiBackendService extends ChangeNotifier {
       loadConversations();
       loadUsers();
       loadTasks();
+      _syncFcmToken();
       notifyListeners();
       return _currentUser!;
     } else {
@@ -649,6 +657,16 @@ class ApiBackendService extends ChangeNotifier {
 
           if (eventType == 'pong') {
             // Heartbeat response from backend
+            return;
+          }
+
+          if (eventType == 'call_signal') {
+            final signalData = payload['data'] ?? payload;
+            if (signalData is Map<String, dynamic>) {
+              _callSignalController.add(signalData);
+            } else if (signalData is Map) {
+              _callSignalController.add(Map<String, dynamic>.from(signalData));
+            }
             return;
           }
 
@@ -782,6 +800,23 @@ class ApiBackendService extends ChangeNotifier {
       debugPrint('[ApiBackendService] Error connecting to WebSocket: $e');
       _cleanupWebSocket();
       _scheduleReconnect();
+    }
+  }
+
+  /// Sends a real-time WebRTC call signal to a target peer over WebSocket
+  void sendCallSignal(String targetUserId, Map<String, dynamic> signalData) {
+    if (_channel != null) {
+      try {
+        _channel!.sink.add(jsonEncode({
+          'type': 'call_signal',
+          'target_user_id': targetUserId,
+          'data': signalData,
+        }));
+      } catch (e) {
+        debugPrint('[ApiBackendService] Error sending call signal: $e');
+      }
+    } else {
+      debugPrint('[ApiBackendService] WebSocket disconnected; cannot send call signal');
     }
   }
 
@@ -1907,6 +1942,11 @@ class ApiBackendService extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    try {
+      if (locator.isRegistered<FirebaseNotificationService>()) {
+        await locator<FirebaseNotificationService>().unregisterOnLogout();
+      }
+    } catch (_) {}
     _token = null;
     _currentUser = null;
     _reconnectTimer?.cancel();
@@ -1929,5 +1969,79 @@ class ApiBackendService extends ChangeNotifier {
   Future<void> setPresence(PresenceState state) async {
     if (_token == null) return;
     debugPrint('Setting presence to $state');
+  }
+
+  /// Register an FCM device token with api-hub for push notifications
+  Future<void> registerDeviceToken(String fcmToken, {String deviceType = 'android'}) async {
+    if (_token == null || fcmToken.isEmpty) return;
+    try {
+      final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/me/devices');
+      http.Response response = await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'Content-Type': 'application/json',
+          'x-tenant-id': ApiBackendConfig.tenantId,
+        },
+        body: jsonEncode({
+          'fcm_token': fcmToken,
+          'device_type': deviceType,
+        }),
+      );
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/app-users/me/devices');
+        await http.post(
+          fallbackUri,
+          headers: {
+            'Authorization': 'Bearer $_token',
+            'Content-Type': 'application/json',
+            'x-tenant-id': ApiBackendConfig.tenantId,
+          },
+          body: jsonEncode({
+            'fcm_token': fcmToken,
+            'device_type': deviceType,
+          }),
+        );
+      }
+      debugPrint('[ApiBackendService] FCM token registered with backend');
+    } catch (e) {
+      debugPrint('[ApiBackendService] Error registering FCM token: $e');
+    }
+  }
+
+  /// Unregister an FCM device token on logout
+  Future<void> unregisterDeviceToken(String fcmToken) async {
+    if (_token == null || fcmToken.isEmpty) return;
+    try {
+      final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/me/devices/$fcmToken');
+      http.Response response = await http.delete(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'x-tenant-id': ApiBackendConfig.tenantId,
+        },
+      );
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/app-users/me/devices/$fcmToken');
+        await http.delete(
+          fallbackUri,
+          headers: {
+            'Authorization': 'Bearer $_token',
+            'x-tenant-id': ApiBackendConfig.tenantId,
+          },
+        );
+      }
+      debugPrint('[ApiBackendService] FCM token unregistered from backend');
+    } catch (e) {
+      debugPrint('[ApiBackendService] Error unregistering FCM token: $e');
+    }
+  }
+
+  void _syncFcmToken() {
+    try {
+      if (locator.isRegistered<FirebaseNotificationService>()) {
+        unawaited(locator<FirebaseNotificationService>().syncTokenOnLogin());
+      }
+    } catch (_) {}
   }
 }

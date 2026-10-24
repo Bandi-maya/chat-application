@@ -23,6 +23,7 @@ import 'package:chat/data/services/rich_chat_realtime_service.dart';
 import 'package:chat/data/services/status_service.dart';
 import 'package:chat/data/services/push_token_service.dart';
 import 'package:chat/data/services/notification_channel_manager.dart';
+import 'package:chat/core/services/firebase_notification_service.dart';
 import 'package:chat/domain/models/call_state.dart';
 import 'package:chat/domain/models/user_profile.dart';
 import 'package:chat/features/auth/create_new_password_screen.dart';
@@ -200,6 +201,11 @@ Future<void> _initializeDeferredPlatformServices() async {
     await locator<PushTokenService>().initialize();
   } catch (error) {
     debugPrint('Chaty push token bootstrap skipped: $error');
+  }
+  try {
+    await locator<FirebaseNotificationService>().initialize();
+  } catch (error) {
+    debugPrint('Chaty Firebase bootstrap skipped: $error');
   }
 }
 

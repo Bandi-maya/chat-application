@@ -3,6 +3,10 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 val releaseKeystorePath = System.getenv("CHATY_ANDROID_KEYSTORE_PATH")
 val releaseStorePassword = System.getenv("CHATY_ANDROID_STORE_PASSWORD")
 val releaseKeyAlias = System.getenv("CHATY_ANDROID_KEY_ALIAS")

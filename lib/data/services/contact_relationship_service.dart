@@ -73,21 +73,28 @@ class ContactRelationshipService {
   }
 
   Future<ContactConnectionStatus> connectionStatus(String otherUserId) async {
-    final raw = await _client.rpc(
-      'get_contact_connection_status',
-      params: <String, dynamic>{'p_other_user_id': otherUserId},
-    );
-    if (raw is List && raw.isNotEmpty && raw.first is Map) {
-      return ContactConnectionStatus.fromDatabaseMap(
-        Map<String, dynamic>.from(raw.first as Map),
-      );
+    if (_client.auth.currentSession == null) {
+      return const ContactConnectionStatus(myAccepted: true, otherAccepted: true);
     }
-    if (raw is Map) {
-      return ContactConnectionStatus.fromDatabaseMap(
-        Map<String, dynamic>.from(raw),
+    try {
+      final raw = await _client.rpc(
+        'get_contact_connection_status',
+        params: <String, dynamic>{'p_other_user_id': otherUserId},
       );
+      if (raw is List && raw.isNotEmpty && raw.first is Map) {
+        return ContactConnectionStatus.fromDatabaseMap(
+          Map<String, dynamic>.from(raw.first as Map),
+        );
+      }
+      if (raw is Map) {
+        return ContactConnectionStatus.fromDatabaseMap(
+          Map<String, dynamic>.from(raw),
+        );
+      }
+    } catch (_) {
+      return const ContactConnectionStatus(myAccepted: true, otherAccepted: true);
     }
-    return const ContactConnectionStatus();
+    return const ContactConnectionStatus(myAccepted: true, otherAccepted: true);
   }
 
   Future<String> acceptConnection(String otherUserId) async {

@@ -8,15 +8,16 @@ import 'package:uuid/uuid.dart';
 import '../../domain/models/call_state.dart';
 import '../../domain/models/other_models.dart';
 import '../../features/settings/calls/call_presentation_preferences.dart';
+import '../../injection/locator.dart';
 import '../repositories/chaty_data_store.dart';
+import 'api_backend_service.dart';
 import 'backend_service.dart';
 
 /// Production call-session controller.
 ///
-/// Supabase Postgres + RLS is the signaling source of truth. WebRTC is the
-/// media source of truth. A session is never marked connected merely because
-/// an invite/answer signal was exchanged: only RTCPeerConnection reaching the
-/// connected state starts the call timer and exposes a connected UI state.
+/// Dual-signaling capable: Uses ApiBackendService WebSocket signaling when connected
+/// to api-hub, and Supabase Postgres + RLS when connected to Supabase.
+/// WebRTC is the media source of truth.
 class CallSignalingService extends ChangeNotifier {
   final SupabaseClient _client;
   final ChatyDataStore dataStore;
@@ -24,6 +25,52 @@ class CallSignalingService extends ChangeNotifier {
   final Uuid _uuid = const Uuid();
 
   ChatyCallSession? _currentSession;
+  String? _cachedRemoteOfferSdp;
+  StreamSubscription<Map<String, dynamic>>? _apiSignalSubscription;
+
+  String? get currentUserId {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.currentUser != null && api.currentUser!.id.isNotEmpty) {
+        return api.currentUser!.id;
+      }
+    }
+    return _client.auth.currentUser?.id ??
+        (dataStore.currentUser.id.isNotEmpty ? dataStore.currentUser.id : null);
+  }
+
+  String get currentUserDisplayName {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.currentUser != null && api.currentUser!.displayName.isNotEmpty) {
+        return api.currentUser!.displayName;
+      }
+    }
+    return dataStore.currentUser.displayName.isNotEmpty
+        ? dataStore.currentUser.displayName
+        : 'User';
+  }
+
+  String? get currentUserAvatarInitials {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.currentUser != null) {
+        return api.currentUser!.avatarInitials;
+      }
+    }
+    return dataStore.currentUser.avatarInitials;
+  }
+
+  String? get currentUserAvatarColorHex {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.currentUser != null) {
+        return api.currentUser!.avatarColorHex;
+      }
+    }
+    return dataStore.currentUser.avatarColorHex;
+  }
+
   Timer? _ringTimeoutTimer;
   Timer? _connectionTimeoutTimer;
   Timer? _durationTimer;
@@ -73,9 +120,14 @@ class CallSignalingService extends ChangeNotifier {
   }
 
   Future<void> _initialize() async {
+    _subscribeApiSignaling();
+
     _authSubscription ??= _client.auth.onAuthStateChange.listen((state) {
       if (state.session == null) {
-        unawaited(_resetForSignedOutSession());
+        if (!locator.isRegistered<ApiBackendService>() ||
+            !locator<ApiBackendService>().isAuthenticated) {
+          unawaited(_resetForSignedOutSession());
+        }
       } else {
         unawaited(_subscribeDatabaseSignaling());
         unawaited(_hydrateLatestIncomingCall());
@@ -89,10 +141,19 @@ class CallSignalingService extends ChangeNotifier {
     _initialized = true;
   }
 
+  void _subscribeApiSignaling() {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      _apiSignalSubscription?.cancel();
+      _apiSignalSubscription = api.onCallSignal.listen(_handleApiCallSignal);
+    }
+  }
+
   /// Rebuilds realtime channels after Android/iOS may have suspended the
   /// process network connection. Unlike [initialize], this always performs a
   /// fresh subscription and reconciles missed incoming-call state.
   Future<void> reconnectSignaling() {
+    _subscribeApiSignaling();
     if (_client.auth.currentSession == null) return Future<void>.value();
     return _signalingReconnectFuture ??= _reconnectSignaling().whenComplete(() {
       _signalingReconnectFuture = null;
@@ -104,8 +165,144 @@ class CallSignalingService extends ChangeNotifier {
     await _hydrateLatestIncomingCall();
   }
 
-  /// Starts a real outgoing WebRTC call. The direct conversation and call row
-  /// are authorized by server-side RPC/RLS before the remote peer can ring.
+  Future<void> _handleApiCallSignal(Map<String, dynamic> signal) async {
+    final signalType = signal['signal_type']?.toString();
+    final callId = signal['call_id']?.toString() ?? '';
+    final senderId = signal['sender_id']?.toString() ??
+        signal['caller_id']?.toString() ??
+        '';
+    final myId = currentUserId;
+
+    if (myId == null || callId.isEmpty) return;
+    if (senderId == myId) return; // Ignore echo of our own signals
+
+    switch (signalType) {
+      case 'offer':
+        final active = _currentSession;
+        if (active != null && active.callId != callId && isInActiveCall) {
+          if (locator.isRegistered<ApiBackendService>()) {
+            locator<ApiBackendService>().sendCallSignal(senderId, <String, dynamic>{
+              'signal_type': 'busy',
+              'call_id': callId,
+            });
+          }
+          return;
+        }
+
+        _cachedRemoteOfferSdp = signal['sdp']?.toString();
+        _callDurationSeconds = 0;
+        final isVideo = signal['is_video'] == true || signal['is_video'] == 'true';
+        _currentSession = ChatyCallSession(
+          callId: callId,
+          remoteUserId: senderId,
+          remoteDisplayName: signal['caller_name']?.toString() ?? 'Contact',
+          remoteAvatarInitials: signal['caller_avatar_initials']?.toString(),
+          remoteAvatarColorHex: signal['caller_avatar_color_hex']?.toString(),
+          isVideo: isVideo,
+          isOutgoing: false,
+          state: CallSessionState.incoming,
+          startedAt: DateTime.now(),
+          audioRoute: isVideo ? AudioRouteType.speaker : AudioRouteType.earpiece,
+        );
+        notifyListeners();
+
+        _ringTimeoutTimer?.cancel();
+        _ringTimeoutTimer = Timer(const Duration(seconds: 40), () {
+          if (_currentSession?.callId == callId &&
+              _currentSession?.state == CallSessionState.incoming) {
+            unawaited(endCall(reason: 'no_answer'));
+          }
+        });
+        break;
+
+      case 'answer':
+        if (_currentSession?.callId == callId && _currentSession!.isOutgoing) {
+          final answerSdp = signal['sdp']?.toString() ?? '';
+          if (answerSdp.isNotEmpty &&
+              !_remoteDescriptionReady &&
+              _peerConnection != null) {
+            _ringTimeoutTimer?.cancel();
+            await _peerConnection!.setRemoteDescription(
+              RTCSessionDescription(answerSdp, 'answer'),
+            );
+            _remoteDescriptionReady = true;
+            _currentSession = _currentSession?.copyWith(
+              state: CallSessionState.connecting,
+            );
+            _startConnectionTimeout(callId);
+            await _flushRemoteCandidates();
+            notifyListeners();
+          }
+        }
+        break;
+
+      case 'ice_candidate':
+        if (_currentSession?.callId == callId) {
+          final candidateText = signal['candidate']?.toString();
+          if (candidateText != null && candidateText.isNotEmpty) {
+            final sdpMid = signal['sdpMid']?.toString();
+            final sdpMLineIndex = signal['sdpMLineIndex'] is int
+                ? signal['sdpMLineIndex'] as int
+                : int.tryParse(signal['sdpMLineIndex']?.toString() ?? '');
+            final candidate = RTCIceCandidate(candidateText, sdpMid, sdpMLineIndex);
+            if (!_remoteDescriptionReady || _peerConnection == null) {
+              _queuedRemoteCandidates.add(candidate);
+            } else {
+              await _peerConnection!.addCandidate(candidate);
+            }
+          }
+        }
+        break;
+
+      case 'busy':
+      case 'decline':
+        if (_currentSession?.callId == callId) {
+          _ringTimeoutTimer?.cancel();
+          _connectionTimeoutTimer?.cancel();
+          _stopDurationTimer();
+          final terminalSession = _currentSession!;
+          final duration = _callDurationSeconds;
+          _logCallRecordOnce(
+            terminalSession,
+            terminalSession.isOutgoing ? CallDirection.outgoing : CallDirection.missed,
+            duration,
+          );
+          _currentSession = terminalSession.copyWith(
+            state: signalType == 'busy' ? CallSessionState.busy : CallSessionState.declined,
+            endedAt: DateTime.now(),
+          );
+          await _disposeMediaTransport();
+          notifyListeners();
+        }
+        break;
+
+      case 'hangup':
+        if (_currentSession?.callId == callId) {
+          _ringTimeoutTimer?.cancel();
+          _connectionTimeoutTimer?.cancel();
+          _stopDurationTimer();
+          final terminalSession = _currentSession!;
+          final duration = _callDurationSeconds;
+          _logCallRecordOnce(
+            terminalSession,
+            terminalSession.isOutgoing
+                ? CallDirection.outgoing
+                : (duration > 0 ? CallDirection.incoming : CallDirection.missed),
+            duration,
+          );
+          _currentSession = terminalSession.copyWith(
+            state: CallSessionState.ended,
+            endedAt: DateTime.now(),
+          );
+          await _disposeMediaTransport();
+          notifyListeners();
+        }
+        break;
+    }
+  }
+
+  /// Starts a real outgoing WebRTC call. Supports ApiBackendService WebSocket signaling
+  /// as well as Supabase direct conversations.
   Future<void> initiateCall({
     required String remoteUserId,
     required String remoteDisplayName,
@@ -114,7 +311,7 @@ class CallSignalingService extends ChangeNotifier {
     required bool isVideo,
   }) async {
     await initialize();
-    final myId = _client.auth.currentUser?.id;
+    final myId = currentUserId;
     if (myId == null) throw StateError('Authentication required.');
     if (remoteUserId.isEmpty || remoteUserId == myId) {
       throw ArgumentError('A different call participant is required.');
@@ -127,17 +324,10 @@ class CallSignalingService extends ChangeNotifier {
     }
 
     await _disposeMediaTransport();
-    final conversationRaw = await _client.rpc(
-      'create_direct_conversation',
-      params: <String, dynamic>{'p_other_user_id': remoteUserId},
-    );
-    final conversationId = conversationRaw?.toString() ?? '';
-    if (conversationId.isEmpty) {
-      throw StateError('Unable to establish an authorized conversation.');
-    }
-
     final callId = _uuid.v4();
     _callDurationSeconds = 0;
+    _cachedRemoteOfferSdp = null;
+
     _currentSession = ChatyCallSession(
       callId: callId,
       remoteUserId: remoteUserId,
@@ -164,15 +354,44 @@ class CallSignalingService extends ChangeNotifier {
         throw StateError('WebRTC did not produce an SDP offer.');
       }
 
-      await _client.from('call_sessions').insert(<String, dynamic>{
-        'id': callId,
-        'conversation_id': conversationId,
-        'caller_id': myId,
-        'callee_id': remoteUserId,
-        'kind': isVideo ? 'video' : 'audio',
-        'status': 'ringing',
-        'offer_sdp': offerSdp,
-      });
+      // 1. Send via ApiBackendService WebSocket
+      if (locator.isRegistered<ApiBackendService>()) {
+        final api = locator<ApiBackendService>();
+        api.sendCallSignal(remoteUserId, <String, dynamic>{
+          'signal_type': 'offer',
+          'call_id': callId,
+          'caller_id': myId,
+          'caller_name': currentUserDisplayName,
+          'caller_avatar_initials': currentUserAvatarInitials,
+          'caller_avatar_color_hex': currentUserAvatarColorHex,
+          'is_video': isVideo,
+          'sdp': offerSdp,
+        });
+      }
+
+      // 2. Also record in Supabase if session exists
+      if (_client.auth.currentSession != null) {
+        try {
+          final conversationRaw = await _client.rpc(
+            'create_direct_conversation',
+            params: <String, dynamic>{'p_other_user_id': remoteUserId},
+          );
+          final conversationId = conversationRaw?.toString() ?? '';
+          if (conversationId.isNotEmpty) {
+            await _client.from('call_sessions').insert(<String, dynamic>{
+              'id': callId,
+              'conversation_id': conversationId,
+              'caller_id': myId,
+              'callee_id': remoteUserId,
+              'kind': isVideo ? 'video' : 'audio',
+              'status': 'ringing',
+              'offer_sdp': offerSdp,
+            });
+          }
+        } catch (e) {
+          debugPrint('Chaty Supabase call insert skipped: $e');
+        }
+      }
 
       _currentSession = _currentSession?.copyWith(
         state: CallSessionState.ringing,
@@ -195,8 +414,7 @@ class CallSignalingService extends ChangeNotifier {
   }
 
   /// Accepts an incoming call by building a real peer connection, applying the
-  /// stored SDP offer, creating an answer and persisting it through the guarded
-  /// server RPC. The state remains `connecting` until WebRTC itself connects.
+  /// SDP offer, creating an answer and dispatching it to the caller.
   Future<void> acceptCall() async {
     await initialize();
     var session = _currentSession;
@@ -225,13 +443,21 @@ class CallSignalingService extends ChangeNotifier {
       return;
     }
     try {
-      final row = await _client
-          .from('call_sessions')
-          .select()
-          .eq('id', session.callId)
-          .single();
-      final offerSdp = row['offer_sdp']?.toString() ?? '';
-      if (offerSdp.isEmpty) throw StateError('Incoming call has no SDP offer.');
+      String? offerSdp = _cachedRemoteOfferSdp;
+      if ((offerSdp == null || offerSdp.isEmpty) && _client.auth.currentSession != null) {
+        try {
+          final row = await _client
+              .from('call_sessions')
+              .select()
+              .eq('id', session.callId)
+              .single();
+          offerSdp = row['offer_sdp']?.toString();
+        } catch (_) {}
+      }
+
+      if (offerSdp == null || offerSdp.isEmpty) {
+        throw StateError('Incoming call has no SDP offer.');
+      }
 
       await _createMediaTransport(isVideo: session.isVideo);
       await _peerConnection!.setRemoteDescription(
@@ -250,13 +476,32 @@ class CallSignalingService extends ChangeNotifier {
         throw StateError('WebRTC did not produce an SDP answer.');
       }
 
-      await _client.rpc(
-        'accept_call_session',
-        params: <String, dynamic>{
-          'p_call_id': session.callId,
-          'p_answer_sdp': answerSdp,
-        },
-      );
+      // Send answer via ApiBackendService WebSocket
+      if (locator.isRegistered<ApiBackendService>()) {
+        final api = locator<ApiBackendService>();
+        api.sendCallSignal(session.remoteUserId, <String, dynamic>{
+          'signal_type': 'answer',
+          'call_id': session.callId,
+          'callee_id': currentUserId,
+          'sdp': answerSdp,
+        });
+      }
+
+      // Also persist to Supabase RPC if session exists
+      if (_client.auth.currentSession != null) {
+        try {
+          await _client.rpc(
+            'accept_call_session',
+            params: <String, dynamic>{
+              'p_call_id': session.callId,
+              'p_answer_sdp': answerSdp,
+            },
+          );
+        } catch (e) {
+          debugPrint('Chaty Supabase accept call skipped: $e');
+        }
+      }
+
       _currentSession = session.copyWith(state: CallSessionState.connecting);
       _startConnectionTimeout(session.callId);
       notifyListeners();
@@ -281,10 +526,22 @@ class CallSignalingService extends ChangeNotifier {
       return;
     }
     try {
-      await _client.rpc(
-        'decline_call_session',
-        params: <String, dynamic>{'p_call_id': session.callId},
-      );
+      if (locator.isRegistered<ApiBackendService>()) {
+        final api = locator<ApiBackendService>();
+        api.sendCallSignal(session.remoteUserId, <String, dynamic>{
+          'signal_type': 'decline',
+          'call_id': session.callId,
+        });
+      }
+
+      if (_client.auth.currentSession != null) {
+        try {
+          await _client.rpc(
+            'decline_call_session',
+            params: <String, dynamic>{'p_call_id': session.callId},
+          );
+        } catch (_) {}
+      }
     } finally {
       _connectionTimeoutTimer?.cancel();
       _logCallRecordOnce(session, CallDirection.missed, 0);
@@ -338,10 +595,20 @@ class CallSignalingService extends ChangeNotifier {
     _stopDurationTimer();
     final duration = _callDurationSeconds;
     try {
-      await _client.rpc(
-        'end_call_session',
-        params: <String, dynamic>{'p_call_id': session.callId},
-      );
+      if (locator.isRegistered<ApiBackendService>()) {
+        final api = locator<ApiBackendService>();
+        api.sendCallSignal(session.remoteUserId, <String, dynamic>{
+          'signal_type': 'hangup',
+          'call_id': session.callId,
+        });
+      }
+
+      if (_client.auth.currentSession != null) {
+        await _client.rpc(
+          'end_call_session',
+          params: <String, dynamic>{'p_call_id': session.callId},
+        );
+      }
     } catch (error, stackTrace) {
       debugPrint('Chaty call end persistence failed: $error\n$stackTrace');
     } finally {
@@ -608,7 +875,21 @@ class CallSignalingService extends ChangeNotifier {
 
     peer.onIceCandidate = (candidate) {
       if (candidate.candidate == null || candidate.candidate!.isEmpty) return;
-      unawaited(_persistLocalCandidate(candidate));
+      final session = _currentSession;
+      if (session != null) {
+        if (locator.isRegistered<ApiBackendService>()) {
+          locator<ApiBackendService>().sendCallSignal(session.remoteUserId, <String, dynamic>{
+            'signal_type': 'ice_candidate',
+            'call_id': session.callId,
+            'candidate': candidate.candidate,
+            'sdpMid': candidate.sdpMid,
+            'sdpMLineIndex': candidate.sdpMLineIndex,
+          });
+        }
+      }
+      if (_client.auth.currentSession != null) {
+        unawaited(_persistLocalCandidate(candidate));
+      }
     };
     peer.onTrack = (event) {
       if (event.streams.isNotEmpty) {
@@ -630,6 +911,8 @@ class CallSignalingService extends ChangeNotifier {
     }
     if (isVideo) {
       await Helper.setSpeakerphoneOn(true);
+    } else {
+      await Helper.setSpeakerphoneOn(false);
     }
   }
 
@@ -660,24 +943,39 @@ class CallSignalingService extends ChangeNotifier {
   }
 
   Future<List<Map<String, dynamic>>> _loadIceServers() async {
-    final response = await _client.functions.invoke(
-      'turn-credentials',
-      body: const <String, dynamic>{},
-    );
-    if (response.status != 200) {
-      throw StateError(
-        'Secure call relay is not configured. TURN credentials are required before calls can start.',
-      );
+    final fallbackServers = <Map<String, dynamic>>[
+      {
+        'urls': [
+          'stun:stun.l.google.com:19302',
+          'stun:stun1.l.google.com:19302',
+          'stun:stun2.l.google.com:19302',
+          'stun:stun3.l.google.com:19302',
+          'stun:stun4.l.google.com:19302',
+        ]
+      },
+    ];
+
+    try {
+      if (_client.auth.currentSession != null) {
+        final response = await _client.functions.invoke(
+          'turn-credentials',
+          body: const <String, dynamic>{},
+        );
+        if (response.status == 200) {
+          final data = Map<String, dynamic>.from(response.data as Map);
+          final rawServers = data['ice_servers'];
+          if (rawServers is List && rawServers.isNotEmpty) {
+            return rawServers
+                .whereType<Map>()
+                .map((server) => Map<String, dynamic>.from(server))
+                .toList(growable: false);
+          }
+        }
+      }
+    } catch (error) {
+      debugPrint('Chaty TURN credentials fetch skipped/fallback: $error');
     }
-    final data = Map<String, dynamic>.from(response.data as Map);
-    final rawServers = data['ice_servers'];
-    if (rawServers is! List || rawServers.isEmpty) {
-      throw StateError('The call relay returned no ICE servers.');
-    }
-    return rawServers
-        .whereType<Map>()
-        .map((server) => Map<String, dynamic>.from(server))
-        .toList(growable: false);
+    return fallbackServers;
   }
 
   Future<void> _subscribeDatabaseSignaling() async {
@@ -1122,7 +1420,7 @@ class CallSignalingService extends ChangeNotifier {
     int durationSec,
   ) {
     if (!_loggedCallIds.add(session.callId)) return;
-    final myId = _client.auth.currentUser?.id ?? '';
+    final myId = currentUserId ?? '';
     dataStore.addCallRecord(
       CallRecord(
         id: session.callId,
@@ -1199,6 +1497,7 @@ class CallSignalingService extends ChangeNotifier {
     _connectionTimeoutTimer?.cancel();
     _stopDurationTimer();
     unawaited(_authSubscription?.cancel());
+    unawaited(_apiSignalSubscription?.cancel());
     unawaited(_disposeMediaTransport());
     unawaited(_removeDatabaseChannels());
     super.dispose();
