@@ -445,15 +445,17 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
                       // Delivery Tick Selector
                       Row(
                         children: [
-                          Text(
-                            'Tick Indicator Style',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: context.colors.foreground,
+                          Expanded(
+                            child: Text(
+                              'Tick Indicator Style',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: context.colors.foreground,
+                              ),
                             ),
                           ),
-                          const Spacer(),
+                          const SizedBox(width: 8),
                           DropdownButton<DeliveryIconStyle>(
                             value: _current.deliveryTickStyle,
                             underline: const SizedBox.shrink(),
