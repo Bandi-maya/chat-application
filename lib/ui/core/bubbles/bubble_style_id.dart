@@ -56,6 +56,19 @@ enum BubbleStyleId {
   aranbor,
   win,
   mood,
+
+  // Set D (49-59): remaining GB reference styles
+  textra,
+  goSms,
+  cvIos,
+  rcPal,
+  rcIosLine,
+  rcImLine,
+  rcGoSms,
+  rcTranLine,
+  rcImess,
+  gabiMess,
+  rcFancy,
 }
 
 extension BubbleStyleIdExtension on BubbleStyleId {
@@ -162,8 +175,50 @@ extension BubbleStyleIdExtension on BubbleStyleId {
         return 'Win';
       case BubbleStyleId.mood:
         return 'Mood';
+
+      // Set D
+      case BubbleStyleId.textra:
+        return 'Textra SMS';
+      case BubbleStyleId.goSms:
+        return 'Go SMS';
+      case BubbleStyleId.cvIos:
+        return 'CV ios';
+      case BubbleStyleId.rcPal:
+        return 'Rc Pal';
+      case BubbleStyleId.rcIosLine:
+        return 'Rc ios Line';
+      case BubbleStyleId.rcImLine:
+        return 'Rc IM Line';
+      case BubbleStyleId.rcGoSms:
+        return 'Rc Go SMS';
+      case BubbleStyleId.rcTranLine:
+        return 'Rc tran Line';
+      case BubbleStyleId.rcImess:
+        return 'Rc Imess';
+      case BubbleStyleId.gabiMess:
+        return 'Gabi Mess';
+      case BubbleStyleId.rcFancy:
+        return 'Rc Fancy';
     }
   }
+
+  /// Bubble styles added for GB catalog parity whose silhouettes are
+  /// original Chaty vector interpretations grounded in the GB 9-patch
+  /// shapes (GB ships 9-patch PNGs; we do not copy assets). The picker
+  /// labels these as "vector redraw".
+  static const Set<BubbleStyleId> gbVectorInterpretations = {
+    BubbleStyleId.textra,
+    BubbleStyleId.goSms,
+    BubbleStyleId.cvIos,
+    BubbleStyleId.rcPal,
+    BubbleStyleId.rcIosLine,
+    BubbleStyleId.rcImLine,
+    BubbleStyleId.rcGoSms,
+    BubbleStyleId.rcTranLine,
+    BubbleStyleId.rcImess,
+    BubbleStyleId.gabiMess,
+    BubbleStyleId.rcFancy,
+  };
 
   /// Safe deserialization with legacy aliases migration
   static BubbleStyleId fromString(String? key) {
