@@ -1156,10 +1156,14 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
   String get _compactBarTitle {
     final homePrefs = widget.preferencesController.home;
     final user = widget.dataStore.currentUser;
+    final override = homePrefs.myNameOverride.trim();
+    final effectiveOverride = (override.isNotEmpty && override != 'Alex Rivera' && override != 'Bandi Maya') ? override : '';
+    final rawName = user.displayName.trim();
+    final effectiveDisplayName = (rawName.isNotEmpty && rawName != 'Chaty User' && rawName != 'Bandi Maya')
+        ? rawName
+        : (user.username.trim().isNotEmpty ? user.username.trim() : 'Chaty');
     final identity = homePrefs.setMyName
-        ? (homePrefs.myNameOverride.trim().isNotEmpty
-            ? homePrefs.myNameOverride.trim()
-            : (user.displayName.isNotEmpty ? user.displayName : 'Chaty'))
+        ? (effectiveOverride.isNotEmpty ? effectiveOverride : effectiveDisplayName)
         : 'Chaty';
     final fallback = identity;
     final homeStyle =

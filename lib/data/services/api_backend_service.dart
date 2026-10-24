@@ -496,12 +496,25 @@ class ApiBackendService extends ChangeNotifier {
       }
 
       final payload = _decodeJwt(_token!);
-      final userObj = data['user'] ?? {};
+      final userObj = (data['user'] is Map ? data['user'] : {}) as Map;
 
       final userId = (userObj['id'] ?? userObj['uid'] ?? payload['uid'] ?? '').toString();
-      final fullName = (userObj['full_name'] ?? userObj['display_name'] ?? userObj['name'] ?? payload['sub'] ?? 'User').toString();
       final username = (userObj['username'] ?? payload['sub'] ?? '').toString();
-      final initials = fullName.isNotEmpty ? fullName.substring(0, 1).toUpperCase() : 'U';
+
+      String extractedName = (userObj['full_name'] ?? userObj['display_name'] ?? userObj['name'] ?? '').toString().trim();
+      if (extractedName.isEmpty) {
+        final fn = (userObj['firstName'] ?? userObj['first_name'] ?? '').toString().trim();
+        final ln = (userObj['lastName'] ?? userObj['last_name'] ?? '').toString().trim();
+        extractedName = '$fn $ln'.trim();
+      }
+      if (extractedName.isEmpty) {
+        extractedName = username.isNotEmpty ? username : (payload['sub'] ?? 'User').toString();
+      }
+
+      final initials = extractedName.isNotEmpty
+          ? extractedName.split(RegExp(r'\s+')).map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
+          : (username.isNotEmpty ? username.substring(0, 1).toUpperCase() : 'U');
+
       final photo = (userObj['photo'] ??
               userObj['avatar_url'] ??
               userObj['avatarUrl'] ??
@@ -510,7 +523,7 @@ class ApiBackendService extends ChangeNotifier {
 
       _currentUser = UserProfile(
         id: userId,
-        displayName: fullName,
+        displayName: extractedName,
         username: username,
         avatarInitials: initials,
         avatarColorHex: '0xFF6366F1',
@@ -834,27 +847,76 @@ class ApiBackendService extends ChangeNotifier {
   }
 
 
-  Future<void> loadUsers() async {
+  Future<void> loadUsers({String? query}) async {
     if (_token == null) return;
     try {
-      final response = await http.get(
-        Uri.parse('${ApiBackendConfig.restApiBaseUrl}/app-users'),
-        headers: {
-          'Authorization': 'Bearer $_token',
-          'x-tenant-id': ApiBackendConfig.tenantId,
-        },
-      );
+      final qParam = (query != null && query.trim().isNotEmpty)
+          ? '?search=${Uri.encodeComponent(query.trim())}'
+          : '';
+
+      http.Response response;
+      try {
+        final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/users$qParam');
+        response = await http.get(
+          uri,
+          headers: {
+            'Authorization': 'Bearer $_token',
+            'x-tenant-id': ApiBackendConfig.tenantId,
+          },
+        );
+        if (response.statusCode == 404) {
+          final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/chat/users$qParam');
+          response = await http.get(
+            fallbackUri,
+            headers: {
+              'Authorization': 'Bearer $_token',
+              'x-tenant-id': ApiBackendConfig.tenantId,
+            },
+          );
+        }
+      } catch (_) {
+        response = await http.get(
+          Uri.parse('${ApiBackendConfig.restApiBaseUrl}/app-users$qParam'),
+          headers: {
+            'Authorization': 'Bearer $_token',
+            'x-tenant-id': ApiBackendConfig.tenantId,
+          },
+        );
+      }
+
+      if (response.statusCode == 404) {
+        response = await http.get(
+          Uri.parse('${ApiBackendConfig.restApiBaseUrl}/app-users$qParam'),
+          headers: {
+            'Authorization': 'Bearer $_token',
+            'x-tenant-id': ApiBackendConfig.tenantId,
+          },
+        );
+        if (response.statusCode == 404) {
+          response = await http.get(
+            Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/app-users$qParam'),
+            headers: {
+              'Authorization': 'Bearer $_token',
+              'x-tenant-id': ApiBackendConfig.tenantId,
+            },
+          );
+        }
+      }
+
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
-        final list = (body['data'] as List?) ?? [];
-        _users = list.map((json) {
+        final list = (body['data'] as List?) ?? (body is List ? body : []);
+        final fetchedUsers = list.map((json) {
           final uid = (json['uid'] ?? json['id'] ?? '').toString();
           final fullName = (json['full_name'] ??
+                  json['displayName'] ??
                   '${json['first_name'] ?? ''} ${json['last_name'] ?? ''}'.trim())
               .toString();
           final username = (json['username'] ?? '').toString();
           final displayName = fullName.isNotEmpty ? fullName : (username.isNotEmpty ? username : 'User');
-          final initials = displayName.isNotEmpty ? displayName.substring(0, 1).toUpperCase() : 'U';
+          final initials = displayName.isNotEmpty
+              ? displayName.split(RegExp(r'\s+')).map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
+              : 'U';
           final photo = (json['photo'] ??
                   json['avatar_url'] ??
                   json['avatarUrl'] ??
@@ -867,7 +929,7 @@ class ApiBackendService extends ChangeNotifier {
             username: username,
             avatarInitials: initials,
             avatarColorHex: '0xFF6366F1',
-            about: (json['about'] ?? json['role'] ?? '').toString(),
+            about: (json['about'] ?? json['designation'] ?? json['role'] ?? '').toString(),
             presence: PresenceState.online,
             lastSeenAt: DateTime.now(),
             isVerified: false,
@@ -877,6 +939,19 @@ class ApiBackendService extends ChangeNotifier {
             avatarUrl: photo,
           );
         }).toList();
+
+        if (query == null || query.trim().isEmpty) {
+          _users = fetchedUsers;
+        } else {
+          for (final u in fetchedUsers) {
+            final idx = _users.indexWhere((x) => x.id == u.id);
+            if (idx == -1) {
+              _users.add(u);
+            } else {
+              _users[idx] = u;
+            }
+          }
+        }
 
         // Enrich current user display name, initials, and photo if found in users list
         if (_currentUser != null) {
@@ -899,6 +974,8 @@ class ApiBackendService extends ChangeNotifier {
         }
 
         notifyListeners();
+      } else {
+        debugPrint('[ApiBackendService] loadUsers status ${response.statusCode}');
       }
     } catch (e) {
       debugPrint('[ApiBackendService] Error loading users: $e');
@@ -906,10 +983,10 @@ class ApiBackendService extends ChangeNotifier {
   }
 
   Future<List<UserProfile>> searchUsers(String query, {bool includeSelf = false}) async {
-    if (_users.isEmpty) {
-      await loadUsers();
-    }
     final q = query.toLowerCase().trim();
+    // Query remote users directly for fresh directory results
+    await loadUsers(query: q);
+
     return _users.where((u) {
       if (!includeSelf && u.id == _currentUser?.id) return false;
       if (q.isEmpty) return true;
@@ -951,6 +1028,57 @@ class ApiBackendService extends ChangeNotifier {
       throw Exception('No active subscription plan found. Please enroll in a product plan to continue.');
     }
     throw Exception('Failed to start chat (${response.statusCode})');
+  }
+
+  Future<Conversation> createGroupRoom(String name, List<String> memberUserIds) async {
+    if (_token == null) throw Exception('Not authenticated');
+    final payload = {
+      'name': name.trim(),
+      'member_user_ids': memberUserIds,
+    };
+    http.Response response;
+    final primaryUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/rooms/group');
+    try {
+      response = await http.post(
+        primaryUri,
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'Content-Type': 'application/json',
+          'x-tenant-id': ApiBackendConfig.tenantId,
+        },
+        body: jsonEncode(payload),
+      );
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/chat/rooms/group');
+        response = await http.post(
+          fallbackUri,
+          headers: {
+            'Authorization': 'Bearer $_token',
+            'Content-Type': 'application/json',
+            'x-tenant-id': ApiBackendConfig.tenantId,
+          },
+          body: jsonEncode(payload),
+        );
+      }
+    } catch (e) {
+      throw Exception('Failed to connect to chat server: $e');
+    }
+
+    if (response.statusCode == 200) {
+      final body = jsonDecode(response.body);
+      final roomData = body['data'] ?? body;
+      final conv = Conversation.fromApi(roomData);
+
+      final idx = _conversations.indexWhere((c) => c.id == conv.id);
+      if (idx == -1) {
+        _conversations.insert(0, conv);
+      } else {
+        _conversations[idx] = conv;
+      }
+      notifyListeners();
+      return conv;
+    }
+    throw Exception('Failed to create group (${response.statusCode})');
   }
 
   Future<void> loadMessages(String chatId) async {

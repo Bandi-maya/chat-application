@@ -45,10 +45,14 @@ class ProfileScreen extends StatelessWidget {
       builder: (context, _) {
         final user = dataStore.currentUser;
         final profileTemplate = locator<TemplateController>().profile;
-        final nameOverride = preferencesController.home.myNameOverride;
-        final displayName = nameOverride.isNotEmpty
-            ? nameOverride
-            : user.displayName;
+        final override = preferencesController.home.myNameOverride.trim();
+        final effectiveOverride = (override.isNotEmpty && override != 'Alex Rivera' && override != 'Bandi Maya') ? override : '';
+        final rawName = user.displayName.trim();
+        final displayName = effectiveOverride.isNotEmpty
+            ? effectiveOverride
+            : (rawName.isNotEmpty && rawName != 'Bandi Maya' && rawName != 'Chaty User'
+                ? rawName
+                : (user.username.isNotEmpty ? user.username : 'User'));
         return ChatySettingsPage(
           title: 'Profile',
           subtitle: 'Account, status and app entry points',

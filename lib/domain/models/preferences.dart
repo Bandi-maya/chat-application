@@ -379,7 +379,7 @@ class HomePreferences {
     this.enableStoriesStrip = false,
     this.storiesStyle = 'Circular',
     this.separateChatsAndGroups = false,
-    this.myNameOverride = 'Alex Rivera',
+    this.myNameOverride = '',
     this.avatarShape = 'circle',
     this.ghostMode = false,
     this.airplaneModeSimulator = false,
@@ -612,7 +612,9 @@ class HomePreferences {
     enableStoriesStrip: map['enableStoriesStrip'] ?? false,
     storiesStyle: map['storiesStyle'] ?? 'Circular',
     separateChatsAndGroups: map['separateChatsAndGroups'] ?? false,
-    myNameOverride: map['myNameOverride'] ?? 'Alex Rivera',
+    myNameOverride: (map['myNameOverride'] == 'Alex Rivera' || map['myNameOverride'] == 'Bandi Maya')
+        ? ''
+        : (map['myNameOverride'] ?? ''),
     avatarShape: map['avatarShape'] ?? 'circle',
     ghostMode: map['ghostMode'] ?? false,
     airplaneModeSimulator: map['airplaneModeSimulator'] ?? false,

@@ -51,9 +51,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
     _isCreatingGroup = widget.startInGroupMode || widget.startInBroadcastMode;
     _isBroadcast = widget.startInBroadcastMode;
     _results = widget.dataStore.contacts;
-    if (_results.isEmpty) {
-      unawaited(_loadInitialUsers());
-    }
+    unawaited(_loadInitialUsers());
   }
 
   Future<void> _loadInitialUsers() async {
@@ -81,7 +79,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
   void _onSearchChanged(String value) {
     _debounce?.cancel();
     final query = value.trim();
-    if (query.length < 2) {
+    if (query.isEmpty) {
       setState(() {
         _results = widget.dataStore.contacts;
         _isLoading = false;
@@ -90,7 +88,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
     }
     final epoch = ++_epoch;
     setState(() => _isLoading = true);
-    _debounce = Timer(const Duration(milliseconds: 280), () {
+    _debounce = Timer(const Duration(milliseconds: 250), () {
       unawaited(_searchUsers(query, epoch));
     });
   }
@@ -385,7 +383,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
                     itemBuilder: (_, __) => const ChatySkeletonTile(),
                   )
                 : _results.isEmpty
-                ? (_searchCtrl.text.trim().length >= 2
+                ? (_searchCtrl.text.trim().isNotEmpty
                       ? ChatyNoResultsState(
                           query: _searchCtrl.text.trim(),
                           message:
