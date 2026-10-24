@@ -43,7 +43,10 @@ class ThemePairPreview extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           _Labeled(
-            label: 'Home',
+            label: layout == null
+                ? 'Home'
+                : 'Home \u00b7 ${layout!.homeStylePreset}',
+            maxWidth: phoneWidth + 24,
             color: themeConfig.secondaryTextColor,
             child: _PhoneFrame(
               themeConfig: themeConfig,
@@ -73,8 +76,10 @@ class _Labeled extends StatelessWidget {
     required this.label,
     required this.color,
     required this.child,
+    this.maxWidth = double.infinity,
   });
 
+  final double maxWidth;
   final String label;
   final Color color;
   final Widget child;
@@ -86,14 +91,20 @@ class _Labeled extends StatelessWidget {
       children: [
         child,
         const SizedBox(height: 4),
-        Text(
+        ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth),
+          child: Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
           textScaler: TextScaler.noScaling,
           style: TextStyle(
             color: color,
             fontSize: 10,
             fontWeight: FontWeight.w600,
           ),
+        ),
         ),
       ],
     );
@@ -154,14 +165,13 @@ class _HomeScreenMini extends StatelessWidget {
     final l = layout;
     final prominent = l?.home.headerStyle == HomeHeaderStyle.prominentIdentity;
     final searchForward = l?.home.headerStyle == HomeHeaderStyle.searchForward;
-    final showStories = l?.home.showStoriesStrip ?? false;
+    final showStories = l?.showStories ?? false;
     final rowCount = switch (l?.chatList.density) {
       ChatListDensity.compact => 6,
       ChatListDensity.comfortable => 4,
       _ => 5,
     };
     final roundAvatar = (l?.chatList.avatarShape ?? 'circle') == 'circle';
-    final navLayout = l?.navigation.layout ?? NavigationLayoutType.flatTabs;
     BoxDecoration avatar(Color color) => BoxDecoration(
       color: color,
       shape: roundAvatar ? BoxShape.circle : BoxShape.rectangle,
@@ -318,52 +328,7 @@ class _HomeScreenMini extends StatelessWidget {
             ],
           ),
         ),
-        Container(
-          height: 18,
-          margin: navLayout == NavigationLayoutType.floatingPill
-              ? const EdgeInsets.fromLTRB(10, 0, 10, 3)
-              : EdgeInsets.zero,
-          decoration: BoxDecoration(
-            color: t.surfaceColor,
-            borderRadius: navLayout == NavigationLayoutType.floatingPill
-                ? BorderRadius.circular(9)
-                : null,
-            border: navLayout == NavigationLayoutType.floatingPill
-                ? Border.all(color: t.cardColor, width: 0.8)
-                : null,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              for (var i = 0;
-                  i <
-                      (navLayout == NavigationLayoutType.utilityBar ||
-                              navLayout == NavigationLayoutType.identityBar
-                          ? 4
-                          : 3);
-                  i++)
-                Container(
-                  width: navLayout == NavigationLayoutType.centerActionDock &&
-                          i == 1
-                      ? 12
-                      : 7,
-                  height: navLayout == NavigationLayoutType.centerActionDock &&
-                          i == 1
-                      ? 12
-                      : 7,
-                  decoration: BoxDecoration(
-                    color: i == 0 ||
-                            (navLayout ==
-                                    NavigationLayoutType.centerActionDock &&
-                                i == 1)
-                        ? t.accentColor
-                        : t.secondaryTextColor.withValues(alpha: 0.5),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-            ],
-          ),
-        ),
+        _NavBarMini(themeConfig: t, layout: l),
       ],
     );
   }
@@ -567,6 +532,134 @@ class _ConversationMini extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+IconData _navIcon(String id) => switch (id) {
+  'groups' => Icons.groups_rounded,
+  'updates' => Icons.auto_stories_rounded,
+  'tasks' => Icons.task_alt_rounded,
+  'calls' => Icons.call_rounded,
+  'settings' => Icons.settings_rounded,
+  'desktop' => Icons.desktop_windows_rounded,
+  _ => Icons.chat_bubble_rounded,
+};
+
+/// Bottom bar miniature. Destinations are the resolved IDs (hidden Tasks and
+/// Updates tabs already removed); the container and active-tab treatment
+/// follow the bottom bar style name.
+class _NavBarMini extends StatelessWidget {
+  const _NavBarMini({required this.themeConfig, this.layout});
+
+  final ThemeConfig themeConfig;
+  final PreviewLayout? layout;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = themeConfig;
+    final style = layout?.bottomBarStyle ?? 'Classic Label Bar';
+    final ids = (layout?.destinationIds.isNotEmpty ?? false)
+        ? layout!.destinationIds
+        : const ['chats', 'updates', 'calls'];
+    final floating = const {
+      'Floating Pill',
+      'Floating Dynamic Island',
+      'Segmented Glass Dock',
+    }.contains(style);
+    final dark = style == 'Floating Dynamic Island';
+    final labels = style == 'Classic Label Bar';
+    final raisedCenter = style == 'Raised Center Action';
+    final barColor = dark ? t.primaryTextColor.withValues(alpha: 0.9) : t.surfaceColor;
+    final inactive = dark
+        ? t.backgroundColor.withValues(alpha: 0.7)
+        : t.secondaryTextColor.withValues(alpha: 0.7);
+    Widget item(int i) {
+      final active = i == 0;
+      final raised = raisedCenter && i == ids.length ~/ 2;
+      final chip = active &&
+          const {'Active Pill Chip', 'Soft Square Tile', 'Circle Accent Pop'}
+              .contains(style);
+      final icon = Icon(
+        _navIcon(ids[i]),
+        size: raised ? 10 : 9,
+        color: raised
+            ? t.outgoingTextColor
+            : (active ? (chip ? t.accentColor : t.accentColor) : inactive),
+      );
+      Widget core = icon;
+      if (raised) {
+        core = Container(
+          width: 14,
+          height: 14,
+          decoration: BoxDecoration(color: t.accentColor, shape: BoxShape.circle),
+          child: Center(child: icon),
+        );
+      } else if (chip) {
+        core = Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: style == 'Active Pill Chip' ? 6 : 3,
+            vertical: 1.5,
+          ),
+          decoration: BoxDecoration(
+            color: t.accentColor.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(
+              style == 'Soft Square Tile' ? 3 : 8,
+            ),
+            shape: style == 'Circle Accent Pop'
+                ? BoxShape.circle
+                : BoxShape.rectangle,
+          ),
+          child: icon,
+        );
+      }
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (active && style == 'Top Indicator Line')
+            Container(width: 10, height: 1.5, color: t.accentColor)
+          else if (style == 'Top Indicator Line')
+            const SizedBox(height: 1.5),
+          core,
+          if (labels)
+            Padding(
+              padding: const EdgeInsets.only(top: 1),
+              child: _line(
+                active ? t.accentColor : inactive,
+                9,
+                1.5,
+              ),
+            ),
+          if (active &&
+              (style == 'Bottom Indicator Dot' ||
+                  style == 'Curved Notch Teardrop'))
+            Container(
+              width: 3,
+              height: 3,
+              margin: const EdgeInsets.only(top: 1),
+              decoration: BoxDecoration(
+                color: t.accentColor,
+                shape: BoxShape.circle,
+              ),
+            ),
+        ],
+      );
+    }
+
+    return Container(
+      height: 20,
+      margin: floating
+          ? const EdgeInsets.fromLTRB(8, 0, 8, 3)
+          : EdgeInsets.zero,
+      decoration: BoxDecoration(
+        color: barColor,
+        borderRadius: floating ? BorderRadius.circular(10) : null,
+        border: floating ? Border.all(color: t.cardColor, width: 0.8) : null,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [for (var i = 0; i < ids.length; i++) item(i)],
+      ),
     );
   }
 }
