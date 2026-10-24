@@ -38,6 +38,11 @@ ThemeData _withFont(ThemeData t) => t.copyWith(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async {
+    // Supabase.initialize starts the app_links listener; give it a no-op host.
+    for (final name in ['com.llfbandit.app_links/messages', 'com.llfbandit.app_links/events']) {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(MethodChannel(name), (call) async => null);
+    }
     await _loadFont('Roboto', 'Roboto-Regular.ttf');
     for (final fam in ['sans-serif', 'sans-serif-medium', 'sans-serif-rounded', 'sans-serif-condensed']) {
       await _loadFont(fam, 'Roboto-Regular.ttf');
@@ -53,7 +58,7 @@ void main() {
       if (!locator.isRegistered<AppIconController>()) {
         locator.registerLazySingleton<AppIconController>(() => AppIconController());
       }
-      tester.view.physicalSize = const Size(800, 3600);
+      tester.view.physicalSize = const Size(800, 5200);
       tester.view.devicePixelRatio = 2;
       addTearDown(tester.view.reset);
       final theme = ThemeController()..syncWithSystem(b);
