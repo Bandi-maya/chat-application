@@ -7,16 +7,26 @@ class CallPresentationPreferences {
     this.dynamicIslandEnabled = true,
     this.pictureInPictureEnabled = true,
     this.lowDataUsageEnabled = false,
+    this.incomingCallTemplate = 'chatyClassic',
+    this.ongoingCallTemplate = 'chatyClassic',
   });
 
   final bool dynamicIslandEnabled;
   final bool pictureInPictureEnabled;
   final bool lowDataUsageEnabled;
 
+  /// Persisted [CallScreenTemplate.name] for the incoming call screen.
+  final String incomingCallTemplate;
+
+  /// Persisted [CallScreenTemplate.name] for the ongoing call screen.
+  final String ongoingCallTemplate;
+
   CallPresentationPreferences copyWith({
     bool? dynamicIslandEnabled,
     bool? pictureInPictureEnabled,
     bool? lowDataUsageEnabled,
+    String? incomingCallTemplate,
+    String? ongoingCallTemplate,
   }) {
     return CallPresentationPreferences(
       dynamicIslandEnabled:
@@ -24,6 +34,9 @@ class CallPresentationPreferences {
       pictureInPictureEnabled:
           pictureInPictureEnabled ?? this.pictureInPictureEnabled,
       lowDataUsageEnabled: lowDataUsageEnabled ?? this.lowDataUsageEnabled,
+      incomingCallTemplate:
+          incomingCallTemplate ?? this.incomingCallTemplate,
+      ongoingCallTemplate: ongoingCallTemplate ?? this.ongoingCallTemplate,
     );
   }
 }
@@ -45,6 +58,9 @@ class CallPresentationPreferencesStore extends ChangeNotifier {
       'chaty.calls.picture_in_picture_enabled.v1';
   static const String _lowDataUsageKey =
       'chaty.calls.low_data_usage_enabled.v1';
+  static const String _incomingTemplateKey =
+      'chaty.calls.incoming_template.v1';
+  static const String _ongoingTemplateKey = 'chaty.calls.ongoing_template.v1';
 
   SharedPreferences? _preferences;
   CallPresentationPreferences _value = const CallPresentationPreferences();
@@ -65,6 +81,10 @@ class CallPresentationPreferencesStore extends ChangeNotifier {
       pictureInPictureEnabled:
           preferences.getBool(_pictureInPictureKey) ?? true,
       lowDataUsageEnabled: preferences.getBool(_lowDataUsageKey) ?? false,
+      incomingCallTemplate:
+          preferences.getString(_incomingTemplateKey) ?? 'chatyClassic',
+      ongoingCallTemplate:
+          preferences.getString(_ongoingTemplateKey) ?? 'chatyClassic',
     );
     notifyListeners();
   }
@@ -94,6 +114,50 @@ class CallPresentationPreferencesStore extends ChangeNotifier {
       read: (value) => value.lowDataUsageEnabled,
       update: (value, next) => value.copyWith(lowDataUsageEnabled: next),
     );
+  }
+
+  Future<void> setIncomingCallTemplate(String template) {
+    return _setString(
+      key: _incomingTemplateKey,
+      template: template,
+      read: (value) => value.incomingCallTemplate,
+      update: (value, next) => value.copyWith(incomingCallTemplate: next),
+    );
+  }
+
+  Future<void> setOutgoingCallTemplate(String template) {
+    return _setString(
+      key: _ongoingTemplateKey,
+      template: template,
+      read: (value) => value.ongoingCallTemplate,
+      update: (value, next) => value.copyWith(ongoingCallTemplate: next),
+    );
+  }
+
+  Future<void> _setString({
+    required String key,
+    required String template,
+    required String Function(CallPresentationPreferences value) read,
+    required CallPresentationPreferences Function(
+      CallPresentationPreferences value,
+      String next,
+    ) update,
+  }) async {
+    await initialize();
+    final operation = _writeQueue.then((_) async {
+      if (read(_value) == template) return;
+      final saved = await _preferences!.setString(key, template);
+      if (!saved) {
+        throw StateError('Unable to save this call screen template.');
+      }
+      _value = update(_value, template);
+      notifyListeners();
+    });
+    _writeQueue = operation.then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stackTrace) {},
+    );
+    return operation;
   }
 
   Future<void> _setBool({
