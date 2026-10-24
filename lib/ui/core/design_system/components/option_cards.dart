@@ -152,7 +152,8 @@ class ChatyOptionGallery<T> extends StatelessWidget {
           ),
         const SizedBox(height: 6),
         SizedBox(
-          height: 118,
+          // Scales with the user's text size so labels are never clipped.
+          height: MediaQuery.textScalerOf(context).scale(118),
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
