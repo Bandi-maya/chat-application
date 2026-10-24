@@ -164,11 +164,7 @@ class _TemplatesSettingsScreenState extends State<TemplatesSettingsScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      TemplateCompositePreview(
-                        template: baseTmpl,
-                        isSelected: true,
-                        height: 190,
-                      ),
+                      TemplatePairPreview(template: baseTmpl, isSelected: true),
                     ],
                   ),
                 ),
@@ -274,11 +270,7 @@ class _TemplatesSettingsScreenState extends State<TemplatesSettingsScreen> {
                           ],
                         ),
                         const SizedBox(height: 14),
-                        TemplateCompositePreview(
-                          template: tmpl,
-                          isSelected: isBase,
-                          height: 180,
-                        ),
+                        TemplatePairPreview(template: tmpl, isSelected: isBase),
                         const SizedBox(height: 14),
                         Row(
                           children: [
