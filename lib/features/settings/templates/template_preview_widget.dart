@@ -17,7 +17,7 @@ class TemplateCompositePreview extends StatelessWidget {
     this.height = 200,
   });
 
-  Color get _accent => switch (template.id) {
+  Color get accent => switch (template.id) {
     ChatyTemplateId.visualSocial => const Color(0xFFE45D9C),
     ChatyTemplateId.stream => const Color(0xFF12A7B8),
     ChatyTemplateId.cameraFirst => const Color(0xFFF0A43A),
@@ -29,7 +29,7 @@ class TemplateCompositePreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final accent = _accent;
+    final accent = this.accent;
     return Container(
       height: height,
       decoration: BoxDecoration(
@@ -770,6 +770,291 @@ class TemplateCompositePreview extends StatelessWidget {
               style: TextStyle(fontSize: 8, fontWeight: FontWeight.w800, color: colors.foreground)),
           const SizedBox(height: 2),
           Text(badge, style: TextStyle(fontSize: 6.5, color: accent, fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Home and Conversation of one template, side by side, each drawn from that
+/// template's own resolved specs (header style, chat-list density, navigation,
+/// bubble radius, composer placement). Both miniatures are laid out at a fixed
+/// phone-like size and scaled down, so they never reflow on narrow cards.
+class TemplatePairPreview extends StatelessWidget {
+  const TemplatePairPreview({
+    super.key,
+    required this.template,
+    this.isSelected = false,
+  });
+
+  final ChatyTemplateDefinition template;
+  final bool isSelected;
+
+  static const double _designWidth = 300;
+  static const double _designHeight = 360;
+
+  Widget _scaled(Widget child) {
+    return AspectRatio(
+      aspectRatio: _designWidth / _designHeight,
+      child: FittedBox(
+        fit: BoxFit.contain,
+        child: SizedBox(
+          width: _designWidth,
+          height: _designHeight,
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    Widget labeled(String label, Widget child) => Expanded(
+      child: Column(
+        children: [
+          child,
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: colors.foregroundSecondary,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+    return Semantics(
+      label: '${template.name}: home screen and conversation preview',
+      excludeSemantics: true,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          labeled(
+            'Home',
+            _scaled(
+              TemplateCompositePreview(
+                template: template,
+                isSelected: isSelected,
+                height: _designHeight,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          labeled(
+            'Conversation',
+            _scaled(
+              TemplateConversationPreview(
+                template: template,
+                isSelected: isSelected,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Conversation miniature for a template: header, bubbles with the template's
+/// corner radius, and a composer laid out the way the template places actions.
+class TemplateConversationPreview extends StatelessWidget {
+  const TemplateConversationPreview({
+    super.key,
+    required this.template,
+    this.isSelected = false,
+  });
+
+  final ChatyTemplateDefinition template;
+  final bool isSelected;
+
+  Color get _accent => TemplateCompositePreview(template: template).accent;
+
+  Widget _bubble(AppColors colors, Color accent, String text, bool mine) {
+    final r = template.conversation.bubbleCornerRadius.clamp(6.0, 24.0);
+    return Align(
+      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: mine ? accent : colors.surface,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(r),
+            topRight: Radius.circular(r),
+            bottomLeft: Radius.circular(mine ? r : r * 0.3),
+            bottomRight: Radius.circular(mine ? r * 0.3 : r),
+          ),
+          border: mine ? null : Border.all(color: colors.border, width: 0.8),
+        ),
+        child: Text(
+          text,
+          textScaler: TextScaler.noScaling,
+          style: TextStyle(
+            fontSize: 13,
+            color: mine ? colors.background : colors.foreground,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _composer(AppColors colors, Color accent) {
+    final c = template.composer;
+    final radius = BorderRadius.circular(c.cornerRadius.clamp(8.0, 26.0));
+    Widget circle(IconData icon, {bool filled = false}) => Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        color: filled ? accent : colors.surfaceSecondary,
+        shape: BoxShape.circle,
+      ),
+      child: Icon(
+        icon,
+        size: 15,
+        color: filled ? colors.background : colors.foregroundSecondary,
+      ),
+    );
+    final field = Expanded(
+      child: Container(
+        height: 28,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: colors.surfaceSecondary,
+          borderRadius: radius,
+          border: Border.all(color: colors.border, width: 0.8),
+        ),
+        child: Row(
+          children: [
+            const Spacer(),
+            if (c.actionPlacement == ComposerActionPlacement.integrated) ...[
+              Icon(Icons.attach_file_rounded,
+                  size: 14, color: colors.foregroundSecondary),
+              if (c.showCameraShortcut)
+                Icon(Icons.camera_alt_outlined,
+                    size: 14, color: colors.foregroundSecondary),
+            ],
+          ],
+        ),
+      ),
+    );
+    final send = circle(
+      c.showVoiceLock ? Icons.mic_rounded : Icons.send_rounded,
+      filled: true,
+    );
+    final rowContent = switch (c.actionPlacement) {
+      ComposerActionPlacement.integrated => [field, const SizedBox(width: 6), send],
+      ComposerActionPlacement.split => [
+        circle(Icons.add_rounded),
+        const SizedBox(width: 6),
+        field,
+        const SizedBox(width: 6),
+        send,
+      ],
+      ComposerActionPlacement.powerRow => [field, const SizedBox(width: 6), send],
+    };
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (c.actionPlacement == ComposerActionPlacement.powerRow)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                for (final icon in const [
+                  Icons.image_outlined,
+                  Icons.folder_open_rounded,
+                  Icons.location_on_outlined,
+                  Icons.poll_outlined,
+                ])
+                  Icon(icon, size: 16, color: colors.foregroundSecondary),
+              ],
+            ),
+          ),
+        Row(children: rowContent),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final accent = _accent;
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surfaceSecondary,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isSelected ? accent : colors.border,
+          width: isSelected ? 2 : 1,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          Container(
+            height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: 11),
+            decoration: BoxDecoration(
+              color: colors.surface,
+              border: Border(
+                bottom: BorderSide(color: colors.border, width: 0.7),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.18),
+                    shape: template.chatList.avatarShape == 'circle'
+                        ? BoxShape.circle
+                        : BoxShape.rectangle,
+                    borderRadius: template.chatList.avatarShape == 'circle'
+                        ? null
+                        : BorderRadius.circular(7),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Maya',
+                    textScaler: TextScaler.noScaling,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: colors.foreground,
+                    ),
+                  ),
+                ),
+                Icon(Icons.more_vert_rounded,
+                    size: 16, color: colors.foregroundSecondary),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  _bubble(colors, accent, 'Lunch today?', false),
+                  const SizedBox(height: 8),
+                  _bubble(colors, accent, 'Sounds good', true),
+                  const SizedBox(height: 8),
+                  _bubble(colors, accent, 'See you at 1', false),
+                ],
+              ),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+            color: colors.surface,
+            child: _composer(colors, accent),
+          ),
         ],
       ),
     );
