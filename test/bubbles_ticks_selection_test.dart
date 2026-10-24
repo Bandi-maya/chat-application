@@ -41,15 +41,17 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(MethodChannel(name), (call) async => null);
     }
+    // Initialise outside the fake-async test zone so its refresh timer is not
+    // reported as a pending test timer.
+    try {
+      await Supabase.initialize(url: 'http://localhost:54321', anonKey: 'x');
+    } catch (_) {}
     await _loadFont('Roboto', 'Roboto-Regular.ttf');
     await _loadFont('MaterialIcons', 'MaterialIcons-Regular.otf');
   });
 
   Future<ChatyPreferencesController> pumpScreen(WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({});
-    try {
-      await Supabase.initialize(url: 'http://localhost:54321', anonKey: 'x');
-    } catch (_) {}
     if (!locator.isRegistered<AppearanceVariantController>()) {
       locator.registerLazySingleton<AppearanceVariantController>(() => AppearanceVariantController());
     }
@@ -94,7 +96,6 @@ void main() {
     expect(DeliveryIconStyleExtension.fromString(prefs.conversation.tickStyle), target);
     await tester.pump(const Duration(seconds: 1));
     await tester.pumpWidget(const SizedBox.shrink());
-    await Supabase.instance.dispose();
   });
 
   testWidgets('tapping a bubbles option saves that style', (tester) async {
@@ -113,6 +114,5 @@ void main() {
     expect(BubbleStyleIdExtension.fromString(prefs.conversation.bubbleStyle), target);
     await tester.pump(const Duration(seconds: 1));
     await tester.pumpWidget(const SizedBox.shrink());
-    await Supabase.instance.dispose();
   });
 }
