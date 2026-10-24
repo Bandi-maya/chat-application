@@ -92,7 +92,9 @@ void main() {
     await tester.tap(item);
     await tester.pump();
     expect(DeliveryIconStyleExtension.fromString(prefs.conversation.tickStyle), target);
+    await tester.pump(const Duration(seconds: 1));
     await tester.pumpWidget(const SizedBox.shrink());
+    await Supabase.instance.dispose();
   });
 
   testWidgets('tapping a bubbles option saves that style', (tester) async {
@@ -109,6 +111,8 @@ void main() {
     await tester.tap(item);
     await tester.pump();
     expect(BubbleStyleIdExtension.fromString(prefs.conversation.bubbleStyle), target);
+    await tester.pump(const Duration(seconds: 1));
     await tester.pumpWidget(const SizedBox.shrink());
+    await Supabase.instance.dispose();
   });
 }
