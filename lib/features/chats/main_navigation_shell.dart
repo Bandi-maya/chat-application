@@ -242,7 +242,6 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         // Single source of truth: the structured Home setting.
         final separateGroups =
             preferencesController.home.separateChatsAndGroups;
-        final showDesktopIcon = preferencesController.home.showDesktopIcon;
         final homeNavMode =
             HomePresetNormalizer.navigationMode(
               preferencesController.home.homeStyle,
@@ -325,23 +324,17 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               notificationService: notificationService,
             ),
           ),
-          if (!showDesktopIcon || templateController.hasCustomNavigationDestinations)
-            _NavDestinationItem(
-              id: 'desktop',
-              label: 'Desktop',
-              icon: ChatyGlyph.devices,
-              activeIcon: ChatyGlyph.devices,
-              builder: (ctx) => LinkedDevicesQrScreen(
-                dataStore: dataStore,
-                relationshipService: locator(),
-                preferencesController: preferencesController,
-                themeController: themeController,
-                devicesOnly: true,
-              ),
-            ),
         ];
 
-        // Resolve the selected template's destination order without changing
+        // Resolve the selected template's destination order without changi        // User-selectable nav tabs: Tasks and Updates can be hidden from the
+        // bottom navigation (Settings > Home screen). Default is shown.
+        if (preferencesController.gbBool('nav_hide_tasks')) {
+          destinationCatalog.removeWhere((item) => item.id == 'tasks');
+        }
+        if (preferencesController.gbBool('nav_hide_updates')) {
+          destinationCatalog.removeWhere((item) => item.id == 'updates');
+        }
+ng
         // destination identity. Keeping a stable ID means applying a layout
         // while Settings is open never sends the user to an unrelated screen.
         final navigationTemplate = templateController.navigation;
