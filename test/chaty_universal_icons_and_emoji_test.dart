@@ -128,9 +128,9 @@ void main() {
     });
   });
 
-  group('Emoji Styles Contract (10 Distinct Styles)', () {
-    test('Contains exactly 10 distinct emoji styles', () {
-      expect(ChatyEmojiStyleId.values.length, 10);
+  group('Emoji Styles Contract (11 Distinct Styles)', () {
+    test('Contains exactly 11 distinct emoji styles', () {
+      expect(ChatyEmojiStyleId.values.length, 11);
       expect(
         ChatyEmojiStyleId.values.map((s) => s.title).toList(),
         [
@@ -144,6 +144,7 @@ void main() {
           'Fluent Color',
           'Blobmoji',
           'EmojiTwo',
+          'iOS Animated (Drive)',
         ],
       );
     });
