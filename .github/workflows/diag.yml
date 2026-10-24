@@ -1,5 +1,5 @@
 {
- "name": "Diagnostics v19",
+ "name": "Diagnostics v20",
  "on": {
   "workflow_dispatch": {},
   "push": {
@@ -32,7 +32,7 @@
     {
      "name": "Analyze touched files",
      "continue-on-error": true,
-     "run": "touch .env; flutter pub get >/dev/null; flutter analyze --no-fatal-infos lib/features/chats/chat_detail_screen.dart lib/features/messages/attachment_sheet.dart lib/core/emoji lib/ui/core/ticks lib/ui/core/bubbles lib/features/settings/settings_root_screen.dart lib/features/settings/conversation/conversation_bubble_and_ticks_screen.dart lib/features/settings lib/features/chats lib/ui/core/gb lib/domain/models/preferences.dart > an.txt 2>&1 || true; { echo '## ANALYZE'; grep -E '(error|warning) \u2022|issues found|No issues' an.txt | head -40; } >> $GITHUB_STEP_SUMMARY"
+     "run": "touch .env; flutter pub get >/dev/null; flutter analyze --no-fatal-infos lib/features/chats/chat_detail_screen.dart lib/features/messages/attachment_sheet.dart lib/core/emoji lib/ui/core/ticks lib/ui/core/bubbles lib/features/settings/settings_root_screen.dart lib/features/settings/conversation/conversation_bubble_and_ticks_screen.dart lib/features/settings lib/features/chats lib/ui/core/gb lib/domain/models/preferences.dart > an.txt 2>&1 || true; { echo '## ANALYZE'; grep -E '(error|warning) \u2022|issues found|No issues' an.txt | head -40; } >> $GITHUB_STEP_SUMMARY\n{ echo; echo ANALYZE-RAW; head -c 1500 an.txt; } >> $GITHUB_STEP_SUMMARY"
     },
     {
      "name": "Story look tests and render",
