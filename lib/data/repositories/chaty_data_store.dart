@@ -386,11 +386,30 @@ class ChatyDataStore extends ChangeNotifier {
     String conversationId,
     String messageId, {
     bool forEveryone = false,
-  }) => _backend.deleteMessage(
-    conversationId,
-    messageId,
-    forEveryone: forEveryone,
-  );
+  }) {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated) {
+        unawaited(api.deleteMessage(conversationId, messageId));
+      }
+    }
+    _backend.deleteMessage(
+      conversationId,
+      messageId,
+      forEveryone: forEveryone,
+    );
+  }
+
+  Future<void> clearConversation(String conversationId) async {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated) {
+        await api.clearConversationMessages(conversationId);
+      }
+    }
+    await _backend.clearConversation(conversationId);
+    notifyListeners();
+  }
 
   void markAsRead(String conversationId) =>
       unawaited(_backend.markAsRead(conversationId));
@@ -400,8 +419,25 @@ class ChatyDataStore extends ChangeNotifier {
   void markAsUnread(String conversationId) =>
       unawaited(_backend.markAsUnread(conversationId));
 
-  void deleteConversation(String conversationId) =>
-      unawaited(_backend.deleteConversation(conversationId));
+  void deleteConversation(String conversationId) {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated) {
+        unawaited(api.deleteConversation(conversationId));
+      }
+    }
+    unawaited(_backend.deleteConversation(conversationId));
+  }
+
+  Future<void> deleteUser(String userId) async {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated) {
+        await api.deleteUser(userId);
+      }
+    }
+    notifyListeners();
+  }
 
   void addCallRecord(CallRecord record) {
     _backend.addCall(record);

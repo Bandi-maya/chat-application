@@ -21,6 +21,12 @@ class Conversation {
   final Duration? disappearingDuration;
   final EncryptionStatus encryptionStatus;
   final String draftText;
+  final String? roomType;
+  final String? taskId;
+
+  bool get isTask => roomType == 'task' || (taskId != null && taskId!.isNotEmpty);
+  bool get isGroup => type == ConversationType.group;
+  bool get isDirect => type == ConversationType.direct;
 
   const Conversation({
     required this.id,
@@ -39,6 +45,8 @@ class Conversation {
     this.isMuted = false,
     this.wallpaperId,
     this.disappearingDuration,
+    this.roomType,
+    this.taskId,
     // Chaty must not claim E2EE until audited device-to-device encryption is
     // actually implemented and verified. The option remains in the UI.
     this.encryptionStatus = EncryptionStatus.verificationNeeded,
@@ -64,6 +72,8 @@ class Conversation {
     Duration? disappearingDuration,
     EncryptionStatus? encryptionStatus,
     String? draftText,
+    String? roomType,
+    String? taskId,
   }) {
     return Conversation(
       id: id ?? this.id,
@@ -82,6 +92,8 @@ class Conversation {
       isMuted: isMuted ?? this.isMuted,
       wallpaperId: wallpaperId ?? this.wallpaperId,
       disappearingDuration: disappearingDuration ?? this.disappearingDuration,
+      roomType: roomType ?? this.roomType,
+      taskId: taskId ?? this.taskId,
       encryptionStatus: encryptionStatus ?? this.encryptionStatus,
       draftText: draftText ?? this.draftText,
     );
@@ -131,9 +143,12 @@ class Conversation {
         ? 'C'
         : compact.substring(0, compact.length.clamp(1, 2)).toUpperCase();
 
+    final rType = json['room_type']?.toString();
+    final tId = json['task_id']?.toString();
+
     return Conversation(
       id: json['uid']?.toString() ?? json['id']?.toString() ?? '',
-      type: json['room_type'] == 'group' ? ConversationType.group : ConversationType.direct,
+      type: rType == 'group' ? ConversationType.group : ConversationType.direct,
       title: effectiveTitle,
       participantIds: participantIds,
       avatarInitials: initials,
@@ -141,6 +156,8 @@ class Conversation {
       lastMessageText: lastText,
       lastMessageTime: lastTime,
       lastMessageSenderId: lastSender,
+      roomType: rType,
+      taskId: tId,
     );
   }
 }

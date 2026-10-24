@@ -2125,6 +2125,17 @@ class ChatyBackendService extends ChangeNotifier {
     }
   }
 
+  Future<void> clearConversation(String conversationId) async {
+    _messagesByChatId.remove(conversationId);
+    final current = _conversationsById[conversationId];
+    if (current != null) {
+      _conversationsById[conversationId] = current.copyWith(
+        lastMessageText: '',
+      );
+    }
+    notifyListeners();
+  }
+
   Future<void> deleteConversation(String conversationId) async {
     _conversationsById.remove(conversationId);
     _messagesByChatId.remove(conversationId);

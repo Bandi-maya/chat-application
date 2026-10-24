@@ -24,6 +24,50 @@ class AccountSettingsScreen extends StatelessWidget {
     required this.dataStore,
   });
 
+  Future<void> _confirmDeleteAccount(BuildContext context, UserProfile user) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Delete Account?'),
+        content: const Text(
+          'This will permanently delete your user profile, message history, and remove you from all workspaces. This action is irreversible.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            child: const Text('Delete Permanently'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      if (locator.isRegistered<ApiBackendService>()) {
+        final api = locator<ApiBackendService>();
+        await api.deleteUser(user.id);
+      }
+      await purgeLocalDataForDeletedAccount(user.id);
+      if (!context.mounted) return;
+      await confirmChatyLogout(context);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.redAccent,
+            content: Text('Failed to delete account: $e'),
+          ),
+        );
+      }
+    }
+  }
+
   void _showEditProfileSheet(BuildContext context, UserProfile user) {
     final colors = context.colors;
     final nameCtrl = TextEditingController(text: user.displayName);
@@ -366,6 +410,13 @@ class AccountSettingsScreen extends StatelessWidget {
                   title: 'Log Out',
                   subtitle: 'Sign out of your current session on this device',
                   onTap: () => confirmChatyLogout(context),
+                ),
+                ChatySettingsTile(
+                  icon: Icons.delete_forever_rounded,
+                  iconColor: Colors.redAccent,
+                  title: 'Delete Account',
+                  subtitle: 'Permanently delete your profile and account data',
+                  onTap: () => _confirmDeleteAccount(context, user),
                 ),
               ],
             ),

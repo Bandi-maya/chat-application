@@ -168,6 +168,77 @@ class _NewChatScreenState extends State<NewChatScreen> {
     }
   }
 
+  Future<void> _onUserLongPress(UserProfile user) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: context.colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                user.displayName,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: context.colors.foreground,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: Icon(Icons.chat_bubble_outline_rounded, color: context.colors.primary),
+              title: const Text('Start Chat'),
+              onTap: () => Navigator.pop(sheetCtx, 'chat'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+              title: const Text('Delete User', style: TextStyle(color: Colors.redAccent)),
+              onTap: () => Navigator.pop(sheetCtx, 'delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted || action == null) return;
+    if (action == 'chat') {
+      _openDirectChat(user);
+    } else if (action == 'delete') {
+      final confirmed = await ChatyConfirmDialog.show(
+        context,
+        title: 'Delete ${user.displayName}?',
+        message: 'This user will be permanently removed from your directory and workspace.',
+        confirmLabel: 'Delete',
+        destructive: true,
+      );
+      if (confirmed == true && mounted) {
+        setState(() => _isLoading = true);
+        try {
+          await widget.dataStore.deleteUser(user.id);
+          await _loadInitialUsers();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('${user.displayName} deleted')),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Failed to delete user: $e')),
+            );
+          }
+        } finally {
+          if (mounted) setState(() => _isLoading = false);
+        }
+      }
+    }
+  }
+
   void _showError(Object error) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -461,6 +532,9 @@ class _NewChatScreenState extends State<NewChatScreen> {
                         onTap: _isCreatingGroup
                             ? () => _toggleMember(user.id)
                             : () => _openDirectChat(user),
+                        onLongPress: _isCreatingGroup
+                            ? null
+                            : () => _onUserLongPress(user),
                       );
                     },
                   ),
