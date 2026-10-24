@@ -237,19 +237,17 @@ class ApiBackendService extends ChangeNotifier {
       }
     }
 
-    if (response != null && response.statusCode == 200) {
+    if (response.statusCode == 200) {
       final body = jsonDecode(response.body);
       final data = body['data'] ?? body;
       return Map<String, dynamic>.from(data);
-    } else if (response != null && response.statusCode == 404) {
+    } else if (response.statusCode == 404) {
       throw Exception('Organization "$clean" not found. Please verify the ID or register a new organization.');
     } else {
-      String detail = 'Organization check failed (${response?.statusCode ?? 'No response'})';
+      String detail = 'Organization check failed (${response.statusCode})';
       try {
-        if (response != null) {
-          final body = jsonDecode(response.body);
-          detail = body['detail'] ?? body['message'] ?? detail;
-        }
+        final body = jsonDecode(response.body);
+        detail = body['detail'] ?? body['message'] ?? detail;
       } catch (_) {}
       throw Exception(detail);
     }
@@ -812,7 +810,7 @@ class ApiBackendService extends ChangeNotifier {
   Future<void> loadConversations() async {
     if (_token == null) return;
     try {
-      final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/rooms');
+      final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/rooms?include_tasks=false');
       http.Response response = await http.get(
         uri,
         headers: {
@@ -821,7 +819,7 @@ class ApiBackendService extends ChangeNotifier {
         },
       );
       if (response.statusCode == 404) {
-        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/chat/rooms');
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/chat/rooms?include_tasks=false');
         response = await http.get(
           fallbackUri,
           headers: {
@@ -834,7 +832,10 @@ class ApiBackendService extends ChangeNotifier {
         _requiresSubscription = false;
         _subscriptionErrorMessage = null;
         final data = jsonDecode(response.body)['data'] as List;
-        _conversations = data.map((json) => Conversation.fromApi(json)).toList();
+        _conversations = data
+            .map((json) => Conversation.fromApi(json))
+            .where((c) => !c.isTask)
+            .toList();
         notifyListeners();
       } else if (response.statusCode == 402) {
         _requiresSubscription = true;
@@ -843,6 +844,156 @@ class ApiBackendService extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('[ApiBackendService] Error loading conversations: $e');
+    }
+  }
+
+  /// Clear all messages in a conversation
+  Future<void> clearConversationMessages(String chatId) async {
+    _messages[chatId] = [];
+    final idx = _conversations.indexWhere((c) => c.id == chatId);
+    if (idx != -1) {
+      _conversations[idx] = _conversations[idx].copyWith(
+        lastMessageText: '',
+      );
+    }
+    notifyListeners();
+
+    if (_token == null) return;
+    try {
+      final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/rooms/$chatId/messages');
+      http.Response response = await http.delete(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'x-tenant-id': ApiBackendConfig.tenantId,
+        },
+      );
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/chat/rooms/$chatId/messages');
+        response = await http.delete(
+          fallbackUri,
+          headers: {
+            'Authorization': 'Bearer $_token',
+            'x-tenant-id': ApiBackendConfig.tenantId,
+          },
+        );
+      }
+    } catch (e) {
+      debugPrint('[ApiBackendService] Error clearing messages: $e');
+    }
+  }
+
+  /// Delete a single message from a conversation
+  Future<void> deleteMessage(String chatId, String messageId) async {
+    final list = _messages[chatId];
+    if (list != null) {
+      list.removeWhere((m) => m.id == messageId);
+      final idx = _conversations.indexWhere((c) => c.id == chatId);
+      if (idx != -1) {
+        final lastMsg = list.isNotEmpty ? list.last : null;
+        _conversations[idx] = _conversations[idx].copyWith(
+          lastMessageText: lastMsg != null
+              ? (lastMsg.text.isNotEmpty
+                  ? lastMsg.text
+                  : (lastMsg.type == MessageType.image ? '📷 Photo' : '📎 Attachment'))
+              : '',
+          lastMessageTime: lastMsg?.createdAt ?? _conversations[idx].lastMessageTime,
+        );
+      }
+      notifyListeners();
+    }
+
+    if (_token == null) return;
+    try {
+      final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/rooms/$chatId/messages/$messageId');
+      http.Response response = await http.delete(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'x-tenant-id': ApiBackendConfig.tenantId,
+        },
+      );
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/chat/rooms/$chatId/messages/$messageId');
+        response = await http.delete(
+          fallbackUri,
+          headers: {
+            'Authorization': 'Bearer $_token',
+            'x-tenant-id': ApiBackendConfig.tenantId,
+          },
+        );
+      }
+    } catch (e) {
+      debugPrint('[ApiBackendService] Error deleting message: $e');
+    }
+  }
+
+  /// Delete a conversation room entirely
+  Future<void> deleteConversation(String chatId) async {
+    _conversations.removeWhere((c) => c.id == chatId);
+    _messages.remove(chatId);
+    if (_activeConversationId == chatId) {
+      _activeConversationId = null;
+    }
+    notifyListeners();
+
+    if (_token == null) return;
+    try {
+      final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/rooms/$chatId');
+      http.Response response = await http.delete(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'x-tenant-id': ApiBackendConfig.tenantId,
+        },
+      );
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/chat/rooms/$chatId');
+        response = await http.delete(
+          fallbackUri,
+          headers: {
+            'Authorization': 'Bearer $_token',
+            'x-tenant-id': ApiBackendConfig.tenantId,
+          },
+        );
+      }
+    } catch (e) {
+      debugPrint('[ApiBackendService] Error deleting conversation: $e');
+    }
+  }
+
+  /// Delete a user directly from backend directory and local memory
+  Future<void> deleteUser(String userId) async {
+    _users.removeWhere((u) => u.id == userId);
+    _conversations.removeWhere((c) => c.isDirect && c.participantIds.contains(userId));
+    notifyListeners();
+
+    if (_token == null) return;
+    try {
+      final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/app-users/$userId');
+      http.Response response = await http.delete(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'x-tenant-id': ApiBackendConfig.tenantId,
+        },
+      );
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/app-users/$userId');
+        response = await http.delete(
+          fallbackUri,
+          headers: {
+            'Authorization': 'Bearer $_token',
+            'x-tenant-id': ApiBackendConfig.tenantId,
+          },
+        );
+      }
+    } catch (e) {
+      debugPrint('[ApiBackendService] Error deleting user: $e');
+    }
+
+    if (_currentUser?.id == userId) {
+      await signOut();
     }
   }
 

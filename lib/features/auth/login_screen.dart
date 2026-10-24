@@ -186,7 +186,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         prefixIcon: Icon(
                           Icons.apartment_rounded,
                           size: 20,
-                          color: theme.secondaryTextColor.withValues(alpha: 0.7),
+                          color: theme.secondaryTextColor.withValues(
+                            alpha: 0.7,
+                          ),
                         ),
                         validator: (val) {
                           if (!_useOrganization) return null;
@@ -354,9 +356,7 @@ class _LoginScreenState extends State<LoginScreen> {
       decoration: BoxDecoration(
         color: theme.surfaceColor.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: theme.dividerColor.withValues(alpha: 0.25),
-        ),
+        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.25)),
       ),
       child: Row(
         children: [
@@ -427,7 +427,9 @@ class _LoginScreenState extends State<LoginScreen> {
               Icon(
                 icon,
                 size: 16,
-                color: isSelected ? theme.onAccentColor : theme.secondaryTextColor,
+                color: isSelected
+                    ? theme.onAccentColor
+                    : theme.secondaryTextColor,
               ),
               const SizedBox(width: 6),
               Flexible(
@@ -455,9 +457,7 @@ class _LoginScreenState extends State<LoginScreen> {
       decoration: BoxDecoration(
         color: theme.accentColor.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: theme.accentColor.withValues(alpha: 0.2),
-        ),
+        border: Border.all(color: theme.accentColor.withValues(alpha: 0.2)),
       ),
       child: Material(
         color: Colors.transparent,
@@ -522,6 +522,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-
-}
 }

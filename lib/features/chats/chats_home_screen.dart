@@ -540,6 +540,7 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         final query = _searchCtrl.text.trim().toLowerCase();
         final conversations = widget.dataStore.conversations
             .where((conversation) {
+              if (conversation.isTask) return false;
               if (widget.forcedType != null &&
                   conversation.type != widget.forcedType)
                 return false;

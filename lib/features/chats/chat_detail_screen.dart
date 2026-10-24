@@ -2753,21 +2753,19 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       destructive: true,
     );
     if (confirmed != true || !mounted) return;
-    final messages = widget.dataStore
-        .getMessages(widget.conversationId)
-        .toList(growable: false);
-    for (final message in messages) {
-      widget.dataStore.deleteMessage(
-        widget.conversationId,
-        message.id,
-        forEveryone: false,
-      );
-    }
+    await widget.dataStore.clearConversation(widget.conversationId);
+    if (!mounted) return;
     setState(() {
       _openedViewOnceIds.clear();
       _pendingBelowCount = 0;
       _lastKnownMessageCount = 0;
     });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Conversation cleared'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _blockContact(UserProfile contact) async {

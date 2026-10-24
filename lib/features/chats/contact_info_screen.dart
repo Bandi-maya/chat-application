@@ -118,6 +118,60 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
     }
   }
 
+  Future<void> _deleteConversation() async {
+    if (_busy) return;
+    final confirmed = await ChatyConfirmDialog.show(
+      context,
+      title: 'Delete chat with ${widget.contact.displayName}?',
+      message: 'This removes this conversation and all message history.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      widget.dataStore.deleteConversation(widget.conversation.id);
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete chat: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _deleteUser() async {
+    if (_busy) return;
+    final confirmed = await ChatyConfirmDialog.show(
+      context,
+      title: 'Delete ${widget.contact.displayName}?',
+      message:
+          'This removes ${widget.contact.displayName} from your contacts, directory, and deletes the conversation.',
+      confirmLabel: 'Delete User',
+      destructive: true,
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await widget.dataStore.deleteUser(widget.contact.id);
+      widget.dataStore.deleteConversation(widget.conversation.id);
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete user: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   String _presenceLabel() {
     final activity = widget.realtimeService.activityFor(
       widget.conversation.id,
@@ -463,6 +517,48 @@ class _ContactInfoScreenState extends State<ContactInfoScreen> {
                           ),
                         ),
                         onTap: _busy ? null : _toggleBlock,
+                      ),
+                      ChatyListTile(
+                        leading: Icon(
+                          Icons.delete_outline_rounded,
+                          color: context.colors.error,
+                        ),
+                        title: Text(
+                          'Delete Conversation',
+                          style: TextStyle(
+                            color: context.colors.error,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Remove this chat and all message history.',
+                          style: ChatyTypography.caption(
+                            context.colors.foregroundSecondary,
+                          ),
+                        ),
+                        onTap: _busy ? null : _deleteConversation,
+                      ),
+                      ChatyListTile(
+                        leading: Icon(
+                          Icons.person_remove_rounded,
+                          color: context.colors.error,
+                        ),
+                        title: Text(
+                          'Delete Contact & Chat',
+                          style: TextStyle(
+                            color: context.colors.error,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Remove ${widget.contact.displayName} and all conversations.',
+                          style: ChatyTypography.caption(
+                            context.colors.foregroundSecondary,
+                          ),
+                        ),
+                        onTap: _busy ? null : _deleteUser,
                       ),
                     ],
                   ),
