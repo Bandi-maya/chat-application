@@ -858,7 +858,7 @@ class TemplatePairPreview extends StatelessWidget {
       ),
           const SizedBox(height: 6),
           Text(
-            'Layout preview only. Surfaces follow your theme, the accent is the template's own, and component overrides are not shown.',
+            'Layout preview only. Surfaces follow your theme, the accent comes from the template itself, and component overrides are not shown.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: colors.foregroundSecondary,
