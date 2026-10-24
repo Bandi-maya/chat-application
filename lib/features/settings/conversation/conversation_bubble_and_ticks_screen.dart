@@ -4,7 +4,7 @@ import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/design_system.dart';
 import '../../../ui/core/design_system/gb_design_system.dart';
-import '../../../ui/core/design_system/components/adaptive_selection_panel.dart';
+
 import '../../../ui/core/bubbles/bubble_style_id.dart';
 import '../../../ui/core/ticks/delivery_icon_style.dart';
 import '../../../ui/core/ticks/delivery_status_icon_painter.dart';
@@ -52,65 +52,27 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
     );
   }
 
-  void _showTicksStyleModal() {
+  void _setTickStyle(DeliveryIconStyle id) {
     final prefs = widget.preferencesController.conversation;
-    final theme = locator<ThemeController>().globalTheme;
-    AdaptiveSelectionPanel.show<String>(
-      context: context,
-      title: 'Choose your Ticks style',
-      selectedValue: DeliveryIconStyleExtension.fromString(prefs.tickStyle).displayName,
-      showApplyButton: true,
-      preferCenteredDialog: true,
-      options: _tickStyleIds
-          .map((id) => SelectionOptionItem<String>(
-                value: id.displayName,
-                title: id.displayName,
-                preview: _buildTickPreview(id, theme.accentColor),
-              ))
-          .toList(),
-    ).then((val) {
-      if (val != null) {
-        widget.preferencesController.updateConversation(
-          prefs.copyWith(tickStyle: val),
-        );
-      }
-    });
+    widget.preferencesController.updateConversation(
+      prefs.copyWith(tickStyle: id.displayName),
+    );
   }
 
-  void _showBubblesStyleModal() {
+  void _setBubbleStyle(BubbleStyleId id) {
     final prefs = widget.preferencesController.conversation;
-    final theme = locator<ThemeController>().globalTheme;
-    AdaptiveSelectionPanel.show<String>(
-      context: context,
-      title: 'Choose your Bubbles style',
-      selectedValue: BubbleStyleIdExtension.fromString(prefs.bubbleStyle).displayName,
-      showApplyButton: true,
-      preferCenteredDialog: true,
-      options: _bubbleStyleIds
-          .map((id) => SelectionOptionItem<String>(
-                value: id.displayName,
-                title: id.displayName,
-                preview: _buildBubblePreview(id, theme.accentColor),
-              ))
-          .toList(),
-    ).then((val) {
-      if (val != null) {
-        // The runtime theme resolves bubble geometry from the legacy
-        // `bubble_style` key first. Update that key through the semantic alias
-        // so it and the typed ConversationPreferences stay in sync; otherwise
-        // an older saved GB value can silently override the selection.
-        // Persist both the typed preference and the legacy GB alias. The
-        // detail screen resolves both live, while exports and older settings
-        // screens continue to read the typed value.
-        widget.preferencesController.updateConversation(
-          prefs.copyWith(bubbleStyle: val, bubbleShape: val),
-        );
-        widget.preferencesController.updateGbFeatures(
-          <String, Object?>{'bubble_style': val},
-          logTitle: 'Bubbles Style',
-        );
-      }
-    });
+    final val = id.displayName;
+    // The runtime theme resolves bubble geometry from the legacy
+    // `bubble_style` key first. Update that key through the semantic alias
+    // so it and the typed ConversationPreferences stay in sync; otherwise
+    // an older saved GB value can silently override the selection.
+    widget.preferencesController.updateConversation(
+      prefs.copyWith(bubbleStyle: val, bubbleShape: val),
+    );
+    widget.preferencesController.updateGbFeatures(
+      <String, Object?>{'bubble_style': val},
+      logTitle: 'Bubbles Style',
+    );
   }
 
   Widget _buildBubblePreview(BubbleStyleId id, Color color) {
@@ -308,19 +270,14 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
                           // Right Outgoing Bubble with Quoted Box & Ticks
                           Align(
                             alignment: Alignment.centerRight,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            child: ConstrainedBox(
                               constraints: const BoxConstraints(maxWidth: 250),
-                              decoration: BoxDecoration(
-                                color: rightBubbleBg,
-                                borderRadius: const BorderRadius.only(
-                                  topLeft: Radius.circular(16),
-                                  topRight: Radius.circular(16),
-                                  bottomLeft: Radius.circular(16),
-                                  bottomRight: Radius.circular(4),
-                                ),
-                              ),
-                              child: Column(
+                              child: ChatyBubbleContainer(
+                                styleId: BubbleStyleIdExtension.fromString(prefs.bubbleStyle),
+                                isMe: true,
+                                fillColor: rightBubbleBg,
+                                accentColor: theme.accentColor,
+                                child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   // Quoted message snippet
@@ -377,6 +334,7 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
                                 ],
                               ),
                             ),
+                            ),
                           ),
                         ],
                       ),
@@ -393,19 +351,23 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
                 GbCardContainer(
                   headerText: 'Styles (Look and feel)',
                   children: [
-                    GbSettingRow(
-                      icon: Icons.done_all_rounded,
-                      title: 'Ticks Style',
-                      subtitle: prefs.tickStyle,
-                      hasSubScreen: true,
-                      onTap: _showTicksStyleModal,
+                    ChatyOptionGallery<DeliveryIconStyle>(
+                      title: 'Ticks style',
+                      subtitle: 'Tap a style. The preview above updates right away.',
+                      values: _tickStyleIds,
+                      selected: DeliveryIconStyleExtension.fromString(prefs.tickStyle),
+                      labelOf: (id) => id.displayName,
+                      previewOf: (id) => _buildTickPreview(id, theme.accentColor),
+                      onSelected: _setTickStyle,
                     ),
-                    GbSettingRow(
-                      icon: Icons.chat_bubble_outline_rounded,
-                      title: 'Bubbles Style',
-                      subtitle: prefs.bubbleStyle,
-                      hasSubScreen: true,
-                      onTap: _showBubblesStyleModal,
+                    ChatyOptionGallery<BubbleStyleId>(
+                      title: 'Bubbles style',
+                      subtitle: 'Tap a shape to preview it in the conversation.',
+                      values: _bubbleStyleIds,
+                      selected: BubbleStyleIdExtension.fromString(prefs.bubbleStyle),
+                      labelOf: (id) => id.displayName,
+                      previewOf: (id) => _buildBubblePreview(id, theme.accentColor),
+                      onSelected: _setBubbleStyle,
                     ),
                     GbSliderTile(
                       title: 'Message Text Size',
