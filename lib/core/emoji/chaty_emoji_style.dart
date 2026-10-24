@@ -61,12 +61,6 @@ enum ChatyEmojiStyleId {
     'Verified CC BY 4.0: Illustrated comic-book emoji with glossy rim highlights.',
     '😎 🍕 🏆',
     false,
-  ),
-  iosAnimated(
-    'iOS Animated (Drive)',
-    'Your own animated emoji pack: 50 iOS-style looping smileys imported from your private Drive folder.',
-    '😀 😂 😍',
-    true,
   );
 
   final String title;
@@ -135,11 +129,6 @@ enum ChatyEmojiStyleId {
         return ChatyEmojiStyleId.blobmoji;
       case 'emojitwo':
         return ChatyEmojiStyleId.emojiTwo;
-      case 'iosanimated':
-      case 'iosanimateddrive':
-      case 'driveemoji':
-      case 'driveanimated':
-        return ChatyEmojiStyleId.iosAnimated;
     }
 
     for (final style in ChatyEmojiStyleId.values) {
