@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../chaty_emoji_playback_manager.dart';
+import '../chaty_ios_animated_emoji.dart';
 import '../chaty_emoji_style.dart';
 import '../chaty_motion_emoji.dart';
 import '../emoji_resolver.dart';
@@ -151,7 +152,15 @@ class _AnimatedEmojiViewState extends State<AnimatedEmojiView>
 
     Widget content;
 
-    if (ChatyMotionEmoji.isSupported(widget.unicode)) {
+    if (currentStyle == ChatyEmojiStyleId.iosAnimated &&
+        ChatyIosAnimatedEmoji.isSupported(widget.unicode)) {
+      content = IosAnimatedEmojiView(
+        key: ValueKey('iosanim_${widget.unicode}_$_replayKey'),
+        unicode: widget.unicode,
+        size: widget.size,
+        animate: widget.animate,
+      );
+    } else if (ChatyMotionEmoji.isSupported(widget.unicode)) {
       final shouldPlay = widget.messageId != null
           ? ChatyEmojiPlaybackManager.instance.shouldAutoPlay(
               widget.messageId!,
