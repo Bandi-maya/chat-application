@@ -2498,8 +2498,13 @@ class _ChatyIconVectorPainter extends CustomPainter {
   }
 
   void _paintCallEnd(Canvas canvas, Paint stroke, Paint fill) {
-    final endColor = Colors.redAccent;
-    final endPaint = Paint()..color = endColor..style = PaintingStyle.fill..isAntiAlias = true;
+    // Honor the caller's color like every other glyph: the end-call button
+    // paints this white-on-error-red, and a hardcoded redAccent glyph was
+    // invisible on that red fill.
+    final endPaint = Paint()
+      ..color = fill.color
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
     canvas.save();
     canvas.translate(12, 12);
     canvas.rotate(math.pi * 0.75);
