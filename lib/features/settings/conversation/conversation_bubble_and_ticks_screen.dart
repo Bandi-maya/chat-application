@@ -286,11 +286,13 @@ class _ConversationBubbleAndTicksScreenState extends State<ConversationBubbleAnd
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(
-                                    'Do you like my theme?',
-                                    style: TextStyle(
-                                      color: leftTextCol,
-                                      fontSize: prefs.messageTextSize.toDouble(),
+                                  Flexible(
+                                    child: Text(
+                                      'Do you like my theme?',
+                                      style: TextStyle(
+                                        color: leftTextCol,
+                                        fontSize: prefs.messageTextSize.toDouble(),
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
