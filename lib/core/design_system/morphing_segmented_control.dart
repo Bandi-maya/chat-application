@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../ui/core/theme/theme_extensions.dart';
 import 'spring_interactive_scale.dart';
 
 /// Segment tab item model for MorphingSegmentedControl.
@@ -41,20 +42,19 @@ class MorphingSegmentedControl<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final pillColor = activePillColor ?? theme.colorScheme.primary;
-    final textActive = activeTextColor ?? (theme.colorScheme.brightness == Brightness.dark ? Colors.white : Colors.white);
-    final textInactive = inactiveTextColor ?? (isDark ? Colors.white70 : Colors.black54);
+    final tokens = context.colors;
+    final pillColor = activePillColor ?? tokens.primary;
+    final textActive = activeTextColor ?? tokens.onPrimary;
+    final textInactive = inactiveTextColor ?? tokens.foregroundSecondary;
 
     return Container(
       height: height,
       padding: const EdgeInsets.all(4.0),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF161A22) : const Color(0xFFEEF1F5),
+        color: tokens.surfaceSecondary,
         borderRadius: BorderRadius.circular(height / 2),
         border: Border.all(
-          color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04),
+          color: tokens.borderSubtle,
           width: 1.0,
         ),
       ),
@@ -113,7 +113,7 @@ class MorphingSegmentedControl<T> extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: isSelected ? Colors.white.withOpacity(0.25) : pillColor,
+                          color: isSelected ? textActive.withValues(alpha: 0.25) : pillColor,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
@@ -121,7 +121,7 @@ class MorphingSegmentedControl<T> extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
-                            color: isSelected ? textActive : Colors.white,
+                            color: isSelected ? textActive : tokens.onPrimary,
                           ),
                         ),
                       ),

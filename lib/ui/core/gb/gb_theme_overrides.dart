@@ -84,9 +84,11 @@ class GbThemeOverrides {
     // themes), then fall back to the structured Conversation "bubble shape"
     // picker, and finally the base theme. Previously only the GB key was read,
     // so the structured picker was write-only.
+    // The typed Conversation selection is canonical (the message bubble reads
+    // it first too, and templates write it); the legacy GB key is the fallback.
     final bubbleStyle =
+        _bubbleStyle(prefs.conversation.bubbleStyle.trim()) ??
         _bubbleStyle(prefs.gbString('bubble_style', fallback: '')) ??
-        _bubbleStyle(prefs.conversation.bubbleStyle) ??
         base.bubbleStyle;
 
     final deliveryTickStyle = DeliveryIconStyleExtension.fromString(

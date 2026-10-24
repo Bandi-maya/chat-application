@@ -209,6 +209,21 @@ class CallSignalingService extends ChangeNotifier {
     }
 
     _ringTimeoutTimer?.cancel();
+    if (session.isDemo) {
+      // Demo incoming call: no backend offer exists; connect immediately.
+      _callDurationSeconds = 0;
+      _currentSession = session.copyWith(
+        state: CallSessionState.connected,
+        connectedAt: DateTime.now(),
+      );
+      _durationTimer?.cancel();
+      _durationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        _callDurationSeconds++;
+        notifyListeners();
+      });
+      notifyListeners();
+      return;
+    }
     try {
       final row = await _client
           .from('call_sessions')
@@ -257,6 +272,14 @@ class CallSignalingService extends ChangeNotifier {
     if (session == null || session.state != CallSessionState.incoming) return;
 
     _ringTimeoutTimer?.cancel();
+    if (session.isDemo) {
+      _currentSession = session.copyWith(
+        state: CallSessionState.declined,
+        endedAt: DateTime.now(),
+      );
+      notifyListeners();
+      return;
+    }
     try {
       await _client.rpc(
         'decline_call_session',
@@ -343,6 +366,7 @@ class CallSignalingService extends ChangeNotifier {
     String? remoteAvatarInitials,
     String? remoteAvatarColorHex,
     bool isVideo = false,
+    bool isOutgoing = true,
   }) async {
     _ringTimeoutTimer?.cancel();
     _stopDurationTimer();
@@ -356,13 +380,21 @@ class CallSignalingService extends ChangeNotifier {
       remoteAvatarInitials: remoteAvatarInitials,
       remoteAvatarColorHex: remoteAvatarColorHex,
       isVideo: isVideo,
-      isOutgoing: true,
-      state: CallSessionState.initiating,
+      isOutgoing: isOutgoing,
+      state: isOutgoing
+          ? CallSessionState.initiating
+          : CallSessionState.incoming,
       startedAt: DateTime.now(),
       audioRoute: isVideo ? AudioRouteType.speaker : AudioRouteType.earpiece,
       isDemo: true,
     );
     notifyListeners();
+
+    if (!isOutgoing) {
+      // Incoming demo: stay in the incoming state until the UI answers or
+      // declines; no outgoing state walk.
+      return;
+    }
 
     // Transition from initiating (calling) to ringing after 1.2s
     _ringTimeoutTimer = Timer(const Duration(milliseconds: 1200), () {

@@ -9,8 +9,8 @@ import 'package:chat/domain/models/preferences.dart';
 
 void main() {
   group('Bubble & Tick Catalog Verification', () {
-    test('All 48 BubbleStyleId values generate valid vector paths', () {
-      expect(BubbleStyleId.values.length, 48);
+    test('All 59 BubbleStyleId values generate valid vector paths', () {
+      expect(BubbleStyleId.values.length, 59);
 
       const testRect = Rect.fromLTWH(0, 0, 200, 60);
 
@@ -30,14 +30,31 @@ void main() {
     });
 
     test('All DeliveryIconStyle values have valid descriptors', () {
-      expect(DeliveryIconStyle.values.length, 24);
+      expect(DeliveryIconStyle.values.length, 95);
 
       for (final style in DeliveryIconStyle.values) {
         expect(style.displayName.isNotEmpty, isTrue);
-        // Test deserialization roundtrip
+        // Test deserialization roundtrip. gbIos/gbCircles intentionally
+        // skip display-name resolution because legacy aliases own the
+        // 'iOS'/'Circles' strings; they persist by enum name instead.
+        if (style == DeliveryIconStyle.gbIos ||
+            style == DeliveryIconStyle.gbCircles) {
+          expect(DeliveryIconStyleExtension.fromString(style.name), style);
+          continue;
+        }
         final parsed = DeliveryIconStyleExtension.fromString(style.displayName);
         expect(parsed, style);
       }
+      // Legacy alias meanings are preserved for older saved values and
+      // imported configs.
+      expect(
+        DeliveryIconStyleExtension.fromString('iOS'),
+        DeliveryIconStyle.rcIos11,
+      );
+      expect(
+        DeliveryIconStyleExtension.fromString('Circles'),
+        DeliveryIconStyle.cirCheck,
+      );
     });
 
     test('Conversation bubble picker labels select distinct real renderers', () {
@@ -72,7 +89,7 @@ void main() {
         'iOS Ticks': DeliveryIconStyle.ios2,
         'Wings': DeliveryIconStyle.wings,
         'Traffic Lights': DeliveryIconStyle.trafficLights,
-        'Circles': DeliveryIconStyle.cirCheck,
+        'CirCheck': DeliveryIconStyle.cirCheck,
         'Stars': DeliveryIconStyle.stars,
         'Hearts': DeliveryIconStyle.hearts,
         'Batman': DeliveryIconStyle.batman,

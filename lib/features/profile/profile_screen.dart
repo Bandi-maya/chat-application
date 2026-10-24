@@ -246,8 +246,11 @@ class _ProfileHeader extends StatelessWidget {
     final profileTemplate = locator<TemplateController>().profile;
     final bannerHeight = switch (profileTemplate.headerStyle) {
       ProfileHeaderStyle.compactHeader => 128.0,
-      ProfileHeaderStyle.centeredIdentity => 160.0,
-      ProfileHeaderStyle.bannerWithAvatar => 180.0,
+      // Banner templates use the 16:9 frame of the banner crop dialog so the
+      // saved crop is shown in full (same as Settings and Edit profile).
+      ProfileHeaderStyle.centeredIdentity ||
+      ProfileHeaderStyle.bannerWithAvatar =>
+        (MediaQuery.of(context).size.width - 32) * 9 / 16,
     };
     final avatarSize = switch (profileTemplate.headerStyle) {
       ProfileHeaderStyle.compactHeader => 64.0,
@@ -511,7 +514,7 @@ class _ProfileHeader extends StatelessWidget {
           children: [
             Stack(
               children: [
-                _bannerSurface(colors, bannerHeight * 0.60),
+                _bannerSurface(colors, bannerHeight),
                 Positioned(
                   top: 8,
                   right: 8,

@@ -656,12 +656,7 @@ class _ChatyAppState extends State<ChatyApp> with WidgetsBindingObserver {
     super.didChangePlatformBrightness();
     final brightness =
         WidgetsBinding.instance.platformDispatcher.platformBrightness;
-    if (_themeController.globalTheme.id == 'monochrome_dark' ||
-        _themeController.globalTheme.id == 'monochrome_light') {
-      _themeController.setGlobalTheme(
-        ThemePresets.getSystemDefaultTheme(brightness),
-      );
-    }
+    _themeController.syncWithSystem(brightness);
   }
 
   @override

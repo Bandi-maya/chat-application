@@ -449,7 +449,7 @@ class _UniversalStylesScreenState extends State<UniversalStylesScreen>
 
                 // SECTION 2: EMOJI STYLES (10 SELECTABLE STYLES)
                 GbCardContainer(
-                  headerText: 'EMOJI STYLES (10 SELECTABLE STYLES)',
+                  headerText: 'EMOJI STYLES (${ChatyEmojiStyleId.values.length} SELECTABLE STYLES)',
                   children: ChatyEmojiStyleId.values.map((style) {
                     final currentStyleId = ChatyEmojiStyleId.fromString(prefs.emojiStyle);
                     final isSelected = currentStyleId == style;

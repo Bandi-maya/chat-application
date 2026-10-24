@@ -1089,22 +1089,31 @@ class GbLiveHeaderPreview extends StatelessWidget {
                   ),
                 ),
                 SizedBox(width: 8),
-                Text(
-                  'LIVE PREVIEW • $homeStyle',
-                  style: TextStyle(
-                    color: _liveTheme.accentColor,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.6,
+                Flexible(
+                  child: Text(
+                    'LIVE PREVIEW • $homeStyle',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: _liveTheme.accentColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.6,
+                    ),
                   ),
                 ),
-                Spacer(),
-                Text(
-                  '3D: $pagerTransition3d',
-                  style: TextStyle(
-                    color: _liveTheme.secondaryTextColor,
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w600,
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    '3D: $pagerTransition3d',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: TextStyle(
+                      color: _liveTheme.secondaryTextColor,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],

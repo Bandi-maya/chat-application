@@ -30,11 +30,36 @@ class BubbleStyleRegistry {
       case BubbleStyleId.rcSamsBord:
       case BubbleStyleId.rcLine:
       case BubbleStyleId.aranbor:
+
+      // Dome styles: reserve the dome cap as top content padding so text
+      // always starts inside the rectangular body below the painted arc.
+      case BubbleStyleId.rcPal:
+      case BubbleStyleId.rcImess:
+        return BubbleGeometry(
+          styleId: id,
+          contentPadding: const EdgeInsets.fromLTRB(13, 30, 13, 9),
+        );
+
+      case BubbleStyleId.rcImLine:
+      case BubbleStyleId.rcTranLine:
+        return BubbleGeometry(
+          styleId: id,
+          isOutlined: true,
+          strokeWidth: 1.5,
+          contentPadding: const EdgeInsets.fromLTRB(13, 28, 13, 9),
+        );
+
+      // Outlined styles whose tails paint outside the widget bounds: reserve
+      // margin so the overhang lands in empty space instead of overpainting
+      // adjacent messages or timestamps.
+      case BubbleStyleId.rcIosLine:
+      case BubbleStyleId.gabiMess:
         return BubbleGeometry(
           styleId: id,
           isOutlined: true,
           strokeWidth: 1.5,
           contentPadding: const EdgeInsets.fromLTRB(13, 9, 13, 9),
+          bubbleMargin: const EdgeInsets.fromLTRB(16, 2, 16, 10),
         );
 
       case BubbleStyleId.transparent:
@@ -50,10 +75,29 @@ class BubbleStyleRegistry {
       case BubbleStyleId.gabiDot:
       case BubbleStyleId.gabiDot2:
       case BubbleStyleId.ilkhang:
+      case BubbleStyleId.rcFancy:
         return BubbleGeometry(
           styleId: id,
           hasCustomPainter: true,
           contentPadding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
+        );
+
+      // Go SMS tails paint outside the widget bounds; reserve margin.
+      case BubbleStyleId.goSms:
+      case BubbleStyleId.rcGoSms:
+        return BubbleGeometry(
+          styleId: id,
+          contentPadding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
+          bubbleMargin: const EdgeInsets.fromLTRB(16, 2, 16, 10),
+        );
+
+      // Textra's stem paints below the widget bounds; reserve margin.
+      case BubbleStyleId.textra:
+        return BubbleGeometry(
+          styleId: id,
+          hasCustomPainter: true,
+          contentPadding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
+          bubbleMargin: const EdgeInsets.fromLTRB(16, 2, 16, 10),
         );
 
       case BubbleStyleId.roundle:
