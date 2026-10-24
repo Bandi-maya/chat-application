@@ -35,7 +35,7 @@ import 'templates/templates_settings_screen.dart';
 import 'theme_editor_screen.dart';
 import 'gb_features/gb_settings_screen.dart';
 import 'universal/universal_screen.dart';
-import 'customization/customization_center_screen.dart';
+import 'appearance/component_styles_screen.dart';
 
 class SettingsRootScreen extends StatelessWidget {
   final ChatyPreferencesController preferencesController;
@@ -103,7 +103,7 @@ class SettingsRootScreen extends StatelessWidget {
         ),
       ),
       '/settings/themes' => ThemeEditorScreen(themeController: themeController),
-      '/settings/customization' => const CustomizationCenterScreen(),
+      '/settings/customization' => const ComponentStylesScreen(),
       '/settings/templates' => const TemplatesSettingsScreen(),
       '/settings/app_icon' => AppIconSettingsScreen(
         appIconController: _appIconController,
