@@ -244,7 +244,7 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
           builder: (context, constraints) {
             final isWide = constraints.maxWidth >= 600;
             final crossAxisCount =
-                isWide ? 3 : (constraints.maxWidth >= 380 ? 2 : 1);
+                isWide ? (constraints.maxWidth >= 900 ? 3 : 2) : 1;
             return GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -253,7 +253,7 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
                 crossAxisCount: crossAxisCount,
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
-                mainAxisExtent: 186 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6),
+                mainAxisExtent: 268 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6),
               ),
               itemBuilder: (context, index) {
                 final preset = presets[index];
