@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'theme_config.dart';
+import '../templates/applied_preview_model.dart';
 import 'theme_pair_preview.dart';
 
 /// Interactive token-driven mini theme preview card.
@@ -9,11 +10,16 @@ class ThemePreviewCard extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
 
+  /// Resolved layout of the active template, so the preview shows this
+  /// theme's colours on the user's current layout.
+  final PreviewLayout? layout;
+
   const ThemePreviewCard({
     super.key,
     required this.themeConfig,
     required this.isSelected,
     required this.onTap,
+    this.layout,
   });
 
   @override
@@ -137,7 +143,7 @@ class ThemePreviewCard extends StatelessWidget {
                 const SizedBox(height: 8),
 
                 // Home + Conversation as they look once this theme is applied
-                Center(child: ThemePairPreview(themeConfig: themeConfig)),
+                Center(child: ThemePairPreview(themeConfig: themeConfig, layout: layout)),
                 const SizedBox(height: 8),
 
                 // Palette Swatches Footer
