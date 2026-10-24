@@ -330,7 +330,10 @@ class _NavigationDestinationsSettingsScreenState
                   ),
                 ),
               ),
-            for (var index = 0; index < ids.length; index++) ...[
+            // The Devices tab was removed from the bottom bar; Linked devices
+            // stays reachable from Settings, so it is not offered as a tab here.
+            for (var index = 0; index < ids.length; index++)
+              if (ids[index] != ChatyNavigationDestinationIds.desktop) ...[
               if (index > 0) Divider(height: 1, color: colors.borderSubtle),
               _buildDestinationRow(
                 context,
