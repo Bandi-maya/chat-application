@@ -376,11 +376,20 @@ class ChatyDataStore extends ChangeNotifier {
     required String conversationId,
     required String messageId,
     required String newText,
-  }) => _backend.editMessage(
-    conversationId: conversationId,
-    messageId: messageId,
-    newText: newText,
-  );
+  }) async {
+    if (locator.isRegistered<ApiBackendService>()) {
+      final api = locator<ApiBackendService>();
+      if (api.isAuthenticated) {
+        await api.editMessage(conversationId, messageId, newText);
+      }
+    }
+    await _backend.editMessage(
+      conversationId: conversationId,
+      messageId: messageId,
+      newText: newText,
+    );
+    notifyListeners();
+  }
 
   void deleteMessage(
     String conversationId,
