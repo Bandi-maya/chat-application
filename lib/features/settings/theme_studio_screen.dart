@@ -10,6 +10,7 @@ import '../../domain/models/chat_message.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/theme/app_theme.dart';
+import 'appearance/component_styles_screen.dart';
 import '../../ui/core/theme/chaty_theme_manager.dart';
 import '../../ui/core/ticks/delivery_icon_style.dart';
 import '../../ui/core/ticks/delivery_status_icon.dart';
@@ -325,13 +326,48 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                child: _buildActiveTabContent(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildActiveTabContent(),
+                    const SizedBox(height: 16),
+                    _buildComponentStylesEntry(),
+                  ],
+                ),
               ),
             ),
           ],
         ),
       ),
       bottomSheet: _buildBottomActionBar(),
+    );
+  }
+
+  /// Entry to the component style editor (navigation, header, composer,
+  /// overlays, motion and density). It replaces the old Customization Center
+  /// row in the Settings list.
+  Widget _buildComponentStylesEntry() {
+    final colors = context.colors;
+    return Material(
+      color: colors.surfaceSecondary,
+      borderRadius: BorderRadius.circular(16),
+      child: ListTile(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        minVerticalPadding: 12,
+        leading: Icon(Icons.dashboard_customize_outlined, color: colors.primary),
+        title: Text(
+          'Component styles',
+          style: TextStyle(color: colors.foreground, fontWeight: FontWeight.w700),
+        ),
+        subtitle: Text(
+          'Navigation, header, composer, overlays, motion and density',
+          style: TextStyle(color: colors.foregroundSecondary, fontSize: 12),
+        ),
+        trailing: Icon(Icons.chevron_right_rounded, color: colors.foregroundSecondary),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const ComponentStylesScreen()),
+        ),
+      ),
     );
   }
 
