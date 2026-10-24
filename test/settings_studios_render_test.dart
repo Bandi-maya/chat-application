@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:chat/features/settings/conversation/conversation_bubble_and_ticks_screen.dart';
+import 'package:chat/features/settings/appearance/component_styles_screen.dart';
 import 'package:chat/features/settings/home/home_screen_settings_page.dart';
 import 'package:chat/features/settings/templates/templates_settings_screen.dart';
 import 'package:chat/features/settings/theme_editor_screen.dart';
@@ -58,11 +59,14 @@ void main() {
     'theme_editor': (t, p) => ThemeEditorScreen(themeController: t),
     'home': (t, p) => HomeScreenSettingsPage(preferencesController: p),
     'bubbles_ticks': (t, p) => ConversationBubbleAndTicksScreen(preferencesController: p),
+    'component_styles': (t, p) => const ComponentStylesScreen(),
   };
 
   for (final entry in screens.entries) {
-    for (final b in [Brightness.light, Brightness.dark]) {
-      testWidgets('${entry.key} ${b.name}', (tester) async {
+    for (final variant in ['light', 'dark', 'light_large_text']) {
+      final b = variant == 'dark' ? Brightness.dark : Brightness.light;
+      final scale = variant.endsWith('large_text') ? 1.6 : 1.0;
+      testWidgets('${entry.key} $variant', (tester) async {
         SharedPreferences.setMockInitialValues({});
         try {
           await Supabase.initialize(url: 'http://localhost:54321', anonKey: 'x');
@@ -95,6 +99,10 @@ void main() {
               child: MaterialApp(
                 debugShowCheckedModeBanner: false,
                 theme: _withFont(theme.globalTheme.toThemeData()),
+                builder: (ctx, child) => MediaQuery(
+                  data: MediaQuery.of(ctx).copyWith(textScaler: TextScaler.linear(scale)),
+                  child: child!,
+                ),
                 home: entry.value(theme, prefs),
               ),
             ),
@@ -105,11 +113,11 @@ void main() {
             final image = await boundary.toImage(pixelRatio: 1);
             final data = await image.toByteData(format: ui.ImageByteFormat.png);
             final dir = Directory('build/settings_render')..createSync(recursive: true);
-            File('${dir.path}/studio_${entry.key}_${b.name}.png').writeAsBytesSync(data!.buffer.asUint8List());
+            File('${dir.path}/studio_${entry.key}_$variant.png').writeAsBytesSync(data!.buffer.asUint8List());
           });
         } catch (e, st) {
           // ignore: avoid_print
-          print('RENDER_ERROR ${entry.key} ${b.name}: $e\n${st.toString().split('\n').take(6).join('\n')}');
+          print('RENDER_ERROR ${entry.key} $variant: $e\n${st.toString().split('\n').take(6).join('\n')}');
         }
         await tester.pumpWidget(const SizedBox.shrink());
       });
