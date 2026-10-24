@@ -16,7 +16,7 @@ void main() {
     test('Default ConversationPreferences values conform to schema contracts', () {
       const prefs = ConversationPreferences();
       expect(prefs.bubbleStyle, 'Stock');
-      expect(prefs.tickStyle, 'RC iOS 11');
+      expect(prefs.tickStyle, 'Stock');
       expect(prefs.enableQuickContactSidebar, isFalse);
       expect(prefs.sidebarPosition, 'Right');
       expect(prefs.sidebarOpacity, 0.9);
