@@ -366,7 +366,7 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
-            'Home and conversation preview',
+            'Template layout preview',
             style: TextStyle(
               color: colors.foreground,
               fontSize: 15,
@@ -379,7 +379,7 @@ class _ThemeStudioScreenState extends State<ThemeStudioScreen>
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
-            'Your theme: home and conversation',
+            'Your palette preview (colours only)',
             style: TextStyle(
               color: colors.foreground,
               fontSize: 15,
