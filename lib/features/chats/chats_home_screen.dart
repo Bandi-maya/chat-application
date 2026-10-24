@@ -1441,14 +1441,6 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           _popupMenuItem(
-                            icon: Icons.settings_rounded,
-                            title: 'Settings',
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              _openSettingsScreen();
-                            },
-                          ),
-                          _popupMenuItem(
                             icon: Icons.group_add_rounded,
                             title: 'New Group',
                             onTap: () {
