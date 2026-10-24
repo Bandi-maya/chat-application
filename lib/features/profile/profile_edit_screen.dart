@@ -283,13 +283,14 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               children: [
                 // Banner & Overlapping Avatar section (Rule 20)
                 SizedBox(
-                  height: 220,
+                  height: (MediaQuery.of(context).size.width - 32) * 9 / 16 + 12 + 60,
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
                       // Banner
                       Container(
-                        height: 160,
+                        // 16:9, the same frame the banner crop dialog uses.
+                        height: (MediaQuery.of(context).size.width - 32) * 9 / 16,
                         margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                         clipBehavior: Clip.antiAlias,
                         decoration: BoxDecoration(
