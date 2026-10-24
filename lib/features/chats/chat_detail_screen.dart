@@ -53,7 +53,7 @@ import '../../data/services/outgoing_message_queue_engine.dart';
 import '../../ui/core/connection/connection_health_indicator.dart';
 import '../../ui/core/connection/connection_detail_sheet.dart';
 import '../../ui/core/connection/global_connection_banner.dart';
-import '../settings/customization/customization_center_screen.dart';
+import '../settings/appearance/component_styles_screen.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final ThemeConfig theme;
@@ -2538,7 +2538,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => CustomizationCenterScreen(
+                builder: (_) => ComponentStylesScreen(
                   conversationId: widget.conversationId,
                   conversationTitle: conversation.title,
                 ),
