@@ -5,11 +5,12 @@ import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/appearance_variant_controller.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/design_system.dart';
+import '../../../ui/core/templates/applied_pair_preview.dart';
 import '../../../ui/core/templates/template_controller.dart';
+import '../../../ui/core/theme/theme_controller.dart';
 import '../../../ui/core/templates/template_models.dart';
 import '../../../ui/core/templates/template_registry.dart';
 import 'component_override_screen.dart';
-import 'template_preview_widget.dart';
 
 /// Top-level Settings screen for managing structural UI Templates & component-level overrides.
 class TemplatesSettingsScreen extends StatefulWidget {
@@ -164,7 +165,19 @@ class _TemplatesSettingsScreenState extends State<TemplatesSettingsScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      TemplatePairPreview(template: baseTmpl, isSelected: true),
+                      AppliedPairPreview(
+                        palette: locator<ThemeController>().globalTheme,
+                        config: config,
+                        applyTemplateConversation: false,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Your current setup with your colours, including component overrides. Bottom bar style, Home UI preset and wallpaper are not drawn.',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.foregroundSecondary,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -270,7 +283,22 @@ class _TemplatesSettingsScreenState extends State<TemplatesSettingsScreen> {
                           ],
                         ),
                         const SizedBox(height: 14),
-                        TemplatePairPreview(template: tmpl, isSelected: isBase),
+                        AppliedPairPreview(
+                          palette: locator<ThemeController>().globalTheme,
+                          config: UserTemplateConfiguration(
+                            baseTemplate: tmpl.id,
+                            componentOverrides: const {},
+                          ),
+                          applyTemplateConversation: true,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'After Apply Complete Template: this layout with your current colours. Component overrides are cleared. Bottom bar style, Home UI preset and wallpaper are not drawn.',
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colors.foregroundSecondary,
+                          ),
+                        ),
                         const SizedBox(height: 14),
                         Row(
                           children: [
