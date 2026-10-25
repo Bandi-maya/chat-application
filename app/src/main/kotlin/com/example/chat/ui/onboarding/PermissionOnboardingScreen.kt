@@ -106,7 +106,7 @@ fun PermissionOnboardingScreen(
             currentStep += 1
         } else {
             // Dart _finishOnboarding: success haptic, then route home.
-            haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
             onFinished()
         }
     }
@@ -208,7 +208,7 @@ fun PermissionOnboardingScreen(
             Button(
                 onClick = {
                     isRequesting = true
-                    haptics.performHapticFeedback(HapticFeedbackType.VirtualKey)
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     requestPermission(step.permission)
                 },
                 enabled = !isRequesting,
