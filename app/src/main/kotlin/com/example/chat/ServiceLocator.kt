@@ -42,26 +42,6 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 
-/** RealtimePreferences backed by the Dart preference model defaults
- *  (lib/domain/models/preferences.dart). Until the M8 preferences-controller
- *  slice lands, edits are unsupported: values are the Dart initial values,
- *  matching a fresh install. */
-class DefaultRealtimePreferences : RealtimePreferences {
-    override val enableGlobalNotifications: Boolean = true
-    override val showMessagePreview: Boolean = true
-    override val notifyContactOnline: Boolean = true
-    override val notifyTypingStarted: Boolean = false
-    override val notifyMessageDeleted: Boolean = true
-    override val messageRevokeAlert: Boolean = true
-    override val freezeLastSeen: Boolean = false
-    override val hideLastSeenAudience: String = "My Contacts"
-    override val hideOnlineAudience: String = "Everyone"
-    override val recordingIndicators: Boolean = true
-    override val ghostMode: Boolean = false
-    override fun gbBool(key: String, fallback: Boolean): Boolean = fallback
-    override fun gbColorArgb(key: String): Long? = null
-}
-
 /**
  * Composition root mirroring lib/injection/locator.dart (api branch) for the
  * services ported so far. Every registration is lazy, like GetIt
@@ -81,6 +61,7 @@ object ServiceLocator {
         // gotrue session restore, mirroring supabase_flutter's initializeAuth
         // which runs during Supabase.initialize before runApp.
         appScope.launch { sessionManager.restore() }
+        preferencesController // start load + remote reconcile (Dart controller constructor)
     }
 
     private fun requireContext(): Context =
@@ -127,6 +108,27 @@ object ServiceLocator {
     // ── local storage ─────────────────────────────────────────────────────
 
     private val secureStore: SecureKeyValueStoreImpl by lazy { SecureKeyValueStoreImpl(requireContext()) }
+
+    private val preferencesStorage: com.example.chat.core.preferences.LocalPreferencesStorage by lazy {
+        com.example.chat.core.preferences.LocalPreferencesStorage(requireContext())
+    }
+
+    val localLockService: com.example.chat.data.services.LocalLockService by lazy {
+        com.example.chat.data.services.LocalLockService(secureStore)
+    }
+
+    /** M8 preferences controller (port of ChatyPreferencesController). Starts
+     *  its load + remote reconcile on first reference; referenced from
+     *  [init] so startup mirrors the Dart controller's constructor. */
+    val preferencesController: com.example.chat.core.preferences.ChatyPreferencesController by lazy {
+        com.example.chat.core.preferences.ChatyPreferencesController(
+            store = AndroidPreferencesBlobStore(preferencesStorage),
+            remote = SupabaseRemoteSettingsStore(queryClient),
+            lockStore = localLockService,
+            auth = SessionAuthSource(sessionManager),
+            scope = appScope,
+        )
+    }
 
     private val snapshotCache: LocalSnapshotCacheService by lazy { LocalSnapshotCacheService(requireContext()) }
 
@@ -192,8 +194,7 @@ object ServiceLocator {
         PresenceService(
             queryClient = queryClient,
             currentUserId = currentUserId,
-            // Preferences controller is M8; null is the documented Dart null path.
-            privacy = { null },
+            privacy = { preferencesController.privacy.toPresenceSnapshot() },
         )
     }
 
@@ -204,7 +205,7 @@ object ServiceLocator {
             tasksRepository = tasksRepository,
             presenceService = presenceService,
             currentAuthUser = { sessionManager.currentAuthUser() },
-            privacy = { null },
+            privacy = { preferencesController.privacy.toPresenceSnapshot() },
             scope = appScope,
             mls = mls,
         )
@@ -232,19 +233,18 @@ object ServiceLocator {
 
     val messageAutomation: MessageAutomationService by lazy {
         MessageAutomationService(
-            // Preferences controller is M8; Dart initial values until then.
-            automation = { MessageAutomationPreferences() },
+            automation = { preferencesController.automation },
             currentUserId = currentUserId,
             backend = gbFeatures,
             scope = appScope,
-            addListener = {},
-            removeListener = {},
+            addListener = { l -> preferencesController.addListener(l) },
+            removeListener = { l -> preferencesController.removeListener(l) },
         )
     }
 
     val richRealtime: RichChatRealtimeService by lazy {
         RichChatRealtimeService(
-            preferences = DefaultRealtimePreferences(),
+            preferences = ControllerRealtimePreferences(preferencesController),
             notifications = EventNotificationSinkAdapter(notifications),
             backend = object : RealtimeBackend {
                 override fun getUserById(userId: String) =
@@ -307,8 +307,7 @@ object ServiceLocator {
             storage = storageClient,
             rpc = rpcClient,
             currentUserId = currentUserId,
-            // Preferences controller is M8; Dart initial values until then.
-            privacy = { PrivacyPreferencesSnapshot() },
+            privacy = { preferencesController.privacy.toPublicationSnapshot() },
         )
     }
 
