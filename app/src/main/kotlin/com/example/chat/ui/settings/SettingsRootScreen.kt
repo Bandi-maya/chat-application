@@ -1,6 +1,7 @@
 package com.example.chat.ui.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -167,6 +168,7 @@ fun SettingsRootScreen(
     val colors = LocalAppColors.current
     val theme = themeController.globalTheme
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
     var dialog by remember { mutableStateOf("") }          // "", "about", "policy"
     var pickTarget by remember { mutableStateOf("") }      // "", "avatar", "banner"
@@ -198,6 +200,7 @@ fun SettingsRootScreen(
         when (d) {
             SettingsDestination.About -> dialog = "about"
             SettingsDestination.PrivacyPolicy -> dialog = "policy"
+            SettingsDestination.ShareChaty -> ChatyShareService.shareApp(context) { toast(it) }
             else -> onNavigate(d)
         }
     }
