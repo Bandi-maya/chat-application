@@ -27,7 +27,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.outlined.CancelOutlined
+import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.rounded.Bluetooth
@@ -241,7 +241,7 @@ fun AudioSettingsScreen(
                         "Verified Dual Output" -> green to Icons.Outlined.CheckCircleOutline
                         "Native Stereo" -> blue to Icons.Rounded.MusicNote
                         "Standard Single Route" -> gray to Icons.Rounded.RadioButtonChecked
-                        "Unsupported or Failed" -> red to Icons.Outlined.CancelOutlined
+                        "Unsupported or Failed" -> red to Icons.Outlined.Cancel
                         else -> orange to Icons.Outlined.HelpOutline
                     }
                     Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
