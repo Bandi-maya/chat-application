@@ -188,7 +188,7 @@ fun HomeFabSettingsScreen(preferences: ChatyPreferencesController, onBack: () ->
                         onChanged = { preferences.updateHome(preferences.home.copy(hidePluginsList = it)) },
                     )
                     GbSwitchTile(
-                        icon = Icons.Rounded.Settings, title = "Hide Chaty Settings FAB", subtitle = "Hide quick Chaty settings gear button from FAB speed dial", value = p.hideGbwaSettingsFab,
+                        icon = Icons.Rounded.RoundedSettings, title = "Hide Chaty Settings FAB", subtitle = "Hide quick Chaty settings gear button from FAB speed dial", value = p.hideGbwaSettingsFab,
                         onChanged = { preferences.updateHome(preferences.home.copy(hideGbwaSettingsFab = it)) },
                     )
                 }
