@@ -5,7 +5,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -62,9 +64,19 @@ class PostgrestQueryClient(
 
         /** Mirrors supabase_dart .delete() with the accumulated filters. */
         suspend fun delete(): Unit = client.runDelete(table, filters)
+
+        /** Mirrors supabase_dart .update(values) with the accumulated
+         *  filters. As with delete(), call eq()/inFilter() BEFORE update():
+         *  a bare update would PATCH every row in the table. */
+        suspend fun update(values: Map<String, Any?>): Unit =
+            client.runUpdate(table, values, filters)
     }
 
     fun from(table: String): Query = Query(this, table)
+
+    private companion object {
+        val JSON = "application/json; charset=utf-8".toMediaType()
+    }
 
     internal suspend fun runDelete(
         table: String,
@@ -83,6 +95,36 @@ class PostgrestQueryClient(
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 throw IOException("Delete $table failed with HTTP ${response.code}")
+            }
+        }
+    }
+
+    internal suspend fun runUpdate(
+        table: String,
+        values: Map<String, Any?>,
+        filters: List<Pair<String, String>>,
+    ): Unit = withContext(Dispatchers.IO) {
+        val urlBuilder = "$supabaseUrl/rest/v1/$table".toHttpUrl().newBuilder()
+        for ((column, clause) in filters) urlBuilder.addQueryParameter(column, clause)
+        val body = JSONObject()
+        for ((key, value) in values) {
+            if (value == null) body.put(key, JSONObject.NULL) else body.put(key, value)
+        }
+        val request = Request.Builder()
+            .url(urlBuilder.build())
+            .addHeader("apikey", publishableKey)
+            .addHeader("Content-Type", "application/json")
+            // supabase_dart update() returns the affected rows; the Dart
+            // callers ported so far discard them, so request no content back.
+            .addHeader("Prefer", "return=minimal")
+            .apply {
+                accessToken()?.let { addHeader("Authorization", "Bearer $it") }
+            }
+            .patch(body.toString().toRequestBody(JSON))
+            .build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("Update $table failed with HTTP ${response.code}")
             }
         }
     }
