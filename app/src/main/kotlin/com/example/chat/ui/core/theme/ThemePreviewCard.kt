@@ -85,10 +85,10 @@ fun ThemePreviewCard(
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { ThemePairPreview(t, layout = layout) }
             Spacer(Modifier.size(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                ColorDot(tc(t.backgroundColor)); Spacer(Modifier.width(4.dp))
-                ColorDot(tc(t.surfaceColor)); Spacer(Modifier.width(4.dp))
-                ColorDot(tc(t.accentColor)); Spacer(Modifier.width(4.dp))
-                ColorDot(tc(t.outgoingBubbleColor))
+                ColorDot(tc(t.backgroundColor), "Bg"); Spacer(Modifier.width(4.dp))
+                ColorDot(tc(t.surfaceColor), "Surface"); Spacer(Modifier.width(4.dp))
+                ColorDot(tc(t.accentColor), "Accent"); Spacer(Modifier.width(4.dp))
+                ColorDot(tc(t.outgoingBubbleColor), "Bubble")
                 Spacer(Modifier.weight(1f))
                 Text(
                     if (isSelected) "\u25CF Active" else "Apply",
@@ -102,8 +102,15 @@ fun ThemePreviewCard(
     }
 }
 
-/** Dart Tooltip (Bg/Surface/Accent/Bubble) has no touch-equivalent here; omitted (long-press tooltip only). */
+/** Dart Tooltip: long-press shows the plain tooltip text. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun ColorDot(color: Color) {
-    Box(Modifier.size(14.dp).background(color, CircleShape).border(1.dp, Color.Black.alpha(0.15f), CircleShape))
+private fun ColorDot(color: Color, tooltip: String) {
+    androidx.compose.material3.TooltipBox(
+        positionProvider = androidx.compose.material3.TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = { androidx.compose.material3.PlainTooltip { Text(tooltip) } },
+        state = androidx.compose.material3.rememberTooltipState(),
+    ) {
+        Box(Modifier.size(14.dp).background(color, CircleShape).border(1.dp, Color.Black.alpha(0.15f), CircleShape))
+    }
 }
