@@ -57,7 +57,7 @@ fun ChatyMiniPlayer(
 ) {
     var tick by remember { mutableIntStateOf(0) }
     DisposableEffect(coordinator) {
-        val listener = { tick++ }
+        val listener: () -> Unit = { tick++ }
         coordinator.addListener(listener)
         onDispose { coordinator.removeListener(listener) }
     }
