@@ -27,6 +27,12 @@ class ChatMediaService(
     private val imageShareLimit: () -> Int = { 30 },
     /** Optional image compression seam (quality percent -> bytes or null). */
     private val imageCompressor: suspend (bytes: ByteArray, quality: Int) -> ByteArray? = { _, _ -> null },
+    /** Dart locator.isRegistered<ApiBackendService>() && api.isAuthenticated:
+     *  facade precedence for the custom backend. */
+    private val apiAuthenticated: () -> Boolean = { false },
+    /** Dart api.uploadMedia(file): custom-backend multipart upload returning
+     *  the server data map; null while no API backend is registered. */
+    private val apiUpload: (suspend (bytes: ByteArray, filename: String) -> Map<String, Any>)? = null,
 ) {
     /** Exact port of pickAndUploadMultiple's limit enforcement. */
     fun enforceShareLimit(count: Int, maxFiles: Int? = null) {
@@ -76,6 +82,23 @@ class ChatMediaService(
         if (size > maxBytes) {
             val limitMb = maxBytes / (1024 * 1024)
             throw IllegalStateException("This $type exceeds the $limitMb MB storage limit.")
+        }
+
+        // Dart: ApiBackendService session takes facade precedence - upload
+        // through the custom backend and carry its absolute url.
+        if (apiAuthenticated()) {
+            val uploader = apiUpload
+            if (uploader != null) {
+                val uploaded = uploader(payload, rawName)
+                return MessageAttachment(
+                    id = UUID.randomUUID().toString(),
+                    type = type,
+                    name = rawName,
+                    size = formatBytes(size),
+                    url = uploaded["url"]?.toString() ?: "",
+                    durationSeconds = durationSeconds,
+                )
+            }
         }
 
         val authUserId = currentUserId()
