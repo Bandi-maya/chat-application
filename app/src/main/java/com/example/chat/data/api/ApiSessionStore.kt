@@ -73,6 +73,30 @@ class ApiAuthSession(private val store: ApiSessionStore) {
         store.save(result.token, apiUserToJson(result.user))
     }
 
+    /** Dart updateProfile local side effect: apply provided fields, derive
+     *  initials from the effective display name's first char, persist. */
+    fun updateProfileFields(
+        displayName: String?,
+        about: String?,
+        username: String?,
+        avatarUrl: String?,
+    ): ApiUserProfile {
+        val current = currentUser ?: throw Exception("Not authenticated")
+        val effectiveName = if (!displayName.isNullOrBlank()) displayName.trim() else current.displayName
+        val initials = if (effectiveName.isNotEmpty()) effectiveName.substring(0, 1).uppercase()
+            else current.avatarInitials
+        val updated = current.copy(
+            displayName = effectiveName,
+            username = if (!username.isNullOrBlank()) username.trim() else current.username,
+            about = about?.trim() ?: current.about,
+            avatarUrl = avatarUrl?.trim() ?: current.avatarUrl,
+            avatarInitials = initials,
+        )
+        currentUser = updated
+        token?.let { store.save(it, apiUserToJson(updated)) }
+        return updated
+    }
+
     fun signOut() {
         token = null
         currentUser = null
