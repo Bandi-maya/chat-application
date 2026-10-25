@@ -54,6 +54,22 @@ fun AppRoot() {
             if (route == AuthRoute.Home) ServiceLocator.appLock.scheduleInitialIfNeeded()
         }
         var promptPending by remember { mutableStateOf(false) }
+        // Dart AuthChangeEvent.signedOut: reset lock/prompt state and replace the stack
+        // with WelcomeScreen (pushAndRemoveUntil).
+        androidx.compose.runtime.DisposableEffect(Unit) {
+            val signOutListener: () -> Unit = {
+                if (!ServiceLocator.apiBackend.isAuthenticated &&
+                    (route == AuthRoute.Home || route == AuthRoute.ChatDetail || route == AuthRoute.Security)
+                ) {
+                    ServiceLocator.appLock.onSignedOut()
+                    promptPending = false
+                    selectedConversation = null
+                    route = AuthRoute.Welcome
+                }
+            }
+            ServiceLocator.apiBackend.addListener(signOutListener)
+            onDispose { ServiceLocator.apiBackend.removeListener(signOutListener) }
+        }
         var showLockPrompt by remember { mutableStateOf(false) }
         // Dart _handleSecurityPreferenceChanged: disabling app lock clears pending lock state.
         androidx.compose.runtime.DisposableEffect(Unit) {
