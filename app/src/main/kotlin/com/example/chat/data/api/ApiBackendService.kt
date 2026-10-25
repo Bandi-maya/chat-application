@@ -49,6 +49,7 @@ class ApiBackendService(context: Context) {
         baseUrl = { config.restApiBaseUrl },
         tenantId = { config.tenantId },
         transport = OkHttpApiTransport(),
+        token = { session.token },
     )
 
     private val session = ApiAuthSession(sessionStore)
@@ -386,6 +387,21 @@ class ApiBackendService(context: Context) {
         config.setTenantId(tenantId.trim())
         session.adopt(result)
         Triple(result.user, orgId, resolvedOrgName)
+    }
+
+    /** ApiBackendService.updateProfile: PUT profile, then apply the local
+     *  user update (effective name + first-char initials) and persist. */
+    suspend fun updateProfile(
+        displayName: String? = null,
+        about: String? = null,
+        username: String? = null,
+        avatarUrl: String? = null,
+    ): ApiUserProfile = withContext(Dispatchers.IO) {
+        if (session.token == null || session.currentUser == null) throw Exception("Not authenticated")
+        auth.updateProfile(displayName, about, username, avatarUrl)
+        val updated = session.updateProfileFields(displayName, about, username, avatarUrl)
+        notifyChatListeners()
+        updated
     }
 
     suspend fun checkOrganization(workspace: String): Map<String, Any?> = withContext(Dispatchers.IO) {
