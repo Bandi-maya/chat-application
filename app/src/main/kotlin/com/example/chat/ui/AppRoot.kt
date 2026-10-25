@@ -260,6 +260,7 @@ fun AppRoot() {
                 var settingsSub by remember { mutableStateOf<com.example.chat.ui.settings.SettingsDestination?>(null) }
                 var pushedSettings by remember { mutableStateOf(false) }
                 var pushedProfile by remember { mutableStateOf(false) }
+                val rootPhoto = rememberRootProfilePhoto()
                 var pushedEditProfile by remember { mutableStateOf(false) }
                 var pushedSettingsSearch by remember { mutableStateOf(false) }
                 val settingsNavigate: (com.example.chat.ui.settings.SettingsDestination) -> Unit = { dest ->
@@ -310,8 +311,8 @@ fun AppRoot() {
                                         onBack = { },
                                         onNavigate = settingsNavigate,
                                         // Avatar/banner upload hosts are not wired yet.
-                                        onPickAvatar = { },
-                                        onPickBanner = { },
+                                        onPickAvatar = { source -> rootPhoto.avatar(source) },
+                                        onPickBanner = { source -> rootPhoto.banner(source) },
                                         // Dart logout: ApiBackendService.signOut; the signed-out
                                         // listener above routes to Welcome.
                                         onLogout = { ServiceLocator.apiBackend.signOut() },
@@ -501,8 +502,8 @@ fun AppRoot() {
                                 canGoBack = true,
                                 onBack = { pushedSettings = false },
                                 onNavigate = settingsNavigate,
-                                onPickAvatar = { },
-                                onPickBanner = { },
+                                onPickAvatar = { source -> rootPhoto.avatar(source) },
+                                onPickBanner = { source -> rootPhoto.banner(source) },
                                 onLogout = { ServiceLocator.apiBackend.signOut() },
                             )
                         }
@@ -584,27 +585,36 @@ fun AppRoot() {
                             }
                             photoWaiter?.complete(bytes); photoWaiter = null
                         }
+                        suspend fun pickBytes(source: com.example.chat.data.services.ProfileMediaSource): ByteArray? {
+                            val d = kotlinx.coroutines.CompletableDeferred<ByteArray?>()
+                            photoWaiter = d
+                            if (source == com.example.chat.data.services.ProfileMediaSource.camera) cameraLauncher.launch(null)
+                            else galleryLauncher.launch("image/*")
+                            return d.await()
+                        }
+                        fun profileMedia() = com.example.chat.data.services.ProfileMediaService(
+                            storage = ServiceLocator.storageClient,
+                            currentUserId = { ServiceLocator.sessionManager.currentUserId() },
+                        )
                         Box(Modifier.fillMaxSize()) {
                             com.example.chat.ui.profile.ProfileEditScreen(
                                 user = editUser,
                                 onBack = { pushedEditProfile = false },
+                                // Dart ProfileMediaService.uploadAvatar/uploadBanner (Supabase storage 'profile-media').
                                 onPickAvatar = { source ->
-                                    val d = kotlinx.coroutines.CompletableDeferred<ByteArray?>()
-                                    photoWaiter = d
-                                    if (source == com.example.chat.data.services.ProfileMediaSource.camera) cameraLauncher.launch(null)
-                                    else galleryLauncher.launch("image/*")
-                                    val bytes = d.await()
-                                    if (bytes == null) null
-                                    else com.example.chat.data.services.ProfileMediaService(
-                                        storage = ServiceLocator.storageClient,
-                                        currentUserId = { ServiceLocator.sessionManager.currentUserId() },
-                                    ).uploadAvatar(bytes)
+                                    val bytes = pickBytes(source)
+                                    if (bytes == null) null else profileMedia().uploadAvatar(bytes)
                                 },
-                                // No banner-upload backend path on the custom backend: button hidden (screen contract).
-                                onPickBanner = null,
+                                onPickBanner = { source ->
+                                    val bytes = pickBytes(source)
+                                    if (bytes == null) null else profileMedia().uploadBanner(bytes)
+                                },
                                 onSave = { name, username, about, avatarUrl, _ ->
+                                    // Dart updateUser -> api.updateProfile(name, about, username, updated.avatarUrl);
+                                    // bannerUrl is not sent by the api-branch backend either.
                                     ServiceLocator.apiBackend.updateProfile(
-                                        displayName = name, about = about, username = username, avatarUrl = avatarUrl,
+                                        displayName = name, about = about, username = username,
+                                        avatarUrl = avatarUrl ?: editUser.avatarUrl,
                                     )
                                 },
                             )
@@ -893,3 +903,63 @@ private fun toDomainUser(u: com.example.chat.data.api.ApiUserProfile): com.examp
         avatarInitials = u.avatarInitials, avatarColorHex = u.avatarColorHex, about = u.about,
         lastSeenAt = java.time.Instant.now(), email = u.email, phone = u.phone, avatarUrl = u.avatarUrl,
     )
+
+/** settings_root_screen.dart _editAccountAvatar/_editAccountBanner: pick (camera/gallery), upload through
+ *  ProfileMediaService, then dataStore.updateUser(currentUser.copyWith(...)) which the api branch sends as
+ *  api.updateProfile(displayName, about, username, avatarUrl) - the banner URL is uploaded but not sent. A
+ *  cancelled pick throws a "cancelled" message, which the root screen swallows like Dart. */
+internal class RootProfilePhoto(
+    val avatar: suspend (com.example.chat.ui.settings.ProfileMediaSource) -> Unit,
+    val banner: suspend (com.example.chat.ui.settings.ProfileMediaSource) -> Unit,
+)
+
+@androidx.compose.runtime.Composable
+private fun rememberRootProfilePhoto(): RootProfilePhoto {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var waiter by remember { mutableStateOf<kotlinx.coroutines.CompletableDeferred<ByteArray?>?>(null) }
+    val gallery = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent(),
+    ) { uri ->
+        val bytes = try { uri?.let { context.contentResolver.openInputStream(it)?.use { i -> i.readBytes() } } } catch (_: Exception) { null }
+        waiter?.complete(bytes); waiter = null
+    }
+    val camera = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.TakePicturePreview(),
+    ) { bmp ->
+        val bytes = bmp?.let {
+            val o = java.io.ByteArrayOutputStream()
+            it.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, o)
+            o.toByteArray()
+        }
+        waiter?.complete(bytes); waiter = null
+    }
+    suspend fun pick(source: com.example.chat.ui.settings.ProfileMediaSource): ByteArray {
+        val d = kotlinx.coroutines.CompletableDeferred<ByteArray?>()
+        waiter = d
+        if (source == com.example.chat.ui.settings.ProfileMediaSource.camera) camera.launch(null) else gallery.launch("image/*")
+        return d.await() ?: throw com.example.chat.data.services.ProfileMediaCancelledException()
+    }
+    fun media() = com.example.chat.data.services.ProfileMediaService(
+        storage = ServiceLocator.storageClient,
+        currentUserId = { ServiceLocator.sessionManager.currentUserId() },
+    )
+    suspend fun saveCurrent() {
+        val me = ServiceLocator.apiBackend.currentUser ?: throw Exception("Not authenticated")
+        ServiceLocator.apiBackend.updateProfile(
+            displayName = me.displayName, about = me.about, username = me.username, avatarUrl = me.avatarUrl,
+        )
+    }
+    return RootProfilePhoto(
+        avatar = { source ->
+            val url = media().uploadAvatar(pick(source))
+            val me = ServiceLocator.apiBackend.currentUser ?: throw Exception("Not authenticated")
+            ServiceLocator.apiBackend.updateProfile(
+                displayName = me.displayName, about = me.about, username = me.username, avatarUrl = url,
+            )
+        },
+        banner = { source ->
+            media().uploadBanner(pick(source))
+            saveCurrent()
+        },
+    )
+}
