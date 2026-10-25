@@ -62,6 +62,30 @@ class ApiBackendService(context: Context) {
         transport = OkHttpApiTransport(),
     )
 
+    private val subscriptionClient = ApiSubscriptionClient(
+        baseUrl = { config.restApiBaseUrl },
+        tenantId = { config.tenantId },
+        token = { session.token },
+        transport = OkHttpApiTransport(),
+    )
+
+    /** ApiBackendService._currentOrg (Dart): current organization payload -
+     *  restored from the persisted api_hub_org, refreshed on org register. */
+    var currentOrg: Map<String, Any?>? = null
+        private set
+
+    /** Dart currentOrganization alias. */
+    val currentOrganization: Map<String, Any?>? get() = currentOrg
+
+    /** ApiBackendService.getAvailablePlans (Dart accepts but never sends orgId). */
+    suspend fun getAvailablePlans(organizationId: String? = null): List<Map<String, Any?>> =
+        withContext(Dispatchers.IO) { subscriptionClient.getAvailablePlans(organizationId) }
+
+    /** ApiBackendService.subscribeToPlan: POST create-order; throws the server
+     *  detail/message on non-200. */
+    suspend fun subscribeToPlan(organizationId: String, planId: String, durationMonths: Int = 1): Boolean =
+        withContext(Dispatchers.IO) { subscriptionClient.subscribeToPlan(organizationId, planId, durationMonths) }
+
     // ---- Realtime plane (W1 ApiRealtimeClient integration) ----
 
     private val callSignalListeners =
@@ -518,6 +542,11 @@ class ApiBackendService(context: Context) {
         initialized = true
         config.init()
         session.restore()
+        // Dart initialize(): restore _currentOrg from the persisted org payload.
+        try {
+            prefs.getString("api_hub_org", null)?.let { currentOrg = ApiChatClient.deepMap(org.json.JSONObject(it)) }
+        } catch (_: Exception) {
+        }
         // Dart initialize(): after session restore, fire the chat-plane loads.
         if (session.isAuthenticated) {
             realtime.connect()
@@ -586,6 +615,7 @@ class ApiBackendService(context: Context) {
                 val orgJson = org.json.JSONObject()
                 for ((k, v) in orgMap) orgJson.put(k, v)
                 prefs.edit().putString("api_hub_org", orgJson.toString()).apply()
+                currentOrg = orgMap
             } catch (_: Exception) {
             }
         }
