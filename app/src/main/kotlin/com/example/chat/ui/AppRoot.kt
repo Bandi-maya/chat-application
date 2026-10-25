@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
  *  Chats home, conversation, register, forgot-password and organization
  *  registration destinations land in their own parity slices; the register /
  *  forgot-password / org buttons route to honest WIP stubs until then. */
-private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home, ChatDetail, Security }
+private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home, ChatDetail, Security, LockedChats }
 
 @Composable
 fun AppRoot() {
@@ -54,12 +54,15 @@ fun AppRoot() {
             if (route == AuthRoute.Home) ServiceLocator.appLock.scheduleInitialIfNeeded()
         }
         var promptPending by remember { mutableStateOf(false) }
+        val gate = remember { GatePrompts() }
+        val scope = androidx.compose.runtime.rememberCoroutineScope()
         // Dart AuthChangeEvent.signedOut: reset lock/prompt state and replace the stack
         // with WelcomeScreen (pushAndRemoveUntil).
         androidx.compose.runtime.DisposableEffect(Unit) {
             val signOutListener: () -> Unit = {
                 if (!ServiceLocator.apiBackend.isAuthenticated &&
-                    (route == AuthRoute.Home || route == AuthRoute.ChatDetail || route == AuthRoute.Security)
+                    (route == AuthRoute.Home || route == AuthRoute.ChatDetail || route == AuthRoute.Security ||
+                        route == AuthRoute.LockedChats)
                 ) {
                     ServiceLocator.appLock.onSignedOut()
                     promptPending = false
@@ -295,29 +298,30 @@ fun AppRoot() {
                                 }
                             }
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.chats -> {
-                com.example.chat.ui.chats.ChatsHomeScreen(
-                    conversations = ServiceLocator.apiBackend.conversations,
-                    requiresSubscription = ServiceLocator.apiBackend.requiresSubscription,
-                    subscriptionMessage = ServiceLocator.apiBackend.subscriptionErrorMessage,
+                com.example.chat.ui.ChatsHomeHost(
+                    forcedType = null, pageTitle = null, gate = gate,
                     onOpenConversation = { conversation ->
                         ServiceLocator.apiBackend.setActiveConversation(conversation.id)
                         selectedConversation = conversation
                         route = AuthRoute.ChatDetail
                     },
+                    onOpenSecurity = { route = AuthRoute.Security },
+                    onOpenLockedChats = { route = AuthRoute.LockedChats },
+                    onOpenSettings = { },
                 )
                             }
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.groups ->
-                                com.example.chat.ui.chats.ChatsHomeScreen(
-                                    conversations = ServiceLocator.apiBackend.conversations,
-                                    requiresSubscription = ServiceLocator.apiBackend.requiresSubscription,
-                                    subscriptionMessage = ServiceLocator.apiBackend.subscriptionErrorMessage,
+                                com.example.chat.ui.ChatsHomeHost(
+                                    forcedType = com.example.chat.domain.models.ConversationType.group,
+                                    pageTitle = "Groups", gate = gate,
                                     onOpenConversation = { conversation ->
                                         ServiceLocator.apiBackend.setActiveConversation(conversation.id)
                                         selectedConversation = conversation
                                         route = AuthRoute.ChatDetail
                                     },
-                                    forcedType = com.example.chat.domain.models.ConversationType.group,
-                                    pageTitle = "Groups",
+                                    onOpenSecurity = { route = AuthRoute.Security },
+                                    onOpenLockedChats = { route = AuthRoute.LockedChats },
+                                    onOpenSettings = { },
                                 )
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.calls -> {
                                 val history = ServiceLocator.callHistory
@@ -447,8 +451,64 @@ fun AppRoot() {
                 preferences = ServiceLocator.preferencesController,
                 lockService = ServiceLocator.localLockService,
                 onBack = { route = AuthRoute.Home },
-                onOpenLockedChats = { },
+                onOpenLockedChats = {
+                    scope.launch {
+                        val ok = com.example.chat.data.services.ProtectedResourceGate.authorizeGeneralAction(
+                            lockMethod = ServiceLocator.preferencesController.security.lockMethod,
+                            lockService = ServiceLocator.localLockService,
+                            lockPrompt = gate.lockPrompt,
+                            title = "Locked Chats", reason = "Authenticate to open Locked Chats",
+                        )
+                        if (ok) route = AuthRoute.LockedChats
+                    }
+                },
             )
+            AuthRoute.LockedChats -> {
+                val prefsL = ServiceLocator.preferencesController
+                val lockSvc = ServiceLocator.localLockService
+                var lockedRev by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                androidx.compose.runtime.DisposableEffect(prefsL) {
+                    val l: () -> Unit = { lockedRev++ }
+                    prefsL.addListener(l)
+                    onDispose { prefsL.removeListener(l) }
+                }
+                @Suppress("UNUSED_EXPRESSION") lockedRev
+                val lockedIds = prefsL.security.lockedConversationIds
+                com.example.chat.ui.chats.locked_chats.LockedChatsScreen(
+                    lockedConversations = ServiceLocator.apiBackend.conversations.filter { it.id in lockedIds },
+                    lockMethod = prefsL.security.lockMethod,
+                    isConversationHidden = { id -> prefsL.isConversationHidden(id) },
+                    hasSecretPhrase = { lockSvc.hasSecretPhrase() },
+                    setSecretPhrase = { lockSvc.setSecretPhrase(it) },
+                    clearSecretPhrase = { lockSvc.clearSecretPhrase() },
+                    onSetEntryBySecretPhrase = { on ->
+                        prefsL.updateSecurity(prefsL.security.copy(entryBySecretPhrase = on))
+                    },
+                    onToggleHide = { id, hide -> prefsL.toggleHideConversation(id, hide) },
+                    onUnlockCompletely = { id -> prefsL.toggleLockConversation(id, false) },
+                    onOpenChat = { conversation ->
+                        scope.launch {
+                            val sec = prefsL.security
+                            val ok = com.example.chat.data.services.ProtectedResourceGate.authorizeConversation(
+                                conversationId = conversation.id,
+                                isProtected = prefsL.isConversationLocked(conversation.id),
+                                autoLockTimeout = sec.autoLockTimeout,
+                                lockMethod = sec.lockMethod,
+                                lockService = lockSvc,
+                                setupPrompt = gate.setupPrompt,
+                                lockPrompt = gate.lockPrompt,
+                            )
+                            if (ok) {
+                                ServiceLocator.apiBackend.setActiveConversation(conversation.id)
+                                selectedConversation = conversation
+                                route = AuthRoute.ChatDetail
+                            }
+                        }
+                    },
+                    onOpenSecuritySettings = { route = AuthRoute.Security },
+                    onBack = { route = AuthRoute.Home },
+                )
+            }
             AuthRoute.ChatDetail -> run {
                 val conversation = selectedConversation
                 if (conversation == null) {
@@ -477,6 +537,7 @@ fun AppRoot() {
                 }
             }
         }
+        gate.Host()
         com.example.chat.ui.calls.GlobalCallHost(isAuthenticated = ServiceLocator.apiBackend.isAuthenticated)
         // Dart shouldShowLock: authenticated && lock enabled && _appLockRequired.
         if (lockRequired && ServiceLocator.apiBackend.isAuthenticated &&
