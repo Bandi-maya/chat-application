@@ -76,6 +76,7 @@ import com.example.chat.ui.kit.ChatyAppBar
 import com.example.chat.ui.kit.ChatyHapticsPort
 import com.example.chat.ui.theme.LocalAppColors
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.outlined.Settings
 
 private val categories = listOf(
     "Navigation", "Header", "Bubbles", "Ticks", "Composer", "Overlays", "Motion & Density",
