@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.background
@@ -252,19 +255,22 @@ fun ThemeEditorScreen(
                             @Composable
                             fun label(text: String) = Text(text, color = colors.foreground, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.fillMaxWidth())
                             label("Bubble Corner Radius (${current.cornerRadius.toInt()}px)")
-                            Slider(
+                            LabeledSlider(
+                                label = "${current.cornerRadius.toInt()}px",
                                 value = current.cornerRadius.coerceIn(4.0, 28.0).toFloat(),
                                 onValueChange = { v -> current = current.copy(cornerRadius = v.toDouble()); themeController.updateThemeConfig(current) },
                                 valueRange = 4f..28f, steps = 11,
                             )
                             label("Font Scale (${(current.fontScale * 100).toInt()}%)")
-                            Slider(
+                            LabeledSlider(
+                                label = "${(current.fontScale * 100).toInt()}%",
                                 value = current.fontScale.coerceIn(0.85, 1.30).toFloat(),
                                 onValueChange = { v -> current = current.copy(fontScale = v.toDouble()); themeController.updateThemeConfig(current) },
                                 valueRange = 0.85f..1.30f, steps = 8,
                             )
                             label("UI Density (${(current.density * 100).toInt()}%)")
-                            Slider(
+                            LabeledSlider(
+                                label = "${(current.density * 100).toInt()}%",
                                 value = current.density.coerceIn(0.8, 1.2).toFloat(),
                                 onValueChange = { v -> current = current.copy(density = v.toDouble()); themeController.updateThemeConfig(current) },
                                 valueRange = 0.8f..1.2f, steps = 7,
@@ -421,4 +427,37 @@ fun ThemeEditorScreen(
         }
     }
     }
+}
+
+
+/** Flutter Slider(label:) shows a value bubble above the thumb while it is dragged. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LabeledSlider(
+    label: String,
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int,
+) {
+    val colors = LocalAppColors.current
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val dragged by interaction.collectIsDraggedAsState()
+    val pressed by interaction.collectIsPressedAsState()
+    Slider(
+        value = value, onValueChange = onValueChange, valueRange = valueRange, steps = steps,
+        interactionSource = interaction,
+        thumb = {
+            Box(contentAlignment = Alignment.Center) {
+                androidx.compose.material3.SliderDefaults.Thumb(interactionSource = interaction)
+                if (dragged || pressed) {
+                    Box(
+                        Modifier.offset(y = (-34).dp)
+                            .background(colors.primary, androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                    ) { Text(label, color = colors.onPrimary, fontSize = 12.sp) }
+                }
+            }
+        },
+    )
 }
