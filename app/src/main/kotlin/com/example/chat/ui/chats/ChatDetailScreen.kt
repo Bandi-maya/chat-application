@@ -72,15 +72,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.Popup
 import com.example.chat.core.templates.ComposerActionPlacement
 import com.example.chat.core.templates.ComposerTemplate
 import com.example.chat.core.theme.ThemeConfig
@@ -94,6 +95,11 @@ import com.example.chat.ui.chats.detail.AttachmentAction
 import com.example.chat.ui.chats.detail.AttachmentSheetContent
 import com.example.chat.ui.chats.detail.BubbleColorOverrides
 import com.example.chat.ui.chats.detail.ChatCommandParser
+import com.example.chat.ui.kit.AppContextMenu
+import com.example.chat.ui.kit.ChatyHapticsPort
+import com.example.chat.ui.kit.ContextMenuItem
+import com.example.chat.ui.kit.ContextMenuSection
+import com.example.chat.ui.kit.ReactionRail
 import com.example.chat.ui.chats.detail.ChatCommandType
 import com.example.chat.ui.chats.detail.ChatWallpaper
 import com.example.chat.ui.chats.detail.ChatyEmojiComposerAction
@@ -104,9 +110,9 @@ import com.example.chat.ui.chats.detail.ConnectionDetailSheetContent
 import com.example.chat.ui.chats.detail.ChatMessageBubble
 import com.example.chat.ui.chats.detail.ConnectionHealthIndicator
 import com.example.chat.ui.chats.detail.GlobalConnectionBanner
-import com.example.chat.ui.chats.detail.MessageActionSheetContent
+import com.example.chat.ui.chats.detail.MessageActionRegistry
 import com.example.chat.ui.chats.detail.MessageActionType
-import com.example.chat.ui.chats.detail.MessageContextMenuContent
+import com.example.chat.ui.chats.detail.actionIcon
 import com.example.chat.ui.chats.detail.RemoteImageSlot
 import com.example.chat.ui.chats.detail.chatyRemoteImage
 import com.example.chat.ui.theme.LocalThemeConfig
@@ -115,7 +121,6 @@ import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 
 /** Full port of lib/features/chats/chat_detail_screen.dart's conversation
  *  surface: header (normal + multi-select + in-chat search with match
@@ -179,7 +184,6 @@ fun ChatDetailScreen(
     disableDoubleTapReaction: Boolean = false,
     doubleTapReactionEmoji: String = "❤️",
     showGroupAvatar: Boolean = true,
-    useBottomSheetActions: Boolean = false,
     colorOverrides: BubbleColorOverrides? = null,
     remoteImage: RemoteImageSlot? = chatyRemoteImage,
     onEditMessage: suspend (messageId: String, newText: String) -> Unit = { _, _ -> },
@@ -192,8 +196,6 @@ fun ChatDetailScreen(
     onClearConversation: () -> Unit = {},
     onRetryMessage: (messageId: String) -> Unit = {},
     onOpenInfo: () -> Unit = {},
-    onMessageInfo: (ChatMessage) -> Unit = {},
-    onReportMessage: (ChatMessage) -> Unit = {},
     onCreateTaskFromMessage: (ChatMessage) -> Unit = {},
     onAttachmentAction: (AttachmentAction) -> Unit = {},
     onCameraTap: () -> Unit = {},
@@ -225,7 +227,6 @@ fun ChatDetailScreen(
     var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var contextMenuMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var contextMenuAnchor by remember { mutableStateOf<Rect?>(null) }
-    var actionSheetMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var attachmentSheetOpen by remember { mutableStateOf(false) }
     var chatMenuOpen by remember { mutableStateOf(false) }
     var openedViewOnceIds by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -241,6 +242,9 @@ fun ChatDetailScreen(
     var emojiReactionTarget by remember { mutableStateOf<ChatMessage?>(null) }
     var connectionSheetOpen by remember { mutableStateOf(false) }
     var connectionTesting by remember { mutableStateOf(false) }
+    val menuView = LocalView.current
+    val menuConfig = LocalConfiguration.current
+    val menuDensity = LocalDensity.current
     var typingPublished by remember { mutableStateOf(false) }
     var typingIdleJob by remember { mutableStateOf<Job?>(null) }
     val searchFocusRequester = remember { FocusRequester() }
@@ -363,13 +367,31 @@ fun ChatDetailScreen(
         }
     }
 
+    // Dart _quickReactionEmojis.
+    val quickReactionEmojis = listOf("❤️", "👍", "😂", "😮", "😢", "🙏")
+
+    // Dart _onMessageLongPress: a rect-less long press synthesizes a 100x40
+    // anchor at screen center (logical px -> window px here).
+    fun syntheticCenterRect(): Rect {
+        val wPx = with(menuDensity) { menuConfig.screenWidthDp.dp.toPx() }
+        val hPx = with(menuDensity) { menuConfig.screenHeightDp.dp.toPx() }
+        val rw = with(menuDensity) { 100.dp.toPx() }
+        val rh = with(menuDensity) { 40.dp.toPx() }
+        return Rect(
+            wPx / 2f - rw / 2f,
+            hPx / 2f - rh / 2f,
+            wPx / 2f + rw / 2f,
+            hPx / 2f + rh / 2f,
+        )
+    }
+
+    // Dart _onMessageLongPressWithRect: selection haptic, then the anchored
+    // AppContextMenu with reaction rail (always; the api-branch detail
+    // screen has no bottom-sheet branch).
     fun openMessageMenu(message: ChatMessage, rect: Rect?) {
-        if (useBottomSheetActions) {
-            actionSheetMessage = message
-        } else {
-            contextMenuMessage = message
-            contextMenuAnchor = rect
-        }
+        ChatyHapticsPort.selection(menuView)
+        contextMenuMessage = message
+        contextMenuAnchor = rect ?: syntheticCenterRect()
     }
 
     fun runAction(message: ChatMessage, type: MessageActionType) {
@@ -380,19 +402,27 @@ fun ChatDetailScreen(
                 scope.launch { snackbarHostState.showSnackbar("Message copied") }
             }
             MessageActionType.edit -> {
+                // Dart sets the editing id + text and keeps the reply target.
                 editingMessage = message
-                replyTarget = null
                 handleComposerChanged(message.text)
             }
             MessageActionType.star -> onToggleStar(message.id)
             MessageActionType.pin -> onTogglePin(message.id)
             MessageActionType.forward -> onForward(message)
             MessageActionType.select -> selectedIds = selectedIds + message.id
-            MessageActionType.info -> onMessageInfo(message)
+            // Dart emits MessageActionType.info but _executeMessageAction has
+            // no info case (default: break) - the row is a source no-op.
+            MessageActionType.info -> Unit
             MessageActionType.task -> onCreateTaskFromMessage(message)
             MessageActionType.deleteForMe -> onDeleteMessage(message.id, false)
             MessageActionType.deleteForEveryone -> onDeleteMessage(message.id, true)
-            MessageActionType.report -> onReportMessage(message)
+            MessageActionType.report -> {
+                scope.launch {
+                    snackbarHostState.showSnackbar(
+                        "Use Contact info → Block to stop unwanted messages.",
+                    )
+                }
+            }
             else -> Unit
         }
     }
@@ -748,63 +778,40 @@ fun ChatDetailScreen(
         }
     }
 
-    // Anchored context menu (Dart AppContextMenu.showWithReactionRail).
+    // Anchored context menu (Dart AppContextMenu.showWithReactionRail,
+    // anchorType left at its generic default like the Dart call site; the
+    // kit dismisses before invoking rail/item callbacks, like Dart's pop).
     val menuMessage = contextMenuMessage
     if (menuMessage != null) {
-        val anchor = contextMenuAnchor
-        Popup(
-            alignment = Alignment.TopStart,
-            offset = if (anchor != null) {
-                IntOffset(anchor.left.roundToInt(), anchor.bottom.roundToInt())
-            } else {
-                IntOffset(0, 0)
-            },
-            onDismissRequest = { contextMenuMessage = null },
-        ) {
-            MessageContextMenuContent(
-                message = menuMessage,
-                isMe = menuMessage.senderId == currentUserId,
-                theme = theme,
-                onReact = { emoji ->
-                    onToggleReaction(menuMessage.id, emoji)
-                    contextMenuMessage = null
-                },
-                onOpenAllReactions = {
-                    emojiReactionTarget = menuMessage
-                    contextMenuMessage = null
-                },
-                onAction = { type ->
-                    runAction(menuMessage, type)
-                    contextMenuMessage = null
-                },
-            )
-        }
-    }
-
-    // Bottom-sheet action presentation (Dart message_action_sheet.dart).
-    actionSheetMessage?.let { sheetMessage ->
-        ModalBottomSheet(
-            onDismissRequest = { actionSheetMessage = null },
-            containerColor = Color.Transparent,
-        ) {
-            MessageActionSheetContent(
-                message = sheetMessage,
-                isMe = sheetMessage.senderId == currentUserId,
-                theme = theme,
-                onReact = { emoji ->
-                    onToggleReaction(sheetMessage.id, emoji)
-                    actionSheetMessage = null
-                },
-                onOpenAllReactions = {
-                    emojiReactionTarget = sheetMessage
-                    actionSheetMessage = null
-                },
-                onAction = { type ->
-                    runAction(sheetMessage, type)
-                    actionSheetMessage = null
-                },
-            )
-        }
+        val actions = MessageActionRegistry.getAvailableActions(
+            message = menuMessage,
+            isMe = menuMessage.senderId == currentUserId,
+        )
+        AppContextMenu(
+            onDismiss = { contextMenuMessage = null },
+            sections = listOf(
+                ContextMenuSection(
+                    items = actions.map { act ->
+                        ContextMenuItem(
+                            icon = actionIcon(act, menuMessage),
+                            label = act.label,
+                            isDestructive = act.isDestructive,
+                            onTap = { runAction(menuMessage, act.type) },
+                        )
+                    },
+                ),
+            ),
+            backgroundColor = Color(theme.surfaceColor),
+            primaryTextColor = Color(theme.primaryTextColor),
+            secondaryTextColor = Color(theme.secondaryTextColor),
+            destructiveColor = Color(theme.dangerColor),
+            anchorRect = contextMenuAnchor,
+            reactionRail = ReactionRail(
+                emojis = quickReactionEmojis,
+                onReact = { emoji -> onToggleReaction(menuMessage.id, emoji) },
+                onAdd = { emojiReactionTarget = menuMessage },
+            ),
+        )
     }
 
     if (attachmentSheetOpen) {
@@ -993,7 +1000,7 @@ private fun ConversationHeader(
                         modifier = Modifier
                             .size(38.dp)
                             .background(
-                                conversation.avatarColorHex?.let { parseHexColor(it) }
+                                conversation.avatarColorHex?.let(::parseHexColor)
                                     ?: Color(theme.accentColor),
                                 CircleShape,
                             ),
