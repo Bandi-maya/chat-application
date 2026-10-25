@@ -146,6 +146,18 @@ object ServiceLocator {
 
     /** locator.dart TemplateController + AppearanceVariantController, persisted through
      *  LocalPreferencesStorage ('chaty_template_v1') and the same SharedPreferences file. */
+    /** Dart locator AppIconController + MethodChannel('chaty/launcher_icon') bridge. */
+    val appIconBridge: com.example.chat.ui.settings.appicon.AndroidLauncherIconBridge by lazy {
+        com.example.chat.ui.settings.appicon.AndroidLauncherIconBridge(requireContext())
+    }
+    val appIconController: com.example.chat.ui.settings.appicon.AppIconController by lazy {
+        com.example.chat.ui.settings.appicon.AppIconController(
+            bridge = appIconBridge,
+            prefs = com.example.chat.ui.settings.appicon.SharedPrefsAppIconStore(requireContext()),
+            processor = com.example.chat.ui.settings.appicon.AndroidCustomIconProcessor(requireContext()),
+        )
+    }
+
     val appearanceVariantController: com.example.chat.core.templates.AppearanceVariantController by lazy {
         val sp = requireContext().applicationContext
             .getSharedPreferences("chaty_local_preferences", android.content.Context.MODE_PRIVATE)
