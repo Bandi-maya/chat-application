@@ -27,6 +27,19 @@ import com.example.chat.ui.auth.WelcomeScreen
 import com.example.chat.ui.theme.ChatyTheme
 import com.example.chat.ui.theme.LocalThemeConfig
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Call
+import androidx.compose.material.icons.outlined.AdminPanelSettings
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material.icons.rounded.Devices
+import androidx.compose.material.icons.rounded.Animation
 
 /** App shell with the auth navigation graph (splash -> welcome -> login).
  *  Chats home, conversation, register, forgot-password and organization
@@ -542,21 +555,20 @@ fun AppRoot() {
                             onSelect = { def ->
                                 // Dart _destinationForRoute; closing the search precedes navigation.
                                 pushedSettingsSearch = false
-                                val d = com.example.chat.ui.settings.SettingsDestination
                                 when (def.canonicalRoute) {
-                                    "/settings/privacy" -> settingsNavigate(d.Privacy)
-                                    "/settings/security" -> settingsNavigate(d.Security)
-                                    "/settings/conversation" -> settingsNavigate(d.Conversation)
+                                    "/settings/privacy" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Privacy)
+                                    "/settings/security" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Security)
+                                    "/settings/conversation" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Conversation)
                                     "/settings/message_management" -> route = AuthRoute.MessageManagement
-                                    "/settings/themes" -> settingsNavigate(d.ThemeEngine)
-                                    "/settings/templates" -> settingsNavigate(d.TemplateStudio)
-                                    "/settings/notifications" -> settingsNavigate(d.Notifications)
-                                    "/settings/calls" -> settingsNavigate(d.Calls)
-                                    "/settings/storage" -> settingsNavigate(d.StorageMedia)
-                                    "/settings/effects" -> settingsNavigate(d.Effects)
-                                    "/settings/permissions" -> settingsNavigate(d.Permissions)
-                                    "/settings/home" -> settingsNavigate(d.HomeScreen)
-                                    "/settings/devices" -> settingsNavigate(d.LinkedDevices)
+                                    "/settings/themes" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.ThemeEngine)
+                                    "/settings/templates" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.TemplateStudio)
+                                    "/settings/notifications" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Notifications)
+                                    "/settings/calls" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Calls)
+                                    "/settings/storage" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.StorageMedia)
+                                    "/settings/effects" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Effects)
+                                    "/settings/permissions" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Permissions)
+                                    "/settings/home" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.HomeScreen)
+                                    "/settings/devices" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.LinkedDevices)
                                     // account, customization, app_icon, universal_appearance: no host yet.
                                     else -> settingsNotice = def.canonicalRoute
                                 }
