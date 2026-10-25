@@ -60,7 +60,9 @@ fun LoginScreen(
     onForgotPassword: () -> Unit,
     onRegister: () -> Unit,
     onRegisterOrganization: () -> Unit,
-    login: suspend (identifier: String, password: String) -> String,
+    login: suspend (identifier: String, password: String, tenant: String?, isDefaultTenant: Boolean) -> String,
+    /** Dart initState: getSavedTenantId + isUsingDefaultTenant. */
+    loadSavedTenant: suspend () -> Pair<String?, Boolean>,
 ) {
     val theme = LocalThemeConfig.current
     val scope = rememberCoroutineScope()
@@ -75,6 +77,7 @@ fun LoginScreen(
     var identifierError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }
     var workspaceError by remember { mutableStateOf<String?>(null) }
+
 
     // Dart _validateIdentifier
     fun validateIdentifier(raw: String): String? {
@@ -98,26 +101,32 @@ fun LoginScreen(
             errorMessage = "Please enter your Workspace / Organization ID."
             return
         }
-        if (useOrganization) {
-            // ApiBackendService (tenant-routed REST auth) is not wired yet;
-            // block submission instead of silently ignoring the workspace.
-            errorMessage =
-                "Organization sign-in is not available in this build yet. Use Normal / Default mode."
-            return
-        }
 
         isLoading = true
         errorMessage = null
         scope.launch {
             try {
-                // Tenant routing lands with the organization-backend slice; the
-                // ported AuthRepository performs the default-tenant sign-in.
-                val userId = login(identifier.trim(), password)
+                val userId = login(
+                    identifier.trim(),
+                    password,
+                    if (useOrganization) workspace.trim() else null,
+                    !useOrganization,
+                )
                 onLoggedIn(userId)
             } catch (e: Exception) {
                 errorMessage = friendlyLoginError(e)
                 isLoading = false
             }
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        val (saved, usingDefault) = loadSavedTenant()
+        if (!saved.isNullOrEmpty()) {
+            workspace = saved
+            useOrganization = true
+        } else {
+            useOrganization = !usingDefault
         }
     }
 
