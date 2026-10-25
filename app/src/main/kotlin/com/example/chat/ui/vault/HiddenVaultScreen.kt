@@ -54,8 +54,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
+import com.example.chat.ui.kit.ChatyHapticsPort
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -89,7 +89,7 @@ fun HiddenVaultScreen(
     onOpenConversation: (conversationId: String) -> Unit,
     onBack: (() -> Unit)? = null,
 ) {
-    val haptics = LocalHapticFeedback.current
+    val view = LocalView.current
     val scope = rememberCoroutineScope()
 
     // AnimatedBuilder port: recompose whenever the controller notifies.
@@ -113,7 +113,7 @@ fun HiddenVaultScreen(
             val authed = controller.unlockVault()
             isAuthenticating = false
             if (authed) {
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                ChatyHapticsPort.light(view) // Dart: HapticFeedback.lightImpact()
             }
         }
     }
@@ -123,12 +123,12 @@ fun HiddenVaultScreen(
         scope.launch {
             val verified = controller.verifyPin(pin)
             if (verified) {
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                ChatyHapticsPort.threshold(view) // Dart: HapticFeedback.mediumImpact()
                 enteredPin = ""
                 errorMessage = null
             } else if (pin.length >= 4) {
                 // Shake animation and haptic rejection
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                ChatyHapticsPort.error(view) // Dart: HapticFeedback.heavyImpact()
                 shake.snapTo(0f)
                 shake.animateTo(1f, animationSpec = tween(durationMillis = 400))
                 errorMessage = "Incorrect PIN. Try again or use biometrics."
@@ -139,7 +139,7 @@ fun HiddenVaultScreen(
 
     fun onDigitPressed(digit: String) {
         if (enteredPin.length >= 6) return
-        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        ChatyHapticsPort.selection(view) // Dart: HapticFeedback.selectionClick()
         enteredPin += digit
         errorMessage = null
         if (enteredPin.length == 4 || enteredPin.length == 6) {
@@ -149,7 +149,7 @@ fun HiddenVaultScreen(
 
     fun onBackspacePressed() {
         if (enteredPin.isEmpty()) return
-        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        ChatyHapticsPort.selection(view) // Dart: HapticFeedback.selectionClick()
         enteredPin = enteredPin.dropLast(1)
         errorMessage = null
     }
@@ -171,7 +171,7 @@ fun HiddenVaultScreen(
             onBack = onBack,
             isDark = isDark,
             onLock = {
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                ChatyHapticsPort.threshold(view) // Dart: HapticFeedback.mediumImpact()
                 controller.lockVault()
             },
         )
