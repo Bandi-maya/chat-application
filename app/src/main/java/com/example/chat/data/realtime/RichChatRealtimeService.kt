@@ -33,7 +33,7 @@ fun interface ConnectionHealthSink {
 enum class EventNotificationIcon {
     notifications, image, videocam, mic, attachFile, locationOn, person,
     checkCircleOutline, chatBubble, onlinePrediction, keyboardAlt, micNone,
-    undo, personOutline,
+    undo, personOutline, autoAwesome, historyToggleOff,
 }
 
 /** Seam over ChatyNotificationService.triggerEventNotification. */
