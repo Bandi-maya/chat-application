@@ -1,5 +1,7 @@
 package com.example.chat.data.messaging
 
+import com.example.chat.core.crypto.MlsStorageInitializationException
+import com.example.chat.core.crypto.MlsStorageInitializationFailure
 import com.example.chat.core.util.parseIsoToInstant
 import com.example.chat.data.e2ee.MlsE2eeService
 import com.example.chat.domain.models.Conversation
@@ -9,8 +11,12 @@ import com.example.chat.domain.models.DeliveryState
 import com.example.chat.domain.models.EncryptionStatus
 import com.example.chat.domain.models.PresenceState
 import com.example.chat.domain.models.UserProfile
+import com.example.chat.domain.models.MessageAttachment
+import com.example.chat.domain.models.MessageType
+import com.example.chat.domain.models.messageTypeFromDatabase
 import com.example.chat.domain.models.messageTypeToDatabase
 import java.time.Instant
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
@@ -27,6 +33,15 @@ class ConversationsRepository(
     private val currentUserId: () -> String?,
     private val shouldSendReadReceipts: (String) -> Boolean = { true },
     private val notifyChanged: () -> Unit = {},
+    /** Persistent queue for sends that cannot be encrypted yet (Dart
+     *  _pendingSecureSends). Required by [sendMessage]'s offline path. */
+    private val pendingStore: PendingSecureSendStore? = null,
+    /** Mirrors the locator<ConnectionHealthService>().updateQueuedCount call. */
+    private val onQueuedCountChanged: (Int) -> Unit = {},
+    /** Mirrors the unawaited _retryPendingSecureSends kick after enqueueing. */
+    private val onPendingEnqueued: () -> Unit = {},
+    /** Mirrors the eventBus RealtimeEventType.messageCreated publish. */
+    private val onMessageCreated: (conversationId: String, messageId: String) -> Unit = { _, _ -> },
 ) {
     val conversationsById = LinkedHashMap<String, Conversation>()
     val messagesByChatId = HashMap<String, MutableList<ChatMessage>>()
@@ -223,6 +238,132 @@ class ConversationsRepository(
         return row
     }
 
+    /** Exact port of sendMessage's non-demo path: build the pending payload,
+     *  try encrypted delivery, otherwise persist + optimistic queued message.
+     *  Demo mode does not exist on api; without an MLS encryptor this fails
+     *  closed with "Encrypted message transport is unavailable." */
+    suspend fun sendMessage(
+        conversationId: String,
+        text: String,
+        type: MessageType = MessageType.text,
+        attachment: MessageAttachment? = null,
+        replyToMessageId: String? = null,
+        replyToPreviewText: String? = null,
+        replyToSenderName: String? = null,
+        linkedTaskId: String? = null,
+        extraMetadata: Map<String, Any?>? = null,
+        clientMessageId: String? = null,
+    ): ChatMessage {
+        val me = currentUserId() ?: throw Exception("Authentication required.")
+        if (!conversationsById.containsKey(conversationId)) {
+            throw Exception("Conversation not found.")
+        }
+        if (mls() == null) {
+            throw IllegalStateException("Encrypted message transport is unavailable.")
+        }
+
+        val pendingSend = transport.buildPendingSend(
+            conversationId = conversationId,
+            text = text,
+            type = type,
+            attachment = attachment,
+            replyToMessageId = replyToMessageId,
+            replyToPreviewText = replyToPreviewText,
+            replyToSenderName = replyToSenderName,
+            linkedTaskId = linkedTaskId,
+            extraMetadata = extraMetadata,
+            clientMessageId = clientMessageId,
+        )
+
+        try {
+            return deliverAndResolve(pendingSend, fallbackType = type)
+        } catch (error: Throwable) {
+            if (error is MlsStorageInitializationException &&
+                error.failure != MlsStorageInitializationFailure.databaseInUse
+            ) {
+                // A native compatibility/storage failure cannot be repaired
+                // by the pending-send retry loop: do not queue.
+                throw error
+            }
+
+            val store = pendingStore ?: throw error
+            store.put(me, pendingSend)
+
+            val optimisticMsg = ChatMessage(
+                id = pendingSend.clientMessageId,
+                conversationId = conversationId,
+                senderId = me,
+                type = type,
+                text = pendingSend.text,
+                attachment = attachment,
+                replyToMessageId = replyToMessageId,
+                replyToPreviewText = replyToPreviewText,
+                replyToSenderName = replyToSenderName,
+                linkedTaskId = linkedTaskId,
+                metadata = pendingSend.metadata,
+                createdAt = pendingSend.createdAt,
+                deliveryState = DeliveryState.queued,
+            )
+            val list = messagesByChatId.getOrPut(conversationId) { mutableListOf() }
+            if (list.none { it.id == pendingSend.clientMessageId }) {
+                list.add(optimisticMsg)
+            }
+            notifyChanged()
+
+            onQueuedCountChanged(store.read(me).size)
+
+            if (transport.isMlsSetupPendingError(error)) {
+                throw SecureSendPendingException(SECURE_SETUP_PENDING_CODE)
+            }
+            // Kick the background retry (Dart: unawaited _retryPendingSecureSends).
+            onPendingEnqueued()
+            return optimisticMsg
+        }
+    }
+
+    /** Exact port of retryPendingSecureMessage: redeliver a queued pending
+     *  send without duplicating the optimistic message or re-enqueueing. */
+    suspend fun retryPendingSecureMessage(item: PendingSecureSend): ChatMessage {
+        return try {
+            deliverAndResolve(item, fallbackType = messageTypeFromDatabase(item.type))
+        } catch (error: Throwable) {
+            if (transport.isMlsSetupPendingError(error)) {
+                throw SecureSendPendingException(SECURE_SETUP_PENDING_CODE)
+            }
+            throw error
+        }
+    }
+
+    /** Shared tail of _deliverEncryptedMessage: RPC, refresh, resolve the
+     *  stored row or fall back to a sent-state local message, publish the
+     *  messageCreated event. */
+    private suspend fun deliverAndResolve(
+        send: PendingSecureSend,
+        fallbackType: MessageType,
+    ): ChatMessage {
+        val messageId = transport.deliverEncryptedMessage(send)
+        kotlinx.coroutines.coroutineScope {
+            val a = launch { loadMessages(send.conversationId) }
+            val b = launch { loadConversations(loadMembers = false) }
+            a.join(); b.join()
+        }
+        val me = currentUserId()
+        val result = messagesByChatId[send.conversationId]
+            ?.firstOrNull { it.id == messageId }
+            ?: ChatMessage(
+                id = messageId,
+                conversationId = send.conversationId,
+                senderId = me ?: "",
+                type = fallbackType,
+                text = send.text,
+                attachment = attachmentFromPending(send.attachment),
+                createdAt = send.createdAt,
+                deliveryState = DeliveryState.sent,
+            )
+        onMessageCreated(send.conversationId, result.id)
+        return result
+    }
+
     suspend fun markAsRead(conversationId: String) {
         if (shouldSendReadReceipts(conversationId)) {
             rpc.rpc(
@@ -274,6 +415,21 @@ class ConversationsRepository(
 
         internal fun stringList(value: Any?): List<String> =
             (value as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+
+        /** Port of the sendMessage/retry fallback attachment reconstruction
+         *  from a PendingSecureSend.attachment map. */
+        fun attachmentFromPending(attachment: Map<String, Any?>?): MessageAttachment? {
+            if (attachment == null) return null
+            return MessageAttachment(
+                id = attachment["id"]?.toString() ?: "",
+                type = attachment["type"]?.toString() ?: "file",
+                name = attachment["name"]?.toString() ?: "",
+                size = attachment["size"]?.toString() ?: "",
+                url = attachment["url"]?.toString(),
+                durationSeconds = (attachment["duration_seconds"] as? Number)?.toInt()
+                    ?: attachment["duration_seconds"]?.toString()?.toIntOrNull() ?: 0,
+            )
+        }
 
         internal fun intOf(value: Any?): Int =
             (value as? Number)?.toInt() ?: value?.toString()?.toIntOrNull() ?: 0
