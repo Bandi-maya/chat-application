@@ -93,6 +93,33 @@ fun ChatsHomeHost(
             onOpenGlobalSearch = onOpenGlobalSearch,
             onOpenMessageManagement = onOpenMessageManagement,
             onOpenProfile = onOpenProfile,
+            // Dart _promptMessageNumber: match an existing contact by phone/username, else
+            // synthesize user_<digits>, then open the direct conversation.
+            onMessageNumber = { raw ->
+                val number = raw.trim()
+                if (number.isNotEmpty()) {
+                    scope.launch {
+                        try {
+                            val existing = api.users.firstOrNull { it.phone.trim() == number || it.username.trim() == number }
+                            val digits = number.filter { it.isDigit() }
+                            val target = existing ?: com.example.chat.domain.models.UserProfile(
+                                id = if (digits.isNotEmpty()) "user_$digits" else number,
+                                displayName = number,
+                                username = number,
+                                avatarInitials = number.substring(0, 1).uppercase(),
+                                avatarColorHex = "#25D366",
+                                about = "Chaty User",
+                                lastSeenAt = java.time.Instant.now(),
+                                phone = number,
+                            )
+                            val conv = repo.getOrCreateDirectConversationAsync(target)
+                            onOpenConversation(conv)
+                        } catch (e: Exception) {
+                            toast("Could not start chat: $e")
+                        }
+                    }
+                }
+            },
             // Dart: widget.themeController.toggleBrightness.
             onToggleBrightness = { ServiceLocator.themeController.toggleBrightness() },
             // Dart: MethodChannel('chaty/launcher_icon').restartApp -> relaunch the app task.
