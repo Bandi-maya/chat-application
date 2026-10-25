@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.Call
 import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.EmojiEmotions
 import androidx.compose.material.icons.outlined.Groups
@@ -107,8 +108,8 @@ private fun destinationIcon(id: String): ImageVector = when (id) {
 
 /** Dart: tmpl.navigation.centerActionIcon ?? Icons.camera_alt_rounded. */
 private fun centerActionIcon(iconName: String?): ImageVector = when (iconName) {
-    null, "camera", "camera_alt_rounded" -> Icons.Outlined.CameraAlt
-    else -> Icons.Outlined.CameraAlt
+    null, "camera", "camera_alt_rounded" -> Icons.Rounded.CameraAlt
+    else -> Icons.Rounded.CameraAlt
 }
 
 /** Observes a listener-style controller (AppearanceVariantController /
