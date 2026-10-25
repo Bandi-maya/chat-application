@@ -772,7 +772,7 @@ private fun HomeConversationList(
                         },
                         actions = listOf(
                             HomeSwipeAction(
-                                icon = if (conversation.isPinned) Icons.Rounded.PushPin else OutlinedPushPin,
+                                icon = if (conversation.isPinned) Icons.Rounded.PushPin else Icons.Outlined.OutlinedPushPin,
                                 label = if (conversation.isPinned) "Unpin" else "Pin",
                                 color = Color(theme.accentColor),
                                 onTriggered = { onTogglePin(conversation.id) },
