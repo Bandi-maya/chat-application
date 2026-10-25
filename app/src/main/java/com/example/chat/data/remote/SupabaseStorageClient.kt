@@ -64,6 +64,11 @@ class SupabaseStorageClient(
         }
     }
 
+    /** Mirrors storage.from(bucket).getPublicUrl(path) for public buckets
+     *  (pure URL construction, no request). */
+    fun getPublicUrl(bucket: String, path: String): String =
+        "$supabaseUrl/storage/v1/object/public/$bucket/$path"
+
     /** Mirrors storage.from(bucket).createSignedUrl(path, expiresIn). */
     suspend fun createSignedUrl(
         bucket: String,
