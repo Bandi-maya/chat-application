@@ -1,6 +1,5 @@
 package com.example.chat.ui.profile
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -57,7 +56,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -65,6 +63,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.chat.domain.models.UserProfile
+import com.example.chat.ui.theme.ChatyAsyncImage
 import com.example.chat.ui.theme.LocalAppColors
 import com.example.chat.ui.theme.LocalThemeConfig
 
@@ -523,7 +522,6 @@ private fun CenteredIdentityHeader(
 @Composable
 internal fun BannerSurface(bannerUrl: String?, height: Int) {
     val theme = LocalThemeConfig.current
-    val image = rememberProfileImage(bannerUrl)
     Box(
         Modifier
             .fillMaxWidth()
@@ -532,16 +530,13 @@ internal fun BannerSurface(bannerUrl: String?, height: Int) {
             .background(Color(theme.cardColor))
             .border(1.dp, LocalAppColors.current.borderSubtle, RoundedCornerShape(18.dp)),
     ) {
-        if (image != null) {
-            Image(
-                bitmap = image,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            BannerFallback()
-        }
+        ChatyAsyncImage(
+            url = bannerUrl,
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            placeholder = { BannerFallback() },
+            error = { BannerFallback() },
+        )
     }
 }
 
@@ -583,11 +578,18 @@ internal fun ChatyAvatar(
     shape: String,
 ) {
     val theme = LocalThemeConfig.current
-    val image = rememberProfileImage(url)
     val clipShape = avatarShapeOf(shape, size)
     val fallbackColor = runCatching {
         Color(android.graphics.Color.parseColor(colorHex.toComposeHex()))
     }.getOrDefault(Color(theme.accentColor))
+    val initialsContent: @Composable () -> Unit = {
+        Text(
+            initials.ifEmpty { "U" },
+            color = fallbackColor,
+            fontSize = (size * 0.34).sp,
+            fontWeight = FontWeight.ExtraBold,
+        )
+    }
     Box(
         Modifier
             .size(size.dp)
@@ -595,21 +597,15 @@ internal fun ChatyAvatar(
             .background(fallbackColor.copy(alpha = 0.20f)),
         contentAlignment = Alignment.Center,
     ) {
-        if (image != null) {
-            Image(
-                bitmap = image,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            Text(
-                initials.ifEmpty { "U" },
-                color = fallbackColor,
-                fontSize = (size * 0.34).sp,
-                fontWeight = FontWeight.ExtraBold,
-            )
-        }
+        // Blank/null URL renders the initials fallback via error ?: placeholder
+        // (ChatyAsyncImage contract), matching the Dart errorBuilder rule.
+        ChatyAsyncImage(
+            url = url,
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            placeholder = initialsContent,
+            error = initialsContent,
+        )
     }
 }
 
