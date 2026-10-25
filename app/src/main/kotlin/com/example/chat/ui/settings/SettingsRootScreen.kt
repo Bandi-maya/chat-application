@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import com.example.chat.core.preferences.ChatyPreferencesController
 import com.example.chat.core.theme.ThemeController
 import com.example.chat.domain.models.UserProfile
+import com.example.chat.ui.theme.ChatyAsyncImage
 import com.example.chat.ui.theme.LocalAppColors
 
 /** Route keys for the root rows; AppRoot maps each to a destination. Mirrors
@@ -87,9 +89,8 @@ private val rootGroups = listOf(
 /**
  * Port of SettingsRootScreen. Display-name resolution replicates the Dart
  * rules (myNameOverride, placeholder names ignored, username fallback).
- * Banner/avatar images are loaded by [avatarContent]/[bannerContent] slots so
- * the integration owner can supply the image loader (no image dependency is
- * assumed here); a gradient/initials fallback is drawn like the Dart screen.
+ * Banner/avatar load through the shared ChatyAsyncImage wrapper; a
+ * gradient/initials fallback is drawn on blank URL or load error, like Dart.
  */
 @Composable
 fun SettingsRootScreen(
@@ -99,8 +100,6 @@ fun SettingsRootScreen(
     canGoBack: Boolean,
     onBack: () -> Unit,
     onNavigate: (SettingsDestination) -> Unit,
-    bannerContent: (@Composable () -> Unit)? = null,
-    avatarContent: (@Composable () -> Unit)? = null,
 ) {
     rememberPreferencesVersion(preferences)
     val colors = LocalAppColors.current
@@ -140,13 +139,21 @@ fun SettingsRootScreen(
                             .background(colors.surface)
                             .border(1.dp, colors.borderSubtle, RoundedCornerShape(20.dp)),
                     ) {
-                        if (bannerContent != null && !user.bannerUrl.isNullOrBlank()) bannerContent()
-                        else Box(
-                            Modifier.fillMaxSize().background(
-                                Brush.linearGradient(listOf(Color(theme.accentColor).copy(alpha = 0.30f), colors.surface, colors.background)),
-                            ),
-                            contentAlignment = Alignment.Center,
-                        ) { Text("\u25A8", color = Color(theme.accentColor).copy(alpha = 0.65f), fontSize = 34.sp) }
+                        val bannerFallback: @Composable () -> Unit = {
+                            Box(
+                                Modifier.fillMaxSize().background(
+                                    Brush.linearGradient(listOf(Color(theme.accentColor).copy(alpha = 0.30f), colors.surface, colors.background)),
+                                ),
+                                contentAlignment = Alignment.Center,
+                            ) { Text("\u25A8", color = Color(theme.accentColor).copy(alpha = 0.65f), fontSize = 34.sp) }
+                        }
+                        ChatyAsyncImage(
+                            url = user.bannerUrl?.trim(),
+                            contentDescription = "Account banner",
+                            modifier = Modifier.fillMaxSize(),
+                            placeholder = bannerFallback,
+                            error = bannerFallback,
+                        )
                     }
                     Box(
                         Modifier.align(Alignment.TopEnd).padding(10.dp).size(36.dp).clip(CircleShape)
@@ -156,19 +163,29 @@ fun SettingsRootScreen(
                     ) { Text("\u25A8", color = colors.foreground, fontSize = 16.sp) }
                 }
                 // Avatar overlaps the banner bottom by 40dp (Dart: bottom -40, 84 + 4 padding).
+                Box(Modifier.fillMaxWidth().height(52.dp), contentAlignment = Alignment.TopCenter) {
                 Box(
-                    Modifier.padding(top = 0.dp).size(92.dp).clip(CircleShape)
+                    Modifier.offset(y = (-40).dp).size(92.dp).clip(CircleShape)
                         .background(colors.background)
                         .border(1.dp, colors.borderSubtle, CircleShape)
                         .padding(4.dp).clip(CircleShape)
                         .clickable { onNavigate(SettingsDestination.ChangeAvatar) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (avatarContent != null && !user.avatarUrl.isNullOrEmpty()) avatarContent()
-                    else Box(
-                        Modifier.fillMaxSize().background(runCatching { Color(android.graphics.Color.parseColor(user.avatarColorHex)) }.getOrDefault(colors.primary)),
-                        contentAlignment = Alignment.Center,
-                    ) { Text(user.avatarInitials, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold) }
+                    val avatarFallback: @Composable () -> Unit = {
+                        Box(
+                            Modifier.fillMaxSize().background(runCatching { Color(android.graphics.Color.parseColor(user.avatarColorHex)) }.getOrDefault(colors.primary)),
+                            contentAlignment = Alignment.Center,
+                        ) { Text(user.avatarInitials, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold) }
+                    }
+                    ChatyAsyncImage(
+                        url = user.avatarUrl,
+                        contentDescription = "Profile photo",
+                        modifier = Modifier.fillMaxSize(),
+                        placeholder = avatarFallback,
+                        error = avatarFallback,
+                    )
+                }
                 }
                 Spacer(Modifier.height(6.dp))
                 Row(
