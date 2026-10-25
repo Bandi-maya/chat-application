@@ -15,7 +15,43 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.outlined.CancelOutlined
+import androidx.compose.material.icons.outlined.CheckCircleOutline
+import androidx.compose.material.icons.outlined.HelpOutline
+import androidx.compose.material.icons.rounded.Bluetooth
+import androidx.compose.material.icons.rounded.BluetoothAudio
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.DevicesOther
+import androidx.compose.material.icons.rounded.Headphones
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.PhoneInTalk
+import androidx.compose.material.icons.rounded.RadioButtonChecked
+import androidx.compose.material.icons.rounded.RadioButtonUnchecked
+import androidx.compose.material.icons.rounded.SpeakerGroup
+import androidx.compose.material.icons.rounded.Usb
+import androidx.compose.material.icons.rounded.VolumeUp
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalView
+import com.example.chat.ui.kit.ChatyHapticsPort
+import com.example.chat.ui.kit.SpecularGlassCard
+import com.example.chat.ui.kit.springInteractiveScale
+import com.example.chat.ui.theme.LocalThemeConfig
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -46,9 +82,9 @@ import kotlinx.coroutines.launch
  * (listeners merged like Listenable.merge). Device-test rows come verbatim
  * from AudioSettingsController.verifiedDeviceRecords; the status labels are
  * shown as recorded and nothing here claims hardware verification.
- * Differences from Dart, pending visual/runtime check: the hero uses a plain
- * surface card instead of SpecularGlassCard (blur 12), no spring-scale press
- * animation and no selectionClick haptic yet.
+ * Hero is SpecularGlassCard (blur 12 NOT rendered: no backdrop blur, see SpecularGlassCard), radio/route rows
+ * have springInteractiveScale(0.98) + ChatyHapticsPort.selection (Dart HapticFeedback.selectionClick), Material
+ * icons, grouped-card shadow, and a plain AppBar (22sp title: Dart uses the theme default titleLarge, unverified).
  * [scope] launches the suspend setPreferredRoute call.
  */
 @Composable
@@ -79,8 +115,22 @@ fun AudioSettingsScreen(
     val blue = Color(0xFF007AFF)
     val gray = Color(0xFF8E8E93)
 
-    SettingsPage("Audio & Speakers", null, onBack) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+    val view = LocalView.current
+    val isDark = LocalThemeConfig.current.isDark
+    Column(Modifier.fillMaxSize().background(colors.background)) {
+        // Dart AppBar(title: Text('Audio & Speakers'), backgroundColor: colors.background, elevation 0) with the default back arrow
+        Row(
+            Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)).height(56.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onBack, modifier = Modifier.padding(start = 4.dp)) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = colors.foreground) }
+            Spacer(Modifier.width(12.dp))
+            Text("Audio & Speakers", color = colors.foreground, fontSize = 22.sp)
+        }
+        Column(
+            Modifier.weight(1f).windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom))
+                .verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
+        ) {
             // 1. Status hero
             val (badgeText, badgeFg) = when (dualStatus) {
                 DualOutputStatus.active -> "Active & Verified" to green
@@ -89,13 +139,11 @@ fun AudioSettingsScreen(
                 DualOutputStatus.unsupported -> "Unsupported by OS/Hardware" to colors.foregroundSecondary
                 DualOutputStatus.failed -> "Activation Failed" to red
             }
-            Column(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(colors.surface)
-                    .border(BorderStroke(0.8.dp, colors.borderSubtle), RoundedCornerShape(20.dp)).padding(18.dp),
-            ) {
+            SpecularGlassCard(Modifier.fillMaxWidth(), blur = 12f, borderRadius = 20.dp, padding = PaddingValues(18.dp)) {
+              Column(Modifier.fillMaxWidth()) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f, fill = false)) {
-                        Text("\u266B", color = colors.accent, fontSize = 24.sp)
+                        Icon(Icons.Rounded.SpeakerGroup, null, Modifier.size(26.dp), tint = colors.accent)
                         Spacer(Modifier.width(10.dp))
                         Text("Dual-Speaker Engine", color = colors.foreground, fontWeight = FontWeight.Bold, fontSize = 17.sp)
                     }
@@ -108,7 +156,7 @@ fun AudioSettingsScreen(
                 }
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "Smart audio policy coordinates native earpiece and bottom loudspeaker routing across VoIP calls, media, and notification sounds without breaking system behavior.",
+                    "Smart audio policy coordinates native earpiece and bottom loudspeaker routing across VoIP calls, media, and notification sounds without breaking Bluetooth or microphone AEC.",
                     color = colors.foregroundSecondary, fontSize = 13.sp, lineHeight = 18.sp,
                 )
                 Spacer(Modifier.height(14.dp))
@@ -116,6 +164,7 @@ fun AudioSettingsScreen(
                     Text("Active Output: ", color = colors.foregroundSecondary, fontSize = 13.sp)
                     Text(activeRoute.name, color = colors.foreground, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 }
+              }
             }
             Spacer(Modifier.height(20.dp))
 
@@ -143,24 +192,27 @@ fun AudioSettingsScreen(
             AudioGroupedCard {
                 availableRoutes.forEachIndexed { i, route ->
                     if (i > 0) AudioDivider()
-                    val (glyph, name) = when (route) {
-                        AudioOutputRoute.receiver -> "\u260E" to "Earpiece Receiver"
-                        AudioOutputRoute.speaker -> "\u266A" to "Bottom Loudspeaker"
-                        AudioOutputRoute.bluetooth -> "\u16D2" to "Bluetooth Device"
-                        AudioOutputRoute.wiredHeadset -> "\u266C" to "Wired Headset"
-                        AudioOutputRoute.usb -> "\u2301" to "USB Audio Interface"
-                        AudioOutputRoute.systemDefault -> "\u25A3" to "System Default"
+                    val (icon, name) = when (route) {
+                        AudioOutputRoute.receiver -> Icons.Rounded.PhoneInTalk to "Earpiece Receiver"
+                        AudioOutputRoute.speaker -> Icons.Rounded.VolumeUp to "Bottom Loudspeaker"
+                        AudioOutputRoute.bluetooth -> Icons.Rounded.BluetoothAudio to "Bluetooth Device"
+                        AudioOutputRoute.wiredHeadset -> Icons.Rounded.Headphones to "Wired Headset"
+                        AudioOutputRoute.usb -> Icons.Rounded.Usb to "USB Audio Interface"
+                        AudioOutputRoute.systemDefault -> Icons.Rounded.DevicesOther to "System Default"
                     }
                     Row(
-                        Modifier.fillMaxWidth()
-                            .clickable { scope.launch { capability.setPreferredRoute(AudioUseCase.communication, route) } }
+                        Modifier.fillMaxWidth().springInteractiveScale(0.98f)
+                            .clickable {
+                                ChatyHapticsPort.selection(view)
+                                scope.launch { capability.setPreferredRoute(AudioUseCase.communication, route) }
+                            }
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Box(
                             Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(colors.accent.copy(alpha = 0.1f)),
                             contentAlignment = Alignment.Center,
-                        ) { Text(glyph, color = colors.accent, fontSize = 18.sp) }
+                        ) { Icon(icon, null, Modifier.size(20.dp), tint = colors.accent) }
                         Spacer(Modifier.width(14.dp))
                         Text(name, color = colors.foreground, fontWeight = FontWeight.SemiBold, fontSize = 14.5.sp, modifier = Modifier.weight(1f))
                         if (route == activeRoute) {
@@ -176,20 +228,20 @@ fun AudioSettingsScreen(
 
             // 4. Evidence dataset (verbatim records; status shown as recorded)
             AudioSectionHeader("VERIFIED DEVICE TEST DATASET")
-            AudioGroupedCard {
+            AudioGroupedCard(withShadow = false) {
                 val records = AudioSettingsController.verifiedDeviceRecords
                 records.forEachIndexed { idx, rec ->
                     if (idx > 0) AudioDivider()
                     val status = rec["testStatus"] as String
-                    val (color, glyph) = when (status) {
-                        "Verified Dual Output" -> green to "\u2713"
-                        "Native Stereo" -> blue to "\u266B"
-                        "Standard Single Route" -> gray to "\u25C9"
-                        "Unsupported or Failed" -> red to "\u2715"
-                        else -> orange to "?"
+                    val (color, statusIcon) = when (status) {
+                        "Verified Dual Output" -> green to Icons.Outlined.CheckCircleOutline
+                        "Native Stereo" -> blue to Icons.Rounded.MusicNote
+                        "Standard Single Route" -> gray to Icons.Rounded.RadioButtonChecked
+                        "Unsupported or Failed" -> red to Icons.Outlined.CancelOutlined
+                        else -> orange to Icons.Outlined.HelpOutline
                     }
                     Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(glyph, color = color, fontSize = 18.sp)
+                        Icon(statusIcon, null, Modifier.size(20.dp), tint = color)
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -222,13 +274,17 @@ private fun AudioSectionHeader(title: String) {
 }
 
 @Composable
-private fun AudioGroupedCard(content: @Composable () -> Unit) {
+private fun AudioGroupedCard(withShadow: Boolean = true, content: @Composable () -> Unit) {
     val colors = LocalAppColors.current
-    val dark = colors.background.red < 0.3f && colors.background.green < 0.3f && colors.background.blue < 0.3f
+    val isDark = LocalThemeConfig.current.isDark
+    val shape = RoundedCornerShape(16.dp)
+    val shadowColor = colors.shadow.copy(alpha = if (isDark) 0.3f else 0.04f)
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-            .background(if (dark) Color(0xFF1C1C1E) else colors.surface)
-            .border(BorderStroke(0.8.dp, colors.borderSubtle), RoundedCornerShape(16.dp)),
+        Modifier.fillMaxWidth()
+            .then(if (withShadow) Modifier.shadow(5.dp, shape, ambientColor = shadowColor, spotColor = shadowColor) else Modifier)
+            .clip(shape)
+            .background(if (isDark) Color(0xFF1C1C1E) else colors.surface)
+            .border(BorderStroke(0.8.dp, colors.borderSubtle), shape),
     ) { content() }
 }
 
@@ -241,8 +297,10 @@ private fun AudioDivider() {
 @Composable
 private fun AudioRadioRow(title: String, subtitle: String, selected: Boolean, enabled: Boolean, onTap: () -> Unit) {
     val colors = LocalAppColors.current
+    val view = LocalView.current
     Row(
-        Modifier.fillMaxWidth().let { if (enabled) it.clickable(onClick = onTap) else it }
+        Modifier.fillMaxWidth().springInteractiveScale(0.98f)
+            .let { if (enabled) it.clickable { ChatyHapticsPort.selection(view); onTap() } else it }
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -254,9 +312,9 @@ private fun AudioRadioRow(title: String, subtitle: String, selected: Boolean, en
             Spacer(Modifier.height(3.dp))
             Text(subtitle, color = colors.foregroundSecondary, fontSize = 12.sp)
         }
-        Text(
-            if (selected) "\u25CF" else "\u25CB", fontSize = 22.sp,
-            color = if (selected) colors.accent else colors.foregroundSecondary.copy(alpha = 0.4f),
+        Icon(
+            if (selected) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked, null, Modifier.size(22.dp),
+            tint = if (selected) colors.accent else colors.foregroundSecondary.copy(alpha = 0.4f),
         )
     }
 }
