@@ -353,26 +353,31 @@ fun MediaViewerScreen(
                                     )
                                 } else {
                                     // Dart AnimatedOpacity play overlay (160ms).
-                                    AnimatedVisibility(
-                                        visible = !isPlaying,
-                                        enter = fadeIn(tween(160)),
-                                        exit = fadeOut(tween(160)),
-                                        modifier = Modifier.align(Alignment.Center),
-                                    ) {
-                                        Box(
-                                            Modifier
-                                                .background(
-                                                    Color(theme.surfaceColor).copy(alpha = 0.7f),
-                                                    CircleShape,
-                                                )
-                                                .padding(12.dp),
+                                    // The unscoped AnimatedVisibility is
+                                    // deprecated-hidden in animation 1.7, so
+                                    // a content-sized Column provides the
+                                    // ColumnScope receiver at the same spot.
+                                    Column(modifier = Modifier.align(Alignment.Center)) {
+                                        AnimatedVisibility(
+                                            visible = !isPlaying,
+                                            enter = fadeIn(tween(160)),
+                                            exit = fadeOut(tween(160)),
                                         ) {
-                                            Icon(
-                                                Icons.Rounded.PlayArrow,
-                                                contentDescription = "Play",
-                                                tint = foreground,
-                                                modifier = Modifier.size(54.dp),
-                                            )
+                                            Box(
+                                                Modifier
+                                                    .background(
+                                                        Color(theme.surfaceColor).copy(alpha = 0.7f),
+                                                        CircleShape,
+                                                    )
+                                                    .padding(12.dp),
+                                            ) {
+                                                Icon(
+                                                    Icons.Rounded.PlayArrow,
+                                                    contentDescription = "Play",
+                                                    tint = foreground,
+                                                    modifier = Modifier.size(54.dp),
+                                                )
+                                            }
                                         }
                                     }
                                 }
