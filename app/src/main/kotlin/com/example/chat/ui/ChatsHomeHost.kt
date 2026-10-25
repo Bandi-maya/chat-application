@@ -33,6 +33,8 @@ fun ChatsHomeHost(
     onOpenSecurity: () -> Unit,
     onOpenLockedChats: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenNewChat: (groupMode: Boolean, broadcastMode: Boolean) -> Unit = { _, _ -> },
+    onOpenGlobalSearch: () -> Unit = {},
 ) {
     val api = ServiceLocator.apiBackend
     val prefs = ServiceLocator.preferencesController
@@ -85,6 +87,8 @@ fun ChatsHomeHost(
             onOpenSettings = onOpenSettings,
             onOpenSecuritySettings = onOpenSecurity,
             onOpenLockedVault = onOpenLockedChats,
+            onOpenNewChat = onOpenNewChat,
+            onOpenGlobalSearch = onOpenGlobalSearch,
         ),
         onTogglePin = { id -> find(id)?.let { setState(id, "pinned", !it.isPinned) } },
         onToggleMute = { id -> find(id)?.let { setState(id, "muted", !it.isMuted) } },
