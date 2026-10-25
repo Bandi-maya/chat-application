@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit
 class SupabaseAuthClient(
     private val baseUrl: String = SUPABASE_URL,
     private val anonKey: String = SUPABASE_PUBLISHABLE_KEY,
+    private val httpClient: OkHttpClient = defaultHttpClient,
 ) {
     companion object {
         // Same project the Flutter app targets (values ship in the Flutter CI
@@ -29,12 +30,14 @@ class SupabaseAuthClient(
         const val SUPABASE_URL = "https://dntnxeanubswyswahdnj.supabase.co"
         const val SUPABASE_PUBLISHABLE_KEY = "sb_publishable_gFpVYJctaDkRRgttvnUl-A_TKu81hFF"
         private val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
+
+        private val defaultHttpClient = OkHttpClient.Builder()
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build()
     }
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
+
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -64,7 +67,7 @@ class SupabaseAuthClient(
         val user: GoTrueUser? = null,
     )
 
-    class AuthException(message: String) : Exception(message)
+    class AuthException(message: String, val statusCode: Int? = null) : Exception(message)
 
     private fun endpoint(path: String) = "$baseUrl/auth/v1$path"
 
@@ -76,10 +79,10 @@ class SupabaseAuthClient(
                 .addHeader("Content-Type", "application/json")
             if (bearer != null) builder.addHeader("Authorization", "Bearer $bearer")
             val request = builder.post(body.toString().toRequestBody(JSON_MEDIA)).build()
-            client.newCall(request).execute().use { response ->
+            httpClient.newCall(request).execute().use { response ->
                 val text = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
-                    throw AuthException(extractError(text) ?: "Auth request failed (${response.code}).")
+                    throw AuthException(extractError(text) ?: "Auth request failed (${response.code}).", response.code)
                 }
                 text
             }
@@ -132,7 +135,7 @@ class SupabaseAuthClient(
                 .addHeader("apikey", anonKey)
                 .addHeader("Authorization", "Bearer $accessToken")
                 .build()
-            client.newCall(request).execute().use { response ->
+            httpClient.newCall(request).execute().use { response ->
                 val text = response.body?.string().orEmpty()
                 if (!response.isSuccessful) throw AuthException("Session is no longer valid.")
                 text
@@ -140,4 +143,46 @@ class SupabaseAuthClient(
         }
         return json.decodeFromString(GoTrueUser.serializer(), raw)
     }
+
+    /** Mirrors verifyOTP(email:, token:, type: OtpType.recovery). */
+    suspend fun verifyRecoveryOtp(email: String, token: String): AuthSession {
+        val body = buildJsonObject {
+            put("email", email)
+            put("token", token)
+            put("type", "recovery")
+        }
+        val raw = post("/verify", body)
+        return json.decodeFromString(AuthSession.serializer(), raw)
+    }
+
+    /** Mirrors updateUser(UserAttributes(password:)). Requires a bearer token. */
+    suspend fun updateUserPassword(accessToken: String, password: String): GoTrueUser {
+        val body = buildJsonObject { put("password", password) }
+        val raw = put("/user", body, bearer = accessToken)
+        return json.decodeFromString(GoTrueUser.serializer(), raw)
+    }
+
+    /** Mirrors signOut()'s server-side logout; callers still clear the local
+     *  session when this fails, matching gotrue-dart. */
+    suspend fun signOutRemote(accessToken: String) {
+        post("/logout", buildJsonObject {}, bearer = accessToken)
+    }
+
+    private suspend fun put(path: String, body: JsonObject, bearer: String): String =
+        withContext(Dispatchers.IO) {
+            val request = Request.Builder()
+                .url(endpoint(path))
+                .addHeader("apikey", anonKey)
+                .addHeader("Content-Type", "application/json")
+                .addHeader("Authorization", "Bearer $bearer")
+                .put(body.toString().toRequestBody(JSON_MEDIA))
+                .build()
+            httpClient.newCall(request).execute().use { response ->
+                val text = response.body?.string().orEmpty()
+                if (!response.isSuccessful) {
+                    throw AuthException(extractError(text) ?: "Auth request failed (${response.code}).", response.code)
+                }
+                text
+            }
+        }
 }
