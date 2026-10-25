@@ -212,6 +212,9 @@ fun ChatDetailScreen(
     onEditTask: (ChatTask) -> Unit = {},
     onUpdateTaskStatus: (taskId: String, status: TaskStatus) -> Unit = { _, _ -> },
     onDeleteTask: (taskId: String) -> Unit = {},
+    // Dart ChatDetailScreen.initialMessageId (chat_detail_screen.dart:65): deep-link
+    // target from the starred-messages screen; jumped to once messages arrive.
+    initialMessageId: String? = null,
     onAttachmentAction: (AttachmentAction) -> Unit = {},
     onCameraTap: () -> Unit = {},
     onVoiceTap: () -> Unit = {},
@@ -311,8 +314,18 @@ fun ChatDetailScreen(
         else msgs.filter { it.text.lowercase().contains(q) }.map { it.id }
     }
 
-    fun highlightAndJump(messageId: String) {
+    var highlightClearJob by remember { mutableStateOf<Job?>(null) }
+    fun flashHighlight(messageId: String, durationMs: Long = 1800L) {
+        highlightClearJob?.cancel()
         highlightedMessageId = messageId
+        highlightClearJob = scope.launch {
+            delay(durationMs)
+            if (highlightedMessageId == messageId) highlightedMessageId = null
+        }
+    }
+
+    fun highlightAndJump(messageId: String) {
+        flashHighlight(messageId)
         val index = messages.indexOfFirst { it.id == messageId }
         if (index >= 0) scope.launch { listState.animateScrollToItem(index) }
     }
@@ -373,12 +386,26 @@ fun ChatDetailScreen(
         }
     }
 
-    // Dart _highlightMessage: 1800ms highlight window.
-    LaunchedEffect(highlightedMessageId) {
-        if (highlightedMessageId != null) {
-            delay(1800)
-            highlightedMessageId = null
+    // Dart _highlightMessage/_jumpToMessage share one cancelable highlight timer
+    // (_searchHighlightTimer): 1800ms for search flashes, 3s for the initial jump.
+    // Dart initialMessageId flow (chat_detail_screen.dart:172, :205-210,
+    // _jumpToMessage): once messages are present, jump to the target, highlight
+    // it for 3s, and snackbar when the message no longer exists.
+    var pendingInitialJump by remember { mutableStateOf(initialMessageId) }
+    LaunchedEffect(pendingInitialJump, messages.isNotEmpty()) {
+        val target = pendingInitialJump ?: return@LaunchedEffect
+        if (messages.isEmpty()) return@LaunchedEffect
+        pendingInitialJump = null
+        val index = messages.indexOfFirst { it.id == target }
+        if (index < 0) {
+            snackbarHostState.showSnackbar("This message is no longer available.")
+            return@LaunchedEffect
         }
+        flashHighlight(target, durationMs = 3000L)
+        // Dart Scrollable.ensureVisible(alignment 0.35, 260ms easeOutCubic):
+        // approximated with a negative LazyList scroll offset for the same anchor.
+        val offset = -(listState.layoutInfo.viewportSize.height * 0.35f).toInt()
+        listState.animateScrollToItem(index, scrollOffset = offset)
     }
     LaunchedEffect(searchOpen) {
         if (searchOpen) searchFocusRequester.requestFocus()
@@ -913,7 +940,7 @@ fun ChatDetailScreen(
                                     icon = Icons.Outlined.ChatBubbleOutline,
                                     label = "Go to source message",
                                     // Dart _highlightMessage: highlight only, no scroll jump.
-                                    onTap = { highlightedMessageId = menuTask.sourceMessageId },
+                                    onTap = { menuTask.sourceMessageId?.let(::flashHighlight) },
                                 ),
                             )
                         }
