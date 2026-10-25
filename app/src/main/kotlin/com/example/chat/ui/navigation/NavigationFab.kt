@@ -1,5 +1,6 @@
 package com.example.chat.ui.navigation
 
+import com.example.chat.core.templates.ChatyNavigationDestinationIds
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
