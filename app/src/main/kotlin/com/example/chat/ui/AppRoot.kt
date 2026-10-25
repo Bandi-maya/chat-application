@@ -260,9 +260,13 @@ fun AppRoot() {
                 var settingsSub by remember { mutableStateOf<com.example.chat.ui.settings.SettingsDestination?>(null) }
                 var pushedSettings by remember { mutableStateOf(false) }
                 var pushedProfile by remember { mutableStateOf(false) }
+                var pushedEditProfile by remember { mutableStateOf(false) }
                 val settingsNavigate: (com.example.chat.ui.settings.SettingsDestination) -> Unit = { dest ->
                     if (dest == com.example.chat.ui.settings.SettingsDestination.Security) {
                         route = AuthRoute.Security
+                    } else if (dest == com.example.chat.ui.settings.SettingsDestination.EditProfile) {
+                        // Dart: ProfileEditScreen.open(context, dataStore).
+                        pushedEditProfile = true
                     } else if (dest == com.example.chat.ui.settings.SettingsDestination.LinkedDevices ||
                         dest == com.example.chat.ui.settings.SettingsDestination.QrCode) {
                         linkedDevicesOnly = dest == com.example.chat.ui.settings.SettingsDestination.LinkedDevices
@@ -472,7 +476,7 @@ fun AppRoot() {
                                 },
                                 showStatsGrid = profTemplate.showStatsGrid,
                                 avatarShape = profTemplate.avatarShape,
-                                onEditProfile = { settingsNavigate(com.example.chat.ui.settings.SettingsDestination.EditProfile) },
+                                onEditProfile = { pushedEditProfile = true },
                                 onOpenSettings = { pushedSettings = true },
                                 onOpenPrivacyCenter = { settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Privacy) },
                                 onOpenNotifications = { settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Notifications) },
@@ -496,6 +500,56 @@ fun AppRoot() {
                                 onPickAvatar = { },
                                 onPickBanner = { },
                                 onLogout = { ServiceLocator.apiBackend.signOut() },
+                            )
+                        }
+                    }
+                }
+                if (pushedEditProfile) {
+                    val editUser = ServiceLocator.apiBackend.currentUser?.let { toDomainUser(it) }
+                    if (editUser != null) {
+                        val editContext = androidx.compose.ui.platform.LocalContext.current
+                        var photoWaiter by remember { mutableStateOf<kotlinx.coroutines.CompletableDeferred<ByteArray?>?>(null) }
+                        val galleryLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                            androidx.activity.result.contract.ActivityResultContracts.GetContent(),
+                        ) { uri ->
+                            val bytes = try {
+                                uri?.let { editContext.contentResolver.openInputStream(it)?.use { i -> i.readBytes() } }
+                            } catch (_: Exception) { null }
+                            photoWaiter?.complete(bytes); photoWaiter = null
+                        }
+                        val cameraLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                            androidx.activity.result.contract.ActivityResultContracts.TakePicturePreview(),
+                        ) { bmp ->
+                            val bytes = bmp?.let {
+                                val o = java.io.ByteArrayOutputStream()
+                                it.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, o)
+                                o.toByteArray()
+                            }
+                            photoWaiter?.complete(bytes); photoWaiter = null
+                        }
+                        Box(Modifier.fillMaxSize()) {
+                            com.example.chat.ui.profile.ProfileEditScreen(
+                                user = editUser,
+                                onBack = { pushedEditProfile = false },
+                                onPickAvatar = { source ->
+                                    val d = kotlinx.coroutines.CompletableDeferred<ByteArray?>()
+                                    photoWaiter = d
+                                    if (source == com.example.chat.data.services.ProfileMediaSource.camera) cameraLauncher.launch(null)
+                                    else galleryLauncher.launch("image/*")
+                                    val bytes = d.await()
+                                    if (bytes == null) null
+                                    else com.example.chat.data.services.ProfileMediaService(
+                                        storage = ServiceLocator.storageClient,
+                                        currentUserId = { ServiceLocator.sessionManager.currentUserId() },
+                                    ).uploadAvatar(bytes)
+                                },
+                                // No banner-upload backend path on the custom backend: button hidden (screen contract).
+                                onPickBanner = null,
+                                onSave = { name, username, about, avatarUrl, _ ->
+                                    ServiceLocator.apiBackend.updateProfile(
+                                        displayName = name, about = about, username = username, avatarUrl = avatarUrl,
+                                    )
+                                },
                             )
                         }
                     }
