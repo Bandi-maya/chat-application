@@ -17,6 +17,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // registerForActivityResult must run before STARTED (launcher-icon pickers).
+        ServiceLocator.appIconBridge.register(this)
         setContent {
             AppRoot()
         }
