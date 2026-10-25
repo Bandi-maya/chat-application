@@ -20,6 +20,7 @@ enum class AppNavigationMode {
     modernSideMenu,
     curvedRadialDrawer,
     gestureTabs,
+    compactRail,
 }
 
 /** WCAG relative luminance of a 32-bit ARGB color, matching Flutter's
