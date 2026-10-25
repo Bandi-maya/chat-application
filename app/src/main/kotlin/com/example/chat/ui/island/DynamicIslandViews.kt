@@ -158,11 +158,14 @@ fun IslandSeekBar(
     progress: Double,
     onSeek: ((Double) -> Unit)?,
     modifier: Modifier = Modifier,
+    active: Boolean = true,
+    barColor: Color = Color.White,
+    height: Double = 18.0,
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(18.dp)
+            .height(height.dp)
             .islandSeekGestures(progress, onSeek),
         contentAlignment = Alignment.Center,
     ) {
@@ -171,14 +174,14 @@ fun IslandSeekBar(
                 .fillMaxWidth()
                 .height(4.dp)
                 .clip(RoundedCornerShape(2.dp))
-                .background(Color.White.copy(alpha = 0.18f)),
+                .background(barColor.copy(alpha = if (active) 0.18f else 0.08f)),
         ) {
             Box(
                 Modifier
                     .fillMaxWidth(progress.coerceIn(0.0, 1.0).toFloat())
                     .height(4.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(Color.White),
+                    .background(barColor.copy(alpha = if (active) 1f else 0.45f)),
             )
         }
     }
