@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
  *  Chats home, conversation, register, forgot-password and organization
  *  registration destinations land in their own parity slices; the register /
  *  forgot-password / org buttons route to honest WIP stubs until then. */
-private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home, ChatDetail, Security, LockedChats, NewChat, GlobalSearch }
+private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home, ChatDetail, Security, LockedChats, HiddenVault, NewChat, GlobalSearch }
 
 @Composable
 fun AppRoot() {
@@ -65,6 +65,7 @@ fun AppRoot() {
                 if (!ServiceLocator.apiBackend.isAuthenticated &&
                     (route == AuthRoute.Home || route == AuthRoute.ChatDetail || route == AuthRoute.Security ||
                         route == AuthRoute.LockedChats ||
+                        route == AuthRoute.HiddenVault ||
                         route == AuthRoute.NewChat || route == AuthRoute.GlobalSearch)
                 ) {
                     ServiceLocator.appLock.onSignedOut()
@@ -311,7 +312,7 @@ fun AppRoot() {
                         route = AuthRoute.ChatDetail
                     },
                     onOpenSecurity = { route = AuthRoute.Security },
-                    onOpenLockedChats = { route = AuthRoute.LockedChats },
+                    onOpenLockedChats = { route = AuthRoute.HiddenVault },
                     onOpenSettings = { pushedSettings = true },
                     onOpenNewChat = { g, b -> newChatGroup = g; newChatBroadcast = b; route = AuthRoute.NewChat },
                     onOpenGlobalSearch = { route = AuthRoute.GlobalSearch },
@@ -327,7 +328,7 @@ fun AppRoot() {
                                         route = AuthRoute.ChatDetail
                                     },
                                     onOpenSecurity = { route = AuthRoute.Security },
-                                    onOpenLockedChats = { route = AuthRoute.LockedChats },
+                                    onOpenLockedChats = { route = AuthRoute.HiddenVault },
                                     onOpenSettings = { pushedSettings = true },
                     onOpenNewChat = { g, b -> newChatGroup = g; newChatBroadcast = b; route = AuthRoute.NewChat },
                     onOpenGlobalSearch = { route = AuthRoute.GlobalSearch },
@@ -520,7 +521,7 @@ fun AppRoot() {
                     verifySecretPhrase = { phrase -> ServiceLocator.localLockService.verifySecretPhrase(phrase) },
                     isConversationHidden = { id -> prefsS.isConversationHidden(id) },
                     onBack = { route = AuthRoute.Home },
-                    onOpenLockedChats = { route = AuthRoute.LockedChats },
+                    onOpenLockedChats = { route = AuthRoute.HiddenVault },
                     onOpenConversation = { id ->
                         ServiceLocator.apiBackend.conversations.firstOrNull { it.id == id }?.let { c ->
                             ServiceLocator.apiBackend.setActiveConversation(c.id)
@@ -580,6 +581,29 @@ fun AppRoot() {
                         }
                     },
                     onOpenSecuritySettings = { route = AuthRoute.Security },
+                    onBack = { route = AuthRoute.Home },
+                )
+            }
+            AuthRoute.HiddenVault -> {
+                // Dart _openLockedChatsVault: push HiddenVaultScreen(dataStore).
+                androidx.compose.runtime.LaunchedEffect(Unit) { ServiceLocator.hiddenVaultService.loadVaultRegistry() }
+                var vaultConvRev by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                androidx.compose.runtime.DisposableEffect(Unit) {
+                    val l: () -> Unit = { vaultConvRev++ }
+                    ServiceLocator.apiBackend.addListener(l)
+                    onDispose { ServiceLocator.apiBackend.removeListener(l) }
+                }
+                @Suppress("UNUSED_EXPRESSION") vaultConvRev
+                com.example.chat.ui.vault.HiddenVaultScreen(
+                    controller = ServiceLocator.hiddenVaultController,
+                    conversationsProvider = { ServiceLocator.apiBackend.conversations },
+                    onOpenConversation = { id ->
+                        ServiceLocator.apiBackend.conversations.firstOrNull { it.id == id }?.let { c ->
+                            ServiceLocator.apiBackend.setActiveConversation(c.id)
+                            selectedConversation = c
+                            route = AuthRoute.ChatDetail
+                        }
+                    },
                     onBack = { route = AuthRoute.Home },
                 )
             }
