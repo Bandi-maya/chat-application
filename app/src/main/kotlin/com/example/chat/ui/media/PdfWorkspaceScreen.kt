@@ -188,7 +188,7 @@ fun PdfWorkspaceScreen(
                         Box(Modifier.weight(1f)) {
                             ToolCard(ChatyIconType.convert, "Images to PDF", "Merge photos into document", Color(0xFF38BDF8), isDark) {
                                 ChatyHapticsPort.light(view)
-                                imagePicker.launch("image/*")
+                                imagePicker.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                             }
                         }
                         Spacer(Modifier.width(12.dp))
