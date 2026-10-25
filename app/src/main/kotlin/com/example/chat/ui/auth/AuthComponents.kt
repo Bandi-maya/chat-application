@@ -1,5 +1,6 @@
 package com.example.chat.ui.auth
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -234,3 +235,71 @@ fun AuthIllustration(type: String, theme: ThemeConfig, height: Int = 180) {
         }
     }
 }
+
+@Composable
+fun WorkspaceModeSelector(
+    theme: ThemeConfig,
+    useOrganization: Boolean,
+    onSelect: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                Color(argbWithAlpha(theme.surfaceColor, 0.6)),
+                RoundedCornerShape(14.dp),
+            )
+            .border(
+                1.dp,
+                // Dart: dividerColor (secondaryText at 0.2) then withValues(alpha: 0.25) replaces the alpha
+                Color(argbWithAlpha(theme.secondaryTextColor, 0.25)),
+                RoundedCornerShape(14.dp),
+            )
+            .padding(4.dp),
+    ) {
+        ModeTab(
+            theme = theme,
+            label = "Normal / Default",
+            selected = !useOrganization,
+            modifier = Modifier.weight(1f),
+            onClick = { onSelect(false) },
+        )
+        ModeTab(
+            theme = theme,
+            label = "Organization",
+            selected = useOrganization,
+            modifier = Modifier.weight(1f),
+            onClick = { onSelect(true) },
+        )
+    }
+}
+
+@Composable
+private fun ModeTab(
+    theme: ThemeConfig,
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val contentColor = if (selected) Color(theme.onAccentColor) else Color(theme.secondaryTextColor)
+    Box(
+        modifier = modifier
+            .background(
+                if (selected) Color(theme.accentColor) else Color.Transparent,
+                RoundedCornerShape(10.dp),
+            )
+            .clickable(onClick = onClick)
+            .padding(vertical = 9.dp, horizontal = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            color = contentColor,
+            fontSize = 12.5.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            maxLines = 1,
+        )
+    }
+}
+
