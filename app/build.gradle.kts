@@ -38,6 +38,7 @@ android {
             java.srcDir(layout.buildDirectory.dir("generated/uniffi"))
             jniLibs.srcDir(layout.buildDirectory.dir("jniLibs"))
             assets.srcDir(layout.buildDirectory.dir("generated/faceModel/assets"))
+            res.srcDir(layout.buildDirectory.dir("generated/launcherIcons/res"))
         }
     }
 
@@ -201,3 +202,54 @@ val downloadFaceLandmarker = tasks.register("downloadFaceLandmarker") {
 }
 
 tasks.named("preBuild") { dependsOn(downloadFaceLandmarker) }
+
+// Launcher alias icons (warm/outline/obsidian/glass/signal/fold x 5 densities). The PNGs are stored
+// as a base64 tar.gz (split into part-NN.b64 files) of drawable-<density>/ic_launcher_<variant>.png because binary files cannot be
+// committed through the integration route; this task unpacks them into a generated res dir.
+val launcherIconsParts = layout.projectDirectory.dir("launcher-icons")
+val launcherIconsOutDir = layout.buildDirectory.dir("generated/launcherIcons/res")
+
+val unpackLauncherIcons = tasks.register("unpackLauncherIcons") {
+    inputs.dir(launcherIconsParts)
+    outputs.dir(launcherIconsOutDir)
+    doLast {
+        val out = launcherIconsOutDir.get().asFile
+        out.deleteRecursively()
+        out.mkdirs()
+        val parts = launcherIconsParts.asFile.listFiles { f -> f.name.startsWith("part-") && f.name.endsWith(".b64") }!!.sortedBy { it.name }
+        check(parts.isNotEmpty()) { "no launcher icon archive parts" }
+        val raw = java.util.Base64.getMimeDecoder().decode(parts.joinToString("") { it.readText().trim() })
+        java.util.zip.GZIPInputStream(java.io.ByteArrayInputStream(raw)).use { gz ->
+            val header = ByteArray(512)
+            fun readFully(buf: ByteArray, len: Int): Boolean {
+                var n = 0
+                while (n < len) {
+                    val r = gz.read(buf, n, len - n)
+                    if (r < 0) return false
+                    n += r
+                }
+                return true
+            }
+            while (readFully(header, 512)) {
+                if (header.all { it == 0.toByte() }) break
+                val name = String(header, 0, 100, Charsets.US_ASCII).trimEnd(0.toChar())
+                val size = String(header, 124, 12, Charsets.US_ASCII).trim(0.toChar(), ' ').toLong(8)
+                val type = header[156].toInt().toChar()
+                val padded = ((size + 511) / 512) * 512
+                val data = ByteArray(padded.toInt())
+                if (padded > 0) check(readFully(data, padded.toInt())) { "truncated tar entry $name" }
+                if ((type == '0' || type == 0.toChar()) && size > 0) {
+                    val clean = name.removePrefix("./")
+                    check(!clean.contains("..")) { "unsafe tar entry $clean" }
+                    val target = File(out, clean)
+                    target.parentFile.mkdirs()
+                    target.writeBytes(data.copyOf(size.toInt()))
+                }
+            }
+        }
+        val count = out.walkTopDown().count { it.isFile && it.name.startsWith("ic_launcher_") }
+        check(count == 30) { "expected 30 launcher icons, unpacked $count" }
+    }
+}
+
+tasks.named("preBuild") { dependsOn(unpackLauncherIcons) }
