@@ -1,5 +1,6 @@
 package com.example.chat.ui.settings.privacy
 
+import com.example.chat.ui.kit.ChatyHapticsPort
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -148,7 +149,7 @@ fun PrivacyCenterScreen(preferences: ChatyPreferencesController, onBack: () -> U
     val appColors = LocalAppColors.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
-    val haptic = LocalHapticFeedback.current
+    val view = androidx.compose.ui.platform.LocalView.current
     var version by remember { mutableIntStateOf(0) }
     DisposableEffect(preferences) {
         val l: () -> Unit = { version += 1 }
@@ -174,7 +175,7 @@ fun PrivacyCenterScreen(preferences: ChatyPreferencesController, onBack: () -> U
         Box(Modifier.springInteractiveScale(0.98f)) {
             Row(
                 Modifier.fillMaxWidth()
-                    .clickable { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onTap() }
+                    .clickable { ChatyHapticsPort.selection(view); onTap() }
                     .padding(horizontal = 16.dp, vertical = vPad.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -348,7 +349,7 @@ fun PrivacyCenterScreen(preferences: ChatyPreferencesController, onBack: () -> U
                 CardContainer {
                     ChevronRow(Icons.Outlined.HelpOutline, "Recovery Question", "Set secret question for password reset") { modal = PrivacyModal.Recovery }
                     ChevronRow(Icons.Rounded.RestartAlt, "Reset Privacy", "Sets back Chaty default Privacy") {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress) // HapticFeedback.heavyImpact
+                        ChatyHapticsPort.error(view) // HapticFeedback.heavyImpact (CONTEXT_CLICK)
                         modal = PrivacyModal.Reset
                     }
                 }
