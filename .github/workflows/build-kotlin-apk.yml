@@ -66,6 +66,7 @@ jobs:
   # E2E messaging). Separate job so the compile/test/APK job keeps its
   # duration. Same Rust cache as the build job, so its native build is warm.
   runtime-smoke:
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
