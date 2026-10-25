@@ -50,6 +50,91 @@
             </intent-filter>
         </activity>
 
+        <!-- Launcher icon variants: all disabled by default, MainActivity stays the installed (bird) launcher entry. -->
+        <activity-alias
+            android:name=".launcher.WarmIconAlias"
+            android:targetActivity=".MainActivity"
+            android:exported="true"
+            android:enabled="false"
+            android:icon="@drawable/ic_launcher_warm"
+            android:roundIcon="@drawable/ic_launcher_warm"
+            android:label="Chaty">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".launcher.OutlineIconAlias"
+            android:targetActivity=".MainActivity"
+            android:exported="true"
+            android:enabled="false"
+            android:icon="@drawable/ic_launcher_outline"
+            android:roundIcon="@drawable/ic_launcher_outline"
+            android:label="Chaty">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".launcher.ObsidianIconAlias"
+            android:targetActivity=".MainActivity"
+            android:exported="true"
+            android:enabled="false"
+            android:icon="@drawable/ic_launcher_obsidian"
+            android:roundIcon="@drawable/ic_launcher_obsidian"
+            android:label="Chaty">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".launcher.GlassIconAlias"
+            android:targetActivity=".MainActivity"
+            android:exported="true"
+            android:enabled="false"
+            android:icon="@drawable/ic_launcher_glass"
+            android:roundIcon="@drawable/ic_launcher_glass"
+            android:label="Chaty">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".launcher.SignalIconAlias"
+            android:targetActivity=".MainActivity"
+            android:exported="true"
+            android:enabled="false"
+            android:icon="@drawable/ic_launcher_signal"
+            android:roundIcon="@drawable/ic_launcher_signal"
+            android:label="Chaty">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".launcher.FoldIconAlias"
+            android:targetActivity=".MainActivity"
+            android:exported="true"
+            android:enabled="false"
+            android:icon="@drawable/ic_launcher_fold"
+            android:roundIcon="@drawable/ic_launcher_fold"
+            android:label="Chaty">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
         <service
             android:name="com.example.chat.data.services.CallForegroundService"
             android:foregroundServiceType="microphone|camera"
