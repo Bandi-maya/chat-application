@@ -41,7 +41,7 @@ import androidx.compose.material.icons.rounded.RotateRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledButton
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -84,6 +84,7 @@ import com.example.chat.ui.settings.ChatySettingsTile
 import com.example.chat.ui.theme.LocalAppColors
 import java.io.File
 import kotlinx.coroutines.launch
+import androidx.compose.ui.semantics.selected
 
 /** Exact port of lib/features/settings/appearance/app_icon_settings_screen.dart.
  *
@@ -401,18 +402,18 @@ fun AppIconSettingsScreen(
             title = { Text(request.title) },
             text = { Text(request.message) },
             confirmButton = {
-                FilledButton(
+                Button(
                     onClick = {
                         confirmRequest = null
                         request.onConfirm()
                     },
                     colors = if (request.destructive) {
-                        androidx.compose.material3.ButtonDefaults.filledButtonColors(
+                        androidx.compose.material3.ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.error,
                             contentColor = Color.White,
                         )
                     } else {
-                        androidx.compose.material3.ButtonDefaults.filledButtonColors()
+                        androidx.compose.material3.ButtonDefaults.buttonColors()
                     },
                 ) { Text(request.confirmLabel) }
             },
@@ -626,6 +627,7 @@ private fun IconTileShell(
 
 /** Modifier.combinedClickable indirection so the long-press stays optional
  *  exactly like Dart InkWell(onLongPress: enabled ? onDelete : null). */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 private fun Modifier.combinedClickableCompat(
     enabled: Boolean,
     onClick: () -> Unit,
