@@ -49,10 +49,28 @@ class AuthScreensPixelProofTest {
     }
 
     private fun awaitText(text: String, timeoutMs: Long = 20000) {
-        assertTrue(
-            "expected screen containing \"$text\"",
-            device.wait(Until.hasObject(By.text(text)), timeoutMs),
-        )
+        if (!device.wait(Until.hasObject(By.text(text)), timeoutMs)) {
+            // Failure diagnostics captured at the moment of failure (not after teardown).
+            val resumed = try {
+                device.executeShellCommand("dumpsys activity activities").lineSequence()
+                    .filter { it.contains("ResumedActivity", true) || it.contains("topResumedActivity", true) }
+                    .take(4).joinToString(" | ")
+            } catch (e: Exception) { "n/a: ${e.message}" }
+            val texts = try {
+                val out = java.io.ByteArrayOutputStream()
+                device.dumpWindowHierarchy(out)
+                Regex("(?:text|content-desc)=\"([^\"]+)\"").findAll(out.toString()).map { it.groupValues[1] }
+                    .filter { it.isNotBlank() }.take(40).toList()
+            } catch (e: Exception) { listOf("dump failed: ${e.message}") }
+            val errs = try {
+                device.executeShellCommand("logcat -d -t 3000 *:E").lineSequence()
+                    .filter { it.contains("chat", true) || it.contains("AndroidRuntime") }
+                    .toList().takeLast(25).joinToString("\n")
+            } catch (e: Exception) { "n/a: ${e.message}" }
+            throw AssertionError(
+                "expected screen containing \"$text\"; resumed=[$resumed]; texts=$texts; errors=[\n$errs]",
+            )
+        }
     }
 
     private fun clickText(text: String, timeoutMs: Long = 20000) {
