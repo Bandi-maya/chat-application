@@ -112,7 +112,24 @@ object ServiceLocator {
     /** REST backend (ApiBackendService on the api branch): the service the
      *  auth screens actually call; its session takes facade precedence. */
     val apiBackend: com.example.chat.data.api.ApiBackendService by lazy {
-        com.example.chat.data.api.ApiBackendService(requireContext()).also { it.initialize() }
+        com.example.chat.data.api.ApiBackendService(requireContext()).also { service ->
+            // Dart locator wiring for _syncFcmToken / unregisterOnLogout:
+            // deferred lambdas so the registrar's lazy init cannot cycle
+            // back into this lazy block during construction.
+            service.syncFcmTokenHook = { fcmRegistrar.syncTokenOnLogin() }
+            service.unregisterFcmHook = { fcmRegistrar.unregisterOnLogout() }
+            service.initialize()
+        }
+    }
+
+    /** FCM token lifecycle (firebase_notification_service.dart port),
+     *  installed into FcmRegistrarHolder so the framework-created
+     *  ChatyFirebaseMessagingService reaches it. Runtime delivery stays
+     *  inert until a real google-services.json lands. */
+    val fcmRegistrar: com.example.chat.data.api.FcmTokenRegistrar by lazy {
+        com.example.chat.data.api.FcmTokenRegistrar(
+            apiDevices = apiBackend.deviceTokenClient,
+        ).also { com.example.chat.notifications.FcmRegistrarHolder.registrar = it }
     }
 
     val themeController: com.example.chat.core.theme.ThemeController by lazy {
