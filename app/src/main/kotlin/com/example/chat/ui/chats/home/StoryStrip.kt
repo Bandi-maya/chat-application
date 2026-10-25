@@ -72,6 +72,7 @@ fun ChatyStoryTile(
     baseWidth: Double,
     nameFontSize: Double,
     wrapInCard: Boolean,
+    avatarUrl: String? = null,
     accent: Color,
     cardColor: Color,
     borderColor: Color,
@@ -84,7 +85,7 @@ fun ChatyStoryTile(
     @Composable
     fun avatar(size: Double, shape: String) {
         Box {
-            HomeAvatar(initials = initials, color = avatarColor, size = size.toFloat(), shape = shape)
+            HomeAvatar(initials = initials, color = avatarColor, size = size.toFloat(), shape = shape, url = avatarUrl)
             if (online) {
                 Box(Modifier.align(Alignment.BottomEnd).offset(x = 1.dp, y = 1.dp)) {
                     HomeOnlineDot(true, size.toFloat(), onlineColor, backgroundColor)
@@ -244,6 +245,7 @@ fun StoryStrip(
                 baseWidth = storyTileWidth,
                 nameFontSize = storyNameFontSize,
                 wrapInCard = storyCardWrap,
+                avatarUrl = contact.avatarUrl,
                 accent = Color(theme.accentColor),
                 cardColor = Color(theme.cardColor),
                 borderColor = Color(theme.surfaceColor),
