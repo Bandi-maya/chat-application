@@ -86,7 +86,7 @@ fun ChatyAudioPlayerScreen(
 ) {
     var tick by remember { mutableIntStateOf(0) }
     DisposableEffect(coordinator) {
-        val listener = { tick++ }
+        val listener: () -> Unit = { tick++ }
         coordinator.addListener(listener)
         onDispose { coordinator.removeListener(listener) }
     }
@@ -213,7 +213,7 @@ fun ChatyAudioPlayerScreen(
                         value = if (durationMs > 0)
                             state.position.inWholeMilliseconds.coerceIn(0, durationMs).toFloat()
                         else 0f,
-                        onValueChange = { val -> scope.launch { coordinator.seek(val.toLong().milliseconds) } },
+                        onValueChange = { v -> scope.launch { coordinator.seek(v.toLong().milliseconds) } },
                         valueRange = 0f..(if (durationMs > 0) durationMs.toFloat() else 1f),
                         colors = SliderDefaults.colors(
                             activeTrackColor = MaterialTheme.colorScheme.primary,
