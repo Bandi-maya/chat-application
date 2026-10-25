@@ -1,7 +1,7 @@
 # Flutter to Kotlin port - parity tracking
 
 Source of truth: `api` branch @ 3bee780d (Flutter). Target: `kotlin` branch (native Android, Jetpack Compose).
-Inventory note: subsystem counts below come from the shared codebase tree (themes snapshot, which includes api); reconcile against the api tree exactly in M1 when bulk repo access lands.
+Inventory RECONCILED against origin/api @ 3bee780d exactly (475 Dart files, 332 lib, 95 test, ~85 screens): the counts below are api's own. api and themes differ in only 38 files (backend services, auth screens, preferences, native scaffolding).
 
 ## Subsystem inventory (Flutter source)
 - features/settings: 48 files (largest surface: studios, selectors, call settings)
@@ -18,7 +18,7 @@ Inventory note: subsystem counts below come from the shared codebase tree (theme
 ## Slice milestones
 - [x] M0: repo private; kotlin branch from api @ 3bee780d
 - [x] M2: Gradle/Compose skeleton (settings.gradle.kts, app module, manifest with chaty:// callbacks, Compose shell, baseline theme)
-- [ ] M1: exact api tree reconciliation + per-screen matrix rows
+- [x] M1: exact api tree reconciliation (475 dart / 332 lib / 95 test); per-screen matrix rows continue as slices land
 - [ ] M3: auth + session (GoTrue REST, chaty:// login-callback/reset-password)
 - [ ] M4: chats home + conversation + messaging core (Supabase REST/Realtime)
 - [ ] M5: MLS E2EE (Rust core via JNI)
