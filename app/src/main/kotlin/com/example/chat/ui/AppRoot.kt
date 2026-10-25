@@ -261,9 +261,13 @@ fun AppRoot() {
                 var pushedSettings by remember { mutableStateOf(false) }
                 var pushedProfile by remember { mutableStateOf(false) }
                 var pushedEditProfile by remember { mutableStateOf(false) }
+                var pushedSettingsSearch by remember { mutableStateOf(false) }
                 val settingsNavigate: (com.example.chat.ui.settings.SettingsDestination) -> Unit = { dest ->
                     if (dest == com.example.chat.ui.settings.SettingsDestination.Security) {
                         route = AuthRoute.Security
+                    } else if (dest == com.example.chat.ui.settings.SettingsDestination.SearchSettings) {
+                        // Dart: showSearch(SettingsSearchDelegate(allSettings: _searchIndex())).
+                        pushedSettingsSearch = true
                     } else if (dest == com.example.chat.ui.settings.SettingsDestination.EditProfile) {
                         // Dart: ProfileEditScreen.open(context, dataStore).
                         pushedEditProfile = true
@@ -502,6 +506,59 @@ fun AppRoot() {
                                 onLogout = { ServiceLocator.apiBackend.signOut() },
                             )
                         }
+                    }
+                }
+                if (pushedSettingsSearch) {
+                    androidx.activity.compose.BackHandler { pushedSettingsSearch = false }
+                    Box(Modifier.fillMaxSize()) {
+                        com.example.chat.ui.settings.navigation.SettingsSearchScreen(
+                            allSettings = com.example.chat.ui.settings.registry.SettingsRegistry.allSettings,
+                            title = { it.title },
+                            category = { it.category.title },
+                            description = { it.description },
+                            keywords = { it.searchKeywords },
+                            // Dart: def.icon ?? def.category.icon (per-setting icon names are not resolved yet).
+                            icon = { def ->
+                                when (def.category) {
+                                    com.example.chat.ui.settings.registry.SettingsCategory.account -> androidx.compose.material.icons.Icons.Outlined.Person
+                                    com.example.chat.ui.settings.registry.SettingsCategory.privacy -> androidx.compose.material.icons.Icons.Outlined.VisibilityOff
+                                    com.example.chat.ui.settings.registry.SettingsCategory.security -> androidx.compose.material.icons.Icons.Outlined.Lock
+                                    com.example.chat.ui.settings.registry.SettingsCategory.chats -> androidx.compose.material.icons.Icons.Outlined.ChatBubbleOutline
+                                    com.example.chat.ui.settings.registry.SettingsCategory.appearance -> androidx.compose.material.icons.Icons.Outlined.Palette
+                                    com.example.chat.ui.settings.registry.SettingsCategory.homeAndNavigation -> androidx.compose.material.icons.Icons.Outlined.Home
+                                    com.example.chat.ui.settings.registry.SettingsCategory.notifications -> androidx.compose.material.icons.Icons.Outlined.Notifications
+                                    com.example.chat.ui.settings.registry.SettingsCategory.calls -> androidx.compose.material.icons.Icons.Outlined.Call
+                                    com.example.chat.ui.settings.registry.SettingsCategory.storageAndMedia -> androidx.compose.material.icons.Icons.Rounded.Storage
+                                    com.example.chat.ui.settings.registry.SettingsCategory.devices -> androidx.compose.material.icons.Icons.Rounded.Devices
+                                    com.example.chat.ui.settings.registry.SettingsCategory.effects -> androidx.compose.material.icons.Icons.Rounded.Animation
+                                    com.example.chat.ui.settings.registry.SettingsCategory.permissions -> androidx.compose.material.icons.Icons.Outlined.AdminPanelSettings
+                                    com.example.chat.ui.settings.registry.SettingsCategory.about -> androidx.compose.material.icons.Icons.Outlined.Info
+                                }
+                            },
+                            onSelect = { def ->
+                                // Dart _destinationForRoute; closing the search precedes navigation.
+                                pushedSettingsSearch = false
+                                val d = com.example.chat.ui.settings.SettingsDestination
+                                when (def.canonicalRoute) {
+                                    "/settings/privacy" -> settingsNavigate(d.Privacy)
+                                    "/settings/security" -> settingsNavigate(d.Security)
+                                    "/settings/conversation" -> settingsNavigate(d.Conversation)
+                                    "/settings/message_management" -> route = AuthRoute.MessageManagement
+                                    "/settings/themes" -> settingsNavigate(d.ThemeEngine)
+                                    "/settings/templates" -> settingsNavigate(d.TemplateStudio)
+                                    "/settings/notifications" -> settingsNavigate(d.Notifications)
+                                    "/settings/calls" -> settingsNavigate(d.Calls)
+                                    "/settings/storage" -> settingsNavigate(d.StorageMedia)
+                                    "/settings/effects" -> settingsNavigate(d.Effects)
+                                    "/settings/permissions" -> settingsNavigate(d.Permissions)
+                                    "/settings/home" -> settingsNavigate(d.HomeScreen)
+                                    "/settings/devices" -> settingsNavigate(d.LinkedDevices)
+                                    // account, customization, app_icon, universal_appearance: no host yet.
+                                    else -> settingsNotice = def.canonicalRoute
+                                }
+                            },
+                            onBack = { pushedSettingsSearch = false },
+                        )
                     }
                 }
                 if (pushedEditProfile) {
