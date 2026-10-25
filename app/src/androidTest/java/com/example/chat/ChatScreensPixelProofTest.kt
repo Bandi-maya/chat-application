@@ -38,7 +38,7 @@ class ChatScreensPixelProofTest {
 
     @Test
     fun chatsHomeRendersFixtureConversations() {
-        val intent = Intent(ApplicationProvider.getApplicationContext(), ChatFixtureActivity::class.java)
+        val intent = Intent(InstrumentationRegistry.getInstrumentation().context, ChatFixtureActivity::class.java)
             .putExtra(ChatFixtureActivity.EXTRA_SCREEN, ChatFixtureActivity.SCREEN_HOME)
         ActivityScenario.launch<ChatFixtureActivity>(intent).use {
             capture("06-chats-home")
@@ -48,7 +48,7 @@ class ChatScreensPixelProofTest {
 
     @Test
     fun chatDetailRendersFixtureMessages() {
-        val intent = Intent(ApplicationProvider.getApplicationContext(), ChatFixtureActivity::class.java)
+        val intent = Intent(InstrumentationRegistry.getInstrumentation().context, ChatFixtureActivity::class.java)
             .putExtra(ChatFixtureActivity.EXTRA_SCREEN, ChatFixtureActivity.SCREEN_DETAIL)
         ActivityScenario.launch<ChatFixtureActivity>(intent).use {
             capture("07-chat-detail")
