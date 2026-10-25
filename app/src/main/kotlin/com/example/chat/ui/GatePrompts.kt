@@ -3,17 +3,11 @@ package com.example.chat.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.example.chat.ServiceLocator
 import com.example.chat.data.services.ProtectedResourceGate
 import com.example.chat.ui.settings.security.AppLockOverlay
@@ -60,7 +54,9 @@ class GatePrompts {
         }
         val lock = lockReq
         if (lock != null && setup == null) {
-            BackHandler { lock.result.complete(false) }
+            // Dart AppLockOverlayModal: barrierDismissible=false and PopScope(canPop=false);
+            // the only exit is a verified unlock, so back is swallowed and there is no cancel.
+            BackHandler { }
             Box(Modifier.fillMaxSize()) {
                 AppLockOverlay(
                     preferences = ServiceLocator.preferencesController,
@@ -69,10 +65,6 @@ class GatePrompts {
                     title = lock.title,
                     reason = lock.reason,
                 )
-                TextButton(
-                    onClick = { lock.result.complete(false) },
-                    modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(8.dp),
-                ) { Text("Cancel") }
             }
         }
     }
