@@ -38,9 +38,11 @@ class ChatyApplication : Application() {
     private val foregroundObserver = object : DefaultLifecycleObserver {
         override fun onStop(owner: LifecycleOwner) {
             ProtectedResourceGate.invalidateAllSessions()
+            ServiceLocator.appLock.onBackgrounded()
         }
 
         override fun onStart(owner: LifecycleOwner) {
+            ServiceLocator.appScope.launch { ServiceLocator.appLock.onResumed() }
             val backend = ServiceLocator.apiBackend
             if (backend.isAuthenticated) {
                 backend.onAppResumed()
