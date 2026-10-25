@@ -25,6 +25,7 @@ val hostedSettingsDestinations: Set<SettingsDestination> = setOf(
     SettingsDestination.BackupRestore, SettingsDestination.Universal,
     SettingsDestination.Conversation, SettingsDestination.HomeScreen, SettingsDestination.Calls,
     SettingsDestination.Permissions, SettingsDestination.StorageMedia,
+    SettingsDestination.TemplateStudio,
 )
 
 /**
@@ -164,6 +165,31 @@ fun SettingsSubHost(destination: SettingsDestination, onBack: () -> Unit): Boole
             onBack = onBack,
             onClearCache = { toast("Clearing the local media cache is not wired in this build yet.") },
         )
+        SettingsDestination.TemplateStudio -> {
+            var component by remember { mutableStateOf<com.example.chat.core.templates.TemplateComponentType?>(null) }
+            BackHandler(enabled = component != null) { component = null }
+            val c = component
+            if (c == null) {
+                com.example.chat.ui.settings.templates.TemplatesSettingsScreen(
+                    templateController = ServiceLocator.templateController,
+                    preferences = prefs,
+                    appearance = ServiceLocator.appearanceVariantController,
+                    palette = theme.globalTheme,
+                    templateRuntime = ServiceLocator.templateRuntime,
+                    onBack = onBack,
+                    onOpenComponent = { component = it },
+                    onNotify = toast,
+                )
+            } else {
+                com.example.chat.ui.settings.templates.ComponentOverrideScreen(
+                    component = c,
+                    templateController = ServiceLocator.templateController,
+                    onBack = { component = null },
+                    runtime = ServiceLocator.templateRuntime,
+                    onMessage = toast,
+                )
+            }
+        }
         else -> return false
     }
     return true
