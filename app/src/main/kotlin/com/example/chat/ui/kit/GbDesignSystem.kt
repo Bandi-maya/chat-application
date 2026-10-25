@@ -61,7 +61,7 @@ fun GbCustomSwitch(
 ) {
     val colors = LocalAppColors.current
     val config = LocalThemeConfig.current
-    val haptic = LocalHapticFeedback.current
+    val view = androidx.compose.ui.platform.LocalView.current
     val active = activeColor ?: Color(config.accentColor)
     val track by animateColorAsState(if (value) active else colors.borderSubtle.copy(alpha = 0.8f), tween(200), label = "gbTrack")
     val thumbOffset by animateDpAsState(if (value) 22.dp else 0.dp, tween(200), label = "gbThumb")
@@ -70,7 +70,7 @@ fun GbCustomSwitch(
             .clip(RoundedCornerShape(15.dp))
             .background(track)
             .border(1.2.dp, if (value) active else colors.borderSubtle, RoundedCornerShape(15.dp))
-            .clickable { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onChanged(!value) }
+            .clickable { ChatyHapticsPort.selection(view); onChanged(!value) }
             .padding(3.dp),
     ) {
         Box(
@@ -110,7 +110,7 @@ fun GbSettingRow(
 ) {
     val config = LocalThemeConfig.current
     val colors = LocalAppColors.current
-    val haptic = LocalHapticFeedback.current
+    val view = androidx.compose.ui.platform.LocalView.current
     val accent = Color(config.accentColor)
     val effIcon = iconColor ?: accent
     val effBg = iconBgColor ?: effIcon.copy(alpha = 0.12f)
@@ -133,7 +133,7 @@ fun GbSettingRow(
     Row(
         Modifier.fillMaxWidth()
             .clickable {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                ChatyHapticsPort.selection(view)
                 if (onSwitchChanged != null && switchValue != null) onSwitchChanged(!switchValue)
                 else if (onColorTap != null) onColorTap()
                 else onTap?.invoke()
