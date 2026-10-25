@@ -144,6 +144,19 @@ object ServiceLocator {
         com.example.chat.data.services.LocalLockService(secureStore)
     }
 
+    /** locator.dart HiddenVaultService / HiddenVaultController singletons.
+     *  Biometric bridge is not provided (no androidx.biometric wiring yet), so
+     *  vault unlock is PIN-only until that bridge lands. */
+    val hiddenVaultService: com.example.chat.ui.vault.HiddenVaultService by lazy {
+        com.example.chat.ui.vault.HiddenVaultService(
+            lockService = localLockService,
+            secureStorage = secureStore,
+        )
+    }
+    val hiddenVaultController: com.example.chat.ui.vault.HiddenVaultController by lazy {
+        com.example.chat.ui.vault.HiddenVaultController(hiddenVaultService)
+    }
+
     /** M8 preferences controller (port of ChatyPreferencesController). Starts
      *  its load + remote reconcile on first reference; referenced from
      *  [init] so startup mirrors the Dart controller's constructor. */
