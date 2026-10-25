@@ -82,6 +82,14 @@ class ApiBackendService(context: Context) {
         transport = OkHttpApiTransport(),
     )
 
+    private val accountClient = ApiAccountClient(
+        baseUrl = { config.restApiBaseUrl },
+        tenantId = { config.tenantId },
+        token = { session.token },
+        transport = OkHttpApiTransport(),
+        binaryTransport = OkHttpApiBinaryTransport(),
+    )
+
     val tasksClient = ApiTasksClient(
         baseUrl = { config.restApiBaseUrl },
         tenantId = { config.tenantId },
@@ -731,6 +739,21 @@ class ApiBackendService(context: Context) {
         val updated = session.updateProfileFields(displayName, about, username, avatarUrl)
         notifyChatListeners()
         updated
+    }
+
+    /** Dart updateOrganizationRegistrationSupport (PATCH /organization/<id>/registration). */
+    suspend fun updateOrganizationRegistrationSupport(organizationIdOrTenantId: String, allowUserRegistration: Boolean): Boolean =
+        withContext(Dispatchers.IO) { accountClient.updateRegistrationSupport(organizationIdOrTenantId, allowUserRegistration) }
+
+    /** Dart uploadProfilePhoto: multipart POST /app-users/upload-photo; on a non-empty URL the current user's
+     *  avatarUrl is updated and persisted (api_hub_user), then listeners are notified. */
+    suspend fun uploadProfilePhoto(filename: String, bytes: ByteArray): String = withContext(Dispatchers.IO) {
+        val url = accountClient.uploadProfilePhoto(filename, bytes)
+        if (url.isNotEmpty() && session.currentUser != null) {
+            session.updateProfileFields(null, null, null, url)
+            notifyChatListeners()
+        }
+        url
     }
 
     suspend fun checkOrganization(workspace: String): Map<String, Any?> = withContext(Dispatchers.IO) {
