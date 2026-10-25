@@ -68,6 +68,10 @@ class ApiBackendService(context: Context) {
         java.util.concurrent.CopyOnWriteArrayList<(Map<String, Any?>) -> Unit>()
 
     fun addCallSignalListener(listener: (Map<String, Any?>) -> Unit) = callSignalListeners.add(listener)
+    /** Dart ApiBackendService.sendCallSignal: fire-and-forget call signaling
+     *  over the custom-backend WebSocket (payload type call_signal). */
+    fun sendCallSignal(targetUserId: String, data: Map<String, Any?>): Boolean =
+        realtime.sendCallSignal(targetUserId, data)
     fun removeCallSignalListener(listener: (Map<String, Any?>) -> Unit) { callSignalListeners.remove(listener) }
 
     /** getWebSocketUrl (backend_config.dart:80): custom/.env seams are absent
