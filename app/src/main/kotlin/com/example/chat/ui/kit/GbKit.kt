@@ -137,7 +137,7 @@ fun <T> GbRadioSelectionModal(
 ) {
     val colors = LocalAppColors.current
     val config = LocalThemeConfig.current
-    val haptic = LocalHapticFeedback.current
+    val view = androidx.compose.ui.platform.LocalView.current
     val accent = Color(config.accentColor)
     val primary = Color(config.primaryTextColor)
     GbModalSheet(title = title, subtitle = subtitle, onDismiss = onDismiss) {
@@ -149,7 +149,7 @@ fun <T> GbRadioSelectionModal(
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
                         .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            ChatyHapticsPort.selection(view)
                             onDismiss()
                             onSelected(opt)
                         }
@@ -351,10 +351,10 @@ private fun GbTextBlock(title: String, subtitle: String?, modifier: Modifier) {
 @Composable
 fun GbSwitchRow(icon: ImageVector, title: String, subtitle: String, value: Boolean, onChanged: (Boolean) -> Unit) {
     val accent = Color(LocalThemeConfig.current.accentColor)
-    val haptic = LocalHapticFeedback.current
+    val view = androidx.compose.ui.platform.LocalView.current
     Row(
         Modifier.fillMaxWidth()
-            .clickable { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onChanged(!value) }
+            .clickable { ChatyHapticsPort.selection(view); onChanged(!value) }
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -374,10 +374,10 @@ fun GbSwitchRow(icon: ImageVector, title: String, subtitle: String, value: Boole
 @Composable
 fun GbChevronRow(icon: ImageVector, title: String, subtitle: String, onTap: () -> Unit) {
     val accent = Color(LocalThemeConfig.current.accentColor)
-    val haptic = LocalHapticFeedback.current
+    val view = androidx.compose.ui.platform.LocalView.current
     Row(
         Modifier.fillMaxWidth()
-            .clickable { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onTap() }
+            .clickable { ChatyHapticsPort.selection(view); onTap() }
             .padding(horizontal = 16.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -393,10 +393,10 @@ fun GbChevronRow(icon: ImageVector, title: String, subtitle: String, onTap: () -
 fun GbSubpageRow(icon: ImageVector, title: String, onTap: () -> Unit) {
     val config = LocalThemeConfig.current
     val accent = Color(config.accentColor)
-    val haptic = LocalHapticFeedback.current
+    val view = androidx.compose.ui.platform.LocalView.current
     Row(
         Modifier.fillMaxWidth()
-            .clickable { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onTap() }
+            .clickable { ChatyHapticsPort.selection(view); onTap() }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -411,10 +411,10 @@ fun GbSubpageRow(icon: ImageVector, title: String, onTap: () -> Unit) {
 fun GbColorRow(icon: ImageVector, title: String, colorValue: Long, onTap: () -> Unit) {
     val config = LocalThemeConfig.current
     val colors = LocalAppColors.current
-    val haptic = LocalHapticFeedback.current
+    val view = androidx.compose.ui.platform.LocalView.current
     Row(
         Modifier.fillMaxWidth()
-            .clickable { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onTap() }
+            .clickable { ChatyHapticsPort.selection(view); onTap() }
             .padding(horizontal = 16.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
