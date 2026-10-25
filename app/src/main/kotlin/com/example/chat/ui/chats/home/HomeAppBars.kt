@@ -1,3 +1,4 @@
+@OptIn(ExperimentalFoundationApi::class)
 package com.example.chat.ui.chats.home
 
 import androidx.compose.foundation.background
@@ -40,7 +41,6 @@ import androidx.compose.material.icons.outlined.ScheduleSend
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.VolumeOff
 import androidx.compose.material.icons.outlined.VolumeUp
-import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DarkMode
@@ -49,7 +49,6 @@ import androidx.compose.material.icons.rounded.GroupAdd
 import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PushPin
-import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SelectAll
@@ -82,6 +81,7 @@ import androidx.compose.ui.unit.sp
 import com.example.chat.core.theme.ThemeConfig
 import com.example.chat.core.theme.argbWithAlpha
 import com.example.chat.domain.models.HomePreferences
+import androidx.compose.foundation.ExperimentalFoundationApi
 
 /** Identity shown in the home header (mapped by the integrator from whatever
  *  user object the active backend plane exposes). */
@@ -99,6 +99,7 @@ data class HomeIdentity(
 data class ChatsHomeNav(
     val onOpenProfile: () -> Unit = {},
     val onOpenSettings: () -> Unit = {},
+    val onOpenSecuritySettings: () -> Unit = {},
     val onOpenGlobalSearch: () -> Unit = {},
     val onOpenQr: () -> Unit = {},
     val onOpenLinkedDevices: () -> Unit = {},
@@ -148,11 +149,9 @@ fun GhostModePill(
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // ChatyGlyph.ghostActive/ghostInactive: the custom glyph font is a
-        // design-system slice; a 👻 emoji keeps the same visual anchor.
-        Text(
-            "👻",
-            fontSize = 12.sp,
+        HomeGlyphIcon(
+            glyph = if (isGhost) HomeGlyph.ghostActive else HomeGlyph.ghostInactive,
+            size = 14.dp,
             color = if (isGhost) Color(0xFF818CF8) else Color(theme.secondaryTextColor),
         )
         if (isGhost) {
@@ -240,12 +239,12 @@ fun StandardHomeAppBar(
         }
         if (homePrefs.showCameraIcon) {
             IconButton(onClick = nav.onOpenCameraEffects) {
-                Icon(Icons.Rounded.CameraAlt, contentDescription = "Camera Effects", tint = Color(theme.primaryTextColor))
+                HomeGlyphIcon(glyph = HomeGlyph.camera, size = 20.dp, color = Color(theme.primaryTextColor), semanticLabel = "Camera Effects")
             }
         }
         if (homePrefs.showDesktopIcon) {
             IconButton(onClick = nav.onOpenQr) {
-                Icon(Icons.Rounded.QrCodeScanner, contentDescription = "QR / Scan", tint = Color(theme.primaryTextColor))
+                HomeGlyphIcon(glyph = HomeGlyph.qrScan, size = 20.dp, color = Color(theme.primaryTextColor), semanticLabel = "QR / Scan")
             }
         }
         if (effectiveShowSearch) {
@@ -385,7 +384,7 @@ fun SelectionHomeAppBar(
         Spacer(Modifier.weight(1f))
         IconButton(onClick = onTogglePin) {
             Icon(
-                if (anyUnpinned) OutlinedPushPin else Icons.Rounded.PushPin,
+                if (anyUnpinned) Icons.Outlined.PushPin else Icons.Rounded.PushPin,
                 contentDescription = if (anyUnpinned) "Pin" else "Unpin",
                 tint = Color(theme.primaryTextColor),
             )
@@ -656,6 +655,101 @@ fun EmptyChatsState(
                 fontSize = 13.5.sp,
                 fontWeight = FontWeight.W700,
             )
+        }
+    }
+}
+
+
+/** The guided Locked Chats setup modal from _handleTopLeftIdentityTap's
+ *  else-branch (no credential + no locked chats yet): explains the feature
+ *  and routes to Privacy & Security. Exact Dart copy and step list. */
+@Composable
+fun LockedChatsSetupDialog(
+    theme: ThemeConfig,
+    onClose: () -> Unit,
+    onConfigureSecurity: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = {
+            Column {
+                Text("Locked Chats", fontWeight = FontWeight.W700)
+                Text(
+                    "Secure conversations with biometric, PIN, or password",
+                    fontSize = 13.sp,
+                    color = Color(theme.secondaryTextColor),
+                )
+            }
+        },
+        text = {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .background(Color(argbWithAlpha(theme.accentColor, 0.15)), RoundedCornerShape(10.dp))
+                            .padding(10.dp),
+                    ) {
+                        Icon(
+                            Icons.Outlined.Lock,
+                            contentDescription = null,
+                            tint = Color(theme.accentColor),
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "Lock individual chats and keep them hidden from the main list.",
+                        fontSize = 13.5.sp,
+                        color = Color(theme.primaryTextColor),
+                        fontWeight = FontWeight.W500,
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    "How to set up Locked Chats:",
+                    fontWeight = FontWeight.W700,
+                    fontSize = 13.5.sp,
+                    color = Color(theme.accentColor),
+                )
+                Spacer(Modifier.height(10.dp))
+                LockedSetupStep("1", "Set up your Security Credential",
+                    "Choose a PIN, Pattern, or Password in Privacy & Security settings.", theme)
+                Spacer(Modifier.height(8.dp))
+                LockedSetupStep("2", "Lock conversations",
+                    "Select any chat in your list and choose \"Lock chat\".", theme)
+                Spacer(Modifier.height(8.dp))
+                LockedSetupStep("3", "Open your vault anytime",
+                    "Tap your name or the Chaty header at the top-left to authenticate and view locked chats.", theme)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onClose()
+                onConfigureSecurity()
+            }) { Text("Configure Security", fontWeight = FontWeight.W700) }
+        },
+        dismissButton = {
+            TextButton(onClick = onClose) { Text("Close") }
+        },
+    )
+}
+
+@Composable
+private fun LockedSetupStep(number: String, title: String, description: String, theme: ThemeConfig) {
+    Row {
+        Box(
+            modifier = Modifier
+                .size(22.dp)
+                .background(Color(argbWithAlpha(theme.accentColor, 0.12)), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(number, fontSize = 12.sp, fontWeight = FontWeight.W700, color = Color(theme.accentColor))
+        }
+        Spacer(Modifier.width(10.dp))
+        Column {
+            Text(title, fontWeight = FontWeight.W600, fontSize = 13.sp, color = Color(theme.primaryTextColor))
+            Spacer(Modifier.height(1.dp))
+            Text(description, fontSize = 12.sp, color = Color(theme.secondaryTextColor))
         }
     }
 }
