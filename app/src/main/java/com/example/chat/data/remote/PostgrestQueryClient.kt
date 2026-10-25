@@ -59,9 +59,33 @@ class PostgrestQueryClient(
         suspend fun execute(): List<Map<String, Any?>> = client.runQuery(
             table, columns, filters, orderClause, limitValue,
         )
+
+        /** Mirrors supabase_dart .delete() with the accumulated filters. */
+        suspend fun delete(): Unit = client.runDelete(table, filters)
     }
 
     fun from(table: String): Query = Query(this, table)
+
+    internal suspend fun runDelete(
+        table: String,
+        filters: List<Pair<String, String>>,
+    ): Unit = withContext(Dispatchers.IO) {
+        val urlBuilder = "$supabaseUrl/rest/v1/$table".toHttpUrl().newBuilder()
+        for ((column, clause) in filters) urlBuilder.addQueryParameter(column, clause)
+        val request = Request.Builder()
+            .url(urlBuilder.build())
+            .addHeader("apikey", publishableKey)
+            .apply {
+                accessToken()?.let { addHeader("Authorization", "Bearer $it") }
+            }
+            .delete()
+            .build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("Delete $table failed with HTTP ${response.code}")
+            }
+        }
+    }
 
     internal suspend fun runQuery(
         table: String,
