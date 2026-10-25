@@ -40,7 +40,9 @@ class AuthScreensPixelProofTest {
     @Before
     fun setUp() {
         device = UiDevice.getInstance(instrumentation)
+        android.util.Log.i("PixelProof", "setUp: launching MainActivity")
         scenario = ActivityScenario.launch(MainActivity::class.java)
+        android.util.Log.i("PixelProof", "setUp: launch returned, state=${scenario.state}")
     }
 
     @After
@@ -63,12 +65,14 @@ class AuthScreensPixelProofTest {
                     .filter { it.isNotBlank() }.take(40).toList()
             } catch (e: Exception) { listOf("dump failed: ${e.message}") }
             val errs = try {
-                device.executeShellCommand("logcat -d -t 6000").lineSequence()
-                    .filter { (it.contains("MainActivity") || it.contains("ChatyApp") || it.contains("AndroidRuntime") || it.contains("FATAL") || it.contains("died") || it.contains("Force finishing") || it.contains("Activity.*finish")) && !it.contains("AppsFilter") }
-                    .toList().takeLast(40).joinToString("\n") { it.take(260) }
+                device.executeShellCommand("logcat -d -t 20000").lineSequence()
+                    .filter { (it.contains("PixelProof") || it.contains("com.example.chat") || it.contains("ActivityScenario") || it.contains("AndroidRuntime") || it.contains("FATAL")) && !it.contains("AppsFilter") }
+                    .toList().takeLast(60).joinToString("\n") { it.take(240) }
             } catch (e: Exception) { "n/a: ${e.message}" }
+            val st = try { scenario.state.toString() } catch (e: Exception) { "state n/a: ${e.message}" }
+            try { capture("00-failure-state") } catch (_: Exception) {}
             throw AssertionError(
-                "expected screen containing \"$text\"; resumed=[$resumed]; texts=$texts; errors=[\n$errs]",
+                "expected screen containing \"$text\"; resumed=[$resumed]; scenarioState=$st; texts=$texts; errors=[\n$errs]",
             )
         }
     }
