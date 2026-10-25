@@ -92,7 +92,7 @@ val generateUniffiBindings = tasks.register<Exec>("generateUniffiBindings") {
     commandLine(
         "cargo", "run", "--release", "--manifest-path", "mls-native/Cargo.toml",
         "--features", "uniffi/cli", "--bin", "uniffi-bindgen", "generate",
-        "--library", mlsJniLibsDir.get().asFile.file("arm64-v8a/libchaty_mls_native.so").absolutePath,
+        "--library", mlsJniLibsDir.get().file("arm64-v8a/libchaty_mls_native.so").asFile.absolutePath,
         "--language", "kotlin",
         "--no-config",
         "--out-dir", uniffiOutDir.get().asFile.absolutePath,
