@@ -36,7 +36,7 @@ class SecureMessageTransport(
     private val rpc: SupabaseRpc,
     private val currentUserId: () -> String?,
     private val encryptor: () -> MlsEncryptor?,
-    private val pendingStore: PendingSecureSendStore,
+    private val pendingStore: PendingSecureSendStore? = null,
 ) {
     data class SendResult(
         val message: ChatMessage,
