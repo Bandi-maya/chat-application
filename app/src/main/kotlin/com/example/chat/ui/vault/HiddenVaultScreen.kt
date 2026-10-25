@@ -28,7 +28,7 @@ import androidx.compose.material.icons.automirrored.rounded.Backspace
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
-import androidx.compose.material.icons.rounded.LockOutline
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -234,7 +234,7 @@ private fun LockScreenView(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.Rounded.LockOutline,
+                    Icons.Outlined.Lock,
                     contentDescription = null,
                     modifier = Modifier.size(34.dp),
                     tint = primary,
@@ -430,7 +430,7 @@ private fun UnlockedVaultView(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 actions = {
                     IconButton(onClick = onLock) {
-                        Icon(Icons.Rounded.LockOutline, contentDescription = "Lock Vault")
+                        Icon(Icons.Outlined.Lock, contentDescription = "Lock Vault")
                     }
                 },
             )
