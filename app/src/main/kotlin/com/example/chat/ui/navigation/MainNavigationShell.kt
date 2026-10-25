@@ -1,5 +1,6 @@
 package com.example.chat.ui.navigation
 
+import com.example.chat.core.templates.ChatyNavigationDestinationIds
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
