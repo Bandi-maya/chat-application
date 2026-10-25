@@ -564,6 +564,12 @@ class ApiBackendService(context: Context) {
     suspend fun uploadMedia(file: java.io.File): Map<String, Any> =
         withContext(Dispatchers.IO) { mediaUpload.uploadMedia(file) }
 
+    /** Byte-array form used by ChatMediaService's post-compression payload;
+     *  Dart uploads the (possibly compressed) File, whose filename is the
+     *  attachment name - here the name travels alongside the bytes. */
+    suspend fun uploadMedia(filename: String, bytes: ByteArray): Map<String, Any> =
+        withContext(Dispatchers.IO) { mediaUpload.uploadMedia(filename, bytes) }
+
     /** Dart ApiBackendService.registerDeviceToken
      *  (api_backend_service.dart:1975): POST /me/devices, /app-users
      *  fallback, failures swallowed after logging like Dart. */
