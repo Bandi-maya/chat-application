@@ -82,7 +82,7 @@ class ApiBackendService(context: Context) {
         transport = OkHttpApiTransport(),
     )
 
-    private val tasksClient = ApiTasksClient(
+    val tasksClient = ApiTasksClient(
         baseUrl = { config.restApiBaseUrl },
         tenantId = { config.tenantId },
         token = { session.token },
