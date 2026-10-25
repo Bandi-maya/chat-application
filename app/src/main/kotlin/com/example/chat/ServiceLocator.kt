@@ -109,6 +109,12 @@ object ServiceLocator {
 
     private val secureStore: SecureKeyValueStoreImpl by lazy { SecureKeyValueStoreImpl(requireContext()) }
 
+    /** REST backend (ApiBackendService on the api branch): the service the
+     *  auth screens actually call; its session takes facade precedence. */
+    val apiBackend: com.example.chat.data.api.ApiBackendService by lazy {
+        com.example.chat.data.api.ApiBackendService(requireContext()).also { it.initialize() }
+    }
+
     val themeController: com.example.chat.core.theme.ThemeController by lazy {
         com.example.chat.core.theme.ThemeController(preferencesStorage, appScope)
     }
