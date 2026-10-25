@@ -30,7 +30,6 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CallEnd
-import androidx.compose.material.icons.rounded.CameraAlt as RoundedCameraAlt
 import androidx.compose.material.icons.rounded.Checklist
 import androidx.compose.material.icons.rounded.Circle
 import androidx.compose.material.icons.rounded.Dock
@@ -108,8 +107,8 @@ private fun destinationIcon(id: String): ImageVector = when (id) {
 
 /** Dart: tmpl.navigation.centerActionIcon ?? Icons.camera_alt_rounded. */
 private fun centerActionIcon(iconName: String?): ImageVector = when (iconName) {
-    null, "camera", "camera_alt_rounded" -> Icons.Rounded.CameraAlt
-    else -> Icons.Rounded.CameraAlt
+    null, "camera", "camera_alt_rounded" -> Icons.Outlined.CameraAlt
+    else -> Icons.Outlined.CameraAlt
 }
 
 /** Observes a listener-style controller (AppearanceVariantController /
