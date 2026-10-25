@@ -1,3 +1,7 @@
+import java.io.File
+import java.net.URI
+import java.security.MessageDigest
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -158,8 +162,8 @@ val downloadFaceLandmarker = tasks.register("downloadFaceLandmarker") {
     val outFile = faceLandmarkerAssetsDir.get().file("face_landmarker.task").asFile
     outputs.file(outFile)
     doLast {
-        fun sha256(f: java.io.File): String {
-            val digest = java.security.MessageDigest.getInstance("SHA-256")
+        fun sha256(f: File): String {
+            val digest = MessageDigest.getInstance("SHA-256")
             f.inputStream().use { input ->
                 val buffer = ByteArray(8192)
                 while (true) {
@@ -176,9 +180,9 @@ val downloadFaceLandmarker = tasks.register("downloadFaceLandmarker") {
             return@doLast
         }
         outFile.parentFile.mkdirs()
-        val tmp = java.io.File(outFile.parentFile, outFile.name + ".download")
+        val tmp = File(outFile.parentFile, outFile.name + ".download")
         tmp.delete()
-        java.net.URI(faceLandmarkerUrl).toURL().openStream().use { input ->
+        URI(faceLandmarkerUrl).toURL().openStream().use { input ->
             tmp.outputStream().use { input.copyTo(it) }
         }
         check(tmp.length() == faceLandmarkerSize) {
