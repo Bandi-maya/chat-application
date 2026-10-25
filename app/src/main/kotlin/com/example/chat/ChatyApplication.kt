@@ -20,7 +20,13 @@ class ChatyApplication : Application() {
         // Dart main() awaits ThemeController.init() before runApp so the first
         // frame already reflects the user's theme; restore it off the main
         // thread into the controller's own scope before AppRoot reads it.
-        ServiceLocator.appScope.launch { ServiceLocator.themeController.init() }
+        ServiceLocator.appScope.launch {
+            ServiceLocator.themeController.init()
+            // main.dart: TemplateController.init(runtime), then reapply template-owned
+            // layout tokens so a slower theme read cannot overwrite them.
+            ServiceLocator.templateController.init(ServiceLocator.templateRuntime)
+            ServiceLocator.templateController.synchronizeThemeAndNavigation(ServiceLocator.templateRuntime)
+        }
         ProcessLifecycleOwner.get().lifecycle.addObserver(foregroundObserver)
     }
 
