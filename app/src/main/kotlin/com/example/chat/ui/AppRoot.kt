@@ -404,6 +404,14 @@ fun AppRoot() {
                 onUnlocked = { ServiceLocator.appLock.onUnlocked() },
             )
         }
+        val toastPrefs = ServiceLocator.preferencesController
+        ChatyEventToastOverlay(
+            notificationService = ServiceLocator.notifications,
+            preferences = toastPrefs,
+            concealWhileLocked = lockRequired && ServiceLocator.apiBackend.isAuthenticated &&
+                toastPrefs.security.isAppLockEnabled && toastPrefs.security.hideLockNotificationContent,
+            content = { },
+        )
         }
     }
 }
