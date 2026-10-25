@@ -248,6 +248,7 @@ fun AppRoot() {
                     com.example.chat.ui.core.theme.ChatyColors(themeController.globalTheme)
                 }
                 var settingsNotice by remember { mutableStateOf<String?>(null) }
+                var settingsSub by remember { mutableStateOf<com.example.chat.ui.settings.SettingsDestination?>(null) }
                 com.example.chat.ui.navigation.MainNavigationShell(
                     colors = shellColors,
                     currentUser = ServiceLocator.apiBackend.currentUser?.let { u ->
@@ -278,6 +279,8 @@ fun AppRoot() {
                                         onNavigate = { dest ->
                                             if (dest == com.example.chat.ui.settings.SettingsDestination.Security) {
                                                 route = AuthRoute.Security
+                                            } else if (dest in com.example.chat.ui.settings.hostedSettingsDestinations) {
+                                                settingsSub = dest
                                             } else {
                                                 settingsNotice = dest.name
                                             }
@@ -419,6 +422,13 @@ fun AppRoot() {
                         }
                     },
                 )
+                val sub = settingsSub
+                if (sub != null) {
+                    androidx.activity.compose.BackHandler { settingsSub = null }
+                    Box(Modifier.fillMaxSize()) {
+                        com.example.chat.ui.settings.SettingsSubHost(sub, onBack = { settingsSub = null })
+                    }
+                }
                 val notice = settingsNotice
                 if (notice != null) {
                     androidx.compose.material3.AlertDialog(
