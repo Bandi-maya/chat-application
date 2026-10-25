@@ -446,13 +446,22 @@ fun AppRoot() {
                     val profUser = ServiceLocator.apiBackend.currentUser?.let { toDomainUser(it) }
                     if (profUser != null) {
                         val convs = ServiceLocator.apiBackend.conversations
+                        val profTemplate = ServiceLocator.templateController.profile
                         Box(Modifier.fillMaxSize()) {
                             com.example.chat.ui.profile.ProfileScreen(
                                 user = profUser,
-                                chatsCount = convs.count { it.type == com.example.chat.domain.models.ConversationType.direct },
+                                // Dart: dataStore.conversations.length / group count / contacts (users except me).
+                                chatsCount = convs.size,
                                 groupsCount = convs.count { it.type == com.example.chat.domain.models.ConversationType.group },
-                                contactsCount = ServiceLocator.apiBackend.users.size,
+                                contactsCount = ServiceLocator.apiBackend.users.count { it.id != profUser.id },
                                 displayNameOverride = ServiceLocator.preferencesController.home.myNameOverride,
+                                headerStyle = when (profTemplate.headerStyle) {
+                                    com.example.chat.core.templates.ProfileHeaderStyle.compactHeader -> com.example.chat.ui.profile.ProfileHeaderStyle.compactHeader
+                                    com.example.chat.core.templates.ProfileHeaderStyle.centeredIdentity -> com.example.chat.ui.profile.ProfileHeaderStyle.centeredIdentity
+                                    com.example.chat.core.templates.ProfileHeaderStyle.bannerWithAvatar -> com.example.chat.ui.profile.ProfileHeaderStyle.bannerWithAvatar
+                                },
+                                showStatsGrid = profTemplate.showStatsGrid,
+                                avatarShape = profTemplate.avatarShape,
                                 onEditProfile = { settingsNavigate(com.example.chat.ui.settings.SettingsDestination.EditProfile) },
                                 onOpenSettings = { pushedSettings = true },
                                 onOpenPrivacyCenter = { settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Privacy) },
