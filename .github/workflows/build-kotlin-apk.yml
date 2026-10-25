@@ -40,6 +40,11 @@ jobs:
           NDK=$(ls -d "$ANDROID_HOME"/ndk/* | sort -V | tail -1)
           echo "ANDROID_NDK_HOME=$NDK" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_ROOT=$NDK" >> "$GITHUB_ENV"
+      - name: Generate UniFFI bindings (diagnostic)
+        run: |
+          gradle :app:generateUniffiBindings --no-daemon
+          echo '--- generated tree ---'
+          find app/build/generated/uniffi -type f | head -20
       - name: Unit tests (behavior parity)
         run: gradle :app:testDebugUnitTest --no-daemon
       - name: Build debug APK (compile verification)
