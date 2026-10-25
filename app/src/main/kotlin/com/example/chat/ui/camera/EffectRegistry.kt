@@ -1,5 +1,9 @@
 package com.example.chat.ui.camera
 
+import androidx.compose.material.icons.rounded.FaceRetouchingNatural
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Pets
+import androidx.compose.material.icons.rounded.FilterNone
 import androidx.compose.material.icons.Icons
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
