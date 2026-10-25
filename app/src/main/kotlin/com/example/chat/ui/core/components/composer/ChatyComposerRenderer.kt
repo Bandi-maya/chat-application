@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.chat.ui.theme.LocalAppColors
+import androidx.compose.foundation.layout.RowScope
 
 /** Port of lib/ui/core/components/composer/chaty_composer_renderer.dart (api 3bee780d). */
 enum class ComposerStateMode { idle, typing, reply, edit, recording, mediaDraft, offline }
@@ -123,7 +124,7 @@ fun ChatyComposerRenderer(
 }
 
 @Composable
-private fun StripBox(accent: Color, content: @Composable () -> Unit) {
+private fun StripBox(accent: Color, content: @Composable RowScope.() -> Unit) {
     val c = LocalAppColors.current
     Row(
         Modifier.fillMaxWidth().padding(10.dp, 6.dp, 10.dp, 0.dp)
