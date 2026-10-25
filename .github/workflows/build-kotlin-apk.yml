@@ -1,9 +1,14 @@
 name: Build kotlin APK
 
 on:
-  # Dispatch-only: editor-commit batches fire one manual build per slice,
-  # never one build per file commit.
   workflow_dispatch:
+  push:
+    branches: [kotlin]
+    paths:
+      # Batched builds: bump ci/kotlin-build-trigger.txt once per committed
+      # slice to fire exactly one build (editor commits land one file at a
+      # time, so a broad push trigger would queue a full build per file).
+      - ci/kotlin-build-trigger.txt
 
 jobs:
   build:
