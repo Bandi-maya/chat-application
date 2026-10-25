@@ -268,3 +268,43 @@ fun SettingsSliderTile(
         )
     }
 }
+
+/** Port of GbRadioSelectionModal: titled dialog, one radio row per option,
+ *  selecting applies and dismisses. */
+@Composable
+fun SettingsRadioDialog(
+    title: String,
+    options: List<String>,
+    selected: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = LocalAppColors.current
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = colors.surfaceElevated,
+        title = { Text(title, color = colors.foreground, fontSize = 18.sp, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                options.forEach { option ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable { onSelect(option); onDismiss() }.padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Box(
+                            Modifier.size(20.dp).clip(CircleShape)
+                                .border(BorderStroke(2.dp, if (option == selected) colors.primary else colors.border), CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) { if (option == selected) Box(Modifier.size(10.dp).clip(CircleShape).background(colors.primary)) }
+                        Text(option, color = colors.foreground, fontSize = 15.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Cancel", color = colors.primary) }
+        },
+    )
+}
