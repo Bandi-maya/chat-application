@@ -645,8 +645,11 @@ fun AppRoot() {
                                 ServiceLocator.apiBackend.updateProfile(displayName = name, about = about, username = username, avatarUrl = avatarUrl)
                             },
                             uploadProfilePhoto = { filename, bytes -> ServiceLocator.apiBackend.uploadProfilePhoto(filename, bytes) },
-                            // Dart: api.deleteUser(id) (signs out itself); purgeLocalDataForDeletedAccount is not ported.
-                            deleteAccountData = { id -> ServiceLocator.apiBackend.deleteUser(id) },
+                            // Dart: api.deleteUser(id), then purgeLocalDataForDeletedAccount(id), then logout.
+                            deleteAccountData = { id ->
+                                ServiceLocator.apiBackend.deleteUser(id)
+                                ServiceLocator.purgeLocalDataForDeletedAccount(id)
+                            },
                             logout = { ServiceLocator.apiBackend.signOut() },
                         )
                     }
