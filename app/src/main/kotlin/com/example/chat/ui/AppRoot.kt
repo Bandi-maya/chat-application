@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
  *  Chats home, conversation, register, forgot-password and organization
  *  registration destinations land in their own parity slices; the register /
  *  forgot-password / org buttons route to honest WIP stubs until then. */
-private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home, ChatDetail, Security, LockedChats }
+private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home, ChatDetail, Security, LockedChats, NewChat, GlobalSearch }
 
 @Composable
 fun AppRoot() {
@@ -55,6 +55,8 @@ fun AppRoot() {
         }
         var promptPending by remember { mutableStateOf(false) }
         val gate = remember { GatePrompts() }
+        var newChatGroup by remember { mutableStateOf(false) }
+        var newChatBroadcast by remember { mutableStateOf(false) }
         val scope = androidx.compose.runtime.rememberCoroutineScope()
         // Dart AuthChangeEvent.signedOut: reset lock/prompt state and replace the stack
         // with WelcomeScreen (pushAndRemoveUntil).
@@ -62,7 +64,8 @@ fun AppRoot() {
             val signOutListener: () -> Unit = {
                 if (!ServiceLocator.apiBackend.isAuthenticated &&
                     (route == AuthRoute.Home || route == AuthRoute.ChatDetail || route == AuthRoute.Security ||
-                        route == AuthRoute.LockedChats)
+                        route == AuthRoute.LockedChats ||
+                        route == AuthRoute.NewChat || route == AuthRoute.GlobalSearch)
                 ) {
                     ServiceLocator.appLock.onSignedOut()
                     promptPending = false
@@ -310,6 +313,8 @@ fun AppRoot() {
                     onOpenSecurity = { route = AuthRoute.Security },
                     onOpenLockedChats = { route = AuthRoute.LockedChats },
                     onOpenSettings = { pushedSettings = true },
+                    onOpenNewChat = { g, b -> newChatGroup = g; newChatBroadcast = b; route = AuthRoute.NewChat },
+                    onOpenGlobalSearch = { route = AuthRoute.GlobalSearch },
                 )
                             }
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.groups ->
@@ -324,6 +329,8 @@ fun AppRoot() {
                                     onOpenSecurity = { route = AuthRoute.Security },
                                     onOpenLockedChats = { route = AuthRoute.LockedChats },
                                     onOpenSettings = { pushedSettings = true },
+                    onOpenNewChat = { g, b -> newChatGroup = g; newChatBroadcast = b; route = AuthRoute.NewChat },
+                    onOpenGlobalSearch = { route = AuthRoute.GlobalSearch },
                                 )
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.calls -> {
                                 val history = ServiceLocator.callHistory
@@ -484,6 +491,52 @@ fun AppRoot() {
                     }
                 },
             )
+            AuthRoute.NewChat -> {
+                val repoN = ServiceLocator.conversationsRepository
+                com.example.chat.ui.chats.NewChatScreen(
+                    contacts = ServiceLocator.apiBackend.users,
+                    startInGroupMode = newChatGroup,
+                    startInBroadcastMode = newChatBroadcast,
+                    searchUsersRemote = { q -> repoN.searchUsersRemote(q) },
+                    openDirectConversation = { u -> repoN.getOrCreateDirectConversationAsync(u) },
+                    createGroup = { title, ids -> repoN.createGroup(title, ids) },
+                    deleteUser = { id -> ServiceLocator.apiBackend.deleteUser(id) },
+                    onOpenConversation = { conversation ->
+                        ServiceLocator.apiBackend.setActiveConversation(conversation.id)
+                        selectedConversation = conversation
+                        route = AuthRoute.ChatDetail
+                    },
+                    onBack = { route = AuthRoute.Home },
+                )
+            }
+            AuthRoute.GlobalSearch -> {
+                val repoS = ServiceLocator.conversationsRepository
+                val prefsS = ServiceLocator.preferencesController
+                com.example.chat.ui.search.GlobalSearchScreen(
+                    colors = com.example.chat.ui.core.theme.ChatyColors(themeController.globalTheme),
+                    conversations = ServiceLocator.apiBackend.conversations,
+                    searchUsers = { q -> repoS.searchUsersRemote(q) },
+                    openDirectConversation = { u -> repoS.getOrCreateDirectConversationAsync(u) },
+                    verifySecretPhrase = { phrase -> ServiceLocator.localLockService.verifySecretPhrase(phrase) },
+                    isConversationHidden = { id -> prefsS.isConversationHidden(id) },
+                    onBack = { route = AuthRoute.Home },
+                    onOpenLockedChats = { route = AuthRoute.LockedChats },
+                    onOpenConversation = { id ->
+                        ServiceLocator.apiBackend.conversations.firstOrNull { it.id == id }?.let { c ->
+                            ServiceLocator.apiBackend.setActiveConversation(c.id)
+                            selectedConversation = c
+                            route = AuthRoute.ChatDetail
+                        }
+                    },
+                    onOpenConversationReplace = { id ->
+                        ServiceLocator.apiBackend.conversations.firstOrNull { it.id == id }?.let { c ->
+                            ServiceLocator.apiBackend.setActiveConversation(c.id)
+                            selectedConversation = c
+                            route = AuthRoute.ChatDetail
+                        }
+                    },
+                )
+            }
             AuthRoute.LockedChats -> {
                 val prefsL = ServiceLocator.preferencesController
                 val lockSvc = ServiceLocator.localLockService
