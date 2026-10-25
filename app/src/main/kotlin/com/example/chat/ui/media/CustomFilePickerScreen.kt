@@ -118,7 +118,7 @@ fun CustomFilePickerScreen(
 
     var tick by remember { mutableIntStateOf(0) }
     DisposableEffect(libraryService) {
-        val listener = { tick++ }
+        val listener: () -> Unit = { tick++ }
         libraryService.addListener(listener)
         onDispose { libraryService.removeListener(listener) }
     }
