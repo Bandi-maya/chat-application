@@ -21,6 +21,25 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry
+            ~/.cargo/git
+            mls-native/target
+          key: ${{ runner.os }}-cargo-mls-${{ hashFiles('mls-native/Cargo.toml', 'mls-native/src/lib.rs', 'third_party/openmls_android/rust/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-mls-
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked || true
+      - name: Set Android NDK for cargo-ndk
+        run: |
+          NDK=$(ls -d "$ANDROID_HOME"/ndk/* | sort -V | tail -1)
+          echo "ANDROID_NDK_HOME=$NDK" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$NDK" >> "$GITHUB_ENV"
       - name: Build debug APK (compile verification)
         run: gradle :app:assembleDebug --no-daemon
       - name: APK info
