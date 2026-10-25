@@ -1,5 +1,7 @@
 package com.example.chat.ui.settings.templates
 
+import com.example.chat.ui.icons.ChatyIconId
+import com.example.chat.ui.icons.ChatyIcon
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
