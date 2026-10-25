@@ -4,6 +4,7 @@ import com.example.chat.core.crypto.MlsStorageInitializationException
 import com.example.chat.core.crypto.MlsStorageInitializationFailure
 import com.example.chat.core.util.parseIsoToInstant
 import com.example.chat.data.e2ee.MlsE2eeService
+import com.example.chat.data.local.SnapshotCodec
 import com.example.chat.data.remote.PostgrestQueryClient
 import com.example.chat.domain.models.Conversation
 import com.example.chat.domain.models.ConversationType
@@ -47,6 +48,11 @@ class ConversationsRepository(
     private val onPendingEnqueued: () -> Unit = {},
     /** Mirrors the eventBus RealtimeEventType.messageCreated publish. */
     private val onMessageCreated: (conversationId: String, messageId: String) -> Unit = { _, _ -> },
+    /** Snapshot-cache seam for _persistConversationSnapshot /
+     *  _persistMessageSnapshot (LocalSnapshotCacheService). */
+    private val snapshotCache: SnapshotCacheStore? = null,
+    /** Scope for the Dart-unawaited snapshot writes. */
+    private val snapshotScope: kotlinx.coroutines.CoroutineScope? = null,
 ) {
     val conversationsById = LinkedHashMap<String, Conversation>()
     val messagesByChatId = HashMap<String, MutableList<ChatMessage>>()
@@ -95,6 +101,9 @@ class ConversationsRepository(
         conversationsById.clear()
         conversationsById.putAll(next)
         messagesByChatId.keys.retainAll(next.keys)
+        // Dart: unawaited(_persistConversationSnapshot()) - failures logged,
+        // never fatal.
+        snapshotScope?.launch { persistConversationSnapshot() }
 
         if (loadMembers) {
             coroutineScope {
@@ -168,6 +177,39 @@ class ConversationsRepository(
                 lastMessageText = latest.text,
                 lastMessageTime = latest.createdAt,
                 lastMessageSenderId = latest.senderId,
+            )
+        }
+        // Dart: unawaited(_persistMessageSnapshot(conversationId, ..)).
+        snapshotScope?.launch { persistMessageSnapshot(conversationId, messagesByChatId[conversationId]) }
+    }
+
+    /** Exact port of _persistConversationSnapshot. */
+    private suspend fun persistConversationSnapshot() {
+        val userId = currentUserId() ?: return
+        val cache = snapshotCache ?: return
+        runCatching {
+            cache.writeJson(
+                userId = userId,
+                scope = "conversations",
+                value = conversationsById.values.map { SnapshotCodec.conversationToJson(it) },
+            )
+        }
+    }
+
+    /** Exact port of _persistMessageSnapshot. Content is encrypted at rest by
+     *  LocalSnapshotCacheService; nothing plaintext is ever written to disk. */
+    private suspend fun persistMessageSnapshot(
+        conversationId: String,
+        messages: List<ChatMessage>?,
+    ) {
+        val userId = currentUserId() ?: return
+        val cache = snapshotCache ?: return
+        if (messages.isNullOrEmpty()) return
+        runCatching {
+            cache.writeJson(
+                userId = userId,
+                scope = "messages_$conversationId",
+                value = messages.map { SnapshotCodec.chatMessageToJson(it) },
             )
         }
     }
