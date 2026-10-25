@@ -54,6 +54,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import java.time.Instant
 import kotlin.math.abs
 import kotlin.math.sin
+import androidx.compose.ui.text.TextStyle
 
 /** Exact port of lib/features/island/widgets/dynamic_island_views.dart:
  *  helpers (formatTime/relativeTime), IslandWaveform, IslandSeekBar,
@@ -457,15 +458,12 @@ fun ExpandedMediaView(
         ) {
             Text(
                 islandFormatTime((payload.progress * payload.durationSeconds).toInt()),
-                color = Color.White.copy(alpha = 0.4f),
-                fontSize = 10.sp,
-                fontFeatureSettings = "tnum", // Dart FontFeature.tabularFigures()
+                // Dart FontFeature.tabularFigures()
+                style = TextStyle(color = Color.White.copy(alpha = 0.4f), fontSize = 10.sp, fontFeatureSettings = "tnum"),
             )
             Text(
                 islandFormatTime(payload.durationSeconds),
-                color = Color.White.copy(alpha = 0.4f),
-                fontSize = 10.sp,
-                fontFeatureSettings = "tnum",
+                style = TextStyle(color = Color.White.copy(alpha = 0.4f), fontSize = 10.sp, fontFeatureSettings = "tnum"),
             )
         }
 
