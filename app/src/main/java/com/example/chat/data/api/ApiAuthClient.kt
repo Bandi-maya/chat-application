@@ -41,6 +41,7 @@ class ApiAuthClient(
     private val baseUrl: () -> String,
     private val tenantId: () -> String,
     private val transport: ApiHttpTransport,
+    private val token: () -> String? = { null },
 ) {
     /** ApiBackendService.login — identifier is sent verbatim as `username`. */
     fun login(identifier: String, password: String): ApiAuthResult {
@@ -59,6 +60,56 @@ class ApiAuthClient(
             .toString()
         val response = postWithFallback("auth/register", body)
         return parseAuthResponse(response.first, response.second)
+    }
+
+    /** ApiBackendService.updateProfile: PUT /app-users/profile (+ /api/v1
+     *  fallback). Payload includes only provided fields plus the nested
+     *  publicProfile block, matching Dart exactly. Returns (success, detail). */
+    fun updateProfile(
+        displayName: String? = null,
+        about: String? = null,
+        username: String? = null,
+        avatarUrl: String? = null,
+    ): Pair<Boolean, String> {
+        val authToken = token() ?: throw Exception("Not authenticated")
+        val payload = JSONObject()
+        if (displayName != null) payload.put("full_name", displayName.trim())
+        if (about != null) payload.put("about", about.trim())
+        if (username != null) payload.put("username", username.trim())
+        val publicProfile = JSONObject()
+        if (about != null) publicProfile.put("about", about.trim())
+        if (avatarUrl != null) publicProfile.put("avatarUrl", avatarUrl.trim())
+        payload.put("publicProfile", publicProfile)
+
+        val headers = mapOf(
+            "Authorization" to "Bearer $authToken",
+            "Content-Type" to "application/json",
+            "x-tenant-id" to tenantId(),
+        )
+        val response = try {
+            transport.execute("PUT", "${baseUrl()}/app-users/profile", headers, payload.toString())
+        } catch (e: Exception) {
+            throw Exception("Unable to reach server to update profile: $e")
+        }
+        val finalResponse = if (response.first == 404) {
+            try {
+                transport.execute("PUT", "${baseUrl()}/api/v1/app-users/profile", headers, payload.toString())
+            } catch (e: Exception) {
+                throw Exception("Unable to reach server to update profile: $e")
+            }
+        } else response
+
+        if (finalResponse.first == 200) return true to ""
+        var detail = "Failed to update profile (${finalResponse.first})"
+        try {
+            val body = JSONObject(finalResponse.second)
+            val d = if (body.has("detail") && !body.isNull("detail")) body.get("detail").toString()
+                else if (body.has("message") && !body.isNull("message")) body.get("message").toString()
+                else null
+            if (d != null) detail = d
+        } catch (_: Exception) {
+        }
+        throw Exception(detail)
     }
 
     /** ApiBackendService.registerOrganization: POST /organization/admin/create
