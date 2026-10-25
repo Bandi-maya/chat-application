@@ -2,10 +2,10 @@ package com.example.chat.data.e2ee
 
 import com.example.chat.core.crypto.MlsE2eeException
 
+// MlsEncryptedPayload lives in core.crypto (engine layer).
+
 /** Server-side MLS descriptors. Exact ports of the Dart fromJson factories
  *  (mls_e2ee_service.dart). */
-
-data class MlsEncryptedPayload(val groupId: String, val epoch: Int, val ciphertext: String)
 
 data class MlsConversationState(
     val group: MlsGroupDescriptor?,
