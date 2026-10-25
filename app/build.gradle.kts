@@ -77,21 +77,23 @@ val uniffiOutDir = layout.buildDirectory.dir("generated/uniffi")
 
 val buildMlsNative = tasks.register<Exec>("buildMlsNative") {
     onlyIf { !skipMlsNative.get() }
-    workingDir = rootProject.projectDir
+    // cargo-ndk resolves the crate from the working directory, so run inside
+    // mls-native rather than passing --manifest-path from the repo root.
+    workingDir = rootProject.file("mls-native")
     commandLine(
         "cargo", "ndk",
         "-t", "arm64-v8a", "-t", "armeabi-v7a", "-t", "x86_64",
         "-o", mlsJniLibsDir.get().asFile.absolutePath,
-        "build", "--release", "--manifest-path", "mls-native/Cargo.toml",
+        "build", "--release",
     )
 }
 
 val generateUniffiBindings = tasks.register<Exec>("generateUniffiBindings") {
     onlyIf { !skipMlsNative.get() }
     dependsOn(buildMlsNative)
-    workingDir = rootProject.projectDir
+    workingDir = rootProject.file("mls-native")
     commandLine(
-        "cargo", "run", "--release", "--manifest-path", "mls-native/Cargo.toml",
+        "cargo", "run", "--release",
         "--features", "uniffi/cli", "--bin", "uniffi-bindgen", "generate",
         "--library", mlsJniLibsDir.get().file("arm64-v8a/libchaty_mls_native.so").asFile.absolutePath,
         "--language", "kotlin",
