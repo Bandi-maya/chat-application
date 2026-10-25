@@ -262,8 +262,8 @@ fun StandardHomeAppBar(
                 Icon(Icons.Outlined.PersonAddAlt1, contentDescription = "Account settings", tint = Color(theme.primaryTextColor))
             }
         }
-        // Small profile avatar -> Settings (real photo when uploaded; the
-        // network-avatar wrapper arrives with the integrator's Coil batch).
+        // Small profile avatar -> Settings (real photo when uploaded, via
+        // the shared ChatyAsyncImage wrapper).
         if (!forcedTypeIsSet) {
             Box(
                 modifier = Modifier
@@ -277,6 +277,7 @@ fun StandardHomeAppBar(
                     color = parseAvatarColorHex(identity.avatarColorHex, Color(theme.accentColor)),
                     size = 28f,
                     shape = "circle",
+                    url = identity.avatarUrl,
                 )
             }
         }
