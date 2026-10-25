@@ -1,5 +1,18 @@
 package com.example.chat.ui.island
 
+import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material.icons.rounded.Replay10
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Forward10
+import androidx.compose.material.icons.rounded.FileDownload
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.ChevronLeft
+import androidx.compose.material.icons.rounded.ArrowForward
+import androidx.compose.material.icons.rounded.ArrowBackIosNew
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
