@@ -241,7 +241,7 @@ fun OngoingCallScreen(
                     .align(Alignment.TopCenter)
                     .offset(y = topOffset)
                     .then(topPanelDecoration(template))
-                    .padding(topPanelPadding(template)),
+                    .then(topPanelPadding(template)),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onBack) {
@@ -311,7 +311,7 @@ fun OngoingCallScreen(
                     .align(Alignment.BottomCenter)
                     .offset(y = bottomOffset)
                     .then(bottomPanelDecoration(template))
-                    .padding(bottomPanelPadding(template)),
+                    .then(bottomPanelPadding(template)),
             ) {
                 CallControlButton(
                     label = if (session.isMuted) "Unmute" else "Mute",
