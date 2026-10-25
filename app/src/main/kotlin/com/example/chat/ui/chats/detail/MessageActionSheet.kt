@@ -1,7 +1,6 @@
 package com.example.chat.ui.chats.detail
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -229,99 +228,3 @@ private fun ActionRow(
 /** Anchored context-menu variant (Dart AppContextMenu.showWithReactionRail):
  *  a compact card with the quick-reaction rail on top and registry actions
  *  below. Shown in a Popup positioned at the bubble by the caller. */
-val quickContextEmojis = listOf("❤️", "👍", "😂", "😮", "😢", "🙏")
-
-@Composable
-fun MessageContextMenuContent(
-    message: ChatMessage,
-    isMe: Boolean,
-    theme: ThemeConfig,
-    onReact: (String) -> Unit,
-    onOpenAllReactions: () -> Unit,
-    onAction: (MessageActionType) -> Unit,
-) {
-    val surface = Color(theme.surfaceColor)
-    val foreground = Color(theme.primaryTextColor)
-    val foregroundSecondary = Color(theme.secondaryTextColor)
-    val danger = Color(theme.dangerColor)
-    val actions = MessageActionRegistry.getAvailableActions(message = message, isMe = isMe)
-
-    Column(
-        Modifier
-            .width(240.dp)
-            .background(surface, RoundedCornerShape(14.dp))
-            .border(1.dp, Color(theme.dividerColor), RoundedCornerShape(14.dp))
-            .verticalScroll(rememberScrollState())
-            .padding(vertical = 6.dp),
-    ) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            quickContextEmojis.forEach { emoji ->
-                Box(
-                    Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .pointerInput(emoji) { detectTapGestures(onTap = { onReact(emoji) }) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(emoji, fontSize = 22.sp)
-                }
-            }
-            Box(
-                Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(Color(argbWithAlpha(theme.secondaryTextColor, 0.15)))
-                    .pointerInput("more") { detectTapGestures(onTap = { onOpenAllReactions() }) },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Rounded.Add, contentDescription = "More reactions", tint = foreground,
-                    modifier = Modifier.size(18.dp))
-            }
-        }
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp)
-                .height(0.6.dp)
-                .background(Color(argbWithAlpha(theme.secondaryTextColor, 0.12))),
-        )
-        actions.forEach { action ->
-            ContextMenuRow(
-                icon = actionIcon(action, message),
-                label = action.label,
-                color = if (action.isDestructive) danger else foreground,
-                onTap = { onAction(action.type) },
-            )
-        }
-        ContextMenuRow(
-            icon = Icons.Outlined.Flag,
-            label = "Report",
-            color = foregroundSecondary,
-            onTap = { onAction(MessageActionType.report) },
-        )
-    }
-}
-
-@Composable
-private fun ContextMenuRow(
-    icon: ImageVector,
-    label: String,
-    color: Color,
-    onTap: () -> Unit,
-) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .pointerInput(label) { detectTapGestures(onTap = { onTap() }) }
-            .padding(horizontal = 14.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(19.dp))
-        Box(Modifier.width(10.dp))
-        Text(label, color = color, fontSize = 14.5.sp)
-    }
-}
