@@ -36,6 +36,7 @@ fun ChatsHomeHost(
     onOpenNewChat: (groupMode: Boolean, broadcastMode: Boolean) -> Unit = { _, _ -> },
     onOpenGlobalSearch: () -> Unit = {},
     onOpenMessageManagement: () -> Unit = {},
+    onOpenProfile: () -> Unit = {},
 ) {
     val api = ServiceLocator.apiBackend
     val prefs = ServiceLocator.preferencesController
@@ -91,6 +92,7 @@ fun ChatsHomeHost(
             onOpenNewChat = onOpenNewChat,
             onOpenGlobalSearch = onOpenGlobalSearch,
             onOpenMessageManagement = onOpenMessageManagement,
+            onOpenProfile = onOpenProfile,
             // Dart: widget.themeController.toggleBrightness.
             onToggleBrightness = { ServiceLocator.themeController.toggleBrightness() },
             // Dart: MethodChannel('chaty/launcher_icon').restartApp -> relaunch the app task.
