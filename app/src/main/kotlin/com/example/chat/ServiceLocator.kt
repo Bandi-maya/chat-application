@@ -348,6 +348,23 @@ object ServiceLocator {
         )
     }
 
+    /** Tasks UI controller over the same REST client as ApiBackendService.loadTasks;
+     *  stage history persists under SharedPreferences chaty_task_history_v1. */
+    val tasksController: com.example.chat.ui.tasks.TasksController by lazy {
+        val prefs = requireContext().getSharedPreferences("chaty_prefs", Context.MODE_PRIVATE)
+        com.example.chat.ui.tasks.TasksController(
+            client = apiBackend.tasksClient,
+            historyStore = object : com.example.chat.ui.tasks.TaskHistoryStore {
+                override fun load() = com.example.chat.ui.tasks.TaskHistoryCodec.decode(
+                    prefs.getString("chaty_task_history_v1", null))
+                override fun save(history: Map<String, List<String>>) {
+                    prefs.edit().putString("chaty_task_history_v1",
+                        com.example.chat.ui.tasks.TaskHistoryCodec.encode(history)).apply()
+                }
+            },
+        )
+    }
+
     val callHistory: CallHistoryService by lazy {
         CallHistoryService(queryClient = queryClient, currentUserId = currentUserId)
     }
