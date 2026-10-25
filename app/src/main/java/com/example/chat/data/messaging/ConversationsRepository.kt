@@ -4,6 +4,7 @@ import com.example.chat.core.crypto.MlsStorageInitializationException
 import com.example.chat.core.crypto.MlsStorageInitializationFailure
 import com.example.chat.core.util.parseIsoToInstant
 import com.example.chat.data.e2ee.MlsE2eeService
+import com.example.chat.data.remote.PostgrestQueryClient
 import com.example.chat.domain.models.Conversation
 import com.example.chat.domain.models.ConversationType
 import com.example.chat.domain.models.ChatMessage
@@ -30,6 +31,9 @@ import kotlinx.coroutines.coroutineScope
  */
 class ConversationsRepository(
     private val rpc: SupabaseRpc,
+    /** Table client for the deleteConversation direct-table fallback
+     *  (Dart: _client.from('conversations').delete().eq('id', ..)). */
+    private val queryClient: PostgrestQueryClient? = null,
     private val mls: () -> MlsE2eeService?,
     private val currentUserId: () -> String?,
     private val shouldSendReadReceipts: (String) -> Boolean = { true },
@@ -363,6 +367,120 @@ class ConversationsRepository(
             )
         onMessageCreated(send.conversationId, result.id)
         return result
+    }
+
+    /** Exact port of markAsUnread (local bump, then best-effort RPC). */
+    suspend fun markAsUnread(conversationId: String) {
+        val current = conversationsById[conversationId]
+        if (current != null) {
+            conversationsById[conversationId] = current.copy(
+                unreadCount = if (current.unreadCount > 0) current.unreadCount else 1,
+            )
+            notifyChanged()
+        }
+        runCatching {
+            rpc.rpc(
+                "mark_conversation_unread",
+                mapOf("p_conversation_id" to conversationId),
+            )
+        }
+    }
+
+    /** Exact port of clearConversation. */
+    fun clearConversation(conversationId: String) {
+        messagesByChatId.remove(conversationId)
+        val current = conversationsById[conversationId]
+        if (current != null) {
+            conversationsById[conversationId] = current.copy(lastMessageText = "")
+        }
+        notifyChanged()
+    }
+
+    /** Exact port of deleteConversation: local removal, RPC with the
+     *  direct-table delete fallback, then reload. */
+    suspend fun deleteConversation(conversationId: String) {
+        conversationsById.remove(conversationId)
+        messagesByChatId.remove(conversationId)
+        notifyChanged()
+        runCatching {
+            rpc.rpc(
+                "delete_conversation",
+                mapOf("p_conversation_id" to conversationId),
+            )
+        }.onFailure {
+            runCatching {
+                queryClient?.from("conversations")
+                    ?.eq("id", conversationId)
+                    ?.delete()
+            }
+        }
+        loadConversations()
+        notifyChanged()
+    }
+
+    /** Exact port of _setConversationStateAsync (pinned/archived/muted). */
+    suspend fun setConversationStateAsync(conversationId: String, field: String, value: Boolean) {
+        rpc.rpc(
+            "set_conversation_state",
+            mapOf(
+                "p_conversation_id" to conversationId,
+                "p_field" to field,
+                "p_value" to value,
+            ),
+        )
+        loadConversations(loadMembers = false)
+        notifyChanged()
+    }
+
+    /** Exact port of _setMessageStateAsync (pinned/starred). */
+    suspend fun setMessageStateAsync(
+        conversationId: String,
+        messageId: String,
+        field: String,
+        value: Boolean,
+    ) {
+        rpc.rpc(
+            "set_message_user_state",
+            mapOf(
+                "p_message_id" to messageId,
+                "p_field" to field,
+                "p_value" to value,
+            ),
+        )
+        loadMessages(conversationId)
+        notifyChanged()
+    }
+
+    /** Exact port of setDraft: local update + silent RPC persist. */
+    suspend fun setDraft(conversationId: String, draft: String) {
+        val current = conversationsById[conversationId]
+        if (current != null) {
+            conversationsById[conversationId] = current.copy(draftText = draft)
+            notifyChanged()
+        }
+        persistDraft(conversationId, draft)
+    }
+
+    /** Exact port of persistDraftSilently (no listener notification). */
+    suspend fun persistDraftSilently(conversationId: String, draft: String) {
+        val current = conversationsById[conversationId]
+        if (current != null) {
+            conversationsById[conversationId] = current.copy(draftText = draft)
+        }
+        persistDraft(conversationId, draft)
+    }
+
+    /** Exact port of _persistDraft (best-effort, fire-and-forget in Dart). */
+    suspend fun persistDraft(conversationId: String, draft: String) {
+        runCatching {
+            rpc.rpc(
+                "set_conversation_draft",
+                mapOf(
+                    "p_conversation_id" to conversationId,
+                    "p_draft" to draft,
+                ),
+            )
+        }
     }
 
     /** Exact port of toggleReaction's optimistic half: applies the local
