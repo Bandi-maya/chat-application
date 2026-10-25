@@ -200,6 +200,74 @@ object ServiceLocator {
 
     val notifications: ChatyNotificationService by lazy { ChatyNotificationService() }
 
+    // ── core audio (locator.dart:147-176) ───────────────────────────────
+
+    val audioPlatform: com.example.chat.core.audio.AndroidChatyAudioPlatform by lazy {
+        com.example.chat.core.audio.AndroidChatyAudioPlatform(requireContext())
+    }
+    val audioCapabilityService: com.example.chat.core.audio.AudioCapabilityService by lazy {
+        com.example.chat.core.audio.AudioCapabilityService(audioPlatform, appScope)
+    }
+    val audioPolicyCoordinator: com.example.chat.core.audio.AudioPolicyCoordinator by lazy {
+        com.example.chat.core.audio.AudioPolicyCoordinator(audioCapabilityService)
+    }
+    val coreCallAudioController: com.example.chat.core.audio.CallAudioController by lazy {
+        com.example.chat.core.audio.CallAudioController(audioPolicyCoordinator, audioCapabilityService, callSignaling)
+    }
+    val mediaAudioController: com.example.chat.core.audio.MediaAudioController by lazy {
+        com.example.chat.core.audio.MediaAudioController(audioPolicyCoordinator)
+    }
+    val notificationAudioController: com.example.chat.core.audio.NotificationAudioController by lazy {
+        com.example.chat.core.audio.NotificationAudioController(audioPolicyCoordinator)
+    }
+    val audioSettingsController: com.example.chat.core.audio.AudioSettingsController by lazy {
+        com.example.chat.core.audio.AudioSettingsController(audioCapabilityService, audioPolicyCoordinator)
+    }
+
+    // ── calls: presentation prefs, signaling, presentation policy, lifecycle ──
+
+    val callPresentationPrefs: com.example.chat.ui.calls.CallPresentationPreferencesStore by lazy {
+        com.example.chat.ui.calls.CallPresentationPreferencesStore(
+            com.example.chat.ui.calls.AndroidCallPresentationPrefsStorage(requireContext()), appScope)
+    }
+    val callSignaling: com.example.chat.data.services.CallSignalingService by lazy {
+        com.example.chat.data.services.CallSignalingService(
+            scope = appScope,
+            currentUserId = { apiBackend.currentUser?.id },
+            currentUserDisplayName = { apiBackend.currentUser?.displayName ?: "User" },
+            currentUserAvatarInitials = { apiBackend.currentUser?.avatarInitials },
+            currentUserAvatarColorHex = { apiBackend.currentUser?.avatarColorHex },
+            signalSender = com.example.chat.data.services.CallSignalSender { targetUserId, data ->
+                apiBackend.sendCallSignal(targetUserId, data)
+            },
+            mediaFactory = { com.example.chat.data.services.WebRtcCallMediaController(requireContext()) },
+            // GAP (no invention): api branch persists terminal call records via
+            // dataStore.addCallRecord; no custom-backend call-history endpoint is
+            // verified, and CallHistoryService here is Postgrest-backed. Sink is a
+            // no-op until the record plane is confirmed.
+            callRecordSink = { },
+            lowDataUsageEnabled = { callPresentationPrefs.value.lowDataUsageEnabled },
+        ).also { svc ->
+            apiBackend.addCallSignalListener { data ->
+                appScope.launch { svc.handleRemoteSignal(data) }
+            }
+        }
+    }
+    val callPresentationController: com.example.chat.ui.calls.CallPresentationController by lazy {
+        com.example.chat.ui.calls.CallPresentationController(callSignaling, callPresentationPrefs)
+            .also { it.start() }
+    }
+    val callLifecycle: com.example.chat.data.services.CallLifecycleCoordinator by lazy {
+        com.example.chat.data.services.CallLifecycleCoordinator(
+            scope = appScope,
+            callService = callSignaling,
+            foregroundSync = { session -> com.example.chat.data.services.CallForegroundService.sync(requireContext(), session) },
+            foregroundStop = { com.example.chat.data.services.CallForegroundService.stop(requireContext()) },
+            // W1 realtime has its own reconnect while the socket is alive; no-op.
+            reconnectSignaling = { },
+        ).also { it.start() }
+    }
+
     val presenceService: PresenceService by lazy {
         PresenceService(
             queryClient = queryClient,
