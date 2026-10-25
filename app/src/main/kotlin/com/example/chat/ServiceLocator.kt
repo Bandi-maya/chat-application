@@ -147,6 +147,20 @@ object ServiceLocator {
     /** M8 preferences controller (port of ChatyPreferencesController). Starts
      *  its load + remote reconcile on first reference; referenced from
      *  [init] so startup mirrors the Dart controller's constructor. */
+    /** main.dart app-lock state machine (_appLockRequired/_backgroundedAt). */
+    val appLock: com.example.chat.data.services.AppLockCoordinator by lazy {
+        com.example.chat.data.services.AppLockCoordinator(
+            isAuthenticated = { apiBackend.isAuthenticated },
+            isLockEnabled = { preferencesController.security.isAppLockEnabled },
+            autoLockTimeout = { preferencesController.security.autoLockTimeout },
+            isMethodReady = {
+                val sec = preferencesController.security
+                sec.isAppLockEnabled &&
+                    com.example.chat.data.services.ProtectedResourceGate.isMethodConfigured(localLockService, sec.lockMethod)
+            },
+        )
+    }
+
     val preferencesController: com.example.chat.core.preferences.ChatyPreferencesController by lazy {
         com.example.chat.core.preferences.ChatyPreferencesController(
             store = AndroidPreferencesBlobStore(preferencesStorage),
