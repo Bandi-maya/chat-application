@@ -88,7 +88,10 @@ fun AppRoot() {
                 },
             )
             AuthRoute.Register -> AuthWipStub("Register", onBack = { route = AuthRoute.Welcome })
-            AuthRoute.ForgotPassword -> AuthWipStub("Reset Password", onBack = { route = AuthRoute.Login })
+            AuthRoute.ForgotPassword -> com.example.chat.ui.auth.ForgotPasswordScreen(
+                onBack = { route = AuthRoute.Login },
+                sendRecovery = { email -> ServiceLocator.authRepository.resetPassword(email) },
+            )
             AuthRoute.RegisterOrganization -> AuthWipStub("Register an Organization", onBack = { route = AuthRoute.Login })
             AuthRoute.Home -> AuthWipStub("Chats home arrives in the next slice", onBack = { route = AuthRoute.Welcome })
         }
