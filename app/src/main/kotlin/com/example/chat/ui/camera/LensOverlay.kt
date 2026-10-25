@@ -187,12 +187,17 @@ object LensAnchorPainter {
      *  cross-platform BlurMaskFilter is desktop-only (absent from Android
      *  ui-graphics 1.7.6, verified against the real AAR), so we set the
      *  framework mask filter directly. android.graphics.BlurMaskFilter takes
-     *  a radius while Flutter/Skia take a sigma; Skia converts with
-     *  radius -> sigma via radius * 0.57735, so sigma -> radius is
-     *  sigma * (1 / 0.57735). Effect preserved, not dropped. */
+     *  a radius while Flutter passes a sigma to Skia; the framework JNI
+     *  converts with sigma = 0.57735 * radius + 0.5
+     *  (frameworks/base libs/hwui/jni/MaskFilter.cpp, createBlur ->
+     *  convertRadiusToSigma), so radius = (sigma - 0.5) / 0.57735
+     *  (matches Skia's own SkBlurMask::ConvertSigmaToRadius).
+     *  Blur is rendered only on a hardware-accelerated canvas; a software
+     *  canvas ignores the mask filter (platform behavior, same class of
+     *  limitation Flutter documents for MaskFilter on the web). */
     private fun applyBlurMask(paint: Paint, sigma: Float) {
         paint.asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(
-            sigma * 1.732f,
+            (sigma - 0.5f) / 0.57735f,
             android.graphics.BlurMaskFilter.Blur.NORMAL,
         )
     }
