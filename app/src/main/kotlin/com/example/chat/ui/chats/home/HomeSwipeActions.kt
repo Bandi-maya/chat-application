@@ -85,8 +85,9 @@ fun HomeSwipeActions(
         settle(0f)
     }
 
+    val dragScope = rememberCoroutineScope()
     val dragState = rememberDraggableState { delta ->
-        snap.stop()
+        dragScope.launch { snap.stop() }
         offset.floatValue = (offset.floatValue - delta).coerceIn(-maxLeadingPx, maxTrailingPx)
     }
 
