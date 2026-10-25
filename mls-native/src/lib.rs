@@ -7,13 +7,11 @@ use std::sync::Arc;
 
 use openmls_frb::api::config::MlsGroupConfig as FrbGroupConfig;
 use openmls_frb::api::credential::MlsCredential as FrbCredential;
-use openmls_frb::api::engine::{
-    MlsEngine as FrbEngine, ProcessedMessageType as FrbProcessedMessageType,
-};
+use openmls_frb::api::engine::MlsEngine as FrbEngine;
 use openmls_frb::api::keys::{serialize_signer as frb_serialize_signer, MlsSignatureKeyPair};
 use openmls_frb::api::types::{
     FlexibleCommitOptions as FrbFlexibleCommitOptions, MlsCiphersuite as FrbCiphersuite,
-    MlsWireFormatPolicy as FrbWireFormatPolicy,
+    MlsWireFormatPolicy as FrbWireFormatPolicy, ProcessedMessageType as FrbProcessedMessageType,
 };
 
 uniffi::setup_scaffolding!("chaty_mls_native");
