@@ -1,5 +1,6 @@
 package com.example.chat.ui.island
 
+import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
