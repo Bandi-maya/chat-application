@@ -70,6 +70,11 @@ class PostgrestQueryClient(
          *  a bare update would PATCH every row in the table. */
         suspend fun update(values: Map<String, Any?>): Unit =
             client.runUpdate(table, values, filters)
+
+        /** Mirrors supabase_dart .insert(values).select(): POST with
+         *  Prefer: return=representation, returning the inserted rows. */
+        suspend fun insert(values: Map<String, Any?>): List<Map<String, Any?>> =
+            client.runInsert(table, values)
     }
 
     fun from(table: String): Query = Query(this, table)
@@ -95,6 +100,41 @@ class PostgrestQueryClient(
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 throw IOException("Delete $table failed with HTTP ${response.code}")
+            }
+        }
+    }
+
+    internal suspend fun runInsert(
+        table: String,
+        values: Map<String, Any?>,
+    ): List<Map<String, Any?>> = withContext(Dispatchers.IO) {
+        val body = JSONObject()
+        for ((key, value) in values) {
+            if (value == null) body.put(key, JSONObject.NULL) else body.put(key, value)
+        }
+        // PostgREST accepts a single object or an array; supabase_dart
+        // insert(map) sends one object, and .select() then returns an array.
+        val request = Request.Builder()
+            .url("$supabaseUrl/rest/v1/$table")
+            .addHeader("apikey", publishableKey)
+            .addHeader("Content-Type", "application/json")
+            .addHeader("Prefer", "return=representation")
+            .apply {
+                accessToken()?.let { addHeader("Authorization", "Bearer $it") }
+            }
+            .post(body.toString().toRequestBody(JSON))
+            .build()
+        client.newCall(request).execute().use { response ->
+            val text = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                throw IOException("Insert into $table failed with HTTP ${response.code}")
+            }
+            if (text.isBlank() || text == "null") return@withContext emptyList()
+            val trimmed = text.trim()
+            val arr = if (trimmed.startsWith("[")) JSONArray(trimmed)
+            else JSONArray().put(JSONObject(trimmed))
+            (0 until arr.length()).map { i ->
+                PostgrestRpcClient.jsonToMap(arr.getJSONObject(i))
             }
         }
     }
