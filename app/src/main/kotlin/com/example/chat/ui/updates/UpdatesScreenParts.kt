@@ -3,6 +3,8 @@ package com.example.chat.ui.updates
 import android.media.MediaPlayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -442,7 +444,7 @@ private fun StatusContent(
             Modifier
                 .clip(RoundedCornerShape(18.dp))
                 .pointerInput(signedUrl) {
-                    androidx.compose.foundation.gestures.detectTransformGestures { _, pan, zoom, _ ->
+                    detectTransformGestures { _, pan, zoom, _ ->
                         scale = (scale * zoom).coerceIn(1f, 5f)
                         if (scale > 1f) {
                             offsetX += pan.x
@@ -514,7 +516,7 @@ private fun ViewsControl(
                     // the sheet. Compose reports no fling velocity here, so
                     // accumulate the drag and open on a clear upward swipe.
                     var total = 0f
-                    androidx.compose.foundation.gestures.detectVerticalDragGestures(
+                    detectVerticalDragGestures(
                         onDragStart = { total = 0f },
                         onDragEnd = { if (total < -120f) onOpen() },
                     ) { _, dragAmount -> total += dragAmount }
