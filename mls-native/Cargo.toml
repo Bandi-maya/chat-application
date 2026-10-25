@@ -11,8 +11,9 @@ crate-type = ["cdylib"]
 [dependencies]
 # Repo-owned OpenMLS Rust API (same code the Flutter build ships).
 openmls_frb = { path = "../third_party/openmls_android/rust" }
-uniffi = { version = "0.28", features = ["cli"] }
+uniffi = { version = "0.28", features = ["cli", "tokio"] }
 tokio = { version = "1", features = ["full"] }
+thiserror = "2"
 
 [profile.release]
 strip = true
