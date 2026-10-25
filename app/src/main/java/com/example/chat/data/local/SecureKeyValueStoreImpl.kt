@@ -32,4 +32,9 @@ class SecureKeyValueStoreImpl(context: Context) : SecureKeyValueStore {
     override suspend fun delete(key: String): Unit = withContext(Dispatchers.IO) {
         prefs.edit().remove(key).apply()
     }
+
+    /** FlutterSecureStorage().deleteAll(): erase every secret in the store. */
+    suspend fun deleteAll(): Unit = withContext(Dispatchers.IO) {
+        prefs.edit().clear().apply()
+    }
 }
