@@ -1,6 +1,7 @@
 package com.example.chat
 
 import com.example.chat.core.auth.friendlyLoginError
+import com.example.chat.core.auth.friendlyOrgRegisterError
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -40,5 +41,38 @@ class LoginErrorParityTest {
     @Test
     fun unknownErrorsPassThroughVerbatim() {
         assertEquals("something entirely unexpected", err("something entirely unexpected"))
+    }
+
+    @Test
+    fun orgRegisterConnectionRefusedMapsToServerMessage() {
+        assertEquals(
+            "Unable to connect to the backend server. Please verify your connection.",
+            friendlyOrgRegisterError(Exception("Connection refused")),
+        )
+        assertEquals(
+            "Unable to connect to the backend server. Please verify your connection.",
+            friendlyOrgRegisterError(Exception("SocketException: failed host lookup")),
+        )
+    }
+
+    @Test
+    fun orgRegisterTenantTakenMapsToWorkspaceMessage() {
+        assertEquals(
+            "This Workspace ID is already taken. Please choose a different Workspace ID.",
+            friendlyOrgRegisterError(Exception("tenant id already exists")),
+        )
+    }
+
+    @Test
+    fun orgRegisterDomainMappedMapsToDomainMessage() {
+        assertEquals(
+            "This domain or workspace is already mapped to an existing organization.",
+            friendlyOrgRegisterError(Exception("domain already mapped")),
+        )
+    }
+
+    @Test
+    fun orgRegisterUnknownErrorPassesThroughStripped() {
+        assertEquals("something odd", friendlyOrgRegisterError(Exception("Exception: something odd")))
     }
 }
