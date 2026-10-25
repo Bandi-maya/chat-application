@@ -2,6 +2,7 @@ package com.example.chat.data.api
 
 import android.content.Context
 import com.example.chat.domain.models.ChatMessage
+import com.example.chat.domain.models.ChatTask
 import com.example.chat.domain.models.Conversation
 import com.example.chat.domain.models.ConversationType
 import com.example.chat.domain.models.DeliveryState
@@ -81,6 +82,13 @@ class ApiBackendService(context: Context) {
         transport = OkHttpApiTransport(),
     )
 
+    private val tasksClient = ApiTasksClient(
+        baseUrl = { config.restApiBaseUrl },
+        tenantId = { config.tenantId },
+        token = { session.token },
+        transport = OkHttpApiTransport(),
+    )
+
     /** ApiBackendService._currentOrg (Dart): current organization payload -
      *  restored from the persisted api_hub_org, refreshed on org register. */
     var currentOrg: Map<String, Any?>? = null
@@ -95,8 +103,21 @@ class ApiBackendService(context: Context) {
 
     /** ApiBackendService.subscribeToPlan: POST create-order; throws the server
      *  detail/message on non-200. */
+    /** Dart subscribeToPlan post-success: clear the subscription gate, update
+     *  the in-memory org plan, notify, and reload conversations/users. */
     suspend fun subscribeToPlan(organizationId: String, planId: String, durationMonths: Int = 1): Boolean =
-        withContext(Dispatchers.IO) { subscriptionClient.subscribeToPlan(organizationId, planId, durationMonths) }
+        withContext(Dispatchers.IO) {
+            val ok = subscriptionClient.subscribeToPlan(organizationId, planId, durationMonths)
+            if (ok) {
+                requiresSubscription = false
+                subscriptionErrorMessage = null
+                (currentOrg as? MutableMap<String, Any?>)?.put("plan_type", planId.trim())
+                notifyChatListeners()
+                chatScope.launch { loadConversations() }
+                chatScope.launch { loadUsers() }
+            }
+            ok
+        }
 
     // ---- Realtime plane (W1 ApiRealtimeClient integration) ----
 
@@ -242,6 +263,11 @@ class ApiBackendService(context: Context) {
     private val _users = mutableListOf<UserProfile>()
     private val _messages = mutableMapOf<String, MutableList<ChatMessage>>()
 
+    /** Dart _tasks / tasks getter. */
+    private val _tasks = mutableListOf<ChatTask>()
+    val tasks: List<ChatTask>
+        get() = synchronized(chatLock) { _tasks.toList() }
+
     /** Active-conversation id drives the 4s poll (Dart setActiveConversation). */
     @Volatile private var activeConversationId: String? = null
     @Volatile private var syncRunning = false
@@ -258,6 +284,17 @@ class ApiBackendService(context: Context) {
 
     /** loadConversations: keep prior state on failure, filter tasks, and
      *  set/clear the 402 subscription state. */
+    /** ApiBackendService.loadTasks: GET /tasks into _tasks, keeping prior
+     *  state on failure or when unauthenticated (Dart early return/catch). */
+    suspend fun loadTasks() {
+        val result = tasksClient.listTasks() ?: return
+        synchronized(chatLock) {
+            _tasks.clear()
+            _tasks.addAll(result)
+        }
+        notifyChatListeners()
+    }
+
     suspend fun loadConversations() {
         when (val result = chat.listRooms()) {
             is ApiChatClient.RoomsResult.Ok -> {
@@ -598,6 +635,7 @@ class ApiBackendService(context: Context) {
             startBackgroundSync()
             chatScope.launch { loadConversations() }
             chatScope.launch { loadUsers() }
+            chatScope.launch { loadTasks() }
             // Dart _syncFcmToken() (api_backend_service.dart:119).
             try { syncFcmTokenHook?.invoke() } catch (_: Exception) {
             }
@@ -620,6 +658,7 @@ class ApiBackendService(context: Context) {
             startBackgroundSync()
             chatScope.launch { loadConversations() }
             chatScope.launch { loadUsers() }
+            chatScope.launch { loadTasks() }
             // Dart _syncFcmToken() (api_backend_service.dart:571).
             try { syncFcmTokenHook?.invoke() } catch (_: Exception) {
             }
