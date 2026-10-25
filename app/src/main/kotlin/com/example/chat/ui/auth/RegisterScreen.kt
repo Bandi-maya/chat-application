@@ -21,7 +21,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AlternateEmail
 import androidx.compose.material.icons.rounded.Apartment
+import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.DomainAdd
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
@@ -510,7 +512,7 @@ private fun RegisterOrgCard(theme: ThemeConfig, onClick: () -> Unit) {
     ) {
         Box(modifier = Modifier.background(Color(argbWithAlpha(theme.accentColor, 0.15)), RoundedCornerShape(10.dp)).padding(7.dp)) {
             Icon(
-                androidx.compose.material.icons.Icons.Rounded.DomainAdd,
+                Icons.Rounded.DomainAdd,
                 contentDescription = null,
                 tint = Color(theme.accentColor),
                 modifier = Modifier.size(20.dp),
@@ -524,7 +526,7 @@ private fun RegisterOrgCard(theme: ThemeConfig, onClick: () -> Unit) {
             Text("Set up a custom workspace & team space", color = Color(theme.secondaryTextColor), fontSize = 11.5.sp)
         }
         Icon(
-            androidx.compose.material.icons.Icons.Rounded.ArrowForwardIos,
+            Icons.AutoMirrored.Rounded.ArrowForwardIos,
             contentDescription = null,
             tint = Color(theme.accentColor),
             modifier = Modifier.size(14.dp),
