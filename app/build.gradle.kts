@@ -105,7 +105,6 @@ val generateUniffiBindings = tasks.register<Exec>("generateUniffiBindings") {
         "--features", "uniffi/cli", "--bin", "uniffi-bindgen", "generate",
         "--library", mlsJniLibsDir.get().file("arm64-v8a/libchaty_mls_native.so").asFile.absolutePath,
         "--language", "kotlin",
-        "--no-config",
         "--out-dir", uniffiOutDir.get().asFile.absolutePath,
     )
 }
