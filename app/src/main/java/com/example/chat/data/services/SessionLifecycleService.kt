@@ -60,6 +60,46 @@ class SessionLifecycleService(
     var currentSession: AuthSessionInfo? = null
         private set
 
+    @Volatile
+    var isInitialized = false
+        private set
+
+    private val initializeMutex = kotlinx.coroutines.sync.Mutex()
+    private var initializeAttempted = false
+
+    /** Exact port of initialize()/_initialize(): one shared attempt, an
+     *  auth-state-change subscription feeding handleSession, then the
+     *  current-session path. A failed attempt resets so a later caller can
+     *  retry (Dart clears _initializeFuture on error). The demo-mode branch
+     *  does not exist on api and is not ported. */
+    suspend fun initialize(authStateChanges: kotlinx.coroutines.flow.Flow<SessionSnapshot?>) {
+        if (isInitialized) return
+        initializeMutex.lock()
+        try {
+            if (isInitialized) return
+            try {
+                if (!initializeAttempted) {
+                    initializeAttempted = true
+                    scope.launch {
+                        authStateChanges.collect { session -> handleSession(session) }
+                    }
+                }
+                handleSession(currentSessionSnapshot())
+                isInitialized = true
+                notifyChanged()
+            } catch (error: Throwable) {
+                initializeAttempted = false
+                throw error
+            }
+        } finally {
+            initializeMutex.unlock()
+        }
+    }
+
+    /** Seam for _client.auth.currentSession at initialize time; wiring
+     *  supplies the GoTrue session snapshot. */
+    var currentSessionSnapshot: () -> SessionSnapshot? = { null }
+
     /** Exact port of _handleSession. */
     suspend fun handleSession(session: SessionSnapshot?) {
         if (session == null) {
