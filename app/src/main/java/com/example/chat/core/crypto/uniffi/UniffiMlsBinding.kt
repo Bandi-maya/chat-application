@@ -175,7 +175,7 @@ class UniffiMlsEngine private constructor(private val inner: ChatyMlsEngine) : M
 
         private fun MlsCiphersuite.toU(): UCiphersuite = when (this) {
             MlsCiphersuite.MLS_128_DHKEMX25519_AES128GCM_SHA256_ED25519 ->
-                UCiphersuite.MLS_128_DHKEMX25519_AES128GCM_SHA256_ED25519
+                UCiphersuite.MLS128_DHKEM_X25519_AES128GCM_SHA256_ED25519
         }
 
         private fun MlsGroupConfig.toU(): UGroupConfig = UGroupConfig(
