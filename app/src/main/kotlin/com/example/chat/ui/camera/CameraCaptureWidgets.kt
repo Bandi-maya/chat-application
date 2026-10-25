@@ -7,8 +7,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.rememberTransformableState
-import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -544,15 +544,33 @@ fun CameraCaptureConfirmPane(
             // InteractiveViewer(maxScale: 4)
             var scale by remember { mutableStateOf(1f) }
             var offset by remember { mutableStateOf(Offset.Zero) }
-            val transformState = rememberTransformableState { zoom, pan, _ ->
-                scale = (scale * zoom).coerceIn(1f, 4f)
-                offset += pan
-            }
+            // Dart InteractiveViewer(maxScale: 4, boundaryMargin: zero,
+            // constrained: true): the transform is about the child's TOP-LEFT
+            // origin (Flutter Transform default), pinch zoom keeps the gesture
+            // focal point fixed, and the child AABB is clamped inside the
+            // viewport every update. Compose graphicsLayer defaults to a
+            // CENTER pivot, so the pivot is pinned to top-left explicitly and
+            // the gesture math lives in confirmPaneZoomPan (JVM-tested).
             Box(
                 Modifier
                     .fillMaxSize()
-                    .transformable(transformState)
+                    .pointerInput(Unit) {
+                        detectTransformGestures { centroid, pan, zoom, _ ->
+                            val step = confirmPaneZoomPan(
+                                offset = offset,
+                                centroid = centroid,
+                                pan = pan,
+                                scale = scale,
+                                zoom = zoom,
+                                viewportWidth = size.width.toFloat(),
+                                viewportHeight = size.height.toFloat(),
+                            )
+                            scale = step.first
+                            offset = step.second
+                        }
+                    }
                     .graphicsLayer {
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
                         scaleX = scale
                         scaleY = scale
                         translationX = offset.x
@@ -631,4 +649,48 @@ fun CameraCaptureConfirmPane(
             }
         }
     }
+}
+
+
+/** InteractiveViewer pan clamp with zero boundaryMargin over a
+ *  viewport-constrained child (top-left pivot): offset stays in
+ *  [viewport * (1-scale), 0] per axis. Pure for JVM tests. */
+fun clampConfirmPanePan(
+    offset: Offset,
+    scale: Float,
+    viewportWidth: Float,
+    viewportHeight: Float,
+): Offset {
+    val minX = viewportWidth * (1f - scale)
+    val minY = viewportHeight * (1f - scale)
+    return Offset(
+        offset.x.coerceIn(minX, 0f),
+        offset.y.coerceIn(minY, 0f),
+    )
+}
+
+
+/** One InteractiveViewer scale/pan update: zoom clamps to [1,4], the gesture
+ *  centroid stays fixed on screen (Flutter scales the matrix about the focal
+ *  point), pan accumulates, then the result is boundary-clamped with
+ *  [clampConfirmPanePan]. Returns (newScale, newOffset). Pure for JVM tests. */
+fun confirmPaneZoomPan(
+    offset: Offset,
+    centroid: Offset,
+    pan: Offset,
+    scale: Float,
+    zoom: Float,
+    viewportWidth: Float,
+    viewportHeight: Float,
+): Pair<Float, Offset> {
+    val newScale = (scale * zoom).coerceIn(1f, 4f)
+    // Keep the centroid fixed: offset' = c + (offset - c) * (s'/s) + pan.
+    val factor = newScale / scale
+    val unclamped = Offset(
+        centroid.x + (offset.x - centroid.x) * factor + pan.x,
+        centroid.y + (offset.y - centroid.y) * factor + pan.y,
+    )
+    return newScale to clampConfirmPanePan(
+        unclamped, newScale, viewportWidth, viewportHeight,
+    )
 }
