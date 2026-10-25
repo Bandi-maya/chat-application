@@ -62,6 +62,37 @@ class StatusService(
     /** gbDouble('abo_saleh_audio_limit_check' | 'Up_size_limit', fallback). */
     private val gbSizeLimitMb: (key: String, fallback: Double) -> Double = { _, fb -> fb },
 ) {
+    /**
+     * Dart watchActiveStatuses (status_updates stream, newest first, unexpired,
+     * deleted rows kept only when anti-delete is on). The Supabase realtime
+     * stream is not ported on this plane, so this polls the same table on a
+     * fixed interval; it never fabricates rows.
+     */
+    fun watchActiveStatuses(
+        keepDeleted: () -> Boolean = { false },
+        pollMillis: Long = 10_000L,
+    ): kotlinx.coroutines.flow.Flow<List<StatusRecord>> = kotlinx.coroutines.flow.flow {
+        while (true) {
+            try {
+                val rows = queryClient.from("status_updates")
+                    .select()
+                    .order("created_at", ascending = false)
+                    .execute()
+                val now = Instant.now()
+                val keep = keepDeleted()
+                emit(
+                    rows.map { fromRow(it) }
+                        .filter { it.expiresAt.isAfter(now) && (!it.isDeleted || keep) },
+                )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // keep the last emission; the next poll retries
+            }
+            kotlinx.coroutines.delay(pollMillis)
+        }
+    }
+
     /** Exact port of publishText. */
     suspend fun publishText(text: String): StatusRecord {
         val value = text.trim()
