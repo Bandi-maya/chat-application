@@ -1,5 +1,8 @@
 package com.example.chat.ui.island
 
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -285,7 +288,7 @@ fun DynamicIslandOverlayHost(
                         ) {
                             androidx.compose.material3.Icon(
                                 imageVector = secondaryPayload.iconData
-                                    ?: androidx.compose.material.icons.Icons.Rounded.Notifications,
+                                    ?: Icons.Rounded.Notifications,
                                 contentDescription = "Secondary activity: ${secondaryPayload.title}",
                                 tint = secondaryPayload.accentColor,
                                 modifier = Modifier.size(16.dp),
