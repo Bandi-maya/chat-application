@@ -33,6 +33,7 @@ android {
         getByName("main") {
             java.srcDir(layout.buildDirectory.dir("generated/uniffi"))
             jniLibs.srcDir(layout.buildDirectory.dir("jniLibs"))
+            assets.srcDir(layout.buildDirectory.dir("generated/faceModel/assets"))
         }
     }
 
@@ -73,6 +74,13 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.security:security-crypto:1.1.0-alpha07")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // FCM transport (firebase_notification_service.dart port). The
+    // google-services plugin is NOT applied: google-services.json exists in
+    // neither repo branch, and the plugin fails the build without it. The
+    // messaging client compiles and registers now; runtime activation
+    // happens once the Firebase config lands.
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-messaging")
     // Required by the uniffi-generated Kotlin bindings (JNA native calls).
     implementation("net.java.dev.jna:jna:5.14.0@aar")
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
@@ -132,3 +140,58 @@ val generateUniffiBindings = tasks.register<Exec>("generateUniffiBindings") {
 }
 
 tasks.named("preBuild") { dependsOn(generateUniffiBindings) }
+
+
+// ── MediaPipe face landmarker model (FaceDetectionBridge.MODEL_ASSET).
+// Downloaded at build time from the official MediaPipe model bucket and
+// verified against the pinned SHA-256 (fail closed on mismatch), so no
+// binary lives in the repo and the app carries no runtime network
+// dependency for the model.
+val faceLandmarkerUrl =
+    "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"
+val faceLandmarkerSha256 =
+    "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff"
+val faceLandmarkerSize = 3758596L
+val faceLandmarkerAssetsDir = layout.buildDirectory.dir("generated/faceModel/assets")
+
+val downloadFaceLandmarker = tasks.register("downloadFaceLandmarker") {
+    val outFile = faceLandmarkerAssetsDir.get().file("face_landmarker.task").asFile
+    outputs.file(outFile)
+    doLast {
+        fun sha256(f: java.io.File): String {
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+            f.inputStream().use { input ->
+                val buffer = ByteArray(8192)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    digest.update(buffer, 0, read)
+                }
+            }
+            return digest.digest().joinToString("") { "%02x".format(it) }
+        }
+        if (outFile.exists() && outFile.length() == faceLandmarkerSize &&
+            sha256(outFile) == faceLandmarkerSha256
+        ) {
+            return@doLast
+        }
+        outFile.parentFile.mkdirs()
+        val tmp = java.io.File(outFile.parentFile, outFile.name + ".download")
+        tmp.delete()
+        java.net.URI(faceLandmarkerUrl).toURL().openStream().use { input ->
+            tmp.outputStream().use { input.copyTo(it) }
+        }
+        check(tmp.length() == faceLandmarkerSize) {
+            tmp.delete()
+            "face_landmarker.task size mismatch: got ${tmp.length()}, want $faceLandmarkerSize"
+        }
+        val hash = sha256(tmp)
+        check(hash == faceLandmarkerSha256) {
+            tmp.delete()
+            "face_landmarker.task SHA-256 mismatch: got $hash, want $faceLandmarkerSha256"
+        }
+        check(tmp.renameTo(outFile)) { "failed to move $tmp to $outFile" }
+    }
+}
+
+tasks.named("preBuild") { dependsOn(downloadFaceLandmarker) }
