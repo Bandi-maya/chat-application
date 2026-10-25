@@ -1,5 +1,6 @@
 package com.example.chat.ui.camera
 
+import androidx.compose.ui.semantics.selected
 import com.example.chat.ui.kit.ChatyHapticsPort
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
