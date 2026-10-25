@@ -77,7 +77,7 @@ dependencies {
     testImplementation("org.json:json:20241224")
 }
 
-// ââ MLS native binding (mls-native UniFFI shim over the repo-owned OpenMLS
+// ── MLS native binding (mls-native UniFFI shim over the repo-owned OpenMLS
 // Rust crate in third_party/openmls_android/rust). Requires cargo-ndk and the
 // Android NDK; the CI workflow installs both. Local builds without Rust can
 // skip with -PskipMlsNative (the app then fails closed at runtime, by design).
