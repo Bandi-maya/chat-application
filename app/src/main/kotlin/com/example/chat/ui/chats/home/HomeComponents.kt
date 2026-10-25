@@ -12,7 +12,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import com.example.chat.ui.theme.ChatyAsyncImage
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -54,7 +57,11 @@ fun avatarShapeFor(shape: String, sizeDp: Float): androidx.compose.ui.graphics.S
     else -> CircleShape
 }
 
-/** ChatyAvatar: initials tile, white w600 label at 38% of size. */
+/** ChatyAvatar + ChatyNetworkAvatar merged port: initials tile, white w600
+ *  label at 38% of size. When [url] is non-blank the remote photo renders
+ *  through the shared ChatyAsyncImage wrapper, clipped to the same shape,
+ *  with the initials tile as loading placeholder AND error fallback (the
+ *  Dart network avatar falls back to initials the same way). */
 @Composable
 fun HomeAvatar(
     initials: String,
@@ -62,7 +69,37 @@ fun HomeAvatar(
     size: Float,
     shape: String,
     modifier: Modifier = Modifier,
+    url: String? = null,
 ) {
+    if (!url.isNullOrBlank()) {
+        val initialsTile: @Composable () -> Unit = {
+            Box(
+                modifier = Modifier
+                    .size(size.dp)
+                    .background(color, avatarShapeFor(shape, size)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    initials,
+                    maxLines = 1,
+                    color = Color.White,
+                    fontWeight = FontWeight.W600,
+                    fontSize = (size * 0.38f).sp,
+                )
+            }
+        }
+        ChatyAsyncImage(
+            url = url,
+            contentDescription = null,
+            modifier = modifier
+                .size(size.dp)
+                .clip(avatarShapeFor(shape, size)),
+            contentScale = ContentScale.Crop,
+            placeholder = initialsTile,
+            error = initialsTile,
+        )
+        return
+    }
     Box(
         modifier = modifier
             .size(size.dp)
