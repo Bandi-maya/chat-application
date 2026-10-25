@@ -16,6 +16,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.chat.ServiceLocator
@@ -160,32 +163,8 @@ fun AppRoot() {
                 else -> AuthRoute.Welcome
             }
         }
-        when (route) {
-            AuthRoute.Splash -> SplashScreen(
-                routeToHome = {
-                    // Mirrors splash_screen.dart: backend.initialize() best-effort,
-                    // then route on authentication state.
-                    try {
-                        ServiceLocator.sessionManager.restore()
-                    } catch (_: Exception) {
-                        // Authentication remains the source of truth.
-                    }
-                    // Facade precedence (backend_service.dart): a live REST
-                    // (ApiBackendService) session also counts as authenticated.
-                    ServiceLocator.sessionManager.currentUserId() != null ||
-                        ServiceLocator.apiBackend.isAuthenticated
-                },
-                onRoute = { isAuthed ->
-                    // Dart pushes MainNavigationShell when authenticated; the
-                    // chats-home slice replaces the Home stub destination.
-                    route = if (isAuthed) AuthRoute.Home else AuthRoute.Welcome
-                },
-            )
-            AuthRoute.Welcome -> WelcomeScreen(
-                onLogin = { route = AuthRoute.Login },
-                onRegister = { registerOrigin = AuthRoute.Welcome; route = AuthRoute.Register },
-            )
-            AuthRoute.Login -> LoginScreen(
+        val loginScreen: @Composable () -> Unit = {
+            LoginScreen(
                 onBack = { route = AuthRoute.Welcome },
                 onLoggedIn = { userId ->
                     ServiceLocator.appLock.onSignedIn()
@@ -210,7 +189,9 @@ fun AppRoot() {
                     user.id
                 },
             )
-            AuthRoute.Register -> com.example.chat.ui.auth.RegisterScreen(
+        }
+        val registerScreen: @Composable () -> Unit = {
+            com.example.chat.ui.auth.RegisterScreen(
                 onBack = { route = registerOrigin },
                 onRegistered = { userId, _ ->
                     ServiceLocator.appLock.onSignedIn()
@@ -243,13 +224,17 @@ fun AppRoot() {
                     com.example.chat.ui.auth.OrgCheckResult(name, allow)
                 },
             )
-            AuthRoute.ForgotPassword -> com.example.chat.ui.auth.ForgotPasswordScreen(
+        }
+        val forgotScreen: @Composable () -> Unit = {
+            com.example.chat.ui.auth.ForgotPasswordScreen(
                 onBack = { route = AuthRoute.Login },
                 // Dart prefers ApiBackendService.forgotPassword when registered
                 // (it is, in locator) over the Supabase path.
                 sendRecovery = { email -> ServiceLocator.apiBackend.forgotPassword(email) },
             )
-            AuthRoute.RegisterOrganization -> com.example.chat.ui.auth.RegisterOrganizationScreen(
+        }
+        val orgScreen: @Composable () -> Unit = {
+            com.example.chat.ui.auth.RegisterOrganizationScreen(
                 onBack = { route = orgOrigin },
                 onRegistered = { userId, regOrgId, regOrgName ->
                     planOrgId = regOrgId; planOrgName = regOrgName; planIsNew = true
@@ -273,6 +258,49 @@ fun AppRoot() {
                     Triple(user.id, orgId, orgNameResolved)
                 },
             )
+        }
+        when (route) {
+            AuthRoute.Splash -> SplashScreen(
+                routeToHome = {
+                    // Mirrors splash_screen.dart: backend.initialize() best-effort,
+                    // then route on authentication state.
+                    try {
+                        ServiceLocator.sessionManager.restore()
+                    } catch (_: Exception) {
+                        // Authentication remains the source of truth.
+                    }
+                    // Facade precedence (backend_service.dart): a live REST
+                    // (ApiBackendService) session also counts as authenticated.
+                    ServiceLocator.sessionManager.currentUserId() != null ||
+                        ServiceLocator.apiBackend.isAuthenticated
+                },
+                onRoute = { isAuthed ->
+                    // Dart pushes MainNavigationShell when authenticated; the
+                    // chats-home slice replaces the Home stub destination.
+                    route = if (isAuthed) AuthRoute.Home else AuthRoute.Welcome
+                },
+            )
+            AuthRoute.Welcome -> WelcomeScreen(
+                onLogin = { route = AuthRoute.Login },
+                onRegister = { registerOrigin = AuthRoute.Welcome; route = AuthRoute.Register },
+            )
+            AuthRoute.Login, AuthRoute.Register, AuthRoute.ForgotPassword, AuthRoute.RegisterOrganization -> {
+                // Dart keeps each pushed-under screen (and its form state) alive: Login under Register/Forgot/
+                // RegisterOrganization, Register under RegisterOrganization. State is in-memory only (no saved
+                // instance state), so passwords are never persisted.
+                val showLogin = route == AuthRoute.Login || route == AuthRoute.ForgotPassword ||
+                    (route == AuthRoute.Register && registerOrigin == AuthRoute.Login) ||
+                    (route == AuthRoute.RegisterOrganization &&
+                        (orgOrigin == AuthRoute.Login || (orgOrigin == AuthRoute.Register && registerOrigin == AuthRoute.Login)))
+                val showRegister = route == AuthRoute.Register ||
+                    (route == AuthRoute.RegisterOrganization && orgOrigin == AuthRoute.Register)
+                androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+                    if (showLogin) PreAuthLayer(route == AuthRoute.Login, loginScreen)
+                    if (showRegister) PreAuthLayer(route == AuthRoute.Register, registerScreen)
+                    if (route == AuthRoute.ForgotPassword) PreAuthLayer(true, forgotScreen)
+                    if (route == AuthRoute.RegisterOrganization) PreAuthLayer(true, orgScreen)
+                }
+            }
             AuthRoute.SubscriptionPlan -> com.example.chat.ui.subscription.PlanSubscriptionScreen(
                 organizationId = planOrgId,
                 organizationName = planOrgName,
@@ -1159,4 +1187,23 @@ private fun MessageManagementHost(onBack: () -> Unit) {
                     onBack = onBack,
                     showToast = { android.widget.Toast.makeText(mmToast, it, android.widget.Toast.LENGTH_SHORT).show() },
                 )
+}
+
+
+/** One pre-auth screen layer. A covered layer stays composed (form state kept) but is measured, placed and
+ *  clipped at zero size so it neither draws, takes touches, nor appears in the accessibility tree; the
+ *  visible layer blocks touches from reaching anything under it. */
+@Composable
+private fun PreAuthLayer(visible: Boolean, content: @Composable () -> Unit) {
+    val mod = if (visible) {
+        Modifier.fillMaxSize().pointerInput(Unit) {}
+    } else {
+        Modifier
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                layout(0, 0) { placeable.place(0, 0) }
+            }
+            .clipToBounds()
+    }
+    androidx.compose.foundation.layout.Box(mod) { content() }
 }
