@@ -109,7 +109,11 @@ object ServiceLocator {
 
     private val secureStore: SecureKeyValueStoreImpl by lazy { SecureKeyValueStoreImpl(requireContext()) }
 
-    private val preferencesStorage: com.example.chat.core.preferences.LocalPreferencesStorage by lazy {
+    val themeController: com.example.chat.core.theme.ThemeController by lazy {
+        com.example.chat.core.theme.ThemeController(preferencesStorage, appScope)
+    }
+
+    val preferencesStorage: com.example.chat.core.preferences.LocalPreferencesStorage by lazy {
         com.example.chat.core.preferences.LocalPreferencesStorage(requireContext())
     }
 
