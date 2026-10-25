@@ -3,8 +3,10 @@ package com.example.chat
 import com.example.chat.data.api.ApiAccountClient
 import com.example.chat.data.api.OkHttpApiBinaryTransport
 import com.example.chat.data.api.OkHttpApiTransport
-import com.sun.net.httpserver.HttpServer
-import java.net.InetSocketAddress
+import okhttp3.mockwebserver.Dispatcher
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
 import java.util.concurrent.CopyOnWriteArrayList
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -17,28 +19,27 @@ import org.junit.Test
 class OkHttpTransportMethodsTest {
     private class Seen(val method: String, val path: String, val headers: Map<String, String>, val body: ByteArray)
 
-    private lateinit var server: HttpServer
+    private lateinit var server: MockWebServer
     private val seen = CopyOnWriteArrayList<Seen>()
     @Volatile private var status = 200
     @Volatile private var responseBody = "{}"
-    private val base get() = "http://127.0.0.1:${server.address.port}"
+    private val base get() = server.url("/").toString().trimEnd('/')
 
     @Before
     fun start() {
-        server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        server.createContext("/") { ex ->
-            val hdrs = ex.requestHeaders.entries.associate { it.key.lowercase() to it.value.joinToString(",") }
-            seen.add(Seen(ex.requestMethod, ex.requestURI.path, hdrs, ex.requestBody.readBytes()))
-            val out = responseBody.toByteArray()
-            ex.sendResponseHeaders(status, if (out.isEmpty()) -1 else out.size.toLong())
-            if (out.isNotEmpty()) ex.responseBody.use { it.write(out) }
-            ex.close()
+        server = MockWebServer()
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val hdrs = request.headers.toMultimap().entries.associate { it.key.lowercase() to it.value.joinToString(",") }
+                seen.add(Seen(request.method ?: "", request.path ?: "", hdrs, request.body.readByteArray()))
+                return MockResponse().setResponseCode(status).setBody(responseBody)
+            }
         }
         server.start()
     }
 
     @After
-    fun stop() { server.stop(0) }
+    fun stop() { server.shutdown() }
 
     @Test
     fun putSendsBodyAndHeaders() {
