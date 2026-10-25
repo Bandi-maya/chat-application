@@ -9,6 +9,7 @@ import com.example.chat.data.remote.RealtimeSubscribeStatus
 import com.example.chat.domain.models.ChatMessage
 import com.example.chat.domain.models.DeliveryState
 import com.example.chat.domain.models.PresenceState
+import com.example.chat.domain.models.RealtimeSocketStatus
 import com.example.chat.domain.models.UserProfile
 import java.time.Instant
 import kotlinx.coroutines.async
@@ -21,10 +22,8 @@ data class ContactActivityState(
     val updatedAt: Instant,
 )
 
-/** Socket statuses consumed by ConnectionHealthService (Dart
- *  RealtimeSocketStatus in domain/models/connection_health.dart). */
-enum class RealtimeSocketStatus { connected, reconnecting, disconnected }
-
+/** Reports Realtime socket transitions to the connection-health slice
+ *  (Dart ConnectionHealthService.notifyRealtimeStatus). */
 fun interface ConnectionHealthSink {
     fun notifyRealtimeStatus(status: RealtimeSocketStatus)
 }
