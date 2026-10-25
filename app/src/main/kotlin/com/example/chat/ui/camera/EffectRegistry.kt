@@ -1,5 +1,58 @@
 package com.example.chat.ui.camera
 
+import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.rounded.WbTwilight
+import androidx.compose.material.icons.rounded.WbSunny
+import androidx.compose.material.icons.rounded.Waves
+import androidx.compose.material.icons.rounded.WaterDrop
+import androidx.compose.material.icons.rounded.Water
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VideogameAsset
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.Theaters
+import androidx.compose.material.icons.rounded.Terminal
+import androidx.compose.material.icons.rounded.Style
+import androidx.compose.material.icons.rounded.Stream
+import androidx.compose.material.icons.rounded.Stars
+import androidx.compose.material.icons.rounded.StarBorder
+import androidx.compose.material.icons.rounded.Spa
+import androidx.compose.material.icons.rounded.SolarPower
+import androidx.compose.material.icons.rounded.PhotoFilter
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Nightlight
+import androidx.compose.material.icons.rounded.NaturePeople
+import androidx.compose.material.icons.rounded.MovieFilter
+import androidx.compose.material.icons.rounded.MovieCreation
+import androidx.compose.material.icons.rounded.MonochromePhotos
+import androidx.compose.material.icons.rounded.MilitaryTech
+import androidx.compose.material.icons.rounded.LocalMovies
+import androidx.compose.material.icons.rounded.LocalFireDepartment
+import androidx.compose.material.icons.rounded.LensBlur
+import androidx.compose.material.icons.rounded.Landscape
+import androidx.compose.material.icons.rounded.Grid4x4
+import androidx.compose.material.icons.rounded.Grain
+import androidx.compose.material.icons.rounded.Gradient
+import androidx.compose.material.icons.rounded.Flare
+import androidx.compose.material.icons.rounded.FilterVintage
+import androidx.compose.material.icons.rounded.FilterBAndW
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.ElectricBolt
+import androidx.compose.material.icons.rounded.Diamond
+import androidx.compose.material.icons.rounded.CropOriginal
+import androidx.compose.material.icons.rounded.Contrast
+import androidx.compose.material.icons.rounded.CircleNotifications
+import androidx.compose.material.icons.rounded.Celebration
+import androidx.compose.material.icons.rounded.CameraRoll
+import androidx.compose.material.icons.rounded.CameraEnhance
+import androidx.compose.material.icons.rounded.CameraAlt
+import androidx.compose.material.icons.rounded.Camera
+import androidx.compose.material.icons.rounded.Business
+import androidx.compose.material.icons.rounded.BrokenImage
+import androidx.compose.material.icons.rounded.BlurOn
+import androidx.compose.material.icons.rounded.BlurLinear
+import androidx.compose.material.icons.rounded.AutoStories
+import androidx.compose.material.icons.rounded.AcUnit
 import androidx.compose.material.icons.rounded.FaceRetouchingNatural
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Pets
@@ -561,7 +614,7 @@ object EffectRegistry {
             id = "cyber_neon_glow",
             name = "Neon Violet",
             category = EffectCategory.glow,
-            icon = Icons.Rounded.LightbulbOutline,
+            icon = Icons.Outlined.Lightbulb,
             previewColor = Color(0xFFA855F7),
             colorMatrix = listOf(
                 1.3, 0.0, 0.0, 0.0, 20.0,
