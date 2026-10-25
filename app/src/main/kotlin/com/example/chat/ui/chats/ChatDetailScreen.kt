@@ -993,7 +993,7 @@ private fun ConversationHeader(
                         modifier = Modifier
                             .size(38.dp)
                             .background(
-                                conversation.avatarColorHex?.let(::parseHexColor)
+                                conversation.avatarColorHex?.let { parseHexColor(it) }
                                     ?: Color(theme.accentColor),
                                 CircleShape,
                             ),
