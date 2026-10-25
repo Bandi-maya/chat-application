@@ -70,7 +70,7 @@ class StatusService(
      */
     fun watchActiveStatuses(
         keepDeleted: () -> Boolean = { false },
-        pollMillis: Long = 10_000L,
+        pollMillis: Long = 60_000L,
     ): kotlinx.coroutines.flow.Flow<List<StatusRecord>> = kotlinx.coroutines.flow.flow {
         while (true) {
             try {
