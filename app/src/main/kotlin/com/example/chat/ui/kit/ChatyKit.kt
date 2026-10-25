@@ -79,8 +79,8 @@ object ChatyMotionTokens {
 
 @Composable
 fun rememberChatySelectionHaptic(): () -> Unit {
-    val haptic = LocalHapticFeedback.current
-    return { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+    val view = androidx.compose.ui.platform.LocalView.current
+    return { ChatyHapticsPort.selection(view) }
 }
 
 /** ChatyBackButton: 34dp circle, surfaceSecondary fill, 0.8dp border, chevron_left 24, press scale 0.92. */
