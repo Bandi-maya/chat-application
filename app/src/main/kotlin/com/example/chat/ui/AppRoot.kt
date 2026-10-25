@@ -61,6 +61,9 @@ fun AppRoot() {
     ChatyTheme(config = themeController.globalTheme) {
         var route by remember { mutableStateOf(AuthRoute.Splash) }
         var selectedConversation by remember { mutableStateOf<com.example.chat.domain.models.Conversation?>(null) }
+        var planOrgId by remember { mutableStateOf("") }
+        var planOrgName by remember { mutableStateOf("") }
+        var planIsNew by remember { mutableStateOf(false) }
         var selectedInitialMessageId by remember { mutableStateOf<String?>(null) }
         val lockRequired by ServiceLocator.appLock.lockRequired.collectAsState()
         androidx.compose.runtime.LaunchedEffect(route) {
@@ -231,7 +234,8 @@ fun AppRoot() {
             )
             AuthRoute.RegisterOrganization -> com.example.chat.ui.auth.RegisterOrganizationScreen(
                 onBack = { route = AuthRoute.Login },
-                onRegistered = { userId, _, _ ->
+                onRegistered = { userId, regOrgId, regOrgName ->
+                    planOrgId = regOrgId; planOrgName = regOrgName; planIsNew = true
                     ServiceLocator.appLock.onSignedIn()
                     promptPending = true
                     ServiceLocator.appScope.launch {
@@ -252,9 +256,19 @@ fun AppRoot() {
                     Triple(user.id, orgId, orgNameResolved)
                 },
             )
-            AuthRoute.SubscriptionPlan -> AuthWipStub(
-                "Plan selection arrives with the subscription slice",
+            AuthRoute.SubscriptionPlan -> com.example.chat.ui.subscription.PlanSubscriptionScreen(
+                organizationId = planOrgId,
+                organizationName = planOrgName,
+                isNewRegistration = planIsNew,
                 onBack = { route = AuthRoute.Home },
+                // Dart pushAndRemoveUntil(MainNavigationShell).
+                onSubscribed = { route = AuthRoute.Home },
+                loadPlans = { id -> ServiceLocator.apiBackend.getAvailablePlans(id) },
+                subscribe = { id, planId, months ->
+                    if (!ServiceLocator.apiBackend.subscribeToPlan(id, planId, months)) {
+                        throw Exception("Subscription failed")
+                    }
+                },
             )
             AuthRoute.Home -> run {
                 // Observe ApiBackendService chat state (listener -> recompose).
@@ -283,6 +297,9 @@ fun AppRoot() {
                     } else if (dest == com.example.chat.ui.settings.SettingsDestination.SearchSettings) {
                         // Dart: showSearch(SettingsSearchDelegate(allSettings: _searchIndex())).
                         pushedSettingsSearch = true
+                    } else if (dest == com.example.chat.ui.settings.SettingsDestination.Automation) {
+                        // Dart settings_root_screen: 'Message Automation & Scheduler' -> MessageManagementPage.
+                        route = AuthRoute.MessageManagement
                     } else if (dest == com.example.chat.ui.settings.SettingsDestination.EditProfile) {
                         // Dart: ProfileEditScreen.open(context, dataStore).
                         pushedEditProfile = true
@@ -348,6 +365,14 @@ fun AppRoot() {
                     onOpenGlobalSearch = { route = AuthRoute.GlobalSearch },
                     onOpenMessageManagement = { route = AuthRoute.MessageManagement },
                     onOpenStarredMessages = { route = AuthRoute.Starred },
+                    // Dart chats_home banner: org uid ?: tenantId ?: config tenant; isNewRegistration=false.
+                    onSelectPlan = {
+                        val org = ServiceLocator.apiBackend.currentOrganization
+                        planOrgId = org?.get("uid")?.toString() ?: org?.get("tenantId")?.toString() ?: com.example.chat.data.api.ApiBackendConfig.tenantId
+                        planOrgName = org?.get("name")?.toString() ?: com.example.chat.data.api.ApiBackendConfig.tenantId
+                        planIsNew = false
+                        route = AuthRoute.SubscriptionPlan
+                    },
                     onOpenProfile = { pushedProfile = true },
                     onOpenQr = { linkedDevicesOnly = false; route = AuthRoute.LinkedDevices },
                     onOpenLinkedDevices = { linkedDevicesOnly = true; route = AuthRoute.LinkedDevices },
@@ -369,6 +394,14 @@ fun AppRoot() {
                     onOpenGlobalSearch = { route = AuthRoute.GlobalSearch },
                     onOpenMessageManagement = { route = AuthRoute.MessageManagement },
                     onOpenStarredMessages = { route = AuthRoute.Starred },
+                    // Dart chats_home banner: org uid ?: tenantId ?: config tenant; isNewRegistration=false.
+                    onSelectPlan = {
+                        val org = ServiceLocator.apiBackend.currentOrganization
+                        planOrgId = org?.get("uid")?.toString() ?: org?.get("tenantId")?.toString() ?: com.example.chat.data.api.ApiBackendConfig.tenantId
+                        planOrgName = org?.get("name")?.toString() ?: com.example.chat.data.api.ApiBackendConfig.tenantId
+                        planIsNew = false
+                        route = AuthRoute.SubscriptionPlan
+                    },
                     onOpenProfile = { pushedProfile = true },
                     onOpenQr = { linkedDevicesOnly = false; route = AuthRoute.LinkedDevices },
                     onOpenLinkedDevices = { linkedDevicesOnly = true; route = AuthRoute.LinkedDevices },
