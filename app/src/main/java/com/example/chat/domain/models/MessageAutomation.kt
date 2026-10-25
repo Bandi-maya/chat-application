@@ -11,13 +11,47 @@ data class AutoReplyRule(
     val responseMessage: String,
     val recipientFilter: String = "All", // 'All', 'Contacts', 'Groups'
     val matchType: String = "contains", // 'contains', 'exact', 'starts_with'
-)
+) {
+    fun toMap(): Map<String, Any?> = mapOf(
+        "id" to id,
+        "enabled" to enabled,
+        "keyword" to keyword,
+        "responseMessage" to responseMessage,
+        "recipientFilter" to recipientFilter,
+        "matchType" to matchType,
+    )
+
+    companion object {
+        fun fromMap(map: Map<String, Any?>): AutoReplyRule = AutoReplyRule(
+            id = map["id"] as String? ?: "",
+            enabled = map["enabled"] as Boolean? ?: true,
+            keyword = map["keyword"] as String? ?: "",
+            responseMessage = map["responseMessage"] as String? ?: "",
+            recipientFilter = map["recipientFilter"] as String? ?: "All",
+            matchType = map["matchType"] as String? ?: "contains",
+        )
+    }
+}
 
 data class QuickReplyTemplate(
     val shortcut: String,
     val title: String,
     val content: String,
-)
+) {
+    fun toMap(): Map<String, Any?> = mapOf(
+        "shortcut" to shortcut,
+        "title" to title,
+        "content" to content,
+    )
+
+    companion object {
+        fun fromMap(map: Map<String, Any?>): QuickReplyTemplate = QuickReplyTemplate(
+            shortcut = map["shortcut"] as String? ?: "",
+            title = map["title"] as String? ?: "",
+            content = map["content"] as String? ?: "",
+        )
+    }
+}
 
 data class ScheduledMessageEntry(
     val id: String,
@@ -26,7 +60,29 @@ data class ScheduledMessageEntry(
     val text: String,
     val scheduledAtMillis: Long,
     val isExecuted: Boolean = false,
-)
+) {
+    fun toMap(): Map<String, Any?> = mapOf(
+        "id" to id,
+        "recipientId" to recipientId,
+        "recipientName" to recipientName,
+        "text" to text,
+        "scheduledAt" to scheduledAtMillis,
+        "isExecuted" to isExecuted,
+    )
+
+    companion object {
+        /** Dart fallback DateTime.now() preserved for a missing timestamp. */
+        fun fromMap(map: Map<String, Any?>): ScheduledMessageEntry = ScheduledMessageEntry(
+            id = map["id"] as String,
+            recipientId = map["recipientId"] as String? ?: "",
+            recipientName = map["recipientName"] as String? ?: "",
+            text = map["text"] as String? ?: "",
+            scheduledAtMillis = (map["scheduledAt"] as Number?)?.toLong()
+                ?: System.currentTimeMillis(),
+            isExecuted = map["isExecuted"] as Boolean? ?: false,
+        )
+    }
+}
 
 data class MessageAutomationPreferences(
     val enableAutoReply: Boolean = false,
@@ -52,3 +108,26 @@ data class MessageAutomationPreferences(
         ),
     ),
 )
+
+fun MessageAutomationPreferences.toMap(): Map<String, Any?> = mapOf(
+    "enableAutoReply" to enableAutoReply,
+    "autoReplyRules" to autoReplyRules.map { it.toMap() },
+    "scheduledMessages" to scheduledMessages.map { it.toMap() },
+    "quickReplies" to quickReplies.map { it.toMap() },
+)
+
+/** Dart fromMap asymmetry preserved: missing lists decode to empty, NOT to
+ *  the const defaults. */
+fun messageAutomationPreferencesFromMap(map: Map<String, Any?>): MessageAutomationPreferences =
+    MessageAutomationPreferences(
+        enableAutoReply = map["enableAutoReply"] as Boolean? ?: false,
+        autoReplyRules = (map["autoReplyRules"] as List<*>?)
+            ?.mapNotNull { (it as? Map<String, Any?>)?.let(AutoReplyRule::fromMap) }
+            ?: emptyList(),
+        scheduledMessages = (map["scheduledMessages"] as List<*>?)
+            ?.mapNotNull { (it as? Map<String, Any?>)?.let(ScheduledMessageEntry::fromMap) }
+            ?: emptyList(),
+        quickReplies = (map["quickReplies"] as List<*>?)
+            ?.mapNotNull { (it as? Map<String, Any?>)?.let(QuickReplyTemplate::fromMap) }
+            ?: emptyList(),
+    )
