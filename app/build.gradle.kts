@@ -207,6 +207,7 @@ tasks.named("preBuild") { dependsOn(downloadFaceLandmarker) }
 // as a base64 tar.gz (split into part-NN.b64 files) of drawable-<density>/ic_launcher_<variant>.png because binary files cannot be
 // committed through the integration route; this task unpacks them into a generated res dir.
 val launcherIconsParts = layout.projectDirectory.dir("launcher-icons")
+val launcherIconsArchiveSha256 = "2a74ea89718b259492671201be7ffabdfc8aa8a735d5d0949bdb0c08b3ee3f99"
 val launcherIconsOutDir = layout.buildDirectory.dir("generated/launcherIcons/res")
 
 val unpackLauncherIcons = tasks.register("unpackLauncherIcons") {
@@ -219,6 +220,11 @@ val unpackLauncherIcons = tasks.register("unpackLauncherIcons") {
         val parts = launcherIconsParts.asFile.listFiles { f -> f.name.startsWith("part-") && f.name.endsWith(".b64") }!!.sortedBy { it.name }
         check(parts.isNotEmpty()) { "no launcher icon archive parts" }
         val raw = java.util.Base64.getMimeDecoder().decode(parts.joinToString("") { it.readText().trim() })
+        val archiveSha256 = MessageDigest.getInstance("SHA-256").digest(raw).joinToString("") { "%02x".format(it) }
+        check(archiveSha256 == launcherIconsArchiveSha256) {
+            "launcher icon archive SHA-256 mismatch: got $archiveSha256, want $launcherIconsArchiveSha256"
+        }
+        val allowedIcon = Regex("^drawable-(mdpi|hdpi|xhdpi|xxhdpi|xxxhdpi)/ic_launcher_(warm|outline|obsidian|glass|signal|fold)\\.png$")
         java.util.zip.GZIPInputStream(java.io.ByteArrayInputStream(raw)).use { gz ->
             val header = ByteArray(512)
             fun readFully(buf: ByteArray, len: Int): Boolean {
@@ -240,7 +246,7 @@ val unpackLauncherIcons = tasks.register("unpackLauncherIcons") {
                 if (padded > 0) check(readFully(data, padded.toInt())) { "truncated tar entry $name" }
                 if ((type == '0' || type == 0.toChar()) && size > 0) {
                     val clean = name.removePrefix("./")
-                    check(!clean.contains("..")) { "unsafe tar entry $clean" }
+                    check(allowedIcon.matches(clean)) { "unexpected tar entry $clean" }
                     val target = File(out, clean)
                     target.parentFile.mkdirs()
                     target.writeBytes(data.copyOf(size.toInt()))
