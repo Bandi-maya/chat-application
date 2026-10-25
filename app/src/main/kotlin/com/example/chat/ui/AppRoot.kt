@@ -143,6 +143,17 @@ fun AppRoot() {
             )
         }
         Box(Modifier.fillMaxSize()) {
+        // Dart Navigator.pop for the pre-auth stack (Welcome > Login/Register > Forgot/RegisterOrganization);
+        // system Back must follow the same targets as each screen's on-screen back arrow.
+        androidx.activity.compose.BackHandler(
+            enabled = route == AuthRoute.Login || route == AuthRoute.Register ||
+                route == AuthRoute.ForgotPassword || route == AuthRoute.RegisterOrganization,
+        ) {
+            route = when (route) {
+                AuthRoute.ForgotPassword, AuthRoute.RegisterOrganization -> AuthRoute.Login
+                else -> AuthRoute.Welcome
+            }
+        }
         when (route) {
             AuthRoute.Splash -> SplashScreen(
                 routeToHome = {
