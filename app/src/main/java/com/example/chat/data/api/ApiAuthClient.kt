@@ -61,6 +61,55 @@ class ApiAuthClient(
         return parseAuthResponse(response.first, response.second)
     }
 
+    /** ApiBackendService.registerOrganization: POST /organization/admin/create
+     *  (404 fallback /api/v1/organization/admin/create). On success the Dart
+     *  side persists the org blob and applies the tenant — the caller
+     *  (ApiBackendService) owns those side effects. */
+    fun registerOrganization(
+        tenantId: String,
+        organizationName: String,
+        adminUsername: String,
+        adminEmail: String,
+        adminPassword: String,
+        adminFullName: String,
+        tenantType: String = "chat",
+        allowUserRegistration: Boolean = true,
+    ): Pair<ApiAuthResult, Map<String, Any?>?> {
+        val payload = JSONObject()
+            .put("tenant_id", tenantId.trim())
+            .put("name", organizationName.trim())
+            .put("admin_username", adminUsername.trim())
+            .put("admin_email", adminEmail.trim())
+            .put("admin_password", adminPassword)
+            .put("admin_full_name", adminFullName.trim())
+            .put("tenant_type", tenantType)
+            .put("allow_user_registration", allowUserRegistration)
+            .toString()
+        val response = postWithFallbackNoTenant("organization/admin/create", payload)
+        var org: Map<String, Any?>? = null
+        if (response.first == 200) {
+            try {
+                val body = JSONObject(response.second)
+                val data = if (body.has("data")) body.get("data") else body
+                if (data is JSONObject && data.has("org") && data.get("org") is JSONObject) {
+                    org = jsonToMap(data.getJSONObject("org"))
+                }
+            } catch (_: Exception) {
+            }
+        }
+        return parseAuthResponse(response.first, response.second) to org
+    }
+
+    /** The organization endpoints do NOT carry the x-tenant-id header. */
+    private fun postWithFallbackNoTenant(path: String, body: String): Pair<Int, String> {
+        val headers = mapOf("Content-Type" to "application/json")
+        val response = transport.execute("POST", "${baseUrl()}/$path", headers, body)
+        if (response.first == 404) {
+            return transport.execute("POST", "${baseUrl()}/api/v1/$path", headers, body)
+        }
+        return response
+    }
+
     /** ApiBackendService.forgotPassword — returns the server message. */
     fun forgotPassword(email: String): String {
         val cleanEmail = email.trim()
