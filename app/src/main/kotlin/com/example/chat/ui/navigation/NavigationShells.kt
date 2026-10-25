@@ -1,5 +1,6 @@
 package com.example.chat.ui.navigation
 
+import com.example.chat.core.templates.ChatyNavigationDestinationIds
 import com.example.chat.core.templates.NavigationTemplate
 
 import androidx.compose.animation.core.animateFloatAsState
