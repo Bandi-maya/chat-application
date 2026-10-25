@@ -31,7 +31,7 @@ import kotlinx.coroutines.launch
  *  Chats home, conversation, register, forgot-password and organization
  *  registration destinations land in their own parity slices; the register /
  *  forgot-password / org buttons route to honest WIP stubs until then. */
-private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, Home }
+private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home }
 
 @Composable
 fun AppRoot() {
@@ -131,7 +131,31 @@ fun AppRoot() {
                 // (it is, in locator) over the Supabase path.
                 sendRecovery = { email -> ServiceLocator.apiBackend.forgotPassword(email) },
             )
-            AuthRoute.RegisterOrganization -> AuthWipStub("Register an Organization", onBack = { route = AuthRoute.Login })
+            AuthRoute.RegisterOrganization -> com.example.chat.ui.auth.RegisterOrganizationScreen(
+                onBack = { route = AuthRoute.Login },
+                onRegistered = { userId, _, _ ->
+                    ServiceLocator.appScope.launch {
+                        ServiceLocator.preferencesStorage.setStoredUserId(userId)
+                    }
+                    route = AuthRoute.SubscriptionPlan
+                },
+                registerOrganization = { tenantId, orgName, adminUser, adminEmail, adminPass, adminFull, allowReg ->
+                    val (user, orgId, orgNameResolved) = ServiceLocator.apiBackend.registerOrganization(
+                        tenantId = tenantId,
+                        organizationName = orgName,
+                        adminUsername = adminUser,
+                        adminEmail = adminEmail,
+                        adminPassword = adminPass,
+                        adminFullName = adminFull,
+                        allowUserRegistration = allowReg,
+                    )
+                    Triple(user.id, orgId, orgNameResolved)
+                },
+            )
+            AuthRoute.SubscriptionPlan -> AuthWipStub(
+                "Plan selection arrives with the subscription slice",
+                onBack = { route = AuthRoute.Home },
+            )
             AuthRoute.Home -> AuthWipStub("Chats home arrives in the next slice", onBack = { route = AuthRoute.Welcome })
         }
     }
