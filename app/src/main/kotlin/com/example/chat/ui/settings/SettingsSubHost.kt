@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 import com.example.chat.ui.settings.universal.*
 
 private enum class ConvSub { ActionBar, Bubbles, Entry, More }
-private enum class HomeSub { Rows, Fab, Status }
+private enum class HomeSub { Header, Rows, Fab, Status }
 private enum class UniversalSub { Colors, Styles, Icons, HideMedia, Backup, General }
 
 val hostedSettingsDestinations: Set<SettingsDestination> = setOf(
@@ -93,12 +93,33 @@ fun SettingsSubHost(destination: SettingsDestination, onBack: () -> Unit): Boole
             when (sub) {
                 null -> HomeScreenSettingsPage(
                     preferences = prefs, onBack = onBack,
-                    // Header settings need the live header preview + overflow menu seams; not hosted yet.
-                    onOpenHeader = { toast("Header settings are not hosted in this build yet.") },
+                    onOpenHeader = { sub = HomeSub.Header },
                     onOpenRows = { sub = HomeSub.Rows },
                     onOpenFab = { sub = HomeSub.Fab },
                     onOpenStatus = { sub = HomeSub.Status },
                 )
+                HomeSub.Header -> {
+                    var overflow by remember { mutableStateOf<(() -> Unit)?>(null) }
+                    val me = ServiceLocator.apiBackend.currentUser
+                    HeaderSettingsScreen(
+                        preferences = prefs,
+                        navigationMode = theme.navigationMode,
+                        onSetNavigationMode = { theme.setNavigationMode(it) },
+                        currentUserDisplayName = me?.displayName,
+                        currentUserUsername = me?.username,
+                        currentUserAbout = me?.about,
+                        headerPreview = { args -> GbLiveHeaderPreview(args, theme.globalTheme) },
+                        showOverflowMenu = { onSettings -> overflow = onSettings },
+                        onBack = { sub = null },
+                    )
+                    overflow?.let { onSettings ->
+                        GbHeaderOverflowMenuDialog(
+                            t = theme.globalTheme,
+                            actions = GbHeaderOverflowActions(onSettings = onSettings),
+                            onDismiss = { overflow = null },
+                        )
+                    }
+                }
                 HomeSub.Rows -> HomeRowsSettingsScreen(preferences = prefs, onBack = { sub = null })
                 HomeSub.Fab -> HomeFabSettingsScreen(preferences = prefs, onBack = { sub = null })
                 HomeSub.Status -> StatusSettingsScreen(preferences = prefs, onBack = { sub = null })
