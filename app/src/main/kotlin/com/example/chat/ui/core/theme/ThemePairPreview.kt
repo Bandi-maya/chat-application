@@ -18,16 +18,16 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AddRounded
-import androidx.compose.material.icons.rounded.AutoStoriesRounded
-import androidx.compose.material.icons.rounded.CallRounded
-import androidx.compose.material.icons.rounded.ChatBubbleRounded
-import androidx.compose.material.icons.rounded.DesktopWindowsRounded
-import androidx.compose.material.icons.rounded.GroupsRounded
-import androidx.compose.material.icons.rounded.MoreVertRounded
-import androidx.compose.material.icons.rounded.SearchRounded
-import androidx.compose.material.icons.rounded.SettingsRounded
-import androidx.compose.material.icons.rounded.TaskAltRounded
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AutoStories
+import androidx.compose.material.icons.rounded.Call
+import androidx.compose.material.icons.rounded.ChatBubble
+import androidx.compose.material.icons.rounded.DesktopWindows
+import androidx.compose.material.icons.rounded.Groups
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.TaskAlt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -157,13 +157,13 @@ private fun HomeScreenMini(t: ThemeConfig, l: PreviewLayout?) {
                 Box(
                     Modifier.weight(1f).height(12.dp).background(tc(t.cardColor), RoundedCornerShape(6.dp)),
                     contentAlignment = Alignment.Center,
-                ) { Icon(Icons.Rounded.SearchRounded, null, Modifier.size(9.dp), tint = tc(t.secondaryTextColor)) }
+                ) { Icon(Icons.Rounded.Search, null, Modifier.size(9.dp), tint = tc(t.secondaryTextColor)) }
             } else {
                 Text(
                     "Chats", Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis,
                     color = tc(t.primaryTextColor), fontSize = fixedSp(if (prominent) 10.5f else 9f), fontWeight = FontWeight.ExtraBold,
                 )
-                Icon(Icons.Rounded.SearchRounded, null, Modifier.size(10.dp), tint = tc(t.secondaryTextColor))
+                Icon(Icons.Rounded.Search, null, Modifier.size(10.dp), tint = tc(t.secondaryTextColor))
             }
         }
         if (showStories) {
@@ -195,7 +195,7 @@ private fun HomeScreenMini(t: ThemeConfig, l: PreviewLayout?) {
                 Modifier.align(Alignment.BottomEnd).padding(end = 6.dp, bottom = 5.dp).size(14.dp)
                     .background(tc(t.accentColor), RoundedCornerShape(5.dp)),
                 contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Rounded.AddRounded, null, Modifier.size(10.dp), tint = tc(t.outgoingTextColor)) }
+            ) { Icon(Icons.Rounded.Add, null, Modifier.size(10.dp), tint = tc(t.outgoingTextColor)) }
         }
         NavBarMini(t, l)
     }
@@ -234,7 +234,7 @@ private fun ConversationMini(t: ThemeConfig, layout: PreviewLayout?) {
             Box(Modifier.size(11.dp).background(tc(t.cardColor), CircleShape))
             Spacer(Modifier.width(4.dp))
             Text("Maya", Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, color = tc(t.primaryTextColor), fontSize = fixedSp(8.5f), fontWeight = FontWeight.Bold)
-            Icon(Icons.Rounded.MoreVertRounded, null, Modifier.size(10.dp), tint = tc(t.secondaryTextColor))
+            Icon(Icons.Rounded.MoreVert, null, Modifier.size(10.dp), tint = tc(t.secondaryTextColor))
         }
         Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 5.dp, vertical = 6.dp), verticalArrangement = Arrangement.Bottom) {
             PreviewBubble(t, false, "Lunch?", tc(t.incomingBubbleColor), tc(t.incomingTextColor), tc(t.secondaryTextColor).alpha(0.12f))
@@ -268,13 +268,13 @@ private fun ConversationMini(t: ThemeConfig, layout: PreviewLayout?) {
 }
 
 private fun navIcon(id: String): ImageVector = when (id) {
-    "groups" -> Icons.Rounded.GroupsRounded
-    "updates" -> Icons.Rounded.AutoStoriesRounded
-    "tasks" -> Icons.Rounded.TaskAltRounded
-    "calls" -> Icons.Rounded.CallRounded
-    "settings" -> Icons.Rounded.SettingsRounded
-    "desktop" -> Icons.Rounded.DesktopWindowsRounded
-    else -> Icons.Rounded.ChatBubbleRounded
+    "groups" -> Icons.Rounded.Groups
+    "updates" -> Icons.Rounded.AutoStories
+    "tasks" -> Icons.Rounded.TaskAlt
+    "calls" -> Icons.Rounded.Call
+    "settings" -> Icons.Rounded.Settings
+    "desktop" -> Icons.Rounded.DesktopWindows
+    else -> Icons.Rounded.ChatBubble
 }
 
 @Composable
