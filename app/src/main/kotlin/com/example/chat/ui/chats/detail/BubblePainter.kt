@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.Stroke
 import com.example.chat.core.theme.BubbleStyleId
 import kotlin.math.min
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 
 /** Exact port of lib/ui/core/bubbles/bubble_geometry.dart's getBubblePath and
  *  bubble_painter.dart (fill, outline, drop shadow, decorative accents) to a
