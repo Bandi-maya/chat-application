@@ -83,6 +83,43 @@ class ApiBackendService(context: Context) {
         auth.forgotPassword(email)
     }
 
+    /** ApiBackendService.registerOrganization: on success applies the new
+     *  tenant (Dart setTenantId) and adopts the returned admin session. */
+    suspend fun registerOrganization(
+        tenantId: String,
+        organizationName: String,
+        adminUsername: String,
+        adminEmail: String,
+        adminPassword: String,
+        adminFullName: String,
+        allowUserRegistration: Boolean = true,
+    ): Triple<ApiUserProfile, String, String> = withContext(Dispatchers.IO) {
+        val (result, orgMap) = auth.registerOrganization(
+            tenantId = tenantId,
+            organizationName = organizationName,
+            adminUsername = adminUsername,
+            adminEmail = adminEmail,
+            adminPassword = adminPassword,
+            adminFullName = adminFullName,
+            allowUserRegistration = allowUserRegistration,
+        )
+        var orgId = tenantId.trim()
+        var resolvedOrgName = organizationName.trim()
+        if (orgMap != null) {
+            orgId = (orgMap["uid"] ?: orgMap["tenantId"] ?: orgId).toString()
+            resolvedOrgName = (orgMap["name"] ?: resolvedOrgName).toString()
+            try {
+                val orgJson = org.json.JSONObject()
+                for ((k, v) in orgMap) orgJson.put(k, v)
+                prefs.edit().putString("api_hub_org", orgJson.toString()).apply()
+            } catch (_: Exception) {
+            }
+        }
+        config.setTenantId(tenantId.trim())
+        session.adopt(result)
+        Triple(result.user, orgId, resolvedOrgName)
+    }
+
     suspend fun checkOrganization(workspace: String): Map<String, Any?> = withContext(Dispatchers.IO) {
         auth.checkOrganization(workspace)
     }
