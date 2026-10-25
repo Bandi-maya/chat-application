@@ -117,6 +117,55 @@ class ApiChatClient(
         }
     }
 
+    /** editMessage: PUT /chat/rooms/<id>/messages/<msgId> {content} (+ fallback). */
+    fun editMessage(roomId: String, messageId: String, newText: String) {
+        if (token() == null) return
+        try {
+            val payload = JSONObject().put("content", newText).toString()
+            val response = transport.execute(
+                "PUT", "${base()}/chat/rooms/$roomId/messages/$messageId", authHeaders(json = true), payload,
+            )
+            if (response.first == 404) {
+                transport.execute(
+                    "PUT", "${base()}/api/v1/chat/rooms/$roomId/messages/$messageId", authHeaders(json = true), payload,
+                )
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    /** deleteMessage: DELETE /chat/rooms/<id>/messages/<msgId> (+ fallback). */
+    fun deleteMessage(roomId: String, messageId: String) {
+        if (token() == null) return
+        try {
+            val response = transport.execute(
+                "DELETE", "${base()}/chat/rooms/$roomId/messages/$messageId", authHeaders(), null,
+            )
+            if (response.first == 404) {
+                transport.execute(
+                    "DELETE", "${base()}/api/v1/chat/rooms/$roomId/messages/$messageId", authHeaders(), null,
+                )
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    /** clearConversationMessages: DELETE /chat/rooms/<id>/messages (+ fallback). */
+    fun clearMessages(roomId: String) {
+        if (token() == null) return
+        try {
+            val response = transport.execute(
+                "DELETE", "${base()}/chat/rooms/$roomId/messages", authHeaders(), null,
+            )
+            if (response.first == 404) {
+                transport.execute(
+                    "DELETE", "${base()}/api/v1/chat/rooms/$roomId/messages", authHeaders(), null,
+                )
+            }
+        } catch (_: Exception) {
+        }
+    }
+
     /** loadUsers: GET /chat/users[?search=] with /api/v1 fallback; on network
      *  error or 404 falls back to /app-users (then /api/v1/app-users). */
     fun listUsers(query: String?): List<UserProfile>? {
