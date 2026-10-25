@@ -27,12 +27,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Backup
-import androidx.compose.material.icons.outlined.CallOutlined
+import androidx.compose.material.icons.outlined.Call
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CleaningServices
 import androidx.compose.material.icons.outlined.ColorLens
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.HomeOutlined
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.NotificationsNone
@@ -119,7 +119,7 @@ private val rootGroups: List<RootGroup> = listOf(
     RootGroup("Look and feel", listOf(
         RootRow(SettingsDestination.ThemeEngine, Icons.Outlined.ColorLens, { LocalAppColors.current.accent }, "Theme & Color Engine", "13+ dark & light theme presets, token editor & palette"),
         RootRow(SettingsDestination.TemplateStudio, Icons.Rounded.DashboardCustomize, { LocalAppColors.current.info }, "Global Template Studio", "App-wide templates and independent component styles"),
-        RootRow(SettingsDestination.HomeScreen, Icons.Outlined.HomeOutlined, { LocalAppColors.current.accent }, "Home Screen", "Header, chat rows, floating button & status"),
+        RootRow(SettingsDestination.HomeScreen, Icons.Outlined.Home, { LocalAppColors.current.accent }, "Home Screen", "Header, chat rows, floating button & status"),
         RootRow(SettingsDestination.Conversation, Icons.Outlined.ChatBubbleOutline, { LocalAppColors.current.success }, "Conversation Customization", "Bubbles, ticks, contact sidebar & message appearance"),
         RootRow(SettingsDestination.Effects, Icons.Outlined.TouchApp, { LocalAppColors.current.warning }, "Navigation & Touch Effects", "Interactive click particles (Stars/Hearts/Bubbles), Sound FX"),
         RootRow(SettingsDestination.Universal, Icons.Outlined.Palette, { LocalAppColors.current.accent }, "Universal", "Colors, icons and fonts, language & other"),
@@ -128,7 +128,7 @@ private val rootGroups: List<RootGroup> = listOf(
     RootGroup("Messages and calls", listOf(
         RootRow(SettingsDestination.Notifications, Icons.Outlined.NotificationsNone, { LocalAppColors.current.warning }, "Notifications & Alerts", "Heads-up popups, notification sounds, LED & vibration"),
         RootRow(SettingsDestination.Automation, Icons.Outlined.SmartToy, { LocalAppColors.current.info }, "Message Automation & Scheduler", "Auto-reply rules, auto-responder bot & message scheduler"),
-        RootRow(SettingsDestination.Calls, Icons.Outlined.CallOutlined, { LocalAppColors.current.warning }, "Call Settings", "Call privacy, incoming call controls & call appearance"),
+        RootRow(SettingsDestination.Calls, Icons.Outlined.Call, { LocalAppColors.current.warning }, "Call Settings", "Call privacy, incoming call controls & call appearance"),
     )),
     RootGroup("Storage and system", listOf(
         RootRow(SettingsDestination.StorageMedia, Icons.Rounded.Storage, { LocalAppColors.current.accent }, "Storage & Media", "Auto-download quality, media limits & cache retention"),
