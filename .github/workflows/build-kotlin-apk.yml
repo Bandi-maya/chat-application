@@ -1,15 +1,9 @@
 name: Build kotlin APK
 
 on:
+  # Dispatch-only: editor-commit batches fire one manual build per slice,
+  # never one build per file commit.
   workflow_dispatch:
-  push:
-    branches: [kotlin]
-    paths:
-      - .github/workflows/build-kotlin-apk.yml
-      - app/**
-      - build.gradle.kts
-      - settings.gradle.kts
-      - gradle.properties
 
 jobs:
   build:
