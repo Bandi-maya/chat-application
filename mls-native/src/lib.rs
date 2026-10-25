@@ -186,7 +186,10 @@ impl ChatyMlsEngine {
         Ok(Arc::new(ChatyMlsEngine { inner: engine }))
     }
 
-    pub async fn close(&self) -> Result<(), MlsNativeError> {
+    // Named `shutdown` rather than `close`: uniffi objects already get a
+    // synchronous AutoCloseable/Disposable `close()` in the generated Kotlin,
+    // and a suspend `close()` export conflicts with it ("conflicting overloads").
+    pub async fn shutdown(&self) -> Result<(), MlsNativeError> {
         self.inner.close().await.map_err(map_err)
     }
 
