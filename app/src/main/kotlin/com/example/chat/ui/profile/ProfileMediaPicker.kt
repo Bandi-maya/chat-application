@@ -330,8 +330,7 @@ fun ProfileImageCropperDialog(
             var sample = 1
             while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) > 1280) sample *= 2
             val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-            val raw = BitmapFactory.decodeFile(sourceFile.absolutePath, opts) ?: return null
-            raw.asImageBitmap()
+            BitmapFactory.decodeFile(sourceFile.absolutePath, opts)?.asImageBitmap()
         }.getOrNull()
     }
     val srcW = image?.width?.toFloat() ?: 1f
