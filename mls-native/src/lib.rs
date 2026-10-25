@@ -26,7 +26,7 @@ fn map_err(e: String) -> MlsNativeError {
     MlsNativeError::Operation { msg: e }
 }
 
-#[derive(uniffi::Enum)]
+#[derive(Debug, Clone, uniffi::Enum)]
 pub enum MlsCiphersuite {
     Mls128DhkemX25519Aes128gcmSha256Ed25519,
     Mls128DhkemX25519Chacha20poly1305Sha256Ed25519,
@@ -368,7 +368,7 @@ impl ChatyMlsEngine {
 
 #[uniffi::export]
 pub fn signature_key_pair_generate(ciphersuite: MlsCiphersuite) -> Result<Vec<u8>, MlsNativeError> {
-    let pair = MlsSignatureKeyPair::generate(ciphersuite.into()).map_err(map_err)?;
+    let pair = MlsSignatureKeyPair::generate(ciphersuite.clone().into()).map_err(map_err)?;
     let private_key = pair.private_key();
     let public_key = pair.public_key();
     frb_serialize_signer(ciphersuite.into(), private_key, public_key).map_err(map_err)
