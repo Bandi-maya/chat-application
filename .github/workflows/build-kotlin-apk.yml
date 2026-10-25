@@ -129,3 +129,18 @@ jobs:
           name: auth-screens-pixel-proof
           path: screenshots/
           if-no-files-found: warn
+      - name: Emit allowlisted synthetic fixture screenshots (base64)
+        if: always()
+        run: |
+          # Allowlist only: deterministic test captures of the app's own auth screens (no input typed) and the
+          # ChatFixtureActivity synthetic conversations. Never the failure-state capture, final screen or logcat.
+          # This repository is public, so the job log is public: keep it bounded and fixture-only.
+          for n in 01-welcome 02-login 03-register 04-forgot-password 05-register-organization 06-chats-home 07-chat-detail; do
+            f="screenshots/$n.png"
+            [ -f "$f" ] || { echo "PNGMISSING $n"; continue; }
+            sz=$(stat -c %s "$f")
+            if [ "$sz" -gt 600000 ]; then echo "PNGSKIP $n size=$sz"; continue; fi
+            echo "PNGB64-BEGIN $n $sz"
+            base64 -w 0 "$f" | fold -w 4000 | sed 's/^/PNGB64 /'
+            echo "PNGB64-END $n"
+          done
