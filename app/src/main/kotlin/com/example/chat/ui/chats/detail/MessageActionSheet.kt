@@ -172,7 +172,7 @@ private fun actionSheetLabel(action: MessageActionDescriptor): String = when (ac
     else -> action.label
 }
 
-private fun actionIcon(action: MessageActionDescriptor, message: ChatMessage): ImageVector =
+fun actionIcon(action: MessageActionDescriptor, message: ChatMessage): ImageVector =
     when (action.type) {
         MessageActionType.reply -> Icons.Rounded.Reply
         MessageActionType.forward -> Icons.Rounded.Shortcut
