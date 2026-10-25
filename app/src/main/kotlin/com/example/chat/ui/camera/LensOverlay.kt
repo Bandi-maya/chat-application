@@ -296,10 +296,13 @@ object LensAnchorPainter {
             sprite.asImageBitmap(),
             androidx.compose.ui.unit.IntOffset(0, 0),
             androidx.compose.ui.unit.IntSize(sprite.width, sprite.height),
-            Offset(l - margin, t - margin),
-            androidx.compose.ui.geometry.Size(
-                (r - l + 2 * margin),
-                (b - t + 2 * margin),
+            androidx.compose.ui.unit.IntOffset(
+                (l - margin).roundToInt(),
+                (t - margin).roundToInt(),
+            ),
+            androidx.compose.ui.unit.IntSize(
+                (r - l + 2 * margin).roundToInt().coerceAtLeast(1),
+                (b - t + 2 * margin).roundToInt().coerceAtLeast(1),
             ),
             Paint().apply { this.alpha = alpha },
         )
