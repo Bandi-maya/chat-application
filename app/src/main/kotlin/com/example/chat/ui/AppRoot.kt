@@ -290,6 +290,8 @@ fun AppRoot() {
                 var pushedProfile by remember { mutableStateOf(false) }
                 val rootPhoto = rememberRootProfilePhoto()
                 var pushedEditProfile by remember { mutableStateOf(false) }
+                var pushedMessageManagement by remember { mutableStateOf(false) }
+                var pushedAccount by remember { mutableStateOf(false) }
                 var pushedSettingsSearch by remember { mutableStateOf(false) }
                 val settingsNavigate: (com.example.chat.ui.settings.SettingsDestination) -> Unit = { dest ->
                     if (dest == com.example.chat.ui.settings.SettingsDestination.Security) {
@@ -299,7 +301,7 @@ fun AppRoot() {
                         pushedSettingsSearch = true
                     } else if (dest == com.example.chat.ui.settings.SettingsDestination.Automation) {
                         // Dart settings_root_screen: 'Message Automation & Scheduler' -> MessageManagementPage.
-                        route = AuthRoute.MessageManagement
+                        pushedMessageManagement = true
                     } else if (dest == com.example.chat.ui.settings.SettingsDestination.EditProfile) {
                         // Dart: ProfileEditScreen.open(context, dataStore).
                         pushedEditProfile = true
@@ -368,8 +370,8 @@ fun AppRoot() {
                     // Dart chats_home banner: org uid ?: tenantId ?: config tenant; isNewRegistration=false.
                     onSelectPlan = {
                         val org = ServiceLocator.apiBackend.currentOrganization
-                        planOrgId = org?.get("uid")?.toString() ?: org?.get("tenantId")?.toString() ?: com.example.chat.data.api.ApiBackendConfig.tenantId
-                        planOrgName = org?.get("name")?.toString() ?: com.example.chat.data.api.ApiBackendConfig.tenantId
+                        planOrgId = org?.get("uid")?.toString() ?: org?.get("tenantId")?.toString() ?: ServiceLocator.apiBackend.config.tenantId
+                        planOrgName = org?.get("name")?.toString() ?: ServiceLocator.apiBackend.config.tenantId
                         planIsNew = false
                         route = AuthRoute.SubscriptionPlan
                     },
@@ -397,8 +399,8 @@ fun AppRoot() {
                     // Dart chats_home banner: org uid ?: tenantId ?: config tenant; isNewRegistration=false.
                     onSelectPlan = {
                         val org = ServiceLocator.apiBackend.currentOrganization
-                        planOrgId = org?.get("uid")?.toString() ?: org?.get("tenantId")?.toString() ?: com.example.chat.data.api.ApiBackendConfig.tenantId
-                        planOrgName = org?.get("name")?.toString() ?: com.example.chat.data.api.ApiBackendConfig.tenantId
+                        planOrgId = org?.get("uid")?.toString() ?: org?.get("tenantId")?.toString() ?: ServiceLocator.apiBackend.config.tenantId
+                        planOrgName = org?.get("name")?.toString() ?: ServiceLocator.apiBackend.config.tenantId
                         planIsNew = false
                         route = AuthRoute.SubscriptionPlan
                     },
@@ -592,7 +594,7 @@ fun AppRoot() {
                                     "/settings/privacy" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Privacy)
                                     "/settings/security" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Security)
                                     "/settings/conversation" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Conversation)
-                                    "/settings/message_management" -> route = AuthRoute.MessageManagement
+                                    "/settings/message_management" -> pushedMessageManagement = true
                                     "/settings/themes" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.ThemeEngine)
                                     "/settings/templates" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.TemplateStudio)
                                     "/settings/notifications" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Notifications)
@@ -602,11 +604,50 @@ fun AppRoot() {
                                     "/settings/permissions" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Permissions)
                                     "/settings/home" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.HomeScreen)
                                     "/settings/devices" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.LinkedDevices)
-                                    // account, customization, app_icon, universal_appearance: no host yet.
+                                    "/settings/account" -> pushedAccount = true
+                                    // customization, app_icon, universal_appearance: no host yet.
                                     else -> settingsNotice = def.canonicalRoute
                                 }
                             },
                             onBack = { pushedSettingsSearch = false },
+                        )
+                    }
+                }
+                if (pushedMessageManagement) {
+                    // Originating settings route stays under this overlay (Dart Navigator.push).
+                    androidx.activity.compose.BackHandler { pushedMessageManagement = false }
+                    Box(Modifier.fillMaxSize()) { MessageManagementHost(onBack = { pushedMessageManagement = false }) }
+                }
+                if (pushedAccount) {
+                    val acct = ServiceLocator.apiBackend.currentUser
+                    androidx.activity.compose.BackHandler { pushedAccount = false }
+                    if (acct != null) Box(Modifier.fillMaxSize()) {
+                        com.example.chat.ui.settings.account.AccountSettingsScreen(
+                            user = com.example.chat.ui.settings.account.AccountUserInfo(
+                                id = acct.id, displayName = acct.displayName, username = acct.username,
+                                about = acct.about, avatarInitials = acct.avatarInitials, avatarUrl = acct.avatarUrl,
+                            ),
+                            // Dart: org?['uid'] ?: org?['tenantId'] ?: ApiBackendConfig.tenantId; name ?: tenantId.
+                            organization = {
+                                val org = ServiceLocator.apiBackend.currentOrganization
+                                (org?.get("uid")?.toString() ?: org?.get("tenantId")?.toString() ?: ServiceLocator.apiBackend.config.tenantId) to
+                                    (org?.get("name")?.toString() ?: ServiceLocator.apiBackend.config.tenantId)
+                            },
+                            onBack = { pushedAccount = false },
+                            onOpenSubscription = { orgId, orgName ->
+                                planOrgId = orgId; planOrgName = orgName; planIsNew = false
+                                pushedAccount = false
+                                route = AuthRoute.SubscriptionPlan
+                            },
+                            checkOrganization = { ws -> ServiceLocator.apiBackend.checkOrganization(ws) },
+                            updateRegistrationSupport = { id, allow -> ServiceLocator.apiBackend.updateOrganizationRegistrationSupport(id, allow) },
+                            updateProfile = { name, about, username, avatarUrl ->
+                                ServiceLocator.apiBackend.updateProfile(displayName = name, about = about, username = username, avatarUrl = avatarUrl)
+                            },
+                            uploadProfilePhoto = { filename, bytes -> ServiceLocator.apiBackend.uploadProfilePhoto(filename, bytes) },
+                            // Dart: api.deleteUser(id) (signs out itself); purgeLocalDataForDeletedAccount is not ported.
+                            deleteAccountData = { id -> ServiceLocator.apiBackend.deleteUser(id) },
+                            logout = { ServiceLocator.apiBackend.signOut() },
                         )
                     }
                 }
@@ -821,21 +862,7 @@ fun AppRoot() {
                     onBack = { route = AuthRoute.Home },
                 )
             }
-            AuthRoute.MessageManagement -> {
-                val mmToast = androidx.compose.ui.platform.LocalContext.current
-                com.example.chat.ui.settings.messagemanagement.MessageManagementPage(
-                    preferencesController = ServiceLocator.preferencesController,
-                    server = ServiceLocator.gbFeatures,
-                    conversationSource = object : com.example.chat.ui.settings.messagemanagement.MessageManagementConversationSource {
-                        override val conversations
-                            get() = ServiceLocator.apiBackend.conversations.map {
-                                com.example.chat.ui.settings.messagemanagement.MessageManagementConversation(it.id, it.title)
-                            }
-                    },
-                    onBack = { route = AuthRoute.Home },
-                    showToast = { android.widget.Toast.makeText(mmToast, it, android.widget.Toast.LENGTH_SHORT).show() },
-                )
-            }
+            AuthRoute.MessageManagement -> MessageManagementHost(onBack = { route = AuthRoute.Home })
             AuthRoute.LinkedDevices -> {
                 val repoL = ServiceLocator.conversationsRepository
                 val rel = ServiceLocator.contactRelationships
@@ -1055,4 +1082,21 @@ private fun rememberRootProfilePhoto(): RootProfilePhoto {
             saveCurrent()
         },
     )
+}
+
+@Composable
+private fun MessageManagementHost(onBack: () -> Unit) {
+                val mmToast = androidx.compose.ui.platform.LocalContext.current
+                com.example.chat.ui.settings.messagemanagement.MessageManagementPage(
+                    preferencesController = ServiceLocator.preferencesController,
+                    server = ServiceLocator.gbFeatures,
+                    conversationSource = object : com.example.chat.ui.settings.messagemanagement.MessageManagementConversationSource {
+                        override val conversations
+                            get() = ServiceLocator.apiBackend.conversations.map {
+                                com.example.chat.ui.settings.messagemanagement.MessageManagementConversation(it.id, it.title)
+                            }
+                    },
+                    onBack = onBack,
+                    showToast = { android.widget.Toast.makeText(mmToast, it, android.widget.Toast.LENGTH_SHORT).show() },
+                )
 }
