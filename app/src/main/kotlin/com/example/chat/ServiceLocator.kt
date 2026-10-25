@@ -318,6 +318,22 @@ object ServiceLocator {
         )
     }
 
+    /** Chat media plane (chat_media_service.dart): custom-backend upload
+     *  takes facade precedence inside the service, exactly like Dart's
+     *  locator.isRegistered && api.isAuthenticated branch. */
+    val chatMedia: com.example.chat.data.services.ChatMediaService by lazy {
+        com.example.chat.data.services.ChatMediaService(
+            storage = storageClient,
+            currentUserId = currentUserId,
+            sendImagesFullResolutionMb = {
+                preferencesController.universal.sendImagesFullResolutionMb
+            },
+            gbSizeLimitMb = { key, fallback -> preferencesController.gbDouble(key, fallback) },
+            apiAuthenticated = { apiBackend.isAuthenticated },
+            apiUpload = { bytes, filename -> apiBackend.uploadMedia(filename, bytes) },
+        )
+    }
+
     val callHistory: CallHistoryService by lazy {
         CallHistoryService(queryClient = queryClient, currentUserId = currentUserId)
     }
