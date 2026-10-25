@@ -34,7 +34,7 @@ import uniffi.chaty_mls_native.signatureKeyPairGenerateRaw
  */
 class UniffiMlsEngine private constructor(private val inner: ChatyMlsEngine) : MlsEngine {
 
-    override suspend fun close() = wrap { inner.close() }
+    override suspend fun close() = wrap { inner.shutdown() }
 
     override suspend fun createKeyPackage(
         ciphersuite: MlsCiphersuite,
