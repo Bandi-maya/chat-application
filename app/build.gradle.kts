@@ -1,6 +1,9 @@
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.net.URI
 import java.security.MessageDigest
+import java.util.Base64
+import java.util.zip.GZIPInputStream
 
 plugins {
     id("com.android.application")
@@ -219,13 +222,13 @@ val unpackLauncherIcons = tasks.register("unpackLauncherIcons") {
         out.mkdirs()
         val parts = launcherIconsParts.asFile.listFiles { f -> f.name.startsWith("part-") && f.name.endsWith(".b64") }!!.sortedBy { it.name }
         check(parts.isNotEmpty()) { "no launcher icon archive parts" }
-        val raw = java.util.Base64.getMimeDecoder().decode(parts.joinToString("") { it.readText().trim() })
+        val raw = Base64.getMimeDecoder().decode(parts.joinToString("") { it.readText().trim() })
         val archiveSha256 = MessageDigest.getInstance("SHA-256").digest(raw).joinToString("") { "%02x".format(it) }
         check(archiveSha256 == launcherIconsArchiveSha256) {
             "launcher icon archive SHA-256 mismatch: got $archiveSha256, want $launcherIconsArchiveSha256"
         }
         val allowedIcon = Regex("^drawable-(mdpi|hdpi|xhdpi|xxhdpi|xxxhdpi)/ic_launcher_(warm|outline|obsidian|glass|signal|fold)\\.png$")
-        java.util.zip.GZIPInputStream(java.io.ByteArrayInputStream(raw)).use { gz ->
+        GZIPInputStream(ByteArrayInputStream(raw)).use { gz ->
             val header = ByteArray(512)
             fun readFully(buf: ByteArray, len: Int): Boolean {
                 var n = 0
