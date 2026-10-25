@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
  *  Chats home, conversation, register, forgot-password and organization
  *  registration destinations land in their own parity slices; the register /
  *  forgot-password / org buttons route to honest WIP stubs until then. */
-private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home, ChatDetail, Security, LockedChats, HiddenVault, MessageManagement, LinkedDevices, NewChat, GlobalSearch }
+private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home, ChatDetail, Security, LockedChats, HiddenVault, MessageManagement, LinkedDevices, Starred, NewChat, GlobalSearch }
 
 @Composable
 fun AppRoot() {
@@ -48,6 +48,7 @@ fun AppRoot() {
     ChatyTheme(config = themeController.globalTheme) {
         var route by remember { mutableStateOf(AuthRoute.Splash) }
         var selectedConversation by remember { mutableStateOf<com.example.chat.domain.models.Conversation?>(null) }
+        var selectedInitialMessageId by remember { mutableStateOf<String?>(null) }
         val lockRequired by ServiceLocator.appLock.lockRequired.collectAsState()
         androidx.compose.runtime.LaunchedEffect(route) {
             // Dart _scheduleInitialAppLockIfNeeded on reaching the authenticated shell.
@@ -333,6 +334,7 @@ fun AppRoot() {
                     onOpenNewChat = { g, b -> newChatGroup = g; newChatBroadcast = b; route = AuthRoute.NewChat },
                     onOpenGlobalSearch = { route = AuthRoute.GlobalSearch },
                     onOpenMessageManagement = { route = AuthRoute.MessageManagement },
+                    onOpenStarredMessages = { route = AuthRoute.Starred },
                     onOpenProfile = { pushedProfile = true },
                     onOpenQr = { linkedDevicesOnly = false; route = AuthRoute.LinkedDevices },
                     onOpenLinkedDevices = { linkedDevicesOnly = true; route = AuthRoute.LinkedDevices },
@@ -353,6 +355,7 @@ fun AppRoot() {
                     onOpenNewChat = { g, b -> newChatGroup = g; newChatBroadcast = b; route = AuthRoute.NewChat },
                     onOpenGlobalSearch = { route = AuthRoute.GlobalSearch },
                     onOpenMessageManagement = { route = AuthRoute.MessageManagement },
+                    onOpenStarredMessages = { route = AuthRoute.Starred },
                     onOpenProfile = { pushedProfile = true },
                     onOpenQr = { linkedDevicesOnly = false; route = AuthRoute.LinkedDevices },
                     onOpenLinkedDevices = { linkedDevicesOnly = true; route = AuthRoute.LinkedDevices },
@@ -826,6 +829,49 @@ fun AppRoot() {
                     onBack = { route = AuthRoute.Home },
                 )
             }
+            AuthRoute.Starred -> {
+                var starRevision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                val starScope = androidx.compose.runtime.rememberCoroutineScope()
+                androidx.compose.runtime.DisposableEffect(Unit) {
+                    val listener: () -> Unit = { starRevision++ }
+                    ServiceLocator.apiBackend.addListener(listener)
+                    onDispose { ServiceLocator.apiBackend.removeListener(listener) }
+                }
+                @Suppress("UNUSED_EXPRESSION") starRevision
+                androidx.activity.compose.BackHandler { route = AuthRoute.Home }
+                com.example.chat.ui.chats.starred.StarredMessagesScreen(
+                    conversations = ServiceLocator.apiBackend.conversations,
+                    messagesFor = { id -> ServiceLocator.apiBackend.getMessages(id) },
+                    // Dart _loadConversations: ensureConversationLoaded for every conversation (Future.wait).
+                    onRefresh = {
+                        var ok = true
+                        for (c in ServiceLocator.apiBackend.conversations) {
+                            try { ServiceLocator.apiBackend.loadMessages(c.id) } catch (_: Exception) { ok = false }
+                        }
+                        ok
+                    },
+                    // Dart toggleStarMessage -> _backend.setMessageState('starred', !isStarred): the
+                    // ChatyBackendService (Supabase RPC set_message_user_state) rail. A custom-backend
+                    // session has no Supabase auth, so this may fail at runtime; the api branch has the same rail.
+                    onToggleStar = { cid, mid ->
+                        val m = ServiceLocator.apiBackend.getMessages(cid).firstOrNull { it.id == mid }
+                        if (m != null) starScope.launch {
+                            try {
+                                ServiceLocator.conversationsRepository.setMessageStateAsync(cid, mid, "starred", !m.isStarred)
+                            } catch (_: Exception) { }
+                        }
+                    },
+                    onOpenConversation = { cid, mid ->
+                        ServiceLocator.apiBackend.conversations.firstOrNull { it.id == cid }?.let { c ->
+                            ServiceLocator.apiBackend.setActiveConversation(c.id)
+                            selectedConversation = c
+                            selectedInitialMessageId = mid
+                            route = AuthRoute.ChatDetail
+                        }
+                    },
+                    onBack = { route = AuthRoute.Home },
+                )
+            }
             AuthRoute.ChatDetail -> run {
                 val conversation = selectedConversation
                 if (conversation == null) {
@@ -841,10 +887,12 @@ fun AppRoot() {
                     com.example.chat.ui.chats.ChatDetailScreen(
                         conversation = conversation,
                         messages = ServiceLocator.apiBackend.getMessages(conversation.id),
+                        initialMessageId = selectedInitialMessageId,
                         currentUserId = ServiceLocator.apiBackend.currentUser?.id ?: "",
                         onBack = {
                             ServiceLocator.apiBackend.setActiveConversation(null)
                             selectedConversation = null
+                            selectedInitialMessageId = null
                             route = AuthRoute.Home
                         },
                         onSend = { text ->
