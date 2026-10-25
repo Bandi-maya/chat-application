@@ -242,6 +242,56 @@ fun AppRoot() {
                     onDispose { ServiceLocator.apiBackend.removeListener(listener) }
                 }
                 @Suppress("UNUSED_EXPRESSION") chatRevision
+                // chats destination content
+                // (ChatsHomeScreen below)
+                val shellColors = remember(themeController.globalTheme) {
+                    com.example.chat.ui.core.theme.ChatyColors(themeController.globalTheme)
+                }
+                var settingsNotice by remember { mutableStateOf<String?>(null) }
+                com.example.chat.ui.navigation.MainNavigationShell(
+                    colors = shellColors,
+                    currentUser = ServiceLocator.apiBackend.currentUser?.let { u ->
+                        com.example.chat.domain.models.UserProfile(
+                            id = u.id, displayName = u.displayName, username = u.username,
+                            avatarInitials = u.avatarInitials, avatarColorHex = u.avatarColorHex,
+                            about = u.about, lastSeenAt = java.time.Instant.now(),
+                            email = u.email, phone = u.phone,
+                        )
+                    },
+                    screenContent = { destinationId ->
+                        when (destinationId) {
+                            com.example.chat.core.templates.ChatyNavigationDestinationIds.settings -> {
+                                val apiUser = ServiceLocator.apiBackend.currentUser
+                                if (apiUser != null) {
+                                    com.example.chat.ui.settings.SettingsRootScreen(
+                                        preferences = ServiceLocator.preferencesController,
+                                        themeController = themeController,
+                                        user = com.example.chat.domain.models.UserProfile(
+                                            id = apiUser.id, displayName = apiUser.displayName,
+                                            username = apiUser.username, avatarInitials = apiUser.avatarInitials,
+                                            avatarColorHex = apiUser.avatarColorHex, about = apiUser.about,
+                                            lastSeenAt = java.time.Instant.now(),
+                                            email = apiUser.email, phone = apiUser.phone,
+                                        ),
+                                        canGoBack = false,
+                                        onBack = { },
+                                        onNavigate = { dest ->
+                                            if (dest == com.example.chat.ui.settings.SettingsDestination.Security) {
+                                                route = AuthRoute.Security
+                                            } else {
+                                                settingsNotice = dest.name
+                                            }
+                                        },
+                                        // Avatar/banner upload hosts are not wired yet.
+                                        onPickAvatar = { },
+                                        onPickBanner = { },
+                                        // Dart logout: ApiBackendService.signOut; the signed-out
+                                        // listener above routes to Welcome.
+                                        onLogout = { ServiceLocator.apiBackend.signOut() },
+                                    )
+                                }
+                            }
+                            com.example.chat.core.templates.ChatyNavigationDestinationIds.chats -> {
                 com.example.chat.ui.chats.ChatsHomeScreen(
                     conversations = ServiceLocator.apiBackend.conversations,
                     requiresSubscription = ServiceLocator.apiBackend.requiresSubscription,
@@ -252,6 +302,27 @@ fun AppRoot() {
                         route = AuthRoute.ChatDetail
                     },
                 )
+                            }
+                            else -> androidx.compose.material3.Text(
+                                "Destination \"$destinationId\" is not hosted in this build yet.",
+                                modifier = Modifier.padding(24.dp),
+                            )
+                        }
+                    },
+                )
+                val notice = settingsNotice
+                if (notice != null) {
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { settingsNotice = null },
+                        title = { androidx.compose.material3.Text(notice) },
+                        text = { androidx.compose.material3.Text("This settings page is not hosted in this build yet.") },
+                        confirmButton = {
+                            androidx.compose.material3.TextButton(onClick = { settingsNotice = null }) {
+                                androidx.compose.material3.Text("OK")
+                            }
+                        },
+                    )
+                }
             }
             AuthRoute.Security -> com.example.chat.ui.settings.security.SecurityCenterScreen(
                 preferences = ServiceLocator.preferencesController,
