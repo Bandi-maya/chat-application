@@ -105,6 +105,8 @@ import androidx.compose.ui.unit.sp
 import com.example.chat.core.preferences.ChatyPreferencesController
 import com.example.chat.core.theme.ThemeController
 import com.example.chat.ui.kit.AppContextMenu
+import com.example.chat.ui.kit.ChatyAboutDialog
+import com.example.chat.ui.kit.ChatyLicenseEntry
 import com.example.chat.ui.kit.ContextMenuItem
 import com.example.chat.ui.kit.ContextMenuSection
 import com.example.chat.ui.theme.LocalAppColors
@@ -174,6 +176,7 @@ fun SettingsScreen(
     onOpenSearch: (List<SettingsSearchEntry>) -> Unit,
     onLogout: () -> Unit,
     onBack: (() -> Unit)?,
+    licenses: List<ChatyLicenseEntry> = emptyList(),
 ) {
     val colors = LocalAppColors.current
     val scope = rememberCoroutineScope()
@@ -419,20 +422,16 @@ fun SettingsScreen(
             // Source quirk preserved: Export JSON only dismisses and shows the snackbar; nothing is exported.
             confirmButton = { Button(onClick = { sheet = null; toast("Exported backup package successfully! \uD83D\uDCE6") }) { Text("Export JSON") } },
         )
-        SettingsSheet.About -> AlertDialog(
-            onDismissRequest = { sheet = null },
-            title = { Text("Chaty") },
-            text = {
-                Column {
-                    Text("1.0.0 (Build 2026)", fontSize = 14.sp)
-                    Spacer(Modifier.height(2.dp))
-                    Text("\u00A9 2026 LOGY BYTE. All rights reserved.", fontSize = 12.sp)
-                    Spacer(Modifier.height(12.dp))
-                    Text("End-to-end encrypted, deeply customizable instant messaging application.")
-                }
-            },
-            confirmButton = { TextButton(onClick = { sheet = null }) { Text("Close") } },
-        )
+        SettingsSheet.About -> ChatyAboutDialog(
+            applicationName = "Chaty",
+            applicationVersion = "1.0.0 (Build 2026)",
+            applicationLegalese = "\u00A9 2026 LOGY BYTE. All rights reserved.",
+            onDismiss = { sheet = null },
+            licenses = licenses,
+        ) {
+            Spacer(Modifier.height(12.dp))
+            Text("End-to-end encrypted, deeply customizable instant messaging application.")
+        }
         null -> Unit
     }
 }
