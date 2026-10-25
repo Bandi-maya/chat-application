@@ -87,7 +87,7 @@ fun MediaWorkspaceScreen(
 
     var tick by remember { mutableIntStateOf(0) }
     DisposableEffect(library) {
-        val listener = { tick++ }
+        val listener: () -> Unit = { tick++ }
         library.addListener(listener)
         onDispose { library.removeListener(listener) }
     }
@@ -98,7 +98,7 @@ fun MediaWorkspaceScreen(
     val isDark = isSystemInDarkTheme()
 
     Scaffold(
-        backgroundColor = if (isDark) Color(0xFF0F131A) else Color(0xFFF8FAFC),
+        containerColor = if (isDark) Color(0xFF0F131A) else Color(0xFFF8FAFC),
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
