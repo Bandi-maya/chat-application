@@ -1,5 +1,7 @@
 package com.example.chat.data.api
 
+import okhttp3.MediaType.Companion.toMediaType
+
 /** FCM device-token plane of the api branch's ApiBackendService
  *  (lib/data/services/api_backend_service.dart:1975-2036): POST
  *  {fcm_token, device_type} to {restApiBaseUrl}/me/devices with Bearer auth
@@ -71,7 +73,7 @@ class ApiDeviceTokenClient(
         override fun send(method: String, url: String, headers: Map<String, String>, body: String?): Int {
             val requestBody = body?.let {
                 okhttp3.RequestBody.create(
-                    okhttp3.MediaType.parse("application/json"), it,
+                    "application/json".toMediaType(), it,
                 )
             }
             val builder = okhttp3.Request.Builder().url(url)
