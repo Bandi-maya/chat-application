@@ -29,7 +29,6 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.PhotoSizeSelectSmall
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -66,7 +65,6 @@ import com.example.chat.ui.icons.ChatyIconThemeId
 import com.example.chat.ui.kit.ChatyHapticsPort
 import com.example.chat.ui.settings.rememberPreferencesVersion
 import com.example.chat.ui.theme.LocalThemeConfig
-import androidx.compose.material3.FilterChipDefaults
 
 // Exact Flutter material color constants used by the Dart screen.
 private val White10 = Color(0x1AFFFFFF)
