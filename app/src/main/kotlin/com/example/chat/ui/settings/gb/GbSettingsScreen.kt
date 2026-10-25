@@ -1,5 +1,8 @@
 package com.example.chat.ui.settings.gb
 
+@file:OptIn(ExperimentalMaterial3Api::class)
+
+import androidx.compose.material3.ExperimentalMaterial3Api
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
