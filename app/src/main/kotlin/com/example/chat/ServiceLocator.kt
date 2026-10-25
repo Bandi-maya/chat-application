@@ -234,6 +234,19 @@ object ServiceLocator {
         )
     }
 
+    /** Dart purgeLocalDataForDeletedAccount (profile_actions.dart:217); see AccountDeletionPurge for the order. */
+    suspend fun purgeLocalDataForDeletedAccount(userId: String) {
+        com.example.chat.data.services.AccountDeletionPurge(
+            clearOutbox = { pendingSends.clear(it) },
+            purgeMlsIdentity = { mls.purgeLocalIdentityForUser(it) },
+            purgeTemporaryFiles = {
+                com.example.chat.data.services.AccountDeletionPurge.purgeChatyTemporaryFiles(requireContext().cacheDir)
+            },
+            deleteSnapshots = { snapshotCache.deleteUser(it) },
+            deleteAllSecureStorage = { secureStore.deleteAll() },
+        ).purge(userId)
+    }
+
     private val pendingSends: PendingSecureSendStore by lazy { PendingSecureSendStore(snapshotCache) }
 
     val conversationsRepository: ConversationsRepository by lazy {
