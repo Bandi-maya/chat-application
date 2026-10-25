@@ -15,6 +15,10 @@ class AuthRepository(
     private val auth: SupabaseAuthClient = SupabaseAuthClient(),
     private val sessions: SessionStore,
     private val rpc: SupabaseRpc? = null,
+    /** When supplied by the service locator, session adoption and sign-out
+     *  route through it so auth state events fire and auto-refresh is
+     *  scheduled (mirrors supabase_flutter's client-side session owner). */
+    private val sessionManager: AuthSessionManager? = null,
 ) {
     data class UserProfile(
         val id: String,
@@ -68,15 +72,17 @@ class AuthRepository(
         val authUser = response.user ?: throw Exception("Unable to create the account.")
 
         if (response.accessToken != null && response.refreshToken != null) {
-            sessions.save(
-                SupabaseAuthClient.AuthSession(
-                    accessToken = response.accessToken,
-                    refreshToken = response.refreshToken,
-                    expiresIn = response.expiresIn ?: 3600,
-                    user = authUser,
-                ),
-                authUser.id,
+            val session = SupabaseAuthClient.AuthSession(
+                accessToken = response.accessToken,
+                refreshToken = response.refreshToken,
+                expiresIn = response.expiresIn ?: 3600,
+                user = authUser,
             )
+            if (sessionManager != null) {
+                sessionManager.adopt(session, authUser)
+            } else {
+                sessions.save(session, authUser.id)
+            }
         }
         UserProfile(
             id = authUser.id,
@@ -100,7 +106,11 @@ class AuthRepository(
             }
             val session = auth.signInWithPassword(value.lowercase(), password)
             val user = session.user ?: throw Exception("Unable to establish a secure session.")
-            sessions.save(session, user.id)
+            if (sessionManager != null) {
+                sessionManager.adopt(session, user)
+            } else {
+                sessions.save(session, user.id)
+            }
             val metadata = user.userMetadata
             UserProfile(
                 id = user.id,
@@ -141,6 +151,10 @@ class AuthRepository(
     }
 
     suspend fun signOut() {
-        sessions.clear()
+        if (sessionManager != null) {
+            sessionManager.signOut()
+        } else {
+            sessions.clear()
+        }
     }
 }
