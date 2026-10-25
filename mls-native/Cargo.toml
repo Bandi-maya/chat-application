@@ -1,0 +1,19 @@
+[package]
+name = "chaty_mls_native"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "chaty_mls_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+# Repo-owned OpenMLS Rust API (same code the Flutter build ships).
+openmls_frb = { path = "../third_party/openmls_android/rust" }
+uniffi = { version = "0.28", features = ["cli"] }
+tokio = { version = "1", features = ["full"] }
+
+[profile.release]
+strip = true
+lto = true
