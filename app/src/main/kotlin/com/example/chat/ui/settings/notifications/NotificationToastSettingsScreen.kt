@@ -179,7 +179,7 @@ fun NotificationToastSettingsScreen(preferences: ChatyPreferencesController, onB
                     )
                     GbSwitchTile(
                         icon = Icons.Rounded.HistoryEdu, title = "Viewed Story Toast", subtitle = "Know immediately when someone views your status via Toast message", value = p.viewedStoryToast,
-                        onChanged = { preferences.updateToasts(preferences.toasts.copy(viewedStoryToast = it)) },
+                        onChanged = { preferences.updateToasts(preferences.toasts.copy(storyToastEnabled = it)) },
                     )
                     GbSwitchTile(
                         icon = Icons.Outlined.AccountCircle, title = "Notifications with profile picture", subtitle = "Show avatar next to status toast", value = p.storyWithProfilePic,
