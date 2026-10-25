@@ -60,6 +60,9 @@ import androidx.compose.material.icons.rounded.FilterNone
 import androidx.compose.material.icons.Icons
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.outlined.Circle
+import androidx.compose.material.icons.outlined.Videocam
+import androidx.compose.material.icons.outlined.WbSunny
 
 /** Exact port of lib/features/camera/effects/effect_model.dart. */
 enum class EffectCategory {
