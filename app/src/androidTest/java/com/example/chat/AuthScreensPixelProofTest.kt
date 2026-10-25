@@ -63,9 +63,9 @@ class AuthScreensPixelProofTest {
                     .filter { it.isNotBlank() }.take(40).toList()
             } catch (e: Exception) { listOf("dump failed: ${e.message}") }
             val errs = try {
-                device.executeShellCommand("logcat -d -t 3000 *:E").lineSequence()
-                    .filter { it.contains("chat", true) || it.contains("AndroidRuntime") }
-                    .toList().takeLast(25).joinToString("\n")
+                device.executeShellCommand("logcat -d -t 6000").lineSequence()
+                    .filter { (it.contains("MainActivity") || it.contains("ChatyApp") || it.contains("AndroidRuntime") || it.contains("FATAL") || it.contains("died") || it.contains("Force finishing") || it.contains("Activity.*finish")) && !it.contains("AppsFilter") }
+                    .toList().takeLast(40).joinToString("\n") { it.take(260) }
             } catch (e: Exception) { "n/a: ${e.message}" }
             throw AssertionError(
                 "expected screen containing \"$text\"; resumed=[$resumed]; texts=$texts; errors=[\n$errs]",
