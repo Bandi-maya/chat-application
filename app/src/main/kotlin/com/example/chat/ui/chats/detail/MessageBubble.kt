@@ -47,8 +47,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -305,11 +305,8 @@ fun ChatMessageBubble(
                 Modifier
                     .weight(1f, fill = false)
                     .onGloballyPositioned { coords ->
-                        val pos = coords.positionInRoot()
-                        bubbleRect = Rect(
-                            pos.x, pos.y,
-                            pos.x + coords.size.width, pos.y + coords.size.height,
-                        )
+                        // AppContextMenu anchorRect contract: window px.
+                        bubbleRect = coords.boundsInWindow()
                     }
                     .pointerInput(message.id, isSelected) {
                         detectTapGestures(
