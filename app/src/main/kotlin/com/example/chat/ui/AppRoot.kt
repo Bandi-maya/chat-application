@@ -303,6 +303,41 @@ fun AppRoot() {
                     },
                 )
                             }
+                            com.example.chat.core.templates.ChatyNavigationDestinationIds.groups ->
+                                com.example.chat.ui.chats.ChatsHomeScreen(
+                                    conversations = ServiceLocator.apiBackend.conversations,
+                                    requiresSubscription = ServiceLocator.apiBackend.requiresSubscription,
+                                    subscriptionMessage = ServiceLocator.apiBackend.subscriptionErrorMessage,
+                                    onOpenConversation = { conversation ->
+                                        ServiceLocator.apiBackend.setActiveConversation(conversation.id)
+                                        selectedConversation = conversation
+                                        route = AuthRoute.ChatDetail
+                                    },
+                                    forcedType = com.example.chat.domain.models.ConversationType.group,
+                                    pageTitle = "Groups",
+                                )
+                            com.example.chat.core.templates.ChatyNavigationDestinationIds.calls -> {
+                                val history = ServiceLocator.callHistory
+                                val callScope = androidx.compose.runtime.rememberCoroutineScope()
+                                androidx.compose.runtime.LaunchedEffect(Unit) { history.start() }
+                                com.example.chat.ui.calls.CallsScreen(
+                                    records = history.records,
+                                    historyUnavailable = history.lastError != null,
+                                    currentUserId = ServiceLocator.apiBackend.currentUser?.id ?: "",
+                                    contactFor = { null },
+                                    onRefresh = { callScope.launch { history.refresh() } },
+                                    // Add-call contact picker host is not wired yet.
+                                    onOpenAddCall = { settingsNotice = "New call" },
+                                    onRedial = { remoteUserId, displayName, initials, colorHex, isVideo ->
+                                        ServiceLocator.callPresentationController.showFullScreen()
+                                        callScope.launch {
+                                            ServiceLocator.callSignaling.initiateCall(
+                                                remoteUserId, displayName, initials, colorHex, isVideo,
+                                            )
+                                        }
+                                    },
+                                )
+                            }
                             else -> androidx.compose.material3.Text(
                                 "Destination \"$destinationId\" is not hosted in this build yet.",
                                 modifier = Modifier.padding(24.dp),
@@ -358,6 +393,7 @@ fun AppRoot() {
                 }
             }
         }
+        com.example.chat.ui.calls.GlobalCallHost(isAuthenticated = ServiceLocator.apiBackend.isAuthenticated)
         // Dart shouldShowLock: authenticated && lock enabled && _appLockRequired.
         if (lockRequired && ServiceLocator.apiBackend.isAuthenticated &&
             ServiceLocator.preferencesController.security.isAppLockEnabled
