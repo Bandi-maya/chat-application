@@ -16,7 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.KeyboardAlt
+import androidx.compose.material.icons.rounded.KeyboardAlt
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.rounded.Done
 import androidx.compose.material.icons.rounded.DoneAll
@@ -165,7 +165,7 @@ fun ContactPrivacyScreen(
 
                 SectionTitle("Live Indicators", colors)
                 Column(Modifier.fillMaxWidth().background(colors.surface, RoundedCornerShape(16.dp))) {
-                    PrivacyTile(Icons.AutoMirrored.Rounded.KeyboardAlt, "Hide typing state",
+                    PrivacyTile(Icons.Rounded.KeyboardAlt, "Hide typing state",
                         "Do not publish your typing state to this contact.",
                         current.hideTyping, saving) { save(current.copy(hideTyping = it)) }
                     PrivacyTile(Icons.Rounded.MicNone, "Hide voice recording state",
