@@ -25,8 +25,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.Send
-import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
@@ -34,12 +32,9 @@ import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.automirrored.rounded.Forward
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.EmojiEmotions
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
-import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.Reply
 import androidx.compose.material.icons.rounded.VideoCameraFront
 import androidx.compose.material.icons.rounded.StarBorder
@@ -71,6 +66,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -85,8 +81,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.Popup
+import com.example.chat.core.templates.ComposerActionPlacement
+import com.example.chat.core.templates.ComposerTemplate
 import com.example.chat.core.theme.ThemeConfig
-import com.example.chat.core.theme.argbWithAlpha
 import com.example.chat.domain.models.ChatMessage
 import com.example.chat.domain.models.ConnectionHealthState
 import com.example.chat.domain.models.Conversation
@@ -100,7 +97,9 @@ import com.example.chat.ui.chats.detail.ChatCommandParser
 import com.example.chat.ui.chats.detail.ChatCommandType
 import com.example.chat.ui.chats.detail.ChatWallpaper
 import com.example.chat.ui.chats.detail.ChatyEmojiComposerAction
+import com.example.chat.ui.chats.detail.ChatEntryBar
 import com.example.chat.ui.chats.detail.ChatyEmojiPickerSheet
+import com.example.chat.ui.chats.detail.ComposerColors
 import com.example.chat.ui.chats.detail.ConnectionDetailSheetContent
 import com.example.chat.ui.chats.detail.ChatMessageBubble
 import com.example.chat.ui.chats.detail.ConnectionHealthIndicator
@@ -199,6 +198,16 @@ fun ChatDetailScreen(
     onAttachmentAction: (AttachmentAction) -> Unit = {},
     onCameraTap: () -> Unit = {},
     onVoiceTap: () -> Unit = {},
+    onVoiceHoldStart: () -> Unit = {},
+    onVoiceMove: (Offset) -> Unit = {},
+    onVoiceHoldEnd: () -> Unit = {},
+    onGalleryTap: (() -> Unit)? = null,
+    onAudioTap: (() -> Unit)? = null,
+    onLocationTap: (() -> Unit)? = null,
+    onContactTap: (() -> Unit)? = null,
+    entryStyle: String = "Stock",
+    composerColors: ComposerColors? = null,
+    composerTemplate: ComposerTemplate = ComposerTemplate(ComposerActionPlacement.integrated),
     onMediaTap: (ChatMessage) -> Unit = {},
     onVoicePlay: (MessageAttachment) -> Unit = {},
     onViewOnceOpen: (ChatMessage) -> Unit = {},
@@ -713,17 +722,29 @@ fun ChatDetailScreen(
                 )
             }
 
-            Composer(
-                theme = theme,
-                text = composerText,
-                onTextChange = ::handleComposerChanged,
-                sending = sending,
-                onSend = ::sendCurrent,
-                onAttach = { attachmentSheetOpen = true },
-                onCameraTap = onCameraTap,
-                onEmojiTap = { emojiComposerOpen = true },
-                onVoiceTap = onVoiceTap,
-            )
+            Box(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                ChatEntryBar(
+                    entryStyle = entryStyle,
+                    colors = composerColors ?: ComposerColors.resolve(theme),
+                    template = composerTemplate,
+                    theme = theme,
+                    text = composerText,
+                    onTextChange = ::handleComposerChanged,
+                    emojiPickerOpen = emojiComposerOpen,
+                    onEmoji = { emojiComposerOpen = true },
+                    onAttach = { attachmentSheetOpen = true },
+                    onCamera = onCameraTap,
+                    onGallery = onGalleryTap,
+                    onAudio = onAudioTap,
+                    onLocation = onLocationTap,
+                    onContact = onContactTap,
+                    onVoice = onVoiceTap,
+                    onVoiceHoldStart = onVoiceHoldStart,
+                    onVoiceMove = onVoiceMove,
+                    onVoiceHoldEnd = onVoiceHoldEnd,
+                    onSend = ::sendCurrent,
+                )
+            }
         }
     }
 
@@ -1410,116 +1431,6 @@ private fun WallpaperPickerSheet(
  *  template: integrated placement, 24dp corners, send/mic morph, camera
  *  shortcut shown). Voice capture and the emoji picker are owner seams. */
 @Composable
-private fun Composer(
-    theme: ThemeConfig,
-    text: String,
-    onTextChange: (String) -> Unit,
-    sending: Boolean,
-    onSend: () -> Unit,
-    onAttach: () -> Unit,
-    onCameraTap: () -> Unit,
-    onEmojiTap: () -> Unit,
-    onVoiceTap: () -> Unit,
-) {
-    val inputBg = Color(theme.cardColor)
-    val inputTextColor = Color(theme.primaryTextColor)
-    val hasText = text.trim().isNotEmpty()
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.Bottom,
-    ) {
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .background(inputBg, RoundedCornerShape(24.dp))
-                .padding(horizontal = 4.dp, vertical = 2.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onEmojiTap) {
-                    Icon(
-                        Icons.Rounded.EmojiEmotions,
-                        contentDescription = "Emoji",
-                        tint = Color(theme.secondaryTextColor),
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-                Box(Modifier.weight(1f)) {
-                    if (text.isEmpty()) {
-                        Text(
-                            "Message…  /task or #reply",
-                            color = Color(argbWithAlpha(theme.secondaryTextColor, 0.9)),
-                            fontSize = (14 * theme.fontScale).sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(vertical = 11.dp),
-                        )
-                    }
-                    BasicTextField(
-                        value = text,
-                        onValueChange = onTextChange,
-                        textStyle = TextStyle(
-                            color = inputTextColor,
-                            fontSize = (14 * theme.fontScale).sp,
-                        ),
-                        cursorBrush = SolidColor(Color(theme.accentColor)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 11.dp),
-                    )
-                }
-                IconButton(onClick = onAttach) {
-                    Icon(
-                        Icons.Rounded.Add,
-                        contentDescription = "Attach",
-                        tint = Color(theme.accentColor),
-                    )
-                }
-                IconButton(onClick = onCameraTap) {
-                    Icon(
-                        Icons.Rounded.PhotoCamera,
-                        contentDescription = "Camera",
-                        tint = Color(theme.accentColor),
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.width(6.dp))
-        // Send/mic morph (Dart AnimatedSwitcher between send-action and
-        // voice-action keyed on hasText).
-        Box(
-            modifier = Modifier
-                .size(46.dp)
-                .background(Color(theme.accentColor), CircleShape)
-                .clip(CircleShape)
-                .pointerInput(hasText, sending) {
-                    detectTapGestures(
-                        onTap = { if (hasText) onSend() else onVoiceTap() },
-                    )
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            if (hasText) {
-                Icon(
-                    Icons.AutoMirrored.Rounded.Send,
-                    contentDescription = "Send message",
-                    tint = Color(theme.onAccentColor),
-                    modifier = Modifier.size(20.dp),
-                )
-            } else {
-                Icon(
-                    Icons.Rounded.Mic,
-                    contentDescription = "Voice note",
-                    tint = Color(theme.onAccentColor),
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-        }
-    }
-}
-
 /** Parse the Dart colorHex formats ('0xFF6366F1', '#6366F1') into a Color. */
 private fun parseHexColor(hex: String): Color? {
     val cleaned = hex.removePrefix("0x").removePrefix("0X").removePrefix("#")
