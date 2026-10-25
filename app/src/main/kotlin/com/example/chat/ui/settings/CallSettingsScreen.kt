@@ -11,6 +11,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.PersonOff
+import androidx.compose.material.icons.rounded.BubbleChart
+import androidx.compose.material.icons.rounded.CallMade
+import androidx.compose.material.icons.rounded.CallReceived
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.PictureInPicture
+import androidx.compose.material.icons.rounded.RingVolume
+import androidx.compose.material.icons.rounded.SpeakerGroup
+import androidx.compose.material.icons.rounded.SpeakerPhone
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -75,31 +86,31 @@ fun CallSettingsScreen(
 
     fun label(name: String) = templates.firstOrNull { it.name == name }?.label ?: templates.firstOrNull()?.label ?: name
 
-    SettingsPage("Calls", "Incoming call privacy, background audio & visual island", onBack) {
-        SettingsSection("Incoming Call Privacy", "Control who is permitted to initiate voice and video calls with you.") {
-            SettingsNavTile("\u260E", "Who Can Call Me", privacy.whoCanCallMe, colors.primary) { dialog = 1 }
+    ChatySettingsPage("Calls", "Incoming call privacy, background audio & visual island", onBack = onBack) {
+        ChatySettingsSection("Incoming Call Privacy", "Control who is permitted to initiate voice and video calls with you.") {
+            ChatySettingsTile(title = "Who Can Call Me", icon = Icons.Rounded.RingVolume, iconColor = colors.primary, subtitle = privacy.whoCanCallMe, trailing = { Icon(Icons.Rounded.ChevronRight, null, tint = colors.foregroundSecondary) }, onTap = { dialog = 1 })
             if (privacy.whoCanCallMe == exceptAudience) {
-                SettingsDivider()
-                SettingsNavTile("\u2298", "Excluded Contacts", " contacts excluded", colors.error) { dialog = 4 }
+                ChatySettingsRowDivider()
+                ChatySettingsTile(title = "Excluded Contacts", icon = Icons.Outlined.PersonOff, iconColor = colors.error, subtitle = " contacts excluded", trailing = { Icon(Icons.Rounded.ChevronRight, null, tint = colors.foregroundSecondary) }, onTap = { dialog = 4 })
             }
         }
-        SettingsSection(
+        ChatySettingsSection(
             "Call Screen Style",
             "Chaty-designed screen layouts. GB WhatsApp customizes call colors (see GB Features) but ships no screen templates.",
         ) {
-            SettingsNavTile("\u2199", "Incoming Call Screen", label(call.incomingCallTemplate), colors.primary) { dialog = 2 }
-            SettingsDivider()
-            SettingsNavTile("\u2197", "Ongoing Call Screen", label(call.ongoingCallTemplate), colors.primary) { dialog = 3 }
+            ChatySettingsTile(title = "Incoming Call Screen", icon = Icons.Rounded.CallReceived, iconColor = colors.primary, subtitle = label(call.incomingCallTemplate), trailing = { Icon(Icons.Rounded.ChevronRight, null, tint = colors.foregroundSecondary) }, onTap = { dialog = 2 })
+            ChatySettingsRowDivider()
+            ChatySettingsTile(title = "Ongoing Call Screen", icon = Icons.Rounded.CallMade, iconColor = colors.primary, subtitle = label(call.ongoingCallTemplate), trailing = { Icon(Icons.Rounded.ChevronRight, null, tint = colors.foregroundSecondary) }, onTap = { dialog = 3 })
         }
-        SettingsSection("In-App Call Presentation") {
-            SettingsSwitchTile("\u25CB", "Dynamic Call Island", "Display interactive floating capsule when navigating away from active calls.", call.dynamicIslandEnabled, colors.primary, onDynamicIsland)
-            SettingsDivider()
-            SettingsSwitchTile("\u25A3", "Picture-in-Picture Video", "Automatically minimize video stream into PiP window when switching apps.", call.pictureInPictureEnabled, colors.primary, onPictureInPicture)
+        ChatySettingsSection("In-App Call Presentation") {
+            ChatySwitchTile(title = "Dynamic Call Island", icon = Icons.Rounded.BubbleChart, iconColor = colors.primary, subtitle = "Display interactive floating capsule when navigating away from active calls.", value = call.dynamicIslandEnabled, onChanged = onDynamicIsland)
+            ChatySettingsRowDivider()
+            ChatySwitchTile(title = "Picture-in-Picture Video", icon = Icons.Rounded.PictureInPicture, iconColor = colors.primary, subtitle = "Automatically minimize video stream into PiP window when switching apps.", value = call.pictureInPictureEnabled, onChanged = onPictureInPicture)
         }
-        SettingsSection("Audio & Connectivity") {
-            SettingsNavTile("\u266B", "Dual-Speaker & Output Routing", "Configure receiver, bottom speaker, and capability routing", colors.accent, onOpenAudioSettings)
-            SettingsDivider()
-            SettingsSwitchTile("\u266A", "Low Data Usage for Calls", "Optimize WebRTC bandwidth consumption on cellular connections.", call.lowDataUsageEnabled, colors.success, onLowData)
+        ChatySettingsSection("Audio & Connectivity") {
+            ChatySettingsTile(title = "Dual-Speaker & Output Routing", icon = Icons.Rounded.SpeakerGroup, iconColor = colors.accent, subtitle = "Configure receiver, bottom speaker, and capability routing", trailing = { Icon(Icons.Rounded.ChevronRight, null, tint = colors.foregroundSecondary) }, onTap = onOpenAudioSettings)
+            ChatySettingsRowDivider()
+            ChatySwitchTile(title = "Low Data Usage for Calls", icon = Icons.Rounded.SpeakerPhone, iconColor = colors.success, subtitle = "Optimize WebRTC bandwidth consumption on cellular connections.", value = call.lowDataUsageEnabled, onChanged = onLowData)
         }
     }
 
