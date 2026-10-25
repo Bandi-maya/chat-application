@@ -41,7 +41,7 @@ fun Modifier.springInteractiveScale(
     scaleDownFactor: Float = 0.95f,
     enableHaptic: Boolean = true,
 ): Modifier = composed {
-    val haptic = LocalHapticFeedback.current
+    val view = androidx.compose.ui.platform.LocalView.current
     val progress = remember { Animatable(0f) } // controller value 0..1
     val scope = rememberCoroutineScope()
     val reversing = remember { androidx.compose.runtime.mutableStateOf(false) }
@@ -53,7 +53,7 @@ fun Modifier.springInteractiveScale(
         .pointerInput(Unit) {
             awaitEachGesture {
                 awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                if (enableHaptic) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                if (enableHaptic) ChatyHapticsPort.selection(view)
                 scope.launch { reversing.value = false; progress.animateTo(1f, tween(140, easing = LinearEasing)) }
                 waitForUpOrCancellation(pass = PointerEventPass.Initial)
                 scope.launch { reversing.value = true; progress.animateTo(0f, tween(140, easing = LinearEasing)) }
