@@ -14,6 +14,10 @@ interface MlsEncryptor {
     /** Null when device identity is unavailable (transport must then fail). */
     val currentDeviceId: String?
 
+    /** Mirrors MlsE2eeService.isReady (group storage opened and usable). */
+    val isReady: Boolean
+        get() = false
+
     /** Mirrors MlsE2eeService.encryptPayload: returns base64 group id, the
      *  local epoch (must match the server epoch or throw), and base64
      *  ciphertext for the given JSON payload. */
@@ -21,6 +25,10 @@ interface MlsEncryptor {
 
     /** Mirrors MlsE2eeService.decryptPayload for incoming row hydration. */
     suspend fun decryptPayload(conversationId: String, ciphertext: String): Map<String, Any?>
+
+    /** Mirrors MlsE2eeService.encryptEditedPayload for the edit path:
+     *  same payload shape as encryptPayload, plus the edited flag. */
+    suspend fun encryptEditedPayload(conversationId: String, payload: Map<String, Any?>): MlsEncryptedPayload
 }
 
 data class MlsEncryptedPayload(
