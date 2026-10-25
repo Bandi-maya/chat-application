@@ -292,6 +292,7 @@ fun AppRoot() {
                 var pushedEditProfile by remember { mutableStateOf(false) }
                 var pushedMessageManagement by remember { mutableStateOf(false) }
                 var pushedAccount by remember { mutableStateOf(false) }
+                var pushedUniversalAppearance by remember { mutableStateOf(false) }
                 var pushedSettingsSearch by remember { mutableStateOf(false) }
                 val settingsNavigate: (com.example.chat.ui.settings.SettingsDestination) -> Unit = { dest ->
                     if (dest == com.example.chat.ui.settings.SettingsDestination.Security) {
@@ -605,7 +606,8 @@ fun AppRoot() {
                                     "/settings/home" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.HomeScreen)
                                     "/settings/devices" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.LinkedDevices)
                                     "/settings/account" -> pushedAccount = true
-                                    // customization, app_icon, universal_appearance: no host yet.
+                                    "/settings/universal_appearance" -> pushedUniversalAppearance = true
+                                    // customization, app_icon: no host yet.
                                     else -> settingsNotice = def.canonicalRoute
                                 }
                             },
@@ -617,6 +619,16 @@ fun AppRoot() {
                     // Originating settings route stays under this overlay (Dart Navigator.push).
                     androidx.activity.compose.BackHandler { pushedMessageManagement = false }
                     Box(Modifier.fillMaxSize()) { MessageManagementHost(onBack = { pushedMessageManagement = false }) }
+                }
+                if (pushedUniversalAppearance) {
+                    androidx.activity.compose.BackHandler { pushedUniversalAppearance = false }
+                    Box(Modifier.fillMaxSize()) {
+                        com.example.chat.ui.settings.appearance.UniversalAppearanceScreen(
+                            controller = ServiceLocator.appearanceVariantController,
+                            onBack = { pushedUniversalAppearance = false },
+                            onMessage = { msg -> settingsNotice = msg },
+                        )
+                    }
                 }
                 if (pushedAccount) {
                     val acct = ServiceLocator.apiBackend.currentUser
