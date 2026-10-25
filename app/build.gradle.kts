@@ -62,6 +62,14 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("io.coil-kt:coil-compose:2.7.0")
+    // QR render + scanner (linked devices): zxing core + CameraX + ML Kit
+    // barcode (same decode engine mobile_scanner uses on Android). All free,
+    // on-device. Availability verified 200 on Maven Central / Google Maven.
+    implementation("com.google.zxing:core:3.5.3")
+    implementation("androidx.camera:camera-camera2:1.4.1")
+    implementation("androidx.camera:camera-lifecycle:1.4.1")
+    implementation("androidx.camera:camera-view:1.4.1")
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.security:security-crypto:1.1.0-alpha07")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
