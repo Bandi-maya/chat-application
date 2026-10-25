@@ -73,6 +73,12 @@ class StatusService(
         pollMillis: Long = 60_000L,
     ): kotlinx.coroutines.flow.Flow<List<StatusRecord>> = kotlinx.coroutines.flow.flow {
         while (true) {
+            if (currentUserId() == null) {
+                // No Supabase session (custom-backend login): no query, empty list.
+                emit(emptyList())
+                kotlinx.coroutines.delay(pollMillis)
+                continue
+            }
             try {
                 val rows = queryClient.from("status_updates")
                     .select()
