@@ -166,6 +166,87 @@ class ApiChatClient(
         }
     }
 
+    /** Thrown for HTTP 402 on subscription-gated chat writes; Dart sets
+     *  requiresSubscription and surfaces this exact message. */
+    class SubscriptionRequiredException(message: String) : Exception(message)
+
+    /** startDirectChat: POST /chat/rooms/direct (NO /api/v1 fallback in the
+     *  Dart source). 200 -> Conversation.fromApi(data ?: body). 402 ->
+     *  SubscriptionRequiredException with the exact enrollment message.
+     *  Other statuses -> "Failed to start chat (code)". */
+    fun createDirectRoom(targetUserId: String): Conversation {
+        if (token() == null) throw Exception("Not authenticated")
+        val response = transport.execute(
+            "POST", "${base()}/chat/rooms/direct", authHeaders(json = true),
+            JSONObject().put("target_user_id", targetUserId).toString(),
+        )
+        return when (response.first) {
+            200 -> {
+                val body = JSONObject(response.second)
+                Conversation.fromApi(
+                    deep(body.optJSONObject("data") ?: body) as Map<String, Any?>
+                )
+            }
+            402 -> throw SubscriptionRequiredException(
+                "No active subscription plan found. Please enroll in a product plan to continue."
+            )
+            else -> throw Exception("Failed to start chat (${response.first})")
+        }
+    }
+
+    /** createGroup: POST /chat/rooms/group (+ /api/v1 fallback on 404).
+     *  Network failure -> "Failed to connect to chat server: <e>". */
+    fun createGroupRoom(name: String, memberUserIds: List<String>): Conversation {
+        if (token() == null) throw Exception("Not authenticated")
+        val body = JSONObject()
+            .put("name", name.trim())
+            .put("member_user_ids", JSONArray(memberUserIds))
+        val response = try {
+            val r = transport.execute("POST", "${base()}/chat/rooms/group", authHeaders(json = true), body.toString())
+            if (r.first == 404) {
+                transport.execute("POST", "${base()}/api/v1/chat/rooms/group", authHeaders(json = true), body.toString())
+            } else r
+        } catch (e: Exception) {
+            throw Exception("Failed to connect to chat server: $e")
+        }
+        return when (response.first) {
+            200 -> {
+                val parsed = JSONObject(response.second)
+                Conversation.fromApi(
+                    deep(parsed.optJSONObject("data") ?: parsed) as Map<String, Any?>
+                )
+            }
+            else -> throw Exception("Failed to create group (${response.first})")
+        }
+    }
+
+    /** deleteUser: DELETE /app-users/<id> (+ fallback); errors swallowed
+     *  (Dart debugPrint only). Local-state removal and the self-sign-out
+     *  rule live on the owning service. */
+    fun deleteUser(userId: String) {
+        if (token() == null) return
+        try {
+            val response = transport.execute("DELETE", "${base()}/app-users/$userId", authHeaders(), null)
+            if (response.first == 404) {
+                transport.execute("DELETE", "${base()}/api/v1/app-users/$userId", authHeaders(), null)
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    /** deleteConversation: DELETE /chat/rooms/<id> (+ fallback); errors
+     *  swallowed. Local-state removal lives on the owning service. */
+    fun deleteRoom(roomId: String) {
+        if (token() == null) return
+        try {
+            val response = transport.execute("DELETE", "${base()}/chat/rooms/$roomId", authHeaders(), null)
+            if (response.first == 404) {
+                transport.execute("DELETE", "${base()}/api/v1/chat/rooms/$roomId", authHeaders(), null)
+            }
+        } catch (_: Exception) {
+        }
+    }
+
     /** loadUsers: GET /chat/users[?search=] with /api/v1 fallback; on network
      *  error or 404 falls back to /app-users (then /api/v1/app-users). */
     fun listUsers(query: String?): List<UserProfile>? {
