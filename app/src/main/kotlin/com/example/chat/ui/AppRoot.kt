@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
  *  Chats home, conversation, register, forgot-password and organization
  *  registration destinations land in their own parity slices; the register /
  *  forgot-password / org buttons route to honest WIP stubs until then. */
-private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home, ChatDetail, Security, LockedChats, HiddenVault, NewChat, GlobalSearch }
+private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home, ChatDetail, Security, LockedChats, HiddenVault, MessageManagement, NewChat, GlobalSearch }
 
 @Composable
 fun AppRoot() {
@@ -65,7 +65,7 @@ fun AppRoot() {
                 if (!ServiceLocator.apiBackend.isAuthenticated &&
                     (route == AuthRoute.Home || route == AuthRoute.ChatDetail || route == AuthRoute.Security ||
                         route == AuthRoute.LockedChats ||
-                        route == AuthRoute.HiddenVault ||
+                        route == AuthRoute.HiddenVault || route == AuthRoute.MessageManagement ||
                         route == AuthRoute.NewChat || route == AuthRoute.GlobalSearch)
                 ) {
                     ServiceLocator.appLock.onSignedOut()
@@ -316,6 +316,7 @@ fun AppRoot() {
                     onOpenSettings = { pushedSettings = true },
                     onOpenNewChat = { g, b -> newChatGroup = g; newChatBroadcast = b; route = AuthRoute.NewChat },
                     onOpenGlobalSearch = { route = AuthRoute.GlobalSearch },
+                    onOpenMessageManagement = { route = AuthRoute.MessageManagement },
                 )
                             }
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.groups ->
@@ -332,6 +333,7 @@ fun AppRoot() {
                                     onOpenSettings = { pushedSettings = true },
                     onOpenNewChat = { g, b -> newChatGroup = g; newChatBroadcast = b; route = AuthRoute.NewChat },
                     onOpenGlobalSearch = { route = AuthRoute.GlobalSearch },
+                    onOpenMessageManagement = { route = AuthRoute.MessageManagement },
                                 )
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.calls -> {
                                 val history = ServiceLocator.callHistory
@@ -605,6 +607,21 @@ fun AppRoot() {
                         }
                     },
                     onBack = { route = AuthRoute.Home },
+                )
+            }
+            AuthRoute.MessageManagement -> {
+                val mmToast = androidx.compose.ui.platform.LocalContext.current
+                com.example.chat.ui.settings.messagemanagement.MessageManagementPage(
+                    preferencesController = ServiceLocator.preferencesController,
+                    server = ServiceLocator.gbFeatures,
+                    conversationSource = object : com.example.chat.ui.settings.messagemanagement.MessageManagementConversationSource {
+                        override val conversations
+                            get() = ServiceLocator.apiBackend.conversations.map {
+                                com.example.chat.ui.settings.messagemanagement.MessageManagementConversation(it.id, it.title)
+                            }
+                    },
+                    onBack = { route = AuthRoute.Home },
+                    showToast = { android.widget.Toast.makeText(mmToast, it, android.widget.Toast.LENGTH_SHORT).show() },
                 )
             }
             AuthRoute.ChatDetail -> run {
