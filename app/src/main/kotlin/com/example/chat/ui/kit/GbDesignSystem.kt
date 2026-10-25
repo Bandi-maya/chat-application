@@ -1,5 +1,6 @@
 package com.example.chat.ui.kit
 
+import androidx.compose.runtime.getValue
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateDpAsState
