@@ -35,7 +35,21 @@ import kotlinx.coroutines.withContext
  *  still-capture bake ([composeLensIntoImage]), exactly like the Dart
  *  _LensAnchorPainter serves CustomPaint and the PictureRecorder. The painter
  *  targets androidx.compose.ui.graphics.Canvas; the bake path wraps an
- *  android.graphics.Canvas. */
+ *  android.graphics.Canvas.
+ *
+ *  INTEGRATION NOTE (blur mask filter, verified against the official
+ *  hardware-acceleration drawing-support table): the Dart glow/halo blurs
+ *  are mapped parameter-exactly to android.graphics.BlurMaskFilter via
+ *  asFrameworkPaint (see applyBlurMask). Paint.setMaskFilter is never
+ *  hardware-accelerated, so in the LIVE preview (hardware canvas) the blur
+ *  will likely not render - the glow shapes draw unblurred instead, a
+ *  cosmetic degradation, never a crash. The STILL BAKE renders into a
+ *  Bitmap-backed android.graphics.Canvas, which is a software canvas, so
+ *  captured photos get the exact Dart blur. If pixel verification shows the
+ *  missing live glow matters, the candidate fixes are an offscreen software
+ *  bitmap for the glow shapes or a child composable with Modifier.blur
+ *  (RenderEffect, API 31+) - both deviations from the shared-painter design,
+ *  pending owner approval. */
 
 @Composable
 fun LensOverlay(
@@ -192,9 +206,17 @@ object LensAnchorPainter {
      *  (frameworks/base libs/hwui/jni/MaskFilter.cpp, createBlur ->
      *  convertRadiusToSigma), so radius = (sigma - 0.5) / 0.57735
      *  (matches Skia's own SkBlurMask::ConvertSigmaToRadius).
-     *  Blur is rendered only on a hardware-accelerated canvas; a software
-     *  canvas ignores the mask filter (platform behavior, same class of
-     *  limitation Flutter documents for MaskFilter on the web). */
+     *  RENDERING SUPPORT (verified against the official Android hardware
+     *  acceleration drawing-support table, developer.android.com/guide/
+     *  topics/graphics/hardware-accel): Paint.setMaskFilter is NEVER
+     *  hardware-accelerated (the table marks it unsupported at every API
+     *  level) - it renders only on software canvases. A Compose Canvas in a
+     *  normal app window is hardware-accelerated, so this blur will likely
+     *  NOT render there; the glow geometry still draws, just unblurred
+     *  (missing-glow degradation, never a crash). A Bitmap-backed software
+     *  canvas or a LAYER_TYPE_SOFTWARE view would render it. Kept as the
+     *  closest parameter-exact mapping pending pixel verification; see the
+     *  integration note in the class header. */
     private fun applyBlurMask(paint: Paint, sigma: Float) {
         paint.asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(
             (sigma - 0.5f) / 0.57735f,
