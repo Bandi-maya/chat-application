@@ -59,6 +59,12 @@ jobs:
             echo "--- APK content check (model/native libs) ---"
             echo "--- model assets ---"
             unzip -l "$APK" | grep -i "face_landmarker\|\.task$\|\.tflite$" || echo "NO MODEL ASSET FOUND"
+            if unzip -l "$APK" | grep -q "assets/face_landmarker.task"; then
+              GOT=$(unzip -p "$APK" assets/face_landmarker.task | sha256sum | cut -d' ' -f1)
+              echo "MODEL sha256 in APK: $GOT"
+              echo "MODEL sha256 pinned: 64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff"
+              [ "$GOT" = "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff" ] && echo "MODEL CHECKSUM MATCH" || echo "MODEL CHECKSUM MISMATCH"
+            fi
             unzip -l "$APK" | grep -i "libchaty\|libmediapipe" || true
             BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
             echo "--- badging ---"
