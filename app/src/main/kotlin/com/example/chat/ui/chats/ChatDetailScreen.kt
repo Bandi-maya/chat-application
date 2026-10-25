@@ -1,19 +1,22 @@
 package com.example.chat.ui.chats
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -23,39 +26,122 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Call
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.automirrored.rounded.Forward
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.EmojiEmotions
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.PhotoCamera
+import androidx.compose.material.icons.rounded.Reply
+import androidx.compose.material.icons.rounded.VideoCameraFront
+import androidx.compose.material.icons.rounded.StarBorder
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.Popup
 import com.example.chat.core.theme.ThemeConfig
 import com.example.chat.core.theme.argbWithAlpha
 import com.example.chat.domain.models.ChatMessage
+import com.example.chat.domain.models.ConnectionHealthState
 import com.example.chat.domain.models.Conversation
 import com.example.chat.domain.models.DeliveryState
+import com.example.chat.domain.models.MessageAttachment
+import com.example.chat.domain.models.QuickReplyTemplate
+import com.example.chat.ui.chats.detail.AttachmentAction
+import com.example.chat.ui.chats.detail.AttachmentSheetContent
+import com.example.chat.ui.chats.detail.BubbleColorOverrides
+import com.example.chat.ui.chats.detail.ChatCommandParser
+import com.example.chat.ui.chats.detail.ChatCommandType
+import com.example.chat.ui.chats.detail.ChatWallpaper
+import com.example.chat.ui.chats.detail.ChatyEmojiComposerAction
+import com.example.chat.ui.chats.detail.ChatyEmojiPickerSheet
+import com.example.chat.ui.chats.detail.ConnectionDetailSheetContent
+import com.example.chat.ui.chats.detail.ChatMessageBubble
+import com.example.chat.ui.chats.detail.ConnectionHealthIndicator
+import com.example.chat.ui.chats.detail.GlobalConnectionBanner
+import com.example.chat.ui.chats.detail.MessageActionSheetContent
+import com.example.chat.ui.chats.detail.MessageActionType
+import com.example.chat.ui.chats.detail.MessageContextMenuContent
+import com.example.chat.ui.chats.detail.RemoteImageSlot
+import com.example.chat.ui.chats.detail.chatyRemoteImage
 import com.example.chat.ui.theme.LocalThemeConfig
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
-/** First-slice port of chat_detail_screen.dart's message view + composer:
- *  bubbles aligned by sender, per-message time, sending/delivered state,
- *  text composer wired to the REST send. Bubble style presets, attachments,
- *  replies, reactions, ticks presets and media land in their own slices. */
+/** Full port of lib/features/chats/chat_detail_screen.dart's conversation
+ *  surface: header (normal + multi-select + in-chat search with match
+ *  navigation), wallpaper layer + per-chat picker, connection banner and
+ *  health indicator, call buttons, message list with anchored long-press
+ *  context menu and reaction rail, reply/edit banners, quick-replies
+ *  overlay, drafts + typing publish, scroll-to-bottom FAB with unseen
+ *  count, attachment sheet, emoji picker (composer + reaction modes over
+ *  a Unicode v18 catalog), connection diagnostics dialog, and the stock
+ *  integrated composer with send/mic morph.
+ *
+ *  The original signature (conversation, messages, currentUserId, onBack,
+ *  onSend) is preserved so AppRoot compiles unchanged; every new behavior is
+ *  an optional callback the integration owner wires to the shared backend /
+ *  preferences seams. Defaults match the Dart fallbacks.
+ *
+ *  Known source-faithful simplifications pending owner seams:
+ *  - Reply send drops the replyTo linkage until ApiBackendService.sendMessage
+ *    gains reply params (reported gap); the banner UI is complete.
+ *  - Star/pin/reactions/forward are dataStore-local in Dart; callbacks are
+ *    provided here, wiring belongs to the owner (reported gap).
+ *  - Presence line, voice recording, drafts, typing indicators, wallpaper,
+ *    in-chat search and quick replies are preference/service features owned
+ *    by other slices; presence renders when presenceText is supplied. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatDetailScreen(
     conversation: Conversation,
@@ -63,114 +149,985 @@ fun ChatDetailScreen(
     currentUserId: String,
     onBack: () -> Unit,
     onSend: suspend (String) -> Unit,
+    resolveSenderName: (String) -> String = { senderId ->
+        if (senderId == currentUserId) "You" else "Team Member"
+    },
+    presenceText: String? = null,
+    presenceIsOnline: Boolean = false,
+    showHeaderAvatar: Boolean = true,
+    showHeaderName: Boolean = true,
+    showHeaderCalls: Boolean = true,
+    showPresenceLine: Boolean = true,
+    callsAllowed: Boolean = true,
+    onStartCall: (isVideo: Boolean) -> Unit = {},
+    connectionState: ConnectionHealthState? = null,
+    onProbeConnection: suspend () -> Unit = {},
+    onDraftChanged: (String) -> Unit = {},
+    onTypingChanged: (Boolean) -> Unit = {},
+    quickReplies: List<QuickReplyTemplate> = emptyList(),
+    wallpaperType: String = "Pattern",
+    wallpaperPatternId: String? = null,
+    wallpaperPath: String? = null,
+    wallpaperProfilePic: Boolean = false,
+    wallpaperAvatarUrl: String? = null,
+    onWallpaperSelected: ((String) -> Unit)? = null,
+    onOpenAppearance: (() -> Unit)? = null,
+    onToggleMute: (() -> Unit)? = null,
+    onBlockContact: (() -> Unit)? = null,
+    hideDateAndName: Boolean = false,
+    showDeletedContent: Boolean = false,
+    retainViewOnce: Boolean = false,
+    disableDoubleTapReaction: Boolean = false,
+    doubleTapReactionEmoji: String = "❤️",
+    showGroupAvatar: Boolean = true,
+    useBottomSheetActions: Boolean = false,
+    colorOverrides: BubbleColorOverrides? = null,
+    remoteImage: RemoteImageSlot? = chatyRemoteImage,
+    onEditMessage: suspend (messageId: String, newText: String) -> Unit = { _, _ -> },
+    onCreateTask: (initialTitle: String?) -> Unit = {},
+    onDeleteMessage: (messageId: String, forEveryone: Boolean) -> Unit = { _, _ -> },
+    onToggleStar: (messageId: String) -> Unit = {},
+    onTogglePin: (messageId: String) -> Unit = {},
+    onToggleReaction: (messageId: String, emoji: String) -> Unit = { _, _ -> },
+    onForward: (ChatMessage) -> Unit = {},
+    onClearConversation: () -> Unit = {},
+    onRetryMessage: (messageId: String) -> Unit = {},
+    onOpenInfo: () -> Unit = {},
+    onMessageInfo: (ChatMessage) -> Unit = {},
+    onReportMessage: (ChatMessage) -> Unit = {},
+    onCreateTaskFromMessage: (ChatMessage) -> Unit = {},
+    onAttachmentAction: (AttachmentAction) -> Unit = {},
+    onCameraTap: () -> Unit = {},
+    onVoiceTap: () -> Unit = {},
+    onMediaTap: (ChatMessage) -> Unit = {},
+    onVoicePlay: (MessageAttachment) -> Unit = {},
+    onViewOnceOpen: (ChatMessage) -> Unit = {},
 ) {
     val theme = LocalThemeConfig.current
     val scope = rememberCoroutineScope()
-    var composerText by remember { mutableStateOf("") }
-    var sending by remember { mutableStateOf(false) }
-    val listState = rememberLazyListState()
+    val clipboard = LocalClipboardManager.current
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+    // Dart initState: the composer restores the persisted draft.
+    var composerText by remember(conversation.id) { mutableStateOf(conversation.draftText) }
+    var sending by remember { mutableStateOf(false) }
+    var replyTarget by remember { mutableStateOf<ChatMessage?>(null) }
+    var editingMessage by remember { mutableStateOf<ChatMessage?>(null) }
+    var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var contextMenuMessage by remember { mutableStateOf<ChatMessage?>(null) }
+    var contextMenuAnchor by remember { mutableStateOf<Rect?>(null) }
+    var actionSheetMessage by remember { mutableStateOf<ChatMessage?>(null) }
+    var attachmentSheetOpen by remember { mutableStateOf(false) }
+    var chatMenuOpen by remember { mutableStateOf(false) }
+    var openedViewOnceIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var pendingBelowCount by remember { mutableIntStateOf(0) }
+    var searchOpen by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var searchMatchIndex by remember { mutableIntStateOf(0) }
+    var highlightedMessageId by remember { mutableStateOf<String?>(null) }
+    var wallpaperOverride by remember(conversation.id) { mutableStateOf(wallpaperPatternId) }
+    var wallpaperPickerOpen by remember { mutableStateOf(false) }
+    var clearConfirmOpen by remember { mutableStateOf(false) }
+    var emojiComposerOpen by remember { mutableStateOf(false) }
+    var emojiReactionTarget by remember { mutableStateOf<ChatMessage?>(null) }
+    var connectionSheetOpen by remember { mutableStateOf(false) }
+    var connectionTesting by remember { mutableStateOf(false) }
+    var typingPublished by remember { mutableStateOf(false) }
+    var typingIdleJob by remember { mutableStateOf<Job?>(null) }
+    val searchFocusRequester = remember { FocusRequester() }
+
+    val listState = rememberLazyListState()
+    val isSelectionMode = selectedIds.isNotEmpty()
+
+    // Dart _isNearBottom: the list counts as pinned while the last item is
+    // visible (with one item of slack for fractional last-row visibility).
+    val isNearBottom by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+            lastVisible >= info.totalItemsCount - 2
+        }
     }
 
-    Scaffold(containerColor = Color(theme.backgroundColor)) { padding ->
+    fun scrollToBottom(animate: Boolean = true) {
+        if (messages.isEmpty()) return
+        scope.launch {
+            if (animate) {
+                listState.animateScrollToItem(messages.size - 1)
+            } else {
+                listState.scrollToItem(messages.size - 1)
+            }
+        }
+    }
+
+    // New messages: follow the bottom when pinned, else count the unseen.
+    var previousCount by remember { mutableIntStateOf(messages.size) }
+    LaunchedEffect(messages.size) {
+        val delta = messages.size - previousCount
+        previousCount = messages.size
+        if (delta <= 0) return@LaunchedEffect
+        if (isNearBottom) {
+            scrollToBottom()
+            pendingBelowCount = 0
+        } else {
+            pendingBelowCount += delta
+        }
+    }
+
+    // Dart _performInChatSearch: case-insensitive substring over message
+    // text in timeline order; first match auto-highlights.
+    val searchMatchedIds = messages.let { msgs ->
+        val q = searchQuery.trim().lowercase()
+        if (q.isEmpty()) emptyList()
+        else msgs.filter { it.text.lowercase().contains(q) }.map { it.id }
+    }
+
+    fun highlightAndJump(messageId: String) {
+        highlightedMessageId = messageId
+        val index = messages.indexOfFirst { it.id == messageId }
+        if (index >= 0) scope.launch { listState.animateScrollToItem(index) }
+    }
+
+    fun performSearch(query: String) {
+        searchQuery = query
+        val q = query.trim().lowercase()
+        if (q.isEmpty()) {
+            searchMatchIndex = 0
+            highlightedMessageId = null
+            return
+        }
+        val matched = messages.filter { it.text.lowercase().contains(q) }.map { it.id }
+        searchMatchIndex = if (matched.isNotEmpty()) 1 else 0
+        matched.firstOrNull()?.let(::highlightAndJump)
+    }
+
+    fun jumpToMatch(index: Int) {
+        if (searchMatchedIds.isEmpty()) return
+        val clamped = index.coerceIn(1, searchMatchedIds.size)
+        searchMatchIndex = clamped
+        highlightAndJump(searchMatchedIds[clamped - 1])
+    }
+
+    fun toggleSearch() {
+        searchOpen = !searchOpen
+        if (!searchOpen) {
+            searchQuery = ""
+            searchMatchIndex = 0
+            highlightedMessageId = null
+        }
+    }
+
+    // Dart _highlightMessage: 1800ms highlight window.
+    LaunchedEffect(highlightedMessageId) {
+        if (highlightedMessageId != null) {
+            delay(1800)
+            highlightedMessageId = null
+        }
+    }
+    LaunchedEffect(searchOpen) {
+        if (searchOpen) searchFocusRequester.requestFocus()
+    }
+
+    // Dart _handleComposerChanged: persist draft, publish typing with a 5s
+    // idle reset, and open the quick-reply overlay on '#'.
+    fun handleComposerChanged(value: String) {
+        composerText = value
+        onDraftChanged(value)
+        val shouldType = value.trim().isNotEmpty()
+        if (shouldType && !typingPublished) {
+            typingPublished = true
+            onTypingChanged(true)
+        }
+        if (!shouldType && typingPublished) {
+            typingPublished = false
+            onTypingChanged(false)
+        }
+        typingIdleJob?.cancel()
+        if (shouldType) {
+            typingIdleJob = scope.launch {
+                delay(5000)
+                if (typingPublished) {
+                    typingPublished = false
+                    onTypingChanged(false)
+                }
+            }
+        }
+    }
+
+    fun openMessageMenu(message: ChatMessage, rect: Rect?) {
+        if (useBottomSheetActions) {
+            actionSheetMessage = message
+        } else {
+            contextMenuMessage = message
+            contextMenuAnchor = rect
+        }
+    }
+
+    fun runAction(message: ChatMessage, type: MessageActionType) {
+        when (type) {
+            MessageActionType.reply -> replyTarget = message
+            MessageActionType.copy -> {
+                clipboard.setText(AnnotatedString(message.text))
+                scope.launch { snackbarHostState.showSnackbar("Message copied") }
+            }
+            MessageActionType.edit -> {
+                editingMessage = message
+                replyTarget = null
+                handleComposerChanged(message.text)
+            }
+            MessageActionType.star -> onToggleStar(message.id)
+            MessageActionType.pin -> onTogglePin(message.id)
+            MessageActionType.forward -> onForward(message)
+            MessageActionType.select -> selectedIds = selectedIds + message.id
+            MessageActionType.info -> onMessageInfo(message)
+            MessageActionType.task -> onCreateTaskFromMessage(message)
+            MessageActionType.deleteForMe -> onDeleteMessage(message.id, false)
+            MessageActionType.deleteForEveryone -> onDeleteMessage(message.id, true)
+            MessageActionType.report -> onReportMessage(message)
+            else -> Unit
+        }
+    }
+
+    // Dart _sendMessage: edit branch restores the draft on failure; a
+    // leading /task command routes to task creation instead of sending;
+    // the reply target is cleared once the send starts.
+    fun sendCurrent() {
+        val text = composerText.trim()
+        if (text.isEmpty() || sending) return
+        val editTarget = editingMessage
+        if (editTarget != null) {
+            sending = true
+            handleComposerChanged("")
+            editingMessage = null
+            replyTarget = null
+            scope.launch {
+                try {
+                    onEditMessage(editTarget.id, text)
+                } catch (error: Exception) {
+                    editingMessage = editTarget
+                    composerText = text
+                    snackbarHostState.showSnackbar(
+                        error.message?.removePrefix("Exception: ") ?: "Could not edit message",
+                    )
+                } finally {
+                    sending = false
+                }
+            }
+            return
+        }
+        val command = ChatCommandParser.parse(text)
+        if (command.type == ChatCommandType.task) {
+            handleComposerChanged("")
+            onCreateTask(command.argument.ifEmpty { null })
+            return
+        }
+        sending = true
+        handleComposerChanged("")
+        replyTarget = null
+        scope.launch {
+            try {
+                onSend(text)
+            } catch (error: Exception) {
+                snackbarHostState.showSnackbar(
+                    error.message?.removePrefix("Exception: ") ?: "Could not send message",
+                )
+            } finally {
+                sending = false
+            }
+        }
+    }
+
+    Scaffold(
+        containerColor = Color(theme.backgroundColor),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+    ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).imePadding()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        Icons.AutoMirrored.Rounded.ArrowBack,
-                        contentDescription = null,
-                        tint = Color(theme.primaryTextColor),
-                    )
-                }
-                Box(
-                    modifier = Modifier.size(38.dp).background(Color(theme.accentColor), CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        conversation.avatarInitials ?: "C",
-                        color = Color(theme.onAccentColor),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    conversation.title,
-                    color = Color(theme.primaryTextColor),
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.SemiBold,
+            if (isSelectionMode) {
+                SelectionHeader(
+                    theme = theme,
+                    count = selectedIds.size,
+                    onCancel = { selectedIds = emptySet() },
+                    onCopy = {
+                        val msgs = messages
+                            .filter { selectedIds.contains(it.id) }
+                            .joinToString("\n") { m ->
+                                if (hideDateAndName) {
+                                    m.text
+                                } else {
+                                    val timeStr = selectionCopyFormatter.format(
+                                        m.createdAt.atZone(ZoneId.systemDefault()),
+                                    )
+                                    "[$timeStr, ${resolveSenderName(m.senderId)}]: ${m.text}"
+                                }
+                            }
+                        clipboard.setText(AnnotatedString(msgs))
+                        selectedIds = emptySet()
+                        scope.launch { snackbarHostState.showSnackbar("Messages copied") }
+                    },
+                    onForward = {
+                        messages.firstOrNull { selectedIds.contains(it.id) }?.let(onForward)
+                        selectedIds = emptySet()
+                    },
+                    onStar = {
+                        selectedIds.forEach(onToggleStar)
+                        selectedIds = emptySet()
+                    },
+                    onDelete = {
+                        selectedIds.forEach { onDeleteMessage(it, false) }
+                        selectedIds = emptySet()
+                    },
+                )
+            } else if (searchOpen) {
+                SearchHeader(
+                    theme = theme,
+                    query = searchQuery,
+                    onQueryChange = ::performSearch,
+                    matchIndex = searchMatchIndex,
+                    matchCount = searchMatchedIds.size,
+                    onPrevious = { jumpToMatch(searchMatchIndex - 1) },
+                    onNext = { jumpToMatch(searchMatchIndex + 1) },
+                    onClose = {
+                        if (searchQuery.isNotEmpty()) {
+                            performSearch("")
+                        } else {
+                            toggleSearch()
+                        }
+                    },
+                    onBack = ::toggleSearch,
+                    focusRequester = searchFocusRequester,
+                )
+            } else {
+                ConversationHeader(
+                    theme = theme,
+                    conversation = conversation,
+                    presenceText = presenceText,
+                    presenceIsOnline = presenceIsOnline,
+                    showHeaderAvatar = showHeaderAvatar,
+                    showHeaderName = showHeaderName,
+                    showPresenceLine = showPresenceLine,
+                    showHeaderCalls = showHeaderCalls,
+                    callsAllowed = callsAllowed,
+                    onStartCall = onStartCall,
+                    connectionState = connectionState,
+                    onConnectionDetailsTap = { connectionSheetOpen = true },
+                    onBack = onBack,
+                    onOpenInfo = onOpenInfo,
+                    menuOpen = chatMenuOpen,
+                    onMenuOpenChange = { chatMenuOpen = it },
+                    onSearch = {
+                        chatMenuOpen = false
+                        toggleSearch()
+                    },
+                    onOpenWallpaperPicker = {
+                        chatMenuOpen = false
+                        wallpaperPickerOpen = true
+                    },
+                    onOpenAppearance = onOpenAppearance,
+                    onToggleMute = onToggleMute,
+                    onBlockContact = onBlockContact,
+                    onClearConversation = {
+                        chatMenuOpen = false
+                        clearConfirmOpen = true
+                    },
                 )
             }
 
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                items(messages, key = { it.id }) { message ->
-                    MessageBubble(
-                        message = message,
-                        isOwn = message.senderId == currentUserId,
-                        theme = theme,
+            connectionState?.let { state ->
+                GlobalConnectionBanner(state = state, onTap = { connectionSheetOpen = true })
+            }
+
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                ChatWallpaper(
+                    theme = theme,
+                    wallpaperType = wallpaperType,
+                    patternId = wallpaperOverride ?: theme.wallpaperId,
+                    profileColorHex = conversation.avatarColorHex,
+                    imagePath = wallpaperPath,
+                    profilePicWallpaper = wallpaperProfilePic,
+                    avatarUrl = wallpaperAvatarUrl,
+                )
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(vertical = 8.dp),
+                ) {
+                    items(messages, key = { it.id }) { message ->
+                        val isMine = message.senderId == currentUserId
+                        val bubble = ChatMessageBubble(
+                            message = message,
+                            isMe = isMine,
+                            theme = theme,
+                            senderName = if (conversation.isGroup && !isMine) {
+                                resolveSenderName(message.senderId)
+                            } else {
+                                null
+                            },
+                            showGroupAvatar = showGroupAvatar,
+                            isSenderAdmin = conversation.isGroup &&
+                                conversation.adminIds.contains(message.senderId),
+                            isSelected = selectedIds.contains(message.id) ||
+                                contextMenuMessage?.id == message.id ||
+                                highlightedMessageId == message.id,
+                            showDeletedContent = showDeletedContent,
+                            retainViewOnce = retainViewOnce,
+                            viewOnceOpened = openedViewOnceIds.contains(message.id),
+                            colorOverrides = colorOverrides,
+                            remoteImage = remoteImage,
+                            onLongPress = { openMessageMenu(message, null) },
+                            onLongPressWithRect = { rect -> openMessageMenu(message, rect) },
+                            onSwipeReply = { replyTarget = message },
+                            onDoubleTap = if (disableDoubleTapReaction) {
+                                null
+                            } else {
+                                { onToggleReaction(message.id, doubleTapReactionEmoji) }
+                            },
+                            onReactionTap = { emoji -> onToggleReaction(message.id, emoji) },
+                            onMediaTap = if (message.attachment == null) {
+                                null
+                            } else {
+                                { onMediaTap(message) }
+                            },
+                            onVoicePlay = { attachment -> onVoicePlay(attachment) },
+                            onViewOnceOpen = {
+                                openedViewOnceIds = openedViewOnceIds + message.id
+                                onViewOnceOpen(message)
+                            },
+                            onRetry = if (isMine && message.deliveryState == DeliveryState.failed) {
+                                { onRetryMessage(message.id) }
+                            } else {
+                                null
+                            },
+                        )
+                        if (isSelectionMode) {
+                            Box(
+                                Modifier.pointerInput(message.id) {
+                                    detectTapGestures(
+                                        onTap = {
+                                            selectedIds = if (selectedIds.contains(message.id)) {
+                                                selectedIds - message.id
+                                            } else {
+                                                selectedIds + message.id
+                                            }
+                                        },
+                                    )
+                                },
+                            ) {
+                                bubble
+                            }
+                        } else {
+                            bubble
+                        }
+                    }
+                }
+
+                // Scroll-to-bottom FAB with unseen-count badge.
+                val fabVisible = !isNearBottom && messages.isNotEmpty()
+                val fabScale by animateFloatAsState(if (fabVisible) 1f else 0.4f, label = "fabScale")
+                val fabAlpha by animateFloatAsState(if (fabVisible) 1f else 0f, label = "fabAlpha")
+                Box(
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 14.dp, bottom = 12.dp)
+                        .size(44.dp)
+                        .scale(fabScale)
+                        .alpha(fabAlpha)
+                        .background(Color(theme.cardColor), CircleShape)
+                        .border(1.dp, Color(theme.surfaceColor), CircleShape)
+                        .clip(CircleShape)
+                        .pointerInput(fabVisible) {
+                            detectTapGestures(
+                                onTap = {
+                                    if (fabVisible) {
+                                        scrollToBottom()
+                                        pendingBelowCount = 0
+                                    }
+                                },
+                            )
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Rounded.KeyboardArrowDown,
+                        contentDescription = "Scroll to bottom",
+                        tint = Color(theme.primaryTextColor),
+                        modifier = Modifier.size(27.dp),
                     )
+                    if (pendingBelowCount > 0) {
+                        Box(
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .offset(x = 5.dp, y = (-4).dp)
+                                .background(Color(theme.accentColor), CircleShape)
+                                .padding(horizontal = 5.dp, vertical = 1.dp),
+                        ) {
+                            Text(
+                                "$pendingBelowCount",
+                                color = Color(theme.onAccentColor),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
                 }
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(Color(theme.surfaceColor), RoundedCornerShape(24.dp))
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                ) {
-                    if (composerText.isEmpty()) {
-                        Text("Message", color = Color(argbWithAlpha(theme.secondaryTextColor, 0.7)), fontSize = 15.sp)
+            // Quick replies overlay (Dart _showQuickReplyOverlay section).
+            if (composerText.contains("#") && quickReplies.isNotEmpty()) {
+                QuickReplyOverlay(
+                    theme = theme,
+                    replies = quickReplies,
+                    onPick = { reply -> handleComposerChanged(reply.content) },
+                )
+            }
+
+            // Edit banner (Dart _editingMessageId section).
+            editingMessage?.let { editing ->
+                BannerRow(
+                    theme = theme,
+                    icon = {
+                        Icon(Icons.Rounded.Edit, contentDescription = null,
+                            tint = Color(theme.accentColor), modifier = Modifier.size(18.dp))
+                    },
+                    title = "Editing message",
+                    titleColor = Color(theme.accentColor),
+                    subtitle = editing.text,
+                    onClose = {
+                        editingMessage = null
+                        handleComposerChanged("")
+                    },
+                )
+            }
+
+            // Reply banner (Dart _replyTarget section).
+            replyTarget?.let { target ->
+                BannerRow(
+                    theme = theme,
+                    icon = {
+                        Icon(Icons.Rounded.Reply, contentDescription = null,
+                            tint = Color(theme.accentColor), modifier = Modifier.size(18.dp))
+                    },
+                    title = "Replying to ${resolveSenderName(target.senderId)}",
+                    titleColor = Color(theme.accentColor),
+                    subtitle = target.text,
+                    onClose = { replyTarget = null },
+                )
+            }
+
+            Composer(
+                theme = theme,
+                text = composerText,
+                onTextChange = ::handleComposerChanged,
+                sending = sending,
+                onSend = ::sendCurrent,
+                onAttach = { attachmentSheetOpen = true },
+                onCameraTap = onCameraTap,
+                onEmojiTap = { emojiComposerOpen = true },
+                onVoiceTap = onVoiceTap,
+            )
+        }
+    }
+
+    // Anchored context menu (Dart AppContextMenu.showWithReactionRail).
+    val menuMessage = contextMenuMessage
+    if (menuMessage != null) {
+        val anchor = contextMenuAnchor
+        Popup(
+            alignment = Alignment.TopStart,
+            offset = if (anchor != null) {
+                IntOffset(anchor.left.roundToInt(), anchor.bottom.roundToInt())
+            } else {
+                IntOffset(0, 0)
+            },
+            onDismissRequest = { contextMenuMessage = null },
+        ) {
+            MessageContextMenuContent(
+                message = menuMessage,
+                isMe = menuMessage.senderId == currentUserId,
+                theme = theme,
+                onReact = { emoji ->
+                    onToggleReaction(menuMessage.id, emoji)
+                    contextMenuMessage = null
+                },
+                onOpenAllReactions = {
+                    emojiReactionTarget = menuMessage
+                    contextMenuMessage = null
+                },
+                onAction = { type ->
+                    runAction(menuMessage, type)
+                    contextMenuMessage = null
+                },
+            )
+        }
+    }
+
+    // Bottom-sheet action presentation (Dart message_action_sheet.dart).
+    actionSheetMessage?.let { sheetMessage ->
+        ModalBottomSheet(
+            onDismissRequest = { actionSheetMessage = null },
+            containerColor = Color.Transparent,
+        ) {
+            MessageActionSheetContent(
+                message = sheetMessage,
+                isMe = sheetMessage.senderId == currentUserId,
+                theme = theme,
+                onReact = { emoji ->
+                    onToggleReaction(sheetMessage.id, emoji)
+                    actionSheetMessage = null
+                },
+                onOpenAllReactions = {
+                    emojiReactionTarget = sheetMessage
+                    actionSheetMessage = null
+                },
+                onAction = { type ->
+                    runAction(sheetMessage, type)
+                    actionSheetMessage = null
+                },
+            )
+        }
+    }
+
+    if (attachmentSheetOpen) {
+        ModalBottomSheet(
+            onDismissRequest = { attachmentSheetOpen = false },
+            containerColor = Color.Transparent,
+        ) {
+            AttachmentSheetContent(
+                theme = theme,
+                onAction = { action ->
+                    attachmentSheetOpen = false
+                    onAttachmentAction(action)
+                },
+            )
+        }
+    }
+
+    // Per-chat wallpaper picker (Dart _openWallpaperPicker options).
+    if (wallpaperPickerOpen) {
+        ModalBottomSheet(
+            onDismissRequest = { wallpaperPickerOpen = false },
+            containerColor = Color.Transparent,
+        ) {
+            WallpaperPickerSheet(
+                theme = theme,
+                currentId = wallpaperOverride ?: theme.wallpaperId,
+                onSelect = { id ->
+                    wallpaperOverride = id
+                    wallpaperPickerOpen = false
+                    onWallpaperSelected?.invoke(id)
+                },
+            )
+        }
+    }
+
+    // Composer emoji picker (Dart ChatyEmojiPicker.showComposer).
+    if (emojiComposerOpen) {
+        ModalBottomSheet(
+            onDismissRequest = { emojiComposerOpen = false },
+            containerColor = Color.Transparent,
+        ) {
+            ChatyEmojiPickerSheet(
+                theme = theme,
+                reactionMode = false,
+                composerMode = true,
+                initialText = composerText,
+                onComposerDone = { result ->
+                    emojiComposerOpen = false
+                    handleComposerChanged(result.text)
+                    when (result.action) {
+                        ChatyEmojiComposerAction.send -> {
+                            if (result.text.trim().isNotEmpty()) sendCurrent()
+                        }
+                        ChatyEmojiComposerAction.keyboard,
+                        ChatyEmojiComposerAction.close -> Unit
                     }
-                    BasicTextField(
-                        value = composerText,
-                        onValueChange = { composerText = it },
-                        textStyle = TextStyle(color = Color(theme.primaryTextColor), fontSize = 15.sp),
-                        cursorBrush = SolidColor(Color(theme.accentColor)),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                IconButton(
-                    onClick = {
-                        val text = composerText.trim()
-                        if (text.isNotEmpty() && !sending) {
-                            sending = true
-                            composerText = ""
+                },
+            )
+        }
+    }
+
+    // Reaction emoji picker (Dart ChatyEmojiPicker.show reactionMode).
+    emojiReactionTarget?.let { target ->
+        ModalBottomSheet(
+            onDismissRequest = { emojiReactionTarget = null },
+            containerColor = Color.Transparent,
+        ) {
+            ChatyEmojiPickerSheet(
+                theme = theme,
+                reactionMode = true,
+                composerMode = false,
+                onEmojiPicked = { emoji ->
+                    if (emoji.isNotEmpty()) onToggleReaction(target.id, emoji)
+                    emojiReactionTarget = null
+                },
+            )
+        }
+    }
+
+    // Connection diagnostics dialog (Dart ConnectionDetailSheet.show).
+    if (connectionSheetOpen) {
+        connectionState?.let { state ->
+            Dialog(onDismissRequest = { connectionSheetOpen = false }) {
+                ConnectionDetailSheetContent(
+                    state = state,
+                    theme = theme,
+                    testing = connectionTesting,
+                    onRunTest = {
+                        if (!connectionTesting) {
+                            connectionTesting = true
                             scope.launch {
                                 try {
-                                    onSend(text)
+                                    onProbeConnection()
                                 } finally {
-                                    sending = false
+                                    connectionTesting = false
                                 }
                             }
                         }
                     },
-                    enabled = !sending && composerText.isNotBlank(),
-                    modifier = Modifier
-                        .size(46.dp)
-                        .background(Color(theme.accentColor), CircleShape),
+                    onDismiss = { connectionSheetOpen = false },
+                )
+            }
+        }
+    }
+
+    // Clear conversation confirmation (Dart _clearConversation).
+    if (clearConfirmOpen) {
+        AlertDialog(
+            onDismissRequest = { clearConfirmOpen = false },
+            title = { Text("Clear conversation?") },
+            text = { Text("All messages will be removed from this chat for you.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        clearConfirmOpen = false
+                        onClearConversation()
+                        openedViewOnceIds = emptySet()
+                        pendingBelowCount = 0
+                        scope.launch { snackbarHostState.showSnackbar("Conversation cleared") }
+                    },
                 ) {
-                    Icon(
-                        Icons.AutoMirrored.Rounded.Send,
-                        contentDescription = null,
-                        tint = Color(theme.onAccentColor),
-                        modifier = Modifier.size(20.dp),
+                    Text("Clear", color = Color(theme.dangerColor))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { clearConfirmOpen = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+}
+
+private val selectionCopyFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+
+@Composable
+private fun ConversationHeader(
+    theme: ThemeConfig,
+    conversation: Conversation,
+    presenceText: String?,
+    presenceIsOnline: Boolean,
+    showHeaderAvatar: Boolean,
+    showHeaderName: Boolean,
+    showPresenceLine: Boolean,
+    showHeaderCalls: Boolean,
+    callsAllowed: Boolean,
+    onStartCall: (Boolean) -> Unit,
+    connectionState: ConnectionHealthState?,
+    onConnectionDetailsTap: () -> Unit,
+    onBack: () -> Unit,
+    onOpenInfo: () -> Unit,
+    menuOpen: Boolean,
+    onMenuOpenChange: (Boolean) -> Unit,
+    onSearch: () -> Unit,
+    onOpenWallpaperPicker: () -> Unit,
+    onOpenAppearance: (() -> Unit)?,
+    onToggleMute: (() -> Unit)?,
+    onBlockContact: (() -> Unit)?,
+    onClearConversation: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(theme.surfaceColor))
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(
+                Icons.AutoMirrored.Rounded.ArrowBack,
+                contentDescription = "Back",
+                tint = Color(theme.primaryTextColor),
+            )
+        }
+        Row(
+            Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(12.dp))
+                .pointerInput(conversation.id) { detectTapGestures(onTap = { onOpenInfo() }) },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (showHeaderAvatar) {
+                Box {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(
+                                conversation.avatarColorHex?.let(::parseHexColor)
+                                    ?: Color(theme.accentColor),
+                                CircleShape,
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            conversation.avatarInitials
+                                ?: conversation.title.take(2).uppercase(),
+                            color = Color(theme.onAccentColor),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                    if (conversation.isDirect && presenceIsOnline) {
+                        Box(
+                            Modifier
+                                .align(Alignment.BottomEnd)
+                                .offset(x = 1.dp, y = 1.dp)
+                                .size(11.dp)
+                                .background(Color(theme.surfaceColor), CircleShape)
+                                .padding(2.dp)
+                                .background(Color(theme.successColor), CircleShape),
+                        )
+                    }
+                }
+                Spacer(Modifier.width(10.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                if (showHeaderName) {
+                    Text(
+                        conversation.title,
+                        color = Color(theme.primaryTextColor),
+                        fontSize = (15.5 * theme.fontScale).sp,
+                        fontWeight = FontWeight.W800,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (showPresenceLine && presenceText != null) {
+                    Text(
+                        presenceText,
+                        color = Color(
+                            if (presenceIsOnline) theme.successColor else theme.secondaryTextColor,
+                        ),
+                        fontSize = (10.5 * theme.fontScale).sp,
+                        fontWeight = FontWeight.W500,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+        if (showHeaderCalls) {
+            val callTint = if (callsAllowed) {
+                Color(theme.primaryTextColor)
+            } else {
+                Color(theme.secondaryTextColor)
+            }
+            IconButton(onClick = { onStartCall(false) }) {
+                Icon(
+                    Icons.Rounded.Call,
+                    contentDescription = if (callsAllowed) {
+                        "Voice call"
+                    } else {
+                        "Voice call • contact acceptance required"
+                    },
+                    tint = callTint,
+                )
+            }
+            IconButton(onClick = { onStartCall(true) }) {
+                Icon(
+                    Icons.Rounded.VideoCameraFront,
+                    contentDescription = if (callsAllowed) {
+                        "Video call"
+                    } else {
+                        "Video call • contact acceptance required"
+                    },
+                    tint = callTint,
+                )
+            }
+        }
+        connectionState?.let { state ->
+            Box(Modifier.padding(horizontal = 4.dp)) {
+                ConnectionHealthIndicator(
+                    health = state.health,
+                    size = 15.dp,
+                    onTap = onConnectionDetailsTap,
+                )
+            }
+        }
+        Box {
+            IconButton(onClick = { onMenuOpenChange(true) }) {
+                Icon(
+                    Icons.Rounded.MoreVert,
+                    contentDescription = "Chat options",
+                    tint = Color(theme.primaryTextColor),
+                )
+            }
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { onMenuOpenChange(false) }) {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            if (conversation.isGroup) "View group info" else "View contact info",
+                        )
+                    },
+                    onClick = {
+                        onMenuOpenChange(false)
+                        onOpenInfo()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Search conversation") },
+                    onClick = onSearch,
+                )
+                DropdownMenuItem(
+                    text = { Text("Chat wallpaper") },
+                    onClick = onOpenWallpaperPicker,
+                )
+                if (onOpenAppearance != null) {
+                    DropdownMenuItem(
+                        text = { Text("Chat appearance") },
+                        onClick = {
+                            onMenuOpenChange(false)
+                            onOpenAppearance()
+                        },
+                    )
+                }
+                if (onToggleMute != null) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                if (conversation.isMuted) {
+                                    "Unmute notifications"
+                                } else {
+                                    "Mute notifications"
+                                },
+                            )
+                        },
+                        onClick = {
+                            onMenuOpenChange(false)
+                            onToggleMute()
+                        },
+                    )
+                }
+                DropdownMenuItem(
+                    text = { Text("Clear conversation", color = Color(theme.dangerColor)) },
+                    onClick = onClearConversation,
+                )
+                if (conversation.isDirect && onBlockContact != null) {
+                    DropdownMenuItem(
+                        text = { Text("Block contact", color = Color(theme.dangerColor)) },
+                        onClick = {
+                            onMenuOpenChange(false)
+                            onBlockContact()
+                        },
                     )
                 }
             }
@@ -179,48 +1136,397 @@ fun ChatDetailScreen(
 }
 
 @Composable
-private fun MessageBubble(message: ChatMessage, isOwn: Boolean, theme: ThemeConfig) {
-    val bubbleColor = if (isOwn) theme.accentColor else theme.surfaceColor
-    val textColor = if (isOwn) theme.onAccentColor else theme.primaryTextColor
-    Column(Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = if (isOwn) Arrangement.End else Arrangement.Start,
-        ) {
-            Column(
-                modifier = Modifier
-                    .widthIn(max = 280.dp)
-                    .background(Color(bubbleColor), RoundedCornerShape(16.dp))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-            ) {
-                if (message.text.isNotEmpty()) {
-                    Text(message.text, color = Color(textColor), fontSize = 15.sp)
-                }
-                Spacer(Modifier.height(2.dp))
-                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+private fun SelectionHeader(
+    theme: ThemeConfig,
+    count: Int,
+    onCancel: () -> Unit,
+    onCopy: () -> Unit,
+    onForward: () -> Unit,
+    onStar: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(theme.surfaceColor))
+            .padding(horizontal = 4.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onCancel) {
+            Icon(Icons.Rounded.Close, contentDescription = "Cancel selection",
+                tint = Color(theme.primaryTextColor))
+        }
+        Text(
+            "$count selected",
+            color = Color(theme.primaryTextColor),
+            fontWeight = FontWeight.W700,
+            fontSize = 16.sp,
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(onClick = onCopy) {
+            Icon(Icons.Rounded.ContentCopy, contentDescription = "Copy",
+                tint = Color(theme.primaryTextColor))
+        }
+        IconButton(onClick = onForward) {
+            Icon(Icons.AutoMirrored.Rounded.Forward, contentDescription = "Forward",
+                tint = Color(theme.primaryTextColor))
+        }
+        IconButton(onClick = onStar) {
+            Icon(Icons.Rounded.StarBorder, contentDescription = "Star",
+                tint = Color(theme.primaryTextColor))
+        }
+        IconButton(onClick = onDelete) {
+            Icon(Icons.Rounded.DeleteOutline, contentDescription = "Delete",
+                tint = Color(theme.dangerColor))
+        }
+    }
+}
+
+@Composable
+private fun BannerRow(
+    theme: ThemeConfig,
+    icon: @Composable () -> Unit,
+    title: String,
+    titleColor: Color,
+    subtitle: String,
+    onClose: () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(Color(theme.cardColor))
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        icon()
+        Spacer(Modifier.width(9.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = titleColor, fontSize = 11.5.sp, fontWeight = FontWeight.W700)
+            Text(
+                subtitle,
+                color = Color(theme.secondaryTextColor),
+                fontSize = 11.5.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        IconButton(onClick = onClose) {
+            Icon(Icons.Rounded.Close, contentDescription = "Cancel",
+                tint = Color(theme.primaryTextColor), modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+/** In-chat search app bar (Dart _isInChatSearchOpen AppBar): back, query
+ *  field, "i of N" match counter, previous/next match, close-or-clear. */
+@Composable
+private fun SearchHeader(
+    theme: ThemeConfig,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    matchIndex: Int,
+    matchCount: Int,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onClose: () -> Unit,
+    onBack: () -> Unit,
+    focusRequester: FocusRequester,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(theme.surfaceColor))
+            .padding(horizontal = 4.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(
+                Icons.AutoMirrored.Rounded.ArrowBack,
+                contentDescription = "Back",
+                tint = Color(theme.primaryTextColor),
+            )
+        }
+        Box(Modifier.weight(1f)) {
+            if (query.isEmpty()) {
+                Text(
+                    "Search conversation…",
+                    color = Color(theme.secondaryTextColor),
+                    fontSize = (15.5 * theme.fontScale).sp,
+                )
+            }
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                textStyle = TextStyle(
+                    color = Color(theme.primaryTextColor),
+                    fontSize = (15.5 * theme.fontScale).sp,
+                ),
+                cursorBrush = SolidColor(Color(theme.accentColor)),
+                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+            )
+        }
+        if (matchCount > 0) {
+            Text(
+                "$matchIndex of $matchCount",
+                color = Color(theme.secondaryTextColor),
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.W600,
+                modifier = Modifier.padding(horizontal = 6.dp),
+            )
+            IconButton(onClick = onPrevious) {
+                Icon(
+                    Icons.Rounded.KeyboardArrowUp,
+                    contentDescription = "Previous match",
+                    tint = Color(theme.primaryTextColor),
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            IconButton(onClick = onNext) {
+                Icon(
+                    Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = "Next match",
+                    tint = Color(theme.primaryTextColor),
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+        }
+        IconButton(onClick = onClose) {
+            Icon(
+                Icons.Rounded.Close,
+                contentDescription = "Clear search",
+                tint = Color(theme.primaryTextColor),
+            )
+        }
+    }
+}
+
+/** Quick replies overlay (Dart _showQuickReplyOverlay block): opened by '#'
+ *  in the composer, lists the automation quick replies, tap fills the
+ *  composer with the reply content. */
+@Composable
+private fun QuickReplyOverlay(
+    theme: ThemeConfig,
+    replies: List<QuickReplyTemplate>,
+    onPick: (QuickReplyTemplate) -> Unit,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .heightIn(max = 180.dp)
+            .background(Color(theme.cardColor), RoundedCornerShape(14.dp))
+            .border(1.dp, Color(theme.surfaceColor), RoundedCornerShape(14.dp)),
+    ) {
+        LazyColumn {
+            items(replies.size) { index ->
+                val reply = replies[index]
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .pointerInput(reply.shortcut) {
+                            detectTapGestures(onTap = { onPick(reply) })
+                        }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                ) {
                     Text(
-                        bubbleTimeFormatter.format(message.createdAt.atZone(ZoneId.systemDefault())),
-                        color = Color(argbWithAlpha(textColor, 0.6)),
-                        fontSize = 10.5.sp,
+                        "${reply.shortcut} — ${reply.title}",
+                        color = Color(theme.primaryTextColor),
+                        fontWeight = FontWeight.W700,
+                        fontSize = 12.5.sp,
                     )
-                    if (isOwn) {
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            when (message.deliveryState) {
-                                DeliveryState.sending, DeliveryState.queued -> "\u23F1"   // ⏱
-                                DeliveryState.failed -> "!"
-                                DeliveryState.sent -> "\u2713"                            // ✓
-                                DeliveryState.delivered -> "\u2713\u2713"                 // ✓✓
-                                DeliveryState.read -> "\u2713\u2713"
-                            },
-                            color = Color(argbWithAlpha(textColor, if (message.deliveryState == DeliveryState.read) 1.0 else 0.6)),
-                            fontSize = 10.5.sp,
-                        )
-                    }
+                    Text(
+                        reply.content,
+                        color = Color(theme.secondaryTextColor),
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }
     }
 }
 
-private val bubbleTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+/** Per-chat wallpaper picker (Dart _openWallpaperPicker): fixed pattern
+ *  options with a check on the current selection. */
+@Composable
+private fun WallpaperPickerSheet(
+    theme: ThemeConfig,
+    currentId: String,
+    onSelect: (String) -> Unit,
+) {
+    val options = listOf(
+        "none" to "Plain",
+        "subtle_dots" to "Subtle Dots",
+        "geometric" to "Geometric",
+        "gradient_mesh" to "Gradient Mesh",
+        "constellation" to "Constellation",
+    )
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(
+                Color(theme.surfaceColor),
+                RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
+            )
+            .padding(vertical = 14.dp),
+    ) {
+        Text(
+            "Chat wallpaper",
+            color = Color(theme.primaryTextColor),
+            fontWeight = FontWeight.W800,
+            fontSize = 15.sp,
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .padding(bottom = 4.dp),
+        )
+        options.forEach { (id, label) ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .pointerInput(id) { detectTapGestures(onTap = { onSelect(id) }) }
+                    .padding(horizontal = 18.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    label,
+                    color = Color(theme.primaryTextColor),
+                    modifier = Modifier.weight(1f),
+                )
+                if (currentId == id) {
+                    Icon(
+                        Icons.Rounded.Check,
+                        contentDescription = null,
+                        tint = Color(theme.accentColor),
+                    )
+                }
+            }
+        }
+        Box(Modifier.padding(bottom = 8.dp))
+    }
+}
+
+/** Stock integrated composer (Dart _Composer._buildInputRow, default
+ *  template: integrated placement, 24dp corners, send/mic morph, camera
+ *  shortcut shown). Voice capture and the emoji picker are owner seams. */
+@Composable
+private fun Composer(
+    theme: ThemeConfig,
+    text: String,
+    onTextChange: (String) -> Unit,
+    sending: Boolean,
+    onSend: () -> Unit,
+    onAttach: () -> Unit,
+    onCameraTap: () -> Unit,
+    onEmojiTap: () -> Unit,
+    onVoiceTap: () -> Unit,
+) {
+    val inputBg = Color(theme.cardColor)
+    val inputTextColor = Color(theme.primaryTextColor)
+    val hasText = text.trim().isNotEmpty()
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .background(inputBg, RoundedCornerShape(24.dp))
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onEmojiTap) {
+                    Icon(
+                        Icons.Rounded.EmojiEmotions,
+                        contentDescription = "Emoji",
+                        tint = Color(theme.secondaryTextColor),
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+                Box(Modifier.weight(1f)) {
+                    if (text.isEmpty()) {
+                        Text(
+                            "Message…  /task or #reply",
+                            color = Color(argbWithAlpha(theme.secondaryTextColor, 0.9)),
+                            fontSize = (14 * theme.fontScale).sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(vertical = 11.dp),
+                        )
+                    }
+                    BasicTextField(
+                        value = text,
+                        onValueChange = onTextChange,
+                        textStyle = TextStyle(
+                            color = inputTextColor,
+                            fontSize = (14 * theme.fontScale).sp,
+                        ),
+                        cursorBrush = SolidColor(Color(theme.accentColor)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 11.dp),
+                    )
+                }
+                IconButton(onClick = onAttach) {
+                    Icon(
+                        Icons.Rounded.Add,
+                        contentDescription = "Attach",
+                        tint = Color(theme.accentColor),
+                    )
+                }
+                IconButton(onClick = onCameraTap) {
+                    Icon(
+                        Icons.Rounded.PhotoCamera,
+                        contentDescription = "Camera",
+                        tint = Color(theme.accentColor),
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.width(6.dp))
+        // Send/mic morph (Dart AnimatedSwitcher between send-action and
+        // voice-action keyed on hasText).
+        Box(
+            modifier = Modifier
+                .size(46.dp)
+                .background(Color(theme.accentColor), CircleShape)
+                .clip(CircleShape)
+                .pointerInput(hasText, sending) {
+                    detectTapGestures(
+                        onTap = { if (hasText) onSend() else onVoiceTap() },
+                    )
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            if (hasText) {
+                Icon(
+                    Icons.AutoMirrored.Rounded.Send,
+                    contentDescription = "Send message",
+                    tint = Color(theme.onAccentColor),
+                    modifier = Modifier.size(20.dp),
+                )
+            } else {
+                Icon(
+                    Icons.Rounded.Mic,
+                    contentDescription = "Voice note",
+                    tint = Color(theme.onAccentColor),
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+        }
+    }
+}
+
+/** Parse the Dart colorHex formats ('0xFF6366F1', '#6366F1') into a Color. */
+private fun parseHexColor(hex: String): Color? {
+    val cleaned = hex.removePrefix("0x").removePrefix("0X").removePrefix("#")
+    val value = cleaned.toLongOrNull(16) ?: return null
+    return if (cleaned.length <= 6) {
+        Color(0xFF000000L or value)
+    } else {
+        Color(value)
+    }
+}
