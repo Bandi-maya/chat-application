@@ -9,7 +9,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.asFrameworkPaint
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.PaintingStyle
@@ -21,6 +23,7 @@ import java.io.ByteArrayOutputStream
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -37,19 +40,17 @@ import kotlinx.coroutines.withContext
  *  targets androidx.compose.ui.graphics.Canvas; the bake path wraps an
  *  android.graphics.Canvas.
  *
- *  INTEGRATION NOTE (blur mask filter, verified against the official
- *  hardware-acceleration drawing-support table): the Dart glow/halo blurs
- *  are mapped parameter-exactly to android.graphics.BlurMaskFilter via
- *  asFrameworkPaint (see applyBlurMask). Paint.setMaskFilter is never
- *  hardware-accelerated, so in the LIVE preview (hardware canvas) the blur
- *  will likely not render - the glow shapes draw unblurred instead, a
- *  cosmetic degradation, never a crash. The STILL BAKE renders into a
- *  Bitmap-backed android.graphics.Canvas, which is a software canvas, so
- *  captured photos get the exact Dart blur. If pixel verification shows the
- *  missing live glow matters, the candidate fixes are an offscreen software
- *  bitmap for the glow shapes or a child composable with Modifier.blur
- *  (RenderEffect, API 31+) - both deviations from the shared-painter design,
- *  pending owner approval. */
+ *  INTEGRATION NOTE (blur glow, implemented): Paint.setMaskFilter is never
+ *  hardware-accelerated (official Android hardware-acceleration drawing
+ *  table), so the live preview paints its three blurred glows from
+ *  pre-baked software-bitmap sprites (glow sprite cache below): each shape
+ *  is rendered ONCE per (shape, color) onto a Bitmap-backed software canvas
+ *  where android.graphics.BlurMaskFilter renders exactly, then drawn as a
+ *  bitmap under the same face transform. The still-capture bake already
+ *  targets a software Bitmap canvas and keeps the direct mask filter
+ *  (applyBlurMask), so live and still render the same Dart blur. API 24+
+ *  safe: bitmaps, LinkedHashMap LRU and the framework mask filter only -
+ *  no RenderEffect/API-31 path. */
 
 @Composable
 fun LensOverlay(
@@ -66,7 +67,7 @@ fun LensOverlay(
         opacity * (if (health == TrackingHealth.temporarilyLost) 0.55f else 1.0f)
     Canvas(modifier = Modifier.fillMaxSize()) {
         drawIntoCanvas { canvas ->
-            LensAnchorPainter.paint(canvas, lens, poses, effectiveOpacity)
+            LensAnchorPainter.paint(canvas, lens, poses, effectiveOpacity, useGlowSprites = true)
         }
     }
 }
@@ -151,6 +152,7 @@ object LensAnchorPainter {
         lens: LensDefinition,
         poses: List<FacePose>,
         opacity: Float,
+        useGlowSprites: Boolean = false,
     ) {
         // Per-lens multi-face capability (requirement 26): each tracked face
         // receives an independent transform - never everything on face #0.
@@ -164,16 +166,16 @@ object LensAnchorPainter {
                         if (lens.id == "lens_sunglasses_aviator") paintAviators(canvas, lens, pose, opacity)
                         else paintGlasses(canvas, pose, opacity)
                     LensAnchor.forehead -> when (lens.id) {
-                        "lens_angel_halo" -> paintAngelHalo(canvas, lens, pose, opacity)
+                        "lens_angel_halo" -> paintAngelHalo(canvas, lens, pose, opacity, useGlowSprites)
                         "lens_sparkles" -> paintSparkles(canvas, lens, pose, opacity)
-                        "lens_neon_crown" -> paintNeonCrown(canvas, lens, pose, opacity)
+                        "lens_neon_crown" -> paintNeonCrown(canvas, lens, pose, opacity, useGlowSprites)
                         else -> paintCrown(canvas, pose, opacity)
                     }
                     LensAnchor.ears -> {
                         paintEars(canvas, pose, opacity)
                         if (lens.id == "lens_dog_ears") paintDogNose(canvas, pose, opacity)
                     }
-                    LensAnchor.mouth -> paintMouthGlow(canvas, pose, opacity)
+                    LensAnchor.mouth -> paintMouthGlow(canvas, pose, opacity, useGlowSprites)
                     LensAnchor.noseBridge, LensAnchor.noseTip -> paintNoseDot(canvas, pose, opacity)
                     LensAnchor.fullHead -> Unit
                 }
@@ -206,21 +208,103 @@ object LensAnchorPainter {
      *  (frameworks/base libs/hwui/jni/MaskFilter.cpp, createBlur ->
      *  convertRadiusToSigma), so radius = (sigma - 0.5) / 0.57735
      *  (matches Skia's own SkBlurMask::ConvertSigmaToRadius).
-     *  RENDERING SUPPORT (verified against the official Android hardware
-     *  acceleration drawing-support table, developer.android.com/guide/
-     *  topics/graphics/hardware-accel): Paint.setMaskFilter is NEVER
-     *  hardware-accelerated (the table marks it unsupported at every API
-     *  level) - it renders only on software canvases. A Compose Canvas in a
-     *  normal app window is hardware-accelerated, so this blur will likely
-     *  NOT render there; the glow geometry still draws, just unblurred
-     *  (missing-glow degradation, never a crash). A Bitmap-backed software
-     *  canvas or a LAYER_TYPE_SOFTWARE view would render it. Kept as the
-     *  closest parameter-exact mapping pending pixel verification; see the
-     *  integration note in the class header. */
+     *  Used by the still-capture bake, whose Bitmap-backed
+     *  android.graphics.Canvas is a software canvas where the framework
+     *  mask filter renders exactly (Paint.setMaskFilter is never
+     *  hardware-accelerated per the official drawing-support table, which
+     *  is why the LIVE preview uses the glow sprite cache instead). */
     private fun applyBlurMask(paint: Paint, sigma: Float) {
         paint.asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(
             (sigma - 0.5f) / 0.57735f,
             android.graphics.BlurMaskFilter.Blur.NORMAL,
+        )
+    }
+
+    // ---- Live-preview glow sprites ---------------------------------------
+    // Paint.setMaskFilter is never hardware-accelerated (official Android
+    // hardware-acceleration drawing-support table), so the Dart blur glows
+    // cannot be painted directly on the live Compose canvas. Each blurred
+    // shape is baked ONCE per (shape, color) into a small software bitmap -
+    // a canvas where BlurMaskFilter renders exactly - and the sprite is then
+    // drawn under the same face transform, so the blur scales with the head
+    // exactly like Skia's CTM-respecting mask filter does in Flutter.
+
+    private const val GLOW_SPRITE_SCALE = 2f
+    private const val GLOW_SPRITE_MAX = 24
+
+    private val glowSpriteCache =
+        object : LinkedHashMap<String, android.graphics.Bitmap>(16, 0.75f, true) {
+            override fun removeEldestEntry(
+                eldest: MutableMap.MutableEntry<String, android.graphics.Bitmap>?,
+            ): Boolean {
+                if (size > GLOW_SPRITE_MAX) {
+                    eldest?.value?.recycle()
+                    return true
+                }
+                return false
+            }
+        }
+
+    /** Framework BlurMaskFilter radius for a Dart blur sigma:
+     *  sigma = 0.57735 * radius + 0.5 (frameworks/base libs/hwui/jni/
+     *  MaskFilter.cpp createBlur), so radius = (sigma - 0.5) / 0.57735,
+     *  matching Skia's own SkBlurMask::ConvertSigmaToRadius. */
+    private fun blurRadiusForSigma(sigma: Float): Float = (sigma - 0.5f) / 0.57735f
+
+    /** Draws a blurred shape via its cached software-baked sprite. [l],[t],
+     *  [r],[b] are the shape bounds in local (transformed) units INCLUDING
+     *  stroke; [alpha] carries the per-frame opacity (the sprite is baked at
+     *  the Dart base alpha, so the product matches the Dart color exactly).
+     *  [bake] receives the software canvas and an anti-aliased framework
+     *  paint with the blur mask filter already set. */
+    private fun drawBlurredSprite(
+        canvas: androidx.compose.ui.graphics.Canvas,
+        key: String,
+        l: Float,
+        t: Float,
+        r: Float,
+        b: Float,
+        blurSigma: Float,
+        alpha: Float,
+        baseColor: Int,
+        strokeWidth: Float,
+        fill: Boolean,
+        bake: (android.graphics.Canvas, android.graphics.Paint) -> Unit,
+    ) {
+        val margin = 3f * blurRadiusForSigma(blurSigma) + 2f
+        val sprite = synchronized(glowSpriteCache) {
+            glowSpriteCache[key] ?: run {
+                val w = ((r - l + 2 * margin) * GLOW_SPRITE_SCALE).roundToInt().coerceAtLeast(1)
+                val h = ((b - t + 2 * margin) * GLOW_SPRITE_SCALE).roundToInt().coerceAtLeast(1)
+                val bmp = android.graphics.Bitmap.createBitmap(
+                    w, h, android.graphics.Bitmap.Config.ARGB_8888,
+                )
+                val ac = android.graphics.Canvas(bmp)
+                ac.scale(GLOW_SPRITE_SCALE, GLOW_SPRITE_SCALE)
+                ac.translate(margin - l, margin - t)
+                val ap = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                    color = baseColor
+                    style = if (fill) android.graphics.Paint.Style.FILL
+                            else android.graphics.Paint.Style.STROKE
+                    if (!fill) {
+                        this.strokeWidth = strokeWidth
+                        strokeCap = android.graphics.Paint.Cap.ROUND
+                        strokeJoin = android.graphics.Paint.Join.ROUND
+                    }
+                    maskFilter = android.graphics.BlurMaskFilter(
+                        blurRadiusForSigma(blurSigma),
+                        android.graphics.BlurMaskFilter.Blur.NORMAL,
+                    )
+                }
+                bake(ac, ap)
+                glowSpriteCache[key] = bmp
+                bmp
+            }
+        }
+        canvas.drawImage(
+            sprite.asImageBitmap(),
+            Offset(l - margin, t - margin),
+            Paint().apply { this.alpha = alpha },
         )
     }
 
@@ -262,36 +346,52 @@ object LensAnchorPainter {
         }
     }
 
-    private fun paintNeonCrown(canvas: androidx.compose.ui.graphics.Canvas, lens: LensDefinition, pose: FacePose, opacity: Float) {
+    private fun paintNeonCrown(canvas: androidx.compose.ui.graphics.Canvas, lens: LensDefinition, pose: FacePose, opacity: Float, useGlowSprites: Boolean = false) {
         val origin = Offset(
             pose.headBounds.center.dx,
             pose.headBounds.top + pose.headBounds.height * 0.08f,
         )
         val unit = pose.headBounds.width * 0.72f
         withFaceTransform(canvas, pose, origin, unit) {
-            val glow = strokePaint(lens.accentColor.copy(alpha = 0.45f * opacity), 11f, blur = 7f)
             val line = strokePaint(lens.accentColor.copy(alpha = opacity), 4f)
             val path = Path().apply {
                 moveTo(-60f, 20f); lineTo(-45f, -22f); lineTo(-20f, 2f); lineTo(0f, -40f)
                 lineTo(20f, 2f); lineTo(45f, -22f); lineTo(60f, 20f)
             }
-            canvas.drawPath(path, glow)
+            if (useGlowSprites) {
+                // Dart lens_overlay.dart:233 - stroke 11, blur sigma 7.
+                drawBlurredSprite(
+                    canvas, "crown:" + lens.accentColor.value.toString(),
+                    -65.5f, -45.5f, 65.5f, 25.5f, 7f, opacity,
+                    lens.accentColor.copy(alpha = 0.45f).value.toInt(), 11f, false,
+                ) { ac, ap -> ac.drawPath(path.asAndroidPath(), ap) }
+            } else {
+                canvas.drawPath(path, strokePaint(lens.accentColor.copy(alpha = 0.45f * opacity), 11f, blur = 7f))
+            }
             canvas.drawPath(path, line)
             canvas.drawLine(Offset(-60f, 20f), Offset(60f, 20f), line)
         }
     }
 
-    private fun paintAngelHalo(canvas: androidx.compose.ui.graphics.Canvas, lens: LensDefinition, pose: FacePose, opacity: Float) {
+    private fun paintAngelHalo(canvas: androidx.compose.ui.graphics.Canvas, lens: LensDefinition, pose: FacePose, opacity: Float, useGlowSprites: Boolean = false) {
         val origin = Offset(
             pose.headBounds.center.dx,
             pose.headBounds.top + pose.headBounds.height * 0.05f,
         )
         val unit = pose.headBounds.width * 0.68f
         withFaceTransform(canvas, pose, origin, unit) {
-            val glow = strokePaint(lens.accentColor.copy(alpha = 0.45f * opacity), 12f, blur = 8f)
             val halo = strokePaint(lens.accentColor.copy(alpha = opacity), 5f)
             val oval = Rect(Offset(0f, -28f), 56f, 12f)
-            canvas.drawOval(oval, glow)
+            if (useGlowSprites) {
+                // Dart lens_overlay.dart:265 - stroke 12, blur sigma 8.
+                drawBlurredSprite(
+                    canvas, "halo:" + lens.accentColor.value.toString(),
+                    -62f, -46f, 62f, -10f, 8f, opacity,
+                    lens.accentColor.copy(alpha = 0.45f).value.toInt(), 12f, false,
+                ) { ac, ap -> ac.drawOval(android.graphics.RectF(-56f, -40f, 56f, -16f), ap) }
+            } else {
+                canvas.drawOval(oval, strokePaint(lens.accentColor.copy(alpha = 0.45f * opacity), 12f, blur = 8f))
+            }
             canvas.drawOval(oval, halo)
             for (x in listOf(-42f, 0f, 42f)) {
                 canvas.drawCircle(
@@ -422,12 +522,20 @@ object LensAnchorPainter {
         }
     }
 
-    private fun paintMouthGlow(canvas: androidx.compose.ui.graphics.Canvas, pose: FacePose, opacity: Float) {
+    private fun paintMouthGlow(canvas: androidx.compose.ui.graphics.Canvas, pose: FacePose, opacity: Float, useGlowSprites: Boolean = false) {
         withFaceTransform(canvas, pose, Offset(pose.mouthCenter.dx, pose.mouthCenter.dy), pose.interocular * 1.6f) {
-            val glow = fillPaint(Color(0xFFF472B6).copy(alpha = 0.30f * opacity)).apply {
-                applyBlurMask(this, 18f)
+            if (useGlowSprites) {
+                // Dart lens_overlay.dart:473 - fill, blur sigma 18.
+                drawBlurredSprite(
+                    canvas, "mouth", -26f, -26f, 26f, 26f, 18f, opacity,
+                    Color(0xFFF472B6).copy(alpha = 0.30f).value.toInt(), 0f, true,
+                ) { ac, ap -> ac.drawCircle(0f, 0f, 26f, ap) }
+            } else {
+                canvas.drawCircle(
+                    Offset.Zero, 26f,
+                    fillPaint(Color(0xFFF472B6).copy(alpha = 0.30f * opacity)).apply { applyBlurMask(this, 18f) },
+                )
             }
-            canvas.drawCircle(Offset.Zero, 26f, glow)
             canvas.drawCircle(Offset.Zero, 8f, fillPaint(Color.White.copy(alpha = 0.35f * opacity)))
         }
     }
