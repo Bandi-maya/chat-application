@@ -2,7 +2,7 @@ package com.example.chat.core.crypto
 
 /**
  * Kotlin-side binding surface for the repo-owned OpenMLS Rust crate
- * (third_party/openmls_android/rust/src/api/*.rs). Method names and argument
+ * (third_party/openmls_android rust/src/api modules). Method names and argument
  * order mirror the Rust `pub async fn` signatures 1:1 so the UniFFI/JNI
  * generated binding can implement this interface without adapting logic.
  *
