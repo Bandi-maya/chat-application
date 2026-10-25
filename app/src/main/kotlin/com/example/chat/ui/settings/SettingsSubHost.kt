@@ -25,7 +25,7 @@ val hostedSettingsDestinations: Set<SettingsDestination> = setOf(
     SettingsDestination.BackupRestore, SettingsDestination.Universal,
     SettingsDestination.Conversation, SettingsDestination.HomeScreen, SettingsDestination.Calls,
     SettingsDestination.Permissions, SettingsDestination.StorageMedia,
-    SettingsDestination.TemplateStudio,
+    SettingsDestination.TemplateStudio, SettingsDestination.ThemeEngine,
 )
 
 /**
@@ -165,6 +165,51 @@ fun SettingsSubHost(destination: SettingsDestination, onBack: () -> Unit): Boole
             onBack = onBack,
             onClearCache = { toast("Clearing the local media cache is not wired in this build yet.") },
         )
+        SettingsDestination.ThemeEngine -> {
+            // Dart file_picker/image_picker seams -> Activity Result launchers.
+            var jsonWaiter by remember { mutableStateOf<kotlinx.coroutines.CompletableDeferred<String?>?>(null) }
+            var imageWaiter by remember { mutableStateOf<kotlinx.coroutines.CompletableDeferred<java.io.File?>?>(null) }
+            val jsonLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+            ) { uri ->
+                val text = try {
+                    uri?.let { context.contentResolver.openInputStream(it)?.bufferedReader()?.use { r -> r.readText() } }
+                } catch (_: Exception) { null }
+                jsonWaiter?.complete(text); jsonWaiter = null
+            }
+            val imageLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                androidx.activity.result.contract.ActivityResultContracts.GetContent(),
+            ) { uri ->
+                val file = try {
+                    uri?.let {
+                        val out = java.io.File(context.cacheDir, "theme_image_${System.currentTimeMillis()}")
+                        context.contentResolver.openInputStream(it)?.use { input -> out.outputStream().use { o -> input.copyTo(o) } }
+                        out
+                    }
+                } catch (_: Exception) { null }
+                imageWaiter?.complete(file); imageWaiter = null
+            }
+            com.example.chat.ui.settings.theme.ThemeEditorScreen(
+                themeController = theme,
+                preferences = prefs,
+                templateController = ServiceLocator.templateController,
+                appearance = ServiceLocator.appearanceVariantController,
+                exportDirectory = context.getExternalFilesDir(null) ?: context.filesDir,
+                pickJsonText = {
+                    val d = kotlinx.coroutines.CompletableDeferred<String?>()
+                    jsonWaiter = d
+                    jsonLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+                    d.await()
+                },
+                pickImageFile = {
+                    val d = kotlinx.coroutines.CompletableDeferred<java.io.File?>()
+                    imageWaiter = d
+                    imageLauncher.launch("image/*")
+                    d.await()
+                },
+                onBack = onBack,
+            )
+        }
         SettingsDestination.TemplateStudio -> {
             var component by remember { mutableStateOf<com.example.chat.core.templates.TemplateComponentType?>(null) }
             BackHandler(enabled = component != null) { component = null }
