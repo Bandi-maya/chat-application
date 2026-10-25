@@ -68,6 +68,11 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    // org.json so unit tests exercise the same JSON helpers as the device.
+    testImplementation("org.json:json:20241224")
 }
 
 // ── MLS native binding (mls-native UniFFI shim over the repo-owned OpenMLS
