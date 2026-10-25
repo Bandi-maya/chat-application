@@ -106,9 +106,25 @@ fun ThemePreviewCard(
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun ColorDot(color: Color, tooltip: String) {
+    // m3 1.3.1 ships PlainTooltip only in Tooltip_androidKt (not on the
+    // metadata compile path), so the plain tooltip body is spelled out with
+    // the same surface/shape/text the PlainTooltip composable wraps.
     androidx.compose.material3.TooltipBox(
         positionProvider = androidx.compose.material3.TooltipDefaults.rememberPlainTooltipPositionProvider(),
-        tooltip = { androidx.compose.material3.PlainTooltip { Text(tooltip) } },
+        tooltip = {
+            androidx.compose.material3.Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = Color(0xFF3B3F44),
+                shadowElevation = 2.dp,
+            ) {
+                Text(
+                    tooltip,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    color = Color.White,
+                    fontSize = 12.sp,
+                )
+            }
+        },
         state = androidx.compose.material3.rememberTooltipState(),
     ) {
         Box(Modifier.size(14.dp).background(color, CircleShape).border(1.dp, Color.Black.alpha(0.15f), CircleShape))
