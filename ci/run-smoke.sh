@@ -2,7 +2,7 @@
 # Runs inside the emulator-runner (which executes each script line separately,
 # so a multi-line inline script cannot propagate the gradle exit code).
 mkdir -p screenshots
-gradle :app:connectedDebugAndroidTest --no-daemon
+gradle :app:connectedDebugAndroidTest --no-daemon -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true
 rc=$?
 adb pull /sdcard/Android/data/com.example.chat/files/screenshots/. screenshots/ || true
 adb logcat -d -t 4000 > screenshots/logcat.txt 2>&1 || true
