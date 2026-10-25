@@ -310,6 +310,55 @@ class ParityBehaviorTest {
         assertEquals(50L * 1024 * 1024, service.maxBytes("video"))
     }
 
+    @Test fun `media api session takes facade precedence with server url`() {
+        // chat_media_service.dart:144-158: an authenticated ApiBackendService
+        // session uploads through the custom backend and the attachment
+        // carries the server's absolute url; storage is never touched.
+        val service = ChatMediaService(
+            storage = throwawayStorage(),
+            currentUserId = { null },
+            apiAuthenticated = { true },
+            apiUpload = { bytes, filename ->
+                assertEquals("photo.jpg", filename)
+                mapOf("url" to "https://api.example.com/media/abc.jpg")
+            },
+        )
+        kotlinx.coroutines.runBlocking {
+            val attachment = service.uploadBytes(
+                conversationId = "c1",
+                type = "image",
+                bytes = byteArrayOf(1, 2, 3),
+                displayName = "photo.jpg",
+                mimeType = "image/gif",
+            )
+            assertEquals("https://api.example.com/media/abc.jpg", attachment.url)
+            assertEquals("photo.jpg", attachment.name)
+            assertEquals("image", attachment.type)
+        }
+    }
+
+    @Test fun `media falls through to storage path when api not authenticated`() {
+        val service = ChatMediaService(
+            storage = throwawayStorage(),
+            currentUserId = { null },
+            apiAuthenticated = { false },
+            apiUpload = { _, _ -> error("must not be called") },
+        )
+        kotlinx.coroutines.runBlocking {
+            try {
+                service.uploadBytes(
+                    conversationId = "c1",
+                    type = "file",
+                    bytes = byteArrayOf(1),
+                    displayName = "f.bin",
+                )
+                throw AssertionError("expected Authentication required")
+            } catch (e: IllegalStateException) {
+                assertEquals("Authentication required.", e.message)
+            }
+        }
+    }
+
     private fun throwawayStorage(): com.example.chat.data.remote.SupabaseStorageClient =
         com.example.chat.data.remote.SupabaseStorageClient(
             supabaseUrl = "https://example.invalid",
