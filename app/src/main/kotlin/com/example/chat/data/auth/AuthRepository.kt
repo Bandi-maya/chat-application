@@ -1,6 +1,7 @@
 package com.example.chat.data.auth
 
 import com.example.chat.core.validators.ChatyValidators
+import com.example.chat.data.messaging.SupabaseRpc
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.buildJsonObject
@@ -13,6 +14,7 @@ import kotlinx.serialization.json.put
 class AuthRepository(
     private val auth: SupabaseAuthClient = SupabaseAuthClient(),
     private val sessions: SessionStore,
+    private val rpc: SupabaseRpc? = null,
 ) {
     data class UserProfile(
         val id: String,
@@ -127,9 +129,15 @@ class AuthRepository(
 
     suspend fun isUsernameAvailable(username: String): Boolean {
         if (ChatyValidators.validateUsername(username) != null) return false
-        // PostgREST RPC is_username_available(p_username) - lands with the
-        // data layer; username uniqueness is also enforced server-side.
-        return true
+        // Mirrors backend_service.dart isUsernameAvailable: RPC
+        // is_username_available(p_username) with the normalized username.
+        val client = rpc
+            ?: throw IllegalStateException("Username availability check is unavailable.")
+        val raw = client.rpc(
+            "is_username_available",
+            mapOf("p_username" to ChatyValidators.normalizeUsername(username)),
+        )
+        return raw == true
     }
 
     suspend fun signOut() {
