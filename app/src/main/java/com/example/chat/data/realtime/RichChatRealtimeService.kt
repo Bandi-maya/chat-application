@@ -644,9 +644,9 @@ class RichChatRealtimeService(
             "document" -> "\uD83D\uDCC4 Document"
             "location" -> "\uD83D\uDCCD Location"
             "contact" -> "\uD83D\uDC64 Contact"
-            "task" -> "â Task"
+            "task" -> "✅ Task"
             else -> if (text.isNotEmpty()) {
-                if (text.length > 80) text.substring(0, 80) + "â¦" else text
+                if (text.length > 80) text.substring(0, 80) + "…" else text
             } else "New message"
         }
 
