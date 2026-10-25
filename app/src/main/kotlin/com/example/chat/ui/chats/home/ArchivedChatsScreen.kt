@@ -40,11 +40,13 @@ import com.example.chat.core.theme.ThemeConfig
 import com.example.chat.core.theme.argbWithAlpha
 import com.example.chat.domain.models.Conversation
 import com.example.chat.domain.models.HomePreferences
+import androidx.compose.foundation.ExperimentalFoundationApi
 
 /** Port of _ArchivedChatsScreen: archived list with selection mode,
  *  unarchive + delete (confirm dialog copy from the Dart source) and its own
  *  simpler timestamp rules. */
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun ArchivedChatsScreen(
     conversations: List<Conversation>,
     theme: ThemeConfig,
