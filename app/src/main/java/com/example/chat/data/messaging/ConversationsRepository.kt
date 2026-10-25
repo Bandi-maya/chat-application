@@ -672,6 +672,50 @@ class ConversationsRepository(
         notifyChanged()
     }
 
+    /** Exact port of markAllAsRead: local counters cleared first and again
+     *  after any server refresh, receipts persisted only where the read-
+     *  receipt policy allows (ghost mode / privacy suppresses publication). */
+    suspend fun markAllAsRead() {
+        val unreadIds = conversationsById.values
+            .filter { it.unreadCount > 0 }
+            .map { it.id }
+        if (unreadIds.isEmpty()) return
+
+        fun clearLocalCounters() {
+            for (id in unreadIds) {
+                val conversation = conversationsById[id]
+                if (conversation != null && conversation.unreadCount != 0) {
+                    conversationsById[id] = conversation.copy(unreadCount = 0)
+                }
+            }
+            notifyChanged()
+        }
+
+        clearLocalCounters()
+
+        val persistIds = unreadIds.filter { shouldSendReadReceipts(it) }
+        if (persistIds.isNotEmpty()) {
+            kotlinx.coroutines.coroutineScope {
+                persistIds.map { id ->
+                    launch {
+                        runCatching {
+                            rpc.rpc(
+                                "mark_conversation_read",
+                                mapOf("p_conversation_id" to id),
+                            )
+                        }
+                    }
+                }.forEach { it.join() }
+            }
+            runCatching { loadConversations(loadMembers = false) }
+        }
+
+        // A refresh can reintroduce server-side unread counts when read
+        // receipts are intentionally suppressed. Keep the user-requested
+        // state.
+        clearLocalCounters()
+    }
+
     companion object {
         fun presenceFromDatabase(value: String?): PresenceState = when (value) {
             "online" -> PresenceState.online
