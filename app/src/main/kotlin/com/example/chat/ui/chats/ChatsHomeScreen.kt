@@ -79,6 +79,7 @@ import com.example.chat.ui.chats.home.HomeSectionHeader
 import com.example.chat.ui.chats.home.HomeStyleSpec
 import com.example.chat.ui.chats.home.HomeSwipeAction
 import com.example.chat.ui.chats.home.HomeSwipeActions
+import com.example.chat.ui.chats.home.LockedChatsSetupDialog
 import com.example.chat.ui.chats.home.HomeTemplates
 import com.example.chat.ui.chats.home.SelectionHomeAppBar
 import com.example.chat.ui.chats.home.SplitQuickPane
@@ -153,6 +154,11 @@ fun ChatsHomeScreen(
     onStartCall: (Conversation, isVideo: Boolean) -> Unit = { _, _ -> },
     onSnack: (String) -> Unit = {},
     onAuthorizeConversation: (Conversation, proceed: () -> Unit) -> Unit = { _, proceed -> proceed() },
+    preferencesController: com.example.chat.core.preferences.ChatyPreferencesController? = null,
+    connectionHealthState: com.example.chat.domain.models.ConnectionHealthState? = null,
+    onOpenConnectionDetail: () -> Unit = {},
+    lockedChatsConfigured: Boolean = false,
+    onRequestVaultAuth: (onAuthorized: () -> Unit) -> Unit = {},
     onShowNotificationPermissionIfNeeded: () -> Unit = {},
     headerExtras: (@Composable () -> Unit)? = null,
     connectionBanner: (@Composable () -> Unit)? = null,
@@ -171,6 +177,37 @@ fun ChatsHomeScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showMessageNumber by remember { mutableStateOf(false) }
     var messageNumberText by remember { mutableStateOf("") }
+    var showWhoCanCallMe by remember { mutableStateOf(false) }
+    var showLockedSetup by remember { mutableStateOf(false) }
+
+    // 'Who can call me?' reuses the shared privacy dialog when the real
+    // preferences controller is wired; otherwise the nav seam stands.
+    val effectiveNav = if (preferencesController != null) {
+        nav.copy(onWhoCanCallMe = { showWhoCanCallMe = true })
+    } else {
+        nav
+    }
+    // Connection UI defaults to the shared detail-slice components once the
+    // owner wires the health snapshot; explicit slots still win.
+    val effectiveConnectionBanner: (@Composable () -> Unit)? = connectionBanner
+        ?: connectionHealthState?.let { state ->
+            @Composable {
+                com.example.chat.ui.chats.detail.GlobalConnectionBanner(
+                    state = state,
+                    onTap = onOpenConnectionDetail,
+                )
+            }
+        }
+    val effectiveHeaderExtras: (@Composable () -> Unit)? = headerExtras
+        ?: connectionHealthState?.let { state ->
+            @Composable {
+                com.example.chat.ui.chats.detail.ConnectionHealthIndicator(
+                    health = state.health,
+                    size = 15.dp,
+                    onTap = onOpenConnectionDetail,
+                )
+            }
+        }
 
     val isSelectionMode = selectedIds.isNotEmpty()
 
@@ -276,6 +313,21 @@ fun ChatsHomeScreen(
         )
     }
 
+    if (showWhoCanCallMe && preferencesController != null) {
+        com.example.chat.ui.settings.privacy.WhoCanCallMeDialog(
+            preferences = preferencesController,
+            onDismiss = { showWhoCanCallMe = false },
+        )
+    }
+
+    if (showLockedSetup) {
+        LockedChatsSetupDialog(
+            theme = theme,
+            onClose = { showLockedSetup = false },
+            onConfigureSecurity = nav.onOpenSecuritySettings,
+        )
+    }
+
     if (showMessageNumber) {
         AlertDialog(
             onDismissRequest = { showMessageNumber = false },
@@ -318,7 +370,7 @@ fun ChatsHomeScreen(
 
     Scaffold(containerColor = Color(theme.backgroundColor)) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            connectionBanner?.invoke()
+            effectiveConnectionBanner?.invoke()
             if (requiresSubscription) {
                 SubscriptionRequiredBanner(theme, subscriptionMessage, nav.onSelectPlan)
             }
@@ -380,24 +432,41 @@ fun ChatsHomeScreen(
                             identity = identity,
                             isSearchOpen = isSearchOpen,
                             forcedTypeIsSet = forcedType != null,
-                            nav = nav,
+                            nav = effectiveNav,
                             onToggleSearch = {
                                 toggleSearch()
                                 if (isSearchOpen) searchFocus.requestFocus()
                             },
                             onToggleGhost = onToggleGhostMode,
-                            onIdentityTap = nav.onOpenLockedVault,
-                            onIdentityLongPress = nav.onOpenLockedVault,
+                            // _handleTopLeftIdentityTap: with Locked Chats
+                            // configured the vault stays behind the auth gate
+                            // (fail-closed seam; owner wires the real gate),
+                            // otherwise the guided setup modal explains it.
+                            onIdentityTap = {
+                                if (lockedChatsConfigured) {
+                                    onRequestVaultAuth { nav.onOpenLockedVault() }
+                                } else {
+                                    showLockedSetup = true
+                                }
+                            },
+                            // Source deviation, deliberate: Dart long-press
+                            // opens the vault directly, but no delivered
+                            // Kotlin slice carries a destination-side auth
+                            // gate, so every entry path goes through the
+                            // fail-closed seam until the shared gate lands.
+                            onIdentityLongPress = {
+                                onRequestVaultAuth { nav.onOpenLockedVault() }
+                            },
                             onOpenOverflowMenu = { overflowOpen = true },
                             onSnack = onSnack,
-                            headerExtras = headerExtras,
+                            headerExtras = effectiveHeaderExtras,
                         )
                         Box(Modifier.align(Alignment.TopEnd)) {
                             HomeOverflowMenu(
                                 expanded = overflowOpen,
                                 onDismiss = { overflowOpen = false },
                                 theme = theme,
-                                nav = nav,
+                                nav = effectiveNav,
                                 onMarkAllAsRead = {
                                     onMarkAllRead()
                                     onSnack("Marked all chats as read")
@@ -448,7 +517,11 @@ fun ChatsHomeScreen(
                             .align(Alignment.CenterStart)
                             .clickable {
                                 if (securityPreferences.hideLockedChats && securityPreferences.entryByAppTitle) {
-                                    nav.onOpenLockedVault()
+                                    // Source opens the vault directly here and
+                                    // relies on destination-side auth; no such
+                                    // gate exists in the Kotlin slice yet, so
+                                    // this entry also fails closed.
+                                    onRequestVaultAuth { nav.onOpenLockedVault() }
                                 }
                             },
                     )
@@ -505,7 +578,9 @@ fun ChatsHomeScreen(
                         filters = filters,
                         selectedFilter = selectedFilter,
                         onSelect = { filter ->
-                            if (filter == "Vault") nav.onOpenLockedVault() else selectedFilter = filter
+                            // Same fail-closed wrap as the other vault
+                            // entries (source relies on destination auth).
+                            if (filter == "Vault") onRequestVaultAuth { nav.onOpenLockedVault() } else selectedFilter = filter
                         },
                     )
                 }
