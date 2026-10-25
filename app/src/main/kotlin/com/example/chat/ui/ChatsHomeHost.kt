@@ -35,6 +35,7 @@ fun ChatsHomeHost(
     onOpenSettings: () -> Unit,
     onOpenNewChat: (groupMode: Boolean, broadcastMode: Boolean) -> Unit = { _, _ -> },
     onOpenGlobalSearch: () -> Unit = {},
+    onOpenMessageManagement: () -> Unit = {},
 ) {
     val api = ServiceLocator.apiBackend
     val prefs = ServiceLocator.preferencesController
@@ -89,6 +90,23 @@ fun ChatsHomeHost(
             onOpenLockedVault = onOpenLockedChats,
             onOpenNewChat = onOpenNewChat,
             onOpenGlobalSearch = onOpenGlobalSearch,
+            onOpenMessageManagement = onOpenMessageManagement,
+            // Dart: widget.themeController.toggleBrightness.
+            onToggleBrightness = { ServiceLocator.themeController.toggleBrightness() },
+            // Dart: MethodChannel('chaty/launcher_icon').restartApp -> relaunch the app task.
+            onRestartApp = {
+                try {
+                    val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                        ?: throw IllegalStateException("no launch intent")
+                    launch.addFlags(
+                        android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK,
+                    )
+                    context.startActivity(launch)
+                    Runtime.getRuntime().exit(0)
+                } catch (e: Exception) {
+                    toast("Chaty could not restart: ${e}")
+                }
+            },
         ),
         onTogglePin = { id -> find(id)?.let { setState(id, "pinned", !it.isPinned) } },
         onToggleMute = { id -> find(id)?.let { setState(id, "muted", !it.isMuted) } },
