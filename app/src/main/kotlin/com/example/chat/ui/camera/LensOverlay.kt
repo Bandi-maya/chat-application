@@ -9,7 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.BlurMaskFilter
+import androidx.compose.ui.graphics.asFrameworkPaint
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.PaintingStyle
@@ -183,6 +183,20 @@ object LensAnchorPainter {
         draw()
     }
 
+    /** Dart MaskFilter.blur(BlurStyle.normal, sigma) port. Compose's
+     *  cross-platform BlurMaskFilter is desktop-only (absent from Android
+     *  ui-graphics 1.7.6, verified against the real AAR), so we set the
+     *  framework mask filter directly. android.graphics.BlurMaskFilter takes
+     *  a radius while Flutter/Skia take a sigma; Skia converts with
+     *  radius -> sigma via radius * 0.57735, so sigma -> radius is
+     *  sigma * (1 / 0.57735). Effect preserved, not dropped. */
+    private fun applyBlurMask(paint: Paint, sigma: Float) {
+        paint.asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(
+            sigma * 1.732f,
+            android.graphics.BlurMaskFilter.Blur.NORMAL,
+        )
+    }
+
     private fun fillPaint(color: Color) = Paint().apply {
         this.color = color
         style = PaintingStyle.Fill
@@ -194,7 +208,7 @@ object LensAnchorPainter {
         strokeWidth = width
         strokeCap = StrokeCap.Round
         strokeJoin = StrokeJoin.Round
-        if (blur > 0f) maskFilter = BlurMaskFilter(blur, BlurMaskFilter.Blur.NORMAL)
+        if (blur > 0f) applyBlurMask(this, blur)
     }
 
     private fun paintAviators(canvas: androidx.compose.ui.graphics.Canvas, lens: LensDefinition, pose: FacePose, opacity: Float) {
@@ -384,7 +398,7 @@ object LensAnchorPainter {
     private fun paintMouthGlow(canvas: androidx.compose.ui.graphics.Canvas, pose: FacePose, opacity: Float) {
         withFaceTransform(canvas, pose, Offset(pose.mouthCenter.dx, pose.mouthCenter.dy), pose.interocular * 1.6f) {
             val glow = fillPaint(Color(0xFFF472B6).copy(alpha = 0.30f * opacity)).apply {
-                maskFilter = BlurMaskFilter(18f, BlurMaskFilter.Blur.NORMAL)
+                applyBlurMask(this, 18f)
             }
             canvas.drawCircle(Offset.Zero, 26f, glow)
             canvas.drawCircle(Offset.Zero, 8f, fillPaint(Color.White.copy(alpha = 0.35f * opacity)))
