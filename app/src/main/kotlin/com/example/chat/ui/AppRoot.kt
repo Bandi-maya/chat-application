@@ -257,6 +257,7 @@ fun AppRoot() {
                 var settingsNotice by remember { mutableStateOf<String?>(null) }
                 var settingsSub by remember { mutableStateOf<com.example.chat.ui.settings.SettingsDestination?>(null) }
                 var pushedSettings by remember { mutableStateOf(false) }
+                var pushedProfile by remember { mutableStateOf(false) }
                 val settingsNavigate: (com.example.chat.ui.settings.SettingsDestination) -> Unit = { dest ->
                     if (dest == com.example.chat.ui.settings.SettingsDestination.Security) {
                         route = AuthRoute.Security
@@ -317,6 +318,7 @@ fun AppRoot() {
                     onOpenNewChat = { g, b -> newChatGroup = g; newChatBroadcast = b; route = AuthRoute.NewChat },
                     onOpenGlobalSearch = { route = AuthRoute.GlobalSearch },
                     onOpenMessageManagement = { route = AuthRoute.MessageManagement },
+                    onOpenProfile = { pushedProfile = true },
                 )
                             }
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.groups ->
@@ -334,6 +336,7 @@ fun AppRoot() {
                     onOpenNewChat = { g, b -> newChatGroup = g; newChatBroadcast = b; route = AuthRoute.NewChat },
                     onOpenGlobalSearch = { route = AuthRoute.GlobalSearch },
                     onOpenMessageManagement = { route = AuthRoute.MessageManagement },
+                    onOpenProfile = { pushedProfile = true },
                                 )
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.calls -> {
                                 val history = ServiceLocator.callHistory
@@ -438,6 +441,27 @@ fun AppRoot() {
                         }
                     },
                 )
+                if (pushedProfile) {
+                    androidx.activity.compose.BackHandler(enabled = settingsSub == null && !pushedSettings) { pushedProfile = false }
+                    val profUser = ServiceLocator.apiBackend.currentUser?.let { toDomainUser(it) }
+                    if (profUser != null) {
+                        val convs = ServiceLocator.apiBackend.conversations
+                        Box(Modifier.fillMaxSize()) {
+                            com.example.chat.ui.profile.ProfileScreen(
+                                user = profUser,
+                                chatsCount = convs.count { it.type == com.example.chat.domain.models.ConversationType.direct },
+                                groupsCount = convs.count { it.type == com.example.chat.domain.models.ConversationType.group },
+                                contactsCount = ServiceLocator.apiBackend.users.size,
+                                displayNameOverride = ServiceLocator.preferencesController.home.myNameOverride,
+                                onEditProfile = { settingsNavigate(com.example.chat.ui.settings.SettingsDestination.EditProfile) },
+                                onOpenSettings = { pushedSettings = true },
+                                onOpenPrivacyCenter = { settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Privacy) },
+                                onOpenNotifications = { settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Notifications) },
+                                onLogout = { ServiceLocator.apiBackend.signOut() },
+                            )
+                        }
+                    }
+                }
                 if (pushedSettings) {
                     androidx.activity.compose.BackHandler(enabled = settingsSub == null) { pushedSettings = false }
                     val pushedUser = ServiceLocator.apiBackend.currentUser?.let { toDomainUser(it) }
