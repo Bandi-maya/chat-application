@@ -338,6 +338,80 @@ fun AppRoot() {
                                     },
                                 )
                             }
+                            com.example.chat.core.templates.ChatyNavigationDestinationIds.tasks -> {
+                                val controller = ServiceLocator.tasksController
+                                var tasksRevision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                                var detailTask by remember { mutableStateOf<com.example.chat.domain.models.ChatTask?>(null) }
+                                var editorOpen by remember { mutableStateOf(false) }
+                                var editorTask by remember { mutableStateOf<com.example.chat.domain.models.ChatTask?>(null) }
+                                androidx.compose.runtime.DisposableEffect(controller) {
+                                    val l: () -> Unit = { tasksRevision++ }
+                                    controller.addListener(l)
+                                    onDispose { controller.removeListener(l) }
+                                }
+                                androidx.compose.runtime.LaunchedEffect(Unit) { controller.loadTasks() }
+                                val taskUser = ServiceLocator.apiBackend.currentUser?.let { toDomainUser(it) }
+                                val lookup: (String) -> com.example.chat.domain.models.UserProfile? =
+                                    { id -> ServiceLocator.apiBackend.users.firstOrNull { it.id == id } }
+                                val detail = detailTask
+                                if (taskUser != null && detail != null) {
+                                    com.example.chat.ui.tasks.TaskDetailScreen(
+                                        task = detail,
+                                        controller = controller,
+                                        colors = com.example.chat.ui.tasks.TaskColors(themeController.globalTheme),
+                                        currentUser = taskUser,
+                                        getUser = lookup,
+                                        onBack = { detailTask = null },
+                                        onEditTask = { editorTask = it; editorOpen = true },
+                                    )
+                                } else {
+                                    com.example.chat.ui.tasks.TasksScreen(
+                                        controller = controller,
+                                        tasksRevision = tasksRevision,
+                                        conversations = ServiceLocator.apiBackend.conversations,
+                                        getUser = lookup,
+                                        onOpenDetail = { detailTask = it },
+                                        onEditTask = { editorTask = it; editorOpen = true },
+                                        onCreateTask = { editorTask = null; editorOpen = true },
+                                    )
+                                }
+                                if (editorOpen && taskUser != null) {
+                                    com.example.chat.ui.tasks.TaskCreateEditModal(
+                                        controller = controller,
+                                        colors = com.example.chat.ui.tasks.TaskColors(themeController.globalTheme),
+                                        conversations = ServiceLocator.apiBackend.conversations,
+                                        currentUser = taskUser,
+                                        getUser = lookup,
+                                        sourceConversationId = "",
+                                        existingTask = editorTask,
+                                        onDismiss = { editorOpen = false },
+                                        onSaved = { msg -> editorOpen = false; settingsNotice = msg },
+                                        onError = { msg -> settingsNotice = msg },
+                                    )
+                                }
+                            }
+                            com.example.chat.core.templates.ChatyNavigationDestinationIds.updates -> {
+                                val updUser = ServiceLocator.apiBackend.currentUser?.let { toDomainUser(it) }
+                                if (updUser != null) {
+                                    val statusService = ServiceLocator.statusService
+                                    val statusFlow = remember(statusService) {
+                                        statusService.watchActiveStatuses(
+                                            keepDeleted = { ServiceLocator.preferencesController.privacy.antiDeleteStatus },
+                                        )
+                                    }
+                                    val toastContext = androidx.compose.ui.platform.LocalContext.current
+                                    com.example.chat.ui.updates.UpdatesScreen(
+                                        statusService = statusService,
+                                        colors = shellColors,
+                                        currentUser = updUser,
+                                        getUser = { id -> ServiceLocator.apiBackend.users.firstOrNull { it.id == id } },
+                                        statuses = statusFlow,
+                                        onNotify = { msg ->
+                                            android.widget.Toast.makeText(toastContext, msg, android.widget.Toast.LENGTH_SHORT).show()
+                                        },
+                                    )
+                                }
+                            }
                             else -> androidx.compose.material3.Text(
                                 "Destination \"$destinationId\" is not hosted in this build yet.",
                                 modifier = Modifier.padding(24.dp),
@@ -432,3 +506,12 @@ private fun AuthWipStub(title: String, onBack: () -> Unit) {
         }
     }
 }
+
+/** ApiBackendService's auth profile -> domain UserProfile (presence/lastSeen are
+ *  not carried by the auth payload; defaults are offline / now). */
+private fun toDomainUser(u: com.example.chat.data.api.ApiUserProfile): com.example.chat.domain.models.UserProfile =
+    com.example.chat.domain.models.UserProfile(
+        id = u.id, displayName = u.displayName, username = u.username,
+        avatarInitials = u.avatarInitials, avatarColorHex = u.avatarColorHex, about = u.about,
+        lastSeenAt = java.time.Instant.now(), email = u.email, phone = u.phone, avatarUrl = u.avatarUrl,
+    )
