@@ -59,7 +59,7 @@ data class FlexibleCommitOptions(
 )
 data class CommitResult(val commit: ByteArray, val welcome: ByteArray?)
 data class CreateMessageResult(val ciphertext: ByteArray)
-enum class ProcessedMessageType { applicationMessage, stagedCommit, proposal, publicMessage }
+enum class ProcessedMessageType { application, proposal, stagedCommit }
 data class ProcessedMessageResult(
     val messageType: ProcessedMessageType,
     val applicationMessage: ByteArray?,
