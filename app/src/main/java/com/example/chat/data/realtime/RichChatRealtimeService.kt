@@ -12,8 +12,11 @@ import com.example.chat.domain.models.PresenceState
 import com.example.chat.domain.models.RealtimeSocketStatus
 import com.example.chat.domain.models.UserProfile
 import java.time.Instant
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 /** Contact typing/recording state, as the Dart ContactActivityState. */
 data class ContactActivityState(
@@ -38,15 +41,18 @@ enum class EventNotificationIcon {
 
 /** Seam over ChatyNotificationService.triggerEventNotification. */
 fun interface EventNotificationSink {
+    // fun-interface abstract methods cannot declare default values; the
+    // service always passes every argument anyway (Dart defaults applied at
+    // the call site).
     fun triggerEventNotification(
         title: String,
         body: String,
-        icon: EventNotificationIcon = EventNotificationIcon.notifications,
-        colorArgb: Long = 0xFF6366F1,
-        textColorArgb: Long? = null,
-        userId: String? = null,
-        avatarInitials: String? = null,
-        avatarColorHex: String? = null,
+        icon: EventNotificationIcon,
+        colorArgb: Long,
+        textColorArgb: Long?,
+        userId: String?,
+        avatarInitials: String?,
+        avatarColorHex: String?,
     )
 }
 
@@ -138,7 +144,7 @@ class RichChatRealtimeService(
     }
 
     private fun launch(block: suspend () -> Unit) {
-        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        GlobalScope.launch(Dispatchers.IO) {
             runCatching { block() }
         }
     }
@@ -638,9 +644,9 @@ class RichChatRealtimeService(
             "document" -> "\uD83D\uDCC4 Document"
             "location" -> "\uD83D\uDCCD Location"
             "contact" -> "\uD83D\uDC64 Contact"
-            "task" -> "✅ Task"
+            "task" -> "â Task"
             else -> if (text.isNotEmpty()) {
-                if (text.length > 80) text.substring(0, 80) + "…" else text
+                if (text.length > 80) text.substring(0, 80) + "â¦" else text
             } else "New message"
         }
 
