@@ -107,11 +107,13 @@ fun AppRoot() {
                     )
                     user.id to user.displayName
                 },
-                // ApiBackendService.checkOrganization slice has not landed:
-                // organization-mode probing surfaces the not-found banner until
-                // it does. Default-mode registration is unaffected.
-                checkOrganization = { workspace ->
-                    throw Exception("tenant not found: $workspace")
+                // ApiBackendService (REST) is being ported; until the Android
+                // transport wiring lands, the probe reports unavailability and
+                // the thrown error keeps org-mode submission blocked safely.
+                checkOrganization = { _ ->
+                    throw Exception(
+                        "Organization workspaces are not available in this build yet. Use Normal / Default mode.",
+                    )
                 },
             )
             AuthRoute.ForgotPassword -> com.example.chat.ui.auth.ForgotPasswordScreen(
