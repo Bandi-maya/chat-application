@@ -737,6 +737,18 @@ class ApiBackendService(context: Context) {
         auth.checkOrganization(workspace)
     }
 
+    /** Dart ApiBackendService.onAppResumed (api_backend_service.dart:914):
+     *  reconnect the realtime socket if down, reload conversations, and
+     *  refresh the active conversation's messages. */
+    fun onAppResumed() {
+        if (session.token == null) return
+        realtime.connect()
+        chatScope.launch { loadConversations() }
+        activeConversationId?.takeIf { it.isNotEmpty() }?.let { id ->
+            chatScope.launch { loadMessages(id) }
+        }
+    }
+
     fun signOut() {
         // Dart signOut: FirebaseNotificationService.unregisterOnLogout first.
         try { unregisterFcmHook?.invoke() } catch (_: Exception) {
