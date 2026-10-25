@@ -16,5 +16,5 @@ tokio = { version = "1", features = ["full"] }
 thiserror = "2"
 
 [profile.release]
-strip = true
+strip = "debuginfo"   # full strip removes the uniffi metadata section; bindgen --library then silently generates nothing (build-6 root cause, locally verified)
 lto = true
