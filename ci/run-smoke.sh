@@ -7,4 +7,9 @@ rc=$?
 adb pull /sdcard/Android/data/com.example.chat/files/screenshots/. screenshots/ || true
 adb logcat -d -t 4000 > screenshots/logcat.txt 2>&1 || true
 adb exec-out screencap -p > screenshots/final-screen.png 2>/dev/null || true
+echo "--- final screen texts (uiautomator) ---"
+adb shell uiautomator dump /sdcard/w.xml >/dev/null 2>&1 || true
+adb shell cat /sdcard/w.xml 2>/dev/null | grep -o 'text="[^"]*"' | head -60 || true
+echo "--- logcat excerpt (app/crash) ---"
+grep -i "AndroidRuntime\|FATAL EXCEPTION\|com.example.chat\|chaty" screenshots/logcat.txt | tail -120 || true
 exit $rc
