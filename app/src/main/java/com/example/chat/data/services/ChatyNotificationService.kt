@@ -27,6 +27,12 @@ class ChatyNotificationService(
     private val notifyChanged: () -> Unit = {},
 ) {
     private val _notifications = mutableListOf<ChatyEventNotification>()
+    private val listeners = java.util.concurrent.CopyOnWriteArrayList<() -> Unit>()
+
+    /** Dart ChangeNotifier.addListener/removeListener. */
+    fun addListener(listener: () -> Unit) { listeners.add(listener) }
+    fun removeListener(listener: () -> Unit) { listeners.remove(listener) }
+    private fun fireListeners() { notifyChanged(); for (l in listeners) l() }
 
     val notifications: List<ChatyEventNotification>
         get() = _notifications.toList()
@@ -60,12 +66,12 @@ class ChatyNotificationService(
         while (_notifications.size > 100) {
             _notifications.removeAt(_notifications.size - 1)
         }
-        notifyChanged()
+        fireListeners()
     }
 
     fun clearAll() {
         if (_notifications.isEmpty()) return
         _notifications.clear()
-        notifyChanged()
+        fireListeners()
     }
 }
