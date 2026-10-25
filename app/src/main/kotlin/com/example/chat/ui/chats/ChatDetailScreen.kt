@@ -31,10 +31,15 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.automirrored.rounded.Forward
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material.icons.rounded.Reply
 import androidx.compose.material.icons.rounded.VideoCameraFront
 import androidx.compose.material.icons.rounded.StarBorder
@@ -86,11 +91,13 @@ import com.example.chat.core.templates.ComposerActionPlacement
 import com.example.chat.core.templates.ComposerTemplate
 import com.example.chat.core.theme.ThemeConfig
 import com.example.chat.domain.models.ChatMessage
+import com.example.chat.domain.models.ChatTask
 import com.example.chat.domain.models.ConnectionHealthState
 import com.example.chat.domain.models.Conversation
 import com.example.chat.domain.models.DeliveryState
 import com.example.chat.domain.models.MessageAttachment
 import com.example.chat.domain.models.QuickReplyTemplate
+import com.example.chat.domain.models.TaskStatus
 import com.example.chat.ui.chats.detail.AttachmentAction
 import com.example.chat.ui.chats.detail.AttachmentSheetContent
 import com.example.chat.ui.chats.detail.BubbleColorOverrides
@@ -116,6 +123,7 @@ import com.example.chat.ui.chats.detail.actionIcon
 import com.example.chat.ui.chats.detail.RemoteImageSlot
 import com.example.chat.ui.chats.detail.chatyRemoteImage
 import com.example.chat.ui.theme.LocalThemeConfig
+import java.time.Duration
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.Job
@@ -197,6 +205,13 @@ fun ChatDetailScreen(
     onRetryMessage: (messageId: String) -> Unit = {},
     onOpenInfo: () -> Unit = {},
     onCreateTaskFromMessage: (ChatMessage) -> Unit = {},
+    // Dart dataStore.tasks slice + task callbacks (chat_detail_screen.dart:2966-3058);
+    // integration wires these to the tasks controller/detail/modal surfaces.
+    tasks: List<ChatTask> = emptyList(),
+    onOpenTaskDetails: (ChatTask) -> Unit = {},
+    onEditTask: (ChatTask) -> Unit = {},
+    onUpdateTaskStatus: (taskId: String, status: TaskStatus) -> Unit = { _, _ -> },
+    onDeleteTask: (taskId: String) -> Unit = {},
     onAttachmentAction: (AttachmentAction) -> Unit = {},
     onCameraTap: () -> Unit = {},
     onVoiceTap: () -> Unit = {},
@@ -226,6 +241,7 @@ fun ChatDetailScreen(
     var editingMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var contextMenuMessage by remember { mutableStateOf<ChatMessage?>(null) }
+    var taskMenuTarget by remember { mutableStateOf<Pair<ChatTask, Rect>?>(null) }
     var contextMenuAnchor by remember { mutableStateOf<Rect?>(null) }
     var attachmentSheetOpen by remember { mutableStateOf(false) }
     var chatMenuOpen by remember { mutableStateOf(false) }
@@ -299,6 +315,33 @@ fun ChatDetailScreen(
         highlightedMessageId = messageId
         val index = messages.indexOfFirst { it.id == messageId }
         if (index >= 0) scope.launch { listState.animateScrollToItem(index) }
+    }
+
+    // Dart call-site lookup (chat_detail_screen.dart:2966-2984): firstWhere with a
+    // synthesized placeholder task in orElse, so a linked id missing from the tasks
+    // list still yields a card with message-derived fields (dueAt = createdAt + 3d).
+    fun resolveTask(message: ChatMessage): ChatTask? = message.linkedTaskId?.let { id ->
+        tasks.firstOrNull { it.id == id } ?: ChatTask(
+            id = id,
+            sourceConversationId = conversation.id,
+            sourceMessageId = message.id,
+            title = message.text,
+            description = "",
+            creatorId = message.senderId,
+            assigneeIds = emptyList(),
+            dueAt = message.createdAt.plus(Duration.ofDays(3)),
+            createdAt = message.createdAt,
+            updatedAt = message.createdAt,
+        )
+    }
+
+    // Dart _toggleTaskStatus: lightImpact haptic + completed<->inbox flip (source :1200).
+    fun toggleTask(task: ChatTask) {
+        ChatyHapticsPort.light(menuView)
+        onUpdateTaskStatus(
+            task.id,
+            if (task.status == TaskStatus.completed) TaskStatus.inbox else TaskStatus.completed,
+        )
     }
 
     fun performSearch(query: String) {
@@ -636,6 +679,21 @@ fun ChatDetailScreen(
                             } else {
                                 null
                             },
+                            task = resolveTask(message),
+                            onTaskTap = {
+                                // Dart onTaskTap: resolved task -> details; otherwise create
+                                // modal seeded with message text/id (source :2985-3003).
+                                val currentTask = resolveTask(message)
+                                if (currentTask != null) {
+                                    onOpenTaskDetails(currentTask)
+                                } else {
+                                    onCreateTaskFromMessage(message)
+                                }
+                            },
+                            onTaskToggle = { resolveTask(message)?.let(::toggleTask) },
+                            onTaskMenu = { rect ->
+                                resolveTask(message)?.let { taskMenuTarget = it to rect }
+                            },
                         )
                         if (isSelectionMode) {
                             Box(
@@ -811,6 +869,70 @@ fun ChatDetailScreen(
                 onReact = { emoji -> onToggleReaction(menuMessage.id, emoji) },
                 onAdd = { emojiReactionTarget = menuMessage },
             ),
+        )
+    }
+
+    // Dart _showTaskContextMenu (chat_detail_screen.dart:1208-1254): section titled
+    // with the task title, anchored at the chip rect, no reaction rail.
+    taskMenuTarget?.let { (menuTask, taskAnchor) ->
+        val taskCompleted = menuTask.status == TaskStatus.completed
+        AppContextMenu(
+            onDismiss = { taskMenuTarget = null },
+            sections = listOf(
+                ContextMenuSection(
+                    title = menuTask.title,
+                    items = buildList {
+                        add(
+                            ContextMenuItem(
+                                icon = if (taskCompleted) {
+                                    Icons.Rounded.Replay
+                                } else {
+                                    Icons.Outlined.CheckCircle
+                                },
+                                label = if (taskCompleted) "Reopen task" else "Mark completed",
+                                onTap = { toggleTask(menuTask) },
+                            ),
+                        )
+                        add(
+                            ContextMenuItem(
+                                icon = Icons.Outlined.Edit,
+                                label = "Edit task",
+                                onTap = { onEditTask(menuTask) },
+                            ),
+                        )
+                        add(
+                            ContextMenuItem(
+                                icon = Icons.Rounded.OpenInNew,
+                                label = "Task details",
+                                onTap = { onOpenTaskDetails(menuTask) },
+                            ),
+                        )
+                        if (menuTask.sourceMessageId != null) {
+                            add(
+                                ContextMenuItem(
+                                    icon = Icons.Outlined.ChatBubbleOutline,
+                                    label = "Go to source message",
+                                    // Dart _highlightMessage: highlight only, no scroll jump.
+                                    onTap = { highlightedMessageId = menuTask.sourceMessageId },
+                                ),
+                            )
+                        }
+                        add(
+                            ContextMenuItem(
+                                icon = Icons.Rounded.DeleteOutline,
+                                label = "Delete task",
+                                isDestructive = true,
+                                onTap = { onDeleteTask(menuTask.id) },
+                            ),
+                        )
+                    },
+                ),
+            ),
+            backgroundColor = Color(theme.surfaceColor),
+            primaryTextColor = Color(theme.primaryTextColor),
+            secondaryTextColor = Color(theme.secondaryTextColor),
+            destructiveColor = Color(theme.dangerColor),
+            anchorRect = taskAnchor,
         )
     }
 
@@ -1000,7 +1122,7 @@ private fun ConversationHeader(
                         modifier = Modifier
                             .size(38.dp)
                             .background(
-                                conversation.avatarColorHex?.let(::parseHexColor)
+                                conversation.avatarColorHex?.let { parseHexColor(it) }
                                     ?: Color(theme.accentColor),
                                 CircleShape,
                             ),
