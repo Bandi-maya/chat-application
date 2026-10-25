@@ -42,6 +42,12 @@ class PostgrestQueryClient(
             return this
         }
 
+        /** Mirrors supabase_dart .isFilter(column, null). */
+        fun isNull(column: String): Query {
+            filters += column to "is.null"
+            return this
+        }
+
         fun inFilter(column: String, values: List<String>): Query {
             val joined = values.joinToString(",") { it }
             filters += column to "in.($joined)"
@@ -68,13 +74,26 @@ class PostgrestQueryClient(
         /** Mirrors supabase_dart .update(values) with the accumulated
          *  filters. As with delete(), call eq()/inFilter() BEFORE update():
          *  a bare update would PATCH every row in the table. */
-        suspend fun update(values: Map<String, Any?>): Unit =
+        suspend fun update(values: Map<String, Any?>): Unit {
             client.runUpdate(table, values, filters)
+        }
 
         /** Mirrors supabase_dart .insert(values).select(): POST with
          *  Prefer: return=representation, returning the inserted rows. */
         suspend fun insert(values: Map<String, Any?>): List<Map<String, Any?>> =
             client.runInsert(table, values)
+
+        /** Mirrors supabase_dart .upsert(values, onConflict: cols): POST with
+         *  resolution=merge-duplicates. */
+        suspend fun upsert(
+            values: Map<String, Any?>,
+            onConflict: String,
+        ): Unit = client.runUpsert(table, values, onConflict)
+
+        /** Mirrors supabase_dart .update(values).select(): PATCH returning
+         *  the affected rows (needed by revokeDevice's maybeSingle check). */
+        suspend fun updateReturning(values: Map<String, Any?>): List<Map<String, Any?>> =
+            client.runUpdate(table, values, filters, returnRows = true)
     }
 
     fun from(table: String): Query = Query(this, table)
@@ -100,6 +119,34 @@ class PostgrestQueryClient(
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 throw IOException("Delete $table failed with HTTP ${response.code}")
+            }
+        }
+    }
+
+    internal suspend fun runUpsert(
+        table: String,
+        values: Map<String, Any?>,
+        onConflict: String,
+    ): Unit = withContext(Dispatchers.IO) {
+        val urlBuilder = "$supabaseUrl/rest/v1/$table".toHttpUrl().newBuilder()
+            .addQueryParameter("on_conflict", onConflict)
+        val body = JSONObject()
+        for ((key, value) in values) {
+            if (value == null) body.put(key, JSONObject.NULL) else body.put(key, value)
+        }
+        val request = Request.Builder()
+            .url(urlBuilder.build())
+            .addHeader("apikey", publishableKey)
+            .addHeader("Content-Type", "application/json")
+            .addHeader("Prefer", "resolution=merge-duplicates,return=minimal")
+            .apply {
+                accessToken()?.let { addHeader("Authorization", "Bearer $it") }
+            }
+            .post(body.toString().toRequestBody(JSON))
+            .build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("Upsert into $table failed with HTTP ${response.code}")
             }
         }
     }
@@ -143,7 +190,8 @@ class PostgrestQueryClient(
         table: String,
         values: Map<String, Any?>,
         filters: List<Pair<String, String>>,
-    ): Unit = withContext(Dispatchers.IO) {
+        returnRows: Boolean = false,
+    ): List<Map<String, Any?>> = withContext(Dispatchers.IO) {
         val urlBuilder = "$supabaseUrl/rest/v1/$table".toHttpUrl().newBuilder()
         for ((column, clause) in filters) urlBuilder.addQueryParameter(column, clause)
         val body = JSONObject()
@@ -154,17 +202,23 @@ class PostgrestQueryClient(
             .url(urlBuilder.build())
             .addHeader("apikey", publishableKey)
             .addHeader("Content-Type", "application/json")
-            // supabase_dart update() returns the affected rows; the Dart
-            // callers ported so far discard them, so request no content back.
-            .addHeader("Prefer", "return=minimal")
+            .addHeader("Prefer", if (returnRows) "return=representation" else "return=minimal")
             .apply {
                 accessToken()?.let { addHeader("Authorization", "Bearer $it") }
             }
             .patch(body.toString().toRequestBody(JSON))
             .build()
         client.newCall(request).execute().use { response ->
+            val text = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
                 throw IOException("Update $table failed with HTTP ${response.code}")
+            }
+            if (!returnRows || text.isBlank() || text == "null") {
+                return@withContext emptyList()
+            }
+            val arr = JSONArray(text.trim())
+            (0 until arr.length()).map { i ->
+                PostgrestRpcClient.jsonToMap(arr.getJSONObject(i))
             }
         }
     }
