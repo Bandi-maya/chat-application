@@ -62,6 +62,18 @@ class ApiBackendService(context: Context) {
         transport = OkHttpApiTransport(),
     )
 
+    private val mediaUpload = ApiMediaUploadClient(
+        restApiBaseUrl = { config.restApiBaseUrl },
+        tenantId = { config.tenantId },
+        token = { session.token },
+    )
+
+    private val deviceTokens = ApiDeviceTokenClient(
+        restApiBaseUrl = { config.restApiBaseUrl },
+        tenantId = { config.tenantId },
+        token = { session.token },
+    )
+
     private val subscriptionClient = ApiSubscriptionClient(
         baseUrl = { config.restApiBaseUrl },
         tenantId = { config.tenantId },
@@ -536,6 +548,33 @@ class ApiBackendService(context: Context) {
 
     private var initialized = false
 
+    /** The device-token plane on this service's session, exposed for the
+     *  ServiceLocator's FcmTokenRegistrar (Dart has the registrar call the
+     *  same _token-backed methods through the locator). */
+    val deviceTokenClient: ApiDeviceTokenClient get() = deviceTokens
+
+    /** Dart _syncFcmToken / signOut's unregisterOnLogout go through the
+     *  lazy locator, which Kotlin object-lazy graphs cannot do re-entrantly;
+     *  ServiceLocator wires these hooks instead (same effect, no cycle). */
+    var syncFcmTokenHook: (() -> Unit)? = null
+    var unregisterFcmHook: (() -> Unit)? = null
+
+    /** Dart ApiBackendService.uploadMedia (api_backend_service.dart:1569):
+     *  multipart POST /chat/upload with the /api/v1 404 fallback. */
+    suspend fun uploadMedia(file: java.io.File): Map<String, Any> =
+        withContext(Dispatchers.IO) { mediaUpload.uploadMedia(file) }
+
+    /** Dart ApiBackendService.registerDeviceToken
+     *  (api_backend_service.dart:1975): POST /me/devices, /app-users
+     *  fallback, failures swallowed after logging like Dart. */
+    suspend fun registerDeviceToken(fcmToken: String, deviceType: String = "android") =
+        withContext(Dispatchers.IO) { deviceTokens.registerDeviceToken(fcmToken, deviceType) }
+
+    /** Dart ApiBackendService.unregisterDeviceToken
+     *  (api_backend_service.dart:2013). */
+    suspend fun unregisterDeviceToken(fcmToken: String) =
+        withContext(Dispatchers.IO) { deviceTokens.unregisterDeviceToken(fcmToken) }
+
     /** Dart initialize(): config restore + session restore (once). */
     fun initialize() {
         if (initialized) return
@@ -553,6 +592,9 @@ class ApiBackendService(context: Context) {
             startBackgroundSync()
             chatScope.launch { loadConversations() }
             chatScope.launch { loadUsers() }
+            // Dart _syncFcmToken() (api_backend_service.dart:119).
+            try { syncFcmTokenHook?.invoke() } catch (_: Exception) {
+            }
         }
     }
 
@@ -572,6 +614,9 @@ class ApiBackendService(context: Context) {
             startBackgroundSync()
             chatScope.launch { loadConversations() }
             chatScope.launch { loadUsers() }
+            // Dart _syncFcmToken() (api_backend_service.dart:571).
+            try { syncFcmTokenHook?.invoke() } catch (_: Exception) {
+            }
             result.user
         }
 
@@ -648,6 +693,9 @@ class ApiBackendService(context: Context) {
     }
 
     fun signOut() {
+        // Dart signOut: FirebaseNotificationService.unregisterOnLogout first.
+        try { unregisterFcmHook?.invoke() } catch (_: Exception) {
+        }
         realtime.disconnect()
         session.signOut()
     }
