@@ -755,5 +755,14 @@ class ApiBackendService(context: Context) {
         }
         realtime.disconnect()
         session.signOut()
+        // Dart signOut: drop the active room and all in-memory chat state
+        // (tasks are intentionally untouched, as in Dart), then notify.
+        activeConversationId = null
+        synchronized(chatLock) {
+            _conversations.clear()
+            _users.clear()
+            _messages.clear()
+        }
+        notifyChatListeners()
     }
 }
