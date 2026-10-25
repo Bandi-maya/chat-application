@@ -98,6 +98,13 @@ fun LoginScreen(
             errorMessage = "Please enter your Workspace / Organization ID."
             return
         }
+        if (useOrganization) {
+            // ApiBackendService (tenant-routed REST auth) is not wired yet;
+            // block submission instead of silently ignoring the workspace.
+            errorMessage =
+                "Organization sign-in is not available in this build yet. Use Normal / Default mode."
+            return
+        }
 
         isLoading = true
         errorMessage = null
