@@ -3,6 +3,7 @@ package com.example.chat.data.api
 import android.content.Context
 import com.example.chat.domain.models.ChatMessage
 import com.example.chat.domain.models.Conversation
+import com.example.chat.domain.models.ConversationType
 import com.example.chat.domain.models.DeliveryState
 import com.example.chat.domain.models.MessageType
 import com.example.chat.domain.models.UserProfile
@@ -250,6 +251,69 @@ class ApiBackendService(context: Context) {
             _messages[chatId] = (remote + pending).sortedBy { it.createdAt }.toMutableList()
         }
         notifyChatListeners()
+    }
+
+    /** startDirectChat: POST /chat/rooms/direct (no fallback), upsert at
+     *  index 0 (replace if the id already exists), notify. 402 sets the
+     *  subscription state with the exact Dart message, notifies, rethrows. */
+    suspend fun createOrGetDirectConversation(targetUserId: String): Conversation {
+        try {
+            val conversation = chat.createDirectRoom(targetUserId)
+            synchronized(chatLock) {
+                val idx = _conversations.indexOfFirst { it.id == conversation.id }
+                if (idx != -1) _conversations.removeAt(idx)
+                _conversations.add(0, conversation)
+            }
+            notifyChatListeners()
+            return conversation
+        } catch (e: ApiChatClient.SubscriptionRequiredException) {
+            requiresSubscription = true
+            subscriptionErrorMessage =
+                "Workspace subscription required. Please choose a plan to chat."
+            notifyChatListeners()
+            throw e
+        }
+    }
+
+    /** createGroup: upsert at index 0 (replace if the id exists), notify. */
+    suspend fun createGroupRoom(name: String, memberUserIds: List<String>): Conversation {
+        val conversation = chat.createGroupRoom(name, memberUserIds)
+        synchronized(chatLock) {
+            val idx = _conversations.indexOfFirst { it.id == conversation.id }
+            if (idx != -1) _conversations.removeAt(idx)
+            _conversations.add(0, conversation)
+        }
+        notifyChatListeners()
+        return conversation
+    }
+
+    /** deleteUser: local-first removal (user + their direct conversations),
+     *  notify, then the backend DELETE with errors swallowed. Deleting
+     *  oneself signs out (Dart). */
+    suspend fun deleteUser(userId: String) {
+        synchronized(chatLock) {
+            _users.removeAll { it.id == userId }
+            _conversations.removeAll { conversation ->
+                conversation.type == ConversationType.direct &&
+                    conversation.participantIds.contains(userId)
+            }
+        }
+        notifyChatListeners()
+        chat.deleteUser(userId)
+        if (userId == session.currentUser?.id) signOut()
+    }
+
+    /** deleteConversation: local-first removal (conversation + its messages
+     *  + active id), notify, then the backend DELETE with errors
+     *  swallowed. */
+    suspend fun deleteConversation(chatId: String) {
+        synchronized(chatLock) {
+            _conversations.removeAll { it.id == chatId }
+            _messages.remove(chatId)
+            if (activeConversationId == chatId) activeConversationId = null
+        }
+        notifyChatListeners()
+        chat.deleteRoom(chatId)
     }
 
     suspend fun loadUsers(query: String? = null) {
