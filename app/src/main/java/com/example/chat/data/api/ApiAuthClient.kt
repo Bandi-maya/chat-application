@@ -75,7 +75,9 @@ class ApiAuthClient(
             return try {
                 val parsed = JSONObject(response.second)
                 val data = if (parsed.has("data")) parsed.get("data") else parsed
-                (if (data is JSONObject) data.optString("message") else null)
+                (if (data is JSONObject && data.has("message") && !data.isNull("message"))
+                    data.get("message").toString()
+                else null)
                     ?: "If an account exists with this email, a reset link has been sent."
             } catch (_: Exception) {
                 "If an account exists with this email, a reset link has been sent."
@@ -132,17 +134,20 @@ class ApiAuthClient(
         }
     }
 
-    /** RegisterScreen's flag/name extraction from the check payload. */
-    fun orgCheckToBanner(data: Map<String, Any?>, workspace: String): Pair<String, Boolean> {
-        val flag = data["allow_user_registration"] ?: data["user_registration_enabled"]
-        val allowReg = when (flag) {
+    companion object {
+        /** RegisterScreen's flag/name extraction from the check payload. */
+        fun orgCheckToBanner(data: Map<String, Any?>, workspace: String): Pair<String, Boolean> {
+            val flag = data["allow_user_registration"] ?: data["user_registration_enabled"]
+            val allowReg = when (flag) {
             is Boolean -> flag
             null -> true
             else -> flag.toString().lowercase() != "false"
+            }
+            val name = (data["name"] ?: workspace).toString()
+            return name to allowReg
         }
-        val name = (data["name"] ?: workspace).toString()
-        return name to allowReg
     }
+
 
     private fun postWithFallback(
         path: String,
@@ -174,8 +179,8 @@ class ApiAuthClient(
             val body = JSONObject(responseBody)
             val data = if (body.has("data")) body.get("data") else body
             val dataObj = data as? JSONObject ?: throw Exception("No token found in response")
-            val tokenRaw = if (dataObj.has("access_token")) dataObj.get("access_token")
-                else if (dataObj.has("token")) dataObj.get("token") else null
+            val tokenRaw = if (dataObj.has("access_token") && !dataObj.isNull("access_token")) dataObj.get("access_token")
+                else if (dataObj.has("token") && !dataObj.isNull("token")) dataObj.get("token") else null
             val token = tokenRaw?.toString() ?: throw Exception("No token found in response")
 
             val payload = decodeJwt(token)
