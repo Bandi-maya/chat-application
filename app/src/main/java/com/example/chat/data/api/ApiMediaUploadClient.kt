@@ -82,7 +82,7 @@ class ApiMediaUploadClient(
         }
         throw UploadException(detail)
     }
-}
+
 
     /** Device transport over OkHttp, mirroring http.MultipartRequest: one
      *  'file' part, Bearer + x-tenant-id headers, no extra fields. */
@@ -115,3 +115,4 @@ class ApiMediaUploadClient(
             }
         }
     }
+}
