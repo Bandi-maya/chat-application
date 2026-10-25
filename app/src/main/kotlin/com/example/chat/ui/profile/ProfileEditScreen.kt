@@ -1,7 +1,6 @@
 package com.example.chat.ui.profile
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -55,7 +54,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -63,6 +61,7 @@ import androidx.compose.ui.unit.sp
 import com.example.chat.core.validators.ChatyValidators
 import com.example.chat.data.services.ProfileMediaSource
 import com.example.chat.domain.models.UserProfile
+import com.example.chat.ui.theme.ChatyAsyncImage
 import com.example.chat.ui.theme.LocalThemeConfig
 import kotlinx.coroutines.launch
 
@@ -247,15 +246,7 @@ fun ProfileEditScreen(
                         .clip(RoundedCornerShape(20.dp))
                         .background(Color(theme.cardColor)),
                 ) {
-                    val bannerImage = rememberProfileImage(activeBannerUrl)
-                    if (bannerImage != null) {
-                        Image(
-                            bitmap = bannerImage,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else {
+                    val bannerPlaceholder: @Composable () -> Unit = {
                         Box(
                             Modifier
                                 .fillMaxSize()
@@ -269,6 +260,13 @@ fun ProfileEditScreen(
                                 ),
                         )
                     }
+                    ChatyAsyncImage(
+                        url = activeBannerUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        placeholder = bannerPlaceholder,
+                        error = bannerPlaceholder,
+                    )
                     if (onPickBanner != null) {
                         IconButton(
                             onClick = { sourceSheetFor = "banner" },
@@ -301,15 +299,7 @@ fun ProfileEditScreen(
                             .background(Color(theme.accentColor).copy(alpha = 0.2f)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        val avatarImage = rememberProfileImage(activeAvatarUrl)
-                        if (avatarImage != null) {
-                            Image(
-                                bitmap = avatarImage,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        } else {
+                        val avatarFallback: @Composable () -> Unit = {
                             Text(
                                 user.avatarInitials.ifEmpty { "U" },
                                 color = Color(theme.accentColor),
@@ -317,6 +307,13 @@ fun ProfileEditScreen(
                                 fontWeight = FontWeight.Bold,
                             )
                         }
+                        ChatyAsyncImage(
+                            url = activeAvatarUrl,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            placeholder = avatarFallback,
+                            error = avatarFallback,
+                        )
                     }
                     IconButton(
                         onClick = { sourceSheetFor = "avatar" },
