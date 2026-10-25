@@ -13,7 +13,7 @@ private val Context.sessionDataStore by preferencesDataStore(name = "chaty_sessi
  * Persists the GoTrue session, mirroring supabase_flutter's local session
  * persistence (access + refresh token, expiry tracking).
  */
-class SessionStore(private val context: Context) {
+class SessionStore(private val context: Context) : SessionStorage {
     private object Keys {
         val ACCESS = stringPreferencesKey("access_token")
         val REFRESH = stringPreferencesKey("refresh_token")
@@ -31,7 +31,7 @@ class SessionStore(private val context: Context) {
             nowMs + skewMs >= expiresAtEpochMs
     }
 
-    suspend fun save(session: SupabaseAuthClient.AuthSession, userId: String) {
+    override suspend fun save(session: SupabaseAuthClient.AuthSession, userId: String) {
         val expiresAt = System.currentTimeMillis() + session.expiresIn * 1000
         context.sessionDataStore.edit { prefs ->
             prefs[Keys.ACCESS] = session.accessToken
@@ -41,7 +41,7 @@ class SessionStore(private val context: Context) {
         }
     }
 
-    suspend fun load(): StoredSession? {
+    override suspend fun load(): StoredSession? {
         val prefs = context.sessionDataStore.data.first()
         val access = prefs[Keys.ACCESS] ?: return null
         val refresh = prefs[Keys.REFRESH] ?: return null
@@ -50,7 +50,7 @@ class SessionStore(private val context: Context) {
         return StoredSession(access, refresh, expiresAt, userId)
     }
 
-    suspend fun clear() {
+    override suspend fun clear() {
         context.sessionDataStore.edit { it.clear() }
     }
 }
