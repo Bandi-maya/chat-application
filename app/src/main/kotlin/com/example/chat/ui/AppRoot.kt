@@ -87,7 +87,33 @@ fun AppRoot() {
                     user.id
                 },
             )
-            AuthRoute.Register -> AuthWipStub("Register", onBack = { route = AuthRoute.Welcome })
+            AuthRoute.Register -> com.example.chat.ui.auth.RegisterScreen(
+                onBack = { route = AuthRoute.Welcome },
+                onRegistered = { userId, _ ->
+                    ServiceLocator.appScope.launch {
+                        ServiceLocator.preferencesStorage.setStoredUserId(userId)
+                    }
+                    route = AuthRoute.Home
+                },
+                onRegisterOrganization = { route = AuthRoute.RegisterOrganization },
+                register = { email, username, password ->
+                    // The Dart register screen collects email/username/password only;
+                    // the public username doubles as the display identity.
+                    val user = ServiceLocator.authRepository.registerUser(
+                        displayName = username,
+                        username = username,
+                        password = password,
+                        email = email,
+                    )
+                    user.id to user.displayName
+                },
+                // ApiBackendService.checkOrganization slice has not landed:
+                // organization-mode probing surfaces the not-found banner until
+                // it does. Default-mode registration is unaffected.
+                checkOrganization = { workspace ->
+                    throw Exception("tenant not found: $workspace")
+                },
+            )
             AuthRoute.ForgotPassword -> com.example.chat.ui.auth.ForgotPasswordScreen(
                 onBack = { route = AuthRoute.Login },
                 sendRecovery = { email -> ServiceLocator.authRepository.resetPassword(email) },
