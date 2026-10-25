@@ -144,6 +144,36 @@ object ServiceLocator {
         com.example.chat.data.services.LocalLockService(secureStore)
     }
 
+    /** locator.dart TemplateController + AppearanceVariantController, persisted through
+     *  LocalPreferencesStorage ('chaty_template_v1') and the same SharedPreferences file. */
+    val appearanceVariantController: com.example.chat.core.templates.AppearanceVariantController by lazy {
+        val sp = requireContext().applicationContext
+            .getSharedPreferences("chaty_local_preferences", android.content.Context.MODE_PRIVATE)
+        com.example.chat.core.templates.AppearanceVariantController(
+            object : com.example.chat.core.templates.AppearanceStore {
+                override suspend fun getString(key: String): String? = sp.getString(key, null)
+                override suspend fun setString(key: String, value: String): Boolean =
+                    sp.edit().putString(key, value).commit()
+            },
+        )
+    }
+    val templateController: com.example.chat.core.templates.TemplateController by lazy {
+        com.example.chat.core.templates.TemplateController(
+            object : com.example.chat.core.templates.TemplateStateStore {
+                override suspend fun load(): Map<String, Any?> = preferencesStorage.loadTemplateState()
+                override suspend fun save(data: Map<String, Any?>): Boolean = preferencesStorage.saveTemplateState(data)
+            },
+        )
+    }
+    val templateRuntime: com.example.chat.core.templates.TemplateRuntime by lazy {
+        val adapter = com.example.chat.core.templates.TemplateRuntimeAdapter(
+            themeController = themeController,
+            preferences = preferencesController,
+            appearance = appearanceVariantController,
+        )
+        com.example.chat.core.templates.TemplateRuntime(theme = adapter, appearance = adapter, preferences = adapter)
+    }
+
     /** locator.dart HiddenVaultService / HiddenVaultController singletons.
      *  Biometric bridge is not provided (no androidx.biometric wiring yet), so
      *  vault unlock is PIN-only until that bridge lands. */
