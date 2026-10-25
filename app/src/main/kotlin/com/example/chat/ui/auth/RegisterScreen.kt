@@ -74,8 +74,10 @@ fun RegisterScreen(
     onBack: () -> Unit,
     onRegistered: (userId: String, displayName: String) -> Unit,
     onRegisterOrganization: () -> Unit,
-    register: suspend (email: String, username: String, password: String) -> Pair<String, String>,
+    register: suspend (email: String, username: String, password: String, tenant: String?, isDefaultTenant: Boolean) -> Pair<String, String>,
     checkOrganization: suspend (workspace: String) -> OrgCheckResult,
+    /** Dart initState: getSavedTenantId + isUsingDefaultTenant. */
+    loadSavedTenant: suspend () -> Pair<String?, Boolean>,
 ) {
     val theme = LocalThemeConfig.current
     val scope = rememberCoroutineScope()
@@ -100,6 +102,7 @@ fun RegisterScreen(
     var orgName by remember { mutableStateOf<String?>(null) }
     var allowUserRegistration by remember { mutableStateOf(true) }
     var orgCheckError by remember { mutableStateOf<String?>(null) }
+
 
     fun checkOrg(ws: String) {
         scope.launch {
@@ -170,12 +173,29 @@ fun RegisterScreen(
         errorMessage = null
         scope.launch {
             try {
-                val (userId, displayName) = register(email.trim(), username.trim(), password)
+                val (userId, displayName) = register(
+                    email.trim(),
+                    username.trim(),
+                    password,
+                    if (useOrganization) workspace.trim() else null,
+                    !useOrganization,
+                )
                 onRegistered(userId, displayName)
             } catch (e: Exception) {
                 errorMessage = friendlyRegisterError(e)
                 isLoading = false
             }
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        val (saved, usingDefault) = loadSavedTenant()
+        if (!saved.isNullOrEmpty()) {
+            workspace = saved
+            useOrganization = true
+            checkOrg(saved)
+        } else {
+            useOrganization = !usingDefault
         }
     }
 
