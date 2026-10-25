@@ -96,6 +96,7 @@ fun ChatsHomeHost(
             onOpenMessageManagement = onOpenMessageManagement,
             onOpenProfile = onOpenProfile,
             onOpenQr = onOpenQr,
+            onShareApp = { com.example.chat.ui.settings.ChatyShareService.shareApp(context) { toast(it) } },
             onOpenLinkedDevices = onOpenLinkedDevices,
             // Dart _promptMessageNumber: match an existing contact by phone/username, else
             // synthesize user_<digits>, then open the direct conversation.
