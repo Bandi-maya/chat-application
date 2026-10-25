@@ -31,7 +31,7 @@ import kotlinx.coroutines.launch
  *  Chats home, conversation, register, forgot-password and organization
  *  registration destinations land in their own parity slices; the register /
  *  forgot-password / org buttons route to honest WIP stubs until then. */
-private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home }
+private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home, ChatDetail }
 
 @Composable
 fun AppRoot() {
@@ -46,6 +46,7 @@ fun AppRoot() {
     @Suppress("UNUSED_EXPRESSION") themeRevision
     ChatyTheme(config = themeController.globalTheme) {
         var route by remember { mutableStateOf(AuthRoute.Splash) }
+        var selectedConversation by remember { mutableStateOf<com.example.chat.domain.models.Conversation?>(null) }
         when (route) {
             AuthRoute.Splash -> SplashScreen(
                 routeToHome = {
@@ -156,7 +157,53 @@ fun AppRoot() {
                 "Plan selection arrives with the subscription slice",
                 onBack = { route = AuthRoute.Home },
             )
-            AuthRoute.Home -> AuthWipStub("Chats home arrives in the next slice", onBack = { route = AuthRoute.Welcome })
+            AuthRoute.Home -> run {
+                // Observe ApiBackendService chat state (listener -> recompose).
+                var chatRevision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                androidx.compose.runtime.DisposableEffect(Unit) {
+                    val listener: () -> Unit = { chatRevision++ }
+                    ServiceLocator.apiBackend.addListener(listener)
+                    onDispose { ServiceLocator.apiBackend.removeListener(listener) }
+                }
+                @Suppress("UNUSED_EXPRESSION") chatRevision
+                com.example.chat.ui.chats.ChatsHomeScreen(
+                    conversations = ServiceLocator.apiBackend.conversations,
+                    requiresSubscription = ServiceLocator.apiBackend.requiresSubscription,
+                    subscriptionMessage = ServiceLocator.apiBackend.subscriptionErrorMessage,
+                    onOpenConversation = { conversation ->
+                        ServiceLocator.apiBackend.setActiveConversation(conversation.id)
+                        selectedConversation = conversation
+                        route = AuthRoute.ChatDetail
+                    },
+                )
+            }
+            AuthRoute.ChatDetail -> run {
+                val conversation = selectedConversation
+                if (conversation == null) {
+                    route = AuthRoute.Home
+                } else {
+                    var chatRevision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                    androidx.compose.runtime.DisposableEffect(Unit) {
+                        val listener: () -> Unit = { chatRevision++ }
+                        ServiceLocator.apiBackend.addListener(listener)
+                        onDispose { ServiceLocator.apiBackend.removeListener(listener) }
+                    }
+                    @Suppress("UNUSED_EXPRESSION") chatRevision
+                    com.example.chat.ui.chats.ChatDetailScreen(
+                        conversation = conversation,
+                        messages = ServiceLocator.apiBackend.getMessages(conversation.id),
+                        currentUserId = ServiceLocator.apiBackend.currentUser?.id ?: "",
+                        onBack = {
+                            ServiceLocator.apiBackend.setActiveConversation(null)
+                            selectedConversation = null
+                            route = AuthRoute.Home
+                        },
+                        onSend = { text ->
+                            ServiceLocator.apiBackend.sendMessage(conversation.id, text)
+                        },
+                    )
+                }
+            }
         }
     }
 }
