@@ -1,5 +1,6 @@
 package com.example.chat.ui.kit
 
+import androidx.compose.ui.composed
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
@@ -39,7 +40,7 @@ private val EaseOutCubic = CubicBezierEasing(0.215f, 0.61f, 0.355f, 1f)
 fun Modifier.springInteractiveScale(
     scaleDownFactor: Float = 0.95f,
     enableHaptic: Boolean = true,
-): Modifier = androidx.compose.ui.composed {
+): Modifier = composed {
     val haptic = LocalHapticFeedback.current
     val progress = remember { Animatable(0f) } // controller value 0..1
     val scope = rememberCoroutineScope()
