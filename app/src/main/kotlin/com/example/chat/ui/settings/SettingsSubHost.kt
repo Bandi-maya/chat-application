@@ -63,6 +63,7 @@ fun SettingsSubHost(destination: SettingsDestination, onBack: () -> Unit): Boole
                 UniversalSub.Colors -> UniversalColorsScreen(preferences = prefs, onBack = { sub = null })
                 UniversalSub.Styles -> UniversalStylesScreen(
                     preferences = prefs, onBack = { sub = null }, themeController = theme, onMessage = toast,
+                    appIconController = ServiceLocator.appIconController,
                 )
                 UniversalSub.Icons -> UniversalChatyIconsScreen(preferences = prefs, onBack = { sub = null }, onMessage = toast)
                 UniversalSub.HideMedia -> HideMediaScreen(preferences = prefs, themeController = theme, onBack = { sub = null })
