@@ -672,6 +672,85 @@ class ConversationsRepository(
         notifyChanged()
     }
 
+    /** Exact port of searchUsersRemote's non-demo path (search_profiles
+     *  RPC, result caching into usersById, optional self prepend). */
+    suspend fun searchUsersRemote(
+        query: String,
+        includeSelf: Boolean = false,
+        currentUser: () -> UserProfile? = { null },
+    ): List<UserProfile> {
+        val trimmed = query.trim()
+        if (trimmed.length < 2) return emptyList()
+        val raw = rpc.rpc("search_profiles", mapOf("p_query" to trimmed))
+        val rows = raw as? List<*> ?: emptyList<Any?>()
+        val results = rows.mapNotNull { item ->
+            (item as? Map<String, Any?>)?.let { profileFromRow(it) }
+        }.toMutableList()
+        for (profile in results) {
+            usersById[profile.id] = profile
+        }
+        val me = currentUser()
+        if (includeSelf && me != null) results.add(0, me)
+        notifyChanged()
+        return results
+    }
+
+    /** Exact port of getOrCreateDirectConversationAsync's non-demo path. */
+    suspend fun getOrCreateDirectConversationAsync(otherUser: UserProfile): Conversation {
+        val raw = rpc.rpc(
+            "create_direct_conversation",
+            mapOf("p_other_user_id" to otherUser.id),
+        )
+        val id = raw?.toString() ?: ""
+        if (id.isEmpty()) throw IllegalStateException("Unable to create conversation.")
+        usersById[otherUser.id] = otherUser
+        loadConversations(true)
+        ensureConversationLoaded(id)
+        notifyChanged()
+        return conversationsById[id]!!
+    }
+
+    /** Exact port of getOrCreateDirectConversation (local scan only; demo
+     *  branch does not exist on api). */
+    fun getOrCreateDirectConversation(
+        otherUser: UserProfile,
+        currentUserId: () -> String?,
+    ): Conversation {
+        val meId = currentUserId()
+        if (meId != null) {
+            for (conversation in conversationsById.values) {
+                if (conversation.type == ConversationType.direct &&
+                    conversation.participantIds.contains(meId) &&
+                    conversation.participantIds.contains(otherUser.id)
+                ) {
+                    return conversation
+                }
+            }
+        }
+        throw IllegalStateException(
+            "Conversation is not loaded. Use getOrCreateDirectConversationAsync().",
+        )
+    }
+
+    /** Exact port of createGroup's non-demo path. */
+    suspend fun createGroup(
+        title: String,
+        memberUserIds: List<String>,
+    ): Conversation {
+        val raw = rpc.rpc(
+            "create_group_conversation",
+            mapOf(
+                "p_title" to title.trim(),
+                "p_member_ids" to memberUserIds,
+            ),
+        )
+        val id = raw?.toString() ?: ""
+        if (id.isEmpty()) throw IllegalStateException("Unable to create group.")
+        loadConversations(true)
+        notifyChanged()
+        return conversationsById[id]!!
+    }
+
     /** Exact port of markAllAsRead: local counters cleared first and again
      *  after any server refresh, receipts persisted only where the read-
      *  receipt policy allows (ghost mode / privacy suppresses publication). */
