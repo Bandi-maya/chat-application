@@ -7,6 +7,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
+import org.json.JSONObject
 
 /** Table-query half of the Supabase PostgREST client (the RPC half is
  *  [PostgrestRpcClient]). Mirrors the supabase_dart reads the api branch
@@ -85,7 +86,15 @@ class PostgrestQueryClient(
         client.newCall(request).execute().use { response ->
             val text = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
-                throw IOException("Query $table failed with HTTP ${response.code}")
+                // PostgREST errors are JSON {message, details, hint, code};
+                // surface both so callers can classify 401/JWT/429 like the
+                // Dart PostgrestException handlers do.
+                val message = runCatching { JSONObject(text).optString("message") }
+                    .getOrDefault("")
+                throw IOException(
+                    if (message.isNotEmpty()) "$message (HTTP ${response.code})"
+                    else "Query $table failed with HTTP ${response.code}"
+                )
             }
             if (text.isBlank() || text == "null") return@withContext emptyList()
             val arr = JSONArray(text)
