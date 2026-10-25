@@ -174,12 +174,23 @@ class SecureMessageTransport(
                 durationSeconds = (attachmentJson["duration_seconds"] as? Number)?.toInt()
                     ?: attachmentJson["duration_seconds"]?.toString()?.toIntOrNull() ?: 0,
             ),
+            replyToMessageId = metadata["reply_to_message_id"]?.toString(),
+            replyToPreviewText = metadata["reply_to_preview_text"]?.toString(),
+            replyToSenderName = metadata["reply_to_sender_name"]?.toString(),
+            linkedTaskId = metadata["task_id"]?.toString()
+                ?: metadata["linked_task_id"]?.toString(),
+            reactions = reactions,
             createdAt = parseIsoToInstant(row["created_at"]?.toString()) ?: Instant.now(),
-            deliveryState = when {
-                isReadByOther -> DeliveryState.read
-                isMine -> DeliveryState.delivered
-                else -> DeliveryState.delivered
+            editedAt = parseIsoToInstant(row["edited_at"]?.toString()),
+            deliveryState = if (isMine) {
+                if (isReadByOther) DeliveryState.read else DeliveryState.sent
+            } else {
+                DeliveryState.delivered
             },
+            isPinned = row["is_pinned"] == true,
+            isStarred = row["is_starred"] == true,
+            isDeletedForEveryone = deletedAt != null,
+            isDeletedForMe = row["is_hidden"] == true,
         )
     }
 }
