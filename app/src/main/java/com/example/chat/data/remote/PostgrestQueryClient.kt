@@ -43,6 +43,12 @@ class PostgrestQueryClient(
         }
 
         /** Mirrors supabase_dart .isFilter(column, null). */
+        /** Mirrors supabase_dart .ilike(): pattern passed verbatim. */
+        fun ilike(column: String, value: String): Query {
+            filters.add(column to "ilike.$value")
+            return this
+        }
+
         fun isNull(column: String): Query {
             filters += column to "is.null"
             return this
@@ -88,7 +94,16 @@ class PostgrestQueryClient(
         suspend fun upsert(
             values: Map<String, Any?>,
             onConflict: String,
-        ): Unit = client.runUpsert(table, values, onConflict)
+        ): Unit {
+            client.runUpsert(table, values, onConflict, returnRows = false)
+        }
+
+        /** Mirrors supabase_dart .upsert(values, onConflict: ...).select():
+         *  upsert returning the affected rows. */
+        suspend fun upsertReturning(
+            values: Map<String, Any?>,
+            onConflict: String,
+        ): List<Map<String, Any?>> = client.runUpsert(table, values, onConflict, returnRows = true)
 
         /** Mirrors supabase_dart .update(values).select(): PATCH returning
          *  the affected rows (needed by revokeDevice's maybeSingle check). */
@@ -127,7 +142,8 @@ class PostgrestQueryClient(
         table: String,
         values: Map<String, Any?>,
         onConflict: String,
-    ): Unit = withContext(Dispatchers.IO) {
+        returnRows: Boolean,
+    ): List<Map<String, Any?>> = withContext(Dispatchers.IO) {
         val urlBuilder = "$supabaseUrl/rest/v1/$table".toHttpUrl().newBuilder()
             .addQueryParameter("on_conflict", onConflict)
         val body = JSONObject()
@@ -138,7 +154,11 @@ class PostgrestQueryClient(
             .url(urlBuilder.build())
             .addHeader("apikey", publishableKey)
             .addHeader("Content-Type", "application/json")
-            .addHeader("Prefer", "resolution=merge-duplicates,return=minimal")
+            .addHeader(
+                "Prefer",
+                if (returnRows) "resolution=merge-duplicates,return=representation"
+                else "resolution=merge-duplicates,return=minimal",
+            )
             .apply {
                 accessToken()?.let { addHeader("Authorization", "Bearer $it") }
             }
@@ -147,6 +167,12 @@ class PostgrestQueryClient(
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 throw IOException("Upsert into $table failed with HTTP ${response.code}")
+            }
+            if (!returnRows) {
+                emptyList()
+            } else {
+                val text = response.body?.string().orEmpty()
+                if (text.isBlank()) emptyList() else PostgrestRpcClient.jsonToList(JSONArray(text)).filterIsInstance<Map<String, Any?>>()
             }
         }
     }
