@@ -39,7 +39,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -171,7 +170,7 @@ fun LinkedDevicesQrScreen(
                         contentColor = colors.primary,
                         indicator = {
                             TabRowDefaults.PrimaryIndicator(
-                                modifier = Modifier.tabIndicatorOffset(selectedTab, matchContentSize = true),
+                                modifier = Modifier,
                                 color = colors.primary,
                             )
                         },
