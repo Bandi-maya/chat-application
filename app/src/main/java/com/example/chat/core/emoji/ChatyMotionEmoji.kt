@@ -233,8 +233,8 @@ object ChatyEmojiPainter {
                 val gloss = Path().apply {
                     addArc(
                         oval = Rect(center = Offset(center.x, center.y - 4), radius = 24f),
-                        startAngleDegrees = ChatyEmojiMotion.radToDeg(-2.4).toFloat(),
-                        sweepAngleDegrees = ChatyEmojiMotion.radToDeg(1.6).toFloat(),
+                        startAngle = ChatyEmojiMotion.radToDeg(-2.4).toFloat(),
+                        sweepAngle = ChatyEmojiMotion.radToDeg(1.6).toFloat(),
                     )
                 }
                 scope.drawPath(gloss, Color.White.copy(alpha = 0.45f), style = Stroke(width = 3.0f))
@@ -563,8 +563,8 @@ object ChatyEmojiPainter {
         val arcStyle = Stroke(width = 2.8f)
         scope.drawArc(
             eyeColor,
-            startAngleDegrees = ChatyEmojiMotion.radToDeg(0.0).toFloat(),
-            sweepAngleDegrees = ChatyEmojiMotion.radToDeg(Math.PI).toFloat(),
+            startAngle = ChatyEmojiMotion.radToDeg(0.0).toFloat(),
+            sweepAngle = ChatyEmojiMotion.radToDeg(Math.PI).toFloat(),
             useCenter = false,
             topLeft = Offset(center.x - 14, center.y - 8),
             size = Size(8f, 6f),
@@ -572,8 +572,8 @@ object ChatyEmojiPainter {
         )
         scope.drawArc(
             eyeColor,
-            startAngleDegrees = 0f,
-            sweepAngleDegrees = 180f,
+            startAngle = 0f,
+            sweepAngle = 180f,
             useCenter = false,
             topLeft = Offset(center.x + 6, center.y - 8),
             size = Size(8f, 6f),
@@ -583,8 +583,8 @@ object ChatyEmojiPainter {
         // Frowning mouth: drawArc(rect, pi, pi) -> start 180, sweep 180
         scope.drawArc(
             eyeColor,
-            startAngleDegrees = ChatyEmojiMotion.radToDeg(Math.PI).toFloat(),
-            sweepAngleDegrees = ChatyEmojiMotion.radToDeg(Math.PI).toFloat(),
+            startAngle = ChatyEmojiMotion.radToDeg(Math.PI).toFloat(),
+            sweepAngle = ChatyEmojiMotion.radToDeg(Math.PI).toFloat(),
             useCenter = false,
             topLeft = Offset(center.x - 8, center.y + 8),
             size = Size(16f, 12f),
