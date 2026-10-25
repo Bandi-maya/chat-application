@@ -37,6 +37,8 @@ fun ChatsHomeHost(
     onOpenGlobalSearch: () -> Unit = {},
     onOpenMessageManagement: () -> Unit = {},
     onOpenProfile: () -> Unit = {},
+    onOpenQr: () -> Unit = {},
+    onOpenLinkedDevices: () -> Unit = {},
 ) {
     val api = ServiceLocator.apiBackend
     val prefs = ServiceLocator.preferencesController
@@ -93,6 +95,8 @@ fun ChatsHomeHost(
             onOpenGlobalSearch = onOpenGlobalSearch,
             onOpenMessageManagement = onOpenMessageManagement,
             onOpenProfile = onOpenProfile,
+            onOpenQr = onOpenQr,
+            onOpenLinkedDevices = onOpenLinkedDevices,
             // Dart _promptMessageNumber: match an existing contact by phone/username, else
             // synthesize user_<digits>, then open the direct conversation.
             onMessageNumber = { raw ->
