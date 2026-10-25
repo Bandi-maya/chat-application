@@ -82,9 +82,9 @@ import kotlinx.coroutines.launch
  * (listeners merged like Listenable.merge). Device-test rows come verbatim
  * from AudioSettingsController.verifiedDeviceRecords; the status labels are
  * shown as recorded and nothing here claims hardware verification.
- * Hero is SpecularGlassCard (blur 12 NOT rendered: no backdrop blur, see SpecularGlassCard), radio/route rows
- * have springInteractiveScale(0.98) + ChatyHapticsPort.selection (Dart HapticFeedback.selectionClick), Material
- * icons, grouped-card shadow, and a plain AppBar (22sp title: Dart uses the theme default titleLarge, unverified).
+ * Hero is the shared SpecularGlassCard (blur 12 NOT rendered, see that file), radio/route rows have
+ * springInteractiveScale(0.98) + ChatyHapticsPort.selection (Dart HapticFeedback.selectionClick), Material icons,
+ * grouped-card shadow, and an AppBar matching the Dart toThemeData appBarTheme (19*fontScale/w600/-0.3, back arrow in a 56dp slot).
  * [scope] launches the suspend setPreferredRoute call.
  */
 @Composable
@@ -116,16 +116,20 @@ fun AudioSettingsScreen(
     val gray = Color(0xFF8E8E93)
 
     val view = LocalView.current
-    val isDark = LocalThemeConfig.current.isDark
+    val themeConfig = LocalThemeConfig.current
+    val isDark = themeConfig.isDark
     Column(Modifier.fillMaxSize().background(colors.background)) {
-        // Dart AppBar(title: Text('Audio & Speakers'), backgroundColor: colors.background, elevation 0) with the default back arrow
+        // Dart AppBar(title: Text('Audio & Speakers'), backgroundColor: colors.background, elevation 0): default BackButton in a
+        // 56dp leading slot, title spacing 16, titleTextStyle from toThemeData(): 19*fontScale / w600 / letterSpacing -0.3 / primaryTextColor.
         Row(
             Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)).height(56.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onBack, modifier = Modifier.padding(start = 4.dp)) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = colors.foreground) }
-            Spacer(Modifier.width(12.dp))
-            Text("Audio & Speakers", color = colors.foreground, fontSize = 22.sp)
+            Box(Modifier.width(56.dp), contentAlignment = Alignment.Center) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color(themeConfig.primaryTextColor)) }
+            }
+            Spacer(Modifier.width(16.dp))
+            Text("Audio & Speakers", color = Color(themeConfig.primaryTextColor), fontSize = (19 * themeConfig.fontScale).sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.3).sp)
         }
         Column(
             Modifier.weight(1f).windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom))
