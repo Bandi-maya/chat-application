@@ -102,4 +102,14 @@ jobs:
           target: default
           arch: x86_64
           profile: pixel_6
-          script: gradle :app:connectedDebugAndroidTest --no-daemon
+          script: |
+            gradle :app:connectedDebugAndroidTest --no-daemon; GRADLE_RC=$?
+            adb pull /sdcard/Android/data/com.example.chat/files/screenshots screenshots || true
+            exit $GRADLE_RC
+      - name: Upload UI pixel proof
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: auth-screens-pixel-proof
+          path: screenshots/
+          if-no-files-found: warn
