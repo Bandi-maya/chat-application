@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.drawBehind
 
 /** Port of ui/core/templates/template_shell.dart TemplateShellHeader: the
  *  single, measured header row owned by a structural template shell. Feature
