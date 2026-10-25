@@ -188,6 +188,7 @@ private data class SectionSpec(
 )
 
 @Composable
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 private fun AppearanceOverview(controller: AppearanceVariantController) {
     val colors = LocalAppColors.current
     Column(
