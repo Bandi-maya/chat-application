@@ -28,7 +28,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FilledButton
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -470,7 +470,7 @@ fun MessageManagementPage(
                 }
             },
             confirmButton = {
-                FilledButton(onClick = {
+                Button(onClick = {
                     val k = keyword.trim()
                     val r = message.trim()
                     if (k.isNotEmpty() && r.isNotEmpty()) {
@@ -511,7 +511,7 @@ fun MessageManagementPage(
                 }
             },
             confirmButton = {
-                FilledButton(onClick = {
+                Button(onClick = {
                     val b = body.trim()
                     if (b.isNotEmpty()) {
                         scheduleDialogOpen = false
@@ -609,7 +609,7 @@ fun MessageManagementPage(
                 }
             },
             confirmButton = {
-                FilledButton(onClick = {
+                Button(onClick = {
                     val sc = shortcut.trim()
                     val ct = content.trim()
                     if (sc.isNotEmpty() && ct.isNotEmpty()) {
@@ -669,7 +669,7 @@ fun MessageManagementPage(
                 }
             },
             confirmButton = {
-                FilledButton(onClick = {
+                Button(onClick = {
                     val b = body.trim()
                     if (selected.value.isNotEmpty() && b.isNotEmpty()) {
                         massSendDialogOpen = false
@@ -732,6 +732,7 @@ private fun ScopeDropdown(
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun TimePickerDialogCompat(
     onCancel: () -> Unit,
