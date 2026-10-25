@@ -61,6 +61,134 @@ class ApiBackendService(context: Context) {
         transport = OkHttpApiTransport(),
     )
 
+    // ---- Realtime plane (W1 ApiRealtimeClient integration) ----
+
+    private val callSignalListeners =
+        java.util.concurrent.CopyOnWriteArrayList<(Map<String, Any?>) -> Unit>()
+
+    fun addCallSignalListener(listener: (Map<String, Any?>) -> Unit) = callSignalListeners.add(listener)
+    fun removeCallSignalListener(listener: (Map<String, Any?>) -> Unit) { callSignalListeners.remove(listener) }
+
+    /** getWebSocketUrl (backend_config.dart:80): custom/.env seams are absent
+     *  in this repo, so this is the default branch: rest base with ws scheme,
+     *  /api/vN and trailing slashes stripped, /chat/ws/<uid>. The uid falls
+     *  back to the JWT uid/sub claim when the stored user id is empty. */
+    private fun resolveWebSocketUrl(): String? {
+        if (session.token == null) return null
+        var uid = session.currentUser?.id?.trim() ?: ""
+        if (uid.isEmpty()) {
+            try {
+                val jwt = ApiAuthClient({ "" }, { "" }, ApiHttpTransport { _, _, _, _ -> 0 to "" })
+                    .decodeJwt(session.token!!)
+                uid = (if (jwt.has("uid")) jwt.get("uid") else jwt.optString("sub")).toString()
+            } catch (_: Exception) {
+            }
+        }
+        if (uid.isEmpty()) return null
+        val base = config.restApiBaseUrl
+            .replaceFirst("https://", "wss://")
+            .replaceFirst("http://", "ws://")
+            .replace(Regex("/api/v[0-9]+/?$"), "")
+            .replace(Regex("/+$"), "")
+        return "$base/chat/ws/$uid"
+    }
+
+    private val realtimeListener = object : ApiRealtimeClient.Listener {
+        override fun onNewMessage(message: ChatMessage) {
+            var unknownRoom = false
+            synchronized(chatLock) {
+                val roomId = message.conversationId
+                val list = _messages.getOrPut(roomId) { mutableListOf() }
+                // Dart: replace the optimistic sending/temp message matching
+                // text + sender; otherwise append if the id is new.
+                val optIdx = list.indexOfFirst { m ->
+                    (m.deliveryState == DeliveryState.sending || m.id.startsWith("temp_")) &&
+                        m.text == message.text &&
+                        (m.senderId == message.senderId || m.senderId == session.currentUser?.id)
+                }
+                if (optIdx != -1) {
+                    list[optIdx] = message
+                } else if (list.none { it.id == message.id }) {
+                    list.add(message)
+                }
+                list.sortBy { it.createdAt }
+                val convIdx = _conversations.indexOfFirst { it.id == roomId }
+                if (convIdx != -1) {
+                    val old = _conversations.removeAt(convIdx)
+                    _conversations.add(
+                        0,
+                        old.copy(
+                            lastMessageText = if (message.text.isNotEmpty()) message.text
+                            else if (message.type == MessageType.image) "📷 Photo" else "📎 Attachment",
+                            lastMessageTime = message.createdAt,
+                            lastMessageSenderId = message.senderId,
+                        ),
+                    )
+                } else {
+                    unknownRoom = true
+                }
+            }
+            if (unknownRoom) chatScope.launch { loadConversations() }
+            notifyChatListeners()
+        }
+
+        override fun onMessageEdited(roomId: String, messageId: String, newContent: String, editedAt: Instant) {
+            synchronized(chatLock) {
+                val list = _messages[roomId] ?: return@synchronized
+                val idx = list.indexOfFirst { it.id == messageId }
+                if (idx != -1) {
+                    list[idx] = list[idx].copy(text = newContent, editedAt = editedAt)
+                    if (idx == list.size - 1) {
+                        val convIdx = _conversations.indexOfFirst { it.id == roomId }
+                        if (convIdx != -1) {
+                            _conversations[convIdx] = _conversations[convIdx].copy(lastMessageText = newContent)
+                        }
+                    }
+                }
+            }
+            notifyChatListeners()
+        }
+
+        override fun onMessageDeleted(roomId: String, messageId: String) {
+            synchronized(chatLock) {
+                val list = _messages[roomId] ?: return@synchronized
+                list.removeAll { it.id == messageId }
+                val convIdx = _conversations.indexOfFirst { it.id == roomId }
+                if (convIdx != -1) {
+                    val lastMsg = list.lastOrNull()
+                    _conversations[convIdx] = _conversations[convIdx].copy(
+                        lastMessageText = if (lastMsg != null) {
+                            if (lastMsg.text.isNotEmpty()) lastMsg.text
+                            else if (lastMsg.type == MessageType.image) "📷 Photo" else "📎 Attachment"
+                        } else "",
+                        lastMessageTime = lastMsg?.createdAt ?: _conversations[convIdx].lastMessageTime,
+                    )
+                }
+            }
+            notifyChatListeners()
+        }
+
+        override fun onMessagesCleared(roomId: String) {
+            synchronized(chatLock) {
+                _messages[roomId]?.clear()
+                val convIdx = _conversations.indexOfFirst { it.id == roomId }
+                if (convIdx != -1) {
+                    _conversations[convIdx] = _conversations[convIdx].copy(lastMessageText = "")
+                }
+            }
+            notifyChatListeners()
+        }
+
+        override fun onCallSignal(data: Map<String, Any?>) {
+            callSignalListeners.forEach { it(data) }
+        }
+    }
+
+    private val realtime = ApiRealtimeClient(
+        webSocketUrl = { resolveWebSocketUrl() },
+        token = { session.token },
+    ).apply { listener = realtimeListener }
+
     private val chatScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val chatLock = Any()
     private val listeners = java.util.concurrent.CopyOnWriteArrayList<() -> Unit>()
@@ -144,6 +272,7 @@ class ApiBackendService(context: Context) {
     fun setActiveConversation(conversationId: String?) {
         activeConversationId = conversationId
         if (!conversationId.isNullOrEmpty()) {
+            realtime.connect()
             startBackgroundSync()
             chatScope.launch { loadMessages(conversationId) }
         }
@@ -279,7 +408,13 @@ class ApiBackendService(context: Context) {
         }
         notifyChatListeners()
 
-        val confirmed = chat.sendMessage(conversationId, text) ?: return null
+        val confirmed = chat.sendMessage(conversationId, text)
+        if (confirmed == null) {
+            // Dart: fall back to the WebSocket send when HTTP did not confirm;
+            // the temp message stays in 'sending' either way.
+            realtime.sendMessageFallback(conversationId, text)
+            return null
+        }
         synchronized(chatLock) {
             val list = _messages.getOrPut(conversationId) { mutableListOf() }
             val idx = list.indexOfFirst { it.id == tempId }
@@ -317,6 +452,7 @@ class ApiBackendService(context: Context) {
         session.restore()
         // Dart initialize(): after session restore, fire the chat-plane loads.
         if (session.isAuthenticated) {
+            realtime.connect()
             startBackgroundSync()
             chatScope.launch { loadConversations() }
             chatScope.launch { loadUsers() }
@@ -335,6 +471,7 @@ class ApiBackendService(context: Context) {
             }
             val result = auth.login(value, password)
             session.adopt(result)
+            realtime.connect()
             startBackgroundSync()
             chatScope.launch { loadConversations() }
             chatScope.launch { loadUsers() }
@@ -386,6 +523,10 @@ class ApiBackendService(context: Context) {
         }
         config.setTenantId(tenantId.trim())
         session.adopt(result)
+        realtime.connect()
+        startBackgroundSync()
+        chatScope.launch { loadConversations() }
+        chatScope.launch { loadUsers() }
         Triple(result.user, orgId, resolvedOrgName)
     }
 
@@ -408,5 +549,8 @@ class ApiBackendService(context: Context) {
         auth.checkOrganization(workspace)
     }
 
-    fun signOut() = session.signOut()
+    fun signOut() {
+        realtime.disconnect()
+        session.signOut()
+    }
 }
