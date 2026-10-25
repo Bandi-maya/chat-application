@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FileProvider share surface for media workspace/pdf/document share flows
+     (authority ${applicationId}.fileprovider, matching ui/media call sites). -->
+<paths>
+    <cache-path name="shared_files" path="." />
+    <files-path name="app_files" path="." />
+</paths>
