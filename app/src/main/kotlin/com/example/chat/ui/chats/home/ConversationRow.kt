@@ -42,6 +42,7 @@ import com.example.chat.domain.models.Conversation
 import com.example.chat.domain.models.ConversationType
 import com.example.chat.domain.models.DeliveryState
 import com.example.chat.domain.models.HomePreferences
+import androidx.compose.foundation.ExperimentalFoundationApi
 
 /** Live presence snapshot for one (conversation, other-user) pair. Null from
  *  the provider means "no presence data" - the Dart screen renders exactly
@@ -59,6 +60,7 @@ data class HomePresence(
  *  overlay, online dot, mute/pin indicators, unread badge and hairline
  *  divider. */
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun ConversationRow(
     conversation: Conversation,
     theme: ThemeConfig,
@@ -257,17 +259,16 @@ fun ConversationRow(
                     Spacer(Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (lastOwnMessageState != null) {
-                            // Same glyph ticks the Kotlin ChatDetailScreen
-                            // already renders; the 16-style tick painter lands
-                            // with its own slice.
-                            val (glyph, tickColor) = when (lastOwnMessageState) {
-                                DeliveryState.sending, DeliveryState.queued -> "⏱" to theme.secondaryTextColor
-                                DeliveryState.failed -> "!" to theme.dangerColor
-                                DeliveryState.sent -> "✓" to theme.secondaryTextColor
-                                DeliveryState.delivered -> "✓✓" to theme.secondaryTextColor
-                                DeliveryState.read -> "✓✓" to theme.accentColor
-                            }
-                            Text(glyph, color = Color(tickColor), fontSize = 13.sp)
+                            // The shared tick painter (ui/chats/detail), exact
+                            // Dart call: style from the theme, 13dp, secondary
+                            // unread / accent read.
+                            com.example.chat.ui.chats.detail.DeliveryStatusIcon(
+                                style = theme.deliveryTickStyle,
+                                state = lastOwnMessageState,
+                                unreadColor = Color(theme.secondaryTextColor),
+                                readColor = Color(theme.accentColor),
+                                size = 13.dp,
+                            )
                             Spacer(Modifier.width(4.dp))
                         }
                         val subtitleSize = (13.5 * effectiveDensity * textSizeScale * theme.fontScale).sp
