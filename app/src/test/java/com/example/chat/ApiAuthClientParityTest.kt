@@ -227,4 +227,57 @@ class ApiAuthClientParityTest {
         }
         assertTrue(t.calls.isEmpty())
     }
+
+    @Test
+    fun registerOrganizationPostsAdminCreatePayloadWithoutTenantHeader() {
+        val t = FakeTransport { call ->
+            assertEquals("http://10.0.2.2:8000/organization/admin/create", call.url)
+            assertNull(call.headers["x-tenant-id"])
+            val body = call.body!!
+            assertTrue(body.contains("\"tenant_id\":\"acme-corp\""))
+            assertTrue(body.contains("\"name\":\"Acme Corp\""))
+            assertTrue(body.contains("\"admin_username\":\"alex_admin\""))
+            assertTrue(body.contains("\"admin_email\":\"alex@acme.com\""))
+            assertTrue(body.contains("\"admin_password\":\"secret1\""))
+            assertTrue(body.contains("\"admin_full_name\":\"Alex Rivera\""))
+            assertTrue(body.contains("\"tenant_type\":\"chat\""))
+            assertTrue(body.contains("\"allow_user_registration\":false"))
+            200 to """{"access_token":"${jwt("{\"uid\":\"admin1\"}")}","user":{"id":"admin1","username":"alex_admin"},"org":{"uid":"org9","name":"Acme Corp"}}"""
+        }
+        val (result, org) = client(t).registerOrganization(
+            tenantId = " acme-corp ",
+            organizationName = " Acme Corp ",
+            adminUsername = "alex_admin",
+            adminEmail = "alex@acme.com",
+            adminPassword = "secret1",
+            adminFullName = "Alex Rivera",
+            allowUserRegistration = false,
+        )
+        assertEquals("admin1", result.user.id)
+        assertEquals("org9", org!!["uid"])
+        assertEquals(1, t.calls.size)
+    }
+
+    @Test
+    fun registerOrganizationFallsBackToApiV1On404() {
+        val t = FakeTransport { call ->
+            if (call.url == "http://10.0.2.2:8000/organization/admin/create") 404 to "" else 200 to
+                """{"access_token":"${jwt("{}")}","user":{"id":"a2","username":"x"}}"""
+        }
+        val (result, org) = client(t).registerOrganization("acme", "Acme", "u", "e@x.com", "pw1234", "Full Name")
+        assertEquals("a2", result.user.id)
+        assertNull(org)
+        assertEquals("http://10.0.2.2:8000/api/v1/organization/admin/create", t.calls[1].url)
+    }
+
+    @Test
+    fun registerOrganizationSurfacesBackendErrorMessage() {
+        val t = FakeTransport { 400 to """{"detail":"tenant id already exists"}""" }
+        try {
+            client(t).registerOrganization("acme", "Acme", "u", "e@x.com", "pw1234", "Full Name")
+            fail("expected exception")
+        } catch (e: Exception) {
+            assertTrue(e.message!!.contains("tenant id already exists"))
+        }
+    }
 }
