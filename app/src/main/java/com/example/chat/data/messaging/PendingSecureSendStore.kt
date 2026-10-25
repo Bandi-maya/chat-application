@@ -57,4 +57,9 @@ class PendingSecureSendStore(private val cache: SnapshotCacheStore) {
         val items = read(userId).filterNot { it.clientMessageId == clientMessageId }
         cache.writeJson(userId = userId, scope = SCOPE, value = items.map { it.toJson() })
     }
+
+    /** Dart PendingSecureSendStore.clear: serialized write of an empty queue (EncryptedMessageOutbox.clear). */
+    suspend fun clear(userId: String) = mutationBarrier.withLock {
+        cache.writeJson(userId = userId, scope = SCOPE, value = emptyList<Any?>())
+    }
 }
