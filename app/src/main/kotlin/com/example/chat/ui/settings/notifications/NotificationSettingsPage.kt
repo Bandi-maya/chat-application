@@ -250,38 +250,7 @@ fun NotificationSettingsPage(
         AlertDialog(
             onDismissRequest = { result.complete(false) },
             title = { Text(if (na) "Allow notification access" else "Allow display over other apps") },
-            text = { Text(if (na) "Android lets Chaty read notification content only after you explicitly enable Chaty Dynamic Island in Notification access settings. This is required to show notifications from other apps.'
-        : 'Android requires display-over-other-apps access so the island can float above your current app. Chaty only draws the temporary notification pill.';
-    final accepted = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(title),
-        content: Text(explanation),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Not now')),
-          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Open Settings')),
-        ],
-      ),
-    );
-    if (accepted != true || !mounted) return;
-    try {
-      await _dynamicIslandChannel.invokeMethod<void>(
-        notificationAccess ? 'openNotificationAccessSettings' : 'openOverlaySettings" else "Android requires display-over-other-apps access so the island can float above your current app. Chaty only draws the temporary notification pill.';
-    final accepted = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(title),
-        content: Text(explanation),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Not now')),
-          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Open Settings')),
-        ],
-      ),
-    );
-    if (accepted != true || !mounted) return;
-    try {
-      await _dynamicIslandChannel.invokeMethod<void>(
-        notificationAccess ? 'openNotificationAccessSettings' : 'openOverlaySettings") },
+            text = { Text(if (na) "Android lets Chaty read notification content only after you explicitly enable Chaty Dynamic Island in Notification access settings. This is required to show notifications from other apps." else "Android requires display-over-other-apps access so the island can float above your current app. Chaty only draws the temporary notification pill.") },
             dismissButton = { TextButton(onClick = { result.complete(false) }) { Text("Not now") } },
             confirmButton = { Button(onClick = { result.complete(true) }) { Text("Open Settings") } },
         )
