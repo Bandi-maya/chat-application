@@ -294,6 +294,7 @@ fun AppRoot() {
                 var pushedAccount by remember { mutableStateOf(false) }
                 var pushedUniversalAppearance by remember { mutableStateOf(false) }
                 var pushedComponentStyles by remember { mutableStateOf(false) }
+                var pushedAppIcon by remember { mutableStateOf(false) }
                 var pushedSettingsSearch by remember { mutableStateOf(false) }
                 val settingsNavigate: (com.example.chat.ui.settings.SettingsDestination) -> Unit = { dest ->
                     if (dest == com.example.chat.ui.settings.SettingsDestination.Security) {
@@ -609,7 +610,8 @@ fun AppRoot() {
                                     "/settings/account" -> pushedAccount = true
                                     "/settings/universal_appearance" -> pushedUniversalAppearance = true
                                     "/settings/customization" -> pushedComponentStyles = true
-                                    // customization, app_icon: no host yet.
+                                    "/settings/app_icon" -> pushedAppIcon = true
+                
                                     else -> settingsNotice = def.canonicalRoute
                                 }
                             },
@@ -621,6 +623,18 @@ fun AppRoot() {
                     // Originating settings route stays under this overlay (Dart Navigator.push).
                     androidx.activity.compose.BackHandler { pushedMessageManagement = false }
                     Box(Modifier.fillMaxSize()) { MessageManagementHost(onBack = { pushedMessageManagement = false }) }
+                }
+                if (pushedAppIcon) {
+                    androidx.activity.compose.BackHandler { pushedAppIcon = false }
+                    val iconController = ServiceLocator.appIconController
+                    androidx.compose.runtime.LaunchedEffect(iconController) { iconController.initialize() }
+                    Box(Modifier.fillMaxSize()) {
+                        com.example.chat.ui.settings.appicon.AppIconSettingsScreen(
+                            controller = iconController,
+                            onBack = { pushedAppIcon = false },
+                            showToast = { msg -> settingsNotice = msg },
+                        )
+                    }
                 }
                 if (pushedComponentStyles) {
                     androidx.activity.compose.BackHandler { pushedComponentStyles = false }
