@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
  *  Chats home, conversation, register, forgot-password and organization
  *  registration destinations land in their own parity slices; the register /
  *  forgot-password / org buttons route to honest WIP stubs until then. */
-private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home, ChatDetail, Security, LockedChats, HiddenVault, MessageManagement, NewChat, GlobalSearch }
+private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home, ChatDetail, Security, LockedChats, HiddenVault, MessageManagement, LinkedDevices, NewChat, GlobalSearch }
 
 @Composable
 fun AppRoot() {
@@ -56,6 +56,8 @@ fun AppRoot() {
         var promptPending by remember { mutableStateOf(false) }
         val gate = remember { GatePrompts() }
         var newChatGroup by remember { mutableStateOf(false) }
+        // 0 = QR only (Dart _openQrScreen initialIndex 1, qrOnly), 1 = devices only.
+        var linkedDevicesOnly by remember { mutableStateOf(false) }
         var newChatBroadcast by remember { mutableStateOf(false) }
         val scope = androidx.compose.runtime.rememberCoroutineScope()
         // Dart AuthChangeEvent.signedOut: reset lock/prompt state and replace the stack
@@ -65,7 +67,7 @@ fun AppRoot() {
                 if (!ServiceLocator.apiBackend.isAuthenticated &&
                     (route == AuthRoute.Home || route == AuthRoute.ChatDetail || route == AuthRoute.Security ||
                         route == AuthRoute.LockedChats ||
-                        route == AuthRoute.HiddenVault || route == AuthRoute.MessageManagement ||
+                        route == AuthRoute.HiddenVault || route == AuthRoute.MessageManagement || route == AuthRoute.LinkedDevices ||
                         route == AuthRoute.NewChat || route == AuthRoute.GlobalSearch)
                 ) {
                     ServiceLocator.appLock.onSignedOut()
@@ -261,6 +263,10 @@ fun AppRoot() {
                 val settingsNavigate: (com.example.chat.ui.settings.SettingsDestination) -> Unit = { dest ->
                     if (dest == com.example.chat.ui.settings.SettingsDestination.Security) {
                         route = AuthRoute.Security
+                    } else if (dest == com.example.chat.ui.settings.SettingsDestination.LinkedDevices ||
+                        dest == com.example.chat.ui.settings.SettingsDestination.QrCode) {
+                        linkedDevicesOnly = dest == com.example.chat.ui.settings.SettingsDestination.LinkedDevices
+                        route = AuthRoute.LinkedDevices
                     } else if (dest in com.example.chat.ui.settings.hostedSettingsDestinations) {
                         settingsSub = dest
                     } else {
@@ -319,6 +325,8 @@ fun AppRoot() {
                     onOpenGlobalSearch = { route = AuthRoute.GlobalSearch },
                     onOpenMessageManagement = { route = AuthRoute.MessageManagement },
                     onOpenProfile = { pushedProfile = true },
+                    onOpenQr = { linkedDevicesOnly = false; route = AuthRoute.LinkedDevices },
+                    onOpenLinkedDevices = { linkedDevicesOnly = true; route = AuthRoute.LinkedDevices },
                 )
                             }
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.groups ->
@@ -337,6 +345,8 @@ fun AppRoot() {
                     onOpenGlobalSearch = { route = AuthRoute.GlobalSearch },
                     onOpenMessageManagement = { route = AuthRoute.MessageManagement },
                     onOpenProfile = { pushedProfile = true },
+                    onOpenQr = { linkedDevicesOnly = false; route = AuthRoute.LinkedDevices },
+                    onOpenLinkedDevices = { linkedDevicesOnly = true; route = AuthRoute.LinkedDevices },
                                 )
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.calls -> {
                                 val history = ServiceLocator.callHistory
@@ -655,6 +665,44 @@ fun AppRoot() {
                     },
                     onBack = { route = AuthRoute.Home },
                     showToast = { android.widget.Toast.makeText(mmToast, it, android.widget.Toast.LENGTH_SHORT).show() },
+                )
+            }
+            AuthRoute.LinkedDevices -> {
+                val repoL = ServiceLocator.conversationsRepository
+                val rel = ServiceLocator.contactRelationships
+                val meL = ServiceLocator.apiBackend.currentUser
+                var devices by remember { mutableStateOf<List<com.example.chat.data.services.LinkedDevice>>(emptyList()) }
+                var loadingDevices by remember { mutableStateOf(false) }
+                var devicesError by remember { mutableStateOf<String?>(null) }
+                suspend fun reloadDevices() {
+                    loadingDevices = true
+                    try {
+                        devices = rel.linkedDevices(); devicesError = null
+                    } catch (e: Exception) {
+                        devicesError = e.message ?: e.toString()
+                    }
+                    loadingDevices = false
+                }
+                androidx.compose.runtime.LaunchedEffect(Unit) { reloadDevices() }
+                com.example.chat.ui.chats.linked_devices.LinkedDevicesQrScreen(
+                    currentUserDisplayName = meL?.displayName ?: "",
+                    currentUserUsername = meL?.username ?: "",
+                    devices = devices,
+                    loadingDevices = loadingDevices,
+                    devicesError = devicesError,
+                    initialIndex = if (linkedDevicesOnly) 0 else 1,
+                    qrOnly = !linkedDevicesOnly,
+                    devicesOnly = linkedDevicesOnly,
+                    onRefreshDevices = { reloadDevices() },
+                    onRevokeDevice = { d -> rel.revokeDevice(d.id); reloadDevices() },
+                    searchUsersRemote = { q -> repoL.searchUsersRemote(q) },
+                    openDirectConversation = { u -> repoL.getOrCreateDirectConversationAsync(u) },
+                    onOpenConversation = { conversation ->
+                        ServiceLocator.apiBackend.setActiveConversation(conversation.id)
+                        selectedConversation = conversation
+                        route = AuthRoute.ChatDetail
+                    },
+                    onBack = { route = AuthRoute.Home },
                 )
             }
             AuthRoute.ChatDetail -> run {
