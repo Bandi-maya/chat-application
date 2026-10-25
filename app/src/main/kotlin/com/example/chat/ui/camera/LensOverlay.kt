@@ -230,20 +230,19 @@ object LensAnchorPainter {
     // exactly like Skia's CTM-respecting mask filter does in Flutter.
 
     private const val GLOW_SPRITE_SCALE = 2f
-    private const val GLOW_SPRITE_MAX = 24
 
-    private val glowSpriteCache =
-        object : LinkedHashMap<String, android.graphics.Bitmap>(16, 0.75f, true) {
-            override fun removeEldestEntry(
-                eldest: MutableMap.MutableEntry<String, android.graphics.Bitmap>?,
-            ): Boolean {
-                if (size > GLOW_SPRITE_MAX) {
-                    eldest?.value?.recycle()
-                    return true
-                }
-                return false
-            }
-        }
+    /** Total pixel-memory bound for the sprite cache (bytes, ARGB_8888).
+     *  Entry counts do not bound memory because sprite sizes vary with the
+     *  blurred shape; ~4 MB covers the full lens set with headroom. */
+    private const val GLOW_SPRITE_MAX_BYTES = 4 * 1024 * 1024
+
+    private var glowSpriteBytes = 0L
+
+    // Evicted bitmaps are NOT recycled manually: a hardware display list
+    // recorded for a previous frame may still reference the bitmap, and
+    // drawing a recycled bitmap crashes. Dropping the reference and letting
+    // the GC reclaim it once the display list releases it is the safe path.
+    private val glowSpriteCache = LinkedHashMap<String, android.graphics.Bitmap>(16, 0.75f, true)
 
     /** Framework BlurMaskFilter radius for a Dart blur sigma:
      *  sigma = 0.57735 * radius + 0.5 (frameworks/base libs/hwui/jni/
@@ -273,7 +272,10 @@ object LensAnchorPainter {
     ) {
         val margin = 3f * blurRadiusForSigma(blurSigma) + 2f
         val sprite = synchronized(glowSpriteCache) {
-            glowSpriteCache[key] ?: run {
+            val hit = glowSpriteCache[key]
+            if (hit != null) {
+                hit
+            } else {
                 val w = ((r - l + 2 * margin) * GLOW_SPRITE_SCALE).roundToInt().coerceAtLeast(1)
                 val h = ((b - t + 2 * margin) * GLOW_SPRITE_SCALE).roundToInt().coerceAtLeast(1)
                 val bmp = android.graphics.Bitmap.createBitmap(
@@ -298,12 +300,29 @@ object LensAnchorPainter {
                 }
                 bake(ac, ap)
                 glowSpriteCache[key] = bmp
+                glowSpriteBytes += w.toLong() * h.toLong() * 4L
+                while (glowSpriteBytes > GLOW_SPRITE_MAX_BYTES) {
+                    val it = glowSpriteCache.entries.iterator()
+                    if (!it.hasNext()) break
+                    val eldest = it.next()
+                    glowSpriteBytes -= eldest.value.width.toLong() * eldest.value.height.toLong() * 4L
+                    it.remove() // reference drop only - see recycle note above
+                }
                 bmp
             }
         }
-        canvas.drawImage(
+        // The sprite has GLOW_SPRITE_SCALE pixels per local unit; map it back
+        // onto its local-units rect so the baked blur lands at the same size
+        // the CTM-respecting mask filter produces in Flutter.
+        canvas.drawImageRect(
             sprite.asImageBitmap(),
+            androidx.compose.ui.unit.IntOffset(0, 0),
+            androidx.compose.ui.unit.IntSize(sprite.width, sprite.height),
             Offset(l - margin, t - margin),
+            androidx.compose.ui.geometry.Size(
+                (r - l + 2 * margin),
+                (b - t + 2 * margin),
+            ),
             Paint().apply { this.alpha = alpha },
         )
     }
