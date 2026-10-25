@@ -233,8 +233,8 @@ object ChatyEmojiPainter {
                 val gloss = Path().apply {
                     addArc(
                         oval = Rect(center = Offset(center.x, center.y - 4), radius = 24f),
-                        startAngle = ChatyEmojiMotion.radToDeg(-2.4).toFloat(),
-                        sweepAngle = ChatyEmojiMotion.radToDeg(1.6).toFloat(),
+                        startAngleDegrees = ChatyEmojiMotion.radToDeg(-2.4).toFloat(),
+                        sweepAngleDegrees = ChatyEmojiMotion.radToDeg(1.6).toFloat(),
                     )
                 }
                 scope.drawPath(gloss, Color.White.copy(alpha = 0.45f), style = Stroke(width = 3.0f))
