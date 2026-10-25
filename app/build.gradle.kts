@@ -28,6 +28,13 @@ android {
         }
     }
 
+    sourceSets {
+        getByName("main") {
+            java.srcDir(layout.buildDirectory.dir("generated/uniffi"))
+            jniLibs.srcDir(layout.buildDirectory.dir("jniLibs"))
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -58,3 +65,38 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
+
+// ── MLS native binding (mls-native UniFFI shim over the repo-owned OpenMLS
+// Rust crate in third_party/openmls_android/rust). Requires cargo-ndk and the
+// Android NDK; the CI workflow installs both. Local builds without Rust can
+// skip with -PskipMlsNative (the app then fails closed at runtime, by design).
+val skipMlsNative = providers.gradleProperty("skipMlsNative").orElse("false").map { it == "true" }
+val mlsJniLibsDir = layout.buildDirectory.dir("jniLibs")
+val uniffiOutDir = layout.buildDirectory.dir("generated/uniffi")
+
+val buildMlsNative = tasks.register<Exec>("buildMlsNative") {
+    onlyIf { !skipMlsNative.get() }
+    workingDir = rootProject.projectDir
+    commandLine(
+        "cargo", "ndk",
+        "-t", "arm64-v8a", "-t", "armeabi-v7a", "-t", "x86_64",
+        "-o", mlsJniLibsDir.get().asFile.absolutePath,
+        "build", "--release", "--manifest-path", "mls-native/Cargo.toml",
+    )
+}
+
+val generateUniffiBindings = tasks.register<Exec>("generateUniffiBindings") {
+    onlyIf { !skipMlsNative.get() }
+    dependsOn(buildMlsNative)
+    workingDir = rootProject.projectDir
+    commandLine(
+        "cargo", "run", "--release", "--manifest-path", "mls-native/Cargo.toml",
+        "--features", "uniffi/cli", "--bin", "uniffi-bindgen", "generate",
+        "--library", mlsJniLibsDir.get().asFile.file("arm64-v8a/libchaty_mls_native.so").absolutePath,
+        "--language", "kotlin",
+        "--no-config",
+        "--out-dir", uniffiOutDir.get().asFile.absolutePath,
+    )
+}
+
+tasks.named("preBuild") { dependsOn(generateUniffiBindings) }
