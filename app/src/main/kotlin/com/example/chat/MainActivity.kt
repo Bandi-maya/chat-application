@@ -4,10 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.lifecycle.lifecycleScope
-import com.example.chat.data.services.ProtectedResourceGate
 import com.example.chat.ui.AppRoot
-import kotlinx.coroutines.launch
 
 /**
  * Native Kotlin entry point for the Chaty port.
@@ -25,27 +22,5 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** Dart _ChatyAppState.didChangeAppLifecycleState (main.dart:669):
-     *  backgrounding invalidates every protected-resource session. */
-    override fun onStop() {
-        super.onStop()
-        ProtectedResourceGate.invalidateAllSessions()
-    }
 
-    /** Dart resumed branch: refresh the API plane and best-effort register
-     *  the current device. Auto-lock timing lives with the AppRoot overlay
-     *  slice (still open); the gate invalidation above is its session side. */
-    override fun onStart() {
-        super.onStart()
-        val backend = ServiceLocator.apiBackend
-        if (backend.isAuthenticated) {
-            backend.onAppResumed()
-            lifecycleScope.launch {
-                try {
-                    ServiceLocator.contactRelationships.registerCurrentDevice()
-                } catch (_: Exception) {
-                }
-            }
-        }
-    }
 }
