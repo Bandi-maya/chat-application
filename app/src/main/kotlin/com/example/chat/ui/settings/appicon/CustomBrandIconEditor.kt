@@ -102,19 +102,27 @@ fun iconEditorGestureStep(
     )
 }
 
+/** Plain-Kotlin rect so the geometry is unit-testable on the JVM
+ *  (android.graphics.RectF is a no-op stub in local unit tests). */
+data class CoverRect(val left: Float, val top: Float, val right: Float, val bottom: Float) {
+    fun width(): Float = right - left
+    fun height(): Float = bottom - top
+    fun toRectF(): RectF = RectF(left, top, right, bottom)
+}
+
 /** ContentScale.Crop of an image into a square box: scale to fill, center
  *  the overflow. Returns the destination rect inside the box. */
 fun coverFitDestination(
     imageWidth: Float,
     imageHeight: Float,
     boxSide: Float,
-): RectF {
+): CoverRect {
     val factor = maxOf(boxSide / imageWidth, boxSide / imageHeight)
     val drawnWidth = imageWidth * factor
     val drawnHeight = imageHeight * factor
     val left = (boxSide - drawnWidth) / 2f
     val top = (boxSide - drawnHeight) / 2f
-    return RectF(left, top, left + drawnWidth, top + drawnHeight)
+    return CoverRect(left, top, left + drawnWidth, top + drawnHeight)
 }
 
 /** Reproduces RepaintBoundary.toImage(pixelRatio: 3) for the editor content:
@@ -146,7 +154,7 @@ fun renderCroppedIconPng(
         canvas.scale(scale, scale)
         canvas.rotate(quarterTurns * 90f, side / 2f, side / 2f)
         val dst = coverFitDestination(source.width.toFloat(), source.height.toFloat(), side.toFloat())
-        canvas.drawBitmap(source, Rect(0, 0, source.width, source.height), dst, paint)
+        canvas.drawBitmap(source, Rect(0, 0, source.width, source.height), dst.toRectF(), paint)
         canvas.restore()
 
         val stream = java.io.ByteArrayOutputStream()
