@@ -11,7 +11,7 @@ import org.json.JSONObject
  *  overwrite each other's settings. The bare key is the signed-out bucket
  *  and the legacy pre-namespacing read. Errors surface as empty/false, never
  *  with payload content (preference values are sensitive). */
-class LocalPreferencesStorage(context: Context) {
+class LocalPreferencesStorage(context: Context) : com.example.chat.core.theme.ThemeStateStore {
 
     private val prefs = context.applicationContext
         .getSharedPreferences("chaty_local_preferences", Context.MODE_PRIVATE)
@@ -53,9 +53,9 @@ class LocalPreferencesStorage(context: Context) {
 
     // ── device-global theme/template state (not account-sensitive) ──────
 
-    suspend fun loadThemeState(): Map<String, Any?> = loadJsonMap(PreferenceKeys.themeState)
+    override suspend fun loadThemeState(): Map<String, Any?> = loadJsonMap(PreferenceKeys.themeState)
 
-    suspend fun saveThemeState(data: Map<String, Any?>): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun saveThemeState(data: Map<String, Any?>): Boolean = withContext(Dispatchers.IO) {
         try {
             prefs.edit().putString(PreferenceKeys.themeState, JSONObject(data).toString()).apply()
             true
