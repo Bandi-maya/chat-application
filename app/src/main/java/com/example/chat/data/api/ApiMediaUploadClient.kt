@@ -40,11 +40,15 @@ class ApiMediaUploadClient(
 
     /** Exact port of ApiBackendService.uploadMedia. Returns the server's
      *  data map (url, path, size, mime keys as the backend supplies them). */
-    fun uploadMedia(file: File): Map<String, Any> {
+    fun uploadMedia(file: File): Map<String, Any> =
+        uploadMedia(file.name, file.readBytes())
+
+    /** Byte-array form for callers that already hold the payload
+     *  (ChatMediaService's post-compression bytes; the wire body is the
+     *  same multipart part either way). */
+    fun uploadMedia(filename: String, bytes: ByteArray): Map<String, Any> {
         val bearer = token() ?: throw UploadException("Not authenticated")
         val base = restApiBaseUrl().trimEnd('/')
-        val filename = file.name
-        val bytes = file.readBytes()
 
         val response: Response = try {
             val primary = transport.upload(
