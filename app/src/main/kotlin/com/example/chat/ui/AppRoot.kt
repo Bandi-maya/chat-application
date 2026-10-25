@@ -252,6 +252,16 @@ fun AppRoot() {
                 }
                 var settingsNotice by remember { mutableStateOf<String?>(null) }
                 var settingsSub by remember { mutableStateOf<com.example.chat.ui.settings.SettingsDestination?>(null) }
+                var pushedSettings by remember { mutableStateOf(false) }
+                val settingsNavigate: (com.example.chat.ui.settings.SettingsDestination) -> Unit = { dest ->
+                    if (dest == com.example.chat.ui.settings.SettingsDestination.Security) {
+                        route = AuthRoute.Security
+                    } else if (dest in com.example.chat.ui.settings.hostedSettingsDestinations) {
+                        settingsSub = dest
+                    } else {
+                        settingsNotice = dest.name
+                    }
+                }
                 com.example.chat.ui.navigation.MainNavigationShell(
                     colors = shellColors,
                     currentUser = ServiceLocator.apiBackend.currentUser?.let { u ->
@@ -279,15 +289,7 @@ fun AppRoot() {
                                         ),
                                         canGoBack = false,
                                         onBack = { },
-                                        onNavigate = { dest ->
-                                            if (dest == com.example.chat.ui.settings.SettingsDestination.Security) {
-                                                route = AuthRoute.Security
-                                            } else if (dest in com.example.chat.ui.settings.hostedSettingsDestinations) {
-                                                settingsSub = dest
-                                            } else {
-                                                settingsNotice = dest.name
-                                            }
-                                        },
+                                        onNavigate = settingsNavigate,
                                         // Avatar/banner upload hosts are not wired yet.
                                         onPickAvatar = { },
                                         onPickBanner = { },
@@ -307,7 +309,7 @@ fun AppRoot() {
                     },
                     onOpenSecurity = { route = AuthRoute.Security },
                     onOpenLockedChats = { route = AuthRoute.LockedChats },
-                    onOpenSettings = { },
+                    onOpenSettings = { pushedSettings = true },
                 )
                             }
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.groups ->
@@ -321,7 +323,7 @@ fun AppRoot() {
                                     },
                                     onOpenSecurity = { route = AuthRoute.Security },
                                     onOpenLockedChats = { route = AuthRoute.LockedChats },
-                                    onOpenSettings = { },
+                                    onOpenSettings = { pushedSettings = true },
                                 )
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.calls -> {
                                 val history = ServiceLocator.callHistory
@@ -426,6 +428,25 @@ fun AppRoot() {
                         }
                     },
                 )
+                if (pushedSettings) {
+                    androidx.activity.compose.BackHandler(enabled = settingsSub == null) { pushedSettings = false }
+                    val pushedUser = ServiceLocator.apiBackend.currentUser?.let { toDomainUser(it) }
+                    if (pushedUser != null) {
+                        Box(Modifier.fillMaxSize()) {
+                            com.example.chat.ui.settings.SettingsRootScreen(
+                                preferences = ServiceLocator.preferencesController,
+                                themeController = themeController,
+                                user = pushedUser,
+                                canGoBack = true,
+                                onBack = { pushedSettings = false },
+                                onNavigate = settingsNavigate,
+                                onPickAvatar = { },
+                                onPickBanner = { },
+                                onLogout = { ServiceLocator.apiBackend.signOut() },
+                            )
+                        }
+                    }
+                }
                 val sub = settingsSub
                 if (sub != null) {
                     androidx.activity.compose.BackHandler { settingsSub = null }
