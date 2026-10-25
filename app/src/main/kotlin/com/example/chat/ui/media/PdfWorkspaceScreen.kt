@@ -95,7 +95,7 @@ fun PdfWorkspaceScreen(
 
     var tick by remember { mutableIntStateOf(0) }
     DisposableEffect(library) {
-        val listener = { tick++ }
+        val listener: () -> Unit = { tick++ }
         library.addListener(listener)
         onDispose { library.removeListener(listener) }
     }
