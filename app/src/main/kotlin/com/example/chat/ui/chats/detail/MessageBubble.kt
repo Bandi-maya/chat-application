@@ -66,6 +66,7 @@ import com.example.chat.domain.models.MessageReaction
 import com.example.chat.domain.models.MessageType
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import androidx.compose.ui.graphics.luminance
 
 /** Optional color overrides mirroring the Dart convPrefs reads in
  *  message_bubble.dart. Null fields fall back to the ThemeConfig colors.
@@ -576,7 +577,7 @@ fun ChatMessageBubble(
 /** Ticks must contrast with the ACTUAL bubble fill they sit on (Dart:
  *  ThemeData.estimateBrightnessForColor(surface)). */
 private fun tickUnreadColor(surface: Color, secondaryText: Color): Color =
-    if (surface.luminance() < 0.5) Color(0xB3FFFFFF) else secondaryText
+    if (surface.luminance() < 0.5f) Color(0xB3FFFFFF) else secondaryText
 
 @Composable
 private fun MessageMetaRow(
