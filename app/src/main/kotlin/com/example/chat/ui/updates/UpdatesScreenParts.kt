@@ -1,5 +1,7 @@
 package com.example.chat.ui.updates
 
+import androidx.compose.material.icons.rounded.Videocam
+import androidx.compose.material.icons.rounded.Image
 import android.media.MediaPlayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
