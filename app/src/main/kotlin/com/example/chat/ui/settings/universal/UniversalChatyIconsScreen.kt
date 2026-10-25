@@ -29,7 +29,7 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.PhotoSizeSelectSmall
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.ChoiceChip
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -66,6 +66,7 @@ import com.example.chat.ui.icons.ChatyIconThemeId
 import com.example.chat.ui.kit.ChatyHapticsPort
 import com.example.chat.ui.settings.rememberPreferencesVersion
 import com.example.chat.ui.theme.LocalThemeConfig
+import androidx.compose.material3.FilterChipDefaults
 
 // Exact Flutter material color constants used by the Dart screen.
 private val White10 = Color(0x1AFFFFFF)
@@ -191,7 +192,7 @@ fun UniversalChatyIconsScreen(
             Text(activeTheme.description, color = secondaryText, fontSize = 12.5.sp)
             Spacer(Modifier.height(12.dp))
             Row {
-                ChoiceChip(
+                FilterChip(
                     selected = previewIsDark,
                     onClick = { previewIsDark = !previewIsDark },
                     label = { Text(if (previewIsDark) "Dark Preview" else "Light Preview", fontSize = 11.sp) },
@@ -202,19 +203,19 @@ fun UniversalChatyIconsScreen(
                             modifier = Modifier.size(14.dp),
                         )
                     },
-                    colors = androidx.compose.material3.ChoiceChipDefaults.choiceChipColors(
+                    colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
                         selectedContainerColor = accent.copy(alpha = 0.2f),
                     ),
                 )
                 Spacer(Modifier.width(8.dp))
-                ChoiceChip(
+                FilterChip(
                     selected = microSizePreview,
                     onClick = { microSizePreview = !microSizePreview },
                     label = { Text(if (microSizePreview) "20px Micro" else "26px Standard", fontSize = 11.sp) },
                     leadingIcon = {
                         Icon(Icons.Rounded.PhotoSizeSelectSmall, contentDescription = null, modifier = Modifier.size(14.dp))
                     },
-                    colors = androidx.compose.material3.ChoiceChipDefaults.choiceChipColors(
+                    colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
                         selectedContainerColor = accent.copy(alpha = 0.2f),
                     ),
                 )
