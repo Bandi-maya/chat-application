@@ -12,6 +12,7 @@ import com.example.chat.domain.models.EncryptionStatus
 import com.example.chat.domain.models.PresenceState
 import com.example.chat.domain.models.UserProfile
 import com.example.chat.domain.models.MessageAttachment
+import com.example.chat.domain.models.MessageReaction
 import com.example.chat.domain.models.MessageType
 import com.example.chat.domain.models.messageTypeFromDatabase
 import com.example.chat.domain.models.messageTypeToDatabase
@@ -364,6 +365,176 @@ class ConversationsRepository(
         return result
     }
 
+    /** Exact port of toggleReaction's optimistic half: applies the local
+     *  reaction change immediately; call [toggleReactionAsync] after it. */
+    fun optimisticToggleReaction(conversationId: String, messageId: String, emoji: String) {
+        val userId = currentUserId() ?: return
+        val list = messagesByChatId[conversationId] ?: return
+        val msgIndex = list.indexOfFirst { it.id == messageId }
+        if (msgIndex < 0) return
+
+        val msg = list[msgIndex]
+        val updatedReactions = mutableListOf<MessageReaction>()
+        var userHadSameReaction = false
+
+        for (r in msg.reactions) {
+            val newUserIds = r.userIds.toMutableList()
+            if (newUserIds.remove(userId) && r.emoji == emoji) {
+                userHadSameReaction = true
+            }
+            if (newUserIds.isNotEmpty()) {
+                updatedReactions.add(r.copy(userIds = newUserIds))
+            }
+        }
+
+        if (!userHadSameReaction) {
+            val existingIndex = updatedReactions.indexOfFirst { it.emoji == emoji }
+            if (existingIndex >= 0) {
+                val r = updatedReactions[existingIndex]
+                updatedReactions[existingIndex] = r.copy(userIds = r.userIds + userId)
+            } else {
+                updatedReactions.add(MessageReaction(emoji = emoji, userIds = listOf(userId)))
+            }
+        }
+
+        list[msgIndex] = msg.copy(reactions = updatedReactions)
+        notifyChanged()
+    }
+
+    /** Exact port of _toggleReactionAsync (demo mode does not exist on api). */
+    suspend fun toggleReactionAsync(conversationId: String, messageId: String, emoji: String) {
+        runCatching {
+            rpc.rpc(
+                "toggle_message_reaction",
+                mapOf("p_message_id" to messageId, "p_emoji" to emoji),
+            )
+        }
+        loadMessages(conversationId)
+        notifyChanged()
+    }
+
+    /** Exact port of editMessage: guards, optimistic edit, MLS re-encrypt at
+     *  the current epoch (never plaintext through the legacy path for MLS
+     *  messages), rollback on failure. */
+    suspend fun editMessage(
+        conversationId: String,
+        messageId: String,
+        newText: String,
+    ) {
+        val text = newText.trim()
+        if (text.isEmpty()) {
+            throw IllegalArgumentException("Message cannot be empty.")
+        }
+
+        var list = messagesByChatId[conversationId]
+            ?: throw IllegalStateException("Conversation messages are not loaded.")
+        var index = list.indexOfFirst { it.id == messageId }
+        if (index < 0) {
+            throw IllegalStateException("Message is no longer available to edit.")
+        }
+
+        // Old encrypted snapshots predate metadata persistence: rehydrate the
+        // authoritative server row before choosing a transport so an offline
+        // cache can never make an MLS message look like a legacy row.
+        if (list[index].metadata.isEmpty()) {
+            loadMessages(conversationId)
+            list = messagesByChatId[conversationId]
+                ?: throw IllegalStateException("Conversation messages could not be refreshed.")
+            index = list.indexOfFirst { it.id == messageId }
+            if (index < 0) {
+                throw IllegalStateException("Message is no longer available to edit.")
+            }
+        }
+
+        val original = list[index]
+        if (original.isDeletedForEveryone ||
+            original.metadata["decryption_failed"] == true
+        ) {
+            throw IllegalStateException("This message cannot be edited.")
+        }
+        if (original.type != MessageType.text) {
+            throw IllegalArgumentException("Only text messages can be edited.")
+        }
+        list[index] = original.copy(text = text, editedAt = Instant.now())
+        notifyChanged()
+        try {
+            // MLS messages must be re-encrypted at the current group epoch.
+            // Never write their plaintext through the legacy RPC or table API.
+            val isMlsMessage =
+                original.metadata["mls_group_id"] != null ||
+                    original.metadata["encryption_protocol"] == MlsE2eeService.protocolSuite
+            if (isMlsMessage) {
+                val service = mls()
+                    ?: throw IllegalStateException("Secure messaging is not available on this device.")
+                val deviceId = service.currentDeviceId
+                if (!service.isReady || deviceId == null) {
+                    throw IllegalStateException("Secure messaging is still initializing.")
+                }
+                val appMetadata = original.metadata.toMutableMap()
+                appMetadata.remove("encrypted")
+                appMetadata.remove("mls_group_id")
+                appMetadata.remove("mls_epoch")
+                appMetadata.remove("encryption_protocol")
+                appMetadata.remove("decryption_failed")
+                val encrypted = service.encryptEditedPayload(
+                    conversationId = conversationId,
+                    payload = mapOf(
+                        "type" to messageTypeToDatabase(original.type),
+                        "text" to text,
+                        "metadata" to appMetadata,
+                    ),
+                )
+                rpc.rpc(
+                    "edit_mls_message_v1",
+                    mapOf(
+                        "p_message_id" to messageId,
+                        "p_sender_device_id" to deviceId,
+                        "p_group_id" to encrypted.groupId,
+                        "p_epoch" to encrypted.epoch,
+                        "p_ciphertext" to encrypted.ciphertext,
+                    ),
+                )
+            } else {
+                rpc.rpc(
+                    "edit_chat_message",
+                    mapOf(
+                        "p_message_id" to messageId,
+                        "p_text" to text,
+                    ),
+                )
+            }
+        } catch (error: Throwable) {
+            // Restore the exact prior message; no unencrypted fallback write.
+            list[index] = original
+            notifyChanged()
+            throw error
+        }
+
+        loadMessages(conversationId)
+        notifyChanged()
+    }
+
+    /** Exact port of _deleteMessageAsync's non-demo path. */
+    suspend fun deleteMessage(
+        conversationId: String,
+        messageId: String,
+        forEveryone: Boolean = false,
+    ) {
+        rpc.rpc(
+            "delete_chat_message",
+            mapOf(
+                "p_message_id" to messageId,
+                "p_for_everyone" to forEveryone,
+            ),
+        )
+        kotlinx.coroutines.coroutineScope {
+            val a = launch { loadMessages(conversationId) }
+            val b = launch { loadConversations(loadMembers = false) }
+            a.join(); b.join()
+        }
+        notifyChanged()
+    }
+
     suspend fun markAsRead(conversationId: String) {
         if (shouldSendReadReceipts(conversationId)) {
             rpc.rpc(
@@ -441,6 +612,7 @@ class MlsServiceEncryptorAdapter(
     private val service: MlsE2eeService,
 ) : com.example.chat.core.crypto.MlsEncryptor {
     override val currentDeviceId: String? get() = service.currentDeviceId
+    override val isReady: Boolean get() = service.isReady
 
     override suspend fun encryptPayload(
         conversationId: String,
@@ -449,4 +621,9 @@ class MlsServiceEncryptorAdapter(
 
     override suspend fun decryptPayload(conversationId: String, ciphertext: String): Map<String, Any?> =
         service.decryptPayload(conversationId, ciphertext)
+
+    override suspend fun encryptEditedPayload(
+        conversationId: String,
+        payload: Map<String, Any?>,
+    ): com.example.chat.core.crypto.MlsEncryptedPayload = service.encryptEditedPayload(conversationId, payload)
 }
