@@ -6,7 +6,9 @@ import com.example.chat.data.messaging.PendingSecureSend
 import com.example.chat.data.messaging.PendingSecureSendStore
 import com.example.chat.data.messaging.SnapshotCacheStore
 import com.example.chat.data.messaging.TasksRepository
+import com.example.chat.data.messaging.SupabaseRpc
 import com.example.chat.data.services.CallHistoryService
+import com.example.chat.data.services.GbFeatureBackendService
 import com.example.chat.data.services.ChatMediaService
 import com.example.chat.data.services.PresenceService
 import com.example.chat.domain.models.CallDirection
@@ -27,6 +29,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -173,7 +176,7 @@ class ParityBehaviorTest {
         assertEquals(3, c.unreadCount)
         // Unknown enum falls back to the safe default, never crashes.
         assertEquals(EncryptionStatus.verificationNeeded, c.encryptionStatus)
-        assertEquals(3600, c.disappearingDuration?.seconds)
+        assertEquals(3600L, c.disappearingDuration?.seconds)
         val back = SnapshotCodec.conversationToJson(c)
         assertEquals(json["id"], back["id"])
         assertEquals("3600", back["disappearing_seconds"])
@@ -279,7 +282,10 @@ class ParityBehaviorTest {
         assertEquals("999 B", ChatMediaService.formatBytes(999))
         assertEquals("1.5 KB", ChatMediaService.formatBytes(1536))
         assertEquals("2.0 MB", ChatMediaService.formatBytes(2 * 1024 * 1024))
-        assertEquals("attachment", ChatMediaService.safeFileName("///"))
+        // Dart _safeFileName("///"): every char -> '_', collapsed to "_" (not
+        // empty), so the result is "_" - only a fully-empty cleaned string
+        // yields "attachment". Pinned from the Dart source, not assumed.
+        assertEquals("_", ChatMediaService.safeFileName("///"))
         assertEquals("a_b.jpg", ChatMediaService.safeFileName("a  b.jpg"))
         val longName = "x".repeat(200)
         assertEquals(120, ChatMediaService.safeFileName(longName).length)
@@ -310,4 +316,96 @@ class ParityBehaviorTest {
             publishableKey = "k",
             accessToken = { null },
         )
+
+    // ── gb_feature_backend_service.dart ──────────────────────────────────
+
+    private class FakeRpc(var result: Any? = null) : SupabaseRpc {
+        val calls = mutableListOf<Pair<String, Map<String, Any?>>>()
+        override suspend fun rpc(function: String, params: Map<String, Any?>): Any? {
+            calls.add(function to params)
+            return result
+        }
+    }
+
+    @Test
+    fun `dart _scope maps recipient filters to server scopes`() {
+        // gb_feature_backend_service.dart _scope: groups/group -> group,
+        // contacts/direct -> direct, everything else -> all (case-insensitive).
+        assertEquals("group", GbFeatureBackendService.scopeOf("Groups"))
+        assertEquals("group", GbFeatureBackendService.scopeOf("group"))
+        assertEquals("direct", GbFeatureBackendService.scopeOf("Contacts"))
+        assertEquals("direct", GbFeatureBackendService.scopeOf("direct"))
+        assertEquals("all", GbFeatureBackendService.scopeOf("All"))
+        assertEquals("all", GbFeatureBackendService.scopeOf("anything"))
+    }
+
+    @Test
+    fun `dart createPoll rejects fewer than two non-blank options`() {
+        val svc = GbFeatureBackendService(null, null) { null }
+        val ex = assertThrows(Exception::class.java) {
+            kotlinx.coroutines.runBlocking {
+                svc.createPoll("c1", "q?", listOf(" only ", "  "))
+            }
+        }
+        assertEquals("A poll requires at least two options.", ex.message)
+    }
+
+    @Test
+    fun `dart createAutoReplyRule falls back to local id when supabase unavailable`() = runTest {
+        // gb_feature_backend_service.dart: !_isSupabaseAvailable ->
+        // 'rule_<millisecondsSinceEpoch>' without touching auth.
+        val svc = GbFeatureBackendService(null, null) {
+            throw IllegalStateException("auth must not be consulted")
+        }
+        val id = svc.createAutoReplyRule("kw", "resp")
+        assertTrue(id.startsWith("rule_"))
+        assertTrue(id.removePrefix("rule_").toLong() > 0)
+    }
+
+    @Test
+    fun `dart synchronizeAutomation is a no-op when supabase unavailable`() = runTest {
+        val svc = GbFeatureBackendService(null, null) {
+            throw IllegalStateException("auth must not be consulted")
+        }
+        svc.synchronizeAutomation(
+            com.example.chat.domain.models.MessageAutomationPreferences(enableAutoReply = true),
+        )
+    }
+
+    @Test
+    fun `dart massSend coerces rpc result to int`() = runTest {
+        // gb_feature_backend_service.dart massSend: raw is int ? raw : int.tryParse(...) ?? 0
+        val rpc = FakeRpc(3)
+        assertEquals(3, GbFeatureBackendService(null, rpc) { "u" }.massSend(listOf("c1"), "hi"))
+        assertEquals(
+            7,
+            GbFeatureBackendService(null, FakeRpc("7")) { "u" }.massSend(listOf("c1"), "hi"),
+        )
+        assertEquals(
+            0,
+            GbFeatureBackendService(null, FakeRpc("garbage")) { "u" }.massSend(listOf("c1"), "hi"),
+        )
+    }
+
+    @Test
+    fun `dart getBlockedUsers returns empty for non-list rpc result`() = runTest {
+        val svc = GbFeatureBackendService(null, FakeRpc(mapOf("not" to "a list"))) { "u" }
+        assertTrue(svc.getBlockedUsers().isEmpty())
+    }
+
+    @Test
+    fun `dart blockUser sends exact rpc name and params`() = runTest {
+        val rpc = FakeRpc()
+        GbFeatureBackendService(null, rpc) { "u" }.blockUser("user-9")
+        assertEquals(listOf("block_user" to mapOf("p_user_id" to "user-9")), rpc.calls)
+    }
+
+    @Test
+    fun `dart DateTime parse toLocal tolerates Z and offset and rejects garbage`() {
+        val a = GbFeatureBackendService.parseToLocal("2026-10-25T08:47:16Z")
+        val b = GbFeatureBackendService.parseToLocal("2026-10-25T08:47:16.123456+00:00")
+        assertTrue(a != null && b != null)
+        assertEquals(a!!.toInstant().epochSecond, b!!.toInstant().epochSecond)
+        assertNull(GbFeatureBackendService.parseToLocal("not a date"))
+    }
 }
