@@ -24,17 +24,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
-      - uses: actions/cache@v4
+      # Rust cache: pruned target dir + cargo registry/bin, keyed on the
+      # mls-native manifests. The earlier actions/cache entry exceeded the
+      # per-cache size cap (3 ABI release targets), so saves failed and every
+      # run did a full ~3.5 min rebuild. rust-cache prunes before saving.
+      - uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/bin
-            ~/.cargo/registry
-            ~/.cargo/git
-            mls-native/target
-          key: ${{ runner.os }}-cargo-mls-${{ hashFiles('mls-native/Cargo.toml', 'mls-native/src/lib.rs', 'third_party/openmls_android/rust/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-mls-
+          workspaces: |
+            mls-native -> target
+          cache-on-failure: true
       - name: Install cargo-ndk
-        run: cargo install cargo-ndk --locked || true
+        run: command -v cargo-ndk >/dev/null || cargo install cargo-ndk --locked
       - name: Set Android NDK for cargo-ndk
         run: |
           NDK=$(ls -d "$ANDROID_HOME"/ndk/* | sort -V | tail -1)
