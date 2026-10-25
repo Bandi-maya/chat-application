@@ -57,7 +57,9 @@ jobs:
           APK=app/build/outputs/apk/debug/app-debug.apk
           if [ -f "$APK" ]; then
             echo "--- APK content check (model/native libs) ---"
-            unzip -l "$APK" | grep -i "face_landmarker\|\.task$\|libchaty\|\.so$" | head -30 || true
+            echo "--- model assets ---"
+            unzip -l "$APK" | grep -i "face_landmarker\|\.task$\|\.tflite$" || echo "NO MODEL ASSET FOUND"
+            unzip -l "$APK" | grep -i "libchaty\|libmediapipe" || true
             BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
             echo "--- badging ---"
             "$BT/aapt2" dump badging "$APK" 2>/dev/null | grep -E "^package:|sdkVersion|targetSdk" || true
@@ -113,10 +115,7 @@ jobs:
           target: default
           arch: x86_64
           profile: pixel_6
-          script: |
-            gradle :app:connectedDebugAndroidTest --no-daemon; GRADLE_RC=$?
-            adb pull /sdcard/Android/data/com.example.chat/files/screenshots screenshots || true
-            exit $GRADLE_RC
+          script: bash ci/run-smoke.sh
       - name: Upload UI pixel proof
         uses: actions/upload-artifact@v4
         if: always()
