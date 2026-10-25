@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
  *  Chats home, conversation, register, forgot-password and organization
  *  registration destinations land in their own parity slices; the register /
  *  forgot-password / org buttons route to honest WIP stubs until then. */
-private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home, ChatDetail }
+private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home, ChatDetail, Security }
 
 @Composable
 fun AppRoot() {
@@ -52,6 +52,53 @@ fun AppRoot() {
         androidx.compose.runtime.LaunchedEffect(route) {
             // Dart _scheduleInitialAppLockIfNeeded on reaching the authenticated shell.
             if (route == AuthRoute.Home) ServiceLocator.appLock.scheduleInitialIfNeeded()
+        }
+        var promptPending by remember { mutableStateOf(false) }
+        var showLockPrompt by remember { mutableStateOf(false) }
+        // Dart _handleSecurityPreferenceChanged: disabling app lock clears pending lock state.
+        androidx.compose.runtime.DisposableEffect(Unit) {
+            val prefListener: () -> Unit = {
+                if (!ServiceLocator.preferencesController.security.isAppLockEnabled) {
+                    ServiceLocator.appLock.onLockDisabled()
+                }
+            }
+            ServiceLocator.preferencesController.addListener(prefListener)
+            onDispose { ServiceLocator.preferencesController.removeListener(prefListener) }
+        }
+        // Dart _schedulePostLoginAppLockPrompt: 650ms after the shell appears post-login,
+        // offer app-lock setup unless a usable lock method is already configured.
+        androidx.compose.runtime.LaunchedEffect(route, promptPending) {
+            if (promptPending && route == AuthRoute.Home) {
+                kotlinx.coroutines.delay(650)
+                promptPending = false
+                val sec = ServiceLocator.preferencesController.security
+                val ready = sec.isAppLockEnabled &&
+                    com.example.chat.data.services.ProtectedResourceGate.isMethodConfigured(
+                        ServiceLocator.localLockService, sec.lockMethod,
+                    )
+                if (!ready && ServiceLocator.apiBackend.isAuthenticated) showLockPrompt = true
+            }
+        }
+        if (showLockPrompt) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showLockPrompt = false },
+                title = { androidx.compose.material3.Text("Enable App Lock?") },
+                text = {
+                    androidx.compose.material3.Text(
+                        "You can protect Chaty with biometrics, device lock, PIN, pattern, or password. Setup is optional and can be changed anytime in Settings.",
+                    )
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = { showLockPrompt = false }) {
+                        androidx.compose.material3.Text("Not now")
+                    }
+                },
+                confirmButton = {
+                    androidx.compose.material3.Button(onClick = { showLockPrompt = false; route = AuthRoute.Security }) {
+                        androidx.compose.material3.Text("Open settings")
+                    }
+                },
+            )
         }
         Box(Modifier.fillMaxSize()) {
         when (route) {
@@ -83,6 +130,7 @@ fun AppRoot() {
                 onBack = { route = AuthRoute.Welcome },
                 onLoggedIn = { userId ->
                     ServiceLocator.appLock.onSignedIn()
+                    promptPending = true
                     // Mirrors login_screen.dart: setStoredUserId, then
                     // pushAndRemoveUntil(MainNavigationShell). The chats-home
                     // slice replaces the Home stub destination.
@@ -107,6 +155,7 @@ fun AppRoot() {
                 onBack = { route = AuthRoute.Welcome },
                 onRegistered = { userId, _ ->
                     ServiceLocator.appLock.onSignedIn()
+                    promptPending = true
                     ServiceLocator.appScope.launch {
                         ServiceLocator.preferencesStorage.setStoredUserId(userId)
                     }
@@ -145,6 +194,7 @@ fun AppRoot() {
                 onBack = { route = AuthRoute.Login },
                 onRegistered = { userId, _, _ ->
                     ServiceLocator.appLock.onSignedIn()
+                    promptPending = true
                     ServiceLocator.appScope.launch {
                         ServiceLocator.preferencesStorage.setStoredUserId(userId)
                     }
@@ -187,6 +237,12 @@ fun AppRoot() {
                     },
                 )
             }
+            AuthRoute.Security -> com.example.chat.ui.settings.security.SecurityCenterScreen(
+                preferences = ServiceLocator.preferencesController,
+                lockService = ServiceLocator.localLockService,
+                onBack = { route = AuthRoute.Home },
+                onOpenLockedChats = { },
+            )
             AuthRoute.ChatDetail -> run {
                 val conversation = selectedConversation
                 if (conversation == null) {
