@@ -166,6 +166,63 @@ class ApiBackendService(context: Context) {
         }
     }
 
+    /** Dart editMessage: local update first (preview if latest), then PUT. */
+    suspend fun editMessage(chatId: String, messageId: String, newText: String) {
+        synchronized(chatLock) {
+            val list = _messages[chatId]
+            if (list != null) {
+                val idx = list.indexOfFirst { it.id == messageId }
+                if (idx != -1) {
+                    list[idx] = list[idx].copy(text = newText, editedAt = Instant.now())
+                    if (idx == list.size - 1) {
+                        val convIdx = _conversations.indexOfFirst { it.id == chatId }
+                        if (convIdx != -1) {
+                            _conversations[convIdx] = _conversations[convIdx].copy(lastMessageText = newText)
+                        }
+                    }
+                }
+            }
+        }
+        notifyChatListeners()
+        chat.editMessage(chatId, messageId, newText)
+    }
+
+    /** Dart deleteMessage: local removal + preview recompute, then DELETE. */
+    suspend fun deleteMessage(chatId: String, messageId: String) {
+        synchronized(chatLock) {
+            val list = _messages[chatId]
+            if (list != null) {
+                list.removeAll { it.id == messageId }
+                val convIdx = _conversations.indexOfFirst { it.id == chatId }
+                if (convIdx != -1) {
+                    val lastMsg = list.lastOrNull()
+                    _conversations[convIdx] = _conversations[convIdx].copy(
+                        lastMessageText = if (lastMsg != null) {
+                            if (lastMsg.text.isNotEmpty()) lastMsg.text
+                            else if (lastMsg.type == MessageType.image) "📷 Photo" else "📎 Attachment"
+                        } else "",
+                        lastMessageTime = lastMsg?.createdAt ?: _conversations[convIdx].lastMessageTime,
+                    )
+                }
+            }
+        }
+        notifyChatListeners()
+        chat.deleteMessage(chatId, messageId)
+    }
+
+    /** Dart clearConversationMessages: local clear + preview, then DELETE all. */
+    suspend fun clearConversationMessages(chatId: String) {
+        synchronized(chatLock) {
+            _messages[chatId] = mutableListOf()
+            val convIdx = _conversations.indexOfFirst { it.id == chatId }
+            if (convIdx != -1) {
+                _conversations[convIdx] = _conversations[convIdx].copy(lastMessageText = "")
+            }
+        }
+        notifyChatListeners()
+        chat.clearMessages(chatId)
+    }
+
     private suspend fun syncActiveRoomMessages(chatId: String) {
         val remote = chat.listMessages(chatId) ?: return
         var changed = false
