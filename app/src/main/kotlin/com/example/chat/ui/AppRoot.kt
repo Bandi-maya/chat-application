@@ -60,6 +60,10 @@ fun AppRoot() {
     @Suppress("UNUSED_EXPRESSION") themeRevision
     ChatyTheme(config = themeController.globalTheme) {
         var route by remember { mutableStateOf(AuthRoute.Splash) }
+        // Dart pre-auth Navigator stack: Register is pushed from Welcome or Login, RegisterOrganization from
+        // Login or Register; pop returns to whichever pushed it.
+        var registerOrigin by remember { mutableStateOf(AuthRoute.Welcome) }
+        var orgOrigin by remember { mutableStateOf(AuthRoute.Login) }
         var selectedConversation by remember { mutableStateOf<com.example.chat.domain.models.Conversation?>(null) }
         var planOrgId by remember { mutableStateOf("") }
         var planOrgName by remember { mutableStateOf("") }
@@ -150,7 +154,9 @@ fun AppRoot() {
                 route == AuthRoute.ForgotPassword || route == AuthRoute.RegisterOrganization,
         ) {
             route = when (route) {
-                AuthRoute.ForgotPassword, AuthRoute.RegisterOrganization -> AuthRoute.Login
+                AuthRoute.ForgotPassword -> AuthRoute.Login
+                AuthRoute.RegisterOrganization -> orgOrigin
+                AuthRoute.Register -> registerOrigin
                 else -> AuthRoute.Welcome
             }
         }
@@ -177,7 +183,7 @@ fun AppRoot() {
             )
             AuthRoute.Welcome -> WelcomeScreen(
                 onLogin = { route = AuthRoute.Login },
-                onRegister = { route = AuthRoute.Register },
+                onRegister = { registerOrigin = AuthRoute.Welcome; route = AuthRoute.Register },
             )
             AuthRoute.Login -> LoginScreen(
                 onBack = { route = AuthRoute.Welcome },
@@ -193,8 +199,8 @@ fun AppRoot() {
                     route = AuthRoute.Home
                 },
                 onForgotPassword = { route = AuthRoute.ForgotPassword },
-                onRegister = { route = AuthRoute.Register },
-                onRegisterOrganization = { route = AuthRoute.RegisterOrganization },
+                onRegister = { registerOrigin = AuthRoute.Login; route = AuthRoute.Register },
+                onRegisterOrganization = { orgOrigin = AuthRoute.Login; route = AuthRoute.RegisterOrganization },
                 loadSavedTenant = {
                     ServiceLocator.apiBackend.config.getSavedTenantId() to
                         ServiceLocator.apiBackend.config.isUsingDefaultTenant
@@ -205,7 +211,7 @@ fun AppRoot() {
                 },
             )
             AuthRoute.Register -> com.example.chat.ui.auth.RegisterScreen(
-                onBack = { route = AuthRoute.Welcome },
+                onBack = { route = registerOrigin },
                 onRegistered = { userId, _ ->
                     ServiceLocator.appLock.onSignedIn()
                     promptPending = true
@@ -214,7 +220,7 @@ fun AppRoot() {
                     }
                     route = AuthRoute.Home
                 },
-                onRegisterOrganization = { route = AuthRoute.RegisterOrganization },
+                onRegisterOrganization = { orgOrigin = AuthRoute.Register; route = AuthRoute.RegisterOrganization },
                 loadSavedTenant = {
                     ServiceLocator.apiBackend.config.getSavedTenantId() to
                         ServiceLocator.apiBackend.config.isUsingDefaultTenant
@@ -244,7 +250,7 @@ fun AppRoot() {
                 sendRecovery = { email -> ServiceLocator.apiBackend.forgotPassword(email) },
             )
             AuthRoute.RegisterOrganization -> com.example.chat.ui.auth.RegisterOrganizationScreen(
-                onBack = { route = AuthRoute.Login },
+                onBack = { route = orgOrigin },
                 onRegistered = { userId, regOrgId, regOrgName ->
                     planOrgId = regOrgId; planOrgName = regOrgName; planIsNew = true
                     ServiceLocator.appLock.onSignedIn()
