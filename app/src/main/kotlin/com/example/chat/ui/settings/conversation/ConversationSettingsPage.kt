@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.chat.core.preferences.ChatyPreferencesController
+import com.example.chat.ui.kit.ChatyHapticsPort
 import com.example.chat.ui.kit.GbChevronRow
 import com.example.chat.ui.kit.GbColorRow
 import com.example.chat.ui.kit.GbPanelCard
@@ -68,18 +69,21 @@ fun ConversationSettingsPage(
         onDispose { preferences.removeListener(l) }
     }
     val pickers = rememberGbPickers()
+    val view = androidx.compose.ui.platform.LocalView.current
+    // Dart _openSubScreen: HapticFeedback.selectionClick() before pushing (on top of the row's own selectionClick).
+    fun openSub(go: () -> Unit) { ChatyHapticsPort.selection(view); go() }
     @Suppress("UNUSED_EXPRESSION") version
     val c = preferences.conversation
 
     GbScreenScaffold(title = "Conversation Screen", onBack = onBack) {
         GbPanelCard {
-            GbSubpageRow(Icons.Outlined.TableChart, "Action Bar", onOpenActionBar)
+            GbSubpageRow(Icons.Outlined.TableChart, "Action Bar") { openSub(onOpenActionBar) }
             GbRowDivider()
-            GbSubpageRow(Icons.Rounded.ChatBubbleOutline, "Bubble And Ticks", onOpenBubbleAndTicks)
+            GbSubpageRow(Icons.Rounded.ChatBubbleOutline, "Bubble And Ticks") { openSub(onOpenBubbleAndTicks) }
             GbRowDivider()
-            GbSubpageRow(Icons.Rounded.EditNote, "Conversation Entry style", onOpenEntryStyle)
+            GbSubpageRow(Icons.Rounded.EditNote, "Conversation Entry style") { openSub(onOpenEntryStyle) }
             GbRowDivider()
-            GbSubpageRow(Icons.Rounded.MoreHoriz, "More options", onOpenMoreOptions)
+            GbSubpageRow(Icons.Rounded.MoreHoriz, "More options") { openSub(onOpenMoreOptions) }
         }
         Spacer(Modifier.height(16.dp))
         GbPanelCard {
