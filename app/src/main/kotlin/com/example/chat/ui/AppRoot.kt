@@ -56,7 +56,10 @@ fun AppRoot() {
                     } catch (_: Exception) {
                         // Authentication remains the source of truth.
                     }
-                    ServiceLocator.sessionManager.currentUserId() != null
+                    // Facade precedence (backend_service.dart): a live REST
+                    // (ApiBackendService) session also counts as authenticated.
+                    ServiceLocator.sessionManager.currentUserId() != null ||
+                        ServiceLocator.apiBackend.isAuthenticated
                 },
                 onRoute = { isAuthed ->
                     // Dart pushes MainNavigationShell when authenticated; the
@@ -82,8 +85,12 @@ fun AppRoot() {
                 onForgotPassword = { route = AuthRoute.ForgotPassword },
                 onRegister = { route = AuthRoute.Register },
                 onRegisterOrganization = { route = AuthRoute.RegisterOrganization },
-                login = { identifier, password ->
-                    val user = ServiceLocator.authRepository.login(identifier, password)
+                loadSavedTenant = {
+                    ServiceLocator.apiBackend.config.getSavedTenantId() to
+                        ServiceLocator.apiBackend.config.isUsingDefaultTenant
+                },
+                login = { identifier, password, tenant, isDefaultTenant ->
+                    val user = ServiceLocator.apiBackend.login(identifier, password, tenant, isDefaultTenant)
                     user.id
                 },
             )
@@ -96,29 +103,33 @@ fun AppRoot() {
                     route = AuthRoute.Home
                 },
                 onRegisterOrganization = { route = AuthRoute.RegisterOrganization },
-                register = { email, username, password ->
-                    // The Dart register screen collects email/username/password only;
-                    // the public username doubles as the display identity.
-                    val user = ServiceLocator.authRepository.registerUser(
-                        displayName = username,
-                        username = username,
-                        password = password,
-                        email = email,
-                    )
+                loadSavedTenant = {
+                    ServiceLocator.apiBackend.config.getSavedTenantId() to
+                        ServiceLocator.apiBackend.config.isUsingDefaultTenant
+                },
+                register = { email, username, password, tenant, isDefaultTenant ->
+                    // Dart _handleRegister: apply the tenant selection, then
+                    // ApiBackendService.register sends only the three fields;
+                    // the display name arrives in the server response.
+                    if (isDefaultTenant) {
+                        ServiceLocator.apiBackend.config.setTenantId(null, useDefault = true)
+                    } else if (!tenant.isNullOrBlank()) {
+                        ServiceLocator.apiBackend.config.setTenantId(tenant, useDefault = false)
+                    }
+                    val user = ServiceLocator.apiBackend.register(email, username, password)
                     user.id to user.displayName
                 },
-                // ApiBackendService (REST) is being ported; until the Android
-                // transport wiring lands, the probe reports unavailability and
-                // the thrown error keeps org-mode submission blocked safely.
-                checkOrganization = { _ ->
-                    throw Exception(
-                        "Organization workspaces are not available in this build yet. Use Normal / Default mode.",
-                    )
+                checkOrganization = { workspace ->
+                    val data = ServiceLocator.apiBackend.checkOrganization(workspace)
+                    val (name, allow) = com.example.chat.data.api.ApiAuthClient.orgCheckToBanner(data, workspace)
+                    com.example.chat.ui.auth.OrgCheckResult(name, allow)
                 },
             )
             AuthRoute.ForgotPassword -> com.example.chat.ui.auth.ForgotPasswordScreen(
                 onBack = { route = AuthRoute.Login },
-                sendRecovery = { email -> ServiceLocator.authRepository.resetPassword(email) },
+                // Dart prefers ApiBackendService.forgotPassword when registered
+                // (it is, in locator) over the Supabase path.
+                sendRecovery = { email -> ServiceLocator.apiBackend.forgotPassword(email) },
             )
             AuthRoute.RegisterOrganization -> AuthWipStub("Register an Organization", onBack = { route = AuthRoute.Login })
             AuthRoute.Home -> AuthWipStub("Chats home arrives in the next slice", onBack = { route = AuthRoute.Welcome })
