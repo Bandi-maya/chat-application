@@ -25,6 +25,7 @@ import com.example.chat.domain.models.DeliveryState
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 
 /** Exact port of lib/ui/core/ticks/delivery_status_icon.dart +
  *  delivery_status_icon_painter.dart: every selectable tick style, preserving
@@ -170,7 +171,7 @@ private fun DrawScope.drawDeliveryStatus(
             drawCircle(activeColor, radius = 1.2f, center = Offset(w * 0.65f, h * 0.4f))
             drawArc(
                 color = activeColor,
-                startAngle = (0.2 * DEG),
+                startAngle = (0.2 * DEG).toFloat(),
                 sweepAngle = ((Math.PI - 0.4) * DEG).toFloat(),
                 useCenter = false,
                 topLeft = Offset(w / 2 - 4, h * 0.45f - 4),
