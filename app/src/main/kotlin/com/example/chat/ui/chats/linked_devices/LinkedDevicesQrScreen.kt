@@ -38,7 +38,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -164,16 +163,19 @@ fun LinkedDevicesQrScreen(
                     Text(title, color = colors.foreground, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 }
                 if (tabCount > 0) {
+                    // Dart TabBar(indicatorColor: primary, labelColor: primary,
+                    // unselectedLabelColor: onSurface 0.55). PrimaryTabRow's
+                    // DEFAULT indicator is the supported way to land that exact
+                    // visual: it positions the bar under the selected tab
+                    // (TabRowScope.tabIndicatorOffset internally) and colors it
+                    // with MaterialTheme.colorScheme.primary, which ChatyTheme
+                    // maps to the theme accent. A custom indicator slot broke
+                    // the build 22 compile (tabIndicatorOffset is
+                    // TabRowScope-scoped, not a top-level Modifier import).
                     PrimaryTabRow(
                         selectedTabIndex = selectedTab,
                         containerColor = colors.background,
                         contentColor = colors.primary,
-                        indicator = {
-                            TabRowDefaults.PrimaryIndicator(
-                                modifier = Modifier,
-                                color = colors.primary,
-                            )
-                        },
                     ) {
                         if (!qrOnly) {
                             Tab(
