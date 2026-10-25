@@ -38,7 +38,7 @@ import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.FormatListBulleted
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Input
-import androidx.compose.material.icons.rounded.LockOutline
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.MicNone
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PersonOutline
@@ -75,6 +75,8 @@ import com.example.chat.core.templates.TemplateRuntime
 import com.example.chat.ui.kit.ChatyAppBar
 import com.example.chat.ui.theme.LocalAppColors
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ChatBubbleOutline
 
 /** Exact port of Dart TemplateComponentType.icon for THIS screen
  *  (component_override_screen.dart reads component.icon). Private and uniquely
@@ -106,8 +108,8 @@ private fun destinationIcon(id: String): ImageVector = when (id) {
 
 /** Dart: tmpl.navigation.centerActionIcon ?? Icons.camera_alt_rounded. */
 private fun centerActionIcon(iconName: String?): ImageVector = when (iconName) {
-    null, "camera", "camera_alt_rounded" -> RoundedCameraAlt
-    else -> RoundedCameraAlt
+    null, "camera", "camera_alt_rounded" -> Icons.Rounded.CameraAlt
+    else -> Icons.Rounded.CameraAlt
 }
 
 /** Observes a listener-style controller (AppearanceVariantController /
@@ -460,7 +462,7 @@ private fun ComposerSnippet(tmpl: ChatyTemplateDefinition) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (composer.showVoiceLock) {
                             Icon(
-                                Icons.Rounded.LockOutline,
+                                Icons.Rounded.Lock,
                                 contentDescription = null,
                                 tint = colors.foregroundSecondary,
                                 modifier = Modifier.size(12.dp),
