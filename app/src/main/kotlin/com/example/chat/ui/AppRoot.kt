@@ -293,6 +293,7 @@ fun AppRoot() {
                 var pushedMessageManagement by remember { mutableStateOf(false) }
                 var pushedAccount by remember { mutableStateOf(false) }
                 var pushedUniversalAppearance by remember { mutableStateOf(false) }
+                var pushedComponentStyles by remember { mutableStateOf(false) }
                 var pushedSettingsSearch by remember { mutableStateOf(false) }
                 val settingsNavigate: (com.example.chat.ui.settings.SettingsDestination) -> Unit = { dest ->
                     if (dest == com.example.chat.ui.settings.SettingsDestination.Security) {
@@ -607,6 +608,7 @@ fun AppRoot() {
                                     "/settings/devices" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.LinkedDevices)
                                     "/settings/account" -> pushedAccount = true
                                     "/settings/universal_appearance" -> pushedUniversalAppearance = true
+                                    "/settings/customization" -> pushedComponentStyles = true
                                     // customization, app_icon: no host yet.
                                     else -> settingsNotice = def.canonicalRoute
                                 }
@@ -619,6 +621,18 @@ fun AppRoot() {
                     // Originating settings route stays under this overlay (Dart Navigator.push).
                     androidx.activity.compose.BackHandler { pushedMessageManagement = false }
                     Box(Modifier.fillMaxSize()) { MessageManagementHost(onBack = { pushedMessageManagement = false }) }
+                }
+                if (pushedComponentStyles) {
+                    androidx.activity.compose.BackHandler { pushedComponentStyles = false }
+                    val customization = com.example.chat.ui.core.customization.rememberLoadedCustomizationController()
+                    val overlayController = com.example.chat.ui.core.components.overlays.rememberChatyOverlayController()
+                    Box(Modifier.fillMaxSize()) {
+                        com.example.chat.ui.settings.appearance.ComponentStylesScreen(
+                            controller = customization,
+                            overlayController = overlayController,
+                            onBack = { pushedComponentStyles = false },
+                        )
+                    }
                 }
                 if (pushedUniversalAppearance) {
                     androidx.activity.compose.BackHandler { pushedUniversalAppearance = false }
