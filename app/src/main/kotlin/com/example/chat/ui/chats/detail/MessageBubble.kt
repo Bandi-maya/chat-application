@@ -1,14 +1,18 @@
 package com.example.chat.ui.chats.detail
 
+import androidx.compose.animation.core.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -25,7 +29,11 @@ import androidx.compose.material.icons.outlined.ImageNotSupported
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Checklist
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Reply
@@ -54,12 +62,16 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.chat.core.theme.ThemeConfig
 import com.example.chat.core.theme.argbWithAlpha
 import com.example.chat.domain.models.ChatMessage
+import com.example.chat.domain.models.ChatTask
+import com.example.chat.domain.models.TaskPriority
+import com.example.chat.domain.models.TaskStatus
 import com.example.chat.domain.models.DeliveryState
 import com.example.chat.domain.models.MessageAttachment
 import com.example.chat.domain.models.MessageReaction
@@ -142,6 +154,10 @@ fun ChatMessageBubble(
     onVoicePlay: ((MessageAttachment) -> Unit)? = null,
     onViewOnceOpen: (() -> Unit)? = null,
     onRetry: (() -> Unit)? = null,
+    task: ChatTask? = null,
+    onTaskTap: (() -> Unit)? = null,
+    onTaskToggle: (() -> Unit)? = null,
+    onTaskMenu: ((Rect) -> Unit)? = null,
 ) {
     val bubbleBg = if (isMe) {
         colorOverrides?.rightBubbleColor ?: theme.outgoingBubbleColor
@@ -515,6 +531,17 @@ fun ChatMessageBubble(
                                 accentColor = Color(theme.accentColor),
                             )
                         }
+                        if (message.type == MessageType.taskCard) {
+                            TaskCardChip(
+                                message = message,
+                                task = task,
+                                textColor = Color(textColor),
+                                theme = theme,
+                                onTaskTap = onTaskTap,
+                                onTaskToggle = onTaskToggle,
+                                onTaskMenu = onTaskMenu,
+                            )
+                        }
                     }
                     if (message.type != MessageType.taskCard &&
                         message.type != MessageType.location &&
@@ -573,6 +600,197 @@ fun ChatMessageBubble(
 
 /** Ticks must contrast with the ACTUAL bubble fill they sit on (Dart:
  *  ThemeData.estimateBrightnessForColor(surface)). */
+/** Exact port of the task-card block in lib/features/messages/message_bubble.dart
+ *  (message.type == MessageType.taskCard, lines ~586-918). Dart parity notes:
+ *  - Container margin vertical 4 / padding 12 / radius 12, 1.2px state border.
+ *  - Toggle circle: Dart AnimatedContainer 200ms -> animateColorAsState(tween(200)).
+ *  - Dart strikethrough decorationColor (textColor a0.6) has no Compose TextStyle
+ *    equivalent; LineThrough renders in text color (framework limitation).
+ *  - Menu anchor = chip bounds in window px (Dart: taskCtx RenderBox localToGlobal). */
+@Composable
+private fun TaskCardChip(
+    message: ChatMessage,
+    task: ChatTask?,
+    textColor: Color,
+    theme: ThemeConfig,
+    onTaskTap: (() -> Unit)?,
+    onTaskToggle: (() -> Unit)?,
+    onTaskMenu: ((Rect) -> Unit)?,
+) {
+    val isCompleted = task?.status == TaskStatus.completed
+    val isBlocked = task?.status == TaskStatus.blocked
+    val isOverdue = task?.isOverdue == true
+    var chipRect by remember { mutableStateOf(Rect.Zero) }
+
+    val toggleBg by animateColorAsState(
+        targetValue = if (isCompleted) Color(theme.successColor) else Color.Transparent,
+        animationSpec = tween(durationMillis = 200),
+        label = "taskToggleBg",
+    )
+    val toggleBorder by animateColorAsState(
+        targetValue = if (isCompleted) {
+            Color(theme.successColor)
+        } else if (isOverdue) {
+            Color(theme.dangerColor)
+        } else {
+            Color(theme.accentColor)
+        },
+        animationSpec = tween(durationMillis = 200),
+        label = "taskToggleBorder",
+    )
+
+    Column(
+        modifier = Modifier
+            .padding(vertical = 4.dp)
+            .onGloballyPositioned { chipRect = it.boundsInWindow() }
+            .background(
+                color = if (isCompleted) {
+                    Color.Black.copy(alpha = 0.1f)
+                } else {
+                    Color(theme.surfaceColor).copy(alpha = 0.85f)
+                },
+                shape = RoundedCornerShape(12.dp),
+            )
+            .border(
+                width = 1.2.dp,
+                color = if (isCompleted) {
+                    Color(theme.successColor).copy(alpha = 0.4f)
+                } else if (isBlocked) {
+                    Color(theme.dangerColor).copy(alpha = 0.5f)
+                } else if (isOverdue) {
+                    Color(theme.dangerColor).copy(alpha = 0.4f)
+                } else {
+                    Color(theme.accentColor).copy(alpha = 0.35f)
+                },
+                shape = RoundedCornerShape(12.dp),
+            )
+            .padding(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .background(toggleBg, CircleShape)
+                    .border(2.dp, toggleBorder, CircleShape)
+                    .then(
+                        if (onTaskToggle != null) {
+                            Modifier.clickable { onTaskToggle() }
+                        } else {
+                            Modifier
+                        },
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (isCompleted) {
+                    Icon(
+                        Icons.Rounded.Check,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text = task?.title ?: message.text,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                style = TextStyle(
+                    color = textColor,
+                    fontWeight = FontWeight.W700,
+                    fontSize = (14 * theme.fontScale).sp,
+                    textDecoration = if (isCompleted) TextDecoration.LineThrough else null,
+                ),
+                modifier = Modifier
+                    .weight(1f)
+                    .then(
+                        if (onTaskTap != null) {
+                            Modifier.clickable { onTaskTap() }
+                        } else {
+                            Modifier
+                        },
+                    ),
+            )
+            if (onTaskMenu != null) {
+                Icon(
+                    Icons.Rounded.MoreVert,
+                    contentDescription = null,
+                    tint = textColor.copy(alpha = 0.6f),
+                    modifier = Modifier
+                        .padding(start = 4.dp)
+                        .size(18.dp)
+                        .clickable { onTaskMenu(chipRect) },
+                )
+            }
+        }
+        if (task != null) {
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val priorityColor = when (task.priority) {
+                    TaskPriority.urgent -> Color(theme.dangerColor)
+                    TaskPriority.high -> Color(0xFFFF9800)
+                    else -> Color(0xFF2196F3)
+                }
+                Text(
+                    text = task.priority.name.uppercase(),
+                    style = TextStyle(
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.W700,
+                        color = priorityColor,
+                    ),
+                    modifier = Modifier
+                        .background(priorityColor.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Icon(
+                    Icons.Rounded.Schedule,
+                    contentDescription = null,
+                    tint = if (isOverdue) Color(theme.dangerColor) else textColor.copy(alpha = 0.65f),
+                    modifier = Modifier.size(12.dp),
+                )
+                Spacer(Modifier.width(3.dp))
+                Text(
+                    task.dueRelativeText,
+                    style = TextStyle(
+                        fontSize = 11.sp,
+                        fontWeight = if (isOverdue) FontWeight.W700 else FontWeight.W500,
+                        color = if (isOverdue) Color(theme.dangerColor) else textColor.copy(alpha = 0.75f),
+                    ),
+                )
+                if (task.checklistItems.isNotEmpty()) {
+                    Spacer(Modifier.width(8.dp))
+                    Icon(
+                        Icons.Rounded.Checklist,
+                        contentDescription = null,
+                        tint = textColor.copy(alpha = 0.65f),
+                        modifier = Modifier.size(13.dp),
+                    )
+                    Spacer(Modifier.width(3.dp))
+                    Text(
+                        "${task.completedChecklistCount}/${task.checklistItems.size}",
+                        style = TextStyle(
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.W600,
+                            color = textColor.copy(alpha = 0.75f),
+                        ),
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "View details →",
+            style = TextStyle(
+                color = Color(theme.accentColor),
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.W600,
+            ),
+            modifier = if (onTaskTap != null) Modifier.clickable { onTaskTap() } else Modifier,
+        )
+    }
+}
+
 private fun tickUnreadColor(surface: Color, secondaryText: Color): Color =
     if (surface.luminance() < 0.5f) Color(0xB3FFFFFF) else secondaryText
 
