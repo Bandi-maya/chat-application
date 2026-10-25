@@ -1,4 +1,4 @@
-@OptIn(ExperimentalFoundationApi::class)
+@file:OptIn(ExperimentalFoundationApi::class)
 package com.example.chat.ui.chats.home
 
 import androidx.compose.foundation.background
@@ -384,7 +384,7 @@ fun SelectionHomeAppBar(
         Spacer(Modifier.weight(1f))
         IconButton(onClick = onTogglePin) {
             Icon(
-                if (anyUnpinned) Icons.Outlined.PushPin else Icons.Rounded.PushPin,
+                if (anyUnpinned) Icons.Outlined.OutlinedPushPin else Icons.Rounded.PushPin,
                 contentDescription = if (anyUnpinned) "Pin" else "Unpin",
                 tint = Color(theme.primaryTextColor),
             )
