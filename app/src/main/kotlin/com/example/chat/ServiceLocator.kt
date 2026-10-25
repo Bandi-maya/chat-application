@@ -175,12 +175,12 @@ object ServiceLocator {
     }
 
     /** locator.dart HiddenVaultService / HiddenVaultController singletons.
-     *  Biometric bridge is not provided (no androidx.biometric wiring yet), so
-     *  vault unlock is PIN-only until that bridge lands. */
+     *  Biometric unlock uses LocalLockService.authenticateBiometric. */
     val hiddenVaultService: com.example.chat.ui.vault.HiddenVaultService by lazy {
         com.example.chat.ui.vault.HiddenVaultService(
             lockService = localLockService,
             secureStorage = secureStore,
+            authenticateBiometric = { reason -> localLockService.authenticateBiometric(reason) },
         )
     }
     val hiddenVaultController: com.example.chat.ui.vault.HiddenVaultController by lazy {
