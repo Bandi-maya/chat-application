@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +48,12 @@ fun AppRoot() {
     ChatyTheme(config = themeController.globalTheme) {
         var route by remember { mutableStateOf(AuthRoute.Splash) }
         var selectedConversation by remember { mutableStateOf<com.example.chat.domain.models.Conversation?>(null) }
+        val lockRequired by ServiceLocator.appLock.lockRequired.collectAsState()
+        androidx.compose.runtime.LaunchedEffect(route) {
+            // Dart _scheduleInitialAppLockIfNeeded on reaching the authenticated shell.
+            if (route == AuthRoute.Home) ServiceLocator.appLock.scheduleInitialIfNeeded()
+        }
+        Box(Modifier.fillMaxSize()) {
         when (route) {
             AuthRoute.Splash -> SplashScreen(
                 routeToHome = {
@@ -75,6 +82,7 @@ fun AppRoot() {
             AuthRoute.Login -> LoginScreen(
                 onBack = { route = AuthRoute.Welcome },
                 onLoggedIn = { userId ->
+                    ServiceLocator.appLock.onSignedIn()
                     // Mirrors login_screen.dart: setStoredUserId, then
                     // pushAndRemoveUntil(MainNavigationShell). The chats-home
                     // slice replaces the Home stub destination.
@@ -98,6 +106,7 @@ fun AppRoot() {
             AuthRoute.Register -> com.example.chat.ui.auth.RegisterScreen(
                 onBack = { route = AuthRoute.Welcome },
                 onRegistered = { userId, _ ->
+                    ServiceLocator.appLock.onSignedIn()
                     ServiceLocator.appScope.launch {
                         ServiceLocator.preferencesStorage.setStoredUserId(userId)
                     }
@@ -135,6 +144,7 @@ fun AppRoot() {
             AuthRoute.RegisterOrganization -> com.example.chat.ui.auth.RegisterOrganizationScreen(
                 onBack = { route = AuthRoute.Login },
                 onRegistered = { userId, _, _ ->
+                    ServiceLocator.appLock.onSignedIn()
                     ServiceLocator.appScope.launch {
                         ServiceLocator.preferencesStorage.setStoredUserId(userId)
                     }
@@ -204,6 +214,17 @@ fun AppRoot() {
                     )
                 }
             }
+        }
+        // Dart shouldShowLock: authenticated && lock enabled && _appLockRequired.
+        if (lockRequired && ServiceLocator.apiBackend.isAuthenticated &&
+            ServiceLocator.preferencesController.security.isAppLockEnabled
+        ) {
+            com.example.chat.ui.settings.security.AppLockOverlay(
+                preferences = ServiceLocator.preferencesController,
+                lockService = ServiceLocator.localLockService,
+                onUnlocked = { ServiceLocator.appLock.onUnlocked() },
+            )
+        }
         }
     }
 }
