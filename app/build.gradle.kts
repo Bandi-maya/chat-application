@@ -63,6 +63,8 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.security:security-crypto:1.1.0-alpha07")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // Required by the uniffi-generated Kotlin bindings (JNA native calls).
+    implementation("net.java.dev.jna:jna:5.14.0@aar")
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-kotlinx-serialization:2.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
@@ -75,7 +77,7 @@ dependencies {
     testImplementation("org.json:json:20241224")
 }
 
-// ── MLS native binding (mls-native UniFFI shim over the repo-owned OpenMLS
+// ââ MLS native binding (mls-native UniFFI shim over the repo-owned OpenMLS
 // Rust crate in third_party/openmls_android/rust). Requires cargo-ndk and the
 // Android NDK; the CI workflow installs both. Local builds without Rust can
 // skip with -PskipMlsNative (the app then fails closed at runtime, by design).
