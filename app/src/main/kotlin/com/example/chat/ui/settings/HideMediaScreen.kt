@@ -25,7 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.GifBox
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.RestartAlt
-import androidx.compose.material.icons.rounded.VideoCollection
+import androidx.compose.material.icons.rounded.VideoLibrary
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.TextButton
@@ -124,7 +124,7 @@ fun HideMediaScreen(
                         },
                     )
                     GbSwitchTile(
-                        icon = Icons.Rounded.VideoCollection, title = "Videos",
+                        icon = Icons.Rounded.VideoLibrary, title = "Videos",
                         subtitle = "Hide received video clips in gallery",
                         value = prefs.hideVideosFromGallery,
                         onChanged = { v ->
