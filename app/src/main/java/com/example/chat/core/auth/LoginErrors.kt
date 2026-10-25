@@ -60,3 +60,22 @@ fun friendlyRegisterError(error: Throwable): String {
     }
     return value
 }
+
+/** Exact port of _RegisterOrganizationScreenState._friendlyError. */
+fun friendlyOrgRegisterError(error: Throwable): String {
+    val value = (error.message ?: error.toString()).replaceFirst("Exception: ", "")
+    val lower = value.lowercase()
+    if (lower.contains("connection refused") ||
+        lower.contains("socketexception") ||
+        lower.contains("failed host lookup")
+    ) {
+        return "Unable to connect to the backend server. Please verify your connection."
+    }
+    if (lower.contains("tenant id already exists")) {
+        return "This Workspace ID is already taken. Please choose a different Workspace ID."
+    }
+    if (lower.contains("domain already mapped")) {
+        return "This domain or workspace is already mapped to an existing organization."
+    }
+    return value
+}
