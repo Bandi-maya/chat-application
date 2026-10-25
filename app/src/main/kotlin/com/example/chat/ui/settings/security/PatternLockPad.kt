@@ -1,5 +1,6 @@
 package com.example.chat.ui.settings.security
 
+import com.example.chat.ui.kit.ChatyHapticsPort
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.size
@@ -72,7 +73,7 @@ fun PatternLockPad(
     state: PatternLockPadState = remember { PatternLockPadState() },
 ) {
     state.onReset = onPatternReset
-    val haptics = LocalHapticFeedback.current
+    val view = androidx.compose.ui.platform.LocalView.current
     val activeColor = MaterialTheme.colorScheme.primary
     val muted = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
     val availableWidth = (LocalConfiguration.current.screenWidthDp - 32).coerceIn(168, 280).dp
@@ -81,7 +82,7 @@ fun PatternLockPad(
     fun selectAt(p: Offset, w: Float, h: Float) {
         val hit = PatternGeometry.hitTest(p, w, h) ?: return
         if (state.selected.contains(hit)) return
-        if (enableHaptics) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        if (enableHaptics) ChatyHapticsPort.selection(view)
         state.selected.add(hit)
         state.pointer = p
     }
