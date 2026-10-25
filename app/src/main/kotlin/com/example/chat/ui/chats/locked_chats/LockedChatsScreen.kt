@@ -25,7 +25,7 @@ import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
-import androidx.compose.material.icons.rounded.LockOutline
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -154,7 +154,7 @@ fun LockedChatsScreen(
                 verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
             ) {
                 Icon(
-                    Icons.Rounded.LockOutline,
+                    Icons.Rounded.Lock,
                     contentDescription = null,
                     tint = colors.foregroundSecondary,
                     modifier = Modifier.size(44.dp),
