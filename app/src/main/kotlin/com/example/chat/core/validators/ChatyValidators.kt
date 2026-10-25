@@ -19,7 +19,7 @@ object ChatyValidators {
         username.trim().lowercase().replace(Regex("^@+"), "")
 
     fun validateUsername(value: String?, forRegistration: Boolean = true): String? {
-        if (value == null || value.trim().isEmpty) return "Username is required"
+        if (value == null || value.trim().isEmpty()) return "Username is required"
         val normalized = normalizeUsername(value)
         if (normalized.length < 3) return "Username must be at least 3 characters"
         if (normalized.length > 24) return "Username must not exceed 24 characters"
@@ -33,7 +33,7 @@ object ChatyValidators {
     }
 
     fun validateEmail(value: String?): String? {
-        if (value == null || value.trim().isEmpty) return "Email address is required"
+        if (value == null || value.trim().isEmpty()) return "Email address is required"
         val email = value.trim()
         val emailPattern = Regex(
             "^[a-zA-Z0-9.!#\$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)+\$",
@@ -60,7 +60,7 @@ object ChatyValidators {
     }
 
     fun validatePhone(value: String?): String? {
-        if (value == null || value.trim().isEmpty) return "Phone number is required"
+        if (value == null || value.trim().isEmpty()) return "Phone number is required"
         val cleaned = value.replace(Regex("[\\s\\-\\(\\)\\.]"), "")
         if (!Regex("^\\+?[0-9]{7,15}\$").matches(cleaned)) {
             return "Please enter a valid international phone number"
@@ -69,13 +69,13 @@ object ChatyValidators {
     }
 
     fun validateDisplayName(value: String?): String? {
-        if (value == null || value.trim().isEmpty) return "Display name is required"
+        if (value == null || value.trim().isEmpty()) return "Display name is required"
         if (value.trim().length > 50) return "Display name must not exceed 50 characters"
         return null
     }
 
     fun validateGroupTitle(value: String?): String? {
-        if (value == null || value.trim().isEmpty) return "Title is required"
+        if (value == null || value.trim().isEmpty()) return "Title is required"
         if (value.trim().length > 64) return "Title must not exceed 64 characters"
         return null
     }
