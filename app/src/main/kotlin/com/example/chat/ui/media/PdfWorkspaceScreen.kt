@@ -146,7 +146,7 @@ fun PdfWorkspaceScreen(
     }
 
     // file_picker: FileType.image, allowMultiple: true
-    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(9, ActivityResultContracts.PickVisualMedia.ImageOnly)) { uris ->
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(9)) { uris ->
         if (uris.isEmpty()) return@rememberLauncherForActivityResult
         // Persisted permission + copy into cache so the clean-room PDF builder
         // can read plain file paths (Dart received real paths from file_picker).
