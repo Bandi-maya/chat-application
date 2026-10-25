@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.chat.core.preferences.ChatyPreferencesController
 import com.example.chat.ui.theme.LocalAppColors
+import androidx.compose.ui.Modifier
 
 private val clickSymbols = listOf("\u2728", "\u2764\uFE0F", "\uD83D\uDD25", "\u26A1", "\u2B50", "\uD83C\uDF38")
 private val fallingObjects = listOf("Stars", "Hearts", "Snowflakes", "Leaves")
