@@ -26,7 +26,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.RotateLeft
 import androidx.compose.material.icons.rounded.RotateRight
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledButton
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -313,7 +313,7 @@ fun CustomBrandIconEditor(
                         ) { Icon(Icons.Rounded.RotateRight, contentDescription = "Rotate right") }
                     }
                     Spacer(Modifier.weight(1f))
-                    FilledButton(
+                    Button(
                         onClick = { if (!saving) apply() },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
