@@ -345,6 +345,13 @@ fun ChatDetailHost(
                 com.example.chat.ui.chats.detail.AttachmentAction.contact -> attachments.onContact()
                 com.example.chat.ui.chats.detail.AttachmentAction.poll -> pollCreateOpen = true
                 com.example.chat.ui.chats.detail.AttachmentAction.task -> taskEditor = Triple(true, null, null)
+                // Demo sandbox dock (Dart chat_detail_screen.dart:1288-1309 -> chat_attachment_actions
+                // sendDemo*); controller ports are exact, afterSend = rev++ like the other arms.
+                com.example.chat.ui.chats.detail.AttachmentAction.demoDocument -> scope.launch { attachments.controller.sendDemoDocument(); rev++ }
+                com.example.chat.ui.chats.detail.AttachmentAction.demoAudio -> scope.launch { attachments.controller.sendDemoAudio(); rev++ }
+                com.example.chat.ui.chats.detail.AttachmentAction.demoCall -> scope.launch { attachments.controller.sendDemoCallCard(); rev++ }
+                com.example.chat.ui.chats.detail.AttachmentAction.demoTask -> scope.launch { attachments.controller.sendDemoTask(); rev++ }
+                com.example.chat.ui.chats.detail.AttachmentAction.demoLocation -> scope.launch { attachments.controller.sendDemoLocation(); rev++ }
                 else -> toast("This attachment type is not connected in this build yet.")
             }
         },
@@ -670,7 +677,7 @@ fun ChatDetailHost(
                                         Text(
                                             item.conversation.title,
                                             maxLines = 1,
-                                            overflow = TextOverflow.ellipsis,
+                                            overflow = TextOverflow.Ellipsis,
                                             color = Color(theme.primaryTextColor),
                                         )
                                     }
