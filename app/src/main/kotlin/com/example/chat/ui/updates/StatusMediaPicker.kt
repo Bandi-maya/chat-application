@@ -29,7 +29,7 @@ fun rememberStatusMediaPicker(): suspend (String) -> PickedStatusMedia? {
         waiter = null
     }
     return remember(launcher, context) {
-        { mediaType: String ->
+        val pick: suspend (String) -> PickedStatusMedia? = { mediaType: String ->
             val d = CompletableDeferred<Uri?>()
             waiter = d
             val mimes = when (mediaType) {
@@ -42,6 +42,7 @@ fun rememberStatusMediaPicker(): suspend (String) -> PickedStatusMedia? {
             val uri = d.await()
             if (uri == null) null else readPicked(context, uri)
         }
+        pick
     }
 }
 
