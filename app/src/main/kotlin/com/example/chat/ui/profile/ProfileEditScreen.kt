@@ -27,7 +27,7 @@ import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.Wallpaper
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -401,7 +401,7 @@ fun ProfileEditScreen(
 
     // Exact _promptImageSource sheet copy from profile_edit_screen.dart.
     sourceSheetFor?.let { target ->
-        ModalBottomSheet(onDismissRequest = { sourceSheetFor = null }) {
+        ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = { sourceSheetFor = null }) {
             Text(
                 if (target == "avatar") "Change Profile Photo" else "Change Banner Photo",
                 fontSize = 17.sp,
@@ -426,7 +426,7 @@ fun ProfileEditScreen(
 
     if (showDiscardDialog) {
         // Exact ChatyConfirmDialog copy from profile_edit_screen.dart.
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { showDiscardDialog = false },
             title = { Text("Discard changes?") },
             text = { Text("You have unsaved changes that will be lost.") },
