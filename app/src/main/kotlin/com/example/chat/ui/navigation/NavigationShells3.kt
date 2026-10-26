@@ -411,7 +411,7 @@ private fun CustomNavItem(
                 NavDestinationIcon(id, size = 20, tint = if (isSelected) accent else unselectedFg)
                 if (isSelected) {
                     Spacer(Modifier.width(6.dp))
-                    Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = accent)
+                    Text(label, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = accent)
                 }
             }
             "Top Indicator Line" -> Column(
@@ -483,7 +483,7 @@ private fun CustomNavItem(
                 NavDestinationIcon(id, size = 19, tint = if (isSelected) colors.onPrimary else unselectedFg)
                 if (isSelected) {
                     Spacer(Modifier.width(5.dp))
-                    Text(label, fontSize = 11.5.sp, fontWeight = FontWeight.ExtraBold, color = colors.onPrimary)
+                    Text(label, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, fontSize = 11.5.sp, fontWeight = FontWeight.ExtraBold, color = colors.onPrimary)
                 }
             }
             "Raised Center Action" -> if (isCenter) {
@@ -550,17 +550,22 @@ private fun CustomNavItem(
                 )
             }
             // 'Floating Pill' default
-            else -> Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
+            else -> androidx.compose.foundation.layout.BoxWithConstraints {
+                val narrow = maxWidth < 100.dp
+                val pill = Modifier.clip(RoundedCornerShape(20.dp))
                     .background(if (isSelected) accent.copy(alpha = if (isDark) 0.2f else 0.12f) else Color.Transparent)
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-            ) {
-                NavDestinationIcon(id, size = 20, tint = if (isSelected) accent else unselectedFg)
-                if (isSelected) {
-                    Spacer(Modifier.width(5.dp))
-                    Text(label, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = accent)
+                    .padding(horizontal = if (narrow) 4.dp else 10.dp, vertical = 6.dp)
+                if (narrow) Column(pill, horizontalAlignment = Alignment.CenterHorizontally) {
+                    NavDestinationIcon(id, size = 20, tint = if (isSelected) accent else unselectedFg)
+                    if (isSelected) Text(label, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
+                        fontSize = 10.sp, fontWeight = FontWeight.Bold, color = accent)
+                } else Row(pill, verticalAlignment = Alignment.CenterVertically) {
+                    NavDestinationIcon(id, size = 20, tint = if (isSelected) accent else unselectedFg)
+                    if (isSelected) {
+                        Spacer(Modifier.width(5.dp))
+                        Text(label, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
+                            fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = accent)
+                    }
                 }
             }
         }
