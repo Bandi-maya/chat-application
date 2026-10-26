@@ -28,6 +28,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -82,9 +83,37 @@ fun SettingsPage(
                 }
             }
         }
+        SettingsSaveFailedRow()
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 36.dp)) {
             content()
         }
+    }
+}
+
+/** Provided by the real settings host only; null (default) in previews/standalone use = no row. */
+class SettingsSaveFailure(
+    val state: kotlinx.coroutines.flow.StateFlow<com.example.chat.core.preferences.SaveState>,
+    val retry: () -> Unit,
+)
+
+val LocalSettingsSaveFailure = androidx.compose.runtime.staticCompositionLocalOf<SettingsSaveFailure?> { null }
+
+/** In-layout row shown only while the latest local settings save has failed. */
+@Composable
+private fun SettingsSaveFailedRow() {
+    val provided = LocalSettingsSaveFailure.current ?: return
+    val state by provided.state.collectAsState()
+    if (state !is com.example.chat.core.preferences.SaveState.Failed) return
+    val colors = LocalAppColors.current
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "Couldn't save your latest settings on this device.",
+            color = colors.foregroundSecondary, fontSize = 13.sp, modifier = Modifier.weight(1f),
+        )
+        androidx.compose.material3.TextButton(onClick = provided.retry) { Text("Try again") }
     }
 }
 
