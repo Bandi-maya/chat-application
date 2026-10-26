@@ -140,6 +140,25 @@ class ApiRealtimeClientParityTest {
         val socket: FakeSocket get() = factory.sockets.last()
     }
 
+    @Test fun scopeReplacementRejectsOldSocketAndConnectsNewSocket() {
+        val scheduler = FakeScheduler()
+        val factory = FakeFactory()
+        var current: Any = Any()
+        val client = ApiRealtimeClient({ "wss://example.invalid/same" }, { "same-token" }, factory, scheduler,
+            connectionScopeIdentity = { current },
+            connectionScopeGuard = { expected, action -> if (expected === current) { action(); true } else false })
+        client.connect(); scheduler.drain()
+        val old = factory.sockets.single()
+        current = Any() // Same token/url is still a different authentication generation.
+        assertFalse(client.sendCallSignal("new-recipient", mapOf("call_id" to "secret-new-call")))
+        assertTrue(old.sent.none { it.contains("secret-new-call") })
+        scheduler.drain()
+        assertTrue(old.closed)
+        assertEquals(2, factory.sockets.size)
+        assertTrue(client.sendCallSignal("new-recipient", mapOf("call_id" to "new-call")))
+        assertTrue(factory.sockets.last().sent.any { it.contains("new-call") })
+    }
+
     // ── URL resolution (backend_config.dart getWebSocketUrl) ─────────────
 
     @Test
