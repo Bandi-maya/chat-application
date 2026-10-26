@@ -151,14 +151,14 @@ fun BackupAndRestoreScreen(
             BackupRow(
                 icon = Icons.Rounded.CloudUpload,
                 title = "Backup Chaty data",
-                subtitle = "Create an authentic backup of Chaty chats and account preferences",
+                subtitle = "Paused: encrypted backup is not available yet. Nothing is saved or uploaded.",
                 busy = isBackingUp,
                 onClick = { if (!isBackingUp) runBackup("Chaty database") },
             )
             BackupRow(
                 icon = Icons.Rounded.SettingsBackupRestore,
                 title = "Restore Chaty data",
-                subtitle = "Restore the most recent local backup file",
+                subtitle = "Paused until encrypted backups are ready. Existing files are not read.",
                 busy = isRestoring,
                 onClick = { if (!isRestoring) runRestore("Chaty database") },
             )
@@ -169,14 +169,14 @@ fun BackupAndRestoreScreen(
             BackupRow(
                 icon = Icons.Rounded.PermMedia,
                 title = "Backup Media",
-                subtitle = "Media and documents configuration",
+                subtitle = "Not available yet. Media is not included in any backup.",
                 busy = false,
                 onClick = { runBackup("Media archives") },
             )
             BackupRow(
                 icon = Icons.Rounded.RestorePage,
                 title = "Restore Media",
-                subtitle = "Restore the most recent media backup",
+                subtitle = "Not available yet.",
                 busy = false,
                 onClick = { runRestore("Media archives") },
             )
@@ -195,7 +195,7 @@ fun BackupAndRestoreScreen(
             BackupRow(
                 icon = Icons.Rounded.DeleteSweep,
                 title = "Clear",
-                subtitle = "Erase old temporary backups and cache logs",
+                subtitle = "Deletes temporary files and all but the newest old backup file in the folder below",
                 busy = false,
                 showChevron = false,
                 onClick = { runClear() },
@@ -206,7 +206,7 @@ fun BackupAndRestoreScreen(
         SettingsSection(title = "Location") {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                 Text(
-                    "• Chaty backup location: ${logic.backupPath}",
+                    "• Old (unencrypted) backup files, if any: ${logic.backupPath}",
                     color = colors.foregroundSecondary,
                     fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
