@@ -119,19 +119,26 @@ fun MainNavigationShell(
         hideUpdates = prefs.hideUpdates,
     )
     val allDestinationIds = NavigationCatalog.resolveOrdered(catalogIds, template)
-    val (primaryIds, overflowIds) = NavigationCatalog.splitPrimaryOverflow(allDestinationIds, template)
-    val navItemIds = NavigationCatalog.navItemIds(primaryIds, overflowIds)
+    // Every enabled destination is visible. Templates still choose ordering/style,
+    // but must not put destinations behind a More item.
+    val primaryIds = allDestinationIds
+    val overflowIds = emptyList<String>()
+    val navItemIds = allDestinationIds
 
-    var currentIndex by remember { mutableStateOf(0) }
-    var currentDestinationId by remember { mutableStateOf(ChatyNavigationDestinationIds.chats) }
+    var currentIndex by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }
+    var currentDestinationId by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(ChatyNavigationDestinationIds.chats) }
     var lastExitAttempt by remember { mutableStateOf(0L) }
+    var rootHistory by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(listOf<String>()) }
 
-    val pagerState = rememberPagerState(initialPage = 0, pageCount = { allDestinationIds.size })
+    val pagerState = rememberPagerState(initialPage = currentIndex, pageCount = { allDestinationIds.size })
 
     fun selectRootDestination(next: Int, destinationId: String? = null) {
         if (next == currentIndex && (destinationId == null || destinationId == currentDestinationId)) return
+        val nextId = destinationId ?: allDestinationIds.getOrNull(next) ?: return
+        rootHistory = rootHistory + currentDestinationId
+        lastExitAttempt = 0L
         currentIndex = next
-        if (destinationId != null) currentDestinationId = destinationId
+        currentDestinationId = nextId
         if (pagerState.currentPage != next) {
             scope.launch {
                 if (prefs.animationsDisabled) pagerState.scrollToPage(next)
@@ -141,8 +148,23 @@ fun MainNavigationShell(
     }
 
     fun handleRootBack() {
-        if (currentIndex != 0) {
-            selectRootDestination(0, ChatyNavigationDestinationIds.chats)
+        if (rootHistory.isNotEmpty()) {
+            val previous = rootHistory.last()
+            rootHistory = rootHistory.dropLast(1)
+            val index = allDestinationIds.indexOf(previous)
+            if (index >= 0) {
+                currentIndex = index
+                currentDestinationId = previous
+                lastExitAttempt = 0L
+                scope.launch { pagerState.scrollToPage(index) }
+                return
+            }
+        }
+        if (currentDestinationId != ChatyNavigationDestinationIds.chats) {
+            currentIndex = allDestinationIds.indexOf(ChatyNavigationDestinationIds.chats).coerceAtLeast(0)
+            currentDestinationId = allDestinationIds[currentIndex]
+            lastExitAttempt = 0L
+            scope.launch { pagerState.scrollToPage(currentIndex) }
             return
         }
         val now = System.currentTimeMillis()
@@ -188,10 +210,12 @@ fun MainNavigationShell(
     }
 
     // Keep the pager and selection in sync after swipes (Dart onPageChanged).
-    androidx.compose.runtime.LaunchedEffect(pagerState.currentPage) {
-        val id = allDestinationIds.getOrNull(pagerState.currentPage) ?: return@LaunchedEffect
-        if (currentIndex != pagerState.currentPage || currentDestinationId != id) {
-            currentIndex = pagerState.currentPage
+    androidx.compose.runtime.LaunchedEffect(pagerState.settledPage) {
+        val id = allDestinationIds.getOrNull(pagerState.settledPage) ?: return@LaunchedEffect
+        if (currentIndex != pagerState.settledPage || currentDestinationId != id) {
+            rootHistory = rootHistory + currentDestinationId
+            lastExitAttempt = 0L
+            currentIndex = pagerState.settledPage
             currentDestinationId = id
         }
     }
