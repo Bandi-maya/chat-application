@@ -37,6 +37,7 @@ fun CameraGlyph(kind: String, color: Color, size: Dp = 24.dp) {
         "flash" -> ChatyIconId.cameraFlashOn
         "camera" -> ChatyIconId.camera
         "close" -> ChatyIconId.close
+        "send" -> ChatyIconId.send
         else -> null
     }
     if (iconId != null) {
@@ -218,4 +219,3 @@ val DOCUMENT_SCAN_EFFECT = ChatyCameraEffect(
         0.0, 0.0, 0.0, 1.0, 0.0,
     ),
 )
-
