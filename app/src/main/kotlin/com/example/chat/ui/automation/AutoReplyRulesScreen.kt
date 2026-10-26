@@ -340,7 +340,7 @@ private fun AddRuleSheet(
     var recipientFilter by remember { mutableStateOf("all") }
     val primary = MaterialTheme.colorScheme.primary
 
-    ModalBottomSheet(
+    ModalBottomSheet(shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = onDismiss,
         sheetState = sheetState,
     ) {
@@ -452,7 +452,7 @@ private fun SheetDropdown(
                 .menuAnchor(),
             shape = RoundedCornerShape(12.dp),
         )
-        ExposedDropdownMenu(
+        ExposedDropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape,
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
