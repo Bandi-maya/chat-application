@@ -55,4 +55,17 @@ class ChatScreensPixelProofTest {
         }
         assertNotNull(File(outDir, "07-chat-detail.png"))
     }
+
+    @Test
+    fun appShellRendersLightAndDark() {
+        for ((screen, name) in listOf(
+            ChatFixtureActivity.SCREEN_SHELL to "08-shell-light",
+            ChatFixtureActivity.SCREEN_SHELL_DARK to "09-shell-dark",
+        )) {
+            val intent = Intent(InstrumentationRegistry.getInstrumentation().targetContext, ChatFixtureActivity::class.java)
+                .putExtra(ChatFixtureActivity.EXTRA_SCREEN, screen)
+            ActivityScenario.launch<ChatFixtureActivity>(intent).use { capture(name) }
+            assertNotNull(File(outDir, "$name.png"))
+        }
+    }
 }
