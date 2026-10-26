@@ -37,11 +37,11 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Share
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.example.chat.ui.kit.ChatyDropdownMenu as DropdownMenu
+import com.example.chat.ui.kit.ChatyDropdownMenuItem as DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -287,7 +287,7 @@ fun DocumentReaderScreen(
                         IconButton(onClick = { menuOpen = true }) {
                             Icon(Icons.Rounded.MoreVert, contentDescription = "More")
                         }
-                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape, expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                             if (totalPages > 1) {
                                 DropdownMenuItem(text = { Text("Jump to page...") }, onClick = {
                                     menuOpen = false; showJumpDialog = true
@@ -501,7 +501,7 @@ fun DocumentReaderScreen(
     // Page jump dialog
     if (showJumpDialog) {
         var jumpText by remember { mutableStateOf("$currentPage") }
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { showJumpDialog = false },
             title = { Text("Jump to Page") },
             text = {
@@ -530,10 +530,10 @@ fun DocumentReaderScreen(
 
     // File details sheet
     if (showDetails) {
-        ModalBottomSheet(
+        ModalBottomSheet(tonalElevation = 0.dp, dragHandle = null,
             onDismissRequest = { showDetails = false },
             containerColor = if (isDark) Color(0xFF141923) else Color.White,
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            shape = com.example.chat.ui.kit.ChatyModalShape,
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(22.dp)) {
                 Box(
