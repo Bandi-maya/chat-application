@@ -374,10 +374,10 @@ private fun HomeUiStyleSheet(
     val colors = LocalAppColors.current
     var draft by remember { mutableStateOf(selected) }
     val screenH = LocalConfiguration.current.screenHeightDp
-    ModalBottomSheet(
+    ModalBottomSheet(tonalElevation = 0.dp,
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        shape = RectangleShape, containerColor = Color(config.surfaceColor), dragHandle = null,
+        shape = com.example.chat.ui.kit.ChatyModalShape, containerColor = Color(config.surfaceColor), dragHandle = null,
     ) {
         Column(Modifier.fillMaxWidth().height((screenH * 0.84f).dp)) {
             Text("Home UI Style", color = colors.foreground, fontSize = 20.sp, fontWeight = FontWeight.W800, modifier = Modifier.padding(20.dp, 2.dp, 20.dp, 0.dp))
