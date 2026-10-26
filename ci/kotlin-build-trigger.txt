@@ -1,1 +1,1 @@
-Verify public dotenv routing, tenant/WebSocket precedence and compact tablet rail after successful 20-test runtime checkpoint.
+Verify approved779path Flutter-only cleanup with native MLS preserved, root Kotlin README and parity record.
