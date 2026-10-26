@@ -55,8 +55,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.chat.core.emoji.ChatyEmojiStyleId
-import com.example.chat.core.emoji.ChatyMotionEmoji
 import com.example.chat.core.preferences.ChatyPreferencesController
 import com.example.chat.core.theme.ThemeController
 import com.example.chat.ui.core.controllers.AppIconControllerContract
@@ -108,7 +106,7 @@ internal fun FontStyleEntry.composeFamily(): FontFamily? = when (fontFamilyKey) 
  * wiring for the SAF document picker (Dart file_picker); null surfaces the
  * Dart error snackbar text.
  *
- * Emoji artwork renders through the real ChatyMotionEmoji vector engine and
+ * Emoji styles were removed; the Noto animated pack is the only emoji artwork.
  * launcher tiles render the real GROUP H LauncherIconPreview
  * (ui/settings/appicon/AppBrandIcon.kt - compile dependency, lands with the
  * app-icon drop). Compose compile is CI-gated; no runtime pixels verified.
@@ -227,101 +225,6 @@ fun UniversalStylesScreen(
             }
         }
 
-        // SECTION 2: EMOJI STYLES (10 SELECTABLE STYLES)
-        SettingsSection(title = "EMOJI STYLES (${ChatyEmojiStyleId.entries.size} SELECTABLE STYLES)") {
-            ChatyEmojiStyleId.entries.forEach { style ->
-                val currentStyleId = ChatyEmojiStyleId.fromString(prefs.emojiStyle)
-                val isSelected = currentStyleId == style
-                Column(
-                    Modifier.fillMaxWidth()
-                        .background(
-                            if (isSelected) accent.copy(alpha = 0.08f) else Color.Transparent
-                        )
-                        .clickable { sheet = 3 }
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            Modifier.size(48.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(
-                                    if (isSelected) accent.copy(alpha = 0.15f) else colors.surfaceSecondary
-                                )
-                                .border(
-                                    width = if (isSelected) 1.8.dp else 1.0.dp,
-                                    color = if (isSelected) accent else colors.border.copy(alpha = 0.6f),
-                                    shape = RoundedCornerShape(12.dp),
-                                ),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            ChatyMotionEmoji(
-                                unicode = "😂",
-                                size = 32.dp,
-                                style = style,
-                                animate = isSelected && style.isAnimated,
-                            )
-                        }
-                        Spacer(Modifier.width(14.dp))
-                        Column(Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    style.title,
-                                    color = theme?.let { Color(it.primaryTextColor) } ?: colors.foreground,
-                                    fontSize = 15.sp,
-                                    fontWeight = if (isSelected) FontWeight.W700 else FontWeight.W600,
-                                )
-                                if (style.isAnimated) {
-                                    Spacer(Modifier.width(8.dp))
-                                    Box(
-                                        Modifier.clip(RoundedCornerShape(6.dp))
-                                            .background(accent.copy(alpha = 0.16f))
-                                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                                    ) {
-                                        Text(
-                                            "ANIMATED",
-                                            color = accent,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.W800,
-                                            letterSpacing = 0.5.sp,
-                                        )
-                                    }
-                                }
-                            }
-                            Spacer(Modifier.height(3.dp))
-                            Text(
-                                style.description,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                color = colors.foregroundSecondary,
-                                fontSize = 12.sp,
-                                lineHeight = 15.sp,
-                            )
-                            Spacer(Modifier.height(6.dp))
-                            Row {
-                                ChatyMotionEmoji(unicode = "😂", size = 20.dp, style = style, animate = false)
-                                Spacer(Modifier.width(6.dp))
-                                ChatyMotionEmoji(unicode = "❤️", size = 20.dp, style = style, animate = false)
-                                Spacer(Modifier.width(6.dp))
-                                ChatyMotionEmoji(unicode = "🔥", size = 20.dp, style = style, animate = false)
-                                Spacer(Modifier.width(6.dp))
-                                ChatyMotionEmoji(unicode = "👍", size = 20.dp, style = style, animate = false)
-                            }
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Box(
-                            Modifier.size(22.dp)
-                                .border(2.dp, if (isSelected) accent else colors.border, CircleShape),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            if (isSelected) {
-                                Box(Modifier.size(12.dp).background(accent, CircleShape))
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         // SECTION 3: CHANGE NOTIFICATION ICON & FONTS
         SettingsSection(title = null) {
             StylesNavRow(
@@ -393,23 +296,6 @@ fun UniversalStylesScreen(
             },
             previewBuilder = { chosen ->
                 if (chosen != null) LauncherIconPreview(variant = chosen, size = 64.dp, borderRadius = 10.dp)
-            },
-        )
-    }
-    if (sheet == 3) {
-        com.example.chat.ui.kit.ChatySingleChoiceModal(
-            title = "Select emojis", value = ChatyEmojiStyleId.fromString(prefs.emojiStyle),
-            options = ChatyEmojiStyleId.entries.toList(), labelBuilder = { it.title },
-            onDismiss = { sheet = 0 },
-            onApply = { chosen ->
-                preferences.updateUniversal(preferences.universal.copy(emojiStyle = chosen.title, emojiVariant = chosen.title))
-                onMessage("Emoji style set to ${chosen.title}")
-                sheet = 0
-            },
-            previewBuilder = { style ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("😂", "❤️", "🔥", "👍").forEach { unicode -> ChatyMotionEmoji(unicode = unicode, size = 24.dp, style = style, animate = false) }
-                }
             },
         )
     }
