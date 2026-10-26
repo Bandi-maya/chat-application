@@ -112,6 +112,7 @@ fun MediaViewerScreen(
 
     val opening = remember(storagePath) { Animatable(0f) }
     LaunchedEffect(storagePath) { opening.animateTo(1f, tween(280)) }
+    var trimming by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(false) }
     var editedCopy by remember(storagePath) { mutableStateOf<java.io.File?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -174,9 +175,15 @@ fun MediaViewerScreen(
         if (restrictedViewOnce) return
         val url = signedUrl ?: return
         try {
+            val local = editedCopy
+            val intent = if (local != null) {
+                val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", local)
+                Intent(Intent.ACTION_VIEW).setDataAndType(uri, when (local.extension) {
+                    "mp4" -> "video/mp4"; "m4a" -> "audio/mp4"; else -> "image/jpeg"
+                }).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } else Intent(Intent.ACTION_VIEW, Uri.parse(url))
             context.startActivity(
-                Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             )
         } catch (e: ActivityNotFoundException) {
             scope.launch {
@@ -192,7 +199,7 @@ fun MediaViewerScreen(
         if (local != null) {
             val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", local)
             context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
-                type = "image/jpeg"; putExtra(Intent.EXTRA_STREAM, uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                type = when { local.extension == "mp4" -> "video/mp4"; local.extension == "m4a" -> "audio/mp4"; else -> "image/jpeg" }; putExtra(Intent.EXTRA_STREAM, uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }, "Share edited copy"))
             return
         }
@@ -225,6 +232,13 @@ fun MediaViewerScreen(
     val primary = Color(theme.accentColor)
     val borderSubtle = Color(theme.dividerColor)
 
+    if (trimming && signedUrl != null && !restrictedViewOnce) {
+        MediaTrimScreen(editedCopy?.toURI()?.toString() ?: signedUrl!!, type == "video",
+            onCancel = { trimming = false },
+            onApply = { result -> editedCopy = result.file; signedUrl = result.file.toURI().toString(); trimming = false },
+        )
+        return
+    }
     if (editing && signedUrl != null && !restrictedViewOnce) {
         ImageEditorScreen(editedCopy?.toURI()?.toString() ?: signedUrl!!,
             onCancel = { editing = false },
@@ -267,6 +281,7 @@ fun MediaViewerScreen(
                         fontSize = 11.5.sp,
                     )
                 }
+                if (type in setOf("video", "audio") && !restrictedViewOnce) TextButton(onClick = { trimming = true }, enabled = signedUrl != null) { Text("Trim") }
                 if (type == "image" && !title.endsWith(".gif", ignoreCase = true) && !restrictedViewOnce) IconButton(onClick = { editing = true }, enabled = signedUrl != null) {
                     Icon(Icons.Rounded.Edit, "Edit a copy", tint = foreground)
                 }
