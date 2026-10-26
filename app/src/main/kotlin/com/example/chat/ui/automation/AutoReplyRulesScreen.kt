@@ -28,7 +28,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
+import com.example.chat.ui.kit.ChatyDropdownMenuItem as DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -340,7 +340,7 @@ private fun AddRuleSheet(
     var recipientFilter by remember { mutableStateOf("all") }
     val primary = MaterialTheme.colorScheme.primary
 
-    ModalBottomSheet(shape = com.example.chat.ui.kit.ChatyModalShape,
+    ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = onDismiss,
         sheetState = sheetState,
     ) {
@@ -452,7 +452,7 @@ private fun SheetDropdown(
                 .menuAnchor(),
             shape = RoundedCornerShape(12.dp),
         )
-        ExposedDropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape,
+        ExposedDropdownMenu(containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, tonalElevation = 0.dp, shape = com.example.chat.ui.kit.ChatyModalShape,
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
