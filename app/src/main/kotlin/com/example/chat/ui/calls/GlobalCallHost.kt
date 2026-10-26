@@ -53,6 +53,34 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
         }
     }
     @Suppress("UNUSED_EXPRESSION") revision
+    // Dart main.dart:808-830: the DynamicIslandController is always registered, so the call island is a controller
+    // payload (id call_<callId>) while the session is active in island presentation, removed otherwise.
+    // The standalone ChatyCallIsland is Dart's `showIsland`, which is false whenever the controller exists.
+    androidx.compose.runtime.SideEffect {
+        val islandCtrl = ServiceLocator.dynamicIslandController
+        val cs = service.currentSession
+        if (cs != null && cs.isActive && presentation.isInAppIsland) {
+            islandCtrl.postPayload(
+                com.example.chat.ui.island.DynamicIslandPayload(
+                    id = "call_${cs.callId}",
+                    type = if (cs.state == CallSessionState.incoming) com.example.chat.ui.island.IslandPayloadType.incomingCall
+                    else com.example.chat.ui.island.IslandPayloadType.ongoingCall,
+                    title = cs.remoteDisplayName,
+                    message = if (cs.isVideo) "Video Call" else "Voice Call",
+                    timestamp = java.time.Instant.now(),
+                    durationSeconds = service.callDurationSeconds,
+                    isVideo = cs.isVideo,
+                    isSpeaker = cs.audioRoute == AudioRouteType.speaker,
+                    onTap = { if (cs.isVideo) presentation.expandFromIsland() else presentation.showFullScreen() },
+                    onAcceptCall = { scope.launch { service.acceptCall() } },
+                    onDeclineCall = { service.endCall() },
+                ),
+                autoExpand = cs.state == CallSessionState.incoming,
+            )
+        } else {
+            islandCtrl.removePayloadsWhere { it.id.startsWith("call_") }
+        }
+    }
     val session = service.currentSession ?: return
     val prefs = prefsStore.value
 
@@ -111,14 +139,5 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
             onCollapseToIsland = { presentation.collapseToIsland() },
             onEndCall = { service.endCall() },
         )
-    } else if (presentation.isInAppIsland) {
-        Box(Modifier.fillMaxSize().statusBarsPadding(), contentAlignment = Alignment.TopCenter) {
-            ChatyCallIsland(
-                session = session,
-                durationSeconds = service.callDurationSeconds,
-                onTap = { presentation.expandFromIsland() },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
     }
 }
