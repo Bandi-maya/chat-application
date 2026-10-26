@@ -56,6 +56,8 @@ class SessionLifecycleService(
      *  _retryPendingSecureSends kick after catch-up. */
     private val kickPendingSends: () -> Unit = {},
     private val notifyChanged: () -> Unit = {},
+    /** Runs when the session becomes null (logout/expiry); e.g. purge decrypted media temps. Must not throw. */
+    private val onSignedOut: () -> Unit = {},
 ) {
     var currentSession: AuthSessionInfo? = null
         private set
@@ -110,11 +112,15 @@ class SessionLifecycleService(
             conversationsRepository.conversationsById.clear()
             conversationsRepository.messagesByChatId.clear()
             tasksRepository?.tasks?.clear()
+            runCatching { onSignedOut() }
             notifyChanged()
             return
         }
 
+        val previousUserId = currentSession?.userId
         currentSession = mapSession(session)
+        // Non-null -> different non-null account: revoke the previous account's decrypted temps/leases too.
+        if (previousUserId != null && previousUserId != session.userId) runCatching { onSignedOut() }
         val current = profileService.currentUser
         if (current == null || current.id != session.userId) {
             val emailOrNull = session.email.ifEmpty { null }
