@@ -3,3 +3,5 @@
 Compile correction: retain Close imports for editor-dismiss buttons while page Back uses ChevronLeft.
 
 Independent parallel candidate: centered GB radio/color, icon and launcher choices, bubble/tick/header galleries, emoji style selectors, shared custom switch/radio and single touch owner. Includes all critical fixes from ec0c25b6. Results must remain separate from correction run40334715139.
+
+2026-10-26 20:07 IST: C cumulative B controls plus compact dock one-line labels, safe visible selector saved-state proof, Calls arrival and failure capture; A/B results remain separate.
