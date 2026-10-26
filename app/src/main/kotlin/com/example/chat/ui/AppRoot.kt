@@ -1335,6 +1335,11 @@ fun AppRoot() {
                             selectedInitialMessageId = null
                             route = AuthRoute.Home
                         },
+                        onOpenConversation = { next ->
+                            ServiceLocator.apiBackend.setActiveConversation(next.id)
+                            selectedConversation = next
+                            selectedInitialMessageId = null
+                        },
                     )
                 }
             }
