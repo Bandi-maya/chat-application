@@ -117,10 +117,10 @@ fun GbHomeShortcutsSheetContent(onDismissSheet: () -> Unit, onOpenHome: () -> Un
 @Composable
 fun GbStandaloneSheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
     val theme = ServiceLocator.themeController.globalTheme
-    ModalBottomSheet(
+    ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp,
         onDismissRequest = onDismiss,
         containerColor = Color(theme.surfaceColor),
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        shape = com.example.chat.ui.kit.ChatyModalShape,
     ) {
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(20.dp)) { content() }
     }
