@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -118,26 +121,18 @@ fun ContactInfoScreen(
     val activity = activityFor(conversation.id, contact.id)
     val online = isOnline(contact.id)
 
-    Scaffold(
-        containerColor = colors.background,
-        snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = colors.foreground)
-                }
-                Text(
-                    "Contact Info",
-                    color = colors.foreground,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-        },
-    ) { padding ->
+    // Keep the route toolbar outside the body subcomposition so it cannot be
+    // covered by the full-height scrolling details. Dart ChatyScaffold owns
+    // this toolbar and SafeArea separately from its ListView body.
+    Column(Modifier.fillMaxSize().background(colors.background)
+        .windowInsetsPadding(WindowInsets.safeDrawing)) {
+        com.example.chat.ui.kit.ChatyAppBar(title = "Contact Info", onBack = onBack)
+        Scaffold(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            containerColor = colors.background,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            snackbarHost = { SnackbarHost(snackbar) },
+        ) { padding ->
         if (loading) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(strokeWidth = 2.2.dp, color = colors.primary)
@@ -480,6 +475,8 @@ fun ContactInfoScreen(
             }
             Spacer(Modifier.height(24.dp))
         }
+    }
+
     }
 
     // ChatyConfirmDialog equivalents for block / delete conversation /
