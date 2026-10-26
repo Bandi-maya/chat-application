@@ -42,7 +42,7 @@ import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.VerifiedUser
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -594,7 +594,7 @@ internal fun ConfirmDialog(
     onDismiss: () -> Unit,
 ) {
     val colors = LocalAppColors.current
-    AlertDialog(
+    AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = onDismiss,
         containerColor = colors.surface,
         title = { Text(title, color = colors.foreground) },
