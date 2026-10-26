@@ -118,6 +118,7 @@ import kotlinx.coroutines.launch
  *  provided), NotificationPermissionSheet (host seam below, W8 owns the UI),
  *  swipe-call relationship checks (calls slice), GB story *content* (the
  *  strip lists contacts exactly like Dart). */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun ChatsHomeScreen(
     conversations: List<Conversation>,
@@ -180,14 +181,15 @@ fun ChatsHomeScreen(
     var showWhoCanCallMe by remember { mutableStateOf(false) }
     var showLockedSetup by remember { mutableStateOf(false) }
     var showArchived by remember { mutableStateOf(false) }
+    var showEffects by remember { mutableStateOf(false) }
 
     // 'Who can call me?' reuses the shared privacy dialog when the real
     // preferences controller is wired; otherwise the nav seam stands.
-    val effectiveNav = if (preferencesController != null) {
+    val effectiveNav = (if (preferencesController != null) {
         nav.copy(onWhoCanCallMe = { showWhoCanCallMe = true })
     } else {
         nav
-    }
+    }).copy(onOpenCameraEffects = { nav.onOpenCameraEffects(); showEffects = true })
     // Connection UI defaults to the shared detail-slice components once the
     // owner wires the health snapshot; explicit slots still win.
     val effectiveConnectionBanner: (@Composable () -> Unit)? = connectionBanner
@@ -312,6 +314,17 @@ fun ChatsHomeScreen(
             },
             onDismiss = { showDeleteConfirm = false },
         )
+    }
+
+    if (showEffects) {
+        // Dart EffectPickerSheet.show: transparent modal bottom sheet over the shared EffectEngine.
+        androidx.compose.material3.ModalBottomSheet(
+            onDismissRequest = { showEffects = false },
+            containerColor = Color.Transparent,
+            dragHandle = null,
+        ) {
+            com.example.chat.ui.camera.EffectPickerSheet(engine = com.example.chat.ServiceLocator.effectEngine)
+        }
     }
 
     if (showArchived) {
