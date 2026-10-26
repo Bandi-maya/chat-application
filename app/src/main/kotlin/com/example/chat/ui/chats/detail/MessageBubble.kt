@@ -41,7 +41,10 @@ import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.material.icons.rounded.WorkspacePremium
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material3.MaterialTheme
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Reply
 import androidx.compose.material.icons.rounded.Shortcut
@@ -150,6 +153,9 @@ fun ChatMessageBubble(
     groupAdminIcon: String = "Default",
     hideAdminNameIcon: Boolean = false,
     voicePlayButtonColor: Color? = null,
+    voicePlayingBarColor: Color? = null,
+    voicePlaybackSpeed: Double = 1.0,
+    voiceUrlResolver: (suspend (String) -> String)? = null,
     isSelected: Boolean = false,
     showDeletedContent: Boolean = false,
     showEditedLabel: Boolean = true,
@@ -553,6 +559,9 @@ fun ChatMessageBubble(
                                 textColor = Color(textColor),
                                 accentColor = Color(theme.accentColor),
                                 playButtonColor = voicePlayButtonColor,
+                                playingBarColor = voicePlayingBarColor,
+                                playbackSpeed = voicePlaybackSpeed,
+                                urlResolver = voiceUrlResolver,
                                 onPlay = onVoicePlay,
                             )
                             "document" -> DocumentPreview(
@@ -1026,16 +1035,89 @@ private fun VideoAttachmentPreview(
     }
 }
 
+/** Port of _VoiceNotePlayer (message_bubble.dart:1578-1730): signed-url load on first play,
+ *  pause/resume, restart after completion, live speed apply while playing, progress bar
+ *  (playingBarColor override) and "pos / total" label. Playback engine is android.media.MediaPlayer
+ *  (Dart: just_audio); runtime audio behaviour is not hardware-verified. */
 @Composable
 private fun VoiceNoteCard(
     attachment: MessageAttachment,
     textColor: Color,
     accentColor: Color,
     playButtonColor: Color? = null,
+    playingBarColor: Color? = null,
+    playbackSpeed: Double = 1.0,
+    urlResolver: (suspend (String) -> String)? = null,
     onPlay: ((MessageAttachment) -> Unit)?,
 ) {
-    val totalSeconds = attachment.durationSeconds
-    val label = "${totalSeconds / 60}:${(totalSeconds % 60).toString().padStart(2, '0')}"
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val player = remember(attachment.id) { android.media.MediaPlayer() }
+    var loading by remember(attachment.id) { mutableStateOf(false) }
+    var playing by remember(attachment.id) { mutableStateOf(false) }
+    var prepared by remember(attachment.id) { mutableStateOf(false) }
+    var completed by remember(attachment.id) { mutableStateOf(false) }
+    var totalMs by remember(attachment.id) { mutableStateOf<Int?>(null) }
+    var positionMs by remember(attachment.id) { mutableStateOf(0) }
+    androidx.compose.runtime.DisposableEffect(attachment.id) {
+        onDispose { try { player.release() } catch (_: Exception) {} }
+    }
+    androidx.compose.runtime.LaunchedEffect(playing, playbackSpeed) {
+        if (playing && prepared) {
+            try {
+                player.playbackParams = player.playbackParams.setSpeed(playbackSpeed.toFloat())
+            } catch (_: Exception) {}
+        }
+        while (playing) {
+            try { positionMs = player.currentPosition } catch (_: Exception) {}
+            kotlinx.coroutines.delay(100)
+        }
+    }
+    fun fmt(ms: Int): String {
+        val sec = ms / 1000
+        return "${sec / 60}:${(sec % 60).toString().padStart(2, '0')}"
+    }
+    fun toggle() {
+        if (loading) return
+        onPlay?.invoke(attachment)
+        if (playing) {
+            try { player.pause() } catch (_: Exception) {}
+            playing = false
+            return
+        }
+        scope.launch {
+            try {
+                if (!prepared) {
+                    loading = true
+                    val path = attachment.url
+                    if (path.isNullOrEmpty()) throw IllegalStateException("Voice note path is missing.")
+                    val url = urlResolver?.invoke(path) ?: path
+                    kotlinx.coroutines.suspendCancellableCoroutine<Unit> { cont ->
+                        player.setOnPreparedListener { if (cont.isActive) cont.resumeWith(Result.success(Unit)) }
+                        player.setOnErrorListener { _, w, e ->
+                            if (cont.isActive) cont.resumeWith(Result.failure(IllegalStateException("Audio error $w/$e")))
+                            true
+                        }
+                        player.setDataSource(url)
+                        player.prepareAsync()
+                    }
+                    totalMs = player.duration
+                    prepared = true
+                    player.setOnCompletionListener { playing = false; completed = true; positionMs = player.duration }
+                }
+                if (completed) { player.seekTo(0); completed = false; positionMs = 0 }
+                try { player.playbackParams = player.playbackParams.setSpeed(playbackSpeed.toFloat()) } catch (_: Exception) {}
+                player.start()
+                playing = true
+            } catch (_: Exception) {
+                playing = false
+            } finally {
+                loading = false
+            }
+        }
+    }
+    val fallbackMs = attachment.durationSeconds * 1000
+    val total = totalMs ?: fallbackMs
+    val progress = if (total <= 0) 0f else (positionMs.toFloat() / total).coerceIn(0f, 1f)
     Row(
         Modifier
             .width(250.dp)
@@ -1047,30 +1129,35 @@ private fun VoiceNoteCard(
         Box(
             Modifier
                 .size(34.dp)
-                // Dart _VoiceNotePlayer: playButtonColor ?? accentColor.
                 .background(playButtonColor ?: accentColor, CircleShape)
                 .pointerInput(attachment.id) {
-                    detectTapGestures(onTap = { onPlay?.invoke(attachment) })
+                    detectTapGestures(onTap = { toggle() })
                 },
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                Icons.Rounded.PlayArrow,
-                contentDescription = "Play voice note",
-                tint = Color.White,
-                modifier = Modifier.size(20.dp),
-            )
+            if (loading) {
+                androidx.compose.material3.CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White,
+                )
+            } else {
+                Icon(
+                    if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                    contentDescription = if (playing) "Pause voice note" else "Play voice note",
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
         Box(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(3.dp)
-                    .background(textColor.copy(alpha = 0.24f), RoundedCornerShape(3.dp)),
+            androidx.compose.material3.LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(3.dp)),
+                color = playingBarColor ?: MaterialTheme.colorScheme.primary,
+                trackColor = (playingBarColor ?: MaterialTheme.colorScheme.primary).copy(alpha = 0.24f),
             )
-            Box(Modifier.height(4.dp))
-            Text(label, color = textColor.copy(alpha = 0.7f), fontSize = 10.5.sp)
+            Box(Modifier.height(5.dp))
+            Text("${fmt(positionMs)} / ${fmt(total)}", color = textColor.copy(alpha = 0.75f), fontSize = 10.5.sp)
         }
     }
 }
