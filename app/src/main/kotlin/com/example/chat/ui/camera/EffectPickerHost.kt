@@ -1,5 +1,7 @@
 package com.example.chat.ui.camera
 
+import androidx.compose.ui.unit.dp
+
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.runtime.Composable
@@ -10,7 +12,7 @@ import com.example.chat.ServiceLocator
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EffectPickerHost(onDismiss: () -> Unit) {
-    ModalBottomSheet(shape = com.example.chat.ui.kit.ChatyModalShape,
+    ModalBottomSheet(tonalElevation = 0.dp, shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = onDismiss,
         containerColor = Color.Transparent,
         dragHandle = null,
