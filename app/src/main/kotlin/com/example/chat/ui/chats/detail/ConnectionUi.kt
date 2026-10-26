@@ -37,6 +37,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -63,6 +64,29 @@ fun ConnectionHealthIndicator(
     onTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
+    if (onTap == null) {
+        ConnectionHealthBars(health, size, modifier)
+    } else {
+        // Explicit 48dp tap box centered on the icon; the drawn icon keeps its size. It is the only
+        // tap target (the bars themselves are not clickable), so no hidden area spreads over the name.
+        Box(
+            modifier
+                .size(maxOf(size, 48.dp))
+                .semantics(mergeDescendants = true) {
+                    onClick(label = "Open connection details") { onTap(); true }
+                }
+                .pointerInput(onTap) { detectTapGestures(onTap = { onTap() }) },
+            contentAlignment = Alignment.Center,
+        ) { ConnectionHealthBars(health, size, Modifier) }
+    }
+}
+
+@Composable
+private fun ConnectionHealthBars(
+    health: ConnectionHealth,
+    size: Dp,
+    modifier: Modifier,
+) {
     val semanticLabel = when (health) {
         ConnectionHealth.excellent -> "Connection excellent"
         ConnectionHealth.weak -> "Connection weak"
@@ -86,9 +110,6 @@ fun ConnectionHealthIndicator(
         modifier
             .size(size)
             .semantics { contentDescription = semanticLabel }
-            .pointerInput(onTap) {
-                if (onTap != null) detectTapGestures(onTap = { onTap() })
-            }
             .drawBehind {
                 val barCount = 3
                 val spacing = this.size.width * 0.15f
