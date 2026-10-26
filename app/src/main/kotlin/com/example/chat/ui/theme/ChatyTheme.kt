@@ -127,6 +127,6 @@ fun ChatyTheme(config: ThemeConfig, content: @Composable () -> Unit) {
         LocalAppColors provides appColors,
         LocalChatColors provides chatColors,
     ) {
-        MaterialTheme(colorScheme = scheme, content = content)
+        MaterialTheme(colorScheme = scheme, typography = com.example.chat.ui.core.theme.ChatyTypography.base(config.fontScale), content = content)
     }
 }
