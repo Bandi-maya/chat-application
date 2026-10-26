@@ -10,7 +10,7 @@ import com.example.chat.ServiceLocator
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EffectPickerHost(onDismiss: () -> Unit) {
-    ModalBottomSheet(
+    ModalBottomSheet(shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = onDismiss,
         containerColor = Color.Transparent,
         dragHandle = null,
