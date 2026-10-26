@@ -138,7 +138,7 @@ class AndroidLockBiometrics(private val context: Context) : LockBiometrics {
         lateinit var prompt: BiometricPrompt
         val callback = object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                finish(generation == myGeneration)
+                finish(!LockBiometricPolicy.isStale(myGeneration, generation, session.stopped))
             }
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                 if (errorCode == BiometricPrompt.ERROR_CANCELED && session.ignoreCanceled()) return // wait for resume
@@ -152,10 +152,10 @@ class AndroidLockBiometrics(private val context: Context) : LockBiometrics {
         lifecycleObserverHolder = object : DefaultLifecycleObserver {
             override fun onPause(owner: LifecycleOwner) { session.onPause() }
             override fun onResume(owner: LifecycleOwner) {
-                if (generation == myGeneration && session.onResume()) {
+                if (!LockBiometricPolicy.isStale(myGeneration, generation, session.stopped) && session.onResume()) {
                     // Dart posts the re-authenticate to the UI queue because the prompt cannot show mid-resume.
                     android.os.Handler(android.os.Looper.getMainLooper()).post {
-                        if (!session.stopped && generation == myGeneration && cont.isActive) {
+                        if (!LockBiometricPolicy.isStale(myGeneration, generation, session.stopped) && cont.isActive) {
                             try { prompt.authenticate(info) } catch (_: Throwable) { finish(false) }
                         }
                     }
