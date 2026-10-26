@@ -1,5 +1,9 @@
 package com.example.chat.ui.settings
 
+import androidx.compose.ui.semantics.clearAndSetSemantics
+
+import androidx.compose.foundation.selection.toggleable
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -180,21 +185,16 @@ fun SettingsSwitchTile(
 ) {
     val colors = LocalAppColors.current
     Row(
-        Modifier.fillMaxWidth().clickable { onChange(!value) }.padding(horizontal = 12.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().toggleable(value = value, role = androidx.compose.ui.semantics.Role.Switch, onValueChange = onChange).padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         SettingsIconSlot(glyph, iconTint)
         Spacer(Modifier.width(12.dp))
         RowText(title, subtitle, Modifier.weight(1f))
         Spacer(Modifier.width(8.dp))
-        Switch(
-            checked = value,
-            onCheckedChange = onChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = colors.onPrimary,
-                checkedTrackColor = colors.primary,
-            ),
-        )
+        Box(Modifier.clearAndSetSemantics { }) {
+            com.example.chat.ui.kit.GbCustomSwitch(value, onChange, interactive = false)
+        }
     }
 }
 
@@ -206,27 +206,12 @@ fun SettingsChoiceTile(
     selected: String,
     onSelect: (String) -> Unit,
 ) {
-    val colors = LocalAppColors.current
-    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
-        Text(title, color = colors.foreground, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(6.dp))
-        options.forEach { option ->
-            Row(
-                Modifier.fillMaxWidth().clickable { onSelect(option) }.padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Box(
-                    Modifier.size(20.dp).clip(CircleShape)
-                        .border(BorderStroke(2.dp, if (option == selected) colors.primary else colors.border), CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (option == selected) Box(Modifier.size(10.dp).clip(CircleShape).background(colors.primary))
-                }
-                Text(option, color = colors.foreground, fontSize = 14.sp)
-            }
-        }
-    }
+    var showChoices by remember { mutableStateOf(false) }
+    com.example.chat.ui.kit.ChatyChoiceTile("$title: $selected", { showChoices = true }, Modifier.fillMaxWidth().padding(12.dp))
+    if (showChoices) com.example.chat.ui.kit.ChatySingleChoiceModal(
+        title = "Select $title", value = selected, options = options, labelBuilder = { it },
+        onDismiss = { showChoices = false }, onApply = { choice -> onSelect(choice); showChoices = false },
+    )
 }
 
 /** Port of ChatySliderTile (divisions = number of intervals, as in Flutter). */
