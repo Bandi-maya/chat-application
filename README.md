@@ -9,7 +9,7 @@ This branch contains the native Android/Kotlin port of `api@3bee780d`, using Jet
 - Native Android module: `app/`
 - Native build and smoke workflow: `.github/workflows/build-kotlin-apk.yml`
 
-Copy root `.env.example` to ignored root `.env`, set your existing public backend routing values, then rebuild. Never put credentials or private server keys there: these values are compiled into the APK. Firebase setup remains separately deferred.
+Copy root `.env.example` to ignored root `.env`, set public routing overrides only if needed, then rebuild. The supplied defaults are centralized in BackendRoutingPolicy.kt; see the setup guide. Never put credentials or private server keys there: these values are compiled into the APK. Firebase setup remains separately deferred.
 
 After installing the documented Java/Gradle/Android SDK/NDK/Rust/cargo-ndk prerequisites:
 
