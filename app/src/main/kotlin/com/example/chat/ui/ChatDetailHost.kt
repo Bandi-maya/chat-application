@@ -137,6 +137,7 @@ fun ChatDetailHost(
     }
     val lookup: (String) -> com.example.chat.domain.models.UserProfile? = { id -> api.users.firstOrNull { it.id == id } }
 
+    val attachments = rememberChatAttachments(conversation.id) { rev++ }
     ChatDetailScreen(
         conversation = live,
         messages = messages,
@@ -261,6 +262,18 @@ fun ChatDetailHost(
             conv.micSendBgCircleColor, conv.textEntryBackgroundColor, conv.textEntryColor,
         ),
         composerTemplate = ServiceLocator.templateController.composer,
+        onAttachmentAction = { action ->
+            when (action) {
+                com.example.chat.ui.chats.detail.AttachmentAction.image -> attachments.onMedia("image")
+                com.example.chat.ui.chats.detail.AttachmentAction.video -> attachments.onMedia("video")
+                com.example.chat.ui.chats.detail.AttachmentAction.document -> attachments.onMedia("document")
+                com.example.chat.ui.chats.detail.AttachmentAction.audio -> attachments.onMedia("audio")
+                com.example.chat.ui.chats.detail.AttachmentAction.task -> taskEditor = Triple(true, null, null)
+                else -> toast("This attachment type is not connected in this build yet.")
+            }
+        },
+        onGalleryTap = { attachments.onMedia("image") },
+        onAudioTap = { attachments.onMedia("audio") },
     )
 
     if (gateOpen) {
