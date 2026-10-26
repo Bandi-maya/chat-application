@@ -52,6 +52,7 @@ class ChatyApplication : Application() {
             val backend = ServiceLocator.apiBackend
             if (backend.isAuthenticated) {
                 backend.onAppResumed()
+                try { ServiceLocator.callLifecycle.onAppResumed() } catch (e: Exception) { android.util.Log.w("ChatyApplication", "call resume sync failed: $e") }
                 ServiceLocator.appScope.launch {
                     try {
                         ServiceLocator.contactRelationships.registerCurrentDevice()
