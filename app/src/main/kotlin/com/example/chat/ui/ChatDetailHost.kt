@@ -62,6 +62,7 @@ import org.json.JSONObject
  *  Known deviations are listed in docs/chat-detail-host-deviations.md semantics:
  *  presence refresh is a 3s tick (richRealtime exposes no listener API);
  *  forward sends text only; task modal has no source-message link param. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun ChatDetailHost(
     conversation: Conversation,
