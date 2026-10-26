@@ -16,10 +16,11 @@ import com.example.chat.core.theme.BubbleStyleId
 import kotlin.math.min
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 
-/** Exact port of lib/ui/core/bubbles/bubble_geometry.dart's getBubblePath and
- *  bubble_painter.dart (fill, outline, drop shadow, decorative accents) to a
- *  Compose DrawScope. Flutter arcToPoint quarter-corners map to arcTo with
- *  axis-aligned rects; coordinates are y-down in both engines. */
+/** Compose port of lib/ui/core/bubbles/bubble_geometry.dart getBubblePath and
+ *  bubble_painter.dart (fill, outline, drop shadow, decorative accents) for the
+ *  first style of each shape group. Ids that used to share a silhouette get their
+ *  own Chaty vector in BubbleDistinctStyles.kt (not a replica of the original art).
+ *  Flutter arcToPoint quarter-corners map to arcTo with axis-aligned rects; coordinates are y-down in both engines. */
 
 private fun rrect(
     rect: Rect,
@@ -47,6 +48,8 @@ fun bubblePath(styleId: BubbleStyleId, size: Size, isMe: Boolean): Path {
     val bottom = size.height
     val height = size.height
     val full = Rect(left, top, right, bottom)
+
+    distinctBubblePath(styleId, size, isMe)?.let { return it }
 
     return when (styleId) {
         // 1. Cr Messenger: super-ellipse pill with subtle pinched tail
@@ -381,6 +384,8 @@ private fun DrawScope.drawBubbleAccents(
     val top = 0f
     val right = size.width
     val bottom = size.height
+
+    if (drawDistinctAccents(styleId, isMe, fillColor, strokeColor, accentColor)) return
 
     when (styleId) {
         // Kitty: subtle cute ear outline at the top corner.
