@@ -106,4 +106,30 @@ class ApiDeviceTokenClientParityTest {
         registrar.onTokenReceived("fcm-4")
         assertEquals(1, t.calls.size)
     }
+
+    @Test
+    fun syncOnLoginFetchesCurrentTokenWhenNoneRemembered() {
+        val t = FakeTransport()
+        var fetches = 0
+        val registrar = FcmTokenRegistrar(client(t), tokenFetcher = { ok, _ -> fetches++; ok("fcm-fetched") })
+        registrar.syncTokenOnLogin()
+        assertEquals(1, fetches)
+        assertEquals(1, t.calls.size)
+        // The fetched token is remembered: the next sync re-pushes it without another fetch.
+        registrar.syncTokenOnLogin()
+        assertEquals(1, fetches)
+        assertEquals(2, t.calls.size)
+    }
+
+    @Test
+    fun fetchFailureAndEmptyTokenDoNotRegisterOrThrow() {
+        val t = FakeTransport()
+        val logs = mutableListOf<String>()
+        FcmTokenRegistrar(client(t), log = { logs.add(it) }, tokenFetcher = { _, err -> err(IllegalStateException("no app")) })
+            .fetchAndRegisterToken()
+        FcmTokenRegistrar(client(t), tokenFetcher = { ok, _ -> ok("") }).fetchAndRegisterToken()
+        FcmTokenRegistrar(client(t), tokenFetcher = { _, _ -> throw IllegalStateException("FirebaseApp") }).fetchAndRegisterToken()
+        assertTrue(t.calls.isEmpty())
+        assertTrue(logs.single().contains("Failed to get FCM token"))
+    }
 }
