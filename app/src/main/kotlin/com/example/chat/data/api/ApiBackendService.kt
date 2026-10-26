@@ -26,7 +26,8 @@ class ApiBackendService(
     chatTransport: ApiHttpTransport = OkHttpApiTransport(),
 ) {
 
-    val config = ApiBackendConfig(context)
+    private val authScopeLock = Any()
+    val config = ApiBackendConfig(context, authScopeLock, ::notifyAuthScopeTransition)
 
     private val prefs = context.applicationContext
         .getSharedPreferences("chaty_api_backend", Context.MODE_PRIVATE)
@@ -57,7 +58,23 @@ class ApiBackendService(
         token = { session.token },
     )
 
-    private val session = ApiAuthSession(sessionStore)
+    private val session = ApiAuthSession(sessionStore, authScopeLock, ::notifyAuthScopeTransition)
+    private val authScopeOwner = ApiAccountScopeOwner(authScopeLock, session::snapshot, config::snapshot)
+    fun authSnapshot(): ApiAccountScope = authScopeOwner.snapshot()
+    fun withAuthScope(expected: ApiAccountScope, block: () -> Unit): Boolean = authScopeOwner.withScope(expected, block)
+    private val authScopeListeners = java.util.concurrent.CopyOnWriteArraySet<(ApiAccountScope) -> Unit>()
+    /** Listener fires synchronously under transition lock, no polling gap. Cancellation only: no IO,
+     * blocking, UI, reentrant auth/config mutation, or unguarded deferred payload. */
+    fun addAuthScopeListener(listener: (ApiAccountScope) -> Unit) = synchronized(authScopeLock) {
+        authScopeListeners.add(listener)
+        listener(authSnapshot())
+    }
+    fun removeAuthScopeListener(listener: (ApiAccountScope) -> Unit) { authScopeListeners.remove(listener) }
+    private fun notifyAuthScopeTransition() {
+        val next = authSnapshot()
+        authScopeListeners.forEach { listener -> runCatching { listener(next) } }
+    }
+
 
     private val chat = ApiChatClient(
         baseUrl = { config.restApiBaseUrl },
@@ -138,9 +155,40 @@ class ApiBackendService(
     fun addCallSignalListener(listener: (Map<String, Any?>) -> Unit) = callSignalListeners.add(listener)
     /** Dart ApiBackendService.sendCallSignal: fire-and-forget call signaling
      *  over the custom-backend WebSocket (payload type call_signal). */
-    fun sendCallSignal(targetUserId: String, data: Map<String, Any?>): Boolean =
-        realtime.sendCallSignal(targetUserId, data)
+    fun sendCallSignal(targetUserId: String, data: Map<String, Any?>): Boolean {
+        val expected = authSnapshot()
+        var queued = false
+        withAuthScope(expected) { queued = realtime.sendCallSignal(targetUserId, data) }
+        callCoordinator.send(expected, targetUserId, data)
+        return queued // Socket enqueue only, never delivery confirmation.
+    }
     fun removeCallSignalListener(listener: (Map<String, Any?>) -> Unit) { callSignalListeners.remove(listener) }
+
+    private val scopedCallListeners = java.util.concurrent.CopyOnWriteArrayList<(ApiAccountScope, Map<String, Any?>) -> Unit>()
+    fun addScopedCallSignalListener(listener: (ApiAccountScope, Map<String, Any?>) -> Unit) = scopedCallListeners.add(listener)
+    private val callRequests = CallRequestRegistry()
+    private val callCoordinator by lazy {
+        ScopedCallCoordinator(chatScope, ::authSnapshot, ::withAuthScope,
+            clientFor = { expected, wire ->
+                ApiCallSignalClient({ if (authSnapshot() === expected) wire else null },
+                    ScopedCallHttpTransport(expected, ::withAuthScope, callRequests))
+            }, cancelRequests = callRequests::cancelAll,
+            deliver = { expected, data -> scopedCallListeners.forEach { it(expected, data) } },
+            clock = { android.os.SystemClock.elapsedRealtime() })
+    }
+    private fun startCallScopeMonitoring() {
+        addAuthScopeListener(callCoordinator::transition)
+        // connect posts work; the callback itself must stay short under authScopeLock.
+        addAuthScopeListener { realtime.connect() }
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            val lifecycle = androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle
+            callCoordinator.foreground(lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED))
+            lifecycle.addObserver(androidx.lifecycle.LifecycleEventObserver { _, event ->
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_START) callCoordinator.foreground(true)
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) callCoordinator.foreground(false)
+            })
+        }
+    }
 
     /** Dart getWebSocketUrl with configured override and REST-derived fallback.
      *  User id falls back to JWT uid/sub when the saved user id is empty. */
@@ -221,8 +269,10 @@ class ApiBackendService(
         }
 
         override fun onMessageDeleted(roomId: String, messageId: String) {
+            var gone: List<com.example.chat.data.local.AttachmentRef> = emptyList()
             synchronized(chatLock) {
                 val list = _messages[roomId] ?: return@synchronized
+                gone = com.example.chat.data.media.AttachmentRefs.refsOf(roomId, list.filter { it.id == messageId })
                 list.removeAll { it.id == messageId }
                 val convIdx = _conversations.indexOfFirst { it.id == roomId }
                 if (convIdx != -1) {
@@ -236,29 +286,47 @@ class ApiBackendService(
                     )
                 }
             }
+            notifyGone(gone)
             notifyChatListeners()
         }
 
         override fun onMessagesCleared(roomId: String) {
+            var gone: List<com.example.chat.data.local.AttachmentRef> = emptyList()
             synchronized(chatLock) {
+                gone = com.example.chat.data.media.AttachmentRefs.refsOf(roomId, _messages[roomId] ?: emptyList())
                 _messages[roomId]?.clear()
                 val convIdx = _conversations.indexOfFirst { it.id == roomId }
                 if (convIdx != -1) {
                     _conversations[convIdx] = _conversations[convIdx].copy(lastMessageText = "")
                 }
             }
+            notifyGone(gone)
             notifyChatListeners()
         }
 
-        override fun onCallSignal(data: Map<String, Any?>) {
-            callSignalListeners.forEach { it(data) }
+        override fun onScopedCallSignal(data: Map<String, Any?>, capturedScope: Any?) {
+            val expected = capturedScope as? ApiAccountScope ?: return
+            callCoordinator.socketSignal(expected, data)
         }
     }
 
     private val realtime = ApiRealtimeClient(
         webSocketUrl = { resolveWebSocketUrl() },
         token = { session.token },
+        backoff = com.example.chat.data.network.BackoffPolicy(),
+        connectionScopeIdentity = { authSnapshot() },
+        connectionScopeGuard = { expected, action -> (expected as? ApiAccountScope)?.let { withAuthScope(it, action) } ?: false },
     ).apply { listener = realtimeListener }
+
+    /** Network regained after loss: reconnect the socket now instead of waiting out the backoff.
+     *  No-op while connected, connecting or signed out. */
+    fun onNetworkRegained() = realtime.reconnectNow()
+
+    /** Invalidates local media copies for deleted/removed messages. Set by the locator BEFORE initialize(). */
+    @Volatile var onAttachmentsGone: (List<com.example.chat.data.local.AttachmentRef>) -> Unit = {}
+    private fun notifyGone(refs: List<com.example.chat.data.local.AttachmentRef>) {
+        if (refs.isNotEmpty()) runCatching { onAttachmentsGone(refs) }
+    }
 
     private val chatScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val chatLock = Any()
@@ -335,14 +403,18 @@ class ApiBackendService(
      *  whose text is absent from the remote list survive; merged + sorted. */
     suspend fun loadMessages(chatId: String) {
         val remote = withContext(Dispatchers.IO) { chat.listMessages(chatId) } ?: return
+        var gone: List<com.example.chat.data.local.AttachmentRef> = emptyList()
         synchronized(chatLock) {
             val current = _messages[chatId] ?: mutableListOf()
             val pending = current.filter { m ->
                 (m.deliveryState == DeliveryState.sending || m.id.startsWith("temp_")) &&
                     remote.none { it.text == m.text }
             }
-            _messages[chatId] = (remote + pending).sortedBy { it.createdAt }.toMutableList()
+            val merged = (remote + pending).sortedBy { it.createdAt }.toMutableList()
+            gone = com.example.chat.data.media.AttachmentRefs.refsGone(chatId, current.toList(), merged)
+            _messages[chatId] = merged
         }
+        notifyGone(gone)
         notifyChatListeners()
     }
 
@@ -400,11 +472,14 @@ class ApiBackendService(
      *  + active id), notify, then the backend DELETE with errors
      *  swallowed. */
     suspend fun deleteConversation(chatId: String) {
+        var gone: List<com.example.chat.data.local.AttachmentRef> = emptyList()
         synchronized(chatLock) {
+            gone = com.example.chat.data.media.AttachmentRefs.refsOf(chatId, _messages[chatId] ?: emptyList())
             _conversations.removeAll { it.id == chatId }
             _messages.remove(chatId)
             if (activeConversationId == chatId) activeConversationId = null
         }
+        notifyGone(gone)
         notifyChatListeners()
         withContext(Dispatchers.IO) { chat.deleteRoom(chatId) }
     }
@@ -455,6 +530,7 @@ class ApiBackendService(
                 delay(4000)
                 if (session.token == null) break
                 ticks++
+                callCoordinator.tick()
                 // Flutter's sync loop also recovers an absent WebSocket. connect()
                 // is idempotent while connecting/connected and retains the configured URL.
                 if (!realtime.isConnected) realtime.connect()
@@ -488,9 +564,11 @@ class ApiBackendService(
 
     /** Dart deleteMessage: local removal + preview recompute, then DELETE. */
     suspend fun deleteMessage(chatId: String, messageId: String) {
+        var gone: List<com.example.chat.data.local.AttachmentRef> = emptyList()
         synchronized(chatLock) {
             val list = _messages[chatId]
             if (list != null) {
+                gone = com.example.chat.data.media.AttachmentRefs.refsOf(chatId, list.filter { it.id == messageId })
                 list.removeAll { it.id == messageId }
                 val convIdx = _conversations.indexOfFirst { it.id == chatId }
                 if (convIdx != -1) {
@@ -505,19 +583,23 @@ class ApiBackendService(
                 }
             }
         }
+        notifyGone(gone)
         notifyChatListeners()
         withContext(Dispatchers.IO) { chat.deleteMessage(chatId, messageId) }
     }
 
     /** Dart clearConversationMessages: local clear + preview, then DELETE all. */
     suspend fun clearConversationMessages(chatId: String) {
+        var gone: List<com.example.chat.data.local.AttachmentRef> = emptyList()
         synchronized(chatLock) {
+            gone = com.example.chat.data.media.AttachmentRefs.refsOf(chatId, _messages[chatId] ?: emptyList())
             _messages[chatId] = mutableListOf()
             val convIdx = _conversations.indexOfFirst { it.id == chatId }
             if (convIdx != -1) {
                 _conversations[convIdx] = _conversations[convIdx].copy(lastMessageText = "")
             }
         }
+        notifyGone(gone)
         notifyChatListeners()
         withContext(Dispatchers.IO) { chat.clearMessages(chatId) }
     }
@@ -667,6 +749,7 @@ class ApiBackendService(
     fun initialize() {
         if (initialized) return
         initialized = true
+        startCallScopeMonitoring()
         config.init()
         session.restore()
         // Dart initialize(): restore _currentOrg from the persisted org payload.
