@@ -161,7 +161,10 @@ fun GlobalSearchScreen(
         }
     }
 
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    LaunchedEffect(Unit) {
+        androidx.compose.runtime.withFrameNanos { }
+        runCatching { focusRequester.requestFocus() }
+    }
 
     Column(modifier = modifier.fillMaxSize().background(colors.background)) {
         // ChatyAppBar equivalent: back + the 40dp pill search field + the
