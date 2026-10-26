@@ -26,6 +26,7 @@ val hostedSettingsDestinations: Set<SettingsDestination> = setOf(
     SettingsDestination.Conversation, SettingsDestination.HomeScreen, SettingsDestination.Calls,
     SettingsDestination.Permissions, SettingsDestination.StorageMedia,
     SettingsDestination.TemplateStudio, SettingsDestination.ThemeEngine,
+    SettingsDestination.HomeShortcuts, SettingsDestination.WasteCleaning,
 )
 
 /**
@@ -34,7 +35,11 @@ val hostedSettingsDestinations: Set<SettingsDestination> = setOf(
  * (the caller keeps its honest "not hosted" state for those).
  */
 @Composable
-fun SettingsSubHost(destination: SettingsDestination, onBack: () -> Unit): Boolean {
+fun SettingsSubHost(
+    destination: SettingsDestination,
+    onBack: () -> Unit,
+    onSwitch: (SettingsDestination) -> Unit = {},
+): Boolean {
     val prefs = ServiceLocator.preferencesController
     val theme = ServiceLocator.themeController
     val context = LocalContext.current
@@ -256,6 +261,16 @@ fun SettingsSubHost(destination: SettingsDestination, onBack: () -> Unit): Boole
                     onMessage = toast,
                 )
             }
+        }
+        // Dart openWasteCleaning / openHomeShortcuts: modal sheets over the settings root.
+        SettingsDestination.WasteCleaning -> com.example.chat.ui.settings.gb.GbStandaloneSheet(onDismiss = onBack) {
+            com.example.chat.ui.settings.gb.GbWasteCleaningSheetContent(onDismissSheet = onBack, toast = toast)
+        }
+        SettingsDestination.HomeShortcuts -> com.example.chat.ui.settings.gb.GbStandaloneSheet(onDismiss = onBack) {
+            com.example.chat.ui.settings.gb.GbHomeShortcutsSheetContent(
+                onDismissSheet = onBack,
+                onOpenHome = { onSwitch(SettingsDestination.HomeScreen) },
+            )
         }
         else -> return false
     }
