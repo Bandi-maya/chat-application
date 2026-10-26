@@ -103,6 +103,7 @@ fun AppRoot() {
             // Dart _scheduleInitialAppLockIfNeeded on reaching the authenticated shell.
             if (route == AuthRoute.Home) ServiceLocator.appLock.scheduleInitialIfNeeded()
         }
+        androidx.compose.runtime.LaunchedEffect(Unit) { try { ServiceLocator.startBadgeSync() } catch (_: Exception) {} }
         androidx.compose.runtime.LaunchedEffect(Unit) {
             // Dart _AppState.initState: locator<MessageAutomationService>() (30s account sync, gated on a session).
             ServiceLocator.messageAutomation
