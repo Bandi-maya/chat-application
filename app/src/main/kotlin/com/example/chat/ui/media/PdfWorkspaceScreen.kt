@@ -301,10 +301,10 @@ fun PdfWorkspaceScreen(
 
     // Success sheet
     successSheet?.let { (title, outputPath) ->
-        ModalBottomSheet(
+        ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp,
             onDismissRequest = { successSheet = null },
             containerColor = if (isDark) Color(0xFF141923) else Color.White,
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            shape = com.example.chat.ui.kit.ChatyModalShape,
         ) {
             val file = File(outputPath)
             val sizeStr = if (file.exists()) "%.1f KB".format(file.length() / 1024.0) else ""
