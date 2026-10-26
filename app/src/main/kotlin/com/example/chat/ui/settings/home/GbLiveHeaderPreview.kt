@@ -71,6 +71,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import com.example.chat.ui.core.theme.ChatyColors
 import com.example.chat.ui.navigation.CurvedRadialDrawerShell
+import com.example.chat.ui.navigation.NavDestinationIcon
 import com.example.chat.core.preferences.HomePresetNormalizer
 import com.example.chat.domain.models.Conversation
 import com.example.chat.domain.models.ConversationType
@@ -345,7 +346,10 @@ private fun InstagramBottomBar(t: ThemeConfig) {
 @Composable
 private fun RowScope.PreviewTab(t: ThemeConfig, icon: ImageVector, label: String, selected: Boolean = false) {
     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Ic(icon, if (selected) col(t.accentColor) else col(t.secondaryTextColor), 15.dp)
+        val tint = if (selected) col(t.accentColor) else col(t.secondaryTextColor)
+        // Same icon registry the real navigation uses for these destinations.
+        val navId = when (label) { "Chats" -> "chats"; "Updates" -> "updates"; "Calls" -> "calls"; "Settings" -> "settings"; else -> null }
+        if (navId != null) NavDestinationIcon(navId, size = 15, tint = tint) else Ic(icon, tint, 15.dp)
         Spacer(Modifier.height(2.dp))
         Text(
             label, maxLines = 1, overflow = TextOverflow.Ellipsis,
