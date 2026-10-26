@@ -152,6 +152,7 @@ object ServiceLocator {
     }
     /** Dart locator<EffectEngine>: one shared engine for the picker sheet and the camera. */
     val effectEngine: com.example.chat.ui.camera.EffectEngine by lazy { com.example.chat.ui.camera.EffectEngine() }
+    val nativeCallPip: com.example.chat.data.services.NativeCallPipService by lazy { com.example.chat.data.services.NativeCallPipService() }
     val appIconController: com.example.chat.ui.settings.appicon.AppIconController by lazy {
         com.example.chat.ui.settings.appicon.AppIconController(
             bridge = appIconBridge,
