@@ -5,7 +5,12 @@ import com.example.chat.BuildConfig
 
 /** Exact port of lib/data/services/backend_config.dart (ApiBackendConfig):
  *  tenant selection + REST base URL resolution + SharedPreferences persistence. */
-class ApiBackendConfig(context: Context) {
+class ApiBackendConfig(context: Context, private val scopeLock: Any = Any(), private val onTransition: () -> Unit = {}) {
+    private var generation: Long = 0
+    fun snapshot(): ApiRoutingSnapshot = synchronized(scopeLock) {
+        ApiRoutingSnapshot(tenantId, restApiBaseUrl,
+            BackendRoutingPolicy.websocketTemplate(DOTENV_WEBSOCKET_URL, WEBSOCKET_URL_OVERRIDE), generation)
+    }
 
     private val prefs = context.applicationContext
         .getSharedPreferences("chaty_api_backend_config", Context.MODE_PRIVATE)
@@ -20,16 +25,19 @@ class ApiBackendConfig(context: Context) {
         get() = useDefault || customTenantId.isNullOrBlank()
 
     /** Dart init(): restore the persisted tenant selection. */
-    fun init() {
+    fun init() = synchronized(scopeLock) {
+        generation++
         try {
             useDefault = prefs.getBoolean(KEY_USE_DEFAULT_TENANT, false)
             val saved = prefs.getString(KEY_ACTIVE_TENANT_ID, null)
             if (!saved.isNullOrBlank()) customTenantId = saved.trim()
         } catch (_: Exception) {
         }
+        onTransition()
     }
 
-    fun setTenantId(tenant: String?, useDefault: Boolean = false) {
+    fun setTenantId(tenant: String?, useDefault: Boolean = false) = synchronized(scopeLock) {
+        generation++
         this.useDefault = useDefault
         prefs.edit().putBoolean(KEY_USE_DEFAULT_TENANT, useDefault).apply()
         if (useDefault || tenant.isNullOrBlank()) {
@@ -40,6 +48,7 @@ class ApiBackendConfig(context: Context) {
             customTenantId = clean
             prefs.edit().putString(KEY_ACTIVE_TENANT_ID, clean).apply()
         }
+        onTransition()
     }
 
     fun getSavedTenantId(): String? =
