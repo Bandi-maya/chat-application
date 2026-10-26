@@ -29,7 +29,7 @@ import androidx.compose.material.icons.rounded.Screenshot
 import androidx.compose.material.icons.rounded.Style
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.VerifiedUser
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
@@ -413,7 +413,7 @@ private fun LockOverlayDialog(
 private fun SecretPhraseDialog(result: CompletableDeferred<String?>) {
     val colors = LocalAppColors.current
     var text by remember { mutableStateOf("") }
-    AlertDialog(
+    AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = { result.complete(null) },
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -448,7 +448,7 @@ private fun SecretPhraseDialog(result: CompletableDeferred<String?>) {
 @Composable
 private fun SafetyNumberDialog(onClose: () -> Unit) {
     val colors = LocalAppColors.current
-    AlertDialog(
+    AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = onClose,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
