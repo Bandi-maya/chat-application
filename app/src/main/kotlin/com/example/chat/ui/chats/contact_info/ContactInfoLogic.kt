@@ -26,7 +26,7 @@ object ContactInfoLogic {
         val local = lastSeen.atZone(zone)
         val hh = local.hour.toString().padStart(2, '0')
         val mm = local.minute.toString().padStart(2, '0')
-        val today = LocalDate.now(zone)
+        val today = now.atZone(zone).toLocalDate()
         return if (local.toLocalDate() == today) {
             "Last seen today at $hh:$mm"
         } else {
