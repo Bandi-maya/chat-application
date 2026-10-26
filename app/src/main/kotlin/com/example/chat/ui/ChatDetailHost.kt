@@ -121,6 +121,40 @@ fun ChatDetailHost(
     val myId = me?.id ?: ""
     val live = api.conversations.firstOrNull { it.id == conversation.id } ?: conversation
     val messages = api.getMessages(conversation.id)
+    // Refresh epoch outside the auth lock, then confirm the SAME captured account and pure epoch together.
+    fun captureMediaBinding(): com.example.chat.ui.chats.detail.AttachmentConsumerBinding? {
+        val account = api.authSnapshot()
+        val stamp = ServiceLocator.attachmentResolver.currentSession() ?: return null
+        var coherent = false
+        api.withAuthScope(account) { coherent = ServiceLocator.attachmentResolver.isEpochCurrent(stamp) }
+        if (!coherent) return null
+        return com.example.chat.ui.chats.detail.AttachmentConsumerBinding(stamp, ServiceLocator.attachmentResolver,
+            { ServiceLocator.attachmentResolver.currentSession() },
+            deliverIfCurrent = { block ->
+                var delivered = false
+                api.withAuthScope(account) {
+                    if (ServiceLocator.attachmentResolver.isEpochCurrent(stamp)) { block(); delivered = true }
+                }
+                delivered
+            },
+        ) { message ->
+            val path = message.attachment?.url ?: throw IllegalStateException("Missing media path")
+            ServiceLocator.chatMedia.createSignedUrl(path, 3600) { account.baseUrl }
+        }
+    }
+    var capturedMedia by remember { mutableStateOf(captureMediaBinding()) }
+    LaunchedEffect(conversation.id) {
+        while (true) {
+            val next = captureMediaBinding()
+            if (next?.session != capturedMedia?.session) capturedMedia = next
+            kotlinx.coroutines.delay(150)
+        }
+    }
+    val mediaStamp = capturedMedia?.session
+    val attachmentBinding = capturedMedia ?: com.example.chat.ui.chats.detail.AttachmentConsumerBinding(
+        "", ServiceLocator.attachmentResolver, { null }, deliverIfCurrent = { _ -> false },
+    ) { throw IllegalStateException("Media identity unavailable") }
+
     val isDirect = live.type == ConversationType.direct
     val otherId = live.participantIds.firstOrNull { it != myId }
     val other = api.users.firstOrNull { it.id == otherId }
@@ -143,7 +177,7 @@ fun ChatDetailHost(
     // 0 none, 1 info (ContactInfo/GroupInfo), 2 contact privacy; viewer = MediaViewerScreen target.
     var infoRoute by remember(conversation.id) { mutableIntStateOf(0) }
     var viewerBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
-    var viewerMessage by remember { mutableStateOf<ChatMessage?>(null) }
+    var viewerMessage by remember(conversation.id, mediaStamp) { mutableStateOf<ChatMessage?>(null) }
     var pollCreateOpen by remember(conversation.id) { mutableStateOf(false) }
     var pollViewId by remember(conversation.id) { mutableStateOf<String?>(null) }
     var appearanceOpen by remember(conversation.id) { mutableStateOf(false) }
@@ -201,6 +235,7 @@ fun ChatDetailHost(
         clearTyping = { scope.launch { try { ServiceLocator.gbFeatures.setTyping(conversation.id, false) } catch (_: Exception) {} } },
     )
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+    androidx.compose.runtime.key(mediaStamp, conversation.id) {
     ChatDetailScreen(
         conversation = live,
         messages = messages,
@@ -343,6 +378,7 @@ fun ChatDetailHost(
                 try { onOpenConversation(repo.getOrCreateDirectConversationAsync(contact)) } catch (_: Exception) {}
             }
         },
+        attachmentBinding = attachmentBinding,
         voiceUrlResolver = { path ->
             ServiceLocator.chatMedia.createSignedUrl(path, 3600, restApiBaseUrl = { ServiceLocator.apiBackend.config.restApiBaseUrl })
         },
@@ -411,6 +447,7 @@ fun ChatDetailHost(
         onVoiceMove = voice.onVoiceMove,
         onVoiceHoldEnd = voice.onVoiceHoldEnd,
     )
+    }
     voice.overlay()
     if (chatCameraOpen) {
         androidx.activity.compose.BackHandler { chatCameraOpen = false }
@@ -535,26 +572,21 @@ fun ChatDetailHost(
             )
         }
     }
-    val vm = viewerMessage
+    val vm = viewerMessage?.let { requested ->
+        messages.firstOrNull { it.id == requested.id && !it.isDeletedForEveryone && !it.isDeletedForMe && !it.isRevokedBySender }
+    }
     val va = vm?.attachment
     if (vm != null && va != null) {
         androidx.activity.compose.BackHandler { viewerMessage = null }
-        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
-            com.example.chat.ui.chats.detail.MediaViewerScreen(
-                theme = theme,
-                title = va.name,
-                type = va.type,
-                size = va.size,
-                storagePath = va.url,
-                sourceBounds = viewerBounds,
-                restrictedViewOnce = vm.metadata["view_once"] == true,
-                createSignedUrl = { path, expires ->
-                    ServiceLocator.chatMedia.createSignedUrl(path, expires) { ServiceLocator.apiBackend.config.restApiBaseUrl }
-                },
-                onBack = { viewerMessage = null },
+        androidx.compose.runtime.key(attachmentBinding.session, conversation.id, vm.id) {
+            com.example.chat.ui.chats.detail.BoundAttachmentViewer(
+                theme, vm, attachmentBinding,
+                restricted = com.example.chat.data.local.AttachmentCachePolicy.viewOnceRestricted(vm.metadata),
+                bounds = viewerBounds, onBack = { viewerMessage = null },
             )
         }
     }
+
     }
 
     if (gateOpen) {
