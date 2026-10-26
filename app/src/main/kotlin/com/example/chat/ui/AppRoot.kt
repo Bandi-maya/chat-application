@@ -371,6 +371,8 @@ fun AppRoot() {
                 val rootPhoto = rememberRootProfilePhoto()
                 var pushedEditProfile by remember { mutableStateOf(false) }
                 var pushedMessageManagement by remember { mutableStateOf(false) }
+                var pushedScheduled by remember { mutableStateOf(false) }
+                var pushedAutoReply by remember { mutableStateOf(false) }
                 var pushedAccount by remember { mutableStateOf(false) }
                 var pushedUniversalAppearance by remember { mutableStateOf(false) }
                 var pushedComponentStyles by remember { mutableStateOf(false) }
@@ -464,8 +466,8 @@ fun AppRoot() {
                                 onScanQr = { linkedDevicesOnly = false; route = AuthRoute.LinkedDevices },
                                 onOpenSettings = { pushedSettings = true },
                                 onOpenThemeStudio = { settingsSub = com.example.chat.ui.settings.SettingsDestination.ThemeEngine },
-                                onOpenMessageScheduler = { pushedMessageManagement = true },
-                                onOpenAutoReplyRules = { pushedMessageManagement = true },
+                                onOpenMessageScheduler = { pushedScheduled = true },
+                                onOpenAutoReplyRules = { pushedAutoReply = true },
                                 onToggleFreezeLastSeen = { frozen ->
                                     shellPrefsCtl.updatePrivacy(shellPrefsCtl.privacy.copy(freezeLastSeen = frozen))
                                 },
@@ -867,6 +869,25 @@ fun AppRoot() {
                                 }
                             },
                             onBack = { pushedSettingsSearch = false },
+                        )
+                    }
+                }
+                if (pushedScheduled) {
+                    androidx.activity.compose.BackHandler { pushedScheduled = false }
+                    Box(Modifier.fillMaxSize()) {
+                        com.example.chat.ui.automation.ScheduledMessagesScreen(
+                            service = ServiceLocator.scheduledMessageService,
+                            conversationsProvider = { ServiceLocator.apiBackend.conversations },
+                            onBack = { pushedScheduled = false },
+                        )
+                    }
+                }
+                if (pushedAutoReply) {
+                    androidx.activity.compose.BackHandler { pushedAutoReply = false }
+                    Box(Modifier.fillMaxSize()) {
+                        com.example.chat.ui.automation.AutoReplyRulesScreen(
+                            engine = ServiceLocator.autoReplyRuleEngine,
+                            onBack = { pushedAutoReply = false },
                         )
                     }
                 }
