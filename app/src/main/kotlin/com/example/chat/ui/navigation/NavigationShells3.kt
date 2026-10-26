@@ -588,13 +588,13 @@ internal fun MoreDestinationsSheet(
     onSelect: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Color.Transparent) {
+    ModalBottomSheet(tonalElevation = 0.dp, dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = onDismiss, containerColor = Color.Transparent) {
         Column(
             modifier = Modifier
                 .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
-                .clip(RoundedCornerShape(24.dp))
+                .clip(com.example.chat.ui.kit.ChatyModalShape)
                 .background(colors.surfaceElevated)
-                .border(0.8.dp, colors.borderSubtle, RoundedCornerShape(24.dp)),
+                .border(0.8.dp, colors.borderSubtle, com.example.chat.ui.kit.ChatyModalShape),
         ) {
             Box(
                 modifier = Modifier
