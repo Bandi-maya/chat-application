@@ -96,6 +96,7 @@ fun ChatyEventToastOverlay(
                     accentColor = Color(latest.colorArgb.toInt()),
                     senderInitials = latest.avatarInitials,
                     canQuickReply = true,
+                    iconData = com.example.chat.ui.island.IslandIconMapper.map(latest.icon),
                 ),
             )
         }
