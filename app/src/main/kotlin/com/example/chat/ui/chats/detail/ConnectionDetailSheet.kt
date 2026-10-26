@@ -68,8 +68,8 @@ fun ConnectionDetailSheetContent(
     Column(
         Modifier
             .fillMaxWidth()
-            .background(Color(theme.backgroundColor), RoundedCornerShape(24.dp))
-            .border(1.dp, Color(theme.dividerColor), RoundedCornerShape(24.dp))
+            .background(Color(theme.backgroundColor), com.example.chat.ui.kit.ChatyModalShape)
+            .border(1.dp, Color(theme.dividerColor), com.example.chat.ui.kit.ChatyModalShape)
             .verticalScroll(rememberScrollState())
             .padding(22.dp),
     ) {
