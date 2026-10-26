@@ -8,6 +8,12 @@ import kotlinx.coroutines.sync.withLock
 interface SnapshotCacheStore {
     suspend fun readJson(userId: String, scope: String): Any?
     suspend fun writeJson(userId: String, scope: String, value: Any?)
+
+    /** Read-only listing of this account's stored snapshot scope names, for
+     *  backup research. Default: none. Names may be filename-sanitised, so every
+     *  returned scope MUST still be verified by readJson (which authenticates the
+     *  exact userId:scope pair) before use. */
+    suspend fun listScopes(userId: String): List<String> = emptyList()
 }
 
 /**
