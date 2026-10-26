@@ -206,7 +206,10 @@ fun ChatDetailHost(
         initialMessageId = initialMessageId,
         currentUserId = myId,
         onBack = onBack,
-        onSend = { text -> api.sendMessage(conversation.id, text) },
+        onSend = { text ->
+            api.sendMessage(conversation.id, text)
+            rt.trackConversation(conversation.id)
+        },
         resolveSenderName = { id ->
             if (id == myId) "You" else (api.users.firstOrNull { it.id == id }?.displayName ?: "Team Member")
         },
