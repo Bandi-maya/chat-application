@@ -26,7 +26,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.HelpOutline
@@ -126,7 +126,7 @@ fun AudioSettingsScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.width(56.dp), contentAlignment = Alignment.Center) {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color(themeConfig.primaryTextColor)) }
+                IconButton(onClick = onBack) { Icon(Icons.Rounded.ChevronLeft, "Back", tint = Color(themeConfig.primaryTextColor)) }
             }
             Spacer(Modifier.width(16.dp))
             Text("Audio & Speakers", color = Color(themeConfig.primaryTextColor), fontSize = (19 * themeConfig.fontScale).sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.3).sp)
