@@ -51,7 +51,7 @@ import androidx.compose.material.icons.rounded.TvOff
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.WarningAmber
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
@@ -101,7 +101,7 @@ private val AudienceOptions = listOf("Everyone", "My Contacts", "My Contacts Exc
 fun WhoCanCallMeDialog(preferences: ChatyPreferencesController, onDismiss: () -> Unit) {
     val colors = LocalAppColors.current
     val prefs = preferences.privacy
-    AlertDialog(
+    AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = onDismiss,
         title = { Text("Who can call me?") },
         text = {
@@ -366,7 +366,7 @@ fun PrivacyCenterScreen(preferences: ChatyPreferencesController, onBack: () -> U
             onCancel = { modal = null },
             onSave = { modal = null; snack("Recovery question saved.") },
         )
-        PrivacyModal.Reset -> AlertDialog(
+        PrivacyModal.Reset -> AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { modal = null },
             title = { Text("Reset Privacy?") },
             text = { Text("This will reset all privacy settings back to WhatsApp default configuration.") },
@@ -398,7 +398,7 @@ private fun CustomPrivacyDialog(preferences: ChatyPreferencesController, title: 
             Checkbox(checked = preferences.gbBool(full, false), onCheckedChange = { preferences.updateGbFeature(full, it); tick++ })
         }
     }
-    AlertDialog(
+    AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = onDone,
         title = { Text("$title Privacy Settings") },
         text = {
@@ -420,7 +420,7 @@ private fun CustomPrivacyDialog(preferences: ChatyPreferencesController, title: 
 private fun RecoveryQuestionDialog(onCancel: () -> Unit, onSave: () -> Unit) {
     var q by remember { mutableStateOf("What is your favorite color?") }
     var a by remember { mutableStateOf("") }
-    AlertDialog(
+    AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = onCancel,
         title = { Text("Recovery Question") },
         text = {
