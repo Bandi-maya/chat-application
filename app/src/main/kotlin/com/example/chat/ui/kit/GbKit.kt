@@ -1,5 +1,9 @@
 package com.example.chat.ui.kit
 
+import androidx.compose.ui.semantics.clearAndSetSemantics
+
+import androidx.compose.foundation.selection.toggleable
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -122,7 +126,7 @@ fun GbModalSheet(
     }
 }
 
-/** GbRadioSelectionModal. [onSelected] is called after the dialog closes, like Dart pop-then-callback. */
+/** Centered settings selection. Draft is discarded on Cancel/X; Apply closes then calls [onSelected]. */
 @Composable
 fun <T> GbRadioSelectionModal(
     title: String,
@@ -135,54 +139,16 @@ fun <T> GbRadioSelectionModal(
     subtitleBuilder: ((T) -> String?)? = null,
     iconBuilder: (@Composable (T) -> Unit)? = null,
 ) {
-    val colors = LocalAppColors.current
-    val config = LocalThemeConfig.current
-    val view = androidx.compose.ui.platform.LocalView.current
-    val accent = Color(config.accentColor)
-    val primary = Color(config.primaryTextColor)
-    GbModalSheet(title = title, subtitle = subtitle, onDismiss = onDismiss) {
-        LazyColumn(Modifier.padding(vertical = 8.dp, horizontal = 10.dp)) {
-            itemsIndexed(options) { i, opt ->
-                val sel = opt == selectedOption
-                val label = labelBuilder?.invoke(opt) ?: opt.toString()
-                val sub = subtitleBuilder?.invoke(opt)
-                Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                        .clickable {
-                            ChatyHapticsPort.selection(view)
-                            onDismiss()
-                            onSelected(opt)
-                        }
-                        .padding(horizontal = 12.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (iconBuilder != null) { iconBuilder(opt); Spacer(Modifier.width(12.dp)) }
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            label,
-                            color = if (sel) primary else primary.copy(alpha = 0.85f),
-                            fontSize = 14.5.sp,
-                            fontWeight = if (sel) FontWeight.W700 else FontWeight.W500,
-                        )
-                        if (!sub.isNullOrEmpty()) {
-                            Spacer(Modifier.height(2.dp))
-                            Text(sub, color = Color(config.secondaryTextColor), fontSize = 12.sp)
-                        }
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Box(
-                        Modifier.size(22.dp).border(2.dp, if (sel) accent else colors.border, CircleShape).padding(3.5.dp),
-                    ) { if (sel) Box(Modifier.fillMaxWidth().height(22.dp).background(accent, CircleShape)) }
-                }
-                if (i < options.lastIndex) {
-                    HorizontalDivider(Modifier.padding(start = 48.dp), color = colors.divider.copy(alpha = 0.4f), thickness = 1.dp)
-                }
-            }
-        }
-    }
+    ChatySingleChoiceModal(
+        title = title, value = selectedOption, options = options,
+        labelBuilder = { labelBuilder?.invoke(it) ?: it.toString() },
+        description = subtitle, descriptionBuilder = { subtitleBuilder?.invoke(it) ?: "" },
+        previewBuilder = iconBuilder, onDismiss = onDismiss,
+        onApply = { choice -> onDismiss(); onSelected(choice) },
+    )
 }
 
-/** ChatyColorPickerModal (bottom sheet). [onColorSelected] receives ARGB Long after Apply. */
+/** Centered color selection. [onColorSelected] receives ARGB Long only after Apply. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ChatyColorPickerModal(
@@ -198,21 +164,12 @@ fun ChatyColorPickerModal(
     val ratio = backgroundContextColor?.let { ColorPickerLogic.contrastRatio(color, it) }
     val warn = ColorPickerLogic.hasContrastWarning(ratio)
     val statusColor = if (warn) colors.error else colors.success
-    ModalBottomSheet(tonalElevation = 0.dp,
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = colors.surface,
-        shape = com.example.chat.ui.kit.ChatyModalShape,
-        dragHandle = null,
+    ChatySelectionModal(
+        title = title, onDismiss = onDismiss,
+        onApply = { onColorSelected(color) },
+        applyEnabled = ColorPickerLogic.fromHex(hex) != null,
     ) {
-        val imeBottom = with(LocalDensity.current) { WindowInsets.ime.getBottom(this).toDp() }
-        Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = imeBottom + 24.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(28.dp).background(Color(color), CircleShape).border(2.dp, Color.White, CircleShape))
-                Spacer(Modifier.width(12.dp))
-                Text(title, Modifier.weight(1f), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = colors.foreground)
-                IconButton(onClick = onDismiss) { Icon(Icons.Rounded.Close, null, tint = colors.foreground) }
-            }
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp)) {
             Spacer(Modifier.height(16.dp))
             Row(
                 Modifier.fillMaxWidth()
@@ -270,24 +227,10 @@ fun ChatyColorPickerModal(
                 }
             }
             Spacer(Modifier.height(16.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = hex,
-                    onValueChange = { hex = it; ColorPickerLogic.fromHex(it)?.let { v -> color = v } },
-                    modifier = Modifier.weight(1f),
-                    label = { Text("HEX Color") },
-                    prefix = { Text("# ") },
-                    shape = RoundedCornerShape(12.dp),
-                    singleLine = true,
-                )
-                Spacer(Modifier.width(12.dp))
-                Button(
-                    onClick = { onColorSelected(color) },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = colors.primary, contentColor = colors.onPrimary),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 24.dp, vertical = 16.dp),
-                ) { Text("Apply Color", fontWeight = FontWeight.Bold) }
-            }
+            ChatyTaskField(
+                value = hex, onValueChange = { hex = it; ColorPickerLogic.fromHex(it)?.let { v -> color = v } },
+                placeholder = "HEX Color", enabled = true,
+            )
         }
     }
 }
@@ -354,7 +297,7 @@ fun GbSwitchRow(icon: ImageVector, title: String, subtitle: String, value: Boole
     val view = androidx.compose.ui.platform.LocalView.current
     Row(
         Modifier.fillMaxWidth()
-            .clickable { ChatyHapticsPort.selection(view); onChanged(!value) }
+            .toggleable(value = value, role = androidx.compose.ui.semantics.Role.Switch, onValueChange = { ChatyHapticsPort.selection(view); onChanged(it) })
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -362,12 +305,9 @@ fun GbSwitchRow(icon: ImageVector, title: String, subtitle: String, value: Boole
         Spacer(Modifier.width(14.dp))
         GbTextBlock(title, subtitle, Modifier.weight(1f))
         Spacer(Modifier.width(8.dp))
-        Switch(
-            checked = value, onCheckedChange = null, enabled = false,
-            colors = androidx.compose.material3.SwitchDefaults.colors(
-                disabledCheckedThumbColor = accent, disabledCheckedTrackColor = accent.copy(alpha = 0.5f),
-            ),
-        )
+        Box(Modifier.clearAndSetSemantics { }) {
+            GbCustomSwitch(value, onChanged, activeColor = accent, interactive = false)
+        }
     }
 }
 
