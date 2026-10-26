@@ -232,6 +232,9 @@ fun ChatDetailScreen(
     onVoicePlay: (MessageAttachment) -> Unit = {},
     onViewOnceOpen: (ChatMessage) -> Unit = {},
     onPollTap: (ChatMessage) -> Unit = {},
+    loadingMessages: Boolean = false,
+    loadError: String? = null,
+    onRetryLoad: () -> Unit = {},
 ) {
     val theme = LocalThemeConfig.current
     val scope = rememberCoroutineScope()
@@ -752,6 +755,14 @@ fun ChatDetailScreen(
                         }
                     }
                 }
+
+                ChatMessagesStateOverlay(
+                    theme = theme,
+                    messagesEmpty = messages.isEmpty(),
+                    loadingMessages = loadingMessages,
+                    loadError = loadError,
+                    onRetryLoad = onRetryLoad,
+                )
 
                 // Scroll-to-bottom FAB with unseen-count badge.
                 val fabVisible = !isNearBottom && messages.isNotEmpty()
