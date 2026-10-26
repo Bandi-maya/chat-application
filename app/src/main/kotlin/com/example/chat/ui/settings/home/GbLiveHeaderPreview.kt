@@ -61,6 +61,31 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.chat.core.theme.ThemeConfig
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import com.example.chat.ui.core.theme.ChatyColors
+import com.example.chat.ui.navigation.CurvedRadialDrawerShell
+import com.example.chat.core.preferences.HomePresetNormalizer
+import com.example.chat.domain.models.Conversation
+import com.example.chat.domain.models.ConversationType
+import com.example.chat.domain.models.DeliveryState
+import com.example.chat.domain.models.HomePreferences
+import com.example.chat.ui.chats.home.ConversationRow
+import com.example.chat.ui.chats.home.HomeFilterChips
+import com.example.chat.ui.chats.home.HomePresence
+import com.example.chat.ui.chats.home.HomeStyleSpec
+import com.example.chat.ui.chats.home.defaultHomeTemplates
+import com.example.chat.ui.chats.home.homeFilters
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 
 private fun col(v: Long) = Color(v)
 private fun Color.a(alpha: Float) = copy(alpha = alpha)
@@ -93,6 +118,11 @@ fun GbLiveHeaderPreview(a: HeaderPreviewArgs, t: ThemeConfig, modifier: Modifier
     val radius = t.cornerRadius.toFloat().coerceIn(0f, 32f).dp
     val shape = RoundedCornerShape(radius)
     val bg = col(t.backgroundColor)
+
+    if (isCurvedRadial) {
+        CurvedRadialActualPreview(a, t, title, modifier)
+        return
+    }
 
     Column(
         modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp)
@@ -136,7 +166,17 @@ fun GbLiveHeaderPreview(a: HeaderPreviewArgs, t: ThemeConfig, modifier: Modifier
         }
         if (showInlineSearch && sp == "below header") SearchPlacementPreview(t)
         if (showInlineSearch && sp == "above chat filters") SearchAboveFiltersPreview(t)
-        SampleChatRow(t)
+        // Real home components: the chip row is the same HomeFilterChips the home screen
+        // renders (so Tab Bubble Style is visible here) and the row is the real ConversationRow.
+        var previewFilter by remember { mutableStateOf("All") }
+        HomeFilterChips(
+            theme = t,
+            tabBubbleStyle = a.tabBubbleStyle,
+            filters = homeFilters(null),
+            selectedFilter = previewFilter,
+            onSelect = { previewFilter = it },
+        )
+        SampleConversationRow(t, a)
         when {
             isOneUi -> OneUiBottomBar(t)
             isIos -> IosBottomBar(t)
@@ -479,6 +519,29 @@ private fun BasicHeader(t: ThemeConfig, a: HeaderPreviewArgs, title: String, hdr
 }
 
 @Composable
+private fun SampleConversationRow(t: ThemeConfig, a: HeaderPreviewArgs) {
+    val spec = HomeStyleSpec.resolve(HomePresetNormalizer.homeStyle(a.homeStyle), a.homeStyle.trim().lowercase())
+    val convo = remember {
+        Conversation(
+            id = "preview", type = ConversationType.direct, title = "Tyler Durden",
+            participantIds = listOf("me", "tyler"), avatarInitials = "TD",
+            lastMessageText = "The things you own end up owning you.",
+            lastMessageTime = java.time.Instant.now(), lastMessageSenderId = "tyler", unreadCount = 7,
+        )
+    }
+    ConversationRow(
+        conversation = convo, theme = t, homePrefs = HomePreferences(homeStyle = a.homeStyle, tabBubbleStyle = a.tabBubbleStyle),
+        chatList = defaultHomeTemplates.chatList, density = spec.tileDensity, isDark = t.isDark,
+        cardRows = spec.cardRows, isTelegramRows = a.homeStyle.trim().lowercase() == "telegram style",
+        displayTitle = convo.title, presence = HomePresence(isOnline = true), currentUserId = "me",
+        lastOwnMessageState = DeliveryState.read, selected = false, locked = false, elapsedTime = false,
+        gbOnlineChat = true, gbOnlineDotChat = true, gbModOnlineColor = null, gbModLastSeenColor = null,
+        gbOnlineDotColor = null, gbHomeCounterBk = null, gbHomeCounterText = null,
+        onTap = {}, onLongPress = {},
+    )
+}
+
+@Composable
 private fun SampleChatRow(t: ThemeConfig) {
     Row(Modifier.fillMaxWidth().background(col(t.backgroundColor)).padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(
@@ -634,5 +697,48 @@ private fun StockTabItem(t: ThemeConfig, icon: ImageVector, label: String, selec
         }
         Spacer(Modifier.height(3.dp))
         Text(label, color = color, fontSize = 10.sp, fontWeight = FontWeight.W600)
+    }
+}
+
+
+/**
+ * Curved Radial Menu preview: the ACTUAL CurvedRadialDrawerShell (trigger, nav strip, fan geometry)
+ * laid out in a full phone-sized viewport, then scaled uniformly into the card. It is never laid
+ * out at card size, so the shell does not take its compact fallback. Window insets are consumed
+ * so the device status bar does not shift the scaled copy. Page content is synthetic.
+ */
+@Composable
+private fun CurvedRadialActualPreview(a: HeaderPreviewArgs, t: ThemeConfig, title: String, modifier: Modifier) {
+    val phoneW = 392.dp
+    val phoneH = 760.dp
+    val ids = listOf("chats", "updates", "calls", "tasks", "settings")
+    var filter by remember { mutableStateOf("All") }
+    BoxWithConstraints(modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp)) {
+        val scale = maxWidth.value / phoneW.value
+        Box(
+            Modifier.width(maxWidth).height(phoneH * scale).clipToBounds()
+                .consumeWindowInsets(WindowInsets.safeDrawing),
+        ) {
+            Box(
+                Modifier.requiredSize(phoneW, phoneH).graphicsLayer {
+                    scaleX = scale; scaleY = scale; transformOrigin = TransformOrigin(0f, 0f)
+                },
+            ) {
+                CurvedRadialDrawerShell(
+                    colors = ChatyColors(t), navItemIds = ids, selectedIndex = 0,
+                    animationsDisabled = true, onSelect = {}, fab = {},
+                    content = {
+                        Column(Modifier.fillMaxSize().background(col(t.backgroundColor))) {
+                            Row(Modifier.fillMaxWidth().padding(14.dp, 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(title, color = col(t.primaryTextColor), fontSize = 18.sp, fontWeight = FontWeight.W800, modifier = Modifier.weight(1f))
+                                Ic(Icons.Rounded.MoreVert, col(t.primaryTextColor), 22.dp)
+                            }
+                            HomeFilterChips(t, a.tabBubbleStyle, homeFilters(null), filter) { filter = it }
+                            SampleConversationRow(t, a)
+                        }
+                    },
+                )
+            }
+        }
     }
 }
