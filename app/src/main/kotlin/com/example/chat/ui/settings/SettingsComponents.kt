@@ -280,7 +280,7 @@ fun SettingsRadioDialog(
     onDismiss: () -> Unit,
 ) {
     val colors = LocalAppColors.current
-    androidx.compose.material3.AlertDialog(
+    com.example.chat.ui.kit.ChatyConfirmationDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = onDismiss,
         containerColor = colors.surfaceElevated,
         title = { Text(title, color = colors.foreground, fontSize = 18.sp, fontWeight = FontWeight.Bold) },
