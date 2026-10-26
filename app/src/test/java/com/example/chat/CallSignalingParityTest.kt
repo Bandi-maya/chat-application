@@ -423,10 +423,10 @@ class CallSignalingParityTest {
     }
 
     @Test
-    fun `acceptCall without offer fails the call`() = runTest {
-        val service = newService(backgroundScope)
-        // No offer cached: session exists only via direct field - simulate by
-        // receiving an offer with empty sdp.
+    fun `malformed offer is rejected before incoming media creation`() = runTest {
+        val media = FakeMediaController()
+        val service = newService(backgroundScope, media = media)
+        // Invalid protocol input must not present a fake answerable call.
         service.handleRemoteSignal(mapOf(
             "signal_type" to "offer", "call_id" to "call-3", "caller_id" to "peer",
         ))
@@ -435,7 +435,8 @@ class CallSignalingParityTest {
             kotlinx.coroutines.runBlocking { service.acceptCall() }
         }
         advanceUntilIdle()
-        assertEquals(CallSessionState.failed, service.currentSession!!.state)
+        assertNull(service.currentSession)
+        assertFalse(media.prepared)
     }
 
     @Test
