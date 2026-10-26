@@ -20,11 +20,11 @@ import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Send
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DropdownMenuItem
+import com.example.chat.ui.kit.ChatyDropdownMenuItem as DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -438,7 +438,7 @@ fun MessageManagementPage(
         var keyword by remember { mutableStateOf("") }
         var message by remember { mutableStateOf("") }
         var scopeChoice by remember { mutableStateOf("all") }
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { autoReplyDialogOpen = false },
             title = { Text("Add auto-reply rule") },
             text = {
@@ -490,7 +490,7 @@ fun MessageManagementPage(
             mutableStateOf(conversationSource.conversations.first().id)
         }
         var body by remember { mutableStateOf("") }
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { scheduleDialogOpen = false },
             title = { Text("Schedule message") },
             text = {
@@ -534,7 +534,7 @@ fun MessageManagementPage(
             initialSelectedDateMillis = initialMillis,
             selectableDates = futureDatesOnly,
         )
-        DatePickerDialog(
+        DatePickerDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { datePickerOpen = false },
             confirmButton = {
                 TextButton(onClick = {
@@ -582,7 +582,7 @@ fun MessageManagementPage(
         var shortcut by remember { mutableStateOf("#") }
         var title by remember { mutableStateOf("") }
         var content by remember { mutableStateOf("") }
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { quickReplyDialogOpen = false },
             title = { Text("Add quick reply") },
             text = {
@@ -633,7 +633,7 @@ fun MessageManagementPage(
     if (massSendDialogOpen) {
         var body by remember { mutableStateOf("") }
         val selected = remember { mutableStateOf(setOf<String>()) }
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { massSendDialogOpen = false },
             title = { Text("Mass sender") },
             text = {
@@ -718,7 +718,7 @@ private fun ScopeDropdown(
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier.menuAnchor().fillMaxWidth(),
         )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        ExposedDropdownMenu(containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, tonalElevation = 0.dp, shape = com.example.chat.ui.kit.ChatyModalShape, expanded = expanded, onDismissRequest = { expanded = false }) {
             options.forEach { (id, title) ->
                 DropdownMenuItem(
                     text = { Text(title) },
@@ -744,7 +744,7 @@ private fun TimePickerDialogCompat(
         initialHour = nowPlus5.hour,
         initialMinute = nowPlus5.minute,
     )
-    AlertDialog(
+    AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = onCancel,
         title = { Text("Select time") },
         text = { androidx.compose.material3.TimePicker(state = state) },
