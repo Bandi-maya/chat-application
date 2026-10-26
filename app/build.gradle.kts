@@ -12,6 +12,20 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+// Only public client routing keys are read. Never embed credentials in these values.
+val routingKeys = setOf("REST_API_BASE_URL", "TENANT_ID", "WEBSOCKET_URL")
+val routingDotenv = rootProject.file(".env").takeIf { it.isFile }?.readLines()?.mapNotNull { line ->
+    val clean = line.trim().removePrefix("export ")
+    if (clean.startsWith("#") || !clean.contains("=")) null else {
+        val key = clean.substringBefore("=").trim()
+        var value = clean.substringAfter("=").trim()
+        if (value.length >= 2 && ((value.first() == '\"' && value.last() == '\"') ||
+                    (value.first() == '\'' && value.last() == '\''))) value = value.substring(1, value.length - 1)
+        if (key in routingKeys) key to value else null
+    }
+}?.toMap().orEmpty()
+fun javaString(value: String): String = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r") + "\""
+
 android {
     namespace = "com.example.chat"
     compileSdk = 36
@@ -22,6 +36,10 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0.0"
+        routingKeys.forEach { key ->
+            buildConfigField("String", key, javaString(providers.gradleProperty(key).orElse(providers.environmentVariable(key)).orNull.orEmpty()))
+            buildConfigField("String", "DOTENV_" + key, javaString(routingDotenv[key].orEmpty()))
+        }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Dart String.fromEnvironment('CHATY_PLAY_STORE_URL', defaultValue: ...): override with
         // -PCHATY_PLAY_STORE_URL=... or the CHATY_PLAY_STORE_URL environment variable at build time.
