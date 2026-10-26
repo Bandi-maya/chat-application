@@ -1,5 +1,9 @@
 package com.example.chat.ui.kit
 
+import androidx.compose.ui.semantics.clearAndSetSemantics
+
+import androidx.compose.foundation.selection.toggleable
+
 import androidx.compose.runtime.getValue
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
@@ -58,6 +62,7 @@ fun GbCustomSwitch(
     value: Boolean,
     onChanged: (Boolean) -> Unit,
     activeColor: Color? = null,
+    interactive: Boolean = true,
 ) {
     val colors = LocalAppColors.current
     val config = LocalThemeConfig.current
@@ -70,7 +75,7 @@ fun GbCustomSwitch(
             .clip(RoundedCornerShape(15.dp))
             .background(track)
             .border(1.2.dp, if (value) active else colors.borderSubtle, RoundedCornerShape(15.dp))
-            .clickable { ChatyHapticsPort.selection(view); onChanged(!value) }
+            .then(if (interactive) Modifier.clickable { ChatyHapticsPort.selection(view); onChanged(!value) } else Modifier)
             .padding(3.dp),
     ) {
         Box(
@@ -132,12 +137,14 @@ fun GbSettingRow(
     }
     Row(
         Modifier.fillMaxWidth()
-            .clickable {
+            .then(if (onSwitchChanged != null && switchValue != null) {
+                Modifier.toggleable(value = switchValue, role = androidx.compose.ui.semantics.Role.Switch, onValueChange = {
+                    ChatyHapticsPort.selection(view); onSwitchChanged(it)
+                })
+            } else Modifier.clickable {
                 ChatyHapticsPort.selection(view)
-                if (onSwitchChanged != null && switchValue != null) onSwitchChanged(!switchValue)
-                else if (onColorTap != null) onColorTap()
-                else onTap?.invoke()
-            }
+                if (onColorTap != null) onColorTap() else onTap?.invoke()
+            })
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -160,7 +167,9 @@ fun GbSettingRow(
             }
         }
         when {
-            switchValue != null && onSwitchChanged != null -> GbCustomSwitch(switchValue, onSwitchChanged)
+            switchValue != null && onSwitchChanged != null -> Box(Modifier.clearAndSetSemantics { }) {
+                GbCustomSwitch(switchValue, onSwitchChanged, interactive = false)
+            }
             effColor != null -> Box(
                 Modifier.size(26.dp).background(Color(effColor), CircleShape).border(1.5.dp, colors.borderSubtle, CircleShape)
                     .clickable { onColorTap?.invoke() },
