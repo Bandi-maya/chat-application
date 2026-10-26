@@ -1,0 +1,22 @@
+import { chromium } from 'playwright';
+import { createServer } from 'node:http';
+import { readFileSync } from 'node:fs';
+const server = createServer((req,res) => {const path=req.url==='/'?'index.html':req.url.slice(1);if(path==='favicon.ico'){res.writeHead(204);res.end();return;}try{res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':'text/html');res.end(readFileSync('../../app/src/main/assets/location-map/'+path));}catch{res.writeHead(404);res.end();}}).listen(0,'127.0.0.1');
+const browser = await chromium.launch({executablePath:'/opt/google/chrome/chrome',headless:true,args:['--no-sandbox','--enable-webgl','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const page = await browser.newPage({viewport:{width:390,height:760},deviceScaleFactor:1});
+const errors=[]; page.on('requestfailed',r=>errors.push(r.url()+' '+r.failure()?.errorText)); page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});const requests=[]; page.on('pageerror',e=>errors.push(String(e)));page.on('request',r=>{if(!r.url().includes('127.0.0.1'))requests.push(r.url());});
+await page.goto('http://127.0.0.1:'+server.address().port);
+await page.evaluate(()=>{window.events=[];window.ChatyMap={postMessage:v=>window.events.push(JSON.parse(v))};window.ChatyGeoLibre.initialize('a'.repeat(32));});
+try { await page.waitForFunction(()=>window.events.some(e=>e.type==='ready'),null,{timeout:20000}); } catch(e) { console.log('READY_TIMEOUT', String(e)); }
+await page.evaluate(()=>window.ChatyGeoLibre.setPin(17.385,78.4867,'a'.repeat(32)));
+await page.waitForFunction(()=>document.querySelectorAll('.maplibregl-canvas').length>0);
+await page.waitForTimeout(4000);
+await page.screenshot({path:'map-proof-2d.png'});
+console.log('BRIDGE_NEGATIVE', await page.evaluate(()=>({wrongToken:window.ChatyGeoLibre.setPin(0,0,'b'.repeat(32)),nan:window.ChatyGeoLibre.setPin(NaN,0,'a'.repeat(32)),range:window.ChatyGeoLibre.setPin(91,0,'a'.repeat(32)),reinitialize:window.ChatyGeoLibre.initialize('b'.repeat(32))})));
+await page.click('#view-mode'); await page.waitForTimeout(350); await page.selectOption('#layers','dark'); await page.click('#view-mode'); await page.waitForTimeout(3000); await page.mouse.click(150,330);
+await page.waitForFunction(()=>window.events.some(e=>e.type==='pinSelected'),null,{timeout:3000});
+await page.screenshot({path:'map-proof-3d-dark.png'});
+console.log(JSON.stringify({errors,events:await page.evaluate(()=>window.events),hosts:[...new Set(requests.map(u=>new URL(u).host))]},null,2));
+await page.evaluate(()=>window.ChatyGeoLibre.dispose());
+const beforeClose=requests.length; await page.waitForTimeout(1000); console.log('DISPOSAL',JSON.stringify({canvases:await page.locator('canvas').count(),newRequests:requests.length-beforeClose,postClosePin:await page.evaluate(()=>window.ChatyGeoLibre.setPin(0,0,'a'.repeat(32)))}));
+await browser.close();await new Promise(resolve=>server.close(resolve));
