@@ -1,5 +1,19 @@
 package com.example.chat.ui.settings
 
+import androidx.compose.ui.semantics.disabled
+
+import androidx.compose.ui.semantics.toggleableState
+
+import androidx.compose.ui.semantics.role
+
+import androidx.compose.ui.semantics.semantics
+
+import androidx.compose.ui.semantics.clearAndSetSemantics
+
+import androidx.compose.foundation.selection.selectable
+
+import androidx.compose.foundation.selection.toggleable
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -180,18 +194,23 @@ fun ChatyBadge(text: String, color: Color? = null) {
 }
 
 @Composable
-fun ChatySwitch(value: Boolean, onChanged: ((Boolean) -> Unit)?) {
+fun ChatySwitch(value: Boolean, onChanged: ((Boolean) -> Unit)?, interactive: Boolean = true) {
     val colors = LocalAppColors.current
-    Switch(
-        checked = value,
-        onCheckedChange = onChanged,
-        enabled = onChanged != null,
-        colors = SwitchDefaults.colors(
-            checkedThumbColor = colors.primary,
-            checkedTrackColor = colors.primary.copy(alpha = 0.3f),
-            checkedBorderColor = Color.Transparent,
-        ),
-    )
+    if (onChanged != null) {
+        Box(if (interactive) Modifier.toggleable(value, role = androidx.compose.ui.semantics.Role.Switch, onValueChange = onChanged) else Modifier) {
+            Box(Modifier.clearAndSetSemantics { }) {
+                com.example.chat.ui.kit.GbCustomSwitch(value, onChanged, interactive = false)
+            }
+        }
+    } else {
+        Box(
+            Modifier.size(width = 52.dp, height = 30.dp)
+                .background(if (value) colors.primary.copy(alpha = 0.45f) else colors.borderSubtle, RoundedCornerShape(15.dp))
+                .semantics { role = androidx.compose.ui.semantics.Role.Switch; toggleableState = androidx.compose.ui.state.ToggleableState(value); disabled() }
+                .padding(3.dp),
+            contentAlignment = if (value) Alignment.CenterEnd else Alignment.CenterStart,
+        ) { Box(Modifier.size(22.dp).background(colors.foregroundTertiary, CircleShape)) }
+    }
 }
 
 @Composable
@@ -283,15 +302,21 @@ fun ChatySwitchTile(
     subtitle: String? = null,
     enabled: Boolean = true,
 ) {
-    ChatySettingsTile(
-        icon = icon,
-        iconColor = iconColor,
-        title = title,
-        subtitle = subtitle,
-        enabled = enabled,
-        onTap = if (enabled && onChanged != null) ({ onChanged(!value) }) else null,
-        trailing = { ChatySwitch(value, if (enabled) onChanged else null) },
-    )
+    Box(Modifier.toggleable(
+        value = value, enabled = enabled && onChanged != null,
+        role = androidx.compose.ui.semantics.Role.Switch,
+        onValueChange = { onChanged?.invoke(it) },
+    )) {
+        ChatySettingsTile(
+            icon = icon, iconColor = iconColor, title = title, subtitle = subtitle, enabled = enabled,
+            onTap = null,
+            trailing = {
+                Box(Modifier.clearAndSetSemantics { }) {
+                    ChatySwitch(value, if (enabled) onChanged else null, interactive = false)
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -369,7 +394,7 @@ fun <T> ChatyRadioTile(
     val colors = LocalAppColors.current
     val selected = value == groupValue
     Row(
-        Modifier.fillMaxWidth().clickable { onChanged(value) }.padding(horizontal = 14.dp),
+        Modifier.fillMaxWidth().selectable(selected = selected, role = androidx.compose.ui.semantics.Role.RadioButton, onClick = { onChanged(value) }).padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
@@ -383,17 +408,18 @@ fun <T> ChatyRadioTile(
                 Text(subtitle, color = colors.foregroundSecondary.copy(alpha = 0.65f), fontSize = 12.sp)
             }
         }
-        RadioButton(
-            selected = selected,
-            onClick = { onChanged(value) },
-            colors = RadioButtonDefaults.colors(selectedColor = colors.primary),
-        )
+        Box(
+            Modifier.size(22.dp).border(2.dp, if (selected) colors.primary else colors.borderSubtle, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (selected) Box(Modifier.size(12.dp).background(colors.primary, CircleShape))
+        }
     }
 }
 
 /**
- * Chip-wrap choice, or (requireApply) a row that opens ChatySingleChoiceModal. The modal is hosted by the
- * caller through [onOpenModal] because Compose has no imperative showDialog; pass a lambda that sets state.
+ * Draft choice selector. Existing explicit external modal hosts retain their route; all other callers
+ * open the centered shared selector and commit only on Apply.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -408,59 +434,28 @@ fun <T> ChatyChoiceTile(
     onOpenModal: (() -> Unit)? = null,
 ) {
     val colors = LocalAppColors.current
-    if (requireApply) {
-        Row(
-            Modifier.fillMaxWidth().clickable { onOpenModal?.invoke() }.padding(horizontal = 14.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
-                Text(title, color = colors.foreground, fontSize = 14.5.sp, fontWeight = FontWeight.W600)
-                Text(
-                    if (subtitle == null) "Selected: ${optionLabel(selectedOption)}"
-                    else "$subtitle\nSelected: ${optionLabel(selectedOption)}",
-                    color = colors.foregroundSecondary,
-                    fontSize = 14.sp,
-                )
-            }
-            Icon(Icons.Rounded.ChevronRight, null, tint = colors.foreground.copy(alpha = 0.6f))
+    var showChoices by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth().clickable {
+            if (requireApply && onOpenModal != null) onOpenModal() else showChoices = true
+        }.padding(horizontal = 14.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
+            Text(title, color = colors.foreground, fontSize = 14.5.sp, fontWeight = FontWeight.W600)
+            Text(
+                if (subtitle == null) "Selected: ${optionLabel(selectedOption)}"
+                else "$subtitle\nSelected: ${optionLabel(selectedOption)}",
+                color = colors.foregroundSecondary, fontSize = 14.sp,
+            )
         }
-        return
+        Icon(Icons.Rounded.ChevronRight, null, tint = colors.foreground.copy(alpha = 0.6f))
     }
-    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp)) {
-        Text(title, color = colors.foreground, fontSize = 14.5.sp, fontWeight = FontWeight.W600)
-        if (subtitle != null) {
-            Spacer(Modifier.height(2.dp))
-            Text(subtitle, color = colors.foregroundSecondary.copy(alpha = 0.7f), fontSize = 12.sp)
-        }
-        Spacer(Modifier.height(8.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            options.forEach { opt ->
-                val sel = opt == selectedOption
-                FilterChip(
-                    selected = sel,
-                    onClick = { if (!sel) onSelected(opt) },
-                    label = {
-                        Text(
-                            optionLabel(opt),
-                            color = if (sel) colors.primary else colors.foregroundSecondary,
-                            fontWeight = if (sel) FontWeight.Bold else FontWeight.W500,
-                            fontSize = 12.5.sp,
-                        )
-                    },
-                    colors = FilterChipDefaults.filterChipColors(
-                        containerColor = colors.surfaceSecondary,
-                        selectedContainerColor = colors.primary.copy(alpha = 0.2f),
-                    ),
-                    border = FilterChipDefaults.filterChipBorder(
-                        enabled = true,
-                        selected = sel,
-                        borderColor = colors.foregroundSecondary.copy(alpha = 0.2f),
-                        selectedBorderColor = colors.foregroundSecondary.copy(alpha = 0.2f),
-                    ),
-                )
-            }
-        }
-    }
+    if (showChoices) com.example.chat.ui.kit.ChatySingleChoiceModal(
+        title = "Select $title", value = selectedOption, options = options, labelBuilder = optionLabel,
+        onApply = { choice -> onSelected(choice); showChoices = false },
+        onDismiss = { showChoices = false },
+    )
 }
 
 @Composable
