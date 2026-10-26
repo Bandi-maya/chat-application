@@ -6,6 +6,11 @@ adb logcat -c || true
 (adb logcat -v threadtime > screenshots/logcat-full.txt 2>&1 &) 
 gradle :app:connectedDebugAndroidTest --no-daemon -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true
 rc=$?
+# Permission restore belongs outside instrumentation: pm revoke kills the app process.
+if adb shell test -f /sdcard/Android/data/com.example.chat/files/camera-permission-cleanup; then
+  adb shell rm /sdcard/Android/data/com.example.chat/files/camera-permission-cleanup
+  adb shell pm revoke com.example.chat android.permission.CAMERA || true
+fi
 adb pull /sdcard/Android/data/com.example.chat/files/screenshots/. screenshots/ || true
 sleep 2
 adb logcat -b crash -d > screenshots/logcat-crash.txt 2>&1 || true
