@@ -448,7 +448,7 @@ fun NewChatScreen(
         ModalBottomSheet(
             onDismissRequest = { sheetUser = null },
             containerColor = colors.surface,
-            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+            shape = com.example.chat.ui.kit.ChatyModalShape,
         ) {
             Column(Modifier.padding(bottom = 24.dp)) {
                 Text(
@@ -481,7 +481,7 @@ fun NewChatScreen(
     // ChatyConfirmDialog for Delete User.
     val deleteTarget = deleteCandidate
     if (deleteTarget != null) {
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { deleteCandidate = null },
             containerColor = colors.surface,
             title = { Text("Delete ${deleteTarget.displayName}?", color = colors.foreground) },
