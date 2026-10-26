@@ -275,8 +275,31 @@ object ServiceLocator {
 
     private val pendingSends: PendingSecureSendStore by lazy { PendingSecureSendStore(snapshotCache) }
 
+    /** Badge sync target. Set ONLY by [startBadgeSync] after the locator is up, so the repository's notifyChanged
+     *  callback never forces lazy initialisation of the manager (no lazy cycle: the callback reads this nullable
+     *  field and the repository constructor/hydration never calls notifyChanged). */
+    @Volatile private var badgeSyncTarget: com.example.chat.data.services.NotificationChannelManager? = null
+
+    /** Dart NotificationChannelManager (badge scope). The conversations lambda is evaluated only inside
+     *  syncUnreadBadgeCount, never at construction. */
+    val notificationChannelManager: com.example.chat.data.services.NotificationChannelManager by lazy {
+        com.example.chat.data.services.NotificationChannelManager(
+            context = requireContext(),
+            preferences = preferencesController,
+            conversations = { conversationsRepository.conversationsById.values.toList() },
+        )
+    }
+
+    /** Explicit post-construction start (AppRoot, after the locator is ready): initialize then subscribe. */
+    fun startBadgeSync() {
+        val m = notificationChannelManager
+        m.initialize()
+        badgeSyncTarget = m
+    }
+
     val conversationsRepository: ConversationsRepository by lazy {
         ConversationsRepository(
+            notifyChanged = { badgeSyncTarget?.syncUnreadBadgeCount() },
             rpc = rpcClient,
             queryClient = queryClient,
             mls = { mls },
