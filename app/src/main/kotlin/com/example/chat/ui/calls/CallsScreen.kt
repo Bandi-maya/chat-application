@@ -32,6 +32,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.paneTitle
+import com.example.chat.ui.navigation.LocalDestinationTitlePresentation
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.graphics.Color
@@ -63,9 +65,12 @@ fun CallsScreen(
     onRedial: (remoteUserId: String, displayName: String, initials: String?, colorHex: String?, isVideo: Boolean) -> Unit,
 ) {
     val theme = LocalThemeConfig.current
+    val titlePresentedByShell = LocalDestinationTitlePresentation.current ==
+        com.example.chat.core.templates.ChatyNavigationDestinationIds.calls
     val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
     Scaffold(
+        modifier = Modifier.semantics { paneTitle = "Calls" },
         containerColor = Color(theme.backgroundColor),
         floatingActionButton = {
             if (showCallActions) {
@@ -84,7 +89,7 @@ fun CallsScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(bottom = 80.dp),
         ) {
-            item {
+            if (!titlePresentedByShell) item {
                 Row(
                     Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 8.dp),
                 ) {
