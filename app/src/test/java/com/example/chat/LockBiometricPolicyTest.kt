@@ -99,4 +99,21 @@ class LockBiometricPolicyTest {
         s.onPause()
         assertFalse(s.paused)
     }
+
+    @Test fun routeChangesBetweenAuthenticatedScreensNeverStopAPrompt() {
+        // lockRequired stays false (vault/security prompts) or true across navigation: nothing is stopped.
+        assertFalse(LockBiometricPolicy.stopOnLockTransition(previousLockRequired = false, lockRequired = false))
+        assertFalse(LockBiometricPolicy.stopOnLockTransition(previousLockRequired = true, lockRequired = true))
+        assertFalse(LockBiometricPolicy.stopOnLockTransition(previousLockRequired = false, lockRequired = true))
+    }
+
+    @Test fun lockRequirementDroppingStopsAPendingPrompt() {
+        assertTrue(LockBiometricPolicy.stopOnLockTransition(previousLockRequired = true, lockRequired = false))
+    }
+
+    @Test fun supersededAttemptsAreStale() {
+        assertFalse(LockBiometricPolicy.isStale(attemptGeneration = 3, currentGeneration = 3, sessionStopped = false))
+        assertTrue(LockBiometricPolicy.isStale(attemptGeneration = 3, currentGeneration = 4, sessionStopped = false)) // stopAuthentication ran
+        assertTrue(LockBiometricPolicy.isStale(attemptGeneration = 3, currentGeneration = 3, sessionStopped = true))
+    }
 }
