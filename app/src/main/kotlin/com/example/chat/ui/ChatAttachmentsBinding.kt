@@ -86,11 +86,16 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
         ChatAttachmentActionController(
             conversationId = conversationId,
             backend = object : AttachmentBackendPort {
-                override suspend fun upload(type: String, file: PickedFile, durationSeconds: Int): MessageAttachment =
-                    ServiceLocator.chatMedia.uploadBytes(
-                        conversationId, type, file.bytes ?: throw IllegalStateException("The selected file is empty."),
-                        file.name, file.mimeType, durationSeconds,
+                override suspend fun upload(type: String, file: PickedFile, durationSeconds: Int): MessageAttachment {
+                    // Camera captures arrive as a file path (no picker bytes): read them here,
+                    // matching Dart ChatMediaService.uploadFile(sourcePath:).
+                    val payload = file.bytes ?: file.path?.let { p ->
+                        withContext(Dispatchers.IO) { java.io.File(p).readBytes() }
+                    } ?: throw IllegalStateException("The selected file is empty.")
+                    return ServiceLocator.chatMedia.uploadBytes(
+                        conversationId, type, payload, file.name, file.mimeType, durationSeconds,
                     )
+                }
                 override suspend fun sendMessage(text: String, type: MessageType, attachment: MessageAttachment?, extraMetadata: Map<String, Any?>?) {
                     api.sendMessage(conversationId, text, type, attachment, extraMetadata)
                 }
