@@ -135,7 +135,7 @@ jobs:
           # Allowlist only: deterministic test captures of the app's own auth screens (no input typed) and the
           # ChatFixtureActivity synthetic conversations. Never the failure-state capture, final screen or logcat.
           # This repository is public, so the job log is public: keep it bounded and fixture-only.
-          for n in 01-welcome 02-login 03-register 04-forgot-password 05-register-organization 06-chats-home 07-chat-detail 08-shell-light 09-shell-dark 10-approot-configured-shell 11-chat-detail-host 12-contact-info; do
+          for n in 01-welcome 02-login 03-register 04-forgot-password 05-register-organization 06-chats-home 07-chat-detail 08-shell-light 09-shell-dark 10-approot-configured-shell 11-chat-detail-host 12-contact-info 13-restart-launch1 13-restart-launch2; do
             f="screenshots/$n.png"
             [ -f "$f" ] || { echo "PNGMISSING $n"; continue; }
             sz=$(stat -c %s "$f")
