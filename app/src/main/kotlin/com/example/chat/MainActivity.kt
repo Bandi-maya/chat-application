@@ -28,6 +28,11 @@ class MainActivity : FragmentActivity() {
 
     override fun onDestroy() {
         com.example.chat.platform.LockPromptHost.detach(this)
+        // Dart AppLifecycleState.detached equivalent: the activity is going away for good (not a
+        // rotation/config change), so persist a terminal call state instead of a stranded row.
+        if (isFinishing && !isChangingConfigurations) {
+            try { ServiceLocator.callLifecycle.onAppDetached() } catch (e: Exception) { android.util.Log.w("MainActivity", "call detach cleanup failed: $e") }
+        }
         super.onDestroy()
     }
 
