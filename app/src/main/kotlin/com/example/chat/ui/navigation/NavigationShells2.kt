@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,9 +17,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,7 +47,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -53,8 +59,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.chat.core.theme.AppNavigationMode
 import com.example.chat.ui.core.theme.ChatyColors
-import kotlin.math.pow
-import kotlin.math.sin
 
 /** Port of _PerspectiveDrawerScaffold: left menu + foreground screen that
  *  slides 220dp, scales to 0.82 and rotates -0.12 rad in 3D while opening
@@ -166,9 +170,8 @@ internal fun PerspectiveDrawerShell(
     }
 }
 
-/** Port of _CurvedRadialDrawerScaffold + _CurvedRadialMenuClipper: accent
- *  quarter-circle panel clipped by the same cubic path, radial icon/label
- *  placement formulas preserved exactly. */
+/** Fixed trigger with a true circular quarter-fan. Only the overlay takes remaining
+ * safe-drawing insets; the page and global shell keep their own inset ownership. */
 @Composable
 internal fun CurvedRadialDrawerShell(
     colors: ChatyColors,
@@ -180,137 +183,125 @@ internal fun CurvedRadialDrawerShell(
     content: @Composable () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
-    val accent = colors.primary
-    val onAccent = colors.onPrimary
+    var page by remember { mutableStateOf(0) }
+    val progress by animateFloatAsState(
+        targetValue = if (menuOpen) 1f else 0f,
+        animationSpec = tween(if (animationsDisabled) 0 else 190),
+        label = "radialFan",
+    )
+    androidx.activity.compose.BackHandler(enabled = menuOpen) { menuOpen = false }
 
     Box(Modifier.fillMaxSize().background(colors.background)) {
         content()
-        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
-            val panelWidth = maxWidth.coerceAtMost(420.dp)
-            val panelHeight = if (maxHeight < 250.dp) maxHeight
-                else (maxHeight * 0.60f).coerceIn(250.dp, 360.dp)
-
-            if (menuOpen) {
-                val panelAlpha by animateFloatAsState(
-                    targetValue = 1f,
-                    animationSpec = tween(if (animationsDisabled) 0 else 190),
-                    label = "radialPanel",
-                )
-                Box(
-                    modifier = Modifier
-                        .padding(start = 0.dp, top = 3.dp)
-                        .width(panelWidth)
-                        .height(panelHeight)
-                        .graphicsLayer { alpha = panelAlpha }
-                        .clip(CurvedRadialMenuShape)
-                        .background(accent),
-                ) {
-                    // Close button
+        Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) { fab() }
+        androidx.compose.foundation.layout.BoxWithConstraints(
+            Modifier.fillMaxSize()
+                .windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.safeDrawing)
+                .clipToBounds(),
+        ) {
+            val geometry = RadialMenuGeometry.layout(maxWidth.value, maxHeight.value, navItemIds.size)
+            val pageCount = if (navItemIds.isEmpty()) 1 else
+                (navItemIds.size + geometry.pageSize - 1) / geometry.pageSize
+            val currentPage = page.coerceIn(0, pageCount - 1)
+            val firstIndex = currentPage * geometry.pageSize
+            val visibleIds = navItemIds.drop(firstIndex).take(geometry.pageSize)
+            val visibleGeometry = RadialMenuGeometry.layout(maxWidth.value, maxHeight.value, visibleIds.size)
+            val half = RadialMenuGeometry.targetSize / 2f
+            // Keep the fan on ordinary phones; compact windows use a reachable list.
+            val canOpen = geometry.radius >= 160f
+            if (menuOpen && canOpen) {
+                Box(Modifier.fillMaxSize().clickable(
+                    indication = null,
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    onClickLabel = "Close navigation menu",
+                ) { menuOpen = false })
+                androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                    drawCircle(
+                        color = colors.primary.copy(alpha = progress),
+                        radius = (geometry.radius + half + 12f).dp.toPx(),
+                        center = androidx.compose.ui.geometry.Offset(geometry.anchor.x.dp.toPx(), geometry.anchor.y.dp.toPx()),
+                    )
+                }
+                visibleIds.forEachIndexed { localIndex, id ->
+                    val point = visibleGeometry.centers[localIndex]
+                    val index = firstIndex + localIndex
+                    val selected = index == selectedIndex
                     Box(
-                        modifier = Modifier
-                            .padding(start = 10.dp, top = 8.dp)
-                            .shadow(4.dp, CircleShape)
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.absoluteOffset(x = (point.x - half).dp, y = (point.y - half).dp)
+                            .size(RadialMenuGeometry.targetSize.dp)
+                            .graphicsLayer { alpha = progress; scaleX = progress; scaleY = progress }
+                            .shadow(if (selected) 4.dp else 1.dp, CircleShape)
                             .clip(CircleShape)
-                            .background(onAccent.copy(alpha = 0.98f)),
-                    ) {
-                        IconButton(onClick = { menuOpen = false }) {
-                            Icon(Icons.Rounded.Close, contentDescription = "Close navigation menu", tint = accent, modifier = Modifier.size(20.dp))
-                        }
-                    }
-                    // Radial items (Dart formulas preserved).
-                    val count = navItemIds.size
-                    if (count > 0) {
-                        val iconSize = if (count > 7) 23f else 26f
-                        val activeIndex = selectedIndex.coerceIn(0, count - 1)
-                        navItemIds.forEachIndexed { index, id ->
-                            val progress = if (count <= 1) 0f else index.toFloat() / (count - 1)
-                            val leftFraction = 0.20f -
-                                0.09f * sin(Math.PI.toFloat() * progress) +
-                                0.44f * progress * progress
-                            val topFraction = 0.04f + 0.50f * progress.toDouble().pow(0.95).toFloat()
-                            val selected = id == navItemIds[activeIndex]
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .offset(x = panelWidth * leftFraction, y = panelHeight * topFraction)
-                                    .height((iconSize + 2).dp),
-                            ) {
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier
-                                        .size(iconSize.dp)
-                                        .clip(CircleShape)
-                                        .background(if (selected) onAccent else onAccent.copy(alpha = 0.86f))
-                                        .border(
-                                            width = if (selected) 1.4.dp else 0.7.dp,
-                                            color = if (selected) onAccent else onAccent.copy(alpha = 0.7f),
-                                            shape = CircleShape,
-                                        )
-                                        .clickable {
-                                            onSelect(index)
-                                            menuOpen = false
-                                        },
-                                ) {
-                                    NavDestinationIcon(id, size = (iconSize * 0.52f).toInt(), tint = accent)
-                                }
-                                Spacer(Modifier.width(7.dp))
-                                Text(
-                                    NavigationCatalog.labelFor(id).uppercase(),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    color = onAccent,
-                                    fontSize = if (selected) 10.5.sp else 9.5.sp,
-                                    fontWeight = if (selected) FontWeight.Black else FontWeight.Bold,
-                                    letterSpacing = 0.25.sp,
-                                    modifier = Modifier
-                                        .width(140.dp)
-                                        .rotate(-0.04f * 180f / Math.PI.toFloat() - progress * 0.30f * 180f / Math.PI.toFloat())
-                                        .clickable {
-                                            onSelect(index)
-                                            menuOpen = false
-                                        },
-                                )
+                            .background(colors.onPrimary)
+                            .border(if (selected) 3.dp else 1.dp, if (selected) colors.foreground else colors.onPrimary.copy(alpha = 0.7f), CircleShape)
+                            .semantics(mergeDescendants = true) {
+                                contentDescription = NavigationCatalog.labelFor(id)
+                                this.selected = selected
                             }
-                        }
+                            .clickable(role = androidx.compose.ui.semantics.Role.Tab) {
+                                onSelect(index)
+                                menuOpen = false
+                            },
+                    ) {
+                        NavDestinationIcon(id, size = 24, tint = colors.primary)
                     }
                 }
-            } else {
-                Box(
-                    modifier = Modifier
-                        .padding(start = 10.dp, top = 8.dp)
-                        .shadow(5.dp, CircleShape)
-                        .clip(CircleShape)
-                        .background(colors.surface),
+                if (pageCount > 1) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.absoluteOffset(
+                            x = (geometry.anchor.x + geometry.radius * 0.35f - half).dp,
+                            y = (geometry.anchor.y + geometry.radius * 0.35f - half).dp,
+                        ).size(56.dp).clip(CircleShape).background(colors.surface)
+                            .clickable(onClickLabel = "Next navigation items") { page = (currentPage + 1) % pageCount },
+                    ) {
+                        Text("${currentPage + 1}/$pageCount", color = colors.foreground, fontSize = 12.sp)
+                    }
+                }
+            } else if (menuOpen) {
+                // Compact landscape / split-screen: never shrink targets or push them
+                // into system bars to force a circle. Keep every destination reachable.
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(top = 72.dp)
+                        .background(colors.surface)
+                        .verticalScroll(rememberScrollState()),
                 ) {
-                    IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Rounded.Menu, contentDescription = "Open navigation menu", tint = colors.foreground)
+                    navItemIds.forEachIndexed { index, id ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().height(56.dp)
+                                .clickable(role = androidx.compose.ui.semantics.Role.Tab) {
+                                    onSelect(index)
+                                    menuOpen = false
+                                }.padding(horizontal = 16.dp),
+                        ) {
+                            NavDestinationIcon(id, size = 24, tint = colors.primary)
+                            Spacer(Modifier.width(12.dp))
+                            Text(NavigationCatalog.labelFor(id), color = colors.foreground)
+                        }
                     }
                 }
             }
+            // One persistent node: Menu changes to X in place, outside the decorative clipping.
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.absoluteOffset(x = (geometry.anchor.x - half).dp, y = (geometry.anchor.y - half).dp)
+                    .size(RadialMenuGeometry.targetSize.dp)
+                    .shadow(4.dp, CircleShape).clip(CircleShape).background(colors.surface)
+                    .clickable(onClickLabel = if (menuOpen) "Close navigation menu" else "Open navigation menu") {
+                        menuOpen = !menuOpen
+                        page = 0
+                    },
+            ) {
+                Icon(
+                    if (menuOpen) Icons.Rounded.Close else Icons.Rounded.Menu,
+                    contentDescription = if (menuOpen) "Close navigation menu" else "Open navigation menu",
+                    tint = colors.foreground,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
         }
-        Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) { fab() }
-    }
-}
-
-/** Port of _CurvedRadialMenuClipper's path as a Shape. */
-private val CurvedRadialMenuShape = object : androidx.compose.ui.graphics.Shape {
-    override fun createOutline(
-        size: androidx.compose.ui.geometry.Size,
-        layoutDirection: androidx.compose.ui.unit.LayoutDirection,
-        density: androidx.compose.ui.unit.Density,
-    ): androidx.compose.ui.graphics.Outline {
-        val w = size.width
-        val h = size.height
-        val path = androidx.compose.ui.graphics.Path().apply {
-            moveTo(w * 0.16f, 0f)
-            lineTo(w, 0f)
-            lineTo(w, h * 0.62f)
-            cubicTo(w * 0.78f, h * 0.74f, w * 0.52f, h * 0.72f, w * 0.30f, h * 0.62f)
-            cubicTo(w * 0.08f, h * 0.51f, -w * 0.05f, h * 0.31f, w * 0.055f, h * 0.12f)
-            cubicTo(w * 0.075f, h * 0.055f, w * 0.11f, 0f, w * 0.16f, 0f)
-            close()
-        }
-        return androidx.compose.ui.graphics.Outline.Generic(path)
     }
 }
 
