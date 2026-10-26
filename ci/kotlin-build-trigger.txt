@@ -1,1 +1,3 @@
-Next4: grounded bubbleV5 correction: true domes30/9 outlined28/9, flat8/8 plus semantic groups regression and textproof taller cells; compact silhouette dimensions/0.004gateUNCHANGED.132reviewedsourceoverlaySHA9968d13fb9fd25147c181e60d3a1b90997a65fced59ecd2e2d9d3962c123178e. Exactrestore132byte-matchPASS,32ChatDetailSliceParityTestsPASS actualKotlin2. Fullnative/APK-first+unit+runtimeverification; notalltaskcomplete. 2026-10-27 01:10 IST.
+Next5 frozen cumulative candidate
+Overlay 5cb7dbc2e3f63eac1cd947d8d6591e82713faa39d1e58a8fbc4f5139304ffb8e
+Synthetic-only runtime checks. No all-screen or connected-call acceptance implied.
