@@ -96,6 +96,19 @@ fun CameraCaptureViewfinder(
                 onViewport(LensSize(it.size.width.toFloat(), it.size.height.toFloat()))
             },
     ) {
+        // Mount the surface before binding. Waiting for ready here deadlocks:
+        // ready itself requires a PreviewView surface to bind the camera.
+        AndroidView(
+            factory = { ctx ->
+                PreviewView(ctx).apply {
+                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                    contentDescription = "Camera preview surface"
+                    scaleType = PreviewView.ScaleType.FILL_CENTER
+                    onPreviewView(this)
+                }
+            },
+            modifier = Modifier.fillMaxSize().then(effectMatrixModifier(effect, effectIntensity)),
+        )
         when (phase) {
             CameraPhase.initializing -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = Color(0xB3FFFFFF))
@@ -113,20 +126,7 @@ fun CameraCaptureViewfinder(
                 actionLabel = "Pick from gallery",
                 onAction = onPickFromGallery,
             )
-            CameraPhase.ready -> {
-                // ClipRect + OverflowBox + FittedBox(cover) -> FILL_CENTER.
-                AndroidView(
-                    factory = { ctx ->
-                        PreviewView(ctx).apply {
-                            scaleType = PreviewView.ScaleType.FILL_CENTER
-                            onPreviewView(this)
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .then(effectMatrixModifier(effect, effectIntensity)),
-                )
-            }
+            CameraPhase.ready -> Unit
         }
         if (phase == CameraPhase.ready && captureViewMode == CaptureViewMode.photo) {
             LensOverlay(lens = lens, poses = facePoses, health = faceHealth)
@@ -649,7 +649,7 @@ fun CameraCaptureConfirmPane(
                 contentAlignment = Alignment.Center,
             ) {
                 CameraGlyph(
-                    kind = if (isChat) "filters" else "camera",
+                    kind = "send",
                     color = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary,
                     size = 24.dp,
                 )
