@@ -723,9 +723,7 @@ fun ChatDetailScreen(
                 )
             }
 
-            connectionState?.let { state ->
-                GlobalConnectionBanner(state = state, onTap = { connectionSheetOpen = true })
-            }
+            // No strip banner in chats: the header signal icon is the only Connection Health tap target.
 
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 ChatWallpaper(
