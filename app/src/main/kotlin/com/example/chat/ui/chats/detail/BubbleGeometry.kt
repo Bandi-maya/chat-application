@@ -40,7 +40,13 @@ object BubbleStyleRegistry {
         )
 
         BubbleStyleId.gabiOutline, BubbleStyleId.rcSamsBord,
-        BubbleStyleId.rcLine, BubbleStyleId.aranbor,
+        BubbleStyleId.rcLine, BubbleStyleId.aranbor -> BubbleGeometry(
+            styleId = id,
+            contentPadding = InsetsD(13.0, 8.0, 13.0, 8.0),
+        )
+
+        // True domes have no painted body beside their centered crown until y=26dp.
+        // Text must start below that shoulder, unlike the flat rounded/chamfered styles above.
         BubbleStyleId.rcPal, BubbleStyleId.rcImess -> BubbleGeometry(
             styleId = id,
             contentPadding = InsetsD(13.0, 30.0, 13.0, 9.0),
