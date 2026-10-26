@@ -41,7 +41,15 @@ private fun Path.cornerArc(rect: Rect, startDeg: Float) {
     arcTo(rect, startDeg, 90f, forceMoveTo = false)
 }
 
-fun bubblePath(styleId: BubbleStyleId, size: Size, isMe: Boolean): Path {
+/** Public path coordinates are pixels; vector specifications below use logical dp. */
+fun bubblePath(styleId: BubbleStyleId, size: Size, isMe: Boolean, density: Float = 1f): Path {
+    val d = density.coerceAtLeast(0.1f)
+    return logicalBubblePath(styleId, Size(size.width / d, size.height / d), isMe).apply {
+        transform(androidx.compose.ui.graphics.Matrix().apply { scale(d, d) })
+    }
+}
+
+private fun logicalBubblePath(styleId: BubbleStyleId, size: Size, isMe: Boolean): Path {
     val left = 0f
     val top = 0f
     val right = size.width
@@ -98,16 +106,21 @@ fun bubblePath(styleId: BubbleStyleId, size: Size, isMe: Boolean): Path {
 
         // 5. Kitty: whimsical crown arch
         BubbleStyleId.kitty -> {
-            val r = CornerRadius(18f)
-            val flat = CornerRadius(4f)
-            if (isMe) rrect(full, r, r, r, flat) else rrect(full, r, r, flat, r)
+            val r = CornerRadius(10f)
+            val flat = CornerRadius(0f)
+            // Kitty: a broad upper ear contour, not a microscopic decorative dot.
+            val body = if (isMe) rrect(full, r, r, r, flat) else rrect(full, r, r, flat, r)
+            body.apply {
+                val x = if (isMe) right - 20f else left + 20f
+                moveTo(x - 8f, top + 3f); lineTo(x, top - 7f); lineTo(x + 8f, top + 3f); close()
+            }
         }
 
         // 6. Amor: heart crest accent
         BubbleStyleId.amor -> {
-            val r = CornerRadius(16f)
-            val flat = CornerRadius(2f)
-            if (isMe) rrect(full, r, r, r, flat) else rrect(full, r, r, flat, r)
+            val r = CornerRadius(20f)
+            val flat = CornerRadius(7f)
+            if (isMe) rrect(full, r, flat, flat, r) else rrect(full, flat, r, r, flat)
         }
 
         // 7. RC SAMS BORD: capsule outline
@@ -115,8 +128,8 @@ fun bubblePath(styleId: BubbleStyleId, size: Size, isMe: Boolean): Path {
 
         // 8. RC IOS 11: sleek rounded iOS tail
         BubbleStyleId.rcIos11, BubbleStyleId.ios -> {
-            val r = CornerRadius(min(18f, height / 2))
-            val tail = CornerRadius(3f)
+            val r = CornerRadius(min(24f, height / 2))
+            val tail = CornerRadius(0f)
             if (isMe) rrect(full, r, r, r, tail) else rrect(full, r, r, tail, r)
         }
 
@@ -350,16 +363,16 @@ fun DrawScope.drawBubble(
     accentColor: Color,
 ) {
     val geometry = BubbleStyleRegistry.getGeometry(styleId)
-    val path = bubblePath(styleId, size, isMe)
+    val path = bubblePath(styleId, size, isMe, density)
 
     if (geometry.hasDropShadow) {
         drawIntoCanvas { canvas ->
             val frameworkPaint = android.graphics.Paint().apply {
                 color = android.graphics.Color.argb(38, 0, 0, 0) // black @ 0.15
-                maskFilter = BlurMaskFilter(3f, BlurMaskFilter.Blur.NORMAL)
+                maskFilter = BlurMaskFilter(3f * density, BlurMaskFilter.Blur.NORMAL)
             }
             val shadowPath = android.graphics.Path(path.asAndroidPath())
-            shadowPath.offset(0f, 2f)
+            shadowPath.offset(0f, 2f * density)
             canvas.nativeCanvas.drawPath(shadowPath, frameworkPaint)
         }
     }
@@ -367,10 +380,24 @@ fun DrawScope.drawBubble(
     drawPath(path, fillColor)
 
     if (geometry.isOutlined) {
-        drawPath(path, strokeColor, style = Stroke(width = geometry.strokeWidth.toFloat()))
+        drawPath(path, strokeColor, style = Stroke(width = geometry.strokeWidth.toFloat() * density))
+    } else if (!isMe) {
+        // Incoming bubbles need a visible edge on pale and dark wallpapers alike.
+        // Keep this in the shared renderer so settings previews match conversation bubbles.
+        drawPath(path, strokeColor, style = Stroke(width = density))
     }
 
-    drawBubbleAccents(styleId, isMe, fillColor, strokeColor, accentColor)
+    val physicalSize = size
+    val d = density
+    drawContext.canvas.save()
+    try {
+        drawContext.canvas.scale(d, d)
+        drawContext.size = Size(physicalSize.width / d, physicalSize.height / d)
+        drawBubbleAccents(styleId, isMe, fillColor, strokeColor, accentColor)
+    } finally {
+        drawContext.size = physicalSize
+        drawContext.canvas.restore()
+    }
 }
 
 private fun DrawScope.drawBubbleAccents(
