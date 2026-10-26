@@ -80,11 +80,11 @@ fun LockCredentialSetupSheet(
     replaceExisting: Boolean = false,
     onResult: (Boolean) -> Unit,
 ) {
-    ModalBottomSheet(
+    ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp,
         onDismissRequest = { onResult(false) },
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        shape = com.example.chat.ui.kit.ChatyModalShape,
     ) {
         LockCredentialSetupContent(method, pinLength, service, replaceExisting, onResult)
     }
