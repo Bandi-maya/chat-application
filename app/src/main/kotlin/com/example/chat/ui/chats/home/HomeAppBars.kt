@@ -208,7 +208,7 @@ fun StandardHomeAppBar(
             Column(
                 modifier = Modifier
                     .weight(1f, fill = false)
-                    .combinedClickable(onClick = onIdentityTap, onLongClick = onIdentityLongPress)
+                    .combinedClickable(onClick = { if (homePrefs.nameTapOpensLocked) onIdentityTap() }, onLongClick = onIdentityLongPress)
                     .padding(horizontal = 4.dp, vertical = 2.dp),
             ) {
                 Text(
@@ -324,7 +324,6 @@ fun HomeOverflowMenu(
         onDismissRequest = onDismiss,
         containerColor = Color(theme.cardColor),
         border = androidx.compose.foundation.BorderStroke(1.1.dp, Color(argbWithAlpha(theme.secondaryTextColor, 0.2))),
-        modifier = Modifier.widthIn(min = 244.dp),
     ) {
         items.forEach { (icon, label, action) ->
             DropdownMenuItem(
