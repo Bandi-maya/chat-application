@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -198,7 +199,7 @@ fun MainNavigationShell(
     val selectedPrimaryIndex = primaryIds.indexOf(activeDestinationId)
     val bottomNavSelectedIndex = if (selectedPrimaryIndex >= 0) selectedPrimaryIndex else primaryIds.size
 
-    androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxSize()) {
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxSize().navigationBarsPadding()) {
         val appearanceStyles = com.example.chat.core.templates.AppearanceVariantController.navigationStyles
         val appearanceNavigationIndex = appearanceStyles.indexOf(prefs.navigationStyleName).coerceIn(0, appearanceStyles.size - 1)
         val forceRail = appearanceNavigationIndex in setOf(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 17, 18)
