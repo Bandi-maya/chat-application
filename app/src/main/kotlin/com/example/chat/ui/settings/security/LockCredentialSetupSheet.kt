@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -53,6 +55,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -225,37 +228,60 @@ fun LockCredentialSetupContent(
             }
             flow.isPin -> {
                 Spacer(Modifier.height(10.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    for (index in 0 until pinLength) {
-                        val focused = focusedPin == index
-                        Box(
-                            Modifier.padding(horizontal = 5.dp).width(48.dp).height(56.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(cs.surfaceContainerHighest.copy(alpha = 0.5f))
-                                .border(
-                                    BorderStroke(if (focused) 2.dp else 1.dp, if (focused) cs.primary else cs.outline.copy(alpha = 0.3f)),
-                                    RoundedCornerShape(12.dp),
-                                ),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            BasicTextField(
-                                value = pins[index],
-                                onValueChange = { raw ->
-                                    val v = raw.filter { it.isDigit() }.takeLast(1)
-                                    pins[index] = v
-                                    if (v.isNotEmpty()) {
-                                        if (index < pinLength - 1) focusRequesters[index + 1].requestFocus()
-                                        else doContinue()
-                                    } else if (index > 0) focusRequesters[index - 1].requestFocus()
-                                },
-                                singleLine = true,
-                                visualTransformation = PasswordVisualTransformation(),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                                textStyle = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold, color = cs.onSurface, textAlign = TextAlign.Center),
-                                modifier = Modifier.fillMaxWidth().focusRequester(focusRequesters[index])
-                                    .onFocusChanged { if (it.isFocused) focusedPin = index else if (focusedPin == index) focusedPin = -1 },
-                            )
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    // Keep digit controls at least 48dp; use one accessible field when
+                    // the complete row cannot fit, or text scaling needs more room.
+                    val requiredWidth = (48 * pinLength + 8 * (pinLength - 1)).dp
+                    if (maxWidth < requiredWidth || LocalDensity.current.fontScale > 1.3f) {
+                        OutlinedTextField(
+                            value = pins.joinToString(""),
+                            onValueChange = { raw ->
+                                val digits = raw.filter { it.isDigit() }.take(pinLength)
+                                for (index in pins.indices) pins[index] = digits.getOrNull(index)?.toString() ?: ""
+                                if (digits.length == pinLength) doContinue()
+                            },
+                            enabled = !flow.busy,
+                            label = { Text("$pinLength-digit PIN") },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = { doContinue() }),
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                        )
+                    } else {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
+                        for (index in 0 until pinLength) {
+                            val focused = focusedPin == index
+                            Box(
+                                Modifier.width(48.dp).heightIn(min = 56.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(cs.surfaceContainerHighest.copy(alpha = 0.5f))
+                                    .border(
+                                        BorderStroke(if (focused) 2.dp else 1.dp, if (focused) cs.primary else cs.outline.copy(alpha = 0.3f)),
+                                        RoundedCornerShape(12.dp),
+                                    ),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                BasicTextField(
+                                    value = pins[index],
+                                    onValueChange = { raw ->
+                                        val v = raw.filter { it.isDigit() }.takeLast(1)
+                                        pins[index] = v
+                                        if (v.isNotEmpty()) {
+                                            if (index < pinLength - 1) focusRequesters[index + 1].requestFocus()
+                                            else doContinue()
+                                        } else if (index > 0) focusRequesters[index - 1].requestFocus()
+                                    },
+                                    singleLine = true,
+                                    visualTransformation = PasswordVisualTransformation(),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                                    textStyle = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold, color = cs.onSurface, textAlign = TextAlign.Center),
+                                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).focusRequester(focusRequesters[index])
+                                        .onFocusChanged { if (it.isFocused) focusedPin = index else if (focusedPin == index) focusedPin = -1 },
+                                )
+                            }
                         }
+                    }
                     }
                 }
                 Spacer(Modifier.height(24.dp))
