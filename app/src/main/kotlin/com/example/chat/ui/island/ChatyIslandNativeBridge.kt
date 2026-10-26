@@ -1,27 +1,11 @@
 package com.example.chat.ui.island
 
 import android.content.Context
+import com.example.chat.IslandOverlay
+import java.lang.ref.WeakReference
 
-/** Real Android implementation of the controller's [IslandNativeBridge] seam:
- *  the native side of Dart MethodChannel('chaty/dynamic_island').
- *
- *  Exact ports of the MainActivity.kt channel handler +
- *  DynamicIslandNotificationListener companion accessors
- *  (chaty-api android/.../MainActivity.kt:230-245,
- *  DynamicIslandNotificationListener.kt:302-336): all four config values are
- *  SharedPreferences("chaty_dynamic_island") reads/writes, returning the
- *  passed/stored value exactly like result.success(...).
- *
- *  Shipped-parity notes:
- *  - clearAll(): Dart forwards to IslandOverlay.clearAllNotifications(); the
- *    system-overlay island window (IslandOverlay/IslandView) is unported AND
- *    unreachable in shipped Dart (neither manifest declares
- *    SYSTEM_ALERT_WINDOW), so this is intentionally a no-op.
- *  - setNotificationEventHandler: the inbound methods
- *    onNativeNotificationPosted/Removed/onClearAll are only invoked by the
- *    Dart app's NotificationListenerService, which is NOT declared in the
- *    shipped Dart manifest, so no events ever arrive there either. The
- *    handler is stored for a future listener; nothing else is synthesized. */
+/** Local-only bridge between the Android listener and the in-app island.
+ * Notification contents are neither persisted nor sent over a network. */
 class ChatyIslandNativeBridge(context: Context) : IslandNativeBridge {
 
     private val appContext = context.applicationContext
@@ -32,16 +16,16 @@ class ChatyIslandNativeBridge(context: Context) : IslandNativeBridge {
 
     override fun setNotificationEventHandler(handler: (IslandNativeEvent) -> Unit) {
         notificationEventHandler = handler
+        activeBridge = WeakReference(this)
     }
 
-    /** Test/native-side entry: delivers an inbound channel event. No shipped
-     *  caller exists (see class doc); kept for the future listener binding. */
+    /** Delivery is on Android main thread, matching controller/UI state. */
     fun dispatchNativeEvent(event: IslandNativeEvent) {
         notificationEventHandler?.invoke(event)
     }
 
     override fun clearAll() {
-        // IslandOverlay.clearAllNotifications(): unported system overlay, no-op.
+        IslandOverlay.clearAllNotifications()
     }
 
     override suspend fun setHideSystemNotifications(hide: Boolean): Boolean {
@@ -61,6 +45,11 @@ class ChatyIslandNativeBridge(context: Context) : IslandNativeBridge {
         prefs().getBoolean(KEY_HEADER, false)
 
     companion object {
+        private var activeBridge: WeakReference<ChatyIslandNativeBridge>? = null
+        fun deliverNativeEvent(event: IslandNativeEvent) {
+            activeBridge?.get()?.dispatchNativeEvent(event)
+        }
+
         const val PREFS = "chaty_dynamic_island"
         const val KEY_ENABLED = "enabled"
         const val KEY_HIDE_SYSTEM = "hide_system_notifications"
