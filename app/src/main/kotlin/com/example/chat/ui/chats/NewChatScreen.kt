@@ -28,7 +28,7 @@ import androidx.compose.material.icons.rounded.GroupAdd
 import androidx.compose.material.icons.rounded.GroupWork
 import androidx.compose.material.icons.rounded.PersonSearch
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -445,7 +445,7 @@ fun NewChatScreen(
     // _onUserLongPress sheet: Start Chat / Delete User.
     val sheetTarget = sheetUser
     if (sheetTarget != null) {
-        ModalBottomSheet(
+        ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp,
             onDismissRequest = { sheetUser = null },
             containerColor = colors.surface,
             shape = com.example.chat.ui.kit.ChatyModalShape,
