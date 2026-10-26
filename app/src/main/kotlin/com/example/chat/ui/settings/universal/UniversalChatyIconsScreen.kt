@@ -485,11 +485,11 @@ fun UniversalChatyIconsScreen(
     // all ten themes.
     detailIcon?.let { iconId ->
         val scheme = MaterialTheme.colorScheme
-        ModalBottomSheet(
+        ModalBottomSheet(tonalElevation = 0.dp,
             onDismissRequest = { detailIcon = null },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             containerColor = scheme.surface,
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            shape = com.example.chat.ui.kit.ChatyModalShape,
             dragHandle = null,
         ) {
             Column(Modifier.navigationBarsPadding().padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 20.dp)) {
