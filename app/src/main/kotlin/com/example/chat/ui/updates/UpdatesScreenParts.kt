@@ -36,7 +36,7 @@ import androidx.compose.material.icons.rounded.PlayCircleFilled
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.RemoveRedEye
 import androidx.compose.material.icons.rounded.Send
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -92,7 +92,7 @@ internal fun UpdatesConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { Text(message) },
@@ -179,7 +179,7 @@ internal fun UpdatesComposerSheet(
         }
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 20.dp),
         ) {
@@ -578,7 +578,7 @@ internal fun StatusViewersSheet(
         return "${diff.toDays()}d ago"
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = onDismiss) {
         Column(Modifier.heightIn(max = 480.dp)) {
             Text(
                 "Viewed by",
