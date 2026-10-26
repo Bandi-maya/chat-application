@@ -66,7 +66,7 @@ fun AppLockOverlay(
     onUnlocked: () -> Unit,
     title: String = "Chaty Lock",
     reason: String = "Authenticate to unlock Chaty",
-    onSetupMissingCredential: suspend (method: String, pinLength: Int) -> Boolean = { _, _ -> false },
+    onSetupMissingCredential: (suspend (method: String, pinLength: Int) -> Boolean)? = null,
 ) {
     val scope = rememberCoroutineScope()
     val controller = remember(lockService) {
@@ -80,6 +80,15 @@ fun AppLockOverlay(
     val locked = ui.busy || ui.cooldownSeconds > 0
 
     BackHandler(enabled = true) { /* canPop: false */ }
+    // Dart _setupMissingCredential: LockCredentialSetupModal.show(method, pinLength), then reload capabilities.
+    // When the caller supplies no host hook (all current call sites), the overlay hosts the sheet itself.
+    var setupRequest by remember { mutableStateOf<Pair<String, Int>?>(null) }
+    setupRequest?.let { (setupMethod, setupPinLength) ->
+        LockCredentialSetupSheet(setupMethod, setupPinLength, remember(lockService) { LockSetupServiceAdapter(lockService) }) { configured ->
+            setupRequest = null
+            if (configured) scope.launch { controller.loadCapabilities() }
+        }
+    }
     LaunchedEffect(controller) {
         controller.loadCapabilities()
         controller.startNativeMethodIfNeeded()
@@ -118,7 +127,9 @@ fun AppLockOverlay(
                 Text("This lock method has not been configured securely on this device yet.", color = cs.onBackground, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(14.dp))
                 Button(onClick = {
-                    scope.launch { if (onSetupMissingCredential(method, ui.pinLength)) controller.loadCapabilities() }
+                    val host = onSetupMissingCredential
+                    if (host == null) setupRequest = method to ui.pinLength
+                    else scope.launch { if (host(method, ui.pinLength)) controller.loadCapabilities() }
                 }) { Text("Set up $method") }
             } else when (method) {
                 "PIN" -> {
