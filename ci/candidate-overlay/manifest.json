@@ -1,6 +1,6 @@
 {
   "base": "5d6e83e846caeba925ee637c3a7babebbef5cbe3",
-  "archive_sha256": "2e42f0d02ce5682e8b6bf26aff626e4f3a95aa6091e4ef011c00fc60d8c0709a",
+  "archive_sha256": "9968d13fb9fd25147c181e60d3a1b90997a65fced59ecd2e2d9d3962c123178e",
   "files": {
     "app/build.gradle.kts": "362c7958e391f4219bf7e53384678eae2e2457ee64e560713cd2f968180080dc",
     "app/src/androidTest/java/com/example/chat/AppRootConfiguredProofTest.kt": "3916e4b944acabdba88a3d716f415d0ab14508928b43672febc15de6ebc1508e",
@@ -75,7 +75,7 @@
     "app/src/main/kotlin/com/example/chat/ui/chats/detail/AttachmentConsumerBinding.kt": "d5a98c5693441479c3f0420d9ceffad3e5c9f06738e48acf2e10aac85ed338ee",
     "app/src/main/kotlin/com/example/chat/ui/chats/detail/BoundAttachmentViewer.kt": "9ab61c274148d28555f98210659875ad1f366feda8c406e811304f79f8ad61c8",
     "app/src/main/kotlin/com/example/chat/ui/chats/detail/BubbleDistinctStyles.kt": "5e8bdf23d684d16b2181759363be4b054cbdba185a56f7962d24e2dc5ff85bde",
-    "app/src/main/kotlin/com/example/chat/ui/chats/detail/BubbleGeometry.kt": "56beb69ac86d0a899e8351cb28880ee9837ff5c5c81b6100a1c1cd95d2e5000b",
+    "app/src/main/kotlin/com/example/chat/ui/chats/detail/BubbleGeometry.kt": "1a0e1381c29c93e7ae76d79c957681db57b11f7ff165a350dbe1aecf28fde7f1",
     "app/src/main/kotlin/com/example/chat/ui/chats/detail/BubblePainter.kt": "b4e4f8805a8ed4f0d26f36c9c812526856e967962ca6eb397e551ca296fb871e",
     "app/src/main/kotlin/com/example/chat/ui/chats/detail/ChatAttachmentActionController.kt": "071c9b7da0250c7c41ae0ee665df606150b4f1b1f81cbdd822ef36d3c090acdb",
     "app/src/main/kotlin/com/example/chat/ui/chats/detail/ImageEditorScreen.kt": "38048e45a4eacb127310f43fd39e51187ea017160a5c09d9564d3b3f95e0c504",
@@ -107,6 +107,7 @@
     "app/src/test/java/com/example/chat/CallSignalCodecTest.kt": "b3367feb5285d50af498656ef0022ab1e9e39244a6cc97e39d8ae86f67afa215",
     "app/src/test/java/com/example/chat/CallSignalDeduplicatorTest.kt": "5f5823c0e9ddc0f28a27133aa78a5fb2b1784b632456df23490d11eb63b2c2be",
     "app/src/test/java/com/example/chat/CallSignalingParityTest.kt": "1c581f5dc30e88c4dd2cbc6dd74d9c0d502b975d406b32b37f3e33bdacd65a95",
+    "app/src/test/java/com/example/chat/ChatDetailSliceParityTest.kt": "8599648e519e158cd97f96350cb4c53ebad9e15a2252609abd0bd4040c9ade0c",
     "app/src/test/java/com/example/chat/EditedOutputValidatorTest.kt": "fba36a24e1d409f5c45ea514bba93e88ffa14cb138c978e8bf467bc992e13206",
     "app/src/test/java/com/example/chat/ExportRegistryTest.kt": "b251aeaf3e91cad91136832956d420a9e28eaa1e108b61bfd11f5ef13f56cd83",
     "app/src/test/java/com/example/chat/LatestApiCallParityTest.kt": "07f516ea3ce6b31d7fcf9c1f8f4520ef4dbb22ea8e1bb3257d3917082675a966",
