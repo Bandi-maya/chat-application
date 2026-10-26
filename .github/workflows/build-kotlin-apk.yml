@@ -29,7 +29,7 @@ jobs:
           for p in z.infolist():
               n=p.filename; q=pathlib.PurePosixPath(n)
               assert not q.is_absolute() and '..' not in q.parts and not n.startswith('.') and not n.endswith('/')
-              assert n.startswith(('app/','ci/')) and '/build/' not in n and '/.env' not in n
+              assert n.startswith(('app/','ci/','tools/location-map/')) and '/build/' not in n and '/.env' not in n
               assert (p.external_attr >> 16) & 0o170000 != 0o120000
               data=z.read(p); assert hashlib.sha256(data).hexdigest()==m['files'][n]
               target=pathlib.Path(n); assert not target.is_symlink()
@@ -132,7 +132,7 @@ jobs:
           for p in z.infolist():
               n=p.filename; q=pathlib.PurePosixPath(n)
               assert not q.is_absolute() and '..' not in q.parts and not n.startswith('.') and not n.endswith('/')
-              assert n.startswith(('app/','ci/')) and '/build/' not in n and '/.env' not in n
+              assert n.startswith(('app/','ci/','tools/location-map/')) and '/build/' not in n and '/.env' not in n
               assert (p.external_attr >> 16) & 0o170000 != 0o120000
               data=z.read(p); assert hashlib.sha256(data).hexdigest()==m['files'][n]
               target=pathlib.Path(n); assert not target.is_symlink()
