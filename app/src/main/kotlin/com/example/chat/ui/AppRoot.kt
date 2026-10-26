@@ -222,7 +222,7 @@ fun AppRoot() {
             }
         }
         if (showLockPrompt) {
-            androidx.compose.material3.AlertDialog(
+            androidx.compose.material3.AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
                 onDismissRequest = { showLockPrompt = false },
                 title = { androidx.compose.material3.Text("Enable App Lock?") },
                 text = {
@@ -449,6 +449,8 @@ fun AppRoot() {
                 }
                 var showCenterEffects by remember { mutableStateOf(false) }
                 var createTaskTick by remember { mutableIntStateOf(0) }
+                // Last FAB tick already consumed; stops a stale tick reopening the modal when Tasks is re-entered.
+                var handledCreateTaskTick by remember { mutableIntStateOf(0) }
                 var shellRev by remember { mutableIntStateOf(0) }
                 val shellCtx = androidx.compose.ui.platform.LocalContext.current
                 androidx.compose.runtime.DisposableEffect(Unit) {
@@ -608,7 +610,7 @@ fun AppRoot() {
                                         avatarInitials = number.take(1).uppercase(), avatarColorHex = "#25D366",
                                         about = "Chaty User", lastSeenAt = java.time.Instant.now(), phone = number,
                                     )
-                                    ServiceLocator.conversationsRepository.getOrCreateDirectConversationAsync(user).id
+                                    ServiceLocator.apiBackend.createOrGetDirectConversation(user.id).id
                                 },
                                 onOpenConversation = { id ->
                                     ServiceLocator.apiBackend.conversations.firstOrNull { it.id == id }?.let { c ->
@@ -778,7 +780,10 @@ fun AppRoot() {
                                 var editorTask by remember { mutableStateOf<com.example.chat.domain.models.ChatTask?>(null) }
                                 // Contextual FAB 'Create task' (hoisted tick from the shell FAB).
                                 androidx.compose.runtime.LaunchedEffect(createTaskTick) {
-                                    if (createTaskTick > 0) { editorTask = null; editorOpen = true }
+                                    if (createTaskTick > handledCreateTaskTick) {
+                                        handledCreateTaskTick = createTaskTick
+                                        editorTask = null; editorOpen = true
+                                    }
                                 }
                                 androidx.compose.runtime.DisposableEffect(controller) {
                                     val l: () -> Unit = { tasksRevision++ }
@@ -1177,7 +1182,7 @@ fun AppRoot() {
                 }
                 val notice = settingsNotice
                 if (notice != null) {
-                    androidx.compose.material3.AlertDialog(
+                    androidx.compose.material3.AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
                         onDismissRequest = { settingsNotice = null },
                         title = { androidx.compose.material3.Text(notice) },
                         text = { androidx.compose.material3.Text("This settings page is not hosted in this build yet.") },
@@ -1212,8 +1217,8 @@ fun AppRoot() {
                     contacts = ServiceLocator.apiBackend.users,
                     startInGroupMode = newChatGroup,
                     startInBroadcastMode = newChatBroadcast,
-                    searchUsersRemote = { q -> repoN.searchUsersRemote(q) },
-                    openDirectConversation = { u -> repoN.getOrCreateDirectConversationAsync(u) },
+                    searchUsersRemote = { q -> ServiceLocator.apiBackend.searchUsers(q) },
+                    openDirectConversation = { u -> ServiceLocator.apiBackend.createOrGetDirectConversation(u.id) },
                     createGroup = { title, ids -> repoN.createGroup(title, ids) },
                     deleteUser = { id -> ServiceLocator.apiBackend.deleteUser(id) },
                     onOpenConversation = { conversation ->
@@ -1235,8 +1240,8 @@ fun AppRoot() {
                     onNotify = { msg -> searchScope.launch { searchSnackbar.showSnackbar(msg) } },
                     colors = com.example.chat.ui.core.theme.ChatyColors(resolvedTheme),
                     conversations = ServiceLocator.apiBackend.conversations,
-                    searchUsers = { q -> repoS.searchUsersRemote(q) },
-                    openDirectConversation = { u -> repoS.getOrCreateDirectConversationAsync(u) },
+                    searchUsers = { q -> ServiceLocator.apiBackend.searchUsers(q) },
+                    openDirectConversation = { u -> ServiceLocator.apiBackend.createOrGetDirectConversation(u.id) },
                     verifySecretPhrase = { phrase -> ServiceLocator.localLockService.verifySecretPhrase(phrase) },
                     isConversationHidden = { id -> prefsS.isConversationHidden(id) },
                     onBack = { navigation.goBack() },
@@ -1357,8 +1362,8 @@ fun AppRoot() {
                     devicesOnly = linkedDevicesOnly,
                     onRefreshDevices = { reloadDevices() },
                     onRevokeDevice = { d -> rel.revokeDevice(d.id); reloadDevices() },
-                    searchUsersRemote = { q -> repoL.searchUsersRemote(q) },
-                    openDirectConversation = { u -> repoL.getOrCreateDirectConversationAsync(u) },
+                    searchUsersRemote = { q -> ServiceLocator.apiBackend.searchUsers(q) },
+                    openDirectConversation = { u -> ServiceLocator.apiBackend.createOrGetDirectConversation(u.id) },
                     onOpenConversation = { conversation ->
                         ServiceLocator.apiBackend.setActiveConversation(conversation.id)
                         selectedConversation = conversation
