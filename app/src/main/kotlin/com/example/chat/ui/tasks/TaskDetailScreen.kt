@@ -34,8 +34,8 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PersonOutline
 import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.example.chat.ui.kit.ChatyDropdownMenu as DropdownMenu
+import com.example.chat.ui.kit.ChatyDropdownMenuItem as DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -122,7 +122,7 @@ fun TaskDetailScreen(
                         IconButton(onClick = { menuOpen = true }) {
                             Icon(Icons.Rounded.MoreVert, contentDescription = "More")
                         }
-                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape, expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                             DropdownMenuItem(
                                 text = { Text("Edit Task") },
                                 leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(20.dp)) },
@@ -170,7 +170,7 @@ fun TaskDetailScreen(
                             Spacer(Modifier.width(4.dp))
                             Icon(Icons.Rounded.ArrowDropDown, contentDescription = "Change Status", tint = colors.primary, modifier = Modifier.size(18.dp))
                         }
-                        DropdownMenu(expanded = statusMenuOpen, onDismissRequest = { statusMenuOpen = false }) {
+                        DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape, expanded = statusMenuOpen, onDismissRequest = { statusMenuOpen = false }) {
                             for (s in TaskStatus.entries) {
                                 DropdownMenuItem(
                                     text = {
