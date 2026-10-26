@@ -792,6 +792,17 @@ fun AppRoot() {
                                     }
                                     val toastContext = androidx.compose.ui.platform.LocalContext.current
                                     com.example.chat.ui.updates.UpdatesScreen(
+                                        // Dart launchUrl(signedUrl, LaunchMode.externalApplication).
+                                        openUrl = { url ->
+                                            try {
+                                                toastContext.startActivity(
+                                                    android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                                                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                                                )
+                                            } catch (e: Exception) {
+                                                android.util.Log.w("AppRoot", "open status url failed: $e")
+                                            }
+                                        },
                                         statusService = statusService,
                                         colors = shellColors,
                                         currentUser = updUser,
@@ -1170,7 +1181,10 @@ fun AppRoot() {
             AuthRoute.GlobalSearch -> {
                 val repoS = ServiceLocator.conversationsRepository
                 val prefsS = ServiceLocator.preferencesController
+                val searchToastCtx = androidx.compose.ui.platform.LocalContext.current
                 com.example.chat.ui.search.GlobalSearchScreen(
+                    // Dart SnackBar for the search error strings.
+                    onNotify = { msg -> android.widget.Toast.makeText(searchToastCtx, msg, android.widget.Toast.LENGTH_SHORT).show() },
                     colors = com.example.chat.ui.core.theme.ChatyColors(resolvedTheme),
                     conversations = ServiceLocator.apiBackend.conversations,
                     searchUsers = { q -> repoS.searchUsersRemote(q) },
