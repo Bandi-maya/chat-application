@@ -171,39 +171,23 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
         override suspend fun fetchDetails(id: String): com.example.chat.ui.chats.detail.ContactDetails? =
             com.example.chat.data.services.AndroidContactsAccess.fetchContactDetails(context, id)
     }
-    var locPending by remember { mutableStateOf<CompletableDeferred<Boolean>?>(null) }
-    val locPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { r ->
-        locPending?.complete(r.values.any { it }); locPending = null
+    // NEW GeoLibre map viewer, loaded only after explicit user action, never during normal chat.
+    var locationPickerOpen by remember(conversationId, api.currentUser?.id) { mutableStateOf(false) }
+    val liveConversation by androidx.compose.runtime.rememberUpdatedState(conversationId)
+    val onLocation: () -> Unit = { locationPickerOpen = true }
+    val locationAccount = api.currentUser?.id
+    if (locationPickerOpen && locationAccount != null) {
+        com.example.chat.ui.chats.location.MapViewerScreen(
+            context = context,
+            accountId = locationAccount,
+            conversationId = conversationId,
+            currentScope = { api.currentUser?.id to liveConversation },
+            onDismiss = { locationPickerOpen = false },
+            onAttributionLink = { uri ->
+                context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri))
+            },
+        )
     }
-    // Deviation: deniedForever is not distinguishable without an Activity rationale check; a denial maps to `denied`.
-    val locationPort = object : com.example.chat.ui.chats.detail.LocationPort {
-        private fun granted() = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
-            androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        private val lm get() = context.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager
-        override suspend fun isLocationServiceEnabled() = androidx.core.location.LocationManagerCompat.isLocationEnabled(lm)
-        override suspend fun checkPermission() = if (granted()) com.example.chat.ui.chats.detail.LocationPermissionState.granted else com.example.chat.ui.chats.detail.LocationPermissionState.denied
-        override suspend fun requestPermission(): com.example.chat.ui.chats.detail.LocationPermissionState {
-            val d = CompletableDeferred<Boolean>()
-            locPending = d
-            locPermission.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION))
-            return if (d.await()) com.example.chat.ui.chats.detail.LocationPermissionState.granted else com.example.chat.ui.chats.detail.LocationPermissionState.denied
-        }
-        @android.annotation.SuppressLint("MissingPermission")
-        override suspend fun getCurrentPosition(): Triple<Double, Double, Double> {
-            val manager = lm
-            val provider = if (manager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)) android.location.LocationManager.GPS_PROVIDER
-            else android.location.LocationManager.NETWORK_PROVIDER
-            val loc = kotlinx.coroutines.suspendCancellableCoroutine<android.location.Location?> { cont ->
-                val signal = androidx.core.os.CancellationSignal()
-                cont.invokeOnCancellation { signal.cancel() }
-                androidx.core.location.LocationManagerCompat.getCurrentLocation(
-                    manager, provider, signal, androidx.core.content.ContextCompat.getMainExecutor(context),
-                ) { cont.resumeWith(Result.success(it)) }
-            } ?: throw IllegalStateException("Could not determine your location.")
-            return Triple(loc.latitude, loc.longitude, loc.accuracy.toDouble())
-        }
-    }
-    val onLocation: () -> Unit = { scope.launch { controller.shareLocation(locationPort); afterSend() } }
     val onContact: () -> Unit = { scope.launch { controller.shareContact(contactsPort); afterSend() } }
     val onMedia: (String) -> Unit = { type ->
         scope.launch {
