@@ -530,6 +530,10 @@ object ServiceLocator {
             rpc = rpcClient,
             currentUserId = currentUserId,
             privacy = { preferencesController.privacy.toPublicationSnapshot() },
+            preferencesReady = { preferencesController.preferencesReady },
+            gbHideStatusView = { preferencesController.gbBool("yoHideStatViewV2") },
+            gbAudioStatusEnabled = { preferencesController.gbBool("abu9aleh_status_audio") },
+            gbSizeLimitMb = { key, fallback -> preferencesController.gbDouble(key, fallback) },
             statusChannelFactory = { topic, tables, onChange, onStatus ->
                 SupabaseRealtimeChannel(supabaseUrl, publishableKey, accessToken, topic, tables, onChange, onStatus).also { it.start() }
             },
