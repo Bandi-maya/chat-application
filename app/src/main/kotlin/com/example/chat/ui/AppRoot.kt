@@ -1595,5 +1595,8 @@ private fun ChatyPushedPage(visible: Boolean, content: @Composable () -> Unit) {
         visible = visible,
         enter = com.example.chat.ui.core.theme.ChatyTransitions.enterTransition(entry),
         exit = com.example.chat.ui.core.theme.ChatyTransitions.popExitTransition(entry),
-    ) { content() }
+    ) {
+        // Pushed pages own their touches; see PushedPageTouchGuard.
+        com.example.chat.ui.kit.PushedPageTouchGuard { content() }
+    }
 }
