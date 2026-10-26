@@ -190,6 +190,26 @@ class AppRootConfiguredProofTest {
             device.pressBack() // Calls -> Updates
             device.pressBack()
             assertTrue("Back from Updates returns Chats", device.wait(Until.hasObject(By.text("Synthetic Peer")), 10000))
+            // Deterministic task source: swap the controller's REST client for one backed by an in-process fake
+            // transport, so every loadTasks() (entry, re-entry) returns the same synthetic list. No network.
+            run {
+                val ctl = ServiceLocator.tasksController
+                val fake = com.example.chat.data.api.ApiTasksClient(
+                    baseUrl = { "http://synthetic.invalid" },
+                    tenantId = { "synthetic-tenant" },
+                    token = { "synthetic-test-token" },
+                    transport = com.example.chat.data.api.ApiHttpTransport { method, url, _, _ ->
+                        if (method == "GET" && url.endsWith("/tasks")) {
+                            val iso = Instant.now().toString()
+                            200 to """{"data":[{"uid":"synthetic-task-1","chat_room_id":"synthetic-room-1","title":"Synthetic Task Alpha","description":"Synthetic","created_by_id":"synthetic-user-1","assigned_to_ids":["synthetic-user-1"],"status":"assigned","priority":"medium","due_date":"$iso","created_at":"$iso","updated_at":"$iso"}]}"""
+                        } else {
+                            500 to "{}"
+                        }
+                    },
+                )
+                val f = ctl.javaClass.getDeclaredField("client"); f.isAccessible = true
+                f.set(ctl, fake)
+            }
             device.findObject(By.desc("Tasks")).click()
             assertTrue("Tasks entry does not open editor", !device.wait(Until.hasObject(By.text("New Task")), 1500))
             val createButtons = device.findObjects(By.desc("Create task"))
@@ -208,7 +228,19 @@ class AppRootConfiguredProofTest {
             device.findObject(By.desc("Chats")).click()
             device.findObject(By.desc("Tasks")).click()
             assertTrue("consumed FAB event does not reopen editor", !device.wait(Until.hasObject(By.text("New Task")), 1500))
+            // System Back from Task Detail must return to the task list, not leave the Tasks tab.
+            val taskRow = device.wait(Until.findObject(By.text("Synthetic Task Alpha")), 10000)
+                ?: throw AssertionError("seeded synthetic task not shown in Tasks list")
+            taskRow.click()
+            assertTrue("task detail opens", device.wait(Until.hasObject(By.text("Task Details")), 10000))
+            device.pressBack()
+            assertTrue("system Back from detail returns to task list",
+                device.wait(Until.hasObject(By.desc("Create task")), 10000) && !device.hasObject(By.text("Task Details")))
+            capture(device, "10f-task-detail-back-to-list")
             device.findObject(By.desc("Chats")).click()
+            // Navigation animates to the Chats page. The tab click is not a completed transition.
+            assertTrue("Chats top bar appears after returning from Tasks",
+                device.wait(Until.hasObject(By.desc("More options")), 10000))
             device.findObject(By.desc("More options")).click()
             assertTrue("custom Home menu opens", device.wait(Until.hasObject(By.text("New Group")), 10000))
             capture(device, "10f-home-custom-menu")
