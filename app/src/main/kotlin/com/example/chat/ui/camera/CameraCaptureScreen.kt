@@ -11,7 +11,16 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -117,9 +126,13 @@ private class CameraSession(
     var lensFacing: Int = CameraSelector.LENS_FACING_BACK
     var imageCapture: ImageCapture? = null
     var analysis: ImageAnalysis? = null
+    var preview: Preview? = null
     val analysisExecutor = Executors.newSingleThreadExecutor()
     val captureExecutor = Executors.newSingleThreadExecutor()
     var torchOn: Boolean = false
+    var stabilization: Boolean = false
+    var flashSupported = false
+    var stabilizationSupported = false
 
     suspend fun ensureProvider(): ProcessCameraProvider {
         provider?.let { return it }
@@ -149,13 +162,18 @@ private class CameraSession(
     ) {
         val provider = provider ?: return
         camera?.cameraInfo?.cameraState?.removeObservers(lifecycleOwner)
-        provider.unbindAll()
+        unbind()
         val selector = if (lensFacing == CameraSelector.LENS_FACING_FRONT) {
             CameraSelector.DEFAULT_FRONT_CAMERA
         } else {
             CameraSelector.DEFAULT_BACK_CAMERA
         }
-        val preview = Preview.Builder().build().also {
+        val info = provider.getCameraInfo(selector)
+        flashSupported = info.hasFlashUnit()
+        stabilizationSupported = Preview.getPreviewCapabilities(info).isStabilizationSupported
+        val preview = Preview.Builder().apply {
+            if (stabilizationSupported) setPreviewStabilizationEnabled(stabilization)
+        }.build().also {
             it.setSurfaceProvider(previewView.surfaceProvider)
         }
         val capture = ImageCapture.Builder()
@@ -171,6 +189,7 @@ private class CameraSession(
                 proxy.close()
             }
         }
+        this.preview = preview
         imageCapture = capture
         analysis = analyzer
         try {
@@ -179,7 +198,7 @@ private class CameraSession(
             } catch (_: IllegalArgumentException) {
                 // Some cameras cannot supply all three streams at once. Keep
                 // photo capture working without optional face analysis.
-                provider.unbindAll()
+                provider.unbind(preview, capture, analyzer)
                 analyzer.clearAnalyzer()
                 provider.bindToLifecycle(lifecycleOwner, selector, preview, capture)
             }
@@ -201,6 +220,7 @@ private class CameraSession(
      *  a failed call reverts the toggle (caller mirrors the Dart catch). */
     fun setTorch(on: Boolean): Boolean {
         return try {
+            if (camera?.cameraInfo?.hasFlashUnit() != true) return false
             camera?.cameraControl?.enableTorch(on) ?: return false
             torchOn = on
             true
@@ -211,7 +231,11 @@ private class CameraSession(
 
     fun unbind() {
         camera?.cameraInfo?.cameraState?.removeObservers(lifecycleOwner)
-        try { provider?.unbindAll() } catch (_: Exception) {}
+        try {
+            preview?.let { provider?.unbind(it) }
+            imageCapture?.let { provider?.unbind(it) }
+            analysis?.let { provider?.unbind(it) }
+        } catch (_: Exception) {}
     }
 
     fun dispose() {
@@ -228,6 +252,7 @@ fun ChatyCameraCaptureScreen(
     deviceTier: DeviceCapabilityTier = DeviceCapabilityTier.midRange,
     onResult: (ChatyCaptureResult) -> Unit,
     onDismiss: () -> Unit,
+    onVideoResult: ((FinalizedVideo) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val view = LocalView.current
@@ -257,6 +282,16 @@ fun ChatyCameraCaptureScreen(
     var flashOn by remember { mutableStateOf(false) }
     var effectsOpen by remember { mutableStateOf(false) }
     var capturing by remember { mutableStateOf(false) }
+    var options by remember { mutableStateOf(CameraCaptureOptions()) }
+    var optionsOpen by remember { mutableStateOf(false) }
+    var flashSupported by remember { mutableStateOf(false) }
+    var stabilizationSupported by remember { mutableStateOf(false) }
+    var countdown by remember { mutableStateOf(0) }
+    var scannerBusy by remember { mutableStateOf(false) }
+    var scannerError by remember { mutableStateOf<String?>(null) }
+    var timerJob by remember { mutableStateOf<Job?>(null) }
+    var zoomRatio by remember { mutableStateOf(1f) }
+    var videoOpen by remember { mutableStateOf(false) }
     var captureViewMode by remember { mutableStateOf(CaptureViewMode.photo) }
     var capturedPath by remember { mutableStateOf<String?>(null) }
     var caption by remember { mutableStateOf("") }
@@ -332,7 +367,7 @@ fun ChatyCameraCaptureScreen(
 
     fun bindCamera() {
         val pv = previewView ?: return
-        if (!cameraPermissionGranted || capturedPath != null) return
+        if (!cameraPermissionGranted || capturedPath != null || scannerBusy || videoOpen) return
         bindJob?.cancel()
         bindJob = scope.launch {
             phase = CameraPhase.initializing
@@ -346,7 +381,12 @@ fun ChatyCameraCaptureScreen(
                         errorMessage = message
                         phase = CameraPhase.noCamera
                     },
-                    onReady = { phase = CameraPhase.ready },
+                    onReady = {
+                        phase = CameraPhase.ready
+                        flashSupported = session.flashSupported
+                        stabilizationSupported = session.stabilizationSupported
+                        zoomRatio = session.camera?.cameraInfo?.zoomState?.value?.zoomRatio ?: 1f
+                    },
                 )
             } catch (error: CancellationException) {
                 throw error
@@ -362,17 +402,24 @@ fun ChatyCameraCaptureScreen(
         if (!granted) phase = CameraPhase.permissionDenied
     }
     LaunchedEffect(Unit) { requestPermission(ChatyPermissions.camera) }
-    LaunchedEffect(previewView, cameraPermissionGranted, capturedPath) {
+    LaunchedEffect(previewView, cameraPermissionGranted, capturedPath, scannerBusy, videoOpen, options.stabilization) {
         if (!cameraPermissionGranted) {
             session.unbind()
             phase = CameraPhase.permissionDenied
-        } else if (capturedPath == null) bindCamera()
-        else session.unbind()
+        } else if (capturedPath == null && !scannerBusy && !videoOpen) {
+            session.stabilization = options.stabilization
+            bindCamera()
+        }
+        else if (!videoOpen) session.unbind()
     }
     // Re-check after returning from Android app settings. A granted permission
     // must not leave this composition stranded in its old denied state.
-    DisposableEffect(lifecycleOwner, session, capturedPath) {
+    DisposableEffect(lifecycleOwner, session, capturedPath, scannerBusy, videoOpen) {
         val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) {
+                timerJob?.cancel()
+                countdown = 0
+            }
             if (event == Lifecycle.Event.ON_RESUME) {
                 val granted = ChatyPermissions.isGranted(context, ChatyPermissions.camera)
                 cameraPermissionGranted = granted
@@ -396,20 +443,26 @@ fun ChatyCameraCaptureScreen(
         }
     }
 
-    // Flash follows the toggle but only on the back camera (Dart parity).
     fun toggleFlash() {
-        ChatyHapticsPort.selection(view)
+        if (!flashSupported) return
+        val camera = session.camera ?: return
         val next = !flashOn
-        flashOn = if (session.lensFacing == CameraSelector.LENS_FACING_BACK) {
-            session.setTorch(next)
-        } else {
-            session.torchOn = false
-            false
-        }
+        val future = camera.cameraControl.enableTorch(next)
+        future.addListener({
+            try {
+                future.get()
+                flashOn = next
+                session.torchOn = next
+            } catch (_: Exception) {
+                flashOn = false
+                session.torchOn = false
+                scannerError = "Flash could not change on this camera."
+            }
+        }, ContextCompat.getMainExecutor(context))
     }
 
     fun flipCamera() {
-        if (phase == CameraPhase.initializing) return
+        if (phase == CameraPhase.initializing || capturing || countdown > 0 || scannerBusy) return
         ChatyHapticsPort.selection(view)
         session.lensFacing = if (session.lensFacing == CameraSelector.LENS_FACING_BACK) {
             CameraSelector.LENS_FACING_FRONT
@@ -430,6 +483,18 @@ fun ChatyCameraCaptureScreen(
         effectsOpen = false
     }
 
+    val scanDocument = rememberDocumentScanner(
+        onDocument = { path ->
+            captureViewMode = CaptureViewMode.document
+            stagePickedOrCaptured(path)
+        },
+        onBusy = { busy ->
+            scannerBusy = busy
+            if (busy) { timerJob?.cancel(); countdown = 0; session.unbind() }
+        },
+        onError = { scannerError = it },
+    )
+
     // Dart FilePicker(type: image) -> Android Photo Picker (the Dart repo's
     // MainActivity used PickVisualMedia). Picked content is copied into the
     // cache so downstream code always has a file path, then document mode
@@ -448,15 +513,6 @@ fun ChatyCameraCaptureScreen(
                         }
                     }
                     var selectedPath = dest.absolutePath
-                    if (captureViewMode == CaptureViewMode.document) {
-                        try {
-                            selectedPath = ImageFxBaker.bakeEffectIntoFile(
-                                context, selectedPath, DOCUMENT_SCAN_EFFECT, 1.0,
-                            )
-                        } catch (_: Exception) {
-                            // Keep the selected original image available.
-                        }
-                    }
                     stagePickedOrCaptured(selectedPath)
                 } catch (_: Exception) {
                     // Picker/copy failure leaves state untouched (Dart returns early).
@@ -467,6 +523,7 @@ fun ChatyCameraCaptureScreen(
 
 
     fun pickFromGallery() {
+        if (captureViewMode == CaptureViewMode.document) { scanDocument(); return }
         ChatyHapticsPort.light(view)
         galleryLauncher.launch(
             androidx.activity.result.PickVisualMediaRequest(
@@ -475,7 +532,8 @@ fun ChatyCameraCaptureScreen(
         )
     }
 
-    fun shutter() {
+    fun captureNow(captureOptions: CameraCaptureOptions) {
+        if (!lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) || scannerBusy) return
         val capture = session.imageCapture ?: return
         if (phase != CameraPhase.ready || capturing) return
         capturing = true
@@ -487,13 +545,7 @@ fun ChatyCameraCaptureScreen(
             override fun onImageSaved(results: ImageCapture.OutputFileResults) {
                 scope.launch {
                     var path = out.absolutePath
-                    if (captureViewMode == CaptureViewMode.document) {
-                        try {
-                            path = ImageFxBaker.bakeEffectIntoFile(context, path, DOCUMENT_SCAN_EFFECT, 1.0)
-                        } catch (_: Exception) {
-                            // Keep the original photo if enhancement fails.
-                        }
-                    } else {
+                    run {
                         val lens = lensManager.selected
                         val poses = facePoses
                         if (!lens.isNoLens && poses.isNotEmpty() && faceSolver.health != TrackingHealth.lost) {
@@ -526,6 +578,14 @@ fun ChatyCameraCaptureScreen(
                             }
                         }
                     }
+                    try {
+                        path = withContext(Dispatchers.IO) {
+                            CameraPhotoOutput.process(context, path, captureOptions,
+                                if (viewportSize.height > 0) viewportSize.width / viewportSize.height else 9f / 16f)
+                        }
+                    } catch (_: Exception) {
+                        scannerError = "Could not apply capture options. Original photo kept; nothing was sent."
+                    }
                     capturing = false
                     stagePickedOrCaptured(path)
                 }
@@ -539,6 +599,22 @@ fun ChatyCameraCaptureScreen(
                 }
             }
         })
+    }
+
+    fun shutter() {
+        if (scannerBusy || capturing || countdown > 0) return
+        if (captureViewMode == CaptureViewMode.document) { scanDocument(); return }
+        val captureOptions = options
+        timerJob = scope.launch {
+            try {
+                for (seconds in captureOptions.timerSeconds downTo 1) {
+                    countdown = seconds
+                    kotlinx.coroutines.delay(1_000)
+                }
+                countdown = 0
+                captureNow(captureOptions)
+            } finally { countdown = 0 }
+        }
     }
 
     fun discard() {
@@ -582,23 +658,45 @@ fun ChatyCameraCaptureScreen(
     BackHandler(enabled = capturedPath != null) { discard() }
 
     DisposableEffect(session) {
-        onDispose { bindJob?.cancel(); session.dispose(); faceDetection.dispose(); lensManager.dispose() }
+        onDispose { timerJob?.cancel(); bindJob?.cancel(); session.dispose(); faceDetection.dispose(); lensManager.dispose() }
     }
 
     Box(Modifier.fillMaxSize()) {
-        if (capturedPath == null) {
+        if (videoOpen && onVideoResult != null) {
+            BackHandler { videoOpen = false }
+            VideoCaptureHost(
+                selector = if (session.lensFacing == CameraSelector.LENS_FACING_FRONT) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA,
+                stabilization = options.stabilization,
+                onUseVideo = onVideoResult,
+                onBackToPhoto = { videoOpen = false },
+            )
+        } else if (capturedPath == null) {
             CameraCaptureViewfinder(
                 phase = phase,
                 errorMessage = errorMessage,
                 captureViewMode = captureViewMode,
-                effect = if (captureViewMode == CaptureViewMode.document) DOCUMENT_SCAN_EFFECT else engine.activeEffect,
+                effect = if (captureViewMode == CaptureViewMode.document) EffectRegistry.allEffects.first { it.id == "none" } else engine.activeEffect,
                 effectIntensity = engine.intensity,
-                onPreviewView = { previewView = it },
+                onPreviewView = { pv ->
+                    previewView = pv
+                    pv.setOnTouchListener { _, event ->
+                        if (event.action == android.view.MotionEvent.ACTION_UP && phase == CameraPhase.ready) {
+                            val point = pv.meteringPointFactory.createPoint(event.x, event.y)
+                            val action = androidx.camera.core.FocusMeteringAction.Builder(point)
+                                .setAutoCancelDuration(5, java.util.concurrent.TimeUnit.SECONDS).build()
+                            session.camera?.cameraControl?.startFocusAndMetering(action)
+                            pv.performClick()
+                        }
+                        true
+                    }
+                },
                 onViewport = { viewportSize = it },
                 lens = lensManager.selected,
                 facePoses = facePoses,
                 faceHealth = faceHealth,
                 flashOn = flashOn,
+                flashSupported = flashSupported,
+                previewAspect = options.aspect.portraitRatio,
                 effectsOpen = effectsOpen,
                 onClose = onDismiss,
                 onToggleFlash = ::toggleFlash,
@@ -629,6 +727,12 @@ fun ChatyCameraCaptureScreen(
                     }
                 },
                 onSetViewMode = { m ->
+                    if (m == CaptureViewMode.document) {
+                        captureViewMode = m
+                        optionsOpen = false
+                        scanDocument()
+                    }
+
                     if (captureViewMode != m) {
                         ChatyHapticsPort.selection(view)
                         captureViewMode = m
@@ -643,13 +747,50 @@ fun ChatyCameraCaptureScreen(
                 onFlip = ::flipCamera,
                 onPickFromGallery = ::pickFromGallery,
             )
+            if (options.grid || options.level) CameraGridAndLevel(options.grid, options.level,
+                Modifier.align(Alignment.Center).then(options.aspect.portraitRatio?.let { Modifier.fillMaxWidth().aspectRatio(it) } ?: Modifier.fillMaxSize()))
+            androidx.compose.foundation.layout.Column(
+                Modifier.fillMaxSize().windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.safeDrawing)
+                    .padding(horizontal = 12.dp, vertical = 60.dp),
+            ) {
+                androidx.compose.material3.TextButton(onClick = { optionsOpen = !optionsOpen }) {
+                    androidx.compose.material3.Text("More settings", color = androidx.compose.ui.graphics.Color.White)
+                }
+                if (onVideoResult != null) androidx.compose.material3.TextButton(onClick = {
+                    timerJob?.cancel(); countdown = 0; bindJob?.cancel(); session.unbind()
+                    optionsOpen = false; videoOpen = true
+                }, enabled = !capturing && !scannerBusy) {
+                    androidx.compose.material3.Text("Video", color = androidx.compose.ui.graphics.Color.White)
+                }
+                if (optionsOpen) CameraOptionsPanel(options, stabilizationSupported, { next -> options = next }, { optionsOpen = false })
+                if (scannerBusy) androidx.compose.material3.Text("Opening on-device scanner…", color = androidx.compose.ui.graphics.Color.White)
+                scannerError?.let { message ->
+                    androidx.compose.material3.TextButton(onClick = { scannerError = null }) {
+                        androidx.compose.material3.Text(message + "  Dismiss", color = androidx.compose.ui.graphics.Color.White)
+                    }
+                }
+                if (countdown > 0) androidx.compose.material3.Text("$countdown", color = androidx.compose.ui.graphics.Color.White,
+                    fontSize = 42.sp)
+                androidx.compose.material3.TextButton(onClick = {
+                    val camera = session.camera
+                    val state = camera?.cameraInfo?.zoomState?.value
+                    if (state != null) {
+                        val target = if (zoomRatio >= 1.9f) 1f.coerceIn(state.minZoomRatio, state.maxZoomRatio)
+                            else 2f.coerceIn(state.minZoomRatio, state.maxZoomRatio)
+                        val result = camera.cameraControl.setZoomRatio(target)
+                        result.addListener({ try { result.get(); zoomRatio = target } catch (_: Exception) {
+                            scannerError = "Zoom is unavailable on this camera."
+                        } }, ContextCompat.getMainExecutor(context))
+                    }
+                }) { androidx.compose.material3.Text("${String.format(java.util.Locale.ROOT, "%.1f", zoomRatio)}x", color = androidx.compose.ui.graphics.Color.White) }
+            }
         } else {
             CameraCaptureConfirmPane(
                 path = capturedPath!!,
                 mode = mode,
                 contactName = contactName,
-                effect = engine.activeEffect,
-                effectIntensity = engine.intensity,
+                effect = if (captureViewMode == CaptureViewMode.document) EffectRegistry.allEffects.first { it.id == "none" } else engine.activeEffect,
+                effectIntensity = if (captureViewMode == CaptureViewMode.document) 1.0 else engine.intensity,
                 caption = caption,
                 onCaptionChange = { caption = it },
                 onDiscard = ::discard,
