@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.padding
@@ -80,13 +81,17 @@ internal fun PerspectiveDrawerShell(
         label = "perspectiveDrawer",
     )
 
-    Box(Modifier.fillMaxSize().background(colors.surfaceElevated)) {
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().background(colors.surfaceElevated)) {
+        val panelWidth = DrawerLayoutMetrics.perspectiveWidth(maxWidth.value).dp
+        val slide = DrawerLayoutMetrics.perspectiveTranslation(maxWidth.value).dp
+        androidx.activity.compose.BackHandler(enabled = open) { open = false }
         // Left menu
         Column(
             modifier = Modifier
-                .width(210.dp)
+                .width(panelWidth)
                 .fillMaxHeight()
-                .padding(horizontal = 18.dp, vertical = 20.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 20.dp),
         ) {
             Text(
                 "Side Menu",
@@ -103,6 +108,7 @@ internal fun PerspectiveDrawerShell(
                     modifier = Modifier
                         .padding(vertical = 4.dp)
                         .fillMaxWidth()
+                        .heightIn(min = 48.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(if (isSel) colors.primary.copy(alpha = 0.15f) else Color.Transparent)
                         .clickable {
@@ -132,7 +138,7 @@ internal fun PerspectiveDrawerShell(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    translationX = 220.dp.toPx() * progress
+                    translationX = slide.toPx() * progress
                     val scale = 1f - 0.18f * progress
                     scaleX = scale
                     scaleY = scale
