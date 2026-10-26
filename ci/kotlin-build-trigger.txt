@@ -8,3 +8,4 @@ trigger 85 01:28:23Z real scheduler/auto-reply screens
 trigger 86 01:29:19Z autoreply send seam
 trigger 87 01:50:27Z settings icons + automation start
 trigger 88 01:52:42Z status picker + status prefs seams
+trigger 89 01:53:50Z licenses partial data
