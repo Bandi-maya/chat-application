@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -27,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.IntOffset
@@ -39,7 +41,10 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.example.chat.ui.theme.LocalAppColors
 
-/** Chaty-owned popup surface. Foundation handles touch/scroll and Popup handles Back/outside dismissal. */
+/** Content-sized popup, bounded to the device width and 80% of its available height.
+ * Intrinsic width prevents weighted menu labels from expanding to the full popup constraint.
+ * Foundation handles scrolling and Popup handles Back/outside dismissal.
+ */
 @Composable
 fun ChatyDropdownMenu(
     expanded: Boolean,
@@ -52,6 +57,9 @@ fun ChatyDropdownMenu(
 ) {
     if (!expanded) return
     val colors = LocalAppColors.current
+    val configuration = LocalConfiguration.current
+    val maxMenuWidth = (configuration.screenWidthDp.dp - 16.dp).coerceAtLeast(1.dp)
+    val maxMenuHeight = (configuration.screenHeightDp.dp * 0.8f).coerceAtLeast(1.dp)
     val margin = with(LocalDensity.current) { 8.dp.roundToPx() }
     val position = remember(margin) { ChatyMenuPositionProvider(margin) }
     Popup(
@@ -63,8 +71,9 @@ fun ChatyDropdownMenu(
             modifier.shadow(12.dp, shape).clip(shape)
                 .background(containerColor)
                 .border(border ?: BorderStroke(1.dp, colors.border), shape)
-                .widthIn(min = 176.dp, max = 320.dp)
-                .heightIn(max = 440.dp)
+                .widthIn(max = maxMenuWidth)
+                .width(IntrinsicSize.Max)
+                .heightIn(max = maxMenuHeight)
                 .verticalScroll(rememberScrollState())
                 .padding(6.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -86,7 +95,7 @@ fun ChatyDropdownMenuItem(
     val colors = LocalAppColors.current
     CompositionLocalProvider(LocalContentColor provides if (enabled) colors.foreground else colors.disabledForeground) {
         Row(
-            modifier.defaultMinSize(minWidth = 164.dp, minHeight = 48.dp)
+            modifier.defaultMinSize(minHeight = 48.dp)
                 .clip(ChatyModalShape)
                 .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
                 .padding(contentPadding),
