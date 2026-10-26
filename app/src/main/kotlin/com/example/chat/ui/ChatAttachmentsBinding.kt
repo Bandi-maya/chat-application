@@ -34,6 +34,7 @@ import kotlinx.coroutines.withContext
  *  Deviation: Dart opens its in-app CustomFilePickerScreen; this uses the Android system picker. */
 class ChatAttachmentsBindings(
     val onMedia: (String) -> Unit,
+    val onContact: () -> Unit,
 )
 
 @Composable
@@ -48,6 +49,10 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
     }
     val single = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         pending?.complete(listOfNotNull(uri)); pending = null
+    }
+    var contactPending by remember { mutableStateOf<CompletableDeferred<Uri?>?>(null) }
+    val contactPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickContact()) { uri ->
+        contactPending?.complete(uri); contactPending = null
     }
     fun toast(m: String) = Toast.makeText(context, m, Toast.LENGTH_SHORT).show()
 
@@ -105,6 +110,23 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
         )
     }
 
+    // No READ_CONTACTS in the manifest: Dart's canRead=false path (name only, no phone/email).
+    val contactsPort = object : com.example.chat.ui.chats.detail.ContactsPort {
+        override suspend fun requestReadAccess() = com.example.chat.ui.chats.detail.ContactReadAccess.denied
+        override suspend fun showPicker(canRead: Boolean): com.example.chat.ui.chats.detail.PickedContactRef? {
+            val d = CompletableDeferred<Uri?>()
+            contactPending = d
+            contactPicker.launch(null)
+            val uri = d.await() ?: return null
+            var name: String? = null
+            context.contentResolver.query(uri, arrayOf(android.provider.ContactsContract.Contacts.DISPLAY_NAME), null, null, null)?.use { c ->
+                if (c.moveToFirst()) name = c.getString(0)
+            }
+            return com.example.chat.ui.chats.detail.PickedContactRef(null, name)
+        }
+        override suspend fun fetchDetails(id: String): com.example.chat.ui.chats.detail.ContactDetails? = null
+    }
+    val onContact: () -> Unit = { scope.launch { controller.shareContact(contactsPort); afterSend() } }
     val onMedia: (String) -> Unit = { type ->
         scope.launch {
             controller.shareMedia(
@@ -140,5 +162,5 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
             confirmButton = { TextButton(onClick = { viewOnceAsk = null; d.complete(true) }) { Text("View once") } },
         )
     }
-    return ChatAttachmentsBindings(onMedia)
+    return ChatAttachmentsBindings(onMedia, onContact)
 }
