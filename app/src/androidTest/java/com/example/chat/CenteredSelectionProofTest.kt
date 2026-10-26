@@ -1,6 +1,8 @@
 package com.example.chat
 
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,7 +43,10 @@ class CenteredSelectionProofTest {
                                 title = "Select synthetic icons", value = saved,
                                 options = (1..30).map { "Choice $it" }, labelBuilder = { it },
                                 onApply = { saved = it; isOpen = false }, onDismiss = { isOpen = false },
-                            ) else Text("Saved: $saved")
+                            ) else androidx.compose.foundation.layout.Box(
+                                androidx.compose.ui.Modifier.fillMaxSize().safeDrawingPadding(),
+                                contentAlignment = androidx.compose.ui.Alignment.Center,
+                            ) { Text("Saved: $saved") }
                         }
                     }
                 }
@@ -58,7 +63,12 @@ class CenteredSelectionProofTest {
             FileOutputStream(file).use { image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
             image.recycle()
             device.findObject(By.text("Cancel")).click()
+            device.waitForIdle()
+            assertTrue("Cancel closes dialog", device.wait(Until.gone(By.text("Select synthetic icons")), 5000))
             assertTrue("Cancel discards draft", device.wait(Until.hasObject(By.text("Saved: Choice 1")), 5000))
+            val afterCancel = inst.uiAutomation.takeScreenshot() ?: throw AssertionError("No after-Cancel pixels")
+            FileOutputStream(File(file.parentFile, "14a-selector-cancel-discard.png")).use { afterCancel.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+            afterCancel.recycle()
             show()
             device.findObject(By.text("Choice 2")).click()
             device.findObject(By.desc("Close Select synthetic icons")).click()
