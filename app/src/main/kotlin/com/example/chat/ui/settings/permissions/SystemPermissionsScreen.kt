@@ -42,7 +42,7 @@ import androidx.compose.material.icons.rounded.PermMedia
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -290,7 +290,7 @@ fun SystemPermissionsScreen(
     }
 
     locationFix?.let { fix ->
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { locationFix = null },
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -581,5 +581,4 @@ private suspend fun currentLocation(context: Context): Location = suspendCancell
         manager.requestSingleUpdate(provider, listener, Looper.getMainLooper())
     }
 }
-
 
