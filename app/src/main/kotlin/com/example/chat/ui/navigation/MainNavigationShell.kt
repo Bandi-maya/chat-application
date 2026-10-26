@@ -224,6 +224,8 @@ fun MainNavigationShell(
     val selectedPrimaryIndex = primaryIds.indexOf(activeDestinationId)
     val bottomNavSelectedIndex = if (selectedPrimaryIndex >= 0) selectedPrimaryIndex else primaryIds.size
 
+    val homeHeaderTabsState = androidx.compose.runtime.remember { HomeHeaderTabsState() }
+    androidx.compose.runtime.CompositionLocalProvider(LocalHomeHeaderTabs provides homeHeaderTabsState) {
     androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxSize().navigationBarsPadding()) {
         val appearanceStyles = com.example.chat.core.templates.AppearanceVariantController.navigationStyles
         val appearanceNavigationIndex = appearanceStyles.indexOf(prefs.navigationStyleName).coerceIn(0, appearanceStyles.size - 1)
@@ -343,6 +345,7 @@ fun MainNavigationShell(
                 }
             }
         }
+    }
     }
 
     if (moreMenuOpen) {
