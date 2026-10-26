@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import com.example.chat.ui.kit.ChatySingleChoiceModal
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.PersonOff
@@ -148,7 +148,7 @@ fun CallSettingsScreen(
         )
         4 -> {
             val selected = remember { privacy.whoCanCallMeExceptions.toMutableStateList() }
-            AlertDialog(
+            AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
                 onDismissRequest = { dialog = 0 },
                 containerColor = colors.surfaceElevated,
                 title = { Text("Contacts who may not call you", color = colors.foreground) },
