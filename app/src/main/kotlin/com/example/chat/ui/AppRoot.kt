@@ -51,6 +51,25 @@ import androidx.compose.material.icons.rounded.Animation
  *  forgot-password / org buttons route to honest WIP stubs until then. */
 private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home, ChatDetail, Security, LockedChats, HiddenVault, MessageManagement, LinkedDevices, Starred, NewChat, GlobalSearch }
 
+private class AuthNavigationState {
+    private var current by mutableStateOf(AuthRoute.Splash)
+    private val history = mutableListOf<AuthRoute>()
+    operator fun getValue(owner: Any?, property: kotlin.reflect.KProperty<*>): AuthRoute = current
+    operator fun setValue(owner: Any?, property: kotlin.reflect.KProperty<*>, next: AuthRoute) {
+        if (next == current) return
+        if (next == AuthRoute.Home && current in listOf(AuthRoute.Splash, AuthRoute.Login, AuthRoute.Register)) {
+            history.clear()
+        } else if (current != AuthRoute.Splash) {
+            history.add(current)
+        }
+        current = next
+    }
+    fun goBack() {
+        current = if (history.isNotEmpty()) history.removeAt(history.lastIndex)
+        else if (ServiceLocator.apiBackend.isAuthenticated) AuthRoute.Home else AuthRoute.Welcome
+    }
+}
+
 @Composable
 fun AppRoot() {
     val themeController = remember { ServiceLocator.themeController }
@@ -88,7 +107,9 @@ fun AppRoot() {
                 }
             },
         )
-        var route by remember { mutableStateOf(AuthRoute.Splash) }
+        val homeStateHolder = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
+        val navigation = remember { AuthNavigationState() }
+        var route by navigation
         // Dart pre-auth Navigator stack: Register is pushed from Welcome or Login, RegisterOrganization from
         // Login or Register; pop returns to whichever pushed it.
         var registerOrigin by remember { mutableStateOf(AuthRoute.Welcome) }
@@ -229,6 +250,19 @@ fun AppRoot() {
                 AuthRoute.Register -> registerOrigin
                 else -> AuthRoute.Welcome
             }
+        }
+        // A page without its own BackHandler still returns to the route that opened
+        // it. Nested handlers (sheets, info, settings) below take precedence.
+        androidx.activity.compose.BackHandler(
+            enabled = route !in listOf(AuthRoute.Home, AuthRoute.Splash, AuthRoute.Welcome,
+                AuthRoute.Login, AuthRoute.Register, AuthRoute.ForgotPassword, AuthRoute.RegisterOrganization),
+        ) {
+            if (route == AuthRoute.ChatDetail) {
+                ServiceLocator.apiBackend.setActiveConversation(null)
+                selectedConversation = null
+                selectedInitialMessageId = null
+            }
+            navigation.goBack()
         }
         val loginScreen: @Composable () -> Unit = {
             LoginScreen(
@@ -373,7 +407,7 @@ fun AppRoot() {
                 organizationId = planOrgId,
                 organizationName = planOrgName,
                 isNewRegistration = planIsNew,
-                onBack = { route = AuthRoute.Home },
+                onBack = { navigation.goBack() },
                 // Dart pushAndRemoveUntil(MainNavigationShell).
                 onSubscribed = { route = AuthRoute.Home },
                 loadPlans = { id -> ServiceLocator.apiBackend.getAvailablePlans(id) },
@@ -383,7 +417,7 @@ fun AppRoot() {
                     }
                 },
             )
-            AuthRoute.Home -> run {
+            AuthRoute.Home -> homeStateHolder.SaveableStateProvider("home") { run {
                 // Observe ApiBackendService chat state (listener -> recompose).
                 var chatRevision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
                 androidx.compose.runtime.DisposableEffect(Unit) {
@@ -1144,10 +1178,11 @@ fun AppRoot() {
                     )
                 }
             }
+            } // Preserve Home's saved navigation state while a page is pushed.
             AuthRoute.Security -> com.example.chat.ui.settings.security.SecurityCenterScreen(
                 preferences = ServiceLocator.preferencesController,
                 lockService = ServiceLocator.localLockService,
-                onBack = { route = AuthRoute.Home },
+                onBack = { navigation.goBack() },
                 onOpenLockedChats = {
                     scope.launch {
                         val ok = com.example.chat.data.services.ProtectedResourceGate.authorizeGeneralAction(
@@ -1175,7 +1210,7 @@ fun AppRoot() {
                         selectedConversation = conversation
                         route = AuthRoute.ChatDetail
                     },
-                    onBack = { route = AuthRoute.Home },
+                    onBack = { navigation.goBack() },
                 )
             }
             AuthRoute.GlobalSearch -> {
@@ -1193,7 +1228,7 @@ fun AppRoot() {
                     openDirectConversation = { u -> repoS.getOrCreateDirectConversationAsync(u) },
                     verifySecretPhrase = { phrase -> ServiceLocator.localLockService.verifySecretPhrase(phrase) },
                     isConversationHidden = { id -> prefsS.isConversationHidden(id) },
-                    onBack = { route = AuthRoute.Home },
+                    onBack = { navigation.goBack() },
                     onOpenLockedChats = { route = AuthRoute.HiddenVault },
                     onOpenConversation = { id ->
                         ServiceLocator.apiBackend.conversations.firstOrNull { it.id == id }?.let { c ->
@@ -1256,7 +1291,7 @@ fun AppRoot() {
                         }
                     },
                     onOpenSecuritySettings = { route = AuthRoute.Security },
-                    onBack = { route = AuthRoute.Home },
+                    onBack = { navigation.goBack() },
                 )
             }
             AuthRoute.HiddenVault -> {
@@ -1279,10 +1314,10 @@ fun AppRoot() {
                             route = AuthRoute.ChatDetail
                         }
                     },
-                    onBack = { route = AuthRoute.Home },
+                    onBack = { navigation.goBack() },
                 )
             }
-            AuthRoute.MessageManagement -> MessageManagementHost(onBack = { route = AuthRoute.Home })
+            AuthRoute.MessageManagement -> MessageManagementHost(onBack = { navigation.goBack() })
             AuthRoute.LinkedDevices -> {
                 val repoL = ServiceLocator.conversationsRepository
                 val rel = ServiceLocator.contactRelationships
@@ -1318,7 +1353,7 @@ fun AppRoot() {
                         selectedConversation = conversation
                         route = AuthRoute.ChatDetail
                     },
-                    onBack = { route = AuthRoute.Home },
+                    onBack = { navigation.goBack() },
                 )
             }
             AuthRoute.Starred -> {
@@ -1330,7 +1365,7 @@ fun AppRoot() {
                     onDispose { ServiceLocator.apiBackend.removeListener(listener) }
                 }
                 @Suppress("UNUSED_EXPRESSION") starRevision
-                androidx.activity.compose.BackHandler { route = AuthRoute.Home }
+                androidx.activity.compose.BackHandler { navigation.goBack() }
                 com.example.chat.ui.chats.starred.StarredMessagesScreen(
                     conversations = ServiceLocator.apiBackend.conversations,
                     messagesFor = { id -> ServiceLocator.apiBackend.getMessages(id) },
@@ -1361,7 +1396,7 @@ fun AppRoot() {
                             route = AuthRoute.ChatDetail
                         }
                     },
-                    onBack = { route = AuthRoute.Home },
+                    onBack = { navigation.goBack() },
                 )
             }
             AuthRoute.ChatDetail -> run {
@@ -1376,7 +1411,7 @@ fun AppRoot() {
                             ServiceLocator.apiBackend.setActiveConversation(null)
                             selectedConversation = null
                             selectedInitialMessageId = null
-                            route = AuthRoute.Home
+                            navigation.goBack()
                         },
                         onOpenConversation = { next ->
                             ServiceLocator.apiBackend.setActiveConversation(next.id)
