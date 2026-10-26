@@ -26,12 +26,50 @@ import android.os.IBinder
  */
 class CallForegroundService : Service() {
 
+    // Dart ForegroundTaskOptions allowWakeLock/allowWifiLock = true: held only while the service
+    // (i.e. an active call per CallForegroundPolicy) runs, released in onDestroy.
+    private var wakeLock: android.os.PowerManager.WakeLock? = null
+    private var wifiLock: android.net.wifi.WifiManager.WifiLock? = null
+
+    private fun acquireLocks() {
+        try {
+            if (wakeLock == null) {
+                val pm = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+                wakeLock = pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "chaty:call").apply {
+                    setReferenceCounted(false); acquire()
+                }
+            }
+            if (wifiLock == null) {
+                val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
+                @Suppress("DEPRECATION")
+                wifiLock = wm.createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, "chaty:call").apply {
+                    setReferenceCounted(false); acquire()
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("CallForegroundService", "call lock acquire failed: $e")
+        }
+    }
+
+    private fun releaseLocks() {
+        try { wakeLock?.takeIf { it.isHeld }?.release() } catch (_: Exception) {}
+        try { wifiLock?.takeIf { it.isHeld }?.release() } catch (_: Exception) {}
+        wakeLock = null
+        wifiLock = null
+    }
+
+    override fun onDestroy() {
+        releaseLocks()
+        super.onDestroy()
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val title = intent?.getStringExtra(EXTRA_TITLE) ?: "Chaty call"
         val text = intent?.getStringExtra(EXTRA_TEXT) ?: ""
         val isVideo = intent?.getBooleanExtra(EXTRA_IS_VIDEO, false) == true
+        acquireLocks()
         ensureChannel()
         val notification = buildNotification(title, text)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
