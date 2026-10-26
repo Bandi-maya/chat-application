@@ -15,7 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Shortcut
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -620,7 +620,7 @@ fun ChatDetailHost(
             // Dart showModalBottomSheet (chat_detail_screen.dart:2402-2499): isScrollControlled,
             // surfaceColor sheet, top rounded 18, max height 0.7x screen, shortcut icon + limit
             // title, sectioned avatar rows.
-            ModalBottomSheet(
+            ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp,
                 onDismissRequest = { forwardMessage = null },
                 containerColor = Color(theme.surfaceColor),
                 shape = com.example.chat.ui.kit.ChatyModalShape,
