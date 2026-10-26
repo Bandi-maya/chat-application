@@ -31,8 +31,8 @@ import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material.icons.rounded.SyncProblem
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.example.chat.ui.kit.ChatyDropdownMenu as DropdownMenu
+import com.example.chat.ui.kit.ChatyDropdownMenuItem as DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -404,7 +404,7 @@ private fun StarredMessageRow(
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
-                DropdownMenu(
+                DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape,
                     expanded = menuOpen,
                     onDismissRequest = { menuOpen = false },
                 ) {
