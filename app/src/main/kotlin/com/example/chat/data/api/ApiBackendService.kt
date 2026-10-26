@@ -139,10 +139,8 @@ class ApiBackendService(context: Context) {
         realtime.sendCallSignal(targetUserId, data)
     fun removeCallSignalListener(listener: (Map<String, Any?>) -> Unit) { callSignalListeners.remove(listener) }
 
-    /** getWebSocketUrl (backend_config.dart:80): custom/.env seams are absent
-     *  in this repo, so this is the default branch: rest base with ws scheme,
-     *  /api/vN and trailing slashes stripped, /chat/ws/<uid>. The uid falls
-     *  back to the JWT uid/sub claim when the stored user id is empty. */
+    /** Dart getWebSocketUrl with configured override and REST-derived fallback.
+     *  User id falls back to JWT uid/sub when the saved user id is empty. */
     private fun resolveWebSocketUrl(): String? {
         if (session.token == null) return null
         var uid = session.currentUser?.id?.trim() ?: ""
@@ -155,12 +153,12 @@ class ApiBackendService(context: Context) {
             }
         }
         if (uid.isEmpty()) return null
-        val base = config.restApiBaseUrl
-            .replaceFirst("https://", "wss://")
-            .replaceFirst("http://", "ws://")
-            .replace(Regex("/api/v[0-9]+/?$"), "")
-            .replace(Regex("/+$"), "")
-        return "$base/chat/ws/$uid"
+        return ApiRealtimeClient.resolveWebSocketUrl(
+            userId = uid,
+            customWebSocketUrl = ApiBackendConfig.DOTENV_WEBSOCKET_URL,
+            envWebSocketUrl = ApiBackendConfig.WEBSOCKET_URL_OVERRIDE,
+            restApiBaseUrl = config.restApiBaseUrl,
+        )
     }
 
     private val realtimeListener = object : ApiRealtimeClient.Listener {
