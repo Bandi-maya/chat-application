@@ -70,6 +70,23 @@ fun ChatDetailHost(
         while (true) { delay(3000); rev++ }
     }
     LaunchedEffect(conversation.id) { try { tasksController.loadTasks() } catch (_: Exception) {} }
+    // Dart _loadConversation: offline-first loading flag, remote refresh, delivered receipt, error + Retry.
+    var loadingMessages by remember(conversation.id) { mutableStateOf(true) }
+    var loadError by remember(conversation.id) { mutableStateOf<String?>(null) }
+    var loadNonce by remember(conversation.id) { mutableIntStateOf(0) }
+    LaunchedEffect(conversation.id, loadNonce) {
+        loadError = null
+        loadingMessages = api.getMessages(conversation.id).isEmpty()
+        try {
+            if (api.isAuthenticated) api.loadMessages(conversation.id)
+            rt.trackConversation(conversation.id)
+            rt.markConversationDelivered(conversation.id)
+            loadingMessages = false
+        } catch (e: Exception) {
+            loadingMessages = false
+            loadError = (e.message ?: e.toString()).replaceFirst("Exception: ", "")
+        }
+    }
     @Suppress("UNUSED_EXPRESSION") rev
 
     fun toast(m: String) = Toast.makeText(context, m, Toast.LENGTH_SHORT).show()
@@ -189,6 +206,8 @@ fun ChatDetailHost(
                         } catch (e: Exception) { toast(e.message ?: "Unable to start the call.") }
                     }
                 }
+            } else {
+                toast("Direct contact calls are available for one-to-one chats.")
             }
         },
         connectionState = ServiceLocator.connectionHealth.state,
@@ -309,6 +328,9 @@ fun ChatDetailHost(
         },
         onOpenAppearance = { appearanceOpen = true },
         onPollTap = { m -> pollViewId = m.id },
+        loadingMessages = loadingMessages,
+        loadError = loadError,
+        onRetryLoad = { loadNonce++ },
         onMediaTap = { m -> viewerMessage = m },
         onViewOnceOpen = { m -> viewerMessage = m },
         onGalleryTap = { attachments.onMedia("image") },
