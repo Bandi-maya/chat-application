@@ -10,6 +10,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -215,6 +221,8 @@ fun CallContactPickerScreen(
     }
 
     Scaffold(
+        modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         containerColor = Color(theme.backgroundColor),
         floatingActionButton = {
             if (isDialpad && isKeypadCollapsed) {
@@ -228,7 +236,9 @@ fun CallContactPickerScreen(
             }
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
+        BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+        val compactHeight = maxHeight < 600.dp
+        Column(Modifier.fillMaxSize()) {
             // App bar row (Dart AppBar: back, title, mode toggle).
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -449,6 +459,7 @@ fun CallContactPickerScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .then(if (compactHeight) Modifier.weight(1f).semantics { contentDescription = "Dialpad keys" }.verticalScroll(rememberScrollState()) else Modifier)
                         .background(
                             Color(theme.surfaceColor),
                             com.example.chat.ui.kit.ChatyModalShape,
@@ -516,10 +527,10 @@ fun CallContactPickerScreen(
                     }
                     Spacer(Modifier.height(14.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { isKeypadCollapsed = true }) {
+                        IconButton(onClick = { isKeypadCollapsed = true }, modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "Hide dialpad" }) {
                             Icon(
                                 Icons.Rounded.KeyboardArrowDown,
-                                contentDescription = "Hide dialpad",
+                                contentDescription = null,
                                 tint = Color(theme.secondaryTextColor),
                                 modifier = Modifier.size(28.dp),
                             )
@@ -547,6 +558,7 @@ fun CallContactPickerScreen(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 .size(48.dp)
+                                .semantics(mergeDescendants = true) { contentDescription = "Delete digit" }
                                 .pointerInput(Unit) {
                                     detectTapGestures(
                                         onTap = { if (query.isNotEmpty()) removeDigit() },
@@ -560,7 +572,7 @@ fun CallContactPickerScreen(
                         ) {
                             Icon(
                                 Icons.Rounded.Backspace,
-                                contentDescription = "Delete digit",
+                                contentDescription = null,
                                 tint = if (query.isEmpty()) {
                                     Color(argbWithAlpha(theme.secondaryTextColor, 0.5))
                                 } else {
@@ -573,5 +585,6 @@ fun CallContactPickerScreen(
                 }
             }
         }
+        } // Measured compact-height boundary.
     }
 }
