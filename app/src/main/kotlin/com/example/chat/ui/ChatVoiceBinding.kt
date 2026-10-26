@@ -11,11 +11,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,22 +31,30 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.example.chat.ServiceLocator
-import com.example.chat.data.services.AndroidVoiceRecorderPort
+import com.example.chat.data.services.AndroidPcmVoiceRecorderPort
 import com.example.chat.data.services.AndroidVoiceStagingPort
 import com.example.chat.domain.models.MessageType
+import com.example.chat.ui.chats.detail.VoiceLevelMeter
+import com.example.chat.ui.chats.detail.VoiceLevelMeterBar
+import com.example.chat.ui.chats.detail.VoiceLevelSampler
 import com.example.chat.ui.chats.detail.VoiceNoteController
 import com.example.chat.ui.chats.detail.VoiceSessionController
 import com.example.chat.ui.chats.detail.VoiceUiState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Binding of VoiceNoteController/VoiceSessionController (Dart voice_note_service.dart and the
  *  screen's _beginVoice/_finishVoice/_cancelVoice) for ChatDetailHost. Bound: MediaRecorder capture,
  *  RECORD_AUDIO runtime prompt, record/lock/cancel/send, upload via ChatMediaService (REST
- *  /chat/upload) and send with the Dart JSON envelope.
+ *  /chat/upload) and send with the Dart JSON envelope. Capture runs the record_android 2.1.2
+ *  default engine port (AndroidPcmVoiceRecorderPort: PCM AudioRecord + AGC/AEC/NS on the record
+ *  session + MediaCodec AAC-LC + MediaMuxer .m4a), and the overlay renders the Dart
+ *  ChatyVoiceLevelMeter port fed by VoiceLevelSampler at the Dart 90ms poll.
  *  Deviations: the recording status strip is a host overlay (ChatDetailScreen has no recording
- *  composer parameters), no level meter bars; recording indicator goes through richRealtime
+ *  composer parameters); recording indicator goes through richRealtime
  *  (Supabase RPC, tolerated on failure like Dart); the first press that triggers the permission
  *  prompt does not start recording, the user presses again after granting. */
 class ChatVoiceBindings(
@@ -61,10 +71,10 @@ fun rememberChatVoice(conversationId: String, afterSend: () -> Unit, clearTyping
     val scope = rememberCoroutineScope()
     var ui by remember(conversationId) { mutableStateOf(VoiceUiState()) }
     val rt = ServiceLocator.richRealtime
-    val session = remember(conversationId) {
-        val note = VoiceNoteController(
+    val note = remember(conversationId) {
+        VoiceNoteController(
             conversationId = conversationId,
-            recorder = AndroidVoiceRecorderPort(context.applicationContext),
+            recorder = AndroidPcmVoiceRecorderPort(context.applicationContext),
             staging = AndroidVoiceStagingPort(context.applicationContext),
             uploadAudio = { path, name, seconds ->
                 val bytes = withContext(Dispatchers.IO) { java.io.File(path).readBytes() }
@@ -74,6 +84,23 @@ fun rememberChatVoice(conversationId: String, afterSend: () -> Unit, clearTyping
                 ServiceLocator.apiBackend.sendMessage(conversationId, "", MessageType.audio, attachment)
             },
         )
+    }
+    // Dart _ComposerState._startLevelPolling: reset on record start, then poll every
+    // VoiceLevelMeter.POLL_INTERVAL_MS; bars are real microphone samples only.
+    val sampler = remember(conversationId) { VoiceLevelSampler { note.currentLevelDbfs() } }
+    var levels by remember(conversationId) { mutableStateOf(List(VoiceLevelMeter.BAR_COUNT) { 0.0 }) }
+    LaunchedEffect(ui.recording) {
+        if (ui.recording) {
+            sampler.reset()
+            levels = sampler.levels()
+            while (isActive) {
+                sampler.pollOnce()
+                levels = sampler.levels()
+                delay(VoiceLevelMeter.POLL_INTERVAL_MS)
+            }
+        }
+    }
+    val session = remember(conversationId) {
         VoiceSessionController(
             voice = note,
             scope = scope,
@@ -110,6 +137,11 @@ fun rememberChatVoice(conversationId: String, afterSend: () -> Unit, clearTyping
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text("● %d:%02d".format(ui.seconds / 60, ui.seconds % 60), color = Color.White)
+                        VoiceLevelMeterBar(
+                            levels = levels,
+                            accent = Color(ServiceLocator.themeController.globalTheme.accentColor),
+                            modifier = Modifier.width(140.dp),
+                        )
                         if (ui.locked) {
                             TextButton(onClick = { session.cancelVoice() }, enabled = !ui.busy) { Text("Cancel", color = Color(0xFFFF8A80)) }
                             TextButton(onClick = { session.finishVoice() }, enabled = !ui.busy) { Text("Send", color = Color.White) }
