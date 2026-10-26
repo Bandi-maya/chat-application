@@ -35,7 +35,7 @@ for i in 1 2; do
   adb shell uiautomator dump /sdcard/r$i.xml >/dev/null 2>&1 || true
   # Reachable first-run notification education sheet: press its real "Not Now" button (tap at the
   # node's centre), as a user would, then re-dump. Pixels of the sheet are kept as 13-restart-launch$i-prompt.
-  BOUNDS=$(adb shell cat /sdcard/r$i.xml 2>/dev/null | tr '>' '>\n' | grep 'text="Not Now"' | head -1 | grep -o 'bounds="[^"]*"' | grep -o '[0-9]\+' | tr '\n' ' ')
+  BOUNDS=$(adb shell cat /sdcard/r$i.xml 2>/dev/null | sed 's/></>\n</g' | grep 'text="Not Now"' | head -1 | grep -o 'bounds="[^"]*"' | grep -o '[0-9]\+' | tr '\n' ' ')
   if [ -n "$BOUNDS" ]; then
     set -- $BOUNDS
     adb exec-out screencap -p > screenshots/13-restart-launch$i-prompt.png 2>/dev/null || true
