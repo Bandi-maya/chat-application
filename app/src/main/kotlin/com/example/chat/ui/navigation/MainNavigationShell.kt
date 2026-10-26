@@ -243,7 +243,11 @@ fun MainNavigationShell(
                 onSelect = { idx -> selectRootDestination(idx, allDestinationIds.getOrNull(idx)) },
                 homeHeaderTabsSlot = homeHeaderTabsSlot,
                 fab = { fab(activeDestinationId) },
-                content = { pageContent() },
+                content = {
+                    androidx.compose.runtime.CompositionLocalProvider(LocalDestinationTitlePresentation provides activeDestinationId) {
+                        pageContent()
+                    }
+                },
             )
             navMode == AppNavigationMode.floatingIslandRail -> FloatingIslandRailShell(
                 colors = colors,
@@ -271,7 +275,11 @@ fun MainNavigationShell(
                 myNameOverride = myNameOverride,
                 onSelect = { idx -> selectRootDestination(idx, allDestinationIds.getOrNull(idx)) },
                 fab = { fab(activeDestinationId) },
-                content = { pageContent() },
+                content = {
+                    androidx.compose.runtime.CompositionLocalProvider(LocalDestinationTitlePresentation provides activeDestinationId) {
+                        pageContent()
+                    }
+                },
             )
             navMode == AppNavigationMode.curvedRadialDrawer -> CurvedRadialDrawerShell(
                 colors = colors,
