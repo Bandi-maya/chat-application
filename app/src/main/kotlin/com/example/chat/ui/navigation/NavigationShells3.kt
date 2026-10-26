@@ -301,7 +301,9 @@ internal fun BottomShell(
     )
 
     Box(Modifier.fillMaxSize().background(colors.background)) {
-        content()
+        // Reserve the complete dock footprint for every destination. Page-owned
+        // Scaffold FABs (Calls) and last rows must not be drawn underneath it.
+        Box(Modifier.fillMaxSize().padding(bottom = (barHeight + bottomMargin).dp)) { content() }
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
