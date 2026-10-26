@@ -1,7 +1,22 @@
 package com.example.chat.ui.navigation
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -67,38 +82,54 @@ val LocalHomeHeaderTabs = compositionLocalOf<HomeHeaderTabsState?> { null }
 
 /** The WhatsApp OLD UI tab row. Styled like the Header settings live preview
  *  (GbLiveHeaderPreview OldUiHeader): surface background, selected = bold accent label + 2.5dp accent underline,
- *  others secondary 13sp. All tabs always visible, equal weight (matches the current published shell). */
+ *  others secondary 13sp. With room, tabs share the width equally (same as before). When labels need more room
+ *  (narrow screens, large font) the row grows in height only as far as the text needs, tabs stop shrinking below
+ *  their label, the row scrolls horizontally, and the selected tab is scrolled into view. Labels never wrap or
+ *  overflow; each tab keeps a 48dp touch height and Tab/selected semantics. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun HomeHeaderTabsBar(colors: ChatyColors, ids: List<String>, selectedIndex: Int, heightDp: Float, onSelect: (Int) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(heightDp.dp)
-            .background(colors.surface),
-    ) {
-        ids.forEachIndexed { index, id ->
-            val selected = index == selectedIndex
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .clickable { onSelect(index) },
-            ) {
-                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text(
-                        NavigationCatalog.labelFor(id).uppercase(),
-                        color = if (selected) colors.primary else colors.foregroundSecondary,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                        fontSize = 13.sp,
+    val scroll = rememberScrollState()
+    val requesters = remember(ids) { ids.map { BringIntoViewRequester() } }
+    LaunchedEffect(selectedIndex, ids) { requesters.getOrNull(selectedIndex)?.bringIntoView() }
+    BoxWithConstraints(Modifier.fillMaxWidth().background(colors.surface)) {
+        val share = if (ids.isEmpty()) maxWidth else maxWidth / ids.size
+        Row(
+            modifier = Modifier
+                .testTag("home-tabs-scroll")
+                .horizontalScroll(scroll)
+                .height(IntrinsicSize.Min)
+                .heightIn(min = maxOf(heightDp, 48f).dp),
+        ) {
+            ids.forEachIndexed { index, id ->
+                val selected = index == selectedIndex
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .widthIn(min = share)
+                        .fillMaxHeight()
+                        .testTag("home-tab-$id")
+                        .bringIntoViewRequester(requesters[index])
+                        .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(index) }),
+                ) {
+                    Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            NavigationCatalog.labelFor(id).uppercase(),
+                            color = if (selected) colors.primary else colors.foregroundSecondary,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(2.5.dp)
+                            .background(if (selected) colors.primary else Color.Transparent),
                     )
                 }
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(2.5.dp)
-                        .background(if (selected) colors.primary else Color.Transparent),
-                )
             }
         }
     }
