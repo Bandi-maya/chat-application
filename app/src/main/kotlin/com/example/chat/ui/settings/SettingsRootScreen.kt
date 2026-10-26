@@ -75,6 +75,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -166,6 +169,8 @@ fun SettingsRootScreen(
 ) {
     rememberPreferencesVersion(preferences)
     val colors = LocalAppColors.current
+    val suppressDuplicateTitle = !canGoBack && com.example.chat.ui.navigation.LocalDestinationTitlePresentation.current ==
+        com.example.chat.core.templates.ChatyNavigationDestinationIds.settings
     val theme = themeController.globalTheme
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -205,14 +210,15 @@ fun SettingsRootScreen(
         }
     }
 
-    Box(Modifier.fillMaxSize().background(colors.background)) {
+    Box(Modifier.fillMaxSize().semantics { paneTitle = "Settings" }.background(colors.background)) {
         Column(Modifier.fillMaxSize()) {
             Row(
                 Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)).height(56.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (canGoBack) Box(Modifier.padding(8.dp)) { ChatyBackButton(onPressed = onBack) } else Spacer(Modifier.width(16.dp))
-                Text("Settings", Modifier.weight(1f), color = colors.foreground, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                if (suppressDuplicateTitle) Spacer(Modifier.weight(1f))
+                else Text("Settings", Modifier.weight(1f).semantics { heading() }, color = colors.foreground, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                 IconButton(onClick = { onNavigate(SettingsDestination.EditProfile) }) { Icon(Icons.Outlined.Edit, "Edit profile", Modifier.size(24.dp), tint = colors.foreground) }
                 IconButton(onClick = { onNavigate(SettingsDestination.SearchSettings) }) { Icon(Icons.Rounded.Search, "Search settings", Modifier.size(24.dp), tint = colors.foreground) }
                 IconButton(onClick = { onNavigate(SettingsDestination.QrCode) }) { Icon(Icons.Rounded.QrCode2, "QR code", Modifier.size(25.dp), tint = colors.foreground) }
