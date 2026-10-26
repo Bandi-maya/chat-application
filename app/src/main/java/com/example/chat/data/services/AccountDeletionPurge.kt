@@ -17,6 +17,8 @@ class AccountDeletionPurge(
     private val purgeTemporaryFiles: suspend () -> Unit,
     private val deleteSnapshots: suspend (userId: String) -> Unit,
     private val deleteAllSecureStorage: suspend () -> Unit,
+    /** Local attachment cache for the deleted account (no-op until a cache is wired). */
+    private val purgeMediaCache: suspend (userId: String) -> Unit = {},
     private val log: (String) -> Unit = {},
 ) {
     suspend fun purge(deletingUserId: String) {
@@ -30,6 +32,11 @@ class AccountDeletionPurge(
             purgeTemporaryFiles()
         } catch (error: Throwable) {
             log("Chaty media purge failed: $error")
+        }
+        try {
+            purgeMediaCache(deletingUserId)
+        } catch (error: Throwable) {
+            log("Chaty media cache purge failed: $error")
         }
         deleteSnapshots(deletingUserId)
         deleteAllSecureStorage()
