@@ -1,5 +1,7 @@
 package com.example.chat.ui.settings.home
 
+import androidx.compose.ui.draw.clip
+
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -16,7 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -102,7 +104,7 @@ fun GbHeaderOverflowMenuDialog(t: ThemeConfig, actions: GbHeaderOverflowActions,
         ) {
             Column(
                 Modifier.align(Alignment.TopEnd)
-                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
                     .padding(top = 42.dp, end = 12.dp)
                     .graphicsLayer {
                         val s = 0.92f + 0.08f * p
@@ -111,9 +113,10 @@ fun GbHeaderOverflowMenuDialog(t: ThemeConfig, actions: GbHeaderOverflowActions,
                     }
                     .width(250.dp)
                     .heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.8f).dp)
-                    .shadow(12.dp, androidx.compose.ui.graphics.RectangleShape, ambientColor = Color(t.backgroundColor).copy(alpha = 0.55f), spotColor = Color(t.backgroundColor).copy(alpha = 0.55f))
-                    .background(Color(t.surfaceColor))
-                    .border(1.dp, Color(t.cardColor))
+                    .shadow(12.dp, com.example.chat.ui.kit.ChatyModalShape, ambientColor = Color(t.backgroundColor).copy(alpha = 0.55f), spotColor = Color(t.backgroundColor).copy(alpha = 0.55f))
+                    .background(Color(t.surfaceColor), com.example.chat.ui.kit.ChatyModalShape)
+                    .border(1.dp, Color(t.cardColor), com.example.chat.ui.kit.ChatyModalShape)
+                    .clip(com.example.chat.ui.kit.ChatyModalShape)
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {})
                     .verticalScroll(rememberScrollState())
                     .padding(vertical = 8.dp),
