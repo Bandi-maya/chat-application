@@ -81,10 +81,15 @@ fun AppRoot() {
             // Dart _AppState.initState: locator<MessageAutomationService>() (30s account sync, gated on a session).
             ServiceLocator.messageAutomation
         }
-        androidx.compose.runtime.LaunchedEffect(route, lockRequired) {
-            // local_auth stopAuthentication(): a pending biometric prompt never resumes after sign-out (route leaves
-            // Home) or once the lock is no longer required (unlocked another way, or lock disabled).
-            if (route != AuthRoute.Home || !lockRequired) ServiceLocator.lockBiometrics.stopAuthentication()
+        var previousLockRequired by remember { mutableStateOf(lockRequired) }
+        androidx.compose.runtime.LaunchedEffect(lockRequired) {
+            // local_auth stopAuthentication(): a pending prompt never resumes once the lock requirement drops (unlocked
+            // another way, or lock disabled). Route changes do not stop it: Security/LockedChats/HiddenVault start
+            // their own prompts. Sign-out stops it in the signed-out listener; activity detach in LockPromptHost.
+            if (com.example.chat.platform.LockBiometricPolicy.stopOnLockTransition(previousLockRequired, lockRequired)) {
+                ServiceLocator.lockBiometrics.stopAuthentication()
+            }
+            previousLockRequired = lockRequired
         }
         var promptPending by remember { mutableStateOf(false) }
         val gate = remember { GatePrompts() }
@@ -104,6 +109,7 @@ fun AppRoot() {
                         route == AuthRoute.NewChat || route == AuthRoute.GlobalSearch)
                 ) {
                     ServiceLocator.appLock.onSignedOut()
+                    ServiceLocator.lockBiometrics.stopAuthentication()
                     promptPending = false
                     selectedConversation = null
                     route = AuthRoute.Welcome
