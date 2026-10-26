@@ -169,6 +169,12 @@ fun OngoingCallScreen(
         return
     }
 
+    LaunchedEffect(session.callId, session.state) {
+        if (session.state == CallSessionState.busy || session.state == CallSessionState.failed) {
+            delay(2400)
+            onSessionGone()
+        }
+    }
     val isActive = session.isActive
     Scaffold(modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing), contentWindowInsets = WindowInsets(0, 0, 0, 0), containerColor = Color.Black) { padding ->
         Box(
@@ -235,7 +241,7 @@ fun OngoingCallScreen(
                 }
             }
 
-            if (setupError != null || session.state == CallSessionState.failed) {
+            if (setupError != null || session.state == CallSessionState.failed || session.state == CallSessionState.busy) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
@@ -244,7 +250,7 @@ fun OngoingCallScreen(
                         .padding(14.dp),
                 ) {
                     Text(
-                        setupError ?: "The media connection failed.",
+                        if (session.state == CallSessionState.busy) "User is on another call (Busy)" else setupError ?: "The media connection failed.",
                         color = Color.White,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -396,7 +402,7 @@ fun statusLabel(session: ChatyCallSession, callDurationSeconds: Int): String =
         CallSessionState.connecting -> "Connecting media…"
         CallSessionState.connected -> formatCallDuration(callDurationSeconds)
         CallSessionState.reconnecting -> "Reconnecting…"
-        CallSessionState.busy -> "Busy"
+        CallSessionState.busy -> "User is on another call"
         CallSessionState.missed -> "Missed"
         CallSessionState.failed -> "Connection failed"
         CallSessionState.declined -> "Declined"
