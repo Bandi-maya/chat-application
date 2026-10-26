@@ -20,6 +20,13 @@ class FcmTokenRegistrar(
     private val pushRegistry: ((String) -> Unit)? = null,
     private val platform: String = "android",
     private val log: (String) -> Unit = {},
+    /** FirebaseMessaging.getToken() seam (Dart _messaging.getToken): invokes exactly one of the callbacks,
+     *  possibly on another thread. Null (or a throwing seam, e.g. FirebaseApp not initialised) means no
+     *  current token can be fetched; the registrar then waits for onNewToken like before. */
+    private val tokenFetcher: ((onToken: (String?) -> Unit, onError: (Throwable) -> Unit) -> Unit)? = null,
+    /** Executor for the network registration after a fetch or sync (the app installs a background thread,
+     *  because the hook can be invoked on the main thread; the default runs inline for JVM tests). */
+    private val runAsync: (() -> Unit) -> Unit = { block -> block() },
 ) {
     @Volatile
     private var fcmToken: String? = null
@@ -55,7 +62,27 @@ class FcmTokenRegistrar(
      *  next onTokenReceived when none has been delivered yet. */
     fun syncTokenOnLogin() {
         val token = fcmToken
-        if (!token.isNullOrEmpty()) registerWithBackends(token)
+        if (!token.isNullOrEmpty()) {
+            runAsync { registerWithBackends(token) }
+        } else {
+            fetchAndRegisterToken()
+        }
+    }
+
+    /** Dart _fetchAndRegisterToken: getToken(); when non-empty remember it and register with the
+     *  backends. Failures are logged only. */
+    fun fetchAndRegisterToken() {
+        val fetch = tokenFetcher ?: return
+        try {
+            fetch({ token ->
+                if (!token.isNullOrEmpty()) {
+                    fcmToken = token
+                    runAsync { registerWithBackends(token) }
+                }
+            }, { e -> log("[FcmTokenRegistrar] Failed to get FCM token: $e") })
+        } catch (e: Exception) {
+            log("[FcmTokenRegistrar] Failed to get FCM token: $e")
+        }
     }
 
     /** Dart unregisterOnLogout: api-hub DELETE for the remembered token. */
