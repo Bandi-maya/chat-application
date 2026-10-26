@@ -839,7 +839,7 @@ fun AppRoot() {
                 if (sub != null) {
                     androidx.activity.compose.BackHandler { settingsSub = null }
                     Box(Modifier.fillMaxSize()) {
-                        com.example.chat.ui.settings.SettingsSubHost(sub, onBack = { settingsSub = null })
+                        com.example.chat.ui.settings.SettingsSubHost(sub, onBack = { settingsSub = null }, onSwitch = { settingsSub = it })
                     }
                 }
                 val notice = settingsNotice
