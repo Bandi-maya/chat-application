@@ -30,6 +30,9 @@ import coil.ImageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
 import androidx.core.graphics.drawable.toBitmap
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -41,7 +44,12 @@ fun ImageEditorScreen(source: String, onCancel: () -> Unit, onApply: (File) -> U
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var bitmap by remember(source) { mutableStateOf<Bitmap?>(null) }
+    var originalBitmap by remember(source) { mutableStateOf<Bitmap?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var saveJob by remember { mutableStateOf<Job?>(null) }
+    var active by remember { mutableStateOf(true) }
+    DisposableEffect(Unit) { onDispose { active = false; saveJob?.cancel() } }
+    fun cancelEditor() { saveJob?.cancel(); onCancel() }
     var saving by remember { mutableStateOf(false) }
     var brightness by remember { mutableFloatStateOf(0f) }
     var contrast by remember { mutableFloatStateOf(1f) }
@@ -51,31 +59,42 @@ fun ImageEditorScreen(source: String, onCancel: () -> Unit, onApply: (File) -> U
     LaunchedEffect(source) {
         try {
             bitmap = withContext(Dispatchers.IO) {
-                val result = ImageLoader(context).execute(ImageRequest.Builder(context).data(source).allowHardware(false).size(2048).build())
-                (result as? SuccessResult)?.drawable?.toBitmap()?.copy(Bitmap.Config.ARGB_8888, false)
-                    ?: throw IllegalStateException("Unable to load image for editing")
+                val loader = ImageLoader(context)
+                try {
+                    val result = loader.execute(ImageRequest.Builder(context).data(source).allowHardware(false).size(2048)
+                        .memoryCachePolicy(coil.request.CachePolicy.DISABLED).diskCachePolicy(coil.request.CachePolicy.DISABLED).build())
+                    (result as? SuccessResult)?.drawable?.toBitmap()?.copy(Bitmap.Config.ARGB_8888, false)
+                        ?: throw IllegalStateException("Unable to load image for editing")
+                } finally { loader.shutdown() }
             }
-        } catch (e: Exception) { error = e.message ?: "Unable to load image" }
+            originalBitmap = bitmap
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) { error = e.message ?: "Unable to load image" }
     }
-    androidx.activity.compose.BackHandler(enabled = !saving, onBack = onCancel)
+    androidx.activity.compose.BackHandler(onBack = ::cancelEditor)
     Column(Modifier.fillMaxSize().background(Color.Black).safeDrawingPadding().imePadding()) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onCancel, enabled = !saving) { Text("Cancel") }
+            TextButton(::cancelEditor) { Text("Cancel") }
             Text("Edit a copy", color = Color.White, modifier = Modifier.weight(1f))
             TextButton(onClick = {
                 val original = bitmap ?: return@TextButton
                 saving = true
-                scope.launch {
+                saveJob = scope.launch {
+                    val file = File(context.cacheDir, "chaty_edited-${java.util.UUID.randomUUID()}.jpg")
+                    var handedOff = false
                     try {
-                        val file = withContext(Dispatchers.IO) {
+                        withContext(Dispatchers.IO) {
                             val edited = renderEditedImage(original, brightness, contrast, strokes)
-                            File(context.cacheDir, "edited-${java.util.UUID.randomUUID()}.jpg").also { f ->
-                                f.outputStream().use { check(edited.compress(Bitmap.CompressFormat.JPEG, 92, it)) }
-                            }
+                            try {
+                                file.outputStream().use { check(edited.compress(Bitmap.CompressFormat.JPEG, 92, it)) }
+                                coroutineContext.ensureActive()
+                            } finally { edited.recycle() }
                         }
-                        onApply(file)
-                    } catch (e: Exception) { error = e.message ?: "Could not save edit" }
-                    finally { saving = false }
+                        coroutineContext.ensureActive()
+                        if (active) { onApply(file); handedOff = true }
+                    } catch (e: CancellationException) { throw e }
+                    catch (e: Exception) { error = e.message ?: "Could not save edit" }
+                    finally { if (!handedOff) file.delete(); saving = false }
                 }
             }, enabled = bitmap != null && !saving) { Text(if (saving) "Saving" else "Apply") }
         }
@@ -120,7 +139,22 @@ fun ImageEditorScreen(source: String, onCancel: () -> Unit, onApply: (File) -> U
                     strokes = strokes.map { s -> s.copy(points = s.points.map { Offset(1f - it.y, it.x) }) }
                 }
             }, enabled = bitmap != null && !saving) { Text("Rotate") }
-            TextButton({ brightness = 0f; contrast = 1f; strokes = emptyList() }, enabled = !saving) { Text("Reset") }
+            TextButton({ brightness = 0f; contrast = 1f; strokes = emptyList(); bitmap = originalBitmap }, enabled = !saving) { Text("Reset") }
+        }
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.SpaceEvenly) {
+            Text("Crop", color = Color.White, modifier = Modifier.padding(12.dp))
+            listOf("Square" to 1f, "Portrait" to (3f / 4f), "Landscape" to (4f / 3f)).forEach { (label, ratio) ->
+                TextButton(onClick = {
+                    bitmap?.let { image ->
+                        val crop = editorCenterCrop(image.width, image.height, ratio)
+                        bitmap = Bitmap.createBitmap(image, crop.left, crop.top, crop.width(), crop.height())
+                        // Existing drawing coordinates follow the crop. Clip discarded strokes at export.
+                        strokes = strokes.map { stroke -> stroke.copy(points = stroke.points.map { point ->
+                            Offset((point.x * image.width - crop.left) / crop.width(), (point.y * image.height - crop.top) / crop.height())
+                        }) }
+                    }
+                }, enabled = bitmap != null && !saving) { Text(label) }
+            }
         }
         if (draw) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.SpaceEvenly) {
             listOf(Color.Red, Color.Yellow, Color.White, Color.Black, Color.Cyan).forEach { color ->
@@ -151,4 +185,12 @@ internal fun renderEditedImage(original: Bitmap, brightness: Float, contrast: Fl
         stroke.points.zipWithNext().forEach { (a, b) -> canvas.drawLine(a.x * original.width, a.y * original.height, b.x * original.width, b.y * original.height, paint) }
     }
     return output
+}
+
+/** Centered preset crop, never upscales. Caller retains the original input file. */
+internal fun editorCenterCrop(width: Int, height: Int, ratio: Float): android.graphics.Rect {
+    require(width > 0 && height > 0 && ratio > 0f)
+    val w = minOf(width, (height * ratio).toInt()).coerceAtLeast(1)
+    val h = minOf(height, (width / ratio).toInt()).coerceAtLeast(1)
+    return android.graphics.Rect((width - w) / 2, (height - h) / 2, (width + w) / 2, (height + h) / 2)
 }
