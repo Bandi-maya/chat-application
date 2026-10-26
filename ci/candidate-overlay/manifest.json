@@ -1,10 +1,10 @@
 {
   "base": "5d6e83e846caeba925ee637c3a7babebbef5cbe3",
-  "archive_sha256": "5cb7dbc2e3f63eac1cd947d8d6591e82713faa39d1e58a8fbc4f5139304ffb8e",
+  "archive_sha256": "cbb32c0f251637e7d072395ff05afb5a86fc43281e3b19d2d77934d986c2306a",
   "files": {
     "app/build.gradle.kts": "362c7958e391f4219bf7e53384678eae2e2457ee64e560713cd2f968180080dc",
     "app/src/androidTest/java/com/example/chat/AppRootConfiguredProofTest.kt": "3977bdb4ccf2472686dc0fe1df1553d82f73d53cda9b31e83c4ef6f400ee1625",
-    "app/src/androidTest/java/com/example/chat/AttachmentFileCacheTest.kt": "29760dadf8f0d0749ea9639a50b7770743c0a6a271315d111aa53fbceead167e",
+    "app/src/androidTest/java/com/example/chat/AttachmentFileCacheTest.kt": "925db982528c83cf398037ffac17cb6a73401369b6d2e846279adb08ff204803",
     "app/src/androidTest/java/com/example/chat/CameraOpeningProofTest.kt": "77ce25eec39e49465c1832735e8fdf10fdeca2dd9a9921bc9ea899ad94f851d4",
     "app/src/androidTest/java/com/example/chat/CameraPhotoOutputTest.kt": "4a0311b6cf56581c77fbb4d03ecb8e8d072a453cce07df021fb33581f6e026df",
     "app/src/androidTest/java/com/example/chat/ConfirmationFooterResponsiveProofTest.kt": "7c2826fe3dad524ecb811d89311f90313b8addf260823bc2ddd8f95f5162c171",
@@ -148,7 +148,6 @@
     "app/src/test/java/com/example/chat/ui/camera/CapturedVideoRouteTest.kt": "3d2b9c4a06986b9946c22b957cf0045a1d0b4a4684a24e1b31de721b3a332ed9",
     "app/src/test/java/com/example/chat/ui/camera/VideoRecordingPolicyTest.kt": "ca7aa4c0a53b3840558b3040c40f97ea17c19f07adc90761900ea70fe0f38666",
     "app/src/test/kotlin/com/example/chat/ui/chats/home/HomeSwipeLayoutTest.kt": "4d7e52527b6eebc063408ea3c312f15c59e0f1755fa4d1f8a95bafcb2b458bb5",
-    "ci/kotlin-build-trigger.txt": "331e4f2c1734c955873cf2aa97da7ecea49e45647d40ee6b2dee0c92b739f388",
     "ci/run-smoke.sh": "68983e1bb932ca09416fe7705407c628d6dcf7e87170e48ac3ffeb3b83ca90a9",
     "tools/location-map/THIRD_PARTY_NOTICES.txt": "7aa140feaccc25e985d8c1a4f3cbb17d56c8362a021f5862eeb2301ccccb1064",
     "tools/location-map/build.mjs": "f33d437bf218d9b28b72933ea6fbbb83cb5d97023e4ca89fffd2009061019b87",
