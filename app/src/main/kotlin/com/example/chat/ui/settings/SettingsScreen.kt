@@ -74,7 +74,7 @@ import androidx.compose.material.icons.rounded.StarOutline
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.Palette
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -367,10 +367,10 @@ fun SettingsScreen(
         SettingsSheet.EditProfile -> {
             var name by remember { mutableStateOf(user.displayName) }
             var about by remember { mutableStateOf(user.about) }
-            ModalBottomSheet(
+            ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp,
                 onDismissRequest = { sheet = null },
                 containerColor = colors.surface,
-                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                shape = com.example.chat.ui.kit.ChatyModalShape,
             ) {
                 Column(Modifier.fillMaxWidth().imePadding().padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 24.dp)) {
                     Text("Edit Profile Details", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = colors.foreground)
@@ -414,7 +414,7 @@ fun SettingsScreen(
                 ),
             ),
         )
-        SettingsSheet.Export -> AlertDialog(
+        SettingsSheet.Export -> AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { sheet = null },
             title = { Text("Backup & Export") },
             text = { Text("All your encrypted chats, settings, scheduled rules, and media configurations have been verified and backed up locally.") },
