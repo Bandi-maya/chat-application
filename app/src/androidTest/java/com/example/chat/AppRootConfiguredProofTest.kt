@@ -44,6 +44,21 @@ class AppRootConfiguredProofTest {
         bitmap.recycle()
     }
 
+    /** Diagnostic only: logs the visible UI texts (synthetic app UI) so a failed wait explains itself. */
+    private fun logScreenTexts(device: UiDevice, tag: String) {
+        try {
+            val out = java.io.ByteArrayOutputStream()
+            device.dumpWindowHierarchy(out)
+            val xml = out.toString("UTF-8")
+            val texts = Regex("text=\"([^\"]*)\"").findAll(xml).map { it.groupValues[1] }.filter { it.isNotBlank() }.take(60).toList()
+            val pkgs = Regex("package=\"([^\"]*)\"").findAll(xml).map { it.groupValues[1] }.toSet()
+            android.util.Log.w("PixelProof", "SCREENTEXTS $tag pkgs=$pkgs texts=$texts")
+            println("SCREENTEXTS $tag pkgs=$pkgs texts=$texts")
+        } catch (e: Exception) {
+            android.util.Log.w("PixelProof", "SCREENTEXTS $tag failed: $e")
+        }
+    }
+
     private fun setInitialized(value: Boolean) {
         val f = ServiceLocator.apiBackend.javaClass.getDeclaredField("initialized")
         f.isAccessible = true
@@ -100,19 +115,19 @@ class AppRootConfiguredProofTest {
             seedSyntheticChat()
             scenario = ActivityScenario.launch(MainActivity::class.java)
             if (!device.wait(Until.hasObject(By.text("Synthetic Peer")), 30000)) {
-                try { capture(device, "00-failure-state") } catch (_: Exception) {}
+                logScreenTexts(device, "failure"); try { capture(device, "00-failure-state") } catch (_: Exception) {}
                 throw AssertionError("seeded conversation row not shown on Home")
             }
             device.findObject(By.text("Synthetic Peer")).click()
             if (!device.wait(Until.hasObject(By.text("Synthetic bubble one")), 20000)) {
-                try { capture(device, "00-failure-state") } catch (_: Exception) {}
+                logScreenTexts(device, "failure"); try { capture(device, "00-failure-state") } catch (_: Exception) {}
                 throw AssertionError("ChatDetailHost did not render the seeded messages")
             }
             capture(device, "11-chat-detail-host")
             // Header tap (Dart InkWell title -> ContactInfoScreen).
             device.findObject(By.text("Synthetic Peer")).click()
             if (!device.wait(Until.hasObject(By.text("Contact Info")), 20000)) {
-                try { capture(device, "00-failure-state") } catch (_: Exception) {}
+                logScreenTexts(device, "failure"); try { capture(device, "00-failure-state") } catch (_: Exception) {}
                 throw AssertionError("header tap did not open Contact Info")
             }
             capture(device, "12-contact-info")
@@ -149,7 +164,7 @@ class AppRootConfiguredProofTest {
             scenario = ActivityScenario.launch(MainActivity::class.java)
             val shown = device.wait(Until.hasObject(By.text("Chats")), 30000)
             if (!shown) {
-                try { capture(device, "00-failure-state") } catch (_: Exception) {}
+                logScreenTexts(device, "failure"); try { capture(device, "00-failure-state") } catch (_: Exception) {}
                 throw AssertionError("authenticated shell did not render a 'Chats' label")
             }
             capture(device, "10-approot-configured-shell")
