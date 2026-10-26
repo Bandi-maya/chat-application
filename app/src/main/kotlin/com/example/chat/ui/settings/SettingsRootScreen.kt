@@ -55,7 +55,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Storage
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -323,7 +323,7 @@ fun SettingsRootScreen(
 
     if (pickTarget.isNotEmpty()) {
         val avatar = pickTarget == "avatar"
-        ModalBottomSheet(onDismissRequest = { pickTarget = "" }) {
+        ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = { pickTarget = "" }) {
             Column(Modifier.padding(bottom = 16.dp)) {
                 for ((icon, label, src) in listOf(
                     Triple(Icons.Rounded.PhotoCamera, "Take photo", ProfileMediaSource.camera),
@@ -343,7 +343,7 @@ fun SettingsRootScreen(
     }
 
     if (dialog == "policy") {
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { dialog = "" },
             containerColor = colors.surfaceElevated,
             title = {
@@ -374,7 +374,7 @@ fun SettingsRootScreen(
         )
     }
     if (dialog == "about") {
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { dialog = "" },
             containerColor = colors.surfaceElevated,
             title = {
