@@ -23,9 +23,9 @@ The source Contact Info search action closes the view and returns a result that 
 
 ## Evidence checkpoint
 
-The build at `6c609002a3b393cb01090faf466441dbe6d45037` passed exactly 783 unit tests in 73 suites, with zero failures, errors or skips, and produced an APK. Its runtime smoke result must be read separately; build success is not runtime parity.
+The build at `6c609002a3b393cb01090faf466441dbe6d45037` passed exactly 783 unit tests in 73 suites, with zero failures, errors or skips, and produced an APK. Its runtime smoke also passed 20 instrumented tests with zero failures/skips. Two saved-synthetic-session cold starts used changed PIDs (2729 -> 2836), zero fatal errors, and restart rc=0.
 
-The preceding emulator run at `eb4fd2ff` executed 20 tests: 19 passed, one failed because Contact Info's toolbar/title was absent. Actual screenshots showed its body had opened. The same run cold-started twice with changed PIDs and no fatal error, using a synthetic saved session. Follow-up toolbar, bottom inset and atomic connection-state fixes were submitted in `6c609002`; they require new runtime pixels before being described as verified.
+The preceding emulator run at `eb4fd2ff` executed 20 tests: 19 passed, one failed because Contact Info's toolbar/title was absent. Actual screenshots showed its body had opened. The same run cold-started twice with changed PIDs and no fatal error, using a synthetic saved session. Follow-up toolbar, bottom inset and atomic connection-state fixes in `6c609002` are now verified in the emulator captures: Contact Info title/back is visible, the unaccepted state is not falsely verified on an authentication error, and Home dock/FAB is above system navigation. This establishes this synthetic scenario, not exhaustive design parity.
 
 Root `.env` build wiring, routing tests and the utilityBar tablet correction are later changes and are not covered by the 783-test result. Their cumulative CI result must be recorded after it finishes.
 
