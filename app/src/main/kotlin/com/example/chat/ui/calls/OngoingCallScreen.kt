@@ -110,6 +110,13 @@ fun OngoingCallScreen(
     var localPipOffsetX by remember { mutableStateOf(20f) }
     var localPipOffsetY by remember { mutableStateOf(80f) }
 
+    // Dart _pipModeSubscription: system PiP mode drives focus mode and hides controls.
+    DisposableEffect(Unit) {
+        val l: (Boolean) -> Unit = { active -> focusMode = active; controlsVisible = !active }
+        com.example.chat.ServiceLocator.nativeCallPip.addModeListener(l)
+        onDispose { com.example.chat.ServiceLocator.nativeCallPip.removeModeListener(l) }
+    }
+
     // Dart _startAutoHideTimer: controls hide after 5s unless focus mode.
     LaunchedEffect(controlsVisible, focusMode) {
         if (controlsVisible && !focusMode) {
@@ -274,7 +281,7 @@ fun OngoingCallScreen(
                     if (session.isVideo) {
                         IconButton(
                             onClick = onEnterNativePip,
-                            enabled = isActive && pictureInPictureEnabled,
+                            enabled = isActive, // Dart: only isActive gates; the disabled-in-settings case shows a message in the host
                         ) {
                             Icon(
                                 Icons.Rounded.PictureInPicture,
