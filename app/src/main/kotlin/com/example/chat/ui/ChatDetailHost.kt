@@ -142,6 +142,7 @@ fun ChatDetailHost(
     var taskDetail by remember { mutableStateOf<ChatTask?>(null) }
     // 0 none, 1 info (ContactInfo/GroupInfo), 2 contact privacy; viewer = MediaViewerScreen target.
     var infoRoute by remember(conversation.id) { mutableIntStateOf(0) }
+    var viewerBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     var viewerMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var pollCreateOpen by remember(conversation.id) { mutableStateOf(false) }
     var pollViewId by remember(conversation.id) { mutableStateOf<String?>(null) }
@@ -397,8 +398,9 @@ fun ChatDetailHost(
         loadingMessages = loadingMessages,
         loadError = loadError,
         onRetryLoad = { loadNonce++ },
-        onMediaTap = { m -> viewerMessage = m },
-        onViewOnceOpen = { m -> viewerMessage = m },
+        onMediaTap = { m -> viewerBounds = null; viewerMessage = m },
+        onMediaTapWithBounds = { m, rect -> viewerBounds = rect; viewerMessage = m },
+        onViewOnceOpen = { m -> viewerBounds = null; viewerMessage = m },
         onCameraTap = { chatCameraOpen = true },
         onGalleryTap = { attachments.onMedia("image") },
         onAudioTap = { attachments.onMedia("audio") },
@@ -544,6 +546,8 @@ fun ChatDetailHost(
                 type = va.type,
                 size = va.size,
                 storagePath = va.url,
+                sourceBounds = viewerBounds,
+                restrictedViewOnce = vm.metadata["view_once"] == true,
                 createSignedUrl = { path, expires ->
                     ServiceLocator.chatMedia.createSignedUrl(path, expires) { ServiceLocator.apiBackend.config.restApiBaseUrl }
                 },
