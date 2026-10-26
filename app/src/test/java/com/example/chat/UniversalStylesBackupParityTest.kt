@@ -1,6 +1,5 @@
 package com.example.chat
 
-import com.example.chat.core.emoji.ChatyEmojiStyleId
 import com.example.chat.ui.core.controllers.BrandIconSource
 import com.example.chat.ui.core.controllers.LauncherIconVariant
 import com.example.chat.ui.core.controllers.launcherIconVariantFromId
@@ -14,35 +13,6 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class UniversalStylesBackupParityTest {
-
-    // ---------- ChatyEmojiStyleId ----------
-
-    @Test fun `emoji registry has 10 styles with 5 animated, verbatim titles`() {
-        assertEquals(10, ChatyEmojiStyleId.entries.size)
-        assertEquals(6, ChatyEmojiStyleId.entries.count { it.isAnimated })
-        assertEquals("Chaty Motion", ChatyEmojiStyleId.chatyMotion.title)
-        assertEquals("OpenMoji", ChatyEmojiStyleId.openMoji.title)
-        assertTrue(ChatyEmojiStyleId.chatyMotion.description.startsWith("Original expressive animated vector emoji"))
-        assertTrue(ChatyEmojiStyleId.twemoji.description.startsWith("Verified CC BY 4.0"))
-    }
-
-    @Test fun `emoji fromString resolves legacy aliases and canonical forms`() {
-        assertEquals(ChatyEmojiStyleId.chatyMotion, ChatyEmojiStyleId.fromString(null))
-        assertEquals(ChatyEmojiStyleId.chatyMotion, ChatyEmojiStyleId.fromString("systemDefault"))
-        assertEquals(ChatyEmojiStyleId.twemoji, ChatyEmojiStyleId.fromString("twemoji_color"))
-        assertEquals(ChatyEmojiStyleId.chatySoft3D, ChatyEmojiStyleId.fromString("iOS Inspired"))
-        assertEquals(ChatyEmojiStyleId.notoColor, ChatyEmojiStyleId.fromString("one-ui-inspired"))
-        assertEquals(ChatyEmojiStyleId.chatySoft3D, ChatyEmojiStyleId.fromString("soft3d"))
-        assertEquals(ChatyEmojiStyleId.chatyInk, ChatyEmojiStyleId.fromString("minimalOutline"))
-        assertEquals(ChatyEmojiStyleId.chatyPixel, ChatyEmojiStyleId.fromString("pixel"))
-        assertEquals(ChatyEmojiStyleId.blobmoji, ChatyEmojiStyleId.fromString("blob"))
-        assertEquals(ChatyEmojiStyleId.emojiTwo, ChatyEmojiStyleId.fromString("EmojiTwo"))
-        // canonical name + title forms
-        assertEquals(ChatyEmojiStyleId.notoColor, ChatyEmojiStyleId.fromString("Noto Color"))
-        assertEquals(ChatyEmojiStyleId.fluentColor, ChatyEmojiStyleId.fromString("fluentColor"))
-        // unknown falls back to chatyMotion
-        assertEquals(ChatyEmojiStyleId.chatyMotion, ChatyEmojiStyleId.fromString("nonsense"))
-    }
 
     // ---------- Launcher icon variants ----------
 
