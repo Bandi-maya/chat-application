@@ -371,57 +371,11 @@ private fun HomeUiStyleSheet(
     onApply: (String) -> Unit,
 ) {
     val config = LocalThemeConfig.current
-    val colors = LocalAppColors.current
-    var draft by remember { mutableStateOf(selected) }
-    val screenH = LocalConfiguration.current.screenHeightDp
-    ModalBottomSheet(tonalElevation = 0.dp,
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        shape = com.example.chat.ui.kit.ChatyModalShape, containerColor = Color(config.surfaceColor), dragHandle = null,
-    ) {
-        Column(Modifier.fillMaxWidth().height((screenH * 0.84f).dp)) {
-            Text("Home UI Style", color = colors.foreground, fontSize = 20.sp, fontWeight = FontWeight.W800, modifier = Modifier.padding(20.dp, 2.dp, 20.dp, 0.dp))
-            Text("Select a layout to see a live preview, then apply it.", color = colors.foregroundSecondary, fontSize = 12.sp, modifier = Modifier.padding(20.dp, 4.dp, 20.dp, 10.dp))
-            Box(Modifier.padding(horizontal = 18.dp)) {
-                AnimatedContent(
-                    targetState = draft,
-                    transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(180)) }, label = "homePreview",
-                ) { d -> HomeUiPreview(d, config, navigationMode, large = true) }
-            }
-            Spacer(Modifier.height(8.dp))
-            LazyColumn(Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(14.dp, 2.dp, 14.dp, 10.dp)) {
-                itemsIndexed(HomeUiStyles.homeUiStyles) { index, option ->
-                    val isSelected = draft == option
-                    if (index > 0) HorizontalDivider(thickness = 1.dp, color = colors.divider)
-                    Row(
-                        Modifier.fillMaxWidth().clickable { draft = option }.padding(horizontal = 7.dp, vertical = 7.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(
-                            Modifier.size(28.dp).background((if (isSelected) colors.primary else colors.foregroundSecondary).copy(alpha = 0.12f), CircleShape),
-                            contentAlignment = Alignment.Center,
-                        ) { Icon(homeUiStyleIcon(option), null, tint = if (isSelected) colors.primary else colors.foregroundSecondary, modifier = Modifier.size(17.dp)) }
-                        Spacer(Modifier.width(6.dp))
-                        Box(Modifier.width(72.dp)) { HomeUiPreview(option, config, navigationMode, large = false) }
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(option, color = if (isSelected) colors.primary else colors.foreground, fontSize = 13.sp, fontWeight = if (isSelected) FontWeight.W800 else FontWeight.W600)
-                            Spacer(Modifier.height(2.dp))
-                            Text(HomeUiStyles.description(option), color = colors.foregroundSecondary, fontSize = 10.5.sp, lineHeight = 12.6.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Icon(
-                            if (isSelected) Icons.Rounded.RadioButtonChecked else Icons.Rounded.RadioButtonUnchecked, null,
-                            tint = if (isSelected) colors.primary else colors.foregroundTertiary, modifier = Modifier.size(20.dp),
-                        )
-                    }
-                }
-            }
-            Row(Modifier.fillMaxWidth().padding(18.dp, 6.dp, 18.dp, 14.dp)) {
-                OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("Cancel") }
-                Spacer(Modifier.width(12.dp))
-                androidx.compose.material3.Button(onClick = { onApply(draft) }, modifier = Modifier.weight(1f)) { Text("Apply style") }
-            }
-        }
-    }
+    com.example.chat.ui.kit.ChatySingleChoiceModal(
+        title = "Select Home UI style", value = selected, options = HomeUiStyles.homeUiStyles,
+        labelBuilder = { it }, descriptionBuilder = { HomeUiStyles.description(it) },
+        onDismiss = onDismiss, onApply = onApply,
+        description = "Select a layout to preview it, then apply it.",
+        previewBuilder = { draft -> HomeUiPreview(draft, config, navigationMode, large = false) },
+    )
 }
