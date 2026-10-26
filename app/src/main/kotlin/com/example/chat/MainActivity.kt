@@ -24,5 +24,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-
+    // Dart native_call_pip_service modeChanges: forward the system PiP state.
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        ServiceLocator.nativeCallPip.onPipModeChanged(isInPictureInPictureMode)
+    }
 }
