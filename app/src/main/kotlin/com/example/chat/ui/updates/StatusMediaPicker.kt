@@ -59,7 +59,19 @@ private suspend fun readPicked(context: Context, uri: Uri): PickedStatusMedia = 
         }
     }
     if (size > MAX_PICK_BYTES) throw IllegalStateException("Selected media exceeds the storage limit.")
-    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-        ?: throw IllegalStateException("The selected file is not accessible on this device.")
+    val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+        // Bounded read: a provider that reports no size still cannot pull more than the cap into memory.
+        val out = java.io.ByteArrayOutputStream()
+        val buf = ByteArray(64 * 1024)
+        var total = 0L
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            total += n
+            if (total > MAX_PICK_BYTES) throw IllegalStateException("Selected media exceeds the storage limit.")
+            out.write(buf, 0, n)
+        }
+        out.toByteArray()
+    } ?: throw IllegalStateException("The selected file is not accessible on this device.")
     PickedStatusMedia(bytes = bytes, displayName = name, mimeType = context.contentResolver.getType(uri))
 }
