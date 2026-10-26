@@ -34,6 +34,10 @@ class ApiRealtimeClient(
     private val token: () -> String?,
     private val socketFactory: SocketFactory = OkHttpSocketFactory(),
     private val scheduler: Scheduler = ExecutorScheduler(),
+    /** null keeps the exact fixed 4s reconnect; non-null adds capped exponential backoff with jitter. */
+    private val backoff: com.example.chat.data.network.BackoffPolicy? = null,
+    private val connectionScopeIdentity: () -> Any? = { null },
+    private val connectionScopeGuard: (Any?, () -> Unit) -> Boolean = { _, action -> action(); true },
 ) {
 
     /** Minimal socket seam so the client is JVM-testable without OkHttp. */
@@ -79,6 +83,7 @@ class ApiRealtimeClient(
         fun onMessagesCleared(roomId: String) {}
         /** call_signal: payload['data'] ?? payload, only when it is a Map. */
         fun onCallSignal(data: Map<String, Any?>) {}
+        fun onScopedCallSignal(data: Map<String, Any?>, capturedScope: Any?) { onCallSignal(data) }
     }
 
     @Volatile
@@ -91,9 +96,24 @@ class ApiRealtimeClient(
     private var socket: Socket? = null
 
     // Everything below is touched only on the scheduler thread.
+    private var socketScope: Any? = null
+    private var socketToken: String? = null
+    private var socketUrl: String? = null
     private var connecting = false
     private var pingCancel: Scheduler.Cancelable? = null
     private var reconnectCancel: Scheduler.Cancelable? = null
+    private var reconnectAttempt = 0
+
+    /** Network regained: skip the pending wait and reconnect now (no-op while
+     *  connected/connecting or signed out). Safe to call from any thread. */
+    fun reconnectNow() = post {
+        if (socket != null && (socketToken != token() || socketUrl != webSocketUrl() || socketScope !== connectionScopeIdentity())) cleanupLocked()
+        if (socket != null || connecting || token() == null) return@post
+        reconnectCancel?.cancel()
+        reconnectCancel = null
+        reconnectAttempt = 0
+        connect()
+    }
 
     private fun post(task: () -> Unit) {
         scheduler.schedule(0, task)
@@ -103,14 +123,27 @@ class ApiRealtimeClient(
      *  connecting/connected; cancels any pending reconnect; on immediate
      *  failure cleans up and schedules the 4s reconnect. */
     fun connect() = post {
+        if (socket != null && (socketToken != token() || socketUrl != webSocketUrl() || socketScope !== connectionScopeIdentity())) cleanupLocked()
         if (connecting || socket != null) return@post
         if (token() == null) return@post
         val url = webSocketUrl()?.takeIf { it.isNotBlank() } ?: return@post
         reconnectCancel?.cancel()
         reconnectCancel = null
         connecting = true
+        socketToken = token(); socketUrl = url; socketScope = connectionScopeIdentity()
+        val expectedScope = socketScope
+        var registered: Socket? = null
         val created = try {
-            socketFactory.connect(url, socketListener)
+            if (!connectionScopeGuard(expectedScope) {
+                if (socketToken == token() && socketUrl == webSocketUrl()) {
+                    registered = socketFactory.connect(url, socketListener)
+                    socket = registered
+                }
+            } || registered == null) {
+                connecting = false
+                return@post
+            }
+            registered!!
         } catch (_: Exception) {
             connecting = false
             scheduleReconnectLocked()
@@ -152,17 +185,17 @@ class ApiRealtimeClient(
      *  {type: call_signal, target_user_id, data}; no-op when disconnected. */
     fun sendCallSignal(targetUserId: String, data: Map<String, Any?>): Boolean {
         val s = socket ?: return false
-        return try {
-            s.send(
-                JSONObject()
-                    .put("type", "call_signal")
-                    .put("target_user_id", targetUserId)
-                    .put("data", toJson(data))
-                    .toString(),
-            )
-        } catch (_: Exception) {
-            false
+        val expectedScope = socketScope
+        var queued = false
+        val accepted = connectionScopeGuard(expectedScope) {
+            if (s === socket && socketToken == token() && socketUrl == webSocketUrl() && expectedScope === connectionScopeIdentity()) {
+                queued = try {
+                    s.send(JSONObject().put("type", "call_signal").put("target_user_id", targetUserId).put("data", toJson(data)).toString())
+                } catch (_: Exception) { false }
+            }
         }
+        if (!accepted || !queued) connect()
+        return queued
     }
 
     // ── Internals (scheduler thread only) ────────────────────────────────
@@ -170,6 +203,8 @@ class ApiRealtimeClient(
     private val socketListener = object : SocketListener {
         override fun onMessage(socket: Socket, text: String) = post {
             if (socket !== this@ApiRealtimeClient.socket) return@post
+            if (socketToken != token() || socketUrl != webSocketUrl() || socketScope !== connectionScopeIdentity()) return@post
+            reconnectAttempt = 0
             handleMessage(text)
         }
 
@@ -195,6 +230,7 @@ class ApiRealtimeClient(
         } catch (_: Exception) {
         }
         socket = null
+        socketToken = null; socketUrl = null
         connecting = false
     }
 
@@ -203,7 +239,8 @@ class ApiRealtimeClient(
     private fun scheduleReconnectLocked() {
         if (token() == null) return
         reconnectCancel?.cancel()
-        reconnectCancel = scheduler.schedule(RECONNECT_DELAY_MS) {
+        val delayMs = backoff?.delayMs(reconnectAttempt++) ?: RECONNECT_DELAY_MS
+        reconnectCancel = scheduler.schedule(delayMs) {
             reconnectCancel = null
             if (token() != null && socket == null) connect()
         }
@@ -250,7 +287,14 @@ class ApiRealtimeClient(
                     } else {
                         payload
                     }
-                    (raw as? JSONObject)?.let { listener?.onCallSignal(ApiChatClient.deepMap(it)) }
+                    (raw as? JSONObject)?.let {
+                        val signal = ApiChatClient.deepMap(it).toMutableMap()
+                        val outer = payload.optString("sender_id", "")
+                        val inner = signal["sender_id"]?.toString().orEmpty()
+                        if (outer.isNotEmpty() && inner.isNotEmpty() && outer != inner) return
+                        if (inner.isEmpty() && outer.isNotEmpty()) signal["sender_id"] = outer
+                        listener?.onScopedCallSignal(signal, socketScope)
+                    }
                 }
                 "new_message" -> {
                     val raw = dataOrMessage(payload) ?: return
