@@ -17,6 +17,8 @@ internal object RadialMenuGeometry {
         val pageSize: Int,
     )
 
+    // Shared live-shell/preview contract: 8dp + 56dp target + 8dp.
+    const val navigationStripHeight = 72f
     const val targetSize = 56f
     const val edge = 8f
     private const val gap = 8f
