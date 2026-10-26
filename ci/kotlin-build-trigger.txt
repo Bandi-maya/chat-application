@@ -1,1 +1,1 @@
-Verify messaging Main-to-IO transport and incoming UI refresh, fully labelled all-destination dock, retained settings/tab history, chevrons and Home-only double Back.
+Verify complete messaging/nav batch after correcting back-icon symbol to ChevronLeft; no behavior-test removal.
