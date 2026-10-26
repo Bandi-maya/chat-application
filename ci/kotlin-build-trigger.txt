@@ -1,1 +1,1 @@
-Verify confirmed central public defaults and dotenv precedence, literal websocket placeholder, synthetic emulator loopback isolation.
+Verify main-dispatcher chat REST send/load/confirm and incoming UI updates; all bottom destinations, chevron backs, route/tab history and Home-only double Back.
