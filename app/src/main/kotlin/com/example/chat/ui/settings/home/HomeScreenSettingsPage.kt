@@ -159,7 +159,7 @@ fun HomeScreenSettingsPage(
             Switch(
                 checked = value,
                 onCheckedChange = { ChatyHapticsPort.selection(view); onChanged(it) },
-                colors = SwitchDefaults.colors(checkedThumbColor = accent, checkedTrackColor = accent.copy(alpha = 0.5f)),
+                colors = com.example.chat.ui.kit.chatySwitchColors(checkedThumbColor = accent, checkedTrackColor = accent.copy(alpha = 0.5f)),
             )
         }
     }
