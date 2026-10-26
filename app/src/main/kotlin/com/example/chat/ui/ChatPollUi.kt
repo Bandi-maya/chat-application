@@ -59,7 +59,7 @@ fun CreatePollDialog(onCancel: () -> Unit, onCreate: (PollDraft) -> Unit) {
     var question by remember { mutableStateOf("") }
     val options = remember { mutableStateListOf("", "") }
     var multiple by remember { mutableStateOf(false) }
-    AlertDialog(
+    AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = onCancel,
         title = { Text("Create poll") },
         text = {
@@ -127,7 +127,7 @@ fun PollViewerSheet(
         try { state = controller.loadPoll(messageId) } catch (e: Throwable) { error = e.message ?: e.toString() }
         loading = false
     }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 18.dp).navigationBarsPadding()) {
             val s = state
             when {
