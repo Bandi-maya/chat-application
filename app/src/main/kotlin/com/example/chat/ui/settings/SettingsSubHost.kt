@@ -205,10 +205,22 @@ fun SettingsSubHost(
             authenticateBiometric = { reason -> ServiceLocator.localLockService.authenticateBiometric(reason) },
         )
         // Dart clear-cache action is not ported; the toggles on this page are static in the Kotlin port.
-        SettingsDestination.StorageMedia -> StorageMediaScreen(
-            onBack = onBack,
-            onClearCache = { toast("Clearing the local media cache is not wired in this build yet.") },
-        )
+        SettingsDestination.StorageMedia -> {
+            var cacheLimitMb by remember { mutableStateOf(com.example.chat.data.local.MediaCacheSettings.limitMb(context)) }
+            StorageMediaScreen(
+                onBack = onBack,
+                onClearCache = {
+                    ServiceLocator.mediaCache.clearCurrentAccount()
+                    toast("Local media cache cleared. Server copies are untouched.")
+                },
+                cacheLimitMb = cacheLimitMb,
+                onCacheLimitChange = { mb ->
+                    com.example.chat.data.local.MediaCacheSettings.setLimitMb(context, mb)
+                    cacheLimitMb = com.example.chat.data.local.MediaCacheSettings.limitMb(context)
+                    ServiceLocator.mediaCache.trimToLimit()
+                },
+            )
+        }
         SettingsDestination.ThemeEngine -> {
             // Dart file_picker/image_picker seams -> Activity Result launchers.
             var jsonWaiter by remember { mutableStateOf<kotlinx.coroutines.CompletableDeferred<String?>?>(null) }
