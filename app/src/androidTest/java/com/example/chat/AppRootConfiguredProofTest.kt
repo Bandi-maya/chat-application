@@ -166,10 +166,21 @@ class AppRootConfiguredProofTest {
                 ?: throw AssertionError("Add call button not visible")
             val callsDock = device.findObject(By.desc("Calls"))
                 ?: throw AssertionError("Calls dock item not visible")
-            assertTrue("Add call fully above dock", addCall.visibleBounds.bottom < callsDock.visibleBounds.top)
+            var fullAddCall = addCall
+            while (!fullAddCall.isClickable && fullAddCall.parent != null) fullAddCall = fullAddCall.parent
+            assertTrue("Add call fully above dock", fullAddCall.visibleBounds.bottom < callsDock.visibleBounds.top)
             capture(device, "10c-calls-fab-above-dock")
             addCall.click()
             assertTrue("dialer opens", device.wait(Until.hasObject(By.desc("Delete digit")), 10000))
+            var safeWindow = android.graphics.Rect(0, 0, device.displayWidth, device.displayHeight)
+            scenario?.onActivity { activity ->
+                val insets = activity.window.decorView.rootWindowInsets?.getInsets(
+                    android.view.WindowInsets.Type.systemBars() or android.view.WindowInsets.Type.displayCutout(),
+                ) ?: throw AssertionError("Missing system insets for dialer proof")
+                safeWindow = android.graphics.Rect(insets.left, insets.top,
+                    device.displayWidth - insets.right, device.displayHeight - insets.bottom)
+            } ?: throw AssertionError("Missing activity for dialer bounds")
+            DialerUiAssertions.verify(device, safeWindow)
             capture(device, "10d-dialer-round-keys-safe-bottom")
             device.pressBack()
             device.pressBack() // Calls -> Updates
