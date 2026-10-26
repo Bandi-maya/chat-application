@@ -187,7 +187,7 @@ fun ChatyEventToastOverlay(
         }
         // Dart _buildDynamicIsland -> DynamicIslandOverlayHost(controller: locator<DynamicIslandController>()),
         // shown only while heads-up is enabled and the island preference is on.
-        if (preferences.gbBool("dynamic_island_notifications", false) &&
+        if (n != null && preferences.gbBool("dynamic_island_notifications", false) &&
             preferences.notification.enableGlobalNotifications &&
             !preferences.universal.disableHeadsUpNotification
         ) {
