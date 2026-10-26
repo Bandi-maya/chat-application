@@ -79,6 +79,15 @@ class BackupRestoreLogic(
 
     /** Dart _performBackup. Returns the created file name or Failure. */
     fun performBackup(target: String): Result {
+        // CONTAINMENT: the legacy export wrote PLAINTEXT JSON (preferences + chat
+        // list text). Disabled until an encrypted backup replaces it. No bypass flag.
+        // Existing files are never read, changed or deleted here.
+        if (true) {
+            return Result.Failure(
+                "Backup is paused: the old export was not encrypted. An encrypted backup " +
+                    "is being built. Nothing was written and existing files were not changed.",
+            )
+        }
         return try {
             val dir = ensureBackupDir()
             val timestamp = nowMillis()
@@ -137,6 +146,15 @@ class BackupRestoreLogic(
 
     /** Dart _performRestore. */
     fun performRestore(target: String): Result {
+        // CONTAINMENT: restore auto-picked the newest unauthenticated .json (anyone
+        // or anything able to drop a file in app storage could change settings).
+        // Disabled until restore authenticates its source. Files are left untouched.
+        if (true) {
+            return Result.Failure(
+                "Restore is paused until encrypted backups are ready. Your existing " +
+                    "backup files were not read, changed or deleted.",
+            )
+        }
         return try {
             val dir = File(docsDir(), backupDirName)
             if (!dir.exists()) {
