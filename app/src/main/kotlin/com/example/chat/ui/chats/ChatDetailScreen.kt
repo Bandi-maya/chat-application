@@ -170,6 +170,9 @@ fun ChatDetailScreen(
     showHeaderName: Boolean = true,
     showHeaderCalls: Boolean = true,
     showPresenceLine: Boolean = true,
+    headerBarColor: Long? = null,
+    presencePillColor: Long? = null,
+    presenceTextColor: Long? = null,
     callsAllowed: Boolean = true,
     onStartCall: (isVideo: Boolean) -> Unit = {},
     connectionState: ConnectionHealthState? = null,
@@ -619,6 +622,9 @@ fun ChatDetailScreen(
                     showHeaderName = showHeaderName,
                     showPresenceLine = showPresenceLine,
                     showHeaderCalls = showHeaderCalls,
+                    headerBarColor = headerBarColor,
+                    presencePillColor = presencePillColor,
+                    presenceTextColor = presenceTextColor,
                     callsAllowed = callsAllowed,
                     onStartCall = onStartCall,
                     connectionState = connectionState,
@@ -1127,6 +1133,9 @@ private fun ConversationHeader(
     showHeaderName: Boolean,
     showPresenceLine: Boolean,
     showHeaderCalls: Boolean,
+    headerBarColor: Long?,
+    presencePillColor: Long?,
+    presenceTextColor: Long?,
     callsAllowed: Boolean,
     onStartCall: (Boolean) -> Unit,
     connectionState: ConnectionHealthState?,
@@ -1145,7 +1154,7 @@ private fun ConversationHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(theme.surfaceColor))
+            .background(Color(headerBarColor ?: theme.surfaceColor))
             .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1209,15 +1218,25 @@ private fun ConversationHeader(
                     )
                 }
                 if (showPresenceLine && presenceText != null) {
+                    // Dart: pill only when a background color is set (8x2 padding, top margin 2, fully rounded).
                     Text(
                         presenceText,
                         color = Color(
-                            if (presenceIsOnline) theme.successColor else theme.secondaryTextColor,
+                            presenceTextColor
+                                ?: if (presenceIsOnline) theme.successColor else theme.secondaryTextColor,
                         ),
                         fontSize = (10.5 * theme.fontScale).sp,
                         fontWeight = FontWeight.W500,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = if (presencePillColor == null) {
+                            Modifier
+                        } else {
+                            Modifier
+                                .padding(top = 2.dp)
+                                .background(Color(presencePillColor), RoundedCornerShape(999.dp))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        },
                     )
                 }
             }
