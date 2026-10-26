@@ -33,7 +33,7 @@ import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.PushPin as OutlinedPushPin
 import androidx.compose.material.icons.rounded.Videocam
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
