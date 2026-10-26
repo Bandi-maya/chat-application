@@ -392,107 +392,33 @@ fun UniversalStylesScreen(
         }
     }
 
-    // Dart _showNotificationIconModal
+    // All settings selections draft locally; only Apply writes preferences.
     if (sheet == 1) {
-        ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = { sheet = 0 }) {
-            Text(
-                "Change Notification Icon",
-                fontSize = 17.sp * fontScale,
-                fontWeight = FontWeight.W700,
-                color = colors.foreground,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-            ChatyNotificationIconPresets.values.forEach { preset ->
-                val isSelected = prefs.notificationIcon == preset.name
-                Row(
-                    Modifier.fillMaxWidth()
-                        .clickable {
-                            preferences.updateUniversal(prefs.copy(notificationIcon = preset.name))
-                            sheet = 0
-                        }
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        Modifier.size(38.dp)
-                            .background(Color(preset.colorArgb).copy(alpha = 0.15f), CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            notificationGlyphIcon(preset.iconKey),
-                            contentDescription = preset.name,
-                            tint = Color(preset.colorArgb),
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        preset.name,
-                        fontWeight = if (isSelected) FontWeight.W700 else FontWeight.W500,
-                        color = if (isSelected) colors.primary else colors.foreground,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Box(
-                        Modifier.size(20.dp)
-                            .border(2.dp, if (isSelected) colors.primary else colors.border, CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (isSelected) {
-                            Box(Modifier.size(10.dp).background(colors.primary, CircleShape))
-                        }
-                    }
-                }
-            }
-            Spacer(Modifier.height(24.dp))
-        }
+        com.example.chat.ui.kit.ChatySingleChoiceModal(
+            title = "Select notification icon", value = prefs.notificationIcon,
+            options = ChatyNotificationIconPresets.values.map { it.name }, labelBuilder = { it },
+            onDismiss = { sheet = 0 },
+            onApply = { chosen -> preferences.updateUniversal(preferences.universal.copy(notificationIcon = chosen)); sheet = 0 },
+            previewBuilder = { name ->
+                val preset = ChatyNotificationIconPresets.values.first { it.name == name }
+                Icon(notificationGlyphIcon(preset.iconKey), contentDescription = name, tint = Color(preset.colorArgb), modifier = Modifier.size(24.dp))
+            },
+        )
+    }
+    if (sheet == 2) {
+        com.example.chat.ui.kit.ChatySingleChoiceModal(
+            title = "Select font style", value = prefs.fontStyle,
+            options = UniversalStylesCatalog.fontStyles.map { it.name }, labelBuilder = { it },
+            onDismiss = { sheet = 0 },
+            onApply = { chosen -> preferences.updateUniversal(preferences.universal.copy(fontStyle = chosen)); sheet = 0 },
+            previewBuilder = { name ->
+                val entry = UniversalStylesCatalog.fontStyles.first { it.name == name }
+                Text("Impossible can be achieved", fontFamily = entry.composeFamily(), fontWeight = FontWeight(entry.weight),
+                    fontStyle = if (entry.italic) FontStyle.Italic else FontStyle.Normal, letterSpacing = entry.letterSpacing.sp)
+            },
+        )
     }
 
-    // Dart _showFontStyleModal
-    if (sheet == 2) {
-        ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = { sheet = 0 }) {
-            Text(
-                "Font Style",
-                fontSize = 17.sp * fontScale,
-                fontWeight = FontWeight.W700,
-                color = colors.foreground,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-            UniversalStylesCatalog.fontStyles.forEach { entry ->
-                val isSelected = prefs.fontStyle == entry.name
-                Row(
-                    Modifier.fillMaxWidth()
-                        .clickable {
-                            preferences.updateUniversal(prefs.copy(fontStyle = entry.name))
-                            sheet = 0
-                        }
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            entry.name,
-                            fontWeight = FontWeight.W700,
-                            fontSize = 15.sp,
-                            color = if (isSelected) colors.primary else colors.foreground,
-                        )
-                        Text(
-                            "Impossible can be achieved",
-                            fontSize = 13.sp,
-                            fontFamily = entry.composeFamily(),
-                            fontWeight = FontWeight(entry.weight),
-                            fontStyle = if (entry.italic) FontStyle.Italic else FontStyle.Normal,
-                            letterSpacing = entry.letterSpacing.sp,
-                            color = if (isSelected) colors.primary.copy(alpha = 0.8f) else colors.foregroundSecondary,
-                        )
-                    }
-                    if (isSelected) {
-                        Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = colors.primary)
-                    }
-                }
-            }
-            Spacer(Modifier.height(24.dp))
-        }
-    }
 }
 
 @Composable
