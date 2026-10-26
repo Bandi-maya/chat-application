@@ -974,12 +974,31 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
     required bool isVideo,
   }) async {
     if (conversation.type != ConversationType.direct) return;
-    final currentUserId = widget.dataStore.currentUser.id;
+    final myId = (locator.isRegistered<ApiBackendService>() &&
+            locator<ApiBackendService>().currentUser != null &&
+            locator<ApiBackendService>().currentUser!.id.isNotEmpty)
+        ? locator<ApiBackendService>().currentUser!.id
+        : widget.dataStore.currentUser.id;
     final otherId = conversation.participantIds.firstWhere(
-      (id) => id != currentUserId,
+      (id) => id != myId,
       orElse: () => '',
     );
-    final contact = otherId.isEmpty ? null : widget.dataStore.getUser(otherId);
+    UserProfile? contact;
+    if (otherId.isNotEmpty) {
+      if (locator.isRegistered<ApiBackendService>()) {
+        contact = locator<ApiBackendService>().getUser(otherId);
+      }
+      contact ??= widget.dataStore.getUser(otherId);
+      contact ??= UserProfile(
+        id: otherId,
+        displayName: conversation.title.isNotEmpty ? conversation.title : 'Contact',
+        username: otherId,
+        avatarInitials: conversation.title.isNotEmpty ? conversation.title.substring(0, 1).toUpperCase() : '?',
+        avatarColorHex: '#6366F1',
+        about: '',
+        lastSeenAt: DateTime.now(),
+      );
+    }
     if (contact == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1000,7 +1019,20 @@ class _ChatsHomeScreenState extends State<ChatsHomeScreen> {
         );
         return;
       }
-      await locator<CallSignalingService>().initiateCall(
+      final callService = locator<CallSignalingService>();
+      if (callService.hasActiveSession) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'You are already in another call. Please end your active call before starting a new one.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+      await callService.initiateCall(
         remoteUserId: contact.id,
         remoteDisplayName: contact.displayName.isNotEmpty
             ? contact.displayName

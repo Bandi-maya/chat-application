@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../data/repositories/chaty_data_store.dart';
+import '../../data/services/api_backend_service.dart';
 import '../../data/services/call_signaling_service.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/design_system/design_system.dart';
@@ -93,14 +94,27 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
   List<dynamic> get _visibleContacts {
     final query = _searchController.text.trim().toLowerCase();
     final queryDigits = query.replaceAll(RegExp(r'[^0-9]'), '');
-    final currentUserId = widget.dataStore.currentUser.id;
+    final myId = (locator.isRegistered<ApiBackendService>() &&
+            locator<ApiBackendService>().currentUser != null &&
+            locator<ApiBackendService>().currentUser!.id.isNotEmpty)
+        ? locator<ApiBackendService>().currentUser!.id
+        : widget.dataStore.currentUser.id;
 
-    return widget.dataStore.contacts.where((contact) {
-      if (contact.id == currentUserId) return false;
+    final allContacts = <dynamic>[...widget.dataStore.contacts];
+    if (locator.isRegistered<ApiBackendService>()) {
+      for (final u in locator<ApiBackendService>().users) {
+        if (!allContacts.any((c) => c.id == u.id)) {
+          allContacts.add(u);
+        }
+      }
+    }
+
+    return allContacts.where((contact) {
+      if (contact.id == myId) return false;
       if (query.isEmpty) return true;
 
-      final name = contact.displayName.trim().toLowerCase();
-      final phone = contact.phone.trim().toLowerCase();
+      final name = (contact.displayName as String? ?? '').trim().toLowerCase();
+      final phone = (contact.phone as String? ?? '').trim().toLowerCase();
       final contactDigits = phone.replaceAll(RegExp(r'[^0-9]'), '');
 
       return name.contains(query) ||
@@ -114,10 +128,20 @@ class _CallContactPickerScreenState extends State<CallContactPickerScreen> {
 
     final contactId = contact.id as String;
     final displayName = (contact.displayName as String).trim();
-    setState(() => _startingContactId = contactId);
+    final callService = locator<CallSignalingService>();
+    if (callService.hasActiveSession) {
+      if (mounted) {
+        ChatyToast.show(
+          context,
+          'You are already in another call. Please end it before starting a new one.',
+          background: context.colors.error,
+        );
+      }
+      return;
+    }
 
     try {
-      await locator<CallSignalingService>().initiateCall(
+      await callService.initiateCall(
         remoteUserId: contactId,
         remoteDisplayName: displayName.isEmpty ? 'Chaty contact' : displayName,
         remoteAvatarInitials: _initials(displayName),

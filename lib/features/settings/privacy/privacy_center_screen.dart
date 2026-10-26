@@ -13,6 +13,8 @@ import '../../../domain/models/preferences.dart';
 import '../../../injection/locator.dart';
 import '../../../ui/core/controllers/preferences_controller.dart';
 import '../../../ui/core/design_system/design_system.dart';
+import '../../../data/services/api_backend_service.dart';
+import 'chat_privacy_settings_screen.dart';
 
 /// Privacy and Security settings screen matching Image 3.
 /// Adapts dynamically to light and dark theme using global color tokens.
@@ -498,7 +500,24 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
                   colors: colors,
                   isDark: isDark,
                   children: [
-                    // Section 1: Privacy
+                    // Section 1: Chat Privacy & Presence (Live SaaS Sync)
+                    _buildSectionDivider(label: 'Workspace & Chat Privacy', accent: theme.accentColor),
+                    _buildChevronRow(
+                      icon: Icons.shield_rounded,
+                      title: 'Chat Privacy & Presence',
+                      subtitle: 'Blue ticks, read receipts, last seen & account status',
+                      theme: theme,
+                      colors: colors,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => ChatPrivacySettingsScreen(theme: theme),
+                          ),
+                        );
+                      },
+                    ),
+
+                    // Section 2: Privacy
                     _buildSectionDivider(label: 'Privacy', accent: theme.accentColor),
                     _buildSwitchRow(
                       icon: Icons.ac_unit_rounded,
@@ -512,6 +531,9 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
                           currentPrefs.copyWith(freezeLastSeen: val),
                           logTitle: 'Freeze Last Seen',
                         );
+                        if (locator.isRegistered<ApiBackendService>()) {
+                          locator<ApiBackendService>().updateChatSettings(freezeLastSeen: val);
+                        }
                       },
                     ),
                     _buildSwitchRow(
@@ -775,6 +797,9 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
                           currentPrefs.copyWith(showBlueTicksAfterReply: val),
                           logTitle: 'Show Blue Ticks after reply',
                         );
+                        if (locator.isRegistered<ApiBackendService>()) {
+                          locator<ApiBackendService>().updateChatSettings(blueTicksAfterReply: val);
+                        }
                       },
                     ),
                     _buildChevronRow(

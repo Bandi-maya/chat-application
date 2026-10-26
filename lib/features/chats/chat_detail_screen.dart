@@ -8,6 +8,7 @@ import '../../ui/core/formatting/chat_formatters.dart';
 import '../../ui/core/theme/app_theme.dart';
 import '../../data/repositories/chaty_data_store.dart';
 import '../../data/services/backend_service.dart';
+import '../../data/services/api_backend_service.dart';
 import '../../data/services/chat_media_service.dart';
 import '../../data/services/contact_relationship_service.dart';
 import '../../data/services/rich_chat_realtime_service.dart';
@@ -1410,7 +1411,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         .where((item) => item.id == widget.conversationId)
         .firstOrNull;
     if (conversation == null || conversation.type != ConversationType.direct) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -1418,13 +1419,51 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             ),
           ),
         );
+      }
       return;
     }
+
+    if (locator.isRegistered<ApiBackendService>()) {
+      final s = locator<ApiBackendService>().chatUserSettings;
+      if (s != null && s.isDeactivated) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Your chat account is deactivated. Reactivate in Settings to place calls.'),
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    final myId = (locator.isRegistered<ApiBackendService>() &&
+            locator<ApiBackendService>().currentUser != null &&
+            locator<ApiBackendService>().currentUser!.id.isNotEmpty)
+        ? locator<ApiBackendService>().currentUser!.id
+        : widget.dataStore.currentUser.id;
+
     final otherId = conversation.participantIds.firstWhere(
-      (id) => id != widget.dataStore.currentUser.id,
+      (id) => id != myId,
       orElse: () => '',
     );
-    final contact = otherId.isEmpty ? null : widget.dataStore.getUser(otherId);
+
+    UserProfile? contact;
+    if (otherId.isNotEmpty) {
+      if (locator.isRegistered<ApiBackendService>()) {
+        contact = locator<ApiBackendService>().getUser(otherId);
+      }
+      contact ??= widget.dataStore.getUser(otherId);
+      contact ??= UserProfile(
+        id: otherId,
+        displayName: conversation.title.isNotEmpty ? conversation.title : 'Contact',
+        username: otherId,
+        avatarInitials: conversation.title.isNotEmpty ? conversation.title.substring(0, 1).toUpperCase() : '?',
+        avatarColorHex: '#6366F1',
+        about: '',
+        lastSeenAt: DateTime.now(),
+      );
+    }
     if (contact == null) return;
     final status = await _relationships.connectionStatus(contact.id);
     if (!mounted) return;
@@ -1435,6 +1474,18 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
 
     final callService = locator<CallSignalingService>();
+    if (callService.hasActiveSession) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'You are already in another call. Please end your active call before starting a new one.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
     try {
       await callService.initiateCall(
         remoteUserId: contact.id,

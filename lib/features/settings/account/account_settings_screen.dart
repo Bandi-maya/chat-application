@@ -12,6 +12,7 @@ import '../../../ui/core/design_system/settings_primitives.dart';
 import '../../../domain/models/user_profile.dart';
 import '../../profile/profile_actions.dart';
 import '../../subscription/plan_subscription_screen.dart';
+import '../privacy/chat_privacy_settings_screen.dart';
 
 /// Dedicated canonical settings screen for Account & Profile details.
 class AccountSettingsScreen extends StatelessWidget {
@@ -396,6 +397,34 @@ class AccountSettingsScreen extends StatelessWidget {
             ChatySettingsSection(
               title: 'Account Actions',
               children: [
+                ChatySettingsTile(
+                  icon: Icons.shield_outlined,
+                  iconColor: const Color(0xFF10B981),
+                  title: 'Chat Privacy & Presence',
+                  subtitle: 'Blue ticks, last seen, online status & typing',
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ChatPrivacySettingsScreen(),
+                      ),
+                    );
+                  },
+                ),
+                ChatySettingsTile(
+                  icon: Icons.manage_accounts_outlined,
+                  iconColor: const Color(0xFF6366F1),
+                  title: 'Account Status & Deactivation',
+                  subtitle: 'Manage temporary deactivation and active state',
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ChatPrivacySettingsScreen(initialIndex: 2),
+                      ),
+                    );
+                  },
+                ),
                 ChatySettingsTile(
                   icon: Icons.qr_code_rounded,
                   iconColor: colors.primary,

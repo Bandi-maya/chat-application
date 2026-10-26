@@ -93,6 +93,16 @@ class _CallsScreenState extends State<CallsScreen> {
     required bool isVideo,
   }) async {
     final callService = locator<CallSignalingService>();
+    if (callService.hasActiveSession) {
+      if (context.mounted) {
+        ChatyToast.show(
+          context,
+          'You are already in another call. Please end it before starting a new one.',
+          background: context.colors.error,
+        );
+      }
+      return;
+    }
     try {
       await callService.initiateCall(
         remoteUserId: remoteUserId,

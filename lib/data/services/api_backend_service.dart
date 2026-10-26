@@ -10,6 +10,7 @@ import '../../domain/models/user_profile.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/chat_task.dart';
+import '../../domain/models/chat_user_settings.dart';
 import '../../injection/locator.dart';
 import '../../core/services/firebase_notification_service.dart';
 
@@ -54,6 +55,9 @@ class ApiBackendService extends ChangeNotifier {
 
   bool _requiresSubscription = false;
   String? _subscriptionErrorMessage;
+
+  ChatUserSettings? _chatUserSettings;
+  ChatUserSettings? get chatUserSettings => _chatUserSettings;
 
   bool get isInitialized => _isInitialized;
   bool get isAuthenticated => _token != null && _currentUser != null;
@@ -116,6 +120,7 @@ class ApiBackendService extends ChangeNotifier {
         unawaited(loadConversations());
         unawaited(loadUsers());
         unawaited(loadTasks());
+        unawaited(loadChatSettings());
         _syncFcmToken();
       }
     } catch (e) {
@@ -568,6 +573,7 @@ class ApiBackendService extends ChangeNotifier {
       loadConversations();
       loadUsers();
       loadTasks();
+      loadChatSettings();
       _syncFcmToken();
       notifyListeners();
       return _currentUser!;
@@ -661,11 +667,53 @@ class ApiBackendService extends ChangeNotifier {
           }
 
           if (eventType == 'call_signal') {
-            final signalData = payload['data'] ?? payload;
-            if (signalData is Map<String, dynamic>) {
-              _callSignalController.add(signalData);
-            } else if (signalData is Map) {
-              _callSignalController.add(Map<String, dynamic>.from(signalData));
+            final raw = payload['data'] ?? payload;
+            final Map<String, dynamic> signalData = raw is Map<String, dynamic>
+                ? raw
+                : (raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{});
+            if (payload['sender_id'] != null && signalData['sender_id'] == null) {
+              signalData['sender_id'] = payload['sender_id'];
+            }
+            _callSignalController.add(signalData);
+            return;
+          }
+
+          if (eventType == 'user_settings_changed') {
+            final data = payload['data'] ?? payload;
+            if (data is Map) {
+              final map = Map<String, dynamic>.from(data);
+              final uid = map['user_id']?.toString() ?? '';
+              if (uid.isEmpty || uid == _currentUser?.id) {
+                if (_chatUserSettings != null) {
+                  _chatUserSettings = _chatUserSettings!.copyWith(
+                    freezeLastSeen: map['freeze_last_seen'] as bool?,
+                    whoCanSeeLastSeen: map['who_can_see_last_seen']?.toString(),
+                    whoCanSeeOnline: map['who_can_see_online']?.toString(),
+                    readReceiptsEnabled: map['read_receipts_enabled'] as bool?,
+                    whoCanSeeReadReceipts: map['who_can_see_read_receipts']?.toString(),
+                    blueTicksAfterReply: map['blue_ticks_after_reply'] as bool?,
+                    typingIndicatorsEnabled: map['typing_indicators_enabled'] as bool?,
+                  );
+                } else {
+                  _chatUserSettings = ChatUserSettings.fromJson(map);
+                }
+                notifyListeners();
+              }
+            }
+            return;
+          }
+
+          if (eventType == 'user_status_changed') {
+            final data = payload['data'] ?? payload;
+            if (data is Map) {
+              final uid = data['user_id']?.toString() ?? '';
+              final isDeactivated = data['is_deactivated'] == true;
+              if (uid.isEmpty || uid == _currentUser?.id) {
+                if (_chatUserSettings != null) {
+                  _chatUserSettings = _chatUserSettings!.copyWith(isDeactivated: isDeactivated);
+                  notifyListeners();
+                }
+              }
             }
             return;
           }
@@ -803,21 +851,274 @@ class ApiBackendService extends ChangeNotifier {
     }
   }
 
-  /// Sends a real-time WebRTC call signal to a target peer over WebSocket
-  void sendCallSignal(String targetUserId, Map<String, dynamic> signalData) {
+  /// Sends a real-time WebRTC call signal to a target peer over WebSocket and HTTP fallback
+  void sendCallSignal(String targetUserId, Map<String, dynamic> signalData, {String? roomId}) {
+    final payload = {
+      'type': 'call_signal',
+      'target_user_id': targetUserId,
+      if (roomId != null && roomId.isNotEmpty) 'room_id': roomId,
+      'data': signalData,
+    };
+
+    // Channel 1: WebSocket (instant delivery)
     if (_channel != null) {
       try {
-        _channel!.sink.add(jsonEncode({
-          'type': 'call_signal',
-          'target_user_id': targetUserId,
-          'data': signalData,
-        }));
+        _channel!.sink.add(jsonEncode(payload));
       } catch (e) {
-        debugPrint('[ApiBackendService] Error sending call signal: $e');
+        debugPrint('[ApiBackendService] Error sending call signal over WebSocket: $e');
       }
     } else {
-      debugPrint('[ApiBackendService] WebSocket disconnected; cannot send call signal');
+      debugPrint('[ApiBackendService] WebSocket disconnected; relying on HTTP call signal delivery');
     }
+
+    // Channel 2: HTTP Fallback API (Dual-Channel Delivery Fallback)
+    if (_token != null) {
+      final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/call/signal');
+      http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_token',
+        },
+        body: jsonEncode({
+          'target_user_id': targetUserId,
+          if (roomId != null && roomId.isNotEmpty) 'room_id': roomId,
+          'data': signalData,
+        }),
+      ).then((res) {
+        if (res.statusCode == 404) {
+          final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/chat/call/signal');
+          http.post(
+            fallbackUri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $_token',
+            },
+            body: jsonEncode({
+              'target_user_id': targetUserId,
+              if (roomId != null && roomId.isNotEmpty) 'room_id': roomId,
+              'data': signalData,
+            }),
+          ).catchError((_) => http.Response('', 500));
+        }
+      }).catchError((err) {
+        debugPrint('[ApiBackendService] HTTP call signal delivery error: $err');
+      });
+    }
+  }
+
+  /// Polls queued call signals from server (Dual-Channel Fallback)
+  Future<void> pollCallSignals() async {
+    if (_token == null) return;
+    try {
+      final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/call/signals');
+      var response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_token',
+        },
+      );
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/chat/call/signals');
+        response = await http.get(
+          fallbackUri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $_token',
+          },
+        );
+      }
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        final signals = body['data'];
+        if (signals is List && signals.isNotEmpty) {
+          for (final item in signals) {
+            if (item is Map) {
+              final sData = item['data'] is Map ? Map<String, dynamic>.from(item['data']) : <String, dynamic>{};
+              if (item['sender_id'] != null && sData['sender_id'] == null) {
+                sData['sender_id'] = item['sender_id'];
+              }
+              _callSignalController.add(sData);
+            }
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  /// Load user's chat privacy and presence settings from backend
+  Future<ChatUserSettings?> loadChatSettings() async {
+    if (_token == null) return null;
+    try {
+      final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/settings');
+      var response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_token',
+        },
+      );
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/chat/settings');
+        response = await http.get(
+          fallbackUri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $_token',
+          },
+        );
+      }
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        final data = body['data'] ?? body;
+        if (data is Map<String, dynamic>) {
+          _chatUserSettings = ChatUserSettings.fromJson(data);
+          notifyListeners();
+          return _chatUserSettings;
+        } else if (data is Map) {
+          _chatUserSettings = ChatUserSettings.fromJson(Map<String, dynamic>.from(data));
+          notifyListeners();
+          return _chatUserSettings;
+        }
+      }
+    } catch (e) {
+      debugPrint('[ApiBackendService] Error loading chat settings: $e');
+    }
+    return _chatUserSettings;
+  }
+
+  /// Update user's chat privacy and presence settings on backend
+  Future<ChatUserSettings?> updateChatSettings({
+    bool? freezeLastSeen,
+    String? whoCanSeeLastSeen,
+    String? whoCanSeeOnline,
+    bool? readReceiptsEnabled,
+    String? whoCanSeeReadReceipts,
+    bool? blueTicksAfterReply,
+    bool? typingIndicatorsEnabled,
+  }) async {
+    if (_token == null) return null;
+    final payload = <String, dynamic>{
+      if (freezeLastSeen != null) 'freeze_last_seen': freezeLastSeen,
+      if (whoCanSeeLastSeen != null) 'who_can_see_last_seen': whoCanSeeLastSeen.toLowerCase(),
+      if (whoCanSeeOnline != null) 'who_can_see_online': whoCanSeeOnline.toLowerCase(),
+      if (readReceiptsEnabled != null) 'read_receipts_enabled': readReceiptsEnabled,
+      if (whoCanSeeReadReceipts != null) 'who_can_see_read_receipts': whoCanSeeReadReceipts.toLowerCase(),
+      if (blueTicksAfterReply != null) 'blue_ticks_after_reply': blueTicksAfterReply,
+      if (typingIndicatorsEnabled != null) 'typing_indicators_enabled': typingIndicatorsEnabled,
+    };
+
+    try {
+      final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/settings');
+      var response = await http.put(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_token',
+        },
+        body: jsonEncode(payload),
+      );
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/chat/settings');
+        response = await http.put(
+          fallbackUri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $_token',
+          },
+          body: jsonEncode(payload),
+        );
+      }
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        final data = body['data'] ?? body;
+        if (data is Map) {
+          _chatUserSettings = ChatUserSettings.fromJson(Map<String, dynamic>.from(data));
+          notifyListeners();
+          return _chatUserSettings;
+        }
+      }
+    } catch (e) {
+      debugPrint('[ApiBackendService] Error updating chat settings: $e');
+    }
+    return _chatUserSettings;
+  }
+
+  /// Deactivate user's chat account
+  Future<ChatUserSettings?> deactivateChatAccount({String? reason}) async {
+    if (_token == null) return null;
+    try {
+      final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/settings/deactivate');
+      var response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_token',
+        },
+        body: jsonEncode({'reason': reason ?? 'User requested via settings'}),
+      );
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/chat/settings/deactivate');
+        response = await http.post(
+          fallbackUri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $_token',
+          },
+          body: jsonEncode({'reason': reason ?? 'User requested via settings'}),
+        );
+      }
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        final data = body['data'] ?? body;
+        if (data is Map) {
+          _chatUserSettings = ChatUserSettings.fromJson(Map<String, dynamic>.from(data));
+          notifyListeners();
+          return _chatUserSettings;
+        }
+      }
+    } catch (e) {
+      debugPrint('[ApiBackendService] Error deactivating chat account: $e');
+    }
+    return _chatUserSettings;
+  }
+
+  /// Reactivate user's chat account
+  Future<ChatUserSettings?> reactivateChatAccount() async {
+    if (_token == null) return null;
+    try {
+      final uri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/chat/settings/reactivate');
+      var response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_token',
+        },
+      );
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse('${ApiBackendConfig.restApiBaseUrl}/api/v1/chat/settings/reactivate');
+        response = await http.post(
+          fallbackUri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $_token',
+          },
+        );
+      }
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        final data = body['data'] ?? body;
+        if (data is Map) {
+          _chatUserSettings = ChatUserSettings.fromJson(Map<String, dynamic>.from(data));
+          notifyListeners();
+          return _chatUserSettings;
+        }
+      }
+    } catch (e) {
+      debugPrint('[ApiBackendService] Error reactivating chat account: $e');
+    }
+    return _chatUserSettings;
   }
 
   void _startBackgroundSync() {
@@ -836,6 +1137,8 @@ class ApiBackendService extends ChangeNotifier {
       if (_syncTicks % 3 == 0) {
         loadConversations();
       }
+      // Poll call signals every 4 seconds as resilient fallback
+      pollCallSignals();
       // Re-establish WebSocket connection if dropped without reconnect
       if (_channel == null && !_isConnecting) {
         _connectWebSocket();

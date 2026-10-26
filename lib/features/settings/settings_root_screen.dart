@@ -27,6 +27,7 @@ import 'message_management/message_management_page.dart';
 import 'notifications/notification_settings_page.dart';
 import 'permissions/system_permissions_screen.dart';
 import 'privacy/privacy_center_screen.dart';
+import 'privacy/chat_privacy_settings_screen.dart';
 import '../profile/profile_edit_screen.dart';
 import '../../data/services/chaty_share_service.dart';
 import 'security/security_center_screen.dart';
@@ -87,6 +88,7 @@ class SettingsRootScreen extends StatelessWidget {
       '/settings/privacy' => _reactive(
         () => PrivacyCenterScreen(preferencesController: preferencesController),
       ),
+      '/settings/chat_privacy' => const ChatPrivacySettingsScreen(),
       '/settings/security' => _reactive(
         () =>
             SecurityCenterScreen(preferencesController: preferencesController),
@@ -919,7 +921,7 @@ class _SettingsItemTile extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Container(
+            SizedBox(
               width: 44,
               height: 44,
               child: Center(child: icon),

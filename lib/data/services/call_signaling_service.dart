@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -114,6 +115,10 @@ class CallSignalingService extends ChangeNotifier {
           _currentSession!.state == CallSessionState.connected ||
           _currentSession!.state == CallSessionState.reconnecting);
 
+  /// True if a session exists and is not in a terminal state (e.g. initiating, ringing, active)
+  bool get hasActiveSession =>
+      _currentSession != null && !_currentSession!.state.isTerminal;
+
   Future<void> initialize() {
     if (_initialized) return Future<void>.value();
     return _initializeFuture ??= _initialize();
@@ -165,6 +170,17 @@ class CallSignalingService extends ChangeNotifier {
     await _hydrateLatestIncomingCall();
   }
 
+  String _extractSdp(dynamic raw) {
+    if (raw == null) return '';
+    if (raw is String) return raw;
+    if (raw is Map) {
+      final sdpVal = raw['sdp'];
+      if (sdpVal is String) return sdpVal;
+      if (sdpVal is Map && sdpVal['sdp'] is String) return sdpVal['sdp'] as String;
+    }
+    return raw.toString();
+  }
+
   Future<void> _handleApiCallSignal(Map<String, dynamic> signal) async {
     final signalType = signal['signal_type']?.toString();
     final callId = signal['call_id']?.toString() ?? '';
@@ -179,19 +195,23 @@ class CallSignalingService extends ChangeNotifier {
     switch (signalType) {
       case 'offer':
         final active = _currentSession;
-        if (active != null && active.callId != callId && isInActiveCall) {
+        if (active != null && active.callId != callId && !active.state.isTerminal) {
           if (locator.isRegistered<ApiBackendService>()) {
             locator<ApiBackendService>().sendCallSignal(senderId, <String, dynamic>{
               'signal_type': 'busy',
               'call_id': callId,
+              'reason': 'already_in_call',
             });
           }
+          _notifyCallWaiting(signal['caller_name']?.toString() ?? 'Contact');
           return;
         }
 
-        _cachedRemoteOfferSdp = signal['sdp']?.toString();
+        _cachedRemoteOfferSdp = _extractSdp(signal['sdp'] ?? signal['offer']);
         _callDurationSeconds = 0;
-        final isVideo = signal['is_video'] == true || signal['is_video'] == 'true';
+        final isVideo = signal['is_video'] == true ||
+            signal['is_video'] == 'true' ||
+            signal['call_type'] == 'video';
         _currentSession = ChatyCallSession(
           callId: callId,
           remoteUserId: senderId,
@@ -217,7 +237,7 @@ class CallSignalingService extends ChangeNotifier {
 
       case 'answer':
         if (_currentSession?.callId == callId && _currentSession!.isOutgoing) {
-          final answerSdp = signal['sdp']?.toString() ?? '';
+          final answerSdp = _extractSdp(signal['sdp'] ?? signal['answer']);
           if (answerSdp.isNotEmpty &&
               !_remoteDescriptionReady &&
               _peerConnection != null) {
@@ -237,13 +257,26 @@ class CallSignalingService extends ChangeNotifier {
         break;
 
       case 'ice_candidate':
+      case 'candidate':
         if (_currentSession?.callId == callId) {
-          final candidateText = signal['candidate']?.toString();
+          String? candidateText;
+          String? sdpMid;
+          int? sdpMLineIndex;
+
+          final rawCand = signal['candidate'];
+          if (rawCand is Map) {
+            candidateText = rawCand['candidate']?.toString();
+            sdpMid = rawCand['sdpMid']?.toString() ?? signal['sdpMid']?.toString();
+            final lineIdx = rawCand['sdpMLineIndex'] ?? signal['sdpMLineIndex'];
+            sdpMLineIndex = lineIdx is int ? lineIdx : int.tryParse(lineIdx?.toString() ?? '');
+          } else if (rawCand is String) {
+            candidateText = rawCand;
+            sdpMid = signal['sdpMid']?.toString();
+            final lineIdx = signal['sdpMLineIndex'];
+            sdpMLineIndex = lineIdx is int ? lineIdx : int.tryParse(lineIdx?.toString() ?? '');
+          }
+
           if (candidateText != null && candidateText.isNotEmpty) {
-            final sdpMid = signal['sdpMid']?.toString();
-            final sdpMLineIndex = signal['sdpMLineIndex'] is int
-                ? signal['sdpMLineIndex'] as int
-                : int.tryParse(signal['sdpMLineIndex']?.toString() ?? '');
             final candidate = RTCIceCandidate(candidateText, sdpMid, sdpMLineIndex);
             if (!_remoteDescriptionReady || _peerConnection == null) {
               _queuedRemoteCandidates.add(candidate);
@@ -256,6 +289,7 @@ class CallSignalingService extends ChangeNotifier {
 
       case 'busy':
       case 'decline':
+      case 'reject':
         if (_currentSession?.callId == callId) {
           _ringTimeoutTimer?.cancel();
           _connectionTimeoutTimer?.cancel();
@@ -277,6 +311,7 @@ class CallSignalingService extends ChangeNotifier {
         break;
 
       case 'hangup':
+      case 'end':
         if (_currentSession?.callId == callId) {
           _ringTimeoutTimer?.cancel();
           _connectionTimeoutTimer?.cancel();
@@ -301,6 +336,12 @@ class CallSignalingService extends ChangeNotifier {
     }
   }
 
+  void _notifyCallWaiting(String callerName) {
+    try {
+      HapticFeedback.heavyImpact();
+    } catch (_) {}
+  }
+
   /// Starts a real outgoing WebRTC call. Supports ApiBackendService WebSocket signaling
   /// as well as Supabase direct conversations.
   Future<void> initiateCall({
@@ -316,11 +357,8 @@ class CallSignalingService extends ChangeNotifier {
     if (remoteUserId.isEmpty || remoteUserId == myId) {
       throw ArgumentError('A different call participant is required.');
     }
-    if (_currentSession != null &&
-        _currentSession!.state != CallSessionState.ended &&
-        _currentSession!.state != CallSessionState.declined &&
-        _currentSession!.state != CallSessionState.failed) {
-      throw StateError('Another call is already active.');
+    if (_currentSession != null && !_currentSession!.state.isTerminal) {
+      throw StateError('You are already in another call. Please end it before starting a new one.');
     }
 
     await _disposeMediaTransport();
@@ -354,12 +392,13 @@ class CallSignalingService extends ChangeNotifier {
         throw StateError('WebRTC did not produce an SDP offer.');
       }
 
-      // 1. Send via ApiBackendService WebSocket
+      // 1. Send via ApiBackendService WebSocket + HTTP fallback
       if (locator.isRegistered<ApiBackendService>()) {
         final api = locator<ApiBackendService>();
         api.sendCallSignal(remoteUserId, <String, dynamic>{
           'signal_type': 'offer',
           'call_id': callId,
+          'call_type': isVideo ? 'video' : 'voice',
           'caller_id': myId,
           'caller_name': currentUserDisplayName,
           'caller_avatar_initials': currentUserAvatarInitials,
@@ -879,9 +918,13 @@ class CallSignalingService extends ChangeNotifier {
       if (session != null) {
         if (locator.isRegistered<ApiBackendService>()) {
           locator<ApiBackendService>().sendCallSignal(session.remoteUserId, <String, dynamic>{
-            'signal_type': 'ice_candidate',
+            'signal_type': 'candidate',
             'call_id': session.callId,
-            'candidate': candidate.candidate,
+            'candidate': <String, dynamic>{
+              'candidate': candidate.candidate,
+              'sdpMid': candidate.sdpMid,
+              'sdpMLineIndex': candidate.sdpMLineIndex,
+            },
             'sdpMid': candidate.sdpMid,
             'sdpMLineIndex': candidate.sdpMLineIndex,
           });
@@ -1113,7 +1156,13 @@ class CallSignalingService extends ChangeNotifier {
     }
 
     final active = _currentSession;
-    if (active != null && active.callId != callId && isInActiveCall) return;
+    if (active != null && active.callId != callId && !active.state.isTerminal) {
+      if (status == 'ringing' && calleeId == myId) {
+        unawaited(_client.from('call_sessions').update({'status': 'busy'}).eq('id', callId));
+        _notifyCallWaiting(callerId);
+      }
+      return;
+    }
 
     if (status == 'ringing' &&
         calleeId == myId &&

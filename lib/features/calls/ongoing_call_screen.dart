@@ -153,6 +153,13 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
       }
       return;
     }
+    if (session.state == CallSessionState.busy || session.state == CallSessionState.failed) {
+      Future.delayed(const Duration(milliseconds: 2400), () {
+        if (mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+      });
+    }
     if (mounted) setState(() {});
   }
 
@@ -189,7 +196,7 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
       case CallSessionState.reconnecting:
         return 'Reconnecting…';
       case CallSessionState.busy:
-        return 'Busy';
+        return 'User is on another call';
       case CallSessionState.missed:
         return 'Missed';
       case CallSessionState.failed:
@@ -365,7 +372,8 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                   ),
 
                 if (_setupError != null ||
-                    session.state == CallSessionState.failed)
+                    session.state == CallSessionState.failed ||
+                    session.state == CallSessionState.busy)
                   Positioned(
                     left: 20,
                     right: 20,
@@ -373,16 +381,35 @@ class _OngoingCallScreenState extends State<OngoingCallScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: colors.error.withValues(alpha: 0.92),
+                        color: session.state == CallSessionState.busy
+                            ? Colors.amber.shade900.withValues(alpha: 0.95)
+                            : colors.error.withValues(alpha: 0.92),
                         borderRadius: BorderRadius.circular(ChatyRadius.md),
                       ),
-                      child: Text(
-                        _setupError ?? 'The media connection failed.',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            session.state == CallSessionState.busy
+                                ? Icons.phone_paused_rounded
+                                : Icons.error_outline_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              session.state == CallSessionState.busy
+                                  ? 'User is on another call (Busy)'
+                                  : (_setupError ?? 'The media connection failed.'),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
