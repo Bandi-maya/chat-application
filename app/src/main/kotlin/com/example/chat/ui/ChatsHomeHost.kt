@@ -48,6 +48,8 @@ fun ChatsHomeHost(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var rev by remember { mutableIntStateOf(0) }
+    var connectionSheetOpen by remember { androidx.compose.runtime.mutableStateOf(false) }
+    var connectionTesting by remember { androidx.compose.runtime.mutableStateOf(false) }
     DisposableEffect(prefs) {
         val l: () -> Unit = { rev++ }
         prefs.addListener(l)
@@ -194,6 +196,8 @@ fun ChatsHomeHost(
         },
         preferencesController = prefs,
         connectionHealthState = ServiceLocator.connectionHealth.state,
+        // Dart GlobalConnectionBanner/indicator tap: ConnectionDetailSheet.show(context).
+        onOpenConnectionDetail = { connectionSheetOpen = true },
         lockedChatsConfigured = security.lockedConversationIds.isNotEmpty() || security.isAppLockEnabled,
         onRequestVaultAuth = { authorized ->
             scope.launch {
@@ -208,4 +212,24 @@ fun ChatsHomeHost(
             }
         },
     )
+    // Dart ConnectionDetailSheet.show: diagnostics dialog with a Run test action.
+    if (connectionSheetOpen) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { connectionSheetOpen = false }) {
+            com.example.chat.ui.chats.detail.ConnectionDetailSheetContent(
+                state = ServiceLocator.connectionHealth.state,
+                theme = com.example.chat.ui.theme.LocalThemeConfig.current,
+                testing = connectionTesting,
+                onRunTest = {
+                    if (!connectionTesting) {
+                        connectionTesting = true
+                        scope.launch {
+                            try { ServiceLocator.connectionHealth.probeConnection() } catch (_: Exception) {} finally { connectionTesting = false }
+                        }
+                    }
+                },
+                onDismiss = { connectionSheetOpen = false },
+            )
+        }
+    }
+
 }
