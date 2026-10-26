@@ -370,7 +370,7 @@ fun ChatsHomeScreen(
     }
 
     if (showMessageNumber) {
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { showMessageNumber = false },
             title = {
                 Column {
