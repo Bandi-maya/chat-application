@@ -27,7 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
@@ -1273,7 +1273,7 @@ private fun ConversationHeader(
     ) {
         IconButton(onClick = onBack) {
             Icon(
-                Icons.AutoMirrored.Rounded.ArrowBack,
+                Icons.Rounded.ChevronLeft,
                 contentDescription = "Back",
                 tint = Color(theme.primaryTextColor),
             )
@@ -1570,7 +1570,7 @@ private fun SearchHeader(
     ) {
         IconButton(onClick = onBack) {
             Icon(
-                Icons.AutoMirrored.Rounded.ArrowBack,
+                Icons.Rounded.ChevronLeft,
                 contentDescription = "Back",
                 tint = Color(theme.primaryTextColor),
             )
