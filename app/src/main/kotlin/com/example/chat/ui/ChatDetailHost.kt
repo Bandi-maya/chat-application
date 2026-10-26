@@ -90,6 +90,10 @@ fun ChatDetailHost(
     @Suppress("UNUSED_EXPRESSION") rev
 
     fun toast(m: String) = Toast.makeText(context, m, Toast.LENGTH_SHORT).show()
+    // Dart _captureAndSendPhoto (chat_detail_screen.dart:473): composer camera
+    // icon opens the full-screen capture flow in chat mode.
+    var chatCameraOpen by remember { mutableStateOf(false) }
+    val hostView = androidx.compose.ui.platform.LocalView.current
     val me = api.currentUser
     val myId = me?.id ?: ""
     val live = api.conversations.firstOrNull { it.id == conversation.id } ?: conversation
@@ -333,6 +337,7 @@ fun ChatDetailHost(
         onRetryLoad = { loadNonce++ },
         onMediaTap = { m -> viewerMessage = m },
         onViewOnceOpen = { m -> viewerMessage = m },
+        onCameraTap = { chatCameraOpen = true },
         onGalleryTap = { attachments.onMedia("image") },
         onAudioTap = { attachments.onMedia("audio") },
         onContactTap = { attachments.onContact() },
@@ -343,6 +348,32 @@ fun ChatDetailHost(
         onVoiceHoldEnd = voice.onVoiceHoldEnd,
     )
     voice.overlay()
+    if (chatCameraOpen) {
+        androidx.activity.compose.BackHandler { chatCameraOpen = false }
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+            com.example.chat.ui.camera.ChatyCameraCaptureScreen(
+                mode = com.example.chat.ui.camera.ChatyCaptureMode.chat,
+                contactName = live.title,
+                onResult = { r ->
+                    chatCameraOpen = false
+                    scope.launch {
+                        attachments.controller.sendCapturedPhoto(
+                            path = r.path,
+                            caption = r.caption,
+                            effectId = r.effectId,
+                            effectIntensity = r.effectIntensity,
+                            onSent = {
+                                try { rt.trackConversation(conversation.id) } catch (_: Exception) {}
+                                com.example.chat.ui.kit.ChatyHapticsPort.success(hostView)
+                                rev++
+                            },
+                        )
+                    }
+                },
+                onDismiss = { chatCameraOpen = false },
+            )
+        }
+    }
     if (infoRoute != 0) {
         androidx.activity.compose.BackHandler { infoRoute = if (infoRoute == 2) 1 else 0 }
         androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
