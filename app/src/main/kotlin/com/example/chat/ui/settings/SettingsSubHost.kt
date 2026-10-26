@@ -43,6 +43,7 @@ fun SettingsSubHost(
     val prefs = ServiceLocator.preferencesController
     val theme = ServiceLocator.themeController
     val context = LocalContext.current
+    val themeConfig = com.example.chat.ui.theme.LocalThemeConfig.current
     val toast: (String) -> Unit = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
     when (destination) {
         SettingsDestination.Privacy -> PrivacyCenterScreen(preferences = prefs, onBack = onBack)
@@ -52,6 +53,13 @@ fun SettingsSubHost(
         SettingsDestination.Notifications -> com.example.chat.ui.settings.notifications.NotificationSettingsPage(
             preferences = prefs, onBack = onBack,
             bridge = com.example.chat.ui.island.AndroidDynamicIslandBridge(androidx.compose.ui.platform.LocalContext.current),
+            // Dart _previewDynamicIsland fallback: notificationService.triggerEventNotification(chat_bubble_rounded icon).
+            triggerEventNotification = { title, body, accent ->
+                ServiceLocator.notifications.triggerEventNotification(
+                    title = title, body = body,
+                    icon = com.example.chat.data.realtime.EventNotificationIcon.chatBubble, colorArgb = accent,
+                )
+            },
         )
         SettingsDestination.BackupRestore -> BackupAndRestoreScreen(
             preferences = prefs, onBack = onBack, onMessage = toast,
@@ -185,8 +193,12 @@ fun SettingsSubHost(
         SettingsDestination.Permissions -> com.example.chat.ui.settings.permissions.SystemPermissionsScreen(
             onBack = onBack,
             triggerTestNotification = {
+                // Dart _sendTestNotification: title/body verbatim, color = context.colors.primary (accent),
+                // icon notifications_active_rounded (closest EventNotificationIcon is notifications).
                 ServiceLocator.notifications.triggerEventNotification(
-                    title = "Chaty", body = "Test notification",
+                    title = "Chaty test notification", body = "This is a sample notification from Chaty.",
+                    icon = com.example.chat.data.realtime.EventNotificationIcon.notifications,
+                    colorArgb = themeConfig.accentColor,
                 )
             },
             canUseBiometrics = { ServiceLocator.localLockService.canUseBiometrics() },
