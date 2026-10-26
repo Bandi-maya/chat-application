@@ -99,12 +99,12 @@ fun EffectPickerSheet(
         modifier = modifier
             .fillMaxWidth()
             .height(360.dp)
-            .clip(RoundedCornerShape(topStart = SHEET_RADIUS, topEnd = SHEET_RADIUS))
+            .clip(com.example.chat.ui.kit.ChatyModalShape)
             .background(colors.surface)
             .border(
                 width = 1.dp,
                 color = colors.borderSubtle,
-                shape = RoundedCornerShape(topStart = SHEET_RADIUS, topEnd = SHEET_RADIUS),
+                shape = com.example.chat.ui.kit.ChatyModalShape,
             ),
     ) {
         Spacer(Modifier.height(8.dp)) // ChatySpacing.sm
