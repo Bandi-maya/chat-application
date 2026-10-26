@@ -25,12 +25,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -60,6 +62,7 @@ fun HomeSwipeActions(
     leadingActions: List<HomeSwipeAction> = emptyList(),
     actionExtent: Float = 74f,
     backgroundColor: Color,
+    enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -79,7 +82,17 @@ fun HomeSwipeActions(
         }
     }
 
-    BackHandler(enabled = abs(offset.floatValue) > 4f) { settle(0f) }
+    // Selection mode must not keep a stale tray or a pointer-blocking overlay.
+    // Mask its offset synchronously; cancel/reset the animation in this effect.
+    LaunchedEffect(enabled) {
+        if (!enabled) {
+            animation.value?.cancel()
+            offset.floatValue = 0f
+            snap.snapTo(0f)
+        }
+    }
+
+    BackHandler(enabled = enabled && abs(offset.floatValue) > 4f) { settle(0f) }
 
     BoxWithConstraints(modifier.fillMaxWidth().clipToBounds()) {
         // Never let an action tray remove the entire foreground on a narrow
@@ -88,17 +101,20 @@ fun HomeSwipeActions(
         val leadingExtent = homeSwipeExtent(maxWidth.value, leadingActions.size, actionExtent)
         val maxTrailingPx = with(density) { (trailingExtent * actions.size).dp.toPx() }
         val maxLeadingPx = with(density) { (leadingExtent * leadingActions.size).dp.toPx() }
-        val current = offset.floatValue.coerceIn(-maxLeadingPx, maxTrailingPx)
+        val current = if (enabled) offset.floatValue.coerceIn(-maxLeadingPx, maxTrailingPx) else 0f
         val dragState = rememberDraggableState { delta ->
-            animation.value?.cancel()
-            offset.floatValue = (offset.floatValue - delta).coerceIn(-maxLeadingPx, maxTrailingPx)
+            if (enabled) {
+                animation.value?.cancel()
+                offset.floatValue = (offset.floatValue - delta).coerceIn(-maxLeadingPx, maxTrailingPx)
+            }
         }
         Box(Modifier.fillMaxWidth().draggable(
             state = dragState,
             orientation = Orientation.Horizontal,
+            enabled = enabled,
             onDragStarted = { animation.value?.cancel(); offset.floatValue = current },
             onDragStopped = { velocity ->
-                settle(homeSwipeSettleTarget(
+                if (enabled) settle(homeSwipeSettleTarget(
                     offset = offset.floatValue, velocity = -velocity,
                     leading = maxLeadingPx, trailing = maxTrailingPx,
                     flingThreshold = with(density) { 420.dp.toPx() },
@@ -114,6 +130,7 @@ fun HomeSwipeActions(
                     (if (leading) leadingActions else actions).forEach { action ->
                         SwipeActionCell(
                             action = action,
+                            backgroundColor = backgroundColor,
                             extentDp = if (leading) leadingExtent else trailingExtent,
                             maxDragPx = if (leading) maxLeadingPx else maxTrailingPx,
                             dragOffset = current,
@@ -138,12 +155,19 @@ fun HomeSwipeActions(
 @Composable
 private fun SwipeActionCell(
     action: HomeSwipeAction,
+    backgroundColor: Color,
     extentDp: Float,
     maxDragPx: Float,
     dragOffset: Float,
     revealed: Boolean,
     onTrigger: () -> Unit,
 ) {
+    // Resolve translucent action colors against the row backdrop before
+    // choosing the foreground. Keep the stored action/background colors intact.
+    val effectiveBackground = action.color.compositeOver(backgroundColor)
+    val foreground = if (homeSwipeUsesDarkForeground(
+        effectiveBackground.red, effectiveBackground.green, effectiveBackground.blue,
+    )) Color.Black else Color.White
     val showLabel = maxDragPx > 0 && abs(dragOffset) > maxDragPx * 0.72f
     Column(
         modifier = Modifier
@@ -155,14 +179,14 @@ private fun SwipeActionCell(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
     ) {
-        Icon(action.icon, contentDescription = action.label, tint = Color.White, modifier = Modifier.width(21.dp).height(21.dp))
+        Icon(action.icon, contentDescription = action.label, tint = foreground, modifier = Modifier.width(21.dp).height(21.dp))
         if (showLabel) {
             Spacer(Modifier.height(4.dp))
             Text(
                 action.label,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                color = Color.White,
+                color = foreground,
                 fontSize = 10.5.sp,
                 fontWeight = FontWeight.W600,
             )
