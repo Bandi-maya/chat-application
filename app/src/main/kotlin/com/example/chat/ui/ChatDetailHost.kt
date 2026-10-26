@@ -555,7 +555,7 @@ fun ChatDetailHost(
 
     if (gateOpen) {
         val st = connection ?: ContactConnectionStatus()
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { gateOpen = false },
             title = { Text(if (st.callsAllowed) "Calls are unlocked" else "Contact acceptance required") },
             text = {
@@ -580,7 +580,7 @@ fun ChatDetailHost(
     }
     if (blockConfirm) {
         val name = other?.displayName ?: live.title
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { blockConfirm = false },
             title = { Text("Block contact?") },
             text = { Text("$name will no longer be able to send you messages or call you.") },
@@ -623,7 +623,7 @@ fun ChatDetailHost(
             ModalBottomSheet(
                 onDismissRequest = { forwardMessage = null },
                 containerColor = Color(theme.surfaceColor),
-                shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
+                shape = com.example.chat.ui.kit.ChatyModalShape,
             ) {
                 Column(
                     Modifier
