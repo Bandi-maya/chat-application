@@ -104,6 +104,8 @@ import com.example.chat.domain.models.MessageAttachment
 import com.example.chat.domain.models.QuickReplyTemplate
 import com.example.chat.domain.models.TaskStatus
 import com.example.chat.ui.chats.detail.AttachmentAction
+import com.example.chat.ui.chats.detail.QuickContactEntry
+import com.example.chat.ui.chats.detail.QuickContactSidebar
 import com.example.chat.ui.chats.detail.AttachmentSheetContent
 import com.example.chat.ui.chats.detail.BubbleColorOverrides
 import com.example.chat.ui.chats.detail.ChatCommandParser
