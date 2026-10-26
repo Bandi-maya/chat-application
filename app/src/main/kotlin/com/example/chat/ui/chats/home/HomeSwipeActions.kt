@@ -9,13 +9,17 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.absoluteOffset
+import androidx.compose.ui.draw.clipToBounds
+import androidx.activity.compose.BackHandler
+import kotlinx.coroutines.Job
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
@@ -24,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -45,12 +50,9 @@ data class HomeSwipeAction(
     val onTriggered: () -> Unit,
 )
 
-/** Port of chaty_kit.dart ChatySwipeActions: the row slides away to reveal
- *  actions; swipe left reveals [actions] on the right, swipe right reveals
- *  [leadingActions] on the left. Settles open past half the max extent (or
- *  on a 420dp/s fling past 12dp), snaps with 220ms easeOutCubic, labels fade
- *  in once |offset| exceeds 72% of the max drag, and the row stops taking
- *  taps while |offset| > 4. */
+/** Chat-row-sized reveal. The foreground alone measures height; the action
+ * layer matches it without claiming the LazyColumn's unbounded height.
+ * Physical left/right gestures work independently of text layout direction. */
 @Composable
 fun HomeSwipeActions(
     actions: List<HomeSwipeAction>,
@@ -62,17 +64,14 @@ fun HomeSwipeActions(
 ) {
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
-    val maxTrailingPx = with(density) { (actionExtent * actions.size).dp.toPx() }
-    val maxLeadingPx = with(density) { (actionExtent * leadingActions.size).dp.toPx() }
-    // Dart _dragOffset: positive reveals trailing actions (right side),
-    // negative reveals leading actions (left side).
     val offset = remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    val animation = remember { androidx.compose.runtime.mutableStateOf<Job?>(null) }
     val snap = remember { Animatable(0f) }
     val easeOutCubic = CubicBezierEasing(0.33f, 1f, 0.68f, 1f)
 
     fun settle(target: Float) {
-        scope.launch {
-            snap.stop()
+        animation.value?.cancel()
+        animation.value = scope.launch {
             snap.snapTo(offset.floatValue)
             snap.animateTo(target, tween(durationMillis = 220, easing = easeOutCubic)) {
                 offset.floatValue = value
@@ -80,81 +79,57 @@ fun HomeSwipeActions(
         }
     }
 
-    fun trigger(action: HomeSwipeAction) {
-        action.onTriggered()
-        settle(0f)
-    }
+    BackHandler(enabled = abs(offset.floatValue) > 4f) { settle(0f) }
 
-    val dragScope = rememberCoroutineScope()
-    val dragState = rememberDraggableState { delta ->
-        dragScope.launch { snap.stop() }
-        offset.floatValue = (offset.floatValue - delta).coerceIn(-maxLeadingPx, maxTrailingPx)
-    }
-
-    Box(
-        modifier = modifier.draggable(
+    BoxWithConstraints(modifier.fillMaxWidth().clipToBounds()) {
+        // Never let an action tray remove the entire foreground on a narrow
+        // window. Size cells together so the last action remains reachable.
+        val trailingExtent = homeSwipeExtent(maxWidth.value, actions.size, actionExtent)
+        val leadingExtent = homeSwipeExtent(maxWidth.value, leadingActions.size, actionExtent)
+        val maxTrailingPx = with(density) { (trailingExtent * actions.size).dp.toPx() }
+        val maxLeadingPx = with(density) { (leadingExtent * leadingActions.size).dp.toPx() }
+        val current = offset.floatValue.coerceIn(-maxLeadingPx, maxTrailingPx)
+        val dragState = rememberDraggableState { delta ->
+            animation.value?.cancel()
+            offset.floatValue = (offset.floatValue - delta).coerceIn(-maxLeadingPx, maxTrailingPx)
+        }
+        Box(Modifier.fillMaxWidth().draggable(
             state = dragState,
             orientation = Orientation.Horizontal,
+            onDragStarted = { animation.value?.cancel(); offset.floatValue = current },
             onDragStopped = { velocity ->
-                val v = -velocity
-                val current = offset.floatValue
-                if (current < 0) {
-                    val openLeading = maxLeadingPx > 0 &&
-                        (abs(current) > maxLeadingPx / 2 || (v < -420 && abs(current) > 12))
-                    settle(if (openLeading) -maxLeadingPx else 0f)
-                } else {
-                    val openTrailing = maxTrailingPx > 0 &&
-                        (current > maxTrailingPx / 2 || (v > 420 && current > 12))
-                    settle(if (openTrailing) maxTrailingPx else 0f)
-                }
+                settle(homeSwipeSettleTarget(
+                    offset = offset.floatValue, velocity = -velocity,
+                    leading = maxLeadingPx, trailing = maxTrailingPx,
+                    flingThreshold = with(density) { 420.dp.toPx() },
+                    minimumFlingDistance = with(density) { 12.dp.toPx() },
+                ))
             },
-        ),
-    ) {
-        // Action layer under the row, on the side the swipe direction opens.
-        Row(Modifier.fillMaxSize()) {
-            if (offset.floatValue < 0) {
-                leadingActions.forEach { action ->
-                    SwipeActionCell(
-                        action = action,
-                        extentDp = actionExtent,
-                        maxDragPx = maxLeadingPx,
-                        dragOffset = offset.floatValue,
-                        revealed = offset.floatValue < -6,
-                        onTrigger = { trigger(action) },
-                    )
-                }
-                Spacer(Modifier.weight(1f))
-            } else {
-                Spacer(Modifier.weight(1f))
-                actions.forEach { action ->
-                    SwipeActionCell(
-                        action = action,
-                        extentDp = actionExtent,
-                        maxDragPx = maxTrailingPx,
-                        dragOffset = offset.floatValue,
-                        revealed = offset.floatValue > 6,
-                        onTrigger = { trigger(action) },
-                    )
+        )) {
+            // matchParentSize is deliberate: unlike fillMaxSize this child
+            // cannot determine the item height before the chat row is measured.
+            if (abs(current) > 0.5f) Box(Modifier.matchParentSize()) {
+                val leading = current < 0f
+                Row(Modifier.fillMaxHeight().align(if (leading) AbsoluteAlignment.CenterLeft else AbsoluteAlignment.CenterRight)) {
+                    (if (leading) leadingActions else actions).forEach { action ->
+                        SwipeActionCell(
+                            action = action,
+                            extentDp = if (leading) leadingExtent else trailingExtent,
+                            maxDragPx = if (leading) maxLeadingPx else maxTrailingPx,
+                            dragOffset = current,
+                            revealed = abs(current) > 6f,
+                            onTrigger = { settle(0f); action.onTriggered() },
+                        )
+                    }
                 }
             }
-        }
-        // The row itself slides away. An opaque backdrop prevents the action
-        // layer bleeding through on transparent rows.
-        Box(
-            modifier = Modifier
-                .offset { IntOffset((-offset.floatValue).roundToInt(), 0) }
-                .background(backgroundColor),
-        ) {
-            if (abs(offset.floatValue) > 4) {
-                // AbsorbPointer equivalent: an invisible overlay eats touches.
-                Box { content() }
-                Box(
-                    Modifier
-                        .matchParentSize()
-                        .clickable(enabled = true, onClick = {}),
-                )
-            } else {
+            Box(Modifier.fillMaxWidth()
+                .absoluteOffset { IntOffset((-current).roundToInt(), 0) }
+                .background(backgroundColor)) {
+                // Keep the content at the same composition position throughout
+                // a drag (avatars, remembered state, selection, custom styles).
                 content()
+                if (abs(current) > 4f) Box(Modifier.matchParentSize().clickable { settle(0f) })
             }
         }
     }
