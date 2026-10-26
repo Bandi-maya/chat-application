@@ -240,7 +240,7 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
         }
     }
     viewOnceAsk?.let { (t, d) ->
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { viewOnceAsk = null; d.complete(false) },
             title = { Text("Send ${if (t == "video") "video" else "photo"}") },
             text = { Text("Choose how it should be delivered.") },
