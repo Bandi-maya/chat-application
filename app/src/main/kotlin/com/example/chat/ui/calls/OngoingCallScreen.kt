@@ -4,6 +4,10 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +30,7 @@ import androidx.compose.material.icons.rounded.Cameraswitch
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.FullscreenExit
 import androidx.compose.material.icons.rounded.Hearing
+import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.MicOff
 import androidx.compose.material.icons.rounded.PictureInPicture
@@ -48,6 +53,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
@@ -103,6 +112,7 @@ fun OngoingCallScreen(
     onToggleAudioRoute: (AudioRouteType) -> Unit,
     onEnterNativePip: () -> Unit,
     effectProvider: CallEffectProvider? = null,
+    autoHideControls: Boolean = true,
 ) {
     val theme = LocalThemeConfig.current
     var controlsVisible by remember { mutableStateOf(true) }
@@ -118,8 +128,8 @@ fun OngoingCallScreen(
     }
 
     // Dart _startAutoHideTimer: controls hide after 5s unless focus mode.
-    LaunchedEffect(controlsVisible, focusMode) {
-        if (controlsVisible && !focusMode) {
+    LaunchedEffect(controlsVisible, focusMode, autoHideControls) {
+        if (autoHideControls && controlsVisible && !focusMode) {
             delay(5000)
             controlsVisible = false
         }
@@ -127,7 +137,7 @@ fun OngoingCallScreen(
 
     if (session == null) {
         LaunchedEffect(Unit) { onSessionGone() }
-        Scaffold(containerColor = Color.Black) { padding ->
+        Scaffold(modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing), contentWindowInsets = WindowInsets(0, 0, 0, 0), containerColor = Color.Black) { padding ->
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.fillMaxSize().padding(padding).padding(28.dp),
@@ -160,7 +170,7 @@ fun OngoingCallScreen(
     }
 
     val isActive = session.isActive
-    Scaffold(containerColor = Color.Black) { padding ->
+    Scaffold(modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing), contentWindowInsets = WindowInsets(0, 0, 0, 0), containerColor = Color.Black) { padding ->
         Box(
             Modifier
                 .fillMaxSize()
@@ -311,109 +321,67 @@ fun OngoingCallScreen(
 
             // Bottom control bar.
             val bottomOffset by animateDpAsState(if (controlsVisible) 0.dp else 150.dp, label = "bottomPanel")
-            Row(
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
+            BoxWithConstraints(
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                     .offset(y = bottomOffset)
                     .then(bottomPanelDecoration(template))
                     .then(bottomPanelPadding(template)),
             ) {
-                CallControlButton(
-                    label = if (session.isMuted) "Unmute" else "Mute",
-                    active = session.isMuted,
-                    activeColor = Color(theme.dangerColor),
-                    enabled = hasLocalMedia || session.isDemo,
-                    onClick = onToggleMute,
-                ) { tint ->
-                    Icon(
+                var showMore by remember { mutableStateOf(false) }
+                val actions = buildList {
+                    add(CallControlAction(if (session.isMuted) "Unmute" else "Mute",
                         if (session.isMuted) Icons.Rounded.MicOff else Icons.Rounded.Mic,
-                        contentDescription = null,
-                        tint = tint,
-                        modifier = Modifier.size(23.dp),
-                    )
-                }
-                if (session.isVideo) {
-                    CallControlButton(
-                        label = if (session.isCameraOff) "Camera on" else "Camera off",
-                        active = session.isCameraOff,
-                        activeColor = Color(theme.dangerColor),
-                        enabled = hasLocalMedia || session.isDemo,
-                        onClick = onToggleCamera,
-                    ) { tint ->
-                        Icon(
+                        session.isMuted, hasLocalMedia || session.isDemo, onToggleMute))
+                    if (session.isVideo) {
+                        add(CallControlAction(if (session.isCameraOff) "Camera on" else "Camera off",
                             if (session.isCameraOff) Icons.Rounded.VideocamOff else Icons.Rounded.Videocam,
-                            contentDescription = null,
-                            tint = tint,
-                            modifier = Modifier.size(23.dp),
-                        )
-                    }
-                    CallControlButton(
-                        label = "Switch camera",
-                        active = false,
-                        activeColor = Color(theme.accentColor),
-                        enabled = hasLocalMedia && !session.isCameraOff && !session.isSharingScreen,
-                        onClick = onSwitchCamera,
-                    ) { tint ->
-                        Icon(
-                            Icons.Rounded.Cameraswitch,
-                            contentDescription = null,
-                            tint = tint,
-                            modifier = Modifier.size(23.dp),
-                        )
-                    }
-                    CallControlButton(
-                        label = if (session.isSharingScreen) "Stop sharing" else "Share screen",
-                        active = session.isSharingScreen,
-                        activeColor = Color(0xFF38BDF8),
-                        enabled = hasLocalMedia,
-                        onClick = onToggleScreenShare,
-                    ) { tint ->
-                        Icon(
+                            session.isCameraOff, hasLocalMedia || session.isDemo, onToggleCamera))
+                        add(CallControlAction("Switch camera", Icons.Rounded.Cameraswitch, false,
+                            hasLocalMedia && !session.isCameraOff && !session.isSharingScreen, onSwitchCamera))
+                        add(CallControlAction(if (session.isSharingScreen) "Stop sharing" else "Share screen",
                             if (session.isSharingScreen) Icons.Rounded.StopScreenShare else Icons.Rounded.ScreenShare,
-                            contentDescription = null,
-                            tint = tint,
-                            modifier = Modifier.size(23.dp),
-                        )
+                            session.isSharingScreen, hasLocalMedia, onToggleScreenShare))
+                    }
+                    add(CallControlAction(if (session.audioRoute == AudioRouteType.speaker) "Earpiece" else "Speaker",
+                        if (session.audioRoute == AudioRouteType.speaker) Icons.Rounded.VolumeUp else Icons.Rounded.Hearing,
+                        session.audioRoute == AudioRouteType.speaker, hasLocalMedia || session.isDemo) {
+                        onToggleAudioRoute(if (session.audioRoute == AudioRouteType.speaker) AudioRouteType.earpiece else AudioRouteType.speaker)
+                    })
+                }
+                val compact = maxWidth < 116.dp
+                val shownCount = if (compact) 0 else visibleCallActionCount(maxWidth.value.toInt(), actions.size)
+                val controls: @Composable () -> Unit = {
+                    actions.take(shownCount).forEach { action ->
+                        CallControlButton(action.label, action.active, Color(theme.accentColor), action.enabled, action.onClick) { tint ->
+                            Icon(action.icon, null, tint = tint, modifier = Modifier.size(23.dp))
+                        }
+                    }
+                    if (shownCount < actions.size) {
+                        Box {
+                            CallControlButton("More call controls", false, Color(theme.accentColor), true, { showMore = !showMore }) { tint ->
+                                Icon(Icons.Rounded.MoreHoriz, null, tint = tint)
+                            }
+                            com.example.chat.ui.kit.ChatyDropdownMenu(showMore, { showMore = false }) {
+                                actions.drop(shownCount).forEach { action ->
+                                    com.example.chat.ui.kit.ChatyDropdownMenuItem(
+                                        text = { Text(action.label) }, enabled = action.enabled,
+                                        leadingIcon = { Icon(action.icon, null) },
+                                        onClick = { showMore = false; action.onClick() },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(54.dp)
+                        .clip(RoundedCornerShape(10.dp)).background(Color(theme.dangerColor))
+                        .semantics { contentDescription = "End call" }.clickable { onEndCall() }) {
+                        Icon(Icons.Rounded.CallEnd, null, tint = Color.White, modifier = Modifier.size(28.dp))
                     }
                 }
-                CallControlButton(
-                    label = if (session.audioRoute == AudioRouteType.speaker) "Earpiece" else "Speaker",
-                    active = session.audioRoute == AudioRouteType.speaker,
-                    activeColor = Color(theme.accentColor),
-                    enabled = hasLocalMedia || session.isDemo,
-                    onClick = {
-                        onToggleAudioRoute(
-                            if (session.audioRoute == AudioRouteType.speaker) {
-                                AudioRouteType.earpiece
-                            } else {
-                                AudioRouteType.speaker
-                            },
-                        )
-                    },
-                ) { tint ->
-                    Icon(
-                        if (session.audioRoute == AudioRouteType.speaker) Icons.Rounded.VolumeUp else Icons.Rounded.Hearing,
-                        contentDescription = null,
-                        tint = tint,
-                        modifier = Modifier.size(23.dp),
-                    )
-                }
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(58.dp)
-                        .background(Color(theme.dangerColor), CircleShape)
-                        .clickable { onEndCall() },
-                ) {
-                    Icon(
-                        Icons.Rounded.CallEnd,
-                        contentDescription = "End call",
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp),
-                    )
-                }
+                if (compact) Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) { controls() }
+                else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically) { controls() }
             }
         }
     }
@@ -457,9 +425,11 @@ private fun CallControlButton(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .size(54.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .semantics { contentDescription = label }
             .background(
-                if (active) activeColor.copy(alpha = 0.28f) else Color(0x29FFFFFF),
-                RoundedCornerShape(16.dp),
+                if (active) activeColor.copy(alpha = 0.28f) else Color(0xB32C3038),
+                RoundedCornerShape(10.dp),
             )
             .clickable(enabled = enabled) { onClick() },
     ) {
@@ -549,14 +519,14 @@ private fun VoiceCallBackdrop(session: ChatyCallSession, callDurationSeconds: In
             Spacer(Modifier.height(16.dp))
             Text(
                 session.remoteDisplayName,
-                color = Color.White,
+                color = Color(theme.primaryTextColor),
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.height(4.dp))
             Text(
                 statusLabel(session, callDurationSeconds),
-                color = Color(0xB8FFFFFF),
+                color = Color(theme.secondaryTextColor),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
             )
@@ -590,11 +560,11 @@ private fun bottomPanelDecoration(template: CallScreenTemplate): Modifier =
     when (template) {
         CallScreenTemplate.sheet -> Modifier.background(
             Color(0xF2141414),
-            RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp),
         )
         CallScreenTemplate.card -> Modifier
             .padding(start = 20.dp, end = 20.dp, bottom = 12.dp)
-            .background(Color(0x99000000), RoundedCornerShape(24.dp))
+            .background(Color(0x99000000), RoundedCornerShape(10.dp))
         CallScreenTemplate.edge -> Modifier
         CallScreenTemplate.chatyClassic -> Modifier.background(
             androidx.compose.ui.graphics.Brush.verticalGradient(
@@ -610,3 +580,11 @@ private fun bottomPanelPadding(template: CallScreenTemplate): Modifier =
         CallScreenTemplate.edge -> Modifier.padding(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 8.dp)
         CallScreenTemplate.chatyClassic -> Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp)
     }
+
+private data class CallControlAction(
+    val label: String,
+    val icon: ImageVector,
+    val active: Boolean,
+    val enabled: Boolean,
+    val onClick: () -> Unit,
+)
