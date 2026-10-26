@@ -250,6 +250,7 @@ fun ChatDetailScreen(
     translationLanguage: String = "Show All",
     onMediaTap: (ChatMessage) -> Unit = {},
     onMediaTapWithBounds: ((ChatMessage, Rect) -> Unit)? = null,
+    attachmentBinding: com.example.chat.ui.chats.detail.AttachmentConsumerBinding? = null,
     onVoicePlay: (MessageAttachment) -> Unit = {},
     voiceUrlResolver: (suspend (String) -> String)? = null,
     onViewOnceOpen: (ChatMessage) -> Unit = {},
@@ -771,6 +772,7 @@ fun ChatDetailScreen(
                             voicePlayingBarColor = convPrefs.voiceNotePlayingBarColor?.let(::Color),
                             voicePlaybackSpeed = convPrefs.voicePlaybackSpeed,
                             voiceUrlResolver = voiceUrlResolver,
+                            attachmentBinding = attachmentBinding,
                             isSelected = selectedIds.contains(message.id) ||
                                 contextMenuMessage?.id == message.id ||
                                 highlightedMessageId == message.id,
