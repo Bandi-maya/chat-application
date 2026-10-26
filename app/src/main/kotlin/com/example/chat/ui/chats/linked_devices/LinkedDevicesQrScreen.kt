@@ -22,7 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.DevicesOther
@@ -158,7 +158,7 @@ fun LinkedDevicesQrScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = colors.foreground)
+                        Icon(Icons.Rounded.ChevronLeft, contentDescription = "Back", tint = colors.foreground)
                     }
                     Text(title, color = colors.foreground, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 }
