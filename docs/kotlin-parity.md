@@ -56,4 +56,9 @@ The user explicitly approved removal now in a direct reply after being told the 
 
 The cleanup net diff was checked against the explicit manifest. Native app/, mls-native/, shared Rust engine, backend/schema, assets and native ci/ trees were unchanged by deletion; api/main were unchanged. The shared Rust crate at third_party/openmls_android/rust is used by mls-native and currently requires FRB annotations/generated code. It and its licenses/notices are intentionally retained. This does not mean a Flutter application is still required to build :app. Preference compatibility identifiers and historical source references are also retained.
 
-Post-cleanup native build/unit/runtime verification is pending at this documentation checkpoint. The earlier 786/20 test results above apply to the pre-cleanup tested code head; deletion is not automatically verified by those results. No environment secrets, backend, encryption logic, application ID, signing certificate or installed app data were changed.
+Post-cleanup verification passed at code head `4d5bb180c4d952ed1b6ecae6d3b52ef4ecaaae6c`, run 40304449978: native MLS/UniFFI generation, exactly 786 unit tests in 74 suites (zero failures/errors/skips), APK assembly, 20 instrumented tests (zero failures/skips), and two saved-synthetic-session cold starts (PIDs 2694 -> 2799, zero fatal errors, restart rc=0). Fresh actual pixels were inspected: configured/restarted Home dock and FAB sit above system navigation, seeded ChatDetailHost renders messages/composer, and Contact Info shows back/title and unaccepted/auth-error state.
+
+- Post-cleanup build: https://github.com/Bandi-maya/chat-application/actions/runs/40304449978/job/121509983384
+- Post-cleanup runtime/pixels: https://github.com/Bandi-maya/chat-application/actions/runs/40304449978/job/121515226361
+
+The root README follow-up and this evidence update are documentation-only. The cleanup outcome is complete; configured live-backend/device/design validation remains separate and is not established by the synthetic tests. No environment secrets, backend, encryption logic, application ID, signing certificate or installed app data were changed.
