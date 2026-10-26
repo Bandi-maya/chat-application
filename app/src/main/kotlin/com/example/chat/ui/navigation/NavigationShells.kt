@@ -84,14 +84,14 @@ internal fun TopWhatsAppShell(
                 .fillMaxWidth()
                 .height(template.height.coerceIn(48.0, 88.0).dp)
                 .background(colors.primary)
-                .horizontalScroll(rememberScrollState(), enabled = navItemIds.size > 4),
+                ,
         ) {
             navItemIds.forEachIndexed { index, id ->
                 val selected = index == selectedIndex
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
-                        .then(if (navItemIds.size > 4) Modifier.width(96.dp) else Modifier.weight(1f))
+                        .weight(1f)
                         .fillMaxHeight()
                         .clickable { onSelect(index) },
                 ) {
