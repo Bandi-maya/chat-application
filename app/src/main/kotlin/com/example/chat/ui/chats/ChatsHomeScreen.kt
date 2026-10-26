@@ -324,7 +324,7 @@ fun ChatsHomeScreen(
             onDismissRequest = { showArchived = false },
             properties = androidx.compose.ui.window.DialogProperties(
                 usePlatformDefaultWidth = false,
-                decorFitsSystemWindows = false,
+                decorFitsSystemWindows = true,
             ),
         ) {
             androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
