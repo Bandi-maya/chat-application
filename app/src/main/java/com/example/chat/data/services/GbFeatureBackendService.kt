@@ -262,6 +262,13 @@ class GbFeatureBackendService(
         return raw.toString()
     }
 
+    /** Dart _PollViewerSheet._load(): Supabase rpc get_poll(p_message_id); a
+     *  non-map payload yields null (caller raises 'Poll data is unavailable.'). */
+    suspend fun getPoll(messageId: String): Map<String, Any?>? {
+        val raw = rpcClient!!.rpc("get_poll", mapOf("p_message_id" to messageId))
+        return (raw as? Map<*, *>)?.entries?.associate { it.key.toString() to it.value }
+    }
+
     suspend fun votePoll(messageId: String, optionId: String) {
         rpcClient!!.rpc(
             "vote_poll",
