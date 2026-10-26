@@ -19,7 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CallEnd
 import androidx.compose.material.icons.rounded.Cameraswitch
@@ -253,7 +253,7 @@ fun OngoingCallScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onBack) {
                         Icon(
-                            Icons.Rounded.ArrowBack,
+                            Icons.Rounded.ChevronLeft,
                             contentDescription = "Back",
                             tint = Color.White,
                         )
