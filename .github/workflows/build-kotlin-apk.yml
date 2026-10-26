@@ -66,17 +66,6 @@ jobs:
           gradle :app:generateUniffiBindings --no-daemon
           echo '--- generated tree ---'
           find app/build/generated/uniffi -type f | head -20
-      - name: Unit tests (behavior parity)
-        run: gradle :app:testDebugUnitTest --no-daemon
-      - name: Report unit test totals
-        if: always()
-        run: |
-          python3 - <<'PYTEST'
-          import glob, xml.etree.ElementTree as ET
-          roots = [ET.parse(p).getroot() for p in glob.glob('app/build/test-results/testDebugUnitTest/TEST-*.xml')]
-          totals = {k: sum(int(r.get(k, 0)) for r in roots) for k in ('tests', 'failures', 'errors', 'skipped')}
-          print('UNIT-TEST-TOTALS', totals, 'suites', len(roots))
-          PYTEST
       - name: Build debug APK (compile verification)
         run: gradle :app:assembleDebug --no-daemon
       - name: APK info
@@ -108,6 +97,25 @@ jobs:
           name: chaty-kotlin-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Unit tests (behavior parity)
+        run: gradle :app:testDebugUnitTest --no-daemon
+      - name: Report unit test totals
+        if: always()
+        run: |
+          python3 - <<'PYTEST'
+          import glob, xml.etree.ElementTree as ET
+          roots = [ET.parse(p).getroot() for p in glob.glob('app/build/test-results/testDebugUnitTest/TEST-*.xml')]
+          totals = {k: sum(int(r.get(k, 0)) for r in roots) for k in ('tests', 'failures', 'errors', 'skipped')}
+          print('UNIT-TEST-TOTALS', totals, 'suites', len(roots))
+          PYTEST
+      - name: Preserve unit test failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cumulative-unit-test-results
+          path: app/build/test-results/testDebugUnitTest/
+          if-no-files-found: warn
 
   # Runtime verification tier: boots the real app on an emulator and executes
   # the OpenMLS native engine over JNI (two-party protocol roundtrip, not app
