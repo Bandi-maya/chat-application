@@ -54,6 +54,79 @@ class MediaInteractionProofTest {
         device.findObject(By.desc(text)).click()
     }
 
+    @Test fun providedVideoModelWaitsForPlayableUriWithoutCrashing() {
+        // Regression: providedModel bypassed the spinner, then video used signedUrl!!
+        // on the first composition before its resolver effect ran.
+        val placeholder = File(inst.targetContext.cacheDir, "synthetic-pending-video.mp4").apply { writeBytes(byteArrayOf(0)) }
+        try {
+            ActivityScenario.launch(MediaFixtureActivity::class.java).use { scenario ->
+                scenario.onActivity { it.setContent {
+                    MaterialTheme {
+                        MediaViewerScreen(ThemePresets.whatsappIosLight, "Pending synthetic video", "video", "1 B",
+                            storagePath = placeholder.toURI().toString(), providedModel = placeholder,
+                            ownedActions = true,
+                            createSignedUrl = { path, _ -> kotlinx.coroutines.delay(60_000); path },
+                            deliverPlayback = { false },
+                        )
+                    }
+                } }
+                waitText("Pending synthetic video")
+                capture("28-owned-video-pending-uri")
+                assertFalse("Cannot play while URI is unresolved", device.hasObject(By.desc("Play")))
+            }
+        } finally { placeholder.delete() }
+    }
+
+    @Test fun boundLeasedVideoPreparesAndStaleEpochDeniesActualPlayback() {
+        val context = inst.targetContext
+        val unique = java.util.UUID.randomUUID().toString()
+        val audio = File(context.cacheDir, "synthetic-bound-$unique.m4a")
+        val video = File(context.cacheDir, "synthetic-bound-$unique.mp4")
+        val identity = com.example.chat.data.local.SessionEpoch.Identity("synthetic-ui", unique, 1L)
+        val store = com.example.chat.data.local.AttachmentFileCache(context, { identity }, { 8L * 1024 * 1024 }, 4L * 1024 * 1024)
+        val ref = com.example.chat.data.local.AttachmentRef("synthetic-room", "synthetic-message", "synthetic-attachment")
+        val guardOpen = java.util.concurrent.atomic.AtomicBoolean(true)
+        val denied = java.util.concurrent.atomic.AtomicInteger(0)
+        try {
+            val native = MediaFollowOnProofTest()
+            native.createSilentAac(audio)
+            native.createAvcWithAudio(video, audio)
+            val stamp = store.session()!!
+            video.inputStream().use {
+                assertEquals(com.example.chat.data.local.StorePut.Stored, store.put(ref, it, false, false, stamp))
+            }
+            val resolver = com.example.chat.data.media.AttachmentSourceResolver(store, { false },
+                { candidate -> if (candidate == ref) com.example.chat.data.media.TrustedAttachment("video", false, false) else null },
+                { error("Synthetic offline bound fixture must not download") })
+            val binding = AttachmentConsumerBinding(stamp, resolver, { store.session() },
+                deliverIfCurrent = { action ->
+                    if (guardOpen.get() && store.isEpochCurrent(stamp)) { action(); true }
+                    else { denied.incrementAndGet(); false }
+                }, authorizedUrl = { error("No signed URL in offline leased fixture") })
+            val message = ChatMessage(ref.messageId, ref.conversationId, "synthetic-peer", MessageType.video, "",
+                createdAt = Instant.EPOCH,
+                attachment = MessageAttachment(ref.attachmentId, "video", "Bound synthetic video", "local", "private-object"))
+            ActivityScenario.launch(MediaFixtureActivity::class.java).use { scenario ->
+                scenario.onActivity { it.setContent { MaterialTheme {
+                    BoundAttachmentViewer(ThemePresets.whatsappIosLight, message, binding, false, null, {})
+                } } }
+                waitText("Bound synthetic video")
+                assertTrue("Native leased video prepared", device.wait(Until.hasObject(By.desc("Play")), 15000))
+                capture("29-bound-leased-video-ready")
+                // Install a new cache epoch without dismissing composition, exercising the final start barrier.
+                store.clearCurrentAccount()
+                guardOpen.set(false)
+                device.findObjects(By.desc("Play")).first().click()
+                waitText("Attachment session changed. Reopen it from the chat.")
+                assertTrue("Stale playback crossed and was denied by final barrier", denied.get() > 0)
+                capture("30-bound-video-stale-playback-denied")
+            }
+        } finally {
+            store.clearCurrentAccount()
+            audio.delete(); video.delete()
+        }
+    }
+
     @Test fun narrowWhiteIncomingAndLocalPreviewHaveVisiblePixelsAndSafeFooter() {
         val image = photo()
         ActivityScenario.launch(MediaFixtureActivity::class.java).use { scenario ->
