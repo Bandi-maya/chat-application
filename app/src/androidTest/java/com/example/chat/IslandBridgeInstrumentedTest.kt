@@ -1,6 +1,9 @@
 package com.example.chat
 
 import android.content.Context
+import android.content.ComponentName
+import android.content.pm.PackageManager
+import android.os.Build
 import android.content.ContextWrapper
 import android.content.Intent
 import android.provider.Settings
@@ -61,10 +64,10 @@ class IslandBridgeInstrumentedTest {
     }
 
     @Test
-    fun permissionStateMatchesShippedManifest() = runBlocking {
+    fun permissionStateRequiresActualOsGrants() = runBlocking {
         val bridge = AndroidDynamicIslandBridge(target)
         val state = bridge.getPermissionState()
-        // No SYSTEM_ALERT_WINDOW and no declared listener service in the manifest.
+        // Declaration is not permission. The isolated emulator starts with no OS grants.
         assertEquals(false, state["overlay"])
         assertEquals(false, state["notificationAccess"])
     }
@@ -78,6 +81,7 @@ class IslandBridgeInstrumentedTest {
             assertEquals(true, bridge.getPermissionState()["enabled"])
             bridge.setEnabled(false)
             assertEquals(false, bridge.getPermissionState()["enabled"])
+            assertEquals(null, IslandOverlay.currentView)
         } finally {
             bridge.setEnabled(before)
         }
@@ -97,7 +101,50 @@ class IslandBridgeInstrumentedTest {
         val ctx = Recording(target)
         AndroidDynamicIslandBridge(ctx).openNotificationAccessSettings()
         assertEquals(1, ctx.started.size)
-        assertEquals("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS", ctx.started[0].action)
+        val intent = ctx.started.single()
+        if (Build.VERSION.SDK_INT >= 30 && intent.action == Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS) {
+            assertEquals(ComponentName(target, DynamicIslandNotificationListener::class.java).flattenToString(),
+                intent.getStringExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME))
+        } else {
+            assertEquals(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS, intent.action)
+        }
+    }
+
+    @Test
+    fun listenerIsDiscoverableAndSystemBoundOnly() {
+        val component = ComponentName(target, DynamicIslandNotificationListener::class.java)
+        @Suppress("DEPRECATION")
+        val info = target.packageManager.getServiceInfo(component, PackageManager.GET_META_DATA)
+        assertEquals("android.permission.BIND_NOTIFICATION_LISTENER_SERVICE", info.permission)
+        assertTrue(info.exported)
+        val services = target.packageManager.queryIntentServices(
+            Intent("android.service.notification.NotificationListenerService").setPackage(target.packageName), 0,
+        )
+        assertTrue(services.any { it.serviceInfo.name == component.className })
+        @Suppress("DEPRECATION")
+        val requested = target.packageManager.getPackageInfo(target.packageName, PackageManager.GET_PERMISSIONS).requestedPermissions
+        assertTrue(requested.contains("android.permission.SYSTEM_ALERT_WINDOW"))
+    }
+
+    @Test
+    fun serviceEventsReachTypedBridgeWithoutFlutter() {
+        val bridge = ChatyIslandNativeBridge(target)
+        var received: IslandNativeEvent? = null
+        bridge.setNotificationEventHandler { received = it }
+        val event = IslandNativeEvent.NotificationPosted("synthetic", false, "Fixture", "Local only")
+        ChatyIslandNativeBridge.deliverNativeEvent(event)
+        assertEquals(event, received)
+        bridge.clearAll()
+    }
+
+    @Test
+    fun screenPrivacySuppressionClearsTypedQueueAndWindow() {
+        val bridge = ChatyIslandNativeBridge(target)
+        var event: IslandNativeEvent? = null
+        bridge.setNotificationEventHandler { event = it }
+        IslandOverlay.suppressForPrivacy()
+        assertEquals(IslandNativeEvent.ClearAll, event)
+        assertEquals(null, IslandOverlay.currentView)
     }
 
     @Test
