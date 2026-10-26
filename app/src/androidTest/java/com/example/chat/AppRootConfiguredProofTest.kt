@@ -134,6 +134,24 @@ class AppRootConfiguredProofTest {
             assertTrue("all destinations visible, not More", device.findObject(By.text("More")) == null)
             assertTrue("Settings visible in dock", device.findObject(By.desc("Settings")) != null || device.findObject(By.text("Settings")) != null)
             capture(device, "10-home-all-destinations")
+            var topInset = 0
+            scenario?.onActivity { activity ->
+                val insets = activity.window.decorView.rootWindowInsets
+                if (insets != null) topInset = insets.getInsets(
+                    android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.displayCutout(),
+                ).top
+            }
+            val updatesTab = device.findObject(By.desc("Updates"))
+                ?: throw AssertionError("Updates destination not accessible")
+            updatesTab.click()
+            assertTrue("Updates page reached", device.wait(Until.hasObject(By.text("My Status")), 10000))
+            val updatesTitle = device.findObjects(By.text("Updates")).minByOrNull { it.visibleBounds.top }
+                ?: throw AssertionError("Updates heading not shown")
+            assertTrue("Updates title below status bar/cutout: top=${updatesTitle.visibleBounds.top}, inset=$topInset",
+                updatesTitle.visibleBounds.top >= topInset)
+            capture(device, "10b-updates-safe-area")
+            device.pressBack()
+            assertTrue("Back from Updates returns Chats", device.wait(Until.hasObject(By.text("Synthetic Peer")), 10000))
             device.findObject(By.text("Synthetic Peer")).click()
             if (!device.wait(Until.hasObject(By.text("Synthetic bubble one")), 20000)) {
                 logScreenTexts(device, "failure"); try { capture(device, "00-failure-state") } catch (_: Exception) {}
