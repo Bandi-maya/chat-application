@@ -449,7 +449,8 @@ object ServiceLocator {
     }
 
     val autoReplyRuleEngine: com.example.chat.ui.automation.AutoReplyRuleEngine by lazy {
-        com.example.chat.ui.automation.AutoReplyRuleEngine(prefs = preferencesController, backend = gbFeatures, scope = appScope)
+        com.example.chat.ui.automation.AutoReplyRuleEngine(prefs = preferencesController, backend = gbFeatures, scope = appScope,
+            sendReply = { cid, text -> apiBackend.sendMessage(cid, text) })
     }
 
     val messageAutomation: MessageAutomationService by lazy {
