@@ -127,7 +127,7 @@ class AuthScreensPixelProofTest {
         awaitText("Welcome Back!")
 
         // Login -> register organization entry.
-        clickText("Register a New Organization")
+        clickText("Register an Organization")
         awaitText("Register Organization")
         capture("05-register-organization")
     }
