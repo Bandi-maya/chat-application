@@ -249,6 +249,7 @@ fun ChatDetailScreen(
     translateOption: String = "Server + No outside apps",
     translationLanguage: String = "Show All",
     onMediaTap: (ChatMessage) -> Unit = {},
+    onMediaTapWithBounds: ((ChatMessage, Rect) -> Unit)? = null,
     onVoicePlay: (MessageAttachment) -> Unit = {},
     voiceUrlResolver: (suspend (String) -> String)? = null,
     onViewOnceOpen: (ChatMessage) -> Unit = {},
@@ -789,6 +790,7 @@ fun ChatDetailScreen(
                                 { onToggleReaction(message.id, doubleTapReactionEmoji) }
                             },
                             onReactionTap = { emoji -> onToggleReaction(message.id, emoji) },
+                            onMediaTapWithBounds = { rect -> onMediaTapWithBounds?.invoke(message, rect) ?: onMediaTap(message) },
                             onMediaTap = if (message.attachment == null) {
                                 null
                             } else {
