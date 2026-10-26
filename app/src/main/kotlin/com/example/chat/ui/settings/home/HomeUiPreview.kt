@@ -52,6 +52,17 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import com.example.chat.ui.core.theme.ChatyColors
+import com.example.chat.ui.navigation.CurvedRadialDrawerShell
 import com.example.chat.core.theme.AppNavigationMode
 import com.example.chat.core.theme.ThemeConfig
 
@@ -107,6 +118,10 @@ fun HomeUiPreview(style: String, theme: ThemeConfig, current: AppNavigationMode,
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val maxW = maxWidth
             val maxH = maxHeight
+            if (curved) {
+                CurvedRadialThumb(theme, large, maxW)
+                return@BoxWithConstraints
+            }
             if (rail) {
                 Column(
                     Modifier.offset(s(3f), s(3f)).width(s(21f)).height(maxH - s(6f))
@@ -184,30 +199,6 @@ fun HomeUiPreview(style: String, theme: ThemeConfig, current: AppNavigationMode,
                     }
                 }
             }
-            if (curved) {
-                val cw = if (large) 246f else 58f
-                val ch = if (large) 174f else 37f
-                Box(Modifier.width(cw.dp).height(ch.dp).clip(HomePreviewCurveShape).background(accent)) {
-                    Icon(
-                        Icons.Rounded.Close, null, tint = onAccent,
-                        modifier = Modifier.offset((cw - (if (large) 7f else 2f) - (if (large) 14f else 7f)).dp, (if (large) 7f else 2f).dp)
-                            .size((if (large) 14f else 7f).dp),
-                    )
-                    val circleIcons = listOf(Icons.Rounded.ChatBubble, Icons.Rounded.PhotoCamera, Icons.Rounded.Call, Icons.Rounded.Checklist, Icons.Rounded.Settings)
-                    for (i in 0 until 5) {
-                        val x = if (large) 16f + i * 19f else 4f + i * 4.2f
-                        val y = if (large) 10f + i * 27f else 7f + i * 5.1f
-                        val d = if (large) 25f else 9f
-                        Box(Modifier.offset(x.dp, y.dp).size(d.dp).background(onAccent, CircleShape), contentAlignment = Alignment.Center) {
-                            Icon(circleIcons[i], null, tint = accent, modifier = Modifier.size((if (large) 12f else 5.5f).dp))
-                        }
-                    }
-                    if (large) {
-                        Text("CHATS", color = onAccent, fontSize = 9.sp, fontWeight = FontWeight.W800, modifier = Modifier.offset(48.dp, 17.dp))
-                        Text("UPDATES", color = onAccent, fontSize = 9.sp, fontWeight = FontWeight.W800, modifier = Modifier.offset(67.dp, 45.dp))
-                    }
-                }
-            }
             if (showBottomDock) {
                 val dockH = s(if (isInstagram) 18f else if (isBasic) 26f else 25f)
                 Row(
@@ -259,5 +250,56 @@ fun HomeUiPreview(style: String, theme: ThemeConfig, current: AppNavigationMode,
                 Box(Modifier.offset(0.dp, maxH - dockH).fillMaxWidth().height(0.7.dp).background(muted.copy(alpha = 0.28f)))
             }
         }
+    }
+}
+
+/**
+ * Curved Radial thumbnail: the ACTUAL CurvedRadialDrawerShell laid out at a phone-sized viewport,
+ * scaled uniformly by width and cropped to the card, so it shows the same trigger/fan the applied
+ * style draws (top-left of the phone). Source only, not compiled or run. Pointer input is
+ * swallowed so the picker row, not the shell, receives taps.
+ */
+@Composable
+private fun CurvedRadialThumb(theme: ThemeConfig, large: Boolean, cardWidth: Dp) {
+    val phoneW = 392.dp
+    val phoneH = 760.dp
+    val scale = cardWidth.value / phoneW.value
+    val ids = listOf("chats", "updates", "calls", "tasks", "settings")
+    Box(Modifier.fillMaxSize().clipToBounds().consumeWindowInsets(WindowInsets.safeDrawing)) {
+        Box(
+            Modifier.requiredSize(phoneW, phoneH).graphicsLayer {
+                scaleX = scale; scaleY = scale; transformOrigin = TransformOrigin(0f, 0f)
+            },
+        ) {
+            CurvedRadialDrawerShell(
+                colors = ChatyColors(theme), navItemIds = ids, selectedIndex = 0,
+                animationsDisabled = true, onSelect = {}, fab = {},
+                initialOpen = large,
+                content = {
+                    Column(Modifier.fillMaxSize().background(Color(theme.backgroundColor)).padding(14.dp, 12.dp)) {
+                        Box(Modifier.width(150.dp).height(12.dp).background(Color(theme.primaryTextColor).copy(alpha = 0.85f), RoundedCornerShape(6.dp)))
+                        for (i in 0 until 5) {
+                            Spacer(Modifier.height(18.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.size(44.dp).background(Color(theme.accentColor).copy(alpha = 0.32f + i * 0.08f), CircleShape))
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Box(Modifier.width(170.dp).height(10.dp).background(Color(theme.primaryTextColor).copy(alpha = 0.8f), RoundedCornerShape(5.dp)))
+                                    Spacer(Modifier.height(8.dp))
+                                    Box(Modifier.width(220.dp).height(8.dp).background(Color(theme.secondaryTextColor).copy(alpha = 0.7f), RoundedCornerShape(4.dp)))
+                                }
+                            }
+                        }
+                    }
+                },
+            )
+        }
+        Box(
+            Modifier.fillMaxSize().pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) { awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() } }
+                }
+            },
+        )
     }
 }
