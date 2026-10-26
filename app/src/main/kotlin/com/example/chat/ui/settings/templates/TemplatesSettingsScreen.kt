@@ -30,7 +30,7 @@ import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material.icons.rounded.Upload
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -461,7 +461,7 @@ fun TemplatesSettingsScreen(
 
     if (importDialogOpen) {
         var input by remember { mutableStateOf("") }
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { importDialogOpen = false },
             title = { Text("Import template profile") },
             text = {
@@ -515,7 +515,7 @@ fun TemplatesSettingsScreen(
     }
 
     applyCandidate?.let { tmpl ->
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { applyCandidate = null },
             title = { Text("Apply ${tmpl.name}?") },
             text = {
@@ -548,7 +548,7 @@ fun TemplatesSettingsScreen(
     }
 
     if (resetDialogOpen) {
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { resetDialogOpen = false },
             title = { Text("Reset Template Configuration?") },
             text = {
