@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -166,7 +166,7 @@ fun ChatyOverlayHost(controller: ChatyOverlayController, modifier: Modifier = Mo
     }
 
     when (val o = controller.current) {
-        is Overlay.Confirm -> AlertDialog(
+        is Overlay.Confirm -> AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { if (o.barrierDismissible) o.result.complete(false) },
             containerColor = colors.surface,
             title = { Text(o.title, color = colors.foreground) },
@@ -186,11 +186,11 @@ fun ChatyOverlayHost(controller: ChatyOverlayController, modifier: Modifier = Mo
             if (!compact) {
                 ChatyModalDialog(420f, o.dismissible, { o.done.complete(Unit) }, null, o.content, null)
             } else {
-                ModalBottomSheet(
+                ModalBottomSheet(tonalElevation = 0.dp,
                     onDismissRequest = { o.done.complete(Unit) },
                     sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
                     containerColor = colors.surface,
-                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    shape = com.example.chat.ui.kit.ChatyModalShape,
                     dragHandle = if (o.showGrabber) {
                         { Box(Modifier.padding(vertical = 10.dp).size(width = 36.dp, height = 4.dp).background(colors.border, RoundedCornerShape(2.dp))) }
                     } else null,
