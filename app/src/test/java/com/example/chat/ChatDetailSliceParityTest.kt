@@ -201,13 +201,31 @@ class ChatDetailSliceParityTest {
     }
 
     @Test fun domeStylesReserveTopPadding() {
+        // Crown shoulders are at26dp (filled) or22/24dp (outlined).
+        for (id in listOf(BubbleStyleId.rcPal, BubbleStyleId.rcImess)) {
+            val padding = BubbleStyleRegistry.getGeometry(id).contentPadding
+            assertEquals(30.0, padding.top, 0.001)
+            assertEquals(9.0, padding.bottom, 0.001)
+        }
+        for (id in listOf(BubbleStyleId.rcImLine, BubbleStyleId.rcTranLine)) {
+            val padding = BubbleStyleRegistry.getGeometry(id).contentPadding
+            assertEquals(28.0, padding.top, 0.001)
+            assertEquals(9.0, padding.bottom, 0.001)
+        }
+    }
+
+    @Test fun flatFrameStylesDoNotReserveDomeHeadroom() {
+        // These actual paths are roundrects/chamfers, not centered domes.
+        //30dp headroom clipped text in the real44dp proof preview.
         for (id in listOf(
-            BubbleStyleId.gabiOutline, BubbleStyleId.rcSamsBord, BubbleStyleId.rcLine,
-            BubbleStyleId.aranbor, BubbleStyleId.rcPal, BubbleStyleId.rcImess,
+            BubbleStyleId.gabiOutline, BubbleStyleId.rcSamsBord,
+            BubbleStyleId.rcLine, BubbleStyleId.aranbor,
         )) {
-            val g = BubbleStyleRegistry.getGeometry(id)
-            assertEquals("top padding for $id", 30.0, g.contentPadding.top, 0.0)
-            assertEquals("side padding for $id", 13.0, g.contentPadding.left, 0.0)
+            val padding = BubbleStyleRegistry.getGeometry(id).contentPadding
+            assertEquals(8.0, padding.top, 0.001)
+            assertEquals(8.0, padding.bottom, 0.001)
+            assertEquals(13.0, padding.left, 0.001)
+            assertEquals(13.0, padding.right, 0.001)
         }
     }
 
