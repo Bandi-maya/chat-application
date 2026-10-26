@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.example.chat.domain.models.MessageAttachment
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -34,16 +35,28 @@ internal fun MediaAttachmentPreview(
     resolveUrl: (suspend (String) -> String)?,
     onTap: (() -> Unit)?,
     video: Boolean,
+    message: com.example.chat.domain.models.ChatMessage? = null,
+    binding: AttachmentConsumerBinding? = null,
 ) {
+    var ownedSource by remember(attachment.id, binding?.session) { mutableStateOf<com.example.chat.data.media.ResolvedSource?>(null) }
     var url by remember(attachment.url) { mutableStateOf<String?>(null) }
     var failed by remember(attachment.url) { mutableStateOf(false) }
     var thumbnail by remember(attachment.url) { mutableStateOf<Bitmap?>(null) }
     var ratio by remember(attachment.url) { mutableStateOf(1.35f) }
     val context = LocalContext.current
-    LaunchedEffect(attachment.url) {
+    LaunchedEffect(attachment.url, binding?.session) {
         try {
             val path = attachment.url?.takeIf { it.isNotBlank() } ?: error("No media path")
-            url = resolveUrl?.invoke(path) ?: path
+            if (binding != null && message != null) {
+                val result = binding.resolve(message, false)
+                try {
+                    kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                    check(binding.deliver(result) { ownedSource = result }) { "Session changed" }
+                }
+                catch (e: kotlinx.coroutines.CancellationException) { releaseConsumerSource(result); throw e }
+                if (result is com.example.chat.data.media.ResolvedSource.Unavailable) { failed = true; return@LaunchedEffect }
+                url = result.consumerUri()
+            } else url = resolveUrl?.invoke(path) ?: path
             if (video) {
                 thumbnail = withContext(Dispatchers.IO) {
                     val retriever = MediaMetadataRetriever()
@@ -57,7 +70,10 @@ internal fun MediaAttachmentPreview(
                 thumbnail?.let { ratio = (it.width.toFloat() / it.height).coerceIn(0.65f, 1.8f) }
                 failed = thumbnail == null
             }
-        } catch (_: Exception) { failed = true }
+            kotlinx.coroutines.awaitCancellation()
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (_: Exception) { failed = true; kotlinx.coroutines.awaitCancellation() }
+        finally { thumbnail?.recycle(); thumbnail = null; releaseConsumerSource(ownedSource); ownedSource = null }
     }
     Box(
         Modifier.widthIn(max = 300.dp).fillMaxWidth().aspectRatio(ratio)
@@ -71,10 +87,10 @@ internal fun MediaAttachmentPreview(
                 Text(if (video) "Tap to play video" else "Preview unavailable. Tap to open", style = MaterialTheme.typography.labelSmall)
             }
             video && thumbnail != null -> Image(thumbnail!!.asImageBitmap(), attachment.name, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            video || url == null -> CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-            remoteImage != null && remoteImage !== chatyRemoteImage -> remoteImage(url!!, Modifier.fillMaxSize(), attachment.name)
+            video || (url == null && ownedSource?.consumerModel() == null) -> CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+            binding == null && remoteImage != null && remoteImage !== chatyRemoteImage -> remoteImage(url!!, Modifier.fillMaxSize(), attachment.name)
             else -> SubcomposeAsyncImage(
-                model = ImageRequest.Builder(context).data(url).crossfade(true).build(),
+                model = ImageRequest.Builder(context).data(ownedSource?.consumerModel() ?: url).memoryCachePolicy(coil.request.CachePolicy.DISABLED).diskCachePolicy(coil.request.CachePolicy.DISABLED).crossfade(true).build(),
                 contentDescription = attachment.name,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
