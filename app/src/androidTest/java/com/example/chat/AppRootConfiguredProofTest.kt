@@ -139,6 +139,14 @@ class AppRootConfiguredProofTest {
                 logScreenTexts(device, "failure"); try { capture(device, "00-failure-state") } catch (_: Exception) {}
                 throw AssertionError("ChatDetailHost did not render the seeded messages")
             }
+            // Drive a new incoming event through the real API listener, not a preseeded
+            // list, and prove the already-open Compose timeline updates.
+            val realtimeListener = field<com.example.chat.data.api.ApiRealtimeClient.Listener>("realtimeListener")
+            realtimeListener.onNewMessage(ChatMessage(
+                id = "incoming-ui-proof", conversationId = "synthetic-room-1", senderId = "synthetic-user-2",
+                text = "Synthetic new incoming", createdAt = Instant.now(),
+            ))
+            assertTrue("incoming event renders in already-open chat", device.wait(Until.hasObject(By.text("Synthetic new incoming")), 10000))
             capture(device, "11-chat-detail-host")
             // Header tap (Dart InkWell title -> ContactInfoScreen).
             device.findObject(By.text("Synthetic Peer")).click()
