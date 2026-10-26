@@ -42,7 +42,7 @@ import androidx.compose.material.icons.rounded.TextFields
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.Wifi
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -272,7 +272,7 @@ fun GbFeatureCenterScreen(
     colorEdit?.let { item ->
         val current = (preferences.gbFeatures[item.key] as? Number)?.toLong() ?: 0L
         var text by remember(item.key) { mutableStateOf(GbFeatureCenterLogic.initialColorText(current)) }
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { colorEdit = null },
             title = { Text(item.title) },
             text = {
@@ -309,7 +309,7 @@ fun GbFeatureCenterScreen(
     // ---- configuration value dialog (Dart _runAction fallthrough) ----
     actionEdit?.let { item ->
         var input by remember(item.key) { mutableStateOf(preferences.gbString(item.key)) }
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { actionEdit = null },
             title = { Text(item.title) },
             text = {
@@ -326,7 +326,7 @@ fun GbFeatureCenterScreen(
 
     // ---- choice sheet (Dart _FeatureTile._choose) ----
     choiceEdit?.let { (item, current) ->
-        ModalBottomSheet(onDismissRequest = { choiceEdit = null }) {
+        ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = { choiceEdit = null }) {
             Column(Modifier.navigationBarsPadding().padding(vertical = 10.dp)) {
                 Text(item.title, Modifier.padding(start = 18.dp, top = 8.dp, end = 18.dp, bottom = 10.dp), fontSize = 16.sp, fontWeight = FontWeight.W800)
                 for (option in item.options) {
@@ -343,7 +343,7 @@ fun GbFeatureCenterScreen(
     }
 
     if (confirmReset) {
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { confirmReset = false },
             title = { Text("Reset advanced features?") },
             text = { Text("This resets advanced controls to Chaty defaults. Existing chats and server data are not deleted.") },
