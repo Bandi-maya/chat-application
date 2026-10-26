@@ -320,10 +320,10 @@ fun ChatyAudioPlayerScreen(
     }
 
     if (showQueue) {
-        ModalBottomSheet(
+        ModalBottomSheet(tonalElevation = 0.dp, dragHandle = null,
             onDismissRequest = { showQueue = false },
             containerColor = if (isDark) Color(0xFF141923) else Color.White,
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            shape = com.example.chat.ui.kit.ChatyModalShape,
         ) {
             val sheetHeight = LocalConfiguration.current.screenHeightDp.dp * 0.6f
             Column(modifier = Modifier.height(sheetHeight)) {
