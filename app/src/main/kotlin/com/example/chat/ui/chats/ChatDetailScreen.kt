@@ -3,6 +3,9 @@ package com.example.chat.ui.chats
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -66,6 +69,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
@@ -94,6 +98,7 @@ import com.example.chat.domain.models.ChatMessage
 import com.example.chat.domain.models.ChatTask
 import com.example.chat.domain.models.ConnectionHealthState
 import com.example.chat.domain.models.Conversation
+import com.example.chat.domain.models.ConversationPreferences
 import com.example.chat.domain.models.DeliveryState
 import com.example.chat.domain.models.MessageAttachment
 import com.example.chat.domain.models.QuickReplyTemplate
@@ -231,6 +236,15 @@ fun ChatDetailScreen(
     entryStyle: String = "Stock",
     composerColors: ComposerColors? = null,
     composerTemplate: ComposerTemplate = ComposerTemplate(ComposerActionPlacement.integrated),
+    // Global conversation prefs (preferencesController.conversation): emoji picker
+    // colors, composer bar bg, bubble prefs - Dart `conv` / `convPrefs` consumers.
+    convPrefs: ConversationPreferences = ConversationPreferences(),
+    disableSwipeToExit: Boolean = false,
+    quickContacts: List<QuickContactEntry> = emptyList(),
+    onOpenConversation: (String) -> Unit = {},
+    homeAvatarShape: String = "circle",
+    translateOption: String = "Server + No outside apps",
+    translationLanguage: String = "Show All",
     onMediaTap: (ChatMessage) -> Unit = {},
     onVoicePlay: (MessageAttachment) -> Unit = {},
     onViewOnceOpen: (ChatMessage) -> Unit = {},
@@ -493,6 +507,14 @@ fun ChatDetailScreen(
             MessageActionType.task -> onCreateTaskFromMessage(message)
             MessageActionType.deleteForMe -> onDeleteMessage(message.id, false)
             MessageActionType.deleteForEveryone -> onDeleteMessage(message.id, true)
+            MessageActionType.translate -> {
+                // Dart _executeMessageAction translate: informational snackbar only.
+                scope.launch {
+                    snackbarHostState.showSnackbar(
+                        "Translation ($translationLanguage via $translateOption): ${message.text}",
+                    )
+                }
+            }
             MessageActionType.report -> {
                 scope.launch {
                     snackbarHostState.showSnackbar(
@@ -553,6 +575,48 @@ fun ChatDetailScreen(
         }
     }
 
+    // Dart chat_detail_screen.dart:2210-2292 - quick-contact rail shown when the
+    // per-chat toggle is on AND the screen is at least 720dp wide; bg is the
+    // custom color unless unset (0xFF000000), where it falls back to the surface
+    // color at sidebarOpacity.
+    val showQuickRail = convPrefs.enableQuickContactSidebar &&
+        LocalConfiguration.current.screenWidthDp >= 720
+    val railBg = if (convPrefs.quickContactBgColor != 0xFF000000L) {
+        Color(convPrefs.quickContactBgColor)
+    } else {
+        Color(theme.surfaceColor).copy(alpha = convPrefs.sidebarOpacity.toFloat())
+    }
+    val railBottomAnchored = convPrefs.quickContactSidebarPosition == "Bottom"
+
+    // Dart :2295-2311 - drag-to-pop: a rightward fling past 300 px/s pops unless
+    // universal.disableSwipeToExit is on. onDragStopped receives px/s.
+    val swipeExitModifier = if (disableSwipeToExit) {
+        Modifier
+    } else {
+        Modifier.draggable(
+            state = rememberDraggableState { },
+            orientation = Orientation.Horizontal,
+            onDragStopped = { velocity ->
+                if (velocity > 300f) onBack()
+            },
+        )
+    }
+
+    Row(Modifier.fillMaxSize().then(swipeExitModifier)) {
+        // Dart :2287-2292 - rail side comes from convPrefs.sidebarPosition;
+        // quickContactSidebarPosition only anchors contacts top/bottom.
+        if (showQuickRail && convPrefs.sidebarPosition == "Left") {
+            QuickContactSidebar(
+                theme = theme,
+                contacts = quickContacts,
+                backgroundColor = railBg,
+                textColor = Color(convPrefs.quickContactTextColor),
+                bottomAnchored = railBottomAnchored,
+                avatarShape = homeAvatarShape,
+                onOpen = { onOpenConversation(it.id) },
+            )
+        }
+        Box(Modifier.weight(1f)) {
     Scaffold(
         containerColor = Color(theme.backgroundColor),
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -692,6 +756,10 @@ fun ChatDetailScreen(
                             showGroupAvatar = showGroupAvatar,
                             isSenderAdmin = conversation.isGroup &&
                                 conversation.adminIds.contains(message.senderId),
+                            makeTextSelectable = convPrefs.makeTextSelectable,
+                            groupAdminIcon = convPrefs.groupAdminIcon,
+                            hideAdminNameIcon = convPrefs.hideAdminNameIcon,
+                            voicePlayButtonColor = convPrefs.voiceNotePlayButtonColor?.let(::Color),
                             isSelected = selectedIds.contains(message.id) ||
                                 contextMenuMessage?.id == message.id ||
                                 highlightedMessageId == message.id,
@@ -863,7 +931,24 @@ fun ChatDetailScreen(
                 )
             }
 
-            Box(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            // Dart composer bar container (chat_detail_screen.dart:3233): bg =
+            // conv.uiEntryBackgroundColor ?: surfaceColor, top border cardColor.
+            val composerBarBg = convPrefs.uiEntryBackgroundColor?.let(::Color)
+                ?: Color(theme.surfaceColor)
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .background(composerBarBg)
+                    .drawBehind {
+                        drawLine(
+                            color = Color(theme.cardColor),
+                            start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                            end = androidx.compose.ui.geometry.Offset(size.width, 0f),
+                            strokeWidth = 1.dp.toPx(),
+                        )
+                    }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+            ) {
                 ChatEntryBar(
                     entryStyle = entryStyle,
                     colors = composerColors ?: ComposerColors.resolve(theme),
@@ -1033,6 +1118,9 @@ fun ChatDetailScreen(
                 reactionMode = false,
                 composerMode = true,
                 initialText = composerText,
+                headerColor = convPrefs.emojiHeaderColor?.let(::Color),
+                headerIconsColor = convPrefs.emojiHeaderIconsColor?.let(::Color),
+                backgroundColor = convPrefs.emojiPickerBgColor?.let(::Color),
                 onComposerDone = { result ->
                     emojiComposerOpen = false
                     handleComposerChanged(result.text)
@@ -1058,6 +1146,9 @@ fun ChatDetailScreen(
                 theme = theme,
                 reactionMode = true,
                 composerMode = false,
+                headerColor = convPrefs.emojiHeaderColor?.let(::Color),
+                headerIconsColor = convPrefs.emojiHeaderIconsColor?.let(::Color),
+                backgroundColor = convPrefs.emojiPickerBgColor?.let(::Color),
                 onEmojiPicked = { emoji ->
                     if (emoji.isNotEmpty()) onToggleReaction(target.id, emoji)
                     emojiReactionTarget = null
@@ -1118,6 +1209,19 @@ fun ChatDetailScreen(
             },
         )
     }
+        } // Box(weight 1f) around Scaffold
+        if (showQuickRail && convPrefs.sidebarPosition == "Right") {
+            QuickContactSidebar(
+                theme = theme,
+                contacts = quickContacts,
+                backgroundColor = railBg,
+                textColor = Color(convPrefs.quickContactTextColor),
+                bottomAnchored = railBottomAnchored,
+                avatarShape = homeAvatarShape,
+                onOpen = { onOpenConversation(it.id) },
+            )
+        }
+    } // Row(quick rail + chat)
 }
 
 private val selectionCopyFormatter: DateTimeFormatter =
