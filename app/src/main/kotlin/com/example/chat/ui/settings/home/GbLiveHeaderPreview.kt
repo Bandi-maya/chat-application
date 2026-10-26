@@ -197,6 +197,12 @@ fun GbLiveHeaderPreview(a: HeaderPreviewArgs, t: ThemeConfig, modifier: Modifier
 }
 
 @Composable private fun Ic(v: ImageVector, c: Color, size: Dp = 24.dp) = Icon(v, null, tint = c, modifier = Modifier.size(size))
+/** Preview-only: same themed registry icon the real bottom navigation draws. */
+@Composable private fun NavIc(id: String, c: Color, size: Dp) = NavDestinationIcon(id, size = size.value.toInt(), tint = c)
+private fun navIdForLabel(label: String): String? = when (label) {
+    "Chats" -> "chats"; "Updates" -> "updates"; "Calls" -> "calls"; "Settings" -> "settings"
+    "Tasks" -> "tasks"; "Communities" -> "groups"; else -> null
+}
 @Composable private fun RowScope.Sp() = Spacer(Modifier.weight(1f))
 
 @Composable
@@ -349,7 +355,7 @@ private fun RowScope.PreviewTab(t: ThemeConfig, icon: ImageVector, label: String
     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         val tint = if (selected) col(t.accentColor) else col(t.secondaryTextColor)
         // Same icon registry the real navigation uses for these destinations.
-        val navId = when (label) { "Chats" -> "chats"; "Updates" -> "updates"; "Calls" -> "calls"; "Settings" -> "settings"; else -> null }
+        val navId = navIdForLabel(label)
         if (navId != null) NavDestinationIcon(navId, size = 15, tint = tint) else Ic(icon, tint, 15.dp)
         Spacer(Modifier.height(2.dp))
         Text(
@@ -381,11 +387,11 @@ private fun FloatingRailBottomBar(t: ThemeConfig) {
 @Composable
 private fun CurvedRadialBottomBar(t: ThemeConfig) {
     Row(Modifier.fillMaxWidth().height(44.dp).background(col(t.surfaceColor)), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-        listOf(Icons.Rounded.ChatBubble, Icons.Rounded.AutoStories, Icons.Rounded.Call, Icons.Rounded.Settings).forEach {
+        listOf("chats", "updates", "calls", "settings").forEach {
             Box(
                 Modifier.size(28.dp).background(col(t.accentColor).a(0.14f), CircleShape).border(1.dp, col(t.accentColor).a(0.5f), CircleShape),
                 contentAlignment = Alignment.Center,
-            ) { Ic(it, col(t.accentColor), 14.dp) }
+            ) { NavIc(it, col(t.accentColor), 14.dp) }
         }
     }
 }
@@ -577,12 +583,12 @@ private fun SampleChatRow(t: ThemeConfig) {
 private fun OneUiBottomBar(t: ThemeConfig) {
     Row(Modifier.fillMaxWidth().background(col(t.surfaceColor)).padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceAround, verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.background(col(t.accentColor).a(0.18f), RoundedCornerShape(16.dp)).padding(horizontal = 14.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-            Ic(Icons.Rounded.ChatBubble, col(t.accentColor), 18.dp)
+            NavIc("chats", col(t.accentColor), 18.dp)
             Spacer(Modifier.width(6.dp))
             Text("Chats", color = col(t.accentColor), fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
         val s = col(t.secondaryTextColor)
-        Ic(Icons.Rounded.Update, s, 20.dp); Ic(Icons.Rounded.Checklist, s, 20.dp); Ic(Icons.Outlined.CallOutlined, s, 20.dp)
+        NavIc("updates", s, 20.dp); NavIc("tasks", s, 20.dp); NavIc("calls", s, 20.dp)
     }
 }
 
@@ -617,12 +623,12 @@ private fun BubblesBottomBar(t: ThemeConfig) {
         horizontalArrangement = Arrangement.SpaceAround, verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(Modifier.background(col(t.accentColor), RoundedCornerShape(16.dp)).padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Ic(Icons.Rounded.ChatBubble, col(t.onAccentColor), 16.dp)
+            NavIc("chats", col(t.onAccentColor), 16.dp)
             Spacer(Modifier.width(4.dp))
             Text("Chats", color = col(t.onAccentColor), fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }
         val s = col(t.secondaryTextColor)
-        Ic(Icons.Rounded.Update, s, 18.dp); Ic(Icons.Rounded.Checklist, s, 18.dp); Ic(Icons.Rounded.Call, s, 18.dp)
+        NavIc("updates", s, 18.dp); NavIc("tasks", s, 18.dp); NavIc("calls", s, 18.dp)
     }
 }
 
@@ -637,7 +643,7 @@ private fun OldUiBottomBar(t: ThemeConfig) {
 private fun BasicBottomBar(t: ThemeConfig) {
     Row(Modifier.fillMaxWidth().background(col(t.surfaceColor)).padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceAround) {
         val s = col(t.secondaryTextColor)
-        Ic(Icons.Rounded.ChatBubble, col(t.accentColor), 20.dp); Ic(Icons.Rounded.Update, s, 20.dp); Ic(Icons.Rounded.Checklist, s, 20.dp); Ic(Icons.Rounded.Call, s, 20.dp)
+        NavIc("chats", col(t.accentColor), 20.dp); NavIc("updates", s, 20.dp); NavIc("tasks", s, 20.dp); NavIc("calls", s, 20.dp)
     }
 }
 
@@ -676,7 +682,7 @@ private fun IosTabItem(t: ThemeConfig, icon: ImageVector, label: String, selecte
     val color = if (selected) col(t.accentColor) else col(t.secondaryTextColor)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box {
-            Ic(icon, color, 18.dp)
+            navIdForLabel(label)?.let { NavIc(it, color, 18.dp) } ?: Ic(icon, color, 18.dp)
             if (badge != null) {
                 Box(Modifier.offset(12.dp, (-3).dp).background(col(t.dangerColor), CircleShape).padding(horizontal = 4.dp, vertical = 1.dp)) {
                     Text(badge, color = col(t.primaryTextColor), fontSize = 8.sp, fontWeight = FontWeight.Bold)
@@ -693,7 +699,7 @@ private fun StockTabItem(t: ThemeConfig, icon: ImageVector, label: String, selec
     val color = if (selected) col(t.accentColor) else col(t.secondaryTextColor)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box {
-            Ic(icon, color, 19.dp)
+            navIdForLabel(label)?.let { NavIc(it, color, 19.dp) } ?: Ic(icon, color, 19.dp)
             if (badge != null) {
                 Box(Modifier.offset(12.dp, (-3).dp).background(col(t.accentColor), CircleShape).padding(horizontal = 4.dp, vertical = 1.dp)) {
                     Text(badge, color = col(t.onAccentColor), fontSize = 8.sp, fontWeight = FontWeight.Bold)
