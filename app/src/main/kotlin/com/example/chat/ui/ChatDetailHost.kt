@@ -96,6 +96,13 @@ fun ChatDetailHost(
     var forwardMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var taskEditor by remember { mutableStateOf<Triple<Boolean, ChatTask?, String?>?>(null) }
     var taskDetail by remember { mutableStateOf<ChatTask?>(null) }
+    // 0 none, 1 info (ContactInfo/GroupInfo), 2 contact privacy; viewer = MediaViewerScreen target.
+    var infoRoute by remember(conversation.id) { mutableIntStateOf(0) }
+    var viewerMessage by remember { mutableStateOf<ChatMessage?>(null) }
+    var infoBusy by remember { mutableStateOf(false) }
+    var infoBlocked by remember(conversation.id) { mutableStateOf(false) }
+    var infoLoading by remember(conversation.id) { mutableStateOf(false) }
+    var infoError by remember(conversation.id) { mutableStateOf<String?>(null) }
 
     // Presence text (Dart _buildChat).
     val activity = otherId?.let { rt.activityFor(conversation.id, it) }
@@ -281,6 +288,23 @@ fun ChatDetailHost(
                 else -> toast("This attachment type is not connected in this build yet.")
             }
         },
+        onOpenInfo = {
+            if (!isDirect) infoRoute = 1
+            else if (other != null) {
+                infoRoute = 1
+                infoLoading = true
+                infoError = null
+                scope.launch {
+                    try {
+                        infoBlocked = ServiceLocator.contactRelationships.isBlocked(other.id)
+                        connection = ServiceLocator.contactRelationships.connectionStatus(other.id)
+                    } catch (e: Exception) { infoError = e.message ?: "Unable to load contact." }
+                    infoLoading = false
+                }
+            }
+        },
+        onMediaTap = { m -> viewerMessage = m },
+        onViewOnceOpen = { m -> viewerMessage = m },
         onGalleryTap = { attachments.onMedia("image") },
         onAudioTap = { attachments.onMedia("audio") },
         onContactTap = { attachments.onContact() },
@@ -291,6 +315,88 @@ fun ChatDetailHost(
         onVoiceHoldEnd = voice.onVoiceHoldEnd,
     )
     voice.overlay()
+    if (infoRoute != 0) {
+        androidx.activity.compose.BackHandler { infoRoute = if (infoRoute == 2) 1 else 0 }
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+            if (!isDirect) {
+                com.example.chat.ui.chats.group_info.GroupInfoScreen(
+                    conversation = live,
+                    participants = live.participantIds.mapNotNull { id -> api.users.firstOrNull { it.id == id } },
+                    currentUserId = myId,
+                    onLeave = { infoRoute = 0; onBack() },
+                    onBack = { infoRoute = 0 },
+                )
+            } else if (other != null && infoRoute == 2) {
+                com.example.chat.ui.chats.contact_info.ContactPrivacyScreen(
+                    contact = other,
+                    privacyFor = { id -> ServiceLocator.contactRelationships.privacyFor(id) },
+                    savePrivacy = { v -> ServiceLocator.contactRelationships.savePrivacy(v) },
+                    onBack = { infoRoute = 1 },
+                )
+            } else if (other != null) {
+                com.example.chat.ui.chats.contact_info.ContactInfoScreen(
+                    conversation = live,
+                    contact = other,
+                    messages = messages,
+                    connection = connection ?: ContactConnectionStatus(),
+                    blocked = infoBlocked,
+                    loading = infoLoading,
+                    loadError = infoError,
+                    busy = infoBusy,
+                    isOnline = { id -> rt.isOnline(id) },
+                    lastSeenFor = { id -> rt.lastSeenFor(id) },
+                    activityFor = { cid, uid -> rt.activityFor(cid, uid) },
+                    hydrateMessage = { m -> rt.hydrateMessage(m) },
+                    onAccept = {
+                        infoBusy = true
+                        try {
+                            ServiceLocator.contactRelationships.acceptConnection(other.id)
+                            refreshConnection()
+                        } finally { infoBusy = false }
+                    },
+                    onSetBlocked = { next ->
+                        infoBusy = true
+                        try {
+                            ServiceLocator.contactRelationships.setBlocked(other.id, next)
+                            infoBlocked = next
+                            refreshConnection()
+                        } finally { infoBusy = false }
+                    },
+                    onDeleteConversation = {
+                        // Dart dataStore.deleteConversation: api first when authenticated, then repository.
+                        scope.launch {
+                            if (api.isAuthenticated) { try { api.deleteConversation(live.id) } catch (_: Exception) {} }
+                            try { repo.deleteConversation(live.id) } catch (_: Exception) {}
+                        }
+                    },
+                    onDeleteUser = { if (api.isAuthenticated) api.deleteUser(other.id) },
+                    onOpenPrivacy = { infoRoute = 2 },
+                    onOpenMedia = { m -> viewerMessage = m },
+                    onSearch = { infoRoute = 0 },
+                    onDeletedPopToRoot = { infoRoute = 0; onBack() },
+                    onBack = { infoRoute = 0 },
+                )
+            }
+        }
+    }
+    val vm = viewerMessage
+    val va = vm?.attachment
+    if (vm != null && va != null) {
+        androidx.activity.compose.BackHandler { viewerMessage = null }
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+            com.example.chat.ui.chats.detail.MediaViewerScreen(
+                theme = theme,
+                title = va.name,
+                type = va.type,
+                size = va.size,
+                storagePath = va.url,
+                createSignedUrl = { path, expires ->
+                    ServiceLocator.chatMedia.createSignedUrl(path, expires) { ServiceLocator.apiBackend.config.restApiBaseUrl }
+                },
+                onBack = { viewerMessage = null },
+            )
+        }
+    }
     }
 
     if (gateOpen) {
