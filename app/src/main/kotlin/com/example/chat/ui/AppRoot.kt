@@ -222,7 +222,7 @@ fun AppRoot() {
             }
         }
         if (showLockPrompt) {
-            androidx.compose.material3.AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
+            com.example.chat.ui.kit.ChatyConfirmationDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
                 onDismissRequest = { showLockPrompt = false },
                 title = { androidx.compose.material3.Text("Enable App Lock?") },
                 text = {
@@ -1182,7 +1182,7 @@ fun AppRoot() {
                 }
                 val notice = settingsNotice
                 if (notice != null) {
-                    androidx.compose.material3.AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
+                    com.example.chat.ui.kit.ChatyConfirmationDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
                         onDismissRequest = { settingsNotice = null },
                         title = { androidx.compose.material3.Text(notice) },
                         text = { androidx.compose.material3.Text("This settings page is not hosted in this build yet.") },
