@@ -24,6 +24,11 @@ class ChatyApplication : Application() {
         // also installs it into FcmRegistrarHolder before any early onNewToken can arrive.
         // Inert until a real google-services.json lands (token fetch then throws and is logged).
         try {
+            // apiBackend before fcmRegistrar: initialize() fires the FCM sync hook
+            // synchronously on a restored session; touching apiBackend first lets that
+            // hook construct the registrar through apiBackendUnderConstruction instead of
+            // re-entering the fcmRegistrar lazy from inside its own initializer.
+            ServiceLocator.apiBackend
             ServiceLocator.fcmRegistrar.fetchAndRegisterToken()
         } catch (e: Exception) {
             android.util.Log.w("ChatyApplication", "Chaty Firebase bootstrap skipped: $e")
