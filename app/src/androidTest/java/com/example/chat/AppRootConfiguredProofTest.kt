@@ -125,6 +125,7 @@ class AppRootConfiguredProofTest {
             ServiceLocator.apiBackend.initialize()
             assertTrue("synthetic session restored", ServiceLocator.apiBackend.isAuthenticated)
             seedSyntheticChat()
+            ServiceLocator.preferencesController.updateHome(ServiceLocator.preferencesController.home.copy(searchPlacement = "Header action", disableSearchBar = false))
             scenario = ActivityScenario.launch(MainActivity::class.java)
             dismissOnboardingPrompts(device)
             if (!device.wait(Until.hasObject(By.text("Synthetic Peer")), 30000)) {
