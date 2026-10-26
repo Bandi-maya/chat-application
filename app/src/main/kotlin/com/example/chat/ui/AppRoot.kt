@@ -402,6 +402,7 @@ fun AppRoot() {
                 var pushedAccount by remember { mutableStateOf(false) }
                 var pushedUniversalAppearance by remember { mutableStateOf(false) }
                 var pushedComponentStyles by remember { mutableStateOf(false) }
+                var pushedThemeStudio by remember { mutableStateOf(false) }
                 var pushedAppIcon by remember { mutableStateOf(false) }
                 var pushedSettingsSearch by remember { mutableStateOf(false) }
                 val settingsNavigate: (com.example.chat.ui.settings.SettingsDestination) -> Unit = { dest ->
@@ -491,7 +492,7 @@ fun AppRoot() {
                                 onNewCall = { showCallPicker = true },
                                 onScanQr = { linkedDevicesOnly = false; route = AuthRoute.LinkedDevices },
                                 onOpenSettings = { pushedSettings = true },
-                                onOpenThemeStudio = { settingsSub = com.example.chat.ui.settings.SettingsDestination.ThemeEngine },
+                                onOpenThemeStudio = { pushedThemeStudio = true },
                                 onOpenMessageScheduler = { pushedScheduled = true },
                                 onOpenAutoReplyRules = { pushedAutoReply = true },
                                 onToggleFreezeLastSeen = { frozen ->
@@ -932,6 +933,44 @@ fun AppRoot() {
                             controller = iconController,
                             onBack = { pushedAppIcon = false },
                             showToast = { msg -> settingsNotice = msg },
+                        )
+                    }
+                }
+                if (pushedThemeStudio) {
+                    // Dart main_navigation_shell Quick Actions "Theme Studio" -> ThemeStudioScreen(prefs, ThemeController).
+                    androidx.activity.compose.BackHandler { pushedThemeStudio = false }
+                    val tsContext = androidx.compose.ui.platform.LocalContext.current
+                    var tsJsonWaiter by remember { mutableStateOf<kotlinx.coroutines.CompletableDeferred<String?>?>(null) }
+                    val tsJsonLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                        androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+                    ) { uri ->
+                        val text = try {
+                            uri?.let { tsContext.contentResolver.openInputStream(it)?.bufferedReader()?.use { r -> r.readText() } }
+                        } catch (_: Exception) { null }
+                        tsJsonWaiter?.complete(text); tsJsonWaiter = null
+                    }
+                    Box(Modifier.fillMaxSize()) {
+                        com.example.chat.ui.settings.studio.ThemeStudioScreen(
+                            themeController = ServiceLocator.themeController,
+                            preferencesController = ServiceLocator.preferencesController,
+                            onBack = { pushedThemeStudio = false },
+                            onOpenComponentStyles = { pushedThemeStudio = false; pushedComponentStyles = true },
+                            pickThemeJson = {
+                                val d = kotlinx.coroutines.CompletableDeferred<String?>()
+                                tsJsonWaiter = d
+                                tsJsonLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+                                d.await()
+                            },
+                            saveThemeJson = { json ->
+                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    val cfg = com.example.chat.core.theme.ChatyThemeManager.validateAndImportTheme(json)
+                                    com.example.chat.core.theme.ChatyThemeManager.saveThemeToFile(
+                                        tsContext.getExternalFilesDir(null) ?: tsContext.filesDir, cfg,
+                                    ).name
+                                }
+                            },
+                            templateController = ServiceLocator.templateController,
+                            appearanceVariantController = ServiceLocator.appearanceVariantController,
                         )
                     }
                 }
