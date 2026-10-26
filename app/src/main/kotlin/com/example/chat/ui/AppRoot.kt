@@ -829,9 +829,9 @@ fun AppRoot() {
                             category = { it.category.title },
                             description = { it.description },
                             keywords = { it.searchKeywords },
-                            // Dart: def.icon ?? def.category.icon (per-setting icon names are not resolved yet).
+                            // Dart: def.icon ?? def.category.icon (def.iconName resolved by SettingsIcons).
                             icon = { def ->
-                                when (def.category) {
+                                com.example.chat.ui.settings.navigation.SettingsIcons.resolve(def.iconName) ?: when (def.category) {
                                     com.example.chat.ui.settings.registry.SettingsCategory.account -> androidx.compose.material.icons.Icons.Outlined.Person
                                     com.example.chat.ui.settings.registry.SettingsCategory.privacy -> androidx.compose.material.icons.Icons.Outlined.VisibilityOff
                                     com.example.chat.ui.settings.registry.SettingsCategory.security -> androidx.compose.material.icons.Icons.Outlined.Lock
