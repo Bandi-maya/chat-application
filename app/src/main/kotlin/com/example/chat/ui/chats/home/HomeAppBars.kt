@@ -54,9 +54,9 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SelectAll
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.WorkspacePremium
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
+import com.example.chat.ui.kit.ChatyDropdownMenu as DropdownMenu
+import com.example.chat.ui.kit.ChatyDropdownMenuItem as DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -319,13 +319,12 @@ fun HomeOverflowMenu(
         Triple(Icons.Outlined.Share, "Share Chaty") { nav.onShareApp() },
         Triple(Icons.Rounded.RestartAlt, "Restart Chaty") { nav.onRestartApp() },
     )
-    DropdownMenu(
+    DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape,
         expanded = expanded,
         onDismissRequest = onDismiss,
-        modifier = Modifier
-            .widthIn(min = 244.dp)
-            .background(Color(theme.cardColor), RoundedCornerShape(16.dp))
-            .border(1.1.dp, Color(argbWithAlpha(theme.secondaryTextColor, 0.2)), RoundedCornerShape(16.dp)),
+        containerColor = Color(theme.cardColor),
+        border = androidx.compose.foundation.BorderStroke(1.1.dp, Color(argbWithAlpha(theme.secondaryTextColor, 0.2))),
+        modifier = Modifier.widthIn(min = 244.dp),
     ) {
         items.forEach { (icon, label, action) ->
             DropdownMenuItem(
@@ -406,7 +405,7 @@ fun SelectionHomeAppBar(
             IconButton(onClick = { overflowOpen = true }) {
                 Icon(Icons.Rounded.MoreVert, contentDescription = "More actions", tint = Color(theme.primaryTextColor))
             }
-            DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
+            DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape, expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
                 SelectionMenuItem(
                     icon = if (anyUnlocked) Icons.Outlined.Lock else Icons.Outlined.LockOpen,
                     label = if (anyUnlocked) "Lock chat" else "Unlock chat",
@@ -588,7 +587,7 @@ fun HomeConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = onDismiss,
         title = { Text(title, fontWeight = FontWeight.W700) },
         text = { Text(message) },
@@ -669,7 +668,7 @@ fun LockedChatsSetupDialog(
     onClose: () -> Unit,
     onConfigureSecurity: () -> Unit,
 ) {
-    AlertDialog(
+    AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = onClose,
         title = {
             Column {
