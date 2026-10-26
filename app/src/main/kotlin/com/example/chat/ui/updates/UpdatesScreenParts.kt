@@ -403,7 +403,7 @@ internal fun StatusViewerDialog(
 }
 
 @Composable
-private fun StatusContent(
+internal fun StatusContent(
     status: StatusRecord,
     signedUrl: String?,
     colors: ChatyColors,
@@ -482,7 +482,7 @@ private fun StatusContent(
             fontSize = 15.sp,
         )
         Spacer(Modifier.height(16.dp))
-        Button(onClick = { openUrl(signedUrl) }, modifier = Modifier.width(200.dp)) {
+        Button(onClick = { openUrl(signedUrl) }, modifier = Modifier.heightIn(min = 48.dp)) {
             Icon(Icons.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text("Open Securely")
