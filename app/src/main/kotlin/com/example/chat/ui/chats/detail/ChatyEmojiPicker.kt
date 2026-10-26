@@ -380,7 +380,14 @@ fun ChatyEmojiPickerSheet(
                                 },
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text(entry.emoji, fontSize = 24.sp)
+                            // Visible-only (LazyVerticalGrid composes just on-screen tiles): production
+                            // AnimatedEmojiView loops the Noto animation, static glyph on registry
+                            // miss / load failure / animator scale 0. Taps stay on the parent Box.
+                            AnimatedEmojiView(
+                                unicode = entry.emoji,
+                                size = 24f,
+                                mode = EmojiDisplayMode.picker,
+                            )
                         }
                     }
                 }
