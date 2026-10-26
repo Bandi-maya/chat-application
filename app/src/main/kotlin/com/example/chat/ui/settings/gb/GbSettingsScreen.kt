@@ -59,7 +59,7 @@ import androidx.compose.material.icons.rounded.SettingsSuggest
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.Widgets
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -285,10 +285,10 @@ fun GbSettingsScreen(
 
     // ---- sheets ----
     sheet?.let { s ->
-        ModalBottomSheet(
+        ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp,
             onDismissRequest = { sheet = null },
             containerColor = Color(theme.surfaceColor),
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            shape = com.example.chat.ui.kit.ChatyModalShape,
         ) {
             Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(20.dp)) {
                 when (s) {
@@ -359,7 +359,7 @@ fun GbSettingsScreen(
 
     // ---- dialogs ----
     when (dialog) {
-        GbDialog.Updates -> AlertDialog(
+        GbDialog.Updates -> AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { dialog = null }, containerColor = Color(theme.surfaceColor),
             title = { Text("Chaty Updates") },
             text = {
@@ -381,7 +381,7 @@ fun GbSettingsScreen(
                 }) { Text("View Release Notes") }
             },
         )
-        GbDialog.About -> AlertDialog(
+        GbDialog.About -> AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { dialog = null }, containerColor = Color(theme.surfaceColor),
             title = { Text("About GBWhatsApp") },
             text = {
@@ -402,7 +402,7 @@ fun GbSettingsScreen(
     if (restoreOpen) {
         val clipboard = (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).primaryClip
         var input by remember { mutableStateOf(clipboard?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString() ?: "") }
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { restoreOpen = false },
             title = { Text("Restore settings") },
             text = {
