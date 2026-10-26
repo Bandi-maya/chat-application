@@ -19,12 +19,14 @@ internal data class MediaTrimResult(val file: File, val actualStartMs: Long, val
 /** Lossless sample-copy trim. Video starts at a sync sample, not an invented frame-exact point.
  * Supports MP4 AVC/HEVC/MPEG4 video and AAC audio only. Unsupported formats fail explicitly.
  * Original is read-only; failed/cancelled outputs are deleted. No account or upload operation. */
-internal suspend fun trimMediaCopy(context: Context, source: String, startMs: Long, endMs: Long, video: Boolean, onSampleWritten: suspend (Int) -> Unit = {}): MediaTrimResult {
+internal suspend fun trimMediaCopy(context: Context, source: String, startMs: Long, endMs: Long, video: Boolean, onSampleWritten: suspend (Int) -> Unit = {}, outputFile: File? = null): MediaTrimResult {
     var pendingOutput: File? = null
     try { return withContext(Dispatchers.IO) {
     require(startMs >= 0 && endMs > startMs) { "End must be after start." }
     val extractor = MediaExtractor()
-    val out = File(context.cacheDir, "chaty_trimmed-${java.util.UUID.randomUUID()}.${if (video) "mp4" else "m4a"}")
+    val out = outputFile ?: File(context.cacheDir, "chaty_trimmed-${java.util.UUID.randomUUID()}.${if (video) "mp4" else "m4a"}")
+    // Dictated files are created/owned by EditSession. Never point this at an original.
+    require(out.canonicalPath != runCatching { File(Uri.parse(source).path.orEmpty()).canonicalPath }.getOrNull()) { "Output cannot overwrite the source." }
     pendingOutput = out
     var muxer: MediaMuxer? = null
     var started = false
