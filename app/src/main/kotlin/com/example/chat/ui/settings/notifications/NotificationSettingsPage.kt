@@ -47,7 +47,7 @@ import androidx.compose.material.icons.rounded.Subtitles
 import androidx.compose.material.icons.rounded.ToggleOn
 import androidx.compose.material.icons.rounded.VerticalAlignTop
 import androidx.compose.material.icons.rounded.Visibility
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -247,7 +247,7 @@ fun NotificationSettingsPage(
     val chipTone = when { !isIslandEnabled -> colors.foregroundSecondary; missing -> colors.warning; else -> colors.success }
 
     dialogFor?.let { (na, result) ->
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { result.complete(false) },
             title = { Text(if (na) "Allow notification access" else "Allow display over other apps") },
             text = { Text(if (na) "Android lets Chaty read notification content only after you explicitly enable Chaty Dynamic Island in Notification access settings. This is required to show notifications from other apps." else "Android requires display-over-other-apps access so the island can float above your current app. Chaty only draws the temporary notification pill.") },
