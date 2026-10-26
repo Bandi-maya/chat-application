@@ -53,19 +53,19 @@ class ApiBackendConfig(context: Context) {
         get() = BackendRoutingPolicy.tenant(customTenantId.orEmpty(), null, useDefault, defaultTenantId)
 
     /** Public routing config is baked from root .env or Gradle/environment overrides.
-     *  With none supplied, preserve Dart's Android emulator fallback. */
+     *  With none supplied, use the user's centralized public defaults. */
     val restApiBaseUrl: String
         get() = BackendRoutingPolicy.restBase(BuildConfig.DOTENV_REST_API_BASE_URL, REST_API_BASE_URL_OVERRIDE)
 
     companion object {
         const val KEY_ACTIVE_TENANT_ID = "chaty_active_tenant_id"
         const val KEY_USE_DEFAULT_TENANT = "chaty_use_default_tenant"
-        const val FALLBACK_DEFAULT_TENANT = "chat-application"
+        const val FALLBACK_DEFAULT_TENANT = BackendRoutingPolicy.DEFAULT_TENANT_ID
 
         /** Mirrors String.fromEnvironment overrides (none shipped in the repo). */
         val REST_API_BASE_URL_OVERRIDE: String get() = BuildConfig.REST_API_BASE_URL
         val TENANT_ID_OVERRIDE: String get() = BuildConfig.TENANT_ID
-        val WEBSOCKET_URL_OVERRIDE: String get() = BuildConfig.WEBSOCKET_URL
+        val WEBSOCKET_URL_OVERRIDE: String get() = BackendRoutingPolicy.websocketTemplate("", BuildConfig.WEBSOCKET_URL)
         val DOTENV_WEBSOCKET_URL: String get() = BuildConfig.DOTENV_WEBSOCKET_URL
     }
 }
