@@ -205,11 +205,11 @@ fun ChatySwitch(value: Boolean, onChanged: ((Boolean) -> Unit)?, interactive: Bo
     } else {
         Box(
             Modifier.size(width = 52.dp, height = 30.dp)
-                .background(if (value) colors.primary.copy(alpha = 0.45f) else colors.borderSubtle, RoundedCornerShape(15.dp))
+                .background(if (value) colors.primary.copy(alpha = 0.45f) else colors.foregroundSecondary.copy(alpha = 0.22f), RoundedCornerShape(15.dp))
                 .semantics { role = androidx.compose.ui.semantics.Role.Switch; toggleableState = androidx.compose.ui.state.ToggleableState(value); disabled() }
                 .padding(3.dp),
             contentAlignment = if (value) Alignment.CenterEnd else Alignment.CenterStart,
-        ) { Box(Modifier.size(22.dp).background(colors.foregroundTertiary, CircleShape)) }
+        ) { Box(Modifier.size(22.dp).background(colors.foregroundSecondary, CircleShape)) }
     }
 }
 
