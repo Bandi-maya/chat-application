@@ -198,68 +198,19 @@ fun <T> ChatySingleChoiceModal(
     val colors = LocalAppColors.current
     var draft by remember { mutableStateOf(value) }
     val changed = draft != value
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
-            Modifier
-                .widthIn(max = 520.dp)
-                .clip(ChatyModalShape)
-                .background(colors.surface)
-                .border(BorderStroke(1.dp, colors.border), ChatyModalShape),
-        ) {
-            Column(Modifier.padding(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 12.dp)) {
-                Text(title, color = colors.foreground, fontSize = 16.sp, fontWeight = FontWeight.W800)
-                if (description != null) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(description, color = colors.foregroundSecondary, fontSize = 12.sp)
+    ChatySelectionModal(title = title, onDismiss = onDismiss, onApply = { onApply(draft) }, applyEnabled = changed, applyLabel = applyLabel) {
+        LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+            if (description != null) item { Text(description, color = colors.foregroundSecondary, fontSize = 13.sp) }
+            if (previewBuilder != null) item {
+                Box(Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) { previewBuilder(draft) }
+            }
+            itemsIndexed(options) { _, option ->
+                Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    ChatyChoiceTile(labelBuilder(option), { draft = option }, Modifier.fillMaxWidth(),
+                        selected = option == draft, role = androidx.compose.ui.semantics.Role.RadioButton)
+                    descriptionBuilder?.invoke(option)?.takeIf { it.isNotEmpty() }?.let { Text(it, color = colors.foregroundSecondary, fontSize = 12.sp) }
+                    if (previewBuilder != null) previewBuilder(option)
                 }
-            }
-            HorizontalDivider(color = colors.border, thickness = 1.dp)
-            if (previewBuilder != null) {
-                Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { previewBuilder(draft) }
-            }
-            LazyColumn(Modifier.weight(1f, fill = false).padding(vertical = 8.dp)) {
-                itemsIndexed(options) { index, option ->
-                    val desc = descriptionBuilder?.invoke(option)
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .selectable(selected = option == draft, onClick = { draft = option })
-                            .padding(horizontal = 12.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(
-                            selected = option == draft,
-                            onClick = { draft = option },
-                            colors = RadioButtonDefaults.colors(selectedColor = colors.primary),
-                        )
-                        Column(Modifier.weight(1f).padding(start = 4.dp)) {
-                            Text(
-                                labelBuilder(option),
-                                color = if (option == draft) colors.primary else colors.foreground,
-                                fontSize = 16.sp,
-                            )
-                            if (!desc.isNullOrEmpty()) {
-                                Text(desc, color = colors.foregroundSecondary, fontSize = 14.sp)
-                            }
-                        }
-                        if (previewBuilder != null) previewBuilder(option)
-                    }
-                    if (index < options.lastIndex) {
-                        HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = colors.borderSubtle, thickness = 1.dp)
-                    }
-                }
-            }
-            HorizontalDivider(color = colors.border, thickness = 1.dp)
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End,
-            ) {
-                TextButton(onClick = onDismiss) { Text("Cancel", color = colors.primary) }
-                Spacer(Modifier.width(8.dp))
-                Button(
-                    onClick = { onApply(draft) },
-                    enabled = changed,
-                ) { Text(applyLabel) }
             }
         }
     }
