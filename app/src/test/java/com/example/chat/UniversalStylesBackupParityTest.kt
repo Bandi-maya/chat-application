@@ -161,64 +161,30 @@ class UniversalStylesBackupParityTest {
         assertEquals(3, convos[0]["unreadCount"])
     }
 
-    @Test fun `performBackup writes chaty_backup file with fixed timestamp and message`() {
+    @Test fun `performBackup is contained - writes nothing and keeps existing files`() {
         val f = Fixture(tempRoot("backup"))
+        val dir = f.logic.ensureBackupDir()
+        val existing = File(dir, "chaty_backup_1.json").also { it.writeText("{}") }
         val result = f.logic.performBackup("Chaty database")
-        assertTrue(result is BackupRestoreLogic.Result.BackupOk)
-        val ok = result as BackupRestoreLogic.Result.BackupOk
-        assertEquals("chaty_backup_1761438600000.json", ok.fileName)
-        assertEquals("Chaty database backup created successfully! Saved to chaty_backup_1761438600000.json", ok.message)
-        val written = File(f.docs, "ChatyBackups/chaty_backup_1761438600000.json")
-        assertTrue(written.exists())
-        val parsed = BackupRestoreLogic.fromJson(written.readText())
-        assertEquals("chaty_full_backup", parsed["kind"])
-        // JSON round trip preserves conversation values
-        @Suppress("UNCHECKED_CAST")
-        val convos = parsed["conversations"] as List<Map<String, Any?>>
-        assertEquals("Alice", convos[0]["title"])
+        assertTrue(result is BackupRestoreLogic.Result.Failure)
+        assertEquals(listOf("chaty_backup_1.json"), dir.list()!!.toList())
+        assertEquals("{}", existing.readText())
     }
 
-    @Test fun `restore applies only universal prefs, from newest backup`() {
+    @Test fun `performRestore is contained - applies nothing and leaves files`() {
         val f = Fixture(tempRoot("restore"))
-        // Older backup with a different universal value
         val dir = f.logic.ensureBackupDir()
-        val older = File(dir, "chaty_backup_1000.json")
-        older.writeText(
+        val file = File(dir, "chaty_backup_1.json")
+        file.writeText(
             BackupRestoreLogic.toJson(
-                mapOf(
-                    "kind" to "chaty_full_backup",
-                    "preferences" to mapOf("universal" to mapOf("launcherIcon" to "Obsidian")),
-                )
+                mapOf("kind" to "chaty_full_backup", "preferences" to mapOf("universal" to mapOf("launcherIcon" to "Obsidian")))
             )
         )
-        older.setLastModified(1000L)
-        f.logic.performBackup("Chaty database")
-        val newer = File(dir, "chaty_backup_1761438600000.json")
-        newer.setLastModified(2000L)
-
+        val before = file.readText()
         val result = f.logic.performRestore("Chaty database")
-        assertTrue(result is BackupRestoreLogic.Result.RestoreOk)
-        assertEquals("chaty_backup_1761438600000.json", (result as BackupRestoreLogic.Result.RestoreOk).fileName)
-        // universal from the NEWER file applied (Classic, from the fixture snapshot)
-        assertEquals(1, f.appliedUniversal.size)
-        assertEquals("Classic", f.appliedUniversal[0]["launcherIcon"])
-    }
-
-    @Test fun `restore failures match Dart messages`() {
-        val f = Fixture(tempRoot("failures"))
-        // No directory at all
-        var result = f.logic.performRestore("Chaty database")
-        assertEquals("No backup directory found.", (result as BackupRestoreLogic.Result.Failure).message)
-        // Directory but no backups
-        f.logic.ensureBackupDir()
-        result = f.logic.performRestore("Chaty database")
-        assertEquals("No local backups found to restore.", (result as BackupRestoreLogic.Result.Failure).message)
-        // Invalid manifest kind
-        File(f.docs, "ChatyBackups/bad.json").writeText("""{"kind":"something_else"}""")
-        result = f.logic.performRestore("Chaty database")
-        val msg = (result as BackupRestoreLogic.Result.Failure).message
-        assertTrue(msg, msg.startsWith("Restore failed: "))
-        assertTrue(msg, msg.contains("Invalid or unverified backup manifest format."))
+        assertTrue(result is BackupRestoreLogic.Result.Failure)
+        assertTrue(f.appliedUniversal.isEmpty())
+        assertEquals(before, file.readText())
     }
 
     @Test fun `applyBackupManifest rejects wrong kind and ignores missing prefs`() {
