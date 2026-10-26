@@ -35,17 +35,7 @@ class LocalSnapshotCacheService(context: Context) : SnapshotCacheStore {
     private val secureStorage = EncryptedSharedPreferences.create(
         appContext,
         "chaty_snapshot_secure_store",
-        MasterKey.Builder(appContext)
-            .setKeyGenParameterSpec(
-                KeyGenParameterSpec.Builder(
-                    "chaty_snapshot_master",
-                    KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
-                ).setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                    .setKeySize(256)
-                    .build(),
-            )
-            .build(),
+        MasterKey.Builder(appContext).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
     )
