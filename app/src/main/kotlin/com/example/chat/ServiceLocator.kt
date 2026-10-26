@@ -286,6 +286,16 @@ object ServiceLocator {
             onPendingEnqueued = { appScope.launch { outgoingQueue.processQueue() } },
             snapshotCache = snapshotCache,
             snapshotScope = appScope,
+            // Dart backend_service _shouldSendReadReceipts: ghost mode, readReceipts and blue-ticks-after-reply.
+            shouldSendReadReceipts = { conversationId ->
+                val p = preferencesController
+                com.example.chat.ui.core.system.ReadReceiptPolicy.shouldSend(
+                    ghostMode = p.home.ghostMode, gbGhost = p.gbBool("yo_want_ghostmode"),
+                    readReceipts = p.privacy.readReceipts, blueTicksAfterReply = p.privacy.showBlueTicksAfterReply,
+                    myId = currentUserId(),
+                    senderIds = conversationsRepository.messagesByChatId[conversationId]?.map { it.senderId },
+                )
+            },
         )
     }
 
