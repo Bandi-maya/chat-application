@@ -150,6 +150,75 @@ class MediaInteractionProofTest {
         }
     }
 
+    @Test fun editorCropApplyExportsSquareCopyResetRestoresPortrait() {
+        val image = photo()
+        val original = image.readBytes()
+        ActivityScenario.launch(MediaFixtureActivity::class.java).use { scenario ->
+            var applied: File? = null
+            scenario.onActivity { it.setContent {
+                MaterialTheme {
+                    var open by remember { mutableStateOf(true) }
+                    if (open) ImageEditorScreen(image.toURI().toString(), onCancel = { open = false }, onApply = { file -> applied = file; open = false })
+                    else Text("Crop applied", Modifier.safeDrawingPadding())
+                }
+            } }
+            assertTrue(device.wait(Until.hasObject(By.desc("Image being edited")), 10000))
+            clickText("Square")
+            capture("25-image-editor-square-crop")
+            val crop = device.findObject(By.desc("Image being edited")).visibleBounds
+            assertTrue("Square preview", kotlin.math.abs(crop.width() - crop.height()) <= 3)
+            clickText("Reset")
+            device.waitForIdle()
+            val reset = device.findObject(By.desc("Image being edited")).visibleBounds
+            assertTrue("Reset restores portrait", reset.height() > reset.width())
+            clickText("Square")
+            clickText("Apply")
+            waitText("Crop applied")
+            val result = android.graphics.BitmapFactory.decodeFile(applied!!.path)
+            assertEquals(result.width, result.height)
+            assertArrayEquals(original, image.readBytes())
+        }
+    }
+
+    @Test fun narrowAudioTrimCancelThenApplyPreservesOriginal() {
+        val context = inst.targetContext
+        val audio = File(context.cacheDir, "synthetic-ui-trim.m4a")
+        MediaFollowOnProofTest().createSilentAac(audio)
+        val original = audio.readBytes()
+        ActivityScenario.launch(MediaFixtureActivity::class.java).use { scenario ->
+            var result: MediaTrimResult? = null
+            fun show() { scenario.onActivity { it.setContent {
+                MaterialTheme {
+                    var open by remember { mutableStateOf(true) }
+                    if (open) Box(Modifier.width(320.dp).fillMaxHeight()) {
+                        MediaTrimScreen(audio.toURI().toString(), false, onCancel = { open = false }, onApply = { value -> result = value; open = false })
+                    } else Text(if (result == null) "Trim cancelled" else "Trim exported", Modifier.safeDrawingPadding())
+                }
+            } } }
+            show()
+            waitText("Trim a copy")
+            assertTrue(device.wait(Until.hasObject(By.textContains("Start:")), 10000))
+            capture("26-audio-trim-narrow-range")
+            val apply = device.findObject(By.text("Apply")).visibleBounds
+            assertTrue(apply.left >= 0 && apply.right <= device.displayWidth)
+            clickText("Cancel")
+            waitText("Trim cancelled")
+            assertNull(result)
+            assertArrayEquals(original, audio.readBytes())
+            scenario.onActivity { it.setContent { Text("Reset") } }
+            show()
+            assertTrue(device.wait(Until.hasObject(By.textContains("Start:")), 10000))
+            clickText("Apply")
+            waitText("Trim exported")
+            assertNotNull(result)
+            assertTrue(result!!.file.length() > 0)
+            assertArrayEquals(original, audio.readBytes())
+            capture("27-audio-trim-exported")
+            result!!.file.delete()
+        }
+        audio.delete()
+    }
+
     @Test fun restrictedViewerHasNoShareEditOrExternalOpen() {
         val image = photo()
         ActivityScenario.launch(MediaFixtureActivity::class.java).use { scenario ->
