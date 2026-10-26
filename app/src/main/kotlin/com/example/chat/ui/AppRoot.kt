@@ -330,6 +330,7 @@ fun AppRoot() {
                     com.example.chat.ui.core.theme.ChatyColors(themeController.globalTheme)
                 }
                 var settingsNotice by remember { mutableStateOf<String?>(null) }
+                var showCallPicker by remember { mutableStateOf(false) }
                 var settingsSub by remember { mutableStateOf<com.example.chat.ui.settings.SettingsDestination?>(null) }
                 var pushedSettings by remember { mutableStateOf(false) }
                 var pushedProfile by remember { mutableStateOf(false) }
@@ -460,14 +461,50 @@ fun AppRoot() {
                                 val history = ServiceLocator.callHistory
                                 val callScope = androidx.compose.runtime.rememberCoroutineScope()
                                 androidx.compose.runtime.LaunchedEffect(Unit) { history.start() }
+                                if (showCallPicker) {
+                                    androidx.compose.ui.window.Dialog(
+                                        onDismissRequest = { showCallPicker = false },
+                                        properties = androidx.compose.ui.window.DialogProperties(
+                                            usePlatformDefaultWidth = false,
+                                            decorFitsSystemWindows = false,
+                                        ),
+                                    ) {
+                                        val ctx = androidx.compose.ui.platform.LocalContext.current
+                                        com.example.chat.ui.calls.CallContactPickerScreen(
+                                            contacts = ServiceLocator.apiBackend.users,
+                                            currentUserId = ServiceLocator.apiBackend.currentUser?.id ?: "",
+                                            initialMode = com.example.chat.ui.calls.CallContactPickerMode.dialpad,
+                                            onBack = { showCallPicker = false },
+                                            onStartCall = { contact, isVideo ->
+                                                val name = contact.displayName.trim()
+                                                ServiceLocator.callPresentationController.showFullScreen()
+                                                callScope.launch {
+                                                    try {
+                                                        ServiceLocator.callSignaling.initiateCall(
+                                                            contact.id,
+                                                            if (name.isEmpty()) "Chaty contact" else name,
+                                                            if (name.isEmpty()) "?" else name.substring(0, 1).uppercase(),
+                                                            contact.avatarColorHex,
+                                                            isVideo,
+                                                        )
+                                                        showCallPicker = false
+                                                    } catch (e: Exception) {
+                                                        android.widget.Toast.makeText(ctx, (e.message ?: e.toString()).replace("Bad state: ", ""), android.widget.Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                            },
+                                            showToast = { m, _ -> android.widget.Toast.makeText(ctx, m, android.widget.Toast.LENGTH_SHORT).show() },
+                                        )
+                                    }
+                                }
                                 com.example.chat.ui.calls.CallsScreen(
                                     records = history.records,
                                     historyUnavailable = history.lastError != null,
                                     currentUserId = ServiceLocator.apiBackend.currentUser?.id ?: "",
-                                    contactFor = { null },
+                                    contactFor = { id -> ServiceLocator.apiBackend.users.firstOrNull { it.id == id } },
                                     onRefresh = { callScope.launch { history.refresh() } },
-                                    // Add-call contact picker host is not wired yet.
-                                    onOpenAddCall = { settingsNotice = "New call" },
+                                    // Dart calls_screen FAB: push CallContactPickerScreen(dialpad).
+                                    onOpenAddCall = { showCallPicker = true },
                                     onRedial = { remoteUserId, displayName, initials, colorHex, isVideo ->
                                         ServiceLocator.callPresentationController.showFullScreen()
                                         callScope.launch {
