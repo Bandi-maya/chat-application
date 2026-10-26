@@ -36,6 +36,7 @@ class ChatAttachmentsBindings(
     val onMedia: (String) -> Unit,
     val onContact: () -> Unit,
     val onLocation: () -> Unit,
+    val controller: com.example.chat.ui.chats.detail.ChatAttachmentActionController,
 )
 
 @Composable
@@ -99,7 +100,7 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                 override suspend fun createPoll(question: String, options: List<String>, allowMultiple: Boolean) {
                     ServiceLocator.gbFeatures.createPoll(conversationId, question, options, allowMultiple)
                 }
-                override suspend fun getPoll(messageId: String): Map<String, Any?>? = null
+                override suspend fun getPoll(messageId: String): Map<String, Any?>? = ServiceLocator.gbFeatures.getPoll(messageId)
                 override suspend fun votePoll(messageId: String, optionId: String) {
                     ServiceLocator.gbFeatures.votePoll(messageId, optionId)
                 }
@@ -196,5 +197,5 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
             confirmButton = { TextButton(onClick = { viewOnceAsk = null; d.complete(true) }) { Text("View once") } },
         )
     }
-    return ChatAttachmentsBindings(onMedia, onContact, onLocation)
+    return ChatAttachmentsBindings(onMedia, onContact, onLocation, controller)
 }
