@@ -2,6 +2,7 @@ package com.example.chat.ui.settings
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CleaningServices
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Hd
@@ -18,7 +19,13 @@ import com.example.chat.ui.theme.LocalAppColors
  * behavior is kept. [onClearCache] lets the integration owner show "Media cache cleared successfully."
  */
 @Composable
-fun StorageMediaScreen(onBack: () -> Unit, onClearCache: () -> Unit) {
+fun StorageMediaScreen(
+    onBack: () -> Unit,
+    onClearCache: () -> Unit,
+    /** Offline media limit in MB (500 / 1024 / 2048); the owner reads/writes MediaCacheSettings. */
+    cacheLimitMb: Int = 1024,
+    onCacheLimitChange: (Int) -> Unit = {},
+) {
     val colors = LocalAppColors.current
     ChatySettingsPage("Storage & Data", "Media quality, upload limits & cache retention", onBack = onBack) {
         ChatySettingsSection("Media Upload & Quality", "Configure resolution and maximum upload size thresholds.") {
@@ -32,6 +39,19 @@ fun StorageMediaScreen(onBack: () -> Unit, onClearCache: () -> Unit) {
             ChatySwitchTile("When Connected on Wi-Fi", true, {}, Icons.Rounded.Wifi, colors.success, "Photos, voice notes and documents")
             ChatySettingsRowDivider()
             ChatySwitchTile("When Using Mobile Data", false, {}, Icons.Rounded.SignalCellularAlt, colors.warning, "Voice notes only")
+        }
+        ChatySettingsSection("Offline Media Storage", "Media you open or download is kept encrypted on this phone. When the limit is reached the oldest local copies are removed; your server copies are never deleted.") {
+            listOf(500 to "500 MB", 1024 to "1 GB", 2048 to "2 GB").forEachIndexed { index, (mb, label) ->
+                if (index > 0) ChatySettingsRowDivider()
+                ChatySettingsTile(
+                    title = label,
+                    icon = Icons.Outlined.PhotoLibrary,
+                    iconColor = colors.primary,
+                    subtitle = if (mb == 1024) "Default" else null,
+                    trailing = { if (cacheLimitMb == mb) Icon(Icons.Rounded.Check, "Selected", tint = colors.primary) },
+                    onTap = { onCacheLimitChange(mb) },
+                )
+            }
         }
         ChatySettingsSection("Device Storage") {
             ChatySettingsTile(
