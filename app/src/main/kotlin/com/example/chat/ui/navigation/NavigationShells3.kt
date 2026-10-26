@@ -6,7 +6,6 @@ import com.example.chat.core.templates.NavigationTemplate
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -77,14 +75,6 @@ internal fun PresetNavigationShell(
         else -> 72f
     }
     val horizontalPadding = if (isIos) 10f else 0f
-    val itemWidth = when {
-        isInstagram -> 58f
-        isBasic -> 76f
-        isTelegram -> 82f
-        isOneUi -> 88f
-        isBubbles -> 76f
-        else -> 80f
-    }
     val dockBackground = when {
         isIos -> colors.surface.copy(alpha = if (isDark) 0.96f else 0.93f)
         isTelegram -> colors.surfaceElevated
@@ -121,8 +111,10 @@ internal fun PresetNavigationShell(
                         .align(Alignment.BottomCenter),
                 )
             }
+            // Every destination stays visible and equally wide (no horizontal scroll,
+            // no fixed per-style width that pushes items off narrow screens).
             Row(
-                modifier = Modifier.fillMaxSize().horizontalScroll(rememberScrollState()),
+                modifier = Modifier.fillMaxSize(),
             ) {
                 navItemIds.forEachIndexed { index, id ->
                     val selected = index == selectedIndex
@@ -131,7 +123,7 @@ internal fun PresetNavigationShell(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                         modifier = Modifier
-                            .width(itemWidth.dp)
+                            .weight(1f)
                             .height(barHeight.dp)
                             .clickable { onSelect(index) }
                             .padding(horizontal = if (isBasic) 2.dp else 4.dp, vertical = if (isInstagram) 0.dp else 4.dp),
