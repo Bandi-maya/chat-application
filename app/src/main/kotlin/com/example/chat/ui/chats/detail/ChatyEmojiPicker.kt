@@ -92,11 +92,19 @@ fun ChatyEmojiPickerSheet(
     recentCache: EmojiRecentCache = remember { EmojiRecentCache().apply { initialize() } },
     onEmojiPicked: (String) -> Unit = {},
     onComposerDone: (ChatyEmojiComposerResult) -> Unit = {},
+    headerColor: Color? = null,
+    headerIconsColor: Color? = null,
+    backgroundColor: Color? = null,
 ) {
-    val surface = Color(theme.surfaceColor)
+    // Dart ChatyEmojiPicker: backgroundColor ?? surface, headerColor as the header
+    // container color (null = none), headerIconsColor ?? onSurface for the header
+    // title and icons - fed by conversation.emojiHeaderColor /
+    // emojiHeaderIconsColor / emojiPickerBgColor at the call sites.
+    val surface = backgroundColor ?: Color(theme.surfaceColor)
     val foreground = Color(theme.primaryTextColor)
     val foregroundSecondary = Color(theme.secondaryTextColor)
     val accent = Color(theme.accentColor)
+    val headerForeground = headerIconsColor ?: foreground
 
     var heightFactor by remember {
         mutableStateOf(
@@ -174,6 +182,7 @@ fun ChatyEmojiPickerSheet(
         Row(
             Modifier
                 .fillMaxWidth()
+                .let { if (headerColor != null) it.background(headerColor) else it }
                 .padding(start = 18.dp, top = 2.dp, end = 12.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -183,7 +192,7 @@ fun ChatyEmojiPickerSheet(
                     composerMode -> "Message with emoji"
                     else -> "Choose emoji"
                 },
-                color = foreground,
+                color = headerForeground,
                 fontWeight = FontWeight.W800,
                 fontSize = 20.sp,
                 modifier = Modifier.weight(1f),
@@ -193,7 +202,7 @@ fun ChatyEmojiPickerSheet(
                     onComposerDone(ChatyEmojiComposerResult(draftText, ChatyEmojiComposerAction.keyboard))
                 }) {
                     Icon(Icons.Rounded.Keyboard, contentDescription = "Return to keyboard",
-                        tint = foreground)
+                        tint = headerForeground)
                 }
             }
             IconButton(onClick = {
@@ -203,7 +212,7 @@ fun ChatyEmojiPickerSheet(
                     onEmojiPicked("")
                 }
             }) {
-                Icon(Icons.Rounded.Close, contentDescription = "Close", tint = foreground)
+                Icon(Icons.Rounded.Close, contentDescription = "Close", tint = headerForeground)
             }
         }
 
