@@ -1,5 +1,6 @@
 package com.example.chat.ui
 
+import com.example.chat.ServiceLocator
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -82,6 +83,20 @@ fun ChatyEventToastOverlay(
             !preferences.universal.disableHeadsUpNotification
         ) {
             visible = latest
+            // Dart _onNotificationChanged: DynamicIslandController.postPayload(chatMessage), masked while locked.
+            // No onQuickReply/onMarkAsRead callbacks, exactly like Dart's payload (quick reply is a no-op there).
+            ServiceLocator.dynamicIslandController.postPayload(
+                com.example.chat.ui.island.DynamicIslandPayload(
+                    id = latest.id,
+                    type = com.example.chat.ui.island.IslandPayloadType.chatMessage,
+                    title = latest.title,
+                    message = if (concealWhileLocked) "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" else latest.body,
+                    timestamp = latest.timestamp,
+                    accentColor = Color(latest.colorArgb.toInt()),
+                    senderInitials = latest.avatarInitials,
+                    canQuickReply = true,
+                ),
+            )
         }
     }
     val seconds = preferences.gbInt("event_toast_duration_seconds", 3).coerceIn(2, 8)
@@ -111,24 +126,7 @@ fun ChatyEventToastOverlay(
             val colors = LocalAppColors.current
             val body = if (concealWhileLocked) "••••••" else shown.body
             if (islandMode) {
-                Row(
-                    Modifier.statusBarsPadding().padding(top = 1.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Color(0xFF08090B))
-                        .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(18.dp))
-                        .clickable { visible = null }
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Box(Modifier.size(7.dp).clip(CircleShape).background(Color(0xFF48D597)))
-                    Text(shown.title, color = Color.White, fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(max = 160.dp))
-                    Text(body, color = Color.White.copy(alpha = 0.72f), fontSize = 12.sp,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(max = 180.dp))
-                }
+                // Dart _buildDynamicIsland: the real DynamicIslandOverlayHost is mounted below.
             } else {
                 val avatarSize = preferences.gbDouble("toast_avatar_size", 40.0).coerceIn(24.0, 56.0).dp
                 val corner = preferences.gbDouble("toast_corner_radius", 18.0).coerceIn(4.0, 32.0).dp
@@ -186,6 +184,35 @@ fun ChatyEventToastOverlay(
                     }
                 }
             }
+        }
+        // Dart _buildDynamicIsland -> DynamicIslandOverlayHost(controller: locator<DynamicIslandController>()),
+        // shown only while heads-up is enabled and the island preference is on.
+        if (preferences.gbBool("dynamic_island_notifications", false) &&
+            preferences.notification.enableGlobalNotifications &&
+            !preferences.universal.disableHeadsUpNotification
+        ) {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            val config = androidx.compose.ui.platform.LocalConfiguration.current
+            val view = androidx.compose.ui.platform.LocalView.current
+            val statusTopDp = with(density) { androidx.compose.foundation.layout.WindowInsets.statusBars.getTop(density).toDouble() / density.density }
+            val cutouts: List<DoubleArray> = if (android.os.Build.VERSION.SDK_INT >= 28) {
+                (view.rootWindowInsets?.displayCutout?.boundingRects ?: emptyList()).map {
+                    doubleArrayOf(
+                        it.left / density.density.toDouble(), it.top / density.density.toDouble(),
+                        it.right / density.density.toDouble(), it.bottom / density.density.toDouble(),
+                    )
+                }
+            } else emptyList()
+            com.example.chat.ui.island.DynamicIslandOverlayHost(
+                controller = ServiceLocator.dynamicIslandController,
+                anchorInput = com.example.chat.ui.island.CutoutAnchorInput(
+                    viewPaddingTop = statusTopDp,
+                    paddingTop = statusTopDp,
+                    screenWidth = config.screenWidthDp.toDouble(),
+                    cutoutBounds = cutouts,
+                ),
+                screenHeight = config.screenHeightDp.toDouble(),
+            )
         }
     }
 }
