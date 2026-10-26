@@ -3,7 +3,9 @@ package com.example.chat.ui.calls
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -132,6 +134,11 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
         return
     }
     if (presentation.isInAppVideoPip) {
+        // GlobalCallHost is no longer inside AppRoot's consumed-inset Box, so the
+        // draggable PiP (which clamps to its parent's measured bounds) gets its own
+        // safe-drawing bounds here. Full-screen/incoming screens are Scaffolds that
+        // paint full-bleed and apply system-bar padding to their own content.
+        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
         InAppCallPip(
             session = session,
             videoSurfaces = surfaces,
@@ -140,5 +147,6 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
             onCollapseToIsland = { presentation.collapseToIsland() },
             onEndCall = { service.endCall() },
         )
+        }
     }
 }
