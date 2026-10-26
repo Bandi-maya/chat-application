@@ -70,6 +70,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
@@ -266,20 +268,27 @@ fun StandardHomeAppBar(
         // Small profile avatar -> Settings (real photo when uploaded, via
         // the shared ChatyAsyncImage wrapper).
         if (!forcedTypeIsSet) {
+            // 48dp touch target and TalkBack semantics around the unchanged ringed 28dp avatar.
             Box(
                 modifier = Modifier
-                    .padding(horizontal = 4.dp)
-                    .border(1.8.dp, Color(theme.accentColor), CircleShape)
-                    .padding(1.8.dp)
-                    .clickable(onClick = nav.onOpenSettings),
+                    .size(48.dp)
+                    .semantics { contentDescription = "Settings" }
+                    .clickable(onClickLabel = "Open settings", role = androidx.compose.ui.semantics.Role.Button, onClick = nav.onOpenSettings),
+                contentAlignment = Alignment.Center,
             ) {
-                HomeAvatar(
-                    initials = identity.avatarInitials,
-                    color = parseAvatarColorHex(identity.avatarColorHex, Color(theme.accentColor)),
-                    size = 28f,
-                    shape = "circle",
-                    url = identity.avatarUrl,
-                )
+                Box(
+                    modifier = Modifier
+                        .border(1.8.dp, Color(theme.accentColor), CircleShape)
+                        .padding(1.8.dp),
+                ) {
+                    HomeAvatar(
+                        initials = identity.avatarInitials,
+                        color = parseAvatarColorHex(identity.avatarColorHex, Color(theme.accentColor)),
+                        size = 28f,
+                        shape = "circle",
+                        url = identity.avatarUrl,
+                    )
+                }
             }
         }
         if (homePrefs.themesEnabled) {
