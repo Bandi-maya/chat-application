@@ -360,6 +360,7 @@ private fun FeatureTile(
             Switch(
                 checked = preferences.gbBool(definition.key, definition.defaultValue == true),
                 onCheckedChange = { preferences.updateGbFeature(definition.key, it) },
+                colors = com.example.chat.ui.kit.chatySwitchColors(),
             )
         }
         GbFeatureKind.slider -> {
