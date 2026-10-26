@@ -1,9 +1,1 @@
-2026-10-26 combined phone fixes: main-thread chat REST, realtime UI refresh, authenticated REST directory, search focus, full destination navigation and back history, safe areas and fullbleed lock/calls, FAB clearance, consumed task entry, circular dialer/T9/tones, scoped ten-dp custom modal/menu/task-form and first centered settings selectors, fixed-anchor radial navigation. Synthetic regression candidate; real-account delivery/audio and whole-app selector migration remain unverified. Includes reviewed instance-scoped old-header tab binding and synthetic selector draft/cancel/Apply proof.
-
-Compile correction: retain Close imports for editor-dismiss buttons while page Back uses ChevronLeft.
-
-Independent parallel candidate: centered GB radio/color, icon and launcher choices, bubble/tick/header galleries, emoji style selectors, shared custom switch/radio and single touch owner. Includes all critical fixes from ec0c25b6. Results must remain separate from correction run40334715139.
-
-2026-10-26 20:07 IST: C cumulative B controls plus compact dock one-line labels, safe visible selector saved-state proof, Calls arrival and failure capture; A/B results remain separate.
-
-2026-10-26 20:54 IST: D C plus accessible Add call semantics and matching instrumentation discovery. Retain actual tap, safe geometry, Tasks/menu/incoming assertions.
+E bounded phone fixes 2026-10-26 21:48 IST: menus calls camera Island media selectors swipe emoji hidden taps radial; synthetic checks only
