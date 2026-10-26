@@ -23,6 +23,36 @@ import com.example.chat.core.templates.AppearanceVariantController
  * Dart also applies the change to primaryTextTheme; Compose Material3 has no separate primary text theme.
  */
 object ChatyTypography {
+    /**
+     * Dart base text theme (toThemeData textTheme merged over englishLike2021, family 'Roboto'): sizes x ThemeConfig.fontScale,
+     * line height = size * Flutter height multiplier. Text COLOR is intentionally not baked in: Flutter colours these via
+     * primaryTextColor/secondaryTextColor, but baking a colour into Compose Typography would override LocalContentColor
+     * (e.g. button labels on primary), which Flutter buttons override themselves. Callers keep using appColors for colour.
+     */
+    @OptIn(ExperimentalTextApi::class)
+    fun base(fontScale: Double): Typography {
+        val roboto = FontFamily(
+            listOf(100, 200, 300, 400, 500, 600, 700, 800, 900).map {
+                Font(DeviceFontFamilyName("Roboto"), FontWeight(it), FontStyle.Normal)
+            },
+        )
+        val m = ChatyBaseTypographySpec.resolve(fontScale)
+        fun st(n: String): TextStyle {
+            val x = m.getValue(n)
+            return TextStyle(
+                fontFamily = roboto, fontSize = x.fontSize.sp, fontWeight = FontWeight(x.weight),
+                letterSpacing = x.letterSpacing.sp, lineHeight = (x.fontSize * x.heightMultiplier).sp,
+            )
+        }
+        return Typography(
+            displayLarge = st("displayLarge"), displayMedium = st("displayMedium"), displaySmall = st("displaySmall"),
+            headlineLarge = st("headlineLarge"), headlineMedium = st("headlineMedium"), headlineSmall = st("headlineSmall"),
+            titleLarge = st("titleLarge"), titleMedium = st("titleMedium"), titleSmall = st("titleSmall"),
+            bodyLarge = st("bodyLarge"), bodyMedium = st("bodyMedium"), bodySmall = st("bodySmall"),
+            labelLarge = st("labelLarge"), labelMedium = st("labelMedium"), labelSmall = st("labelSmall"),
+        )
+    }
+
     @OptIn(ExperimentalTextApi::class)
     private fun deviceFamily(name: String): FontFamily = FontFamily(
         listOf(100, 200, 300, 400, 500, 600, 700, 800, 900).flatMap { w ->
