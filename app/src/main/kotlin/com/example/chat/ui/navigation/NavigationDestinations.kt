@@ -21,11 +21,7 @@ fun navigationModeForLayout(layout: NavigationLayoutType): com.example.chat.core
         NavigationLayoutType.floatingPill,
         NavigationLayoutType.centerActionDock,
         -> com.example.chat.core.theme.AppNavigationMode.bottomNav
-        // Dart maps utilityBar -> AppNavigationMode.compactRail, but the
-        // Kotlin AppNavigationMode enum is missing compactRail (owner gap,
-        // reported with the exact fix). bottomNav keeps powerChat navigable;
-        // the rail shell still engages through the width-based adaptive rule.
-        NavigationLayoutType.utilityBar -> com.example.chat.core.theme.AppNavigationMode.bottomNav
+        NavigationLayoutType.utilityBar -> com.example.chat.core.theme.AppNavigationMode.compactRail
         NavigationLayoutType.identityBar -> com.example.chat.core.theme.AppNavigationMode.topWhatsAppBar
     }
 
