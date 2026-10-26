@@ -1,6 +1,11 @@
 package com.example.chat.ui
 
 import com.example.chat.ui.core.system.ChatySystemBarScrims
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -238,6 +243,12 @@ fun AppRoot() {
             )
         }
         Box(Modifier.fillMaxSize()) {
+        // Own top/cutout safety once for every route. windowInsetsPadding consumes
+        // these insets, so a child safeDrawing app bar does not add them twice.
+        // Bottom/IME ownership stays with each route and the navigation shell.
+        Box(Modifier.fillMaxSize().windowInsetsPadding(
+            WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+        )) {
         // Dart Navigator.pop for the pre-auth stack (Welcome > Login/Register > Forgot/RegisterOrganization);
         // system Back must follow the same targets as each screen's on-screen back arrow.
         androidx.activity.compose.BackHandler(
@@ -1422,6 +1433,7 @@ fun AppRoot() {
                 }
             }
         }
+        } // Shared safe-area route container.
         // API 35+: chosen status/navigation bar colors are drawn under the bars (no-op below 35 and for default colors).
         ChatySystemBarScrims(ServiceLocator.preferencesController)
         }
