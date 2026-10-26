@@ -1,5 +1,7 @@
 package com.example.chat.ui.tasks
 
+import androidx.compose.foundation.selection.selectableGroup
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,23 +25,11 @@ import androidx.compose.material.icons.rounded.Event
 import androidx.compose.material.icons.rounded.Notes
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PersonOutline
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DatePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,7 +49,8 @@ import java.time.Instant
 import java.time.ZoneId
 import kotlinx.coroutines.launch
 
-/** Exact port of task_create_edit_modal.dart: New/Edit Task sheet with title
+/** Task form behavior ported from task_create_edit_modal.dart; custom Chaty controls requested by the user.
+ *  Previously: New/Edit Task sheet with title
  *  + description inputs, 'Assign To' participant chips + Me chip, Low/Med/
  *  High/Urgent segmented priority, Today 6 PM / Tomorrow / Next Week quick
  *  chips + date picker, exact validation and error text, exact success
@@ -170,7 +161,7 @@ fun TaskCreateEditModal(
         }
     }
 
-    ModalBottomSheet(onDismissRequest = { if (!isSaving) onDismiss() }) {
+    ModalBottomSheet(tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = { if (!isSaving) onDismiss() }) {
         Column(
             modifier = Modifier
                 .imePadding()
@@ -200,24 +191,15 @@ fun TaskCreateEditModal(
                 }
             }
             Spacer(Modifier.height(16.dp))
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                enabled = !isSaving,
-                placeholder = { Text("Task Title") },
+            com.example.chat.ui.kit.ChatyTaskField(
+                value = title, onValueChange = { title = it }, placeholder = "Task Title", enabled = !isSaving,
                 leadingIcon = { Icon(Icons.Rounded.CheckBox, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
             )
             Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
-                enabled = !isSaving,
-                placeholder = { Text("Description & instructions (optional)") },
+            com.example.chat.ui.kit.ChatyTaskField(
+                value = description, onValueChange = { description = it },
+                placeholder = "Description & instructions (optional)", enabled = !isSaving, singleLine = false,
                 leadingIcon = { Icon(Icons.Rounded.Notes, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 3,
             )
             Spacer(Modifier.height(16.dp))
             Text("Assign To", color = colors.foreground, fontSize = 13.sp, fontWeight = FontWeight.Bold)
@@ -229,140 +211,78 @@ fun TaskCreateEditModal(
             ) {
                 for (candidate in candidateAssignees) {
                     val selected = candidate.id in selectedAssigneeIds
-                    FilterChip(
-                        selected = selected,
-                        enabled = !isSaving,
-                        onClick = { setAssignee(candidate.id, !selected) },
-                        leadingIcon = {
-                            Icon(
-                                if (selected) Icons.Rounded.CheckCircle else Icons.Rounded.PersonOutline,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                            )
-                        },
-                        label = { Text(candidate.displayName.split(" ").first()) },
+                    com.example.chat.ui.kit.ChatyChoiceTile(
+                        label = candidate.displayName.split(" ").first(), selected = selected, enabled = !isSaving,
+                        onClick = { setAssignee(candidate.id, !selected) }, role = androidx.compose.ui.semantics.Role.Checkbox,
                     )
                 }
-                FilterChip(
-                    selected = currentUser.id in selectedAssigneeIds,
-                    enabled = !isSaving,
+                com.example.chat.ui.kit.ChatyChoiceTile(
+                    label = "Me (${currentUser.displayName.split(" ").first()})",
+                    selected = currentUser.id in selectedAssigneeIds, enabled = !isSaving,
                     onClick = { setAssignee(currentUser.id, currentUser.id !in selectedAssigneeIds) },
-                    leadingIcon = { Icon(Icons.Rounded.Person, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                    label = { Text("Me (${currentUser.displayName.split(" ").first()})") },
+                    role = androidx.compose.ui.semantics.Role.Checkbox,
                 )
             }
             Spacer(Modifier.height(16.dp))
             Text("Priority", color = colors.foreground, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                val priorities = listOf(
-                    TaskPriority.low to "Low",
-                    TaskPriority.medium to "Med",
-                    TaskPriority.high to "High",
-                    TaskPriority.urgent to "Urgent",
-                )
-                priorities.forEachIndexed { index, (value, label) ->
-                    SegmentedButton(
-                        selected = priority == value,
-                        enabled = !isSaving,
-                        onClick = { priority = value },
-                        shape = SegmentedButtonDefaults.itemShape(index = index, count = priorities.size),
-                    ) { Text(label) }
+            Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(TaskPriority.low to "Low", TaskPriority.medium to "Med", TaskPriority.high to "High", TaskPriority.urgent to "Urgent").forEach { (value, label) ->
+                    com.example.chat.ui.kit.ChatyChoiceTile(label, { priority = value }, Modifier.weight(1f),
+                        selected = priority == value, enabled = !isSaving, role = androidx.compose.ui.semantics.Role.RadioButton)
                 }
             }
             Spacer(Modifier.height(16.dp))
             Text("Due Date", color = colors.foreground, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(
-                    enabled = !isSaving,
+                com.example.chat.ui.kit.ChatyChoiceTile(
+                    label = "Today 6 PM", enabled = !isSaving,
                     onClick = {
                         val now = java.time.ZonedDateTime.now()
                         dueDate = now.withHour(18).withMinute(0).withSecond(0).withNano(0).toInstant()
                     },
-                ) { Text("Today 6 PM", fontSize = 12.sp) }
-                TextButton(
-                    enabled = !isSaving,
+                )
+                com.example.chat.ui.kit.ChatyChoiceTile(
+                    label = "Tomorrow", enabled = !isSaving,
                     onClick = {
                         val t = java.time.ZonedDateTime.now().plusDays(1)
                         dueDate = t.withHour(18).withMinute(0).withSecond(0).withNano(0).toInstant()
                     },
-                ) { Text("Tomorrow", fontSize = 12.sp) }
-                TextButton(
-                    enabled = !isSaving,
+                )
+                com.example.chat.ui.kit.ChatyChoiceTile(
+                    label = "Next Week", enabled = !isSaving,
                     onClick = {
                         val t = java.time.ZonedDateTime.now().plusDays(7)
                         dueDate = t.withHour(18).withMinute(0).withSecond(0).withNano(0).toInstant()
                     },
-                ) { Text("Next Week", fontSize = 12.sp) }
+                )
             }
             Spacer(Modifier.height(4.dp))
             val zone = ZoneId.systemDefault()
             val due = dueDate.atZone(zone)
-            OutlinedButton(
-                onClick = { if (!isSaving) showDatePicker = true },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(Icons.Rounded.Event, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "Due ${due.dayOfMonth.toString().padStart(2, '0')}/" +
-                        "${due.monthValue.toString().padStart(2, '0')}/${due.year} at " +
-                        "${due.hour.toString().padStart(2, '0')}:${due.minute.toString().padStart(2, '0')}",
-                )
-            }
+            com.example.chat.ui.kit.ChatyChoiceTile(
+                label = "Due ${due.dayOfMonth.toString().padStart(2, '0')}/" +
+                    "${due.monthValue.toString().padStart(2, '0')}/${due.year} at " +
+                    "${due.hour.toString().padStart(2, '0')}:${due.minute.toString().padStart(2, '0')}",
+                onClick = { showDatePicker = true }, enabled = !isSaving, modifier = Modifier.fillMaxWidth(),
+            )
             errorMessage?.let {
                 Spacer(Modifier.height(8.dp))
                 Text(it, color = colors.error, fontSize = 13.sp)
             }
             Spacer(Modifier.height(20.dp))
-            Button(
-                onClick = ::save,
-                enabled = !isSaving,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                } else {
-                    Text(if (existingTask == null) "Create & Share in Chat" else "Save Changes")
-                }
-            }
+            com.example.chat.ui.kit.ChatyChoiceTile(
+                label = if (isSaving) "Saving..." else if (existingTask == null) "Create & Share in Chat" else "Save Changes",
+                onClick = ::save, enabled = !isSaving, prominent = true, modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 
     if (showDatePicker) {
-        // Dart showDatePicker: firstDate now, lastDate now + 3650 days.
-        val pickerState = rememberDatePickerState(
-            initialSelectedDateMillis = dueDate.toEpochMilli(),
-            selectableDates = object : androidx.compose.material3.SelectableDates {
-                override fun isSelectableDate(utcTimeMillis: Long): Boolean =
-                    utcTimeMillis >= java.time.LocalDate.now(ZoneId.systemDefault())
-                        .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() &&
-                        utcTimeMillis <= Instant.now().plus(java.time.Duration.ofDays(3650)).toEpochMilli()
-            },
-        )
-        androidx.compose.material3.DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        pickerState.selectedDateMillis?.let { millis ->
-                            val selected = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault())
-                            val current = dueDate.atZone(ZoneId.systemDefault())
-                            dueDate = selected
-                                .withHour(current.hour).withMinute(current.minute)
-                                .withSecond(0).withNano(0)
-                                .toInstant()
-                        }
-                        showDatePicker = false
-                    },
-                ) { Text("OK") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
-            },
-        ) {
-            DatePicker(state = pickerState)
+        com.example.chat.ui.kit.ChatyTaskCalendar(dueDate, { showDatePicker = false }) { selected ->
+            dueDate = selected
+            showDatePicker = false
         }
     }
 }
