@@ -81,6 +81,11 @@ fun AppRoot() {
             // Dart _AppState.initState: locator<MessageAutomationService>() (30s account sync, gated on a session).
             ServiceLocator.messageAutomation
         }
+        androidx.compose.runtime.LaunchedEffect(route, lockRequired) {
+            // local_auth stopAuthentication(): a pending biometric prompt never resumes after sign-out (route leaves
+            // Home) or once the lock is no longer required (unlocked another way, or lock disabled).
+            if (route != AuthRoute.Home || !lockRequired) ServiceLocator.lockBiometrics.stopAuthentication()
+        }
         var promptPending by remember { mutableStateOf(false) }
         val gate = remember { GatePrompts() }
         var newChatGroup by remember { mutableStateOf(false) }
