@@ -51,7 +51,8 @@ class CallForegroundService : Service() {
         } else {
             startForeground(SERVICE_ID, notification)
         }
-        return START_STICKY
+        // Dart allowAutoRestart=false: never recreated by the system without a live call.
+        return START_NOT_STICKY
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -82,6 +83,18 @@ class CallForegroundService : Service() {
         } else {
             @Suppress("DEPRECATION")
             Notification.Builder(this)
+        }
+        // Dart notificationInitialRoute '/': tapping the notification brings the app to its launch screen.
+        val launch = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+        if (launch != null) {
+            builder.setContentIntent(
+                android.app.PendingIntent.getActivity(
+                    this, SERVICE_ID, launch,
+                    android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
+                ),
+            )
         }
         return builder
             .setContentTitle(title)
