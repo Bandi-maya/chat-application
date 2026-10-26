@@ -326,20 +326,11 @@ fun GbFeatureCenterScreen(
 
     // ---- choice sheet (Dart _FeatureTile._choose) ----
     choiceEdit?.let { (item, current) ->
-        ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = { choiceEdit = null }) {
-            Column(Modifier.navigationBarsPadding().padding(vertical = 10.dp)) {
-                Text(item.title, Modifier.padding(start = 18.dp, top = 8.dp, end = 18.dp, bottom = 10.dp), fontSize = 16.sp, fontWeight = FontWeight.W800)
-                for (option in item.options) {
-                    Row(
-                        Modifier.fillMaxWidth().clickable { preferences.updateGbFeature(item.key, option); choiceEdit = null }.padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(option, Modifier.weight(1f), fontSize = 16.sp)
-                        Icon(if (option == current) Icons.Rounded.Check else Icons.Rounded.ChevronRight, null)
-                    }
-                }
-            }
-        }
+        com.example.chat.ui.kit.ChatySingleChoiceModal(
+            title = "Select ${item.title}", value = current, options = item.options, labelBuilder = { it },
+            description = item.description, onDismiss = { choiceEdit = null },
+            onApply = { chosen -> preferences.updateGbFeature(item.key, chosen); choiceEdit = null },
+        )
     }
 
     if (confirmReset) {
