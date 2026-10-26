@@ -140,8 +140,13 @@ object ServiceLocator {
         com.example.chat.core.preferences.LocalPreferencesStorage(requireContext())
     }
 
+    /** Android BiometricPrompt adapter behind LocalLockService (Dart local_auth). */
+    val lockBiometrics: com.example.chat.platform.AndroidLockBiometrics by lazy {
+        com.example.chat.platform.AndroidLockBiometrics(requireContext())
+    }
+
     val localLockService: com.example.chat.data.services.LocalLockService by lazy {
-        com.example.chat.data.services.LocalLockService(secureStore, biometrics = com.example.chat.platform.AndroidLockBiometrics(requireContext()))
+        com.example.chat.data.services.LocalLockService(secureStore, biometrics = lockBiometrics)
     }
 
     /** locator.dart TemplateController + AppearanceVariantController, persisted through
