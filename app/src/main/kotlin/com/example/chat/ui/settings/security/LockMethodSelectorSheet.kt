@@ -66,7 +66,7 @@ fun LockMethodSelectorSheet(
     currentMethod: LockMethodType?,
     onResult: (LockMethodType?) -> Unit,
 ) {
-    ModalBottomSheet(
+    ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = { onResult(null) },
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
