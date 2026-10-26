@@ -1,5 +1,7 @@
 package com.example.chat.ui.chats.detail
 
+import kotlinx.coroutines.ensureActive
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -174,6 +176,7 @@ fun ChatMessageBubble(
     onReactionBadgeTap: ((MessageReaction) -> Unit)? = null,
     onMediaTap: (() -> Unit)? = null,
     onMediaTapWithBounds: ((Rect) -> Unit)? = null,
+    attachmentBinding: AttachmentConsumerBinding? = null,
     onVoicePlay: ((MessageAttachment) -> Unit)? = null,
     onViewOnceOpen: (() -> Unit)? = null,
     onRetry: (() -> Unit)? = null,
@@ -407,12 +410,6 @@ fun ChatMessageBubble(
                                 strokeColor = Color(argbWithAlpha(theme.accentColor, 0.4)),
                                 accentColor = Color(theme.accentColor),
                             )
-                            // White incoming bubbles must remain visible on a white wallpaper.
-                            if (!isMe && !isVisualMedia) drawPath(
-                                bubblePath(theme.bubbleStyle, size, false),
-                                Color(theme.secondaryTextColor).copy(alpha = 0.18f),
-                                style = androidx.compose.ui.graphics.drawscope.Stroke(1f),
-                            )
                         }
                         .padding(
                             start = if (isVisualMedia) mediaInset else geometry.contentPadding.left.dp,
@@ -564,6 +561,7 @@ fun ChatMessageBubble(
                             "image" -> ImageAttachmentPreview(
                                 attachment = message.attachment!!,
                                 remoteImage = remoteImage,
+                                message = message, binding = attachmentBinding,
                                 resolveUrl = voiceUrlResolver,
                                 onTap = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke() },
                             )
@@ -572,6 +570,7 @@ fun ChatMessageBubble(
                                 textColor = Color(textColor),
                                 accentColor = Color(theme.accentColor),
                                 remoteImage = remoteImage,
+                                message = message, binding = attachmentBinding,
                                 resolveUrl = voiceUrlResolver,
                                 onTap = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke() },
                             )
@@ -583,6 +582,7 @@ fun ChatMessageBubble(
                                 playingBarColor = voicePlayingBarColor,
                                 playbackSpeed = voicePlaybackSpeed,
                                 urlResolver = voiceUrlResolver,
+                                message = message, binding = attachmentBinding,
                                 onPlay = onVoicePlay,
                             )
                             "document" -> DocumentPreview(
@@ -994,9 +994,10 @@ private fun ReactionBadge(
 private fun ImageAttachmentPreview(
     attachment: MessageAttachment,
     remoteImage: RemoteImageSlot?,
+    message: ChatMessage, binding: AttachmentConsumerBinding?,
     resolveUrl: (suspend (String) -> String)?,
     onTap: (() -> Unit)?,
-) = MediaAttachmentPreview(attachment, remoteImage, resolveUrl, onTap, false)
+) = MediaAttachmentPreview(attachment, remoteImage, resolveUrl, onTap, false, message, binding)
 
 @Composable
 private fun VideoAttachmentPreview(
@@ -1004,9 +1005,10 @@ private fun VideoAttachmentPreview(
     textColor: Color,
     accentColor: Color,
     remoteImage: RemoteImageSlot?,
+    message: ChatMessage, binding: AttachmentConsumerBinding?,
     resolveUrl: (suspend (String) -> String)?,
     onTap: (() -> Unit)?,
-) = MediaAttachmentPreview(attachment, remoteImage, resolveUrl, onTap, true)
+) = MediaAttachmentPreview(attachment, remoteImage, resolveUrl, onTap, true, message, binding)
 
 /** Port of _VoiceNotePlayer (message_bubble.dart:1578-1730): signed-url load on first play,
  *  pause/resume, restart after completion, live speed apply while playing, progress bar
@@ -1022,17 +1024,25 @@ private fun VoiceNoteCard(
     playbackSpeed: Double = 1.0,
     urlResolver: (suspend (String) -> String)? = null,
     onPlay: ((MessageAttachment) -> Unit)?,
+    message: ChatMessage,
+    binding: AttachmentConsumerBinding?,
 ) {
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val player = remember(attachment.id) { android.media.MediaPlayer() }
+    val audioContext = androidx.compose.ui.platform.LocalContext.current
+    val player = remember(attachment.id, binding?.session) { android.media.MediaPlayer() }
     var loading by remember(attachment.id) { mutableStateOf(false) }
     var playing by remember(attachment.id) { mutableStateOf(false) }
     var prepared by remember(attachment.id) { mutableStateOf(false) }
     var completed by remember(attachment.id) { mutableStateOf(false) }
     var totalMs by remember(attachment.id) { mutableStateOf<Int?>(null) }
     var positionMs by remember(attachment.id) { mutableStateOf(0) }
-    androidx.compose.runtime.DisposableEffect(attachment.id) {
-        onDispose { try { player.release() } catch (_: Exception) {} }
+    var playbackSource by remember(attachment.id, binding?.session) { mutableStateOf<com.example.chat.data.media.ResolvedSource?>(null) }
+    var playbackError by remember(attachment.id, binding?.session) { mutableStateOf<String?>(null) }
+    androidx.compose.runtime.DisposableEffect(attachment.id, binding?.session) {
+        onDispose {
+            // The row owns this MediaPlayer, not the app-wide coordinator. Stop reader BEFORE deleting lease.
+            try { player.release() } finally { releaseConsumerSource(playbackSource); playbackSource = null }
+        }
     }
     androidx.compose.runtime.LaunchedEffect(playing, playbackSpeed) {
         if (playing && prepared) {
@@ -1063,26 +1073,43 @@ private fun VoiceNoteCard(
                     loading = true
                     val path = attachment.url
                     if (path.isNullOrEmpty()) throw IllegalStateException("Voice note path is missing.")
-                    val url = urlResolver?.invoke(path) ?: path
+                    val url = if (binding != null) {
+                        val result = binding.resolve(message, true)
+                        try {
+                            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                            check(binding.deliver(result) { playbackSource = result }) { "Session changed" }
+                        }
+                        catch (e: kotlinx.coroutines.CancellationException) { releaseConsumerSource(result); throw e }
+                        result.consumerUri() ?: throw IllegalStateException("Audio unavailable offline or access denied.")
+                    } else urlResolver?.invoke(path) ?: path
                     kotlinx.coroutines.suspendCancellableCoroutine<Unit> { cont ->
                         player.setOnPreparedListener { if (cont.isActive) cont.resumeWith(Result.success(Unit)) }
                         player.setOnErrorListener { _, w, e ->
                             if (cont.isActive) cont.resumeWith(Result.failure(IllegalStateException("Audio error $w/$e")))
                             true
                         }
-                        player.setDataSource(url)
+                        if (binding != null) player.setDataSource(audioContext, android.net.Uri.parse(url))
+                        else player.setDataSource(url)
                         player.prepareAsync()
                     }
                     totalMs = player.duration
                     prepared = true
-                    player.setOnCompletionListener { playing = false; completed = true; positionMs = player.duration }
+                    player.setOnCompletionListener {
+                        playing = false; completed = false; positionMs = totalMs ?: 0
+                        runCatching { player.reset() }; prepared = false
+                        releaseConsumerSource(playbackSource); playbackSource = null
+                    }
                 }
                 if (completed) { player.seekTo(0); completed = false; positionMs = 0 }
                 try { player.playbackParams = player.playbackParams.setSpeed(playbackSpeed.toFloat()) } catch (_: Exception) {}
-                player.start()
-                playing = true
-            } catch (_: Exception) {
-                playing = false
+                if (binding != null) {
+                    check(binding.deliverIfCurrent { player.start(); playing = true }) { "Session changed" }
+                } else { player.start(); playing = true }
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) {
+                playing = false; playbackError = e.message ?: "Audio unavailable"
+                runCatching { player.reset() }; prepared = false
+                releaseConsumerSource(playbackSource); playbackSource = null
             } finally {
                 loading = false
             }
@@ -1130,6 +1157,7 @@ private fun VoiceNoteCard(
                 trackColor = (playingBarColor ?: MaterialTheme.colorScheme.primary).copy(alpha = 0.24f),
             )
             Box(Modifier.height(5.dp))
+            playbackError?.let { Text(it, color = textColor, fontSize = 10.sp) }
             Text("${fmt(positionMs)} / ${fmt(total)}", color = textColor.copy(alpha = 0.75f), fontSize = 10.5.sp)
         }
     }
