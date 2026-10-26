@@ -350,62 +350,8 @@ fun GbSettingsScreen(
                             restoreOpen = true
                         }
                     }
-                    GbSheet.Waste -> {
-                        Text("Expired Cache Cleanup", color = Color(theme.primaryTextColor), fontSize = (18f * fs).sp, fontWeight = FontWeight.W700)
-                        Spacer(Modifier.height(10.dp))
-                        Text("Only Chaty-generated compressed image copies older than 24 hours are eligible. Voice notes, recent uploads, unsent staged media, chat attachments and profile images are preserved.", color = Color(theme.secondaryTextColor), fontSize = 13.sp)
-                        Spacer(Modifier.height(16.dp))
-                        val stats by produceState<Result<GbSettingsLogic.CacheStats>?>(null) {
-                            value = withContext(Dispatchers.IO) { runCatching { GbSettingsLogic.scanExpiredCompressedImages(context.cacheDir) } }
-                        }
-                        val r = stats
-                        when {
-                            r == null -> Box(Modifier.fillMaxWidth().padding(18.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                            r.isFailure -> Text("Cache information is unavailable on this device.", color = Color(theme.secondaryTextColor))
-                            else -> {
-                                val st = r.getOrThrow()
-                                Row(
-                                    Modifier.fillMaxWidth().background(colors.primary.copy(alpha = 0.08f), RoundedCornerShape(14.dp)).padding(14.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Icon(Icons.Rounded.CleaningServices, null, tint = accent, modifier = Modifier.size(28.dp))
-                                    Spacer(Modifier.width(14.dp))
-                                    Column(Modifier.weight(1f)) {
-                                        Text("Expired image cache", fontWeight = FontWeight.Bold, color = Color(theme.primaryTextColor))
-                                        Text("${st.count} file(s) \u2022 ${GbSettingsLogic.formatCacheSize(st.bytes)}", fontSize = 12.sp, color = Color(theme.secondaryTextColor))
-                                    }
-                                }
-                                Spacer(Modifier.height(16.dp))
-                                Button(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = colors.onPrimary),
-                                    enabled = st.count != 0,
-                                    onClick = {
-                                        sheet = null
-                                        scope.launch {
-                                            val removed = withContext(Dispatchers.IO) { GbSettingsLogic.cleanExpiredCompressedImages(context.cacheDir) }
-                                            toast("Removed ${removed.count} expired file(s), ${GbSettingsLogic.formatCacheSize(removed.bytes)}.")
-                                        }
-                                    },
-                                ) {
-                                    Icon(Icons.Rounded.DeleteSweep, null)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(if (st.count == 0) "No expired cache to clean" else "Clean ${st.count} expired file(s)")
-                                }
-                            }
-                        }
-                    }
-                    GbSheet.Widgets -> {
-                        Text("Home shortcuts", color = Color(theme.primaryTextColor), fontSize = (18f * fs).sp, fontWeight = FontWeight.W700)
-                        Spacer(Modifier.height(10.dp))
-                        Text("Chaty applies home layout and shortcut settings inside the app. Native Android/iOS launcher widgets are not registered in this build, so this screen does not show switches that cannot take effect.", color = Color(theme.secondaryTextColor), fontSize = 13.sp)
-                        Spacer(Modifier.height(18.dp))
-                        Button(modifier = Modifier.fillMaxWidth(), onClick = { sheet = null; onOpenHome() }) {
-                            Icon(Icons.Rounded.DashboardCustomize, null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Customize in-app home")
-                        }
-                    }
+                    GbSheet.Waste -> GbWasteCleaningSheetContent(onDismissSheet = { sheet = null }, toast = { toast(it) })
+                    GbSheet.Widgets -> GbHomeShortcutsSheetContent(onDismissSheet = { sheet = null }, onOpenHome = onOpenHome)
                 }
             }
         }
