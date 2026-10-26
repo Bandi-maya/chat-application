@@ -212,7 +212,7 @@ private fun PrivacyTile(
         Switch(
             checked = value,
             onCheckedChange = if (saving) null else onChanged,
-            colors = SwitchDefaults.colors(checkedTrackColor = colors.primary, checkedThumbColor = colors.onPrimary),
+            colors = com.example.chat.ui.kit.chatySwitchColors(checkedThumbColor = colors.onPrimary, checkedTrackColor = colors.primary),
         )
     }
 }
