@@ -795,7 +795,7 @@ fun AppRoot() {
                         }
                     }
                 }
-                if (pushedProfile) {
+                ChatyPushedPage(pushedProfile) {
                     androidx.activity.compose.BackHandler(enabled = settingsSub == null && !pushedSettings) { pushedProfile = false }
                     val profUser = ServiceLocator.apiBackend.currentUser?.let { toDomainUser(it) }
                     if (profUser != null) {
@@ -825,7 +825,7 @@ fun AppRoot() {
                         }
                     }
                 }
-                if (pushedSettings) {
+                ChatyPushedPage(pushedSettings) {
                     androidx.activity.compose.BackHandler(enabled = settingsSub == null) { pushedSettings = false }
                     val pushedUser = ServiceLocator.apiBackend.currentUser?.let { toDomainUser(it) }
                     if (pushedUser != null) {
@@ -844,7 +844,7 @@ fun AppRoot() {
                         }
                     }
                 }
-                if (pushedSettingsSearch) {
+                ChatyPushedPage(pushedSettingsSearch) {
                     androidx.activity.compose.BackHandler { pushedSettingsSearch = false }
                     Box(Modifier.fillMaxSize()) {
                         com.example.chat.ui.settings.navigation.SettingsSearchScreen(
@@ -900,7 +900,7 @@ fun AppRoot() {
                         )
                     }
                 }
-                if (pushedScheduled) {
+                ChatyPushedPage(pushedScheduled) {
                     androidx.activity.compose.BackHandler { pushedScheduled = false }
                     Box(Modifier.fillMaxSize()) {
                         com.example.chat.ui.automation.ScheduledMessagesScreen(
@@ -910,7 +910,7 @@ fun AppRoot() {
                         )
                     }
                 }
-                if (pushedAutoReply) {
+                ChatyPushedPage(pushedAutoReply) {
                     androidx.activity.compose.BackHandler { pushedAutoReply = false }
                     Box(Modifier.fillMaxSize()) {
                         com.example.chat.ui.automation.AutoReplyRulesScreen(
@@ -919,12 +919,12 @@ fun AppRoot() {
                         )
                     }
                 }
-                if (pushedMessageManagement) {
+                ChatyPushedPage(pushedMessageManagement) {
                     // Originating settings route stays under this overlay (Dart Navigator.push).
                     androidx.activity.compose.BackHandler { pushedMessageManagement = false }
                     Box(Modifier.fillMaxSize()) { MessageManagementHost(onBack = { pushedMessageManagement = false }) }
                 }
-                if (pushedAppIcon) {
+                ChatyPushedPage(pushedAppIcon) {
                     androidx.activity.compose.BackHandler { pushedAppIcon = false }
                     val iconController = ServiceLocator.appIconController
                     androidx.compose.runtime.LaunchedEffect(iconController) { iconController.initialize() }
@@ -936,7 +936,7 @@ fun AppRoot() {
                         )
                     }
                 }
-                if (pushedThemeStudio) {
+                ChatyPushedPage(pushedThemeStudio) {
                     // Dart main_navigation_shell Quick Actions "Theme Studio" -> ThemeStudioScreen(prefs, ThemeController).
                     androidx.activity.compose.BackHandler { pushedThemeStudio = false }
                     val tsContext = androidx.compose.ui.platform.LocalContext.current
@@ -974,7 +974,7 @@ fun AppRoot() {
                         )
                     }
                 }
-                if (pushedComponentStyles) {
+                ChatyPushedPage(pushedComponentStyles) {
                     androidx.activity.compose.BackHandler { pushedComponentStyles = false }
                     val customization = com.example.chat.ui.core.customization.rememberLoadedCustomizationController()
                     val overlayController = com.example.chat.ui.core.components.overlays.rememberChatyOverlayController()
@@ -986,7 +986,7 @@ fun AppRoot() {
                         )
                     }
                 }
-                if (pushedUniversalAppearance) {
+                ChatyPushedPage(pushedUniversalAppearance) {
                     androidx.activity.compose.BackHandler { pushedUniversalAppearance = false }
                     Box(Modifier.fillMaxSize()) {
                         com.example.chat.ui.settings.appearance.UniversalAppearanceScreen(
@@ -996,7 +996,7 @@ fun AppRoot() {
                         )
                     }
                 }
-                if (pushedAccount) {
+                ChatyPushedPage(pushedAccount) {
                     val acct = ServiceLocator.apiBackend.currentUser
                     androidx.activity.compose.BackHandler { pushedAccount = false }
                     if (acct != null) Box(Modifier.fillMaxSize()) {
@@ -1032,7 +1032,7 @@ fun AppRoot() {
                         )
                     }
                 }
-                if (pushedEditProfile) {
+                ChatyPushedPage(pushedEditProfile) {
                     val editUser = ServiceLocator.apiBackend.currentUser?.let { toDomainUser(it) }
                     if (editUser != null) {
                         val editContext = androidx.compose.ui.platform.LocalContext.current
@@ -1493,4 +1493,20 @@ private fun PreAuthLayer(visible: Boolean, content: @Composable () -> Unit) {
             .clipToBounds()
     }
     androidx.compose.foundation.layout.Box(mod) { content() }
+}
+
+/**
+ * Dart main.dart:739 ChatyTransitions.build(entry, exit): every pushed MaterialPageRoute enters with the configured entry
+ * style and pops with its reverse. DEVIATION: the covered page's secondaryAnimation (exit style on the page underneath)
+ * is not reproduced; only the pushed page's own enter/pop animation is.
+ */
+@Composable
+private fun ChatyPushedPage(visible: Boolean, content: @Composable () -> Unit) {
+    val appearance = ServiceLocator.appearanceVariantController
+    val entry = appearance.entryAnimation
+    androidx.compose.animation.AnimatedVisibility(
+        visible = visible,
+        enter = com.example.chat.ui.core.theme.ChatyTransitions.enterTransition(entry),
+        exit = com.example.chat.ui.core.theme.ChatyTransitions.popExitTransition(entry),
+    ) { content() }
 }
