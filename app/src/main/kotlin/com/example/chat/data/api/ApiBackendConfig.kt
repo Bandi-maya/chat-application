@@ -1,6 +1,7 @@
 package com.example.chat.data.api
 
 import android.content.Context
+import com.example.chat.BuildConfig
 
 /** Exact port of lib/data/services/backend_config.dart (ApiBackendConfig):
  *  tenant selection + REST base URL resolution + SharedPreferences persistence. */
@@ -10,7 +11,7 @@ class ApiBackendConfig(context: Context) {
         .getSharedPreferences("chaty_api_backend_config", Context.MODE_PRIVATE)
 
     @Volatile
-    private var customTenantId: String? = null
+    private var customTenantId: String? = BuildConfig.DOTENV_TENANT_ID.takeIf { it.isNotEmpty() }
 
     @Volatile
     private var useDefault: Boolean = false
@@ -44,24 +45,17 @@ class ApiBackendConfig(context: Context) {
     fun getSavedTenantId(): String? =
         try { prefs.getString(KEY_ACTIVE_TENANT_ID, null) } catch (_: Exception) { null }
 
-    /** Dart: String.fromEnvironment('TENANT_ID', defaultValue: fallback). The
-     *  repo ships no dart-define override, so the fallback is the live value;
-     *  OVERRIDE mirrors the env seam for future build flavors. */
+    /** Dart String.fromEnvironment default tenant; .env is the initial custom tenant. */
     val defaultTenantId: String
         get() = TENANT_ID_OVERRIDE.ifEmpty { FALLBACK_DEFAULT_TENANT }
 
     val tenantId: String
-        get() {
-            val custom = customTenantId
-            if (!useDefault && !custom.isNullOrBlank()) return custom.trim()
-            return defaultTenantId
-        }
+        get() = BackendRoutingPolicy.tenant(customTenantId.orEmpty(), null, useDefault, defaultTenantId)
 
-    /** Dart restApiBaseUrl: customBaseUrl -> REST_API_BASE_URL env -> Android
-     *  emulator loopback. The repo ships no dart-define, so the loopback
-     *  default is the live value; OVERRIDE mirrors the env seam. */
+    /** Public routing config is baked from root .env or Gradle/environment overrides.
+     *  With none supplied, preserve Dart's Android emulator fallback. */
     val restApiBaseUrl: String
-        get() = REST_API_BASE_URL_OVERRIDE.ifEmpty { "http://10.0.2.2:8000" }
+        get() = BackendRoutingPolicy.restBase(BuildConfig.DOTENV_REST_API_BASE_URL, REST_API_BASE_URL_OVERRIDE)
 
     companion object {
         const val KEY_ACTIVE_TENANT_ID = "chaty_active_tenant_id"
@@ -69,7 +63,9 @@ class ApiBackendConfig(context: Context) {
         const val FALLBACK_DEFAULT_TENANT = "chat-application"
 
         /** Mirrors String.fromEnvironment overrides (none shipped in the repo). */
-        const val REST_API_BASE_URL_OVERRIDE = ""
-        const val TENANT_ID_OVERRIDE = ""
+        val REST_API_BASE_URL_OVERRIDE: String get() = BuildConfig.REST_API_BASE_URL
+        val TENANT_ID_OVERRIDE: String get() = BuildConfig.TENANT_ID
+        val WEBSOCKET_URL_OVERRIDE: String get() = BuildConfig.WEBSOCKET_URL
+        val DOTENV_WEBSOCKET_URL: String get() = BuildConfig.DOTENV_WEBSOCKET_URL
     }
 }
