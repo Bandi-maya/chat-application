@@ -68,6 +68,8 @@ fun ChatDetailHost(
     conversation: Conversation,
     initialMessageId: String?,
     onBack: () -> Unit,
+    /** Dart quick-contact tap: Navigator.pushReplacement(ChatDetailScreen(next.id)). */
+    onOpenConversation: (Conversation) -> Unit = {},
 ) {
     val api = ServiceLocator.apiBackend
     val prefs = ServiceLocator.preferencesController
@@ -325,11 +327,20 @@ fun ChatDetailHost(
         disableSwipeToExit = ServiceLocator.preferencesController.universal.disableSwipeToExit,
         homeAvatarShape = ServiceLocator.preferencesController.home.avatarShape,
         universalEmojiStyle = ServiceLocator.preferencesController.universal.emojiStyle,
-        // quickContacts + onOpenConversation stay at their ChatDetailScreen
-        // defaults for now: the API layer has no contacts list source yet, so
-        // the integration owner binds both seams when that lands (the rail
-        // renders an empty 62dp column until then, exactly like Dart with an
-        // empty dataStore.contacts).
+        // Dart dataStore.contacts: api.users except the current user (chaty_data_store.dart:206-214).
+        quickContacts = api.users.filter { it.id != api.currentUser?.id }.map {
+            com.example.chat.ui.chats.detail.QuickContactEntry(it.id, it.displayName, it.avatarInitials, it.avatarColorHex)
+        },
+        // Dart: dataStore.getOrCreateDirectConversation(contact) then pushReplacement; errors swallowed.
+        onOpenConversation = { contactId ->
+            val contact = api.users.firstOrNull { it.id == contactId }
+            if (contact != null) scope.launch {
+                try { onOpenConversation(repo.getOrCreateDirectConversationAsync(contact)) } catch (_: Exception) {}
+            }
+        },
+        voiceUrlResolver = { path ->
+            ServiceLocator.chatMedia.createSignedUrl(path, 3600, restApiBaseUrl = { ServiceLocator.apiBackend.config.restApiBaseUrl })
+        },
         translateOption = ServiceLocator.preferencesController.universal.translateOption,
         translationLanguage = ServiceLocator.preferencesController.universal.translationLanguage,
         composerColors = com.example.chat.ui.chats.detail.ComposerColors.resolve(
