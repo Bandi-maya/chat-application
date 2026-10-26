@@ -106,6 +106,14 @@ fun MediaViewerScreen(
     onBack: () -> Unit = {},
     sourceBounds: Rect? = null,
     restrictedViewOnce: Boolean = false,
+    providedModel: Any? = null,
+    ownedActions: Boolean = false,
+    onOwnedEdit: (() -> Unit)? = null,
+    onOwnedShare: (() -> Unit)? = null,
+    onOwnedOpen: (() -> Unit)? = null,
+    registerStopReader: (((() -> Unit)?) -> Unit)? = null,
+    // Owned viewers must cross the same short account/epoch barrier as inline playback.
+    deliverPlayback: ((() -> Unit) -> Boolean)? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -130,6 +138,7 @@ fun MediaViewerScreen(
     var videoHeight by remember { mutableIntStateOf(0) }
     var videoView by remember { mutableStateOf<VideoView?>(null) }
 
+    androidx.compose.runtime.SideEffect { registerStopReader?.invoke { videoView?.stopPlayback(); videoView = null } }
     // Dart _load.
     LaunchedEffect(storagePath, type) {
         error = null
@@ -165,15 +174,19 @@ fun MediaViewerScreen(
     }
 
     DisposableEffect(videoView) {
+        // Capture this effect's reader. Reading delegated state from onDispose can
+        // stop the NEW view when the initial null-key effect is replaced.
+        val reader = videoView
         onDispose {
-            videoView?.stopPlayback()
-            videoView = null
+            reader?.stopPlayback()
+            if (videoView === reader) videoView = null
         }
     }
 
     // Dart _openExternally (url_launcher externalApplication).
     fun openExternally() {
         if (restrictedViewOnce) return
+        if (ownedActions) { onOwnedOpen?.invoke(); return }
         val url = signedUrl ?: return
         try {
             val local = editedCopy
@@ -196,6 +209,7 @@ fun MediaViewerScreen(
     // Dart _share (share_plus text + subject).
     fun share() {
         if (restrictedViewOnce) return
+        if (ownedActions) { onOwnedShare?.invoke(); return }
         val local = editedCopy
         if (local != null) {
             val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", local)
@@ -223,7 +237,16 @@ fun MediaViewerScreen(
     fun toggleVideo() {
         val vv = videoView ?: return
         if (!videoReady) return
-        if (vv.isPlaying) vv.pause() else vv.start()
+        if (vv.isPlaying) vv.pause() else {
+            val start = { vv.start() }
+            val accepted = deliverPlayback?.invoke(start) ?: if (ownedActions) false else { start(); true }
+            if (!accepted) {
+                vv.stopPlayback()
+                videoReady = false
+                error = "Attachment session changed. Reopen it from the chat."
+                return
+            }
+        }
         isPlaying = vv.isPlaying
     }
 
@@ -282,18 +305,18 @@ fun MediaViewerScreen(
                         fontSize = 11.5.sp,
                     )
                 }
-                if (type in setOf("video", "audio") && !restrictedViewOnce) TextButton(onClick = { trimming = true }, enabled = signedUrl != null) { Text("Trim") }
-                if (type == "image" && !title.endsWith(".gif", ignoreCase = true) && !restrictedViewOnce) IconButton(onClick = { editing = true }, enabled = signedUrl != null) {
+                if (type in setOf("video", "audio") && !restrictedViewOnce) TextButton(onClick = { if (ownedActions) onOwnedEdit?.invoke() else trimming = true }, enabled = signedUrl != null || providedModel != null) { Text("Trim") }
+                if (type == "image" && !title.endsWith(".gif", ignoreCase = true) && !restrictedViewOnce) IconButton(onClick = { if (ownedActions) onOwnedEdit?.invoke() else editing = true }, enabled = signedUrl != null || providedModel != null) {
                     Icon(Icons.Rounded.Edit, "Edit a copy", tint = foreground)
                 }
-                if (!restrictedViewOnce) IconButton(onClick = ::openExternally, enabled = signedUrl != null) {
+                if (!restrictedViewOnce) IconButton(onClick = ::openExternally, enabled = signedUrl != null || providedModel != null) {
                     Icon(
                         Icons.Rounded.OpenInNew,
                         contentDescription = "Open with app",
                         tint = foreground,
                     )
                 }
-                if (!restrictedViewOnce) IconButton(onClick = ::share, enabled = signedUrl != null) {
+                if (!restrictedViewOnce) IconButton(onClick = ::share, enabled = signedUrl != null || providedModel != null) {
                     Icon(
                         Icons.Rounded.Share,
                         contentDescription = "Share file link",
@@ -330,13 +353,15 @@ fun MediaViewerScreen(
                     modifier = Modifier.padding(20.dp), // ChatySpacing.lg
                 )
 
-                signedUrl == null -> CircularProgressIndicator(
+                // A provided image model can render without a URL. VideoView cannot:
+                // its URI is resolved asynchronously, even for a leased local file.
+                signedUrl == null && (type == "video" || providedModel == null) -> CircularProgressIndicator(
                     strokeWidth = 2.2.dp,
                     color = primary,
                 )
 
                 type == "image" -> ImageViewerContent(
-                    url = editedCopy?.toURI()?.toString() ?: signedUrl!!,
+                    model = providedModel ?: editedCopy?.toURI()?.toString() ?: signedUrl!!,
                     title = title,
                     primary = primary,
                     foregroundSecondary = foregroundSecondary,
@@ -523,7 +548,7 @@ fun MediaViewerScreen(
  *  (_rotateEnabled = false); dropped here too. */
 @Composable
 private fun ImageViewerContent(
-    url: String,
+    model: Any,
     title: String,
     primary: Color,
     foregroundSecondary: Color,
@@ -572,8 +597,9 @@ private fun ImageViewerContent(
                 },
             contentAlignment = Alignment.Center,
         ) {
-        ChatyAsyncImage(
-            url = url,
+        coil.compose.SubcomposeAsyncImage(
+            model = coil.request.ImageRequest.Builder(LocalContext.current).data(model)
+                .memoryCachePolicy(coil.request.CachePolicy.DISABLED).diskCachePolicy(coil.request.CachePolicy.DISABLED).build(),
             contentDescription = title,
             contentScale = ContentScale.Fit,
             modifier = Modifier
@@ -585,7 +611,7 @@ private fun ImageViewerContent(
                     translationY = offset.y
                     transformOrigin = TransformOrigin(0f, 0f)
                 },
-            placeholder = {
+            loading = {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(strokeWidth = 2.2.dp, color = primary)
                 }
