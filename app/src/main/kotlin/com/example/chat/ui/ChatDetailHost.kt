@@ -1,0 +1,367 @@
+package com.example.chat.ui
+
+import android.widget.Toast
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import com.example.chat.ServiceLocator
+import com.example.chat.domain.models.ChatMessage
+import com.example.chat.domain.models.ChatTask
+import com.example.chat.domain.models.Conversation
+import com.example.chat.domain.models.ContactConnectionStatus
+import com.example.chat.domain.models.ConversationType
+import com.example.chat.ui.chats.ChatDetailScreen
+import com.example.chat.ui.chats.home.HomeFormatters
+import com.example.chat.ui.theme.LocalThemeConfig
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import org.json.JSONObject
+
+/** Real host for ChatDetailScreen. Mirrors how Dart ChatDetailScreen wires its
+ *  services (chat_detail_screen.dart _buildChat/_executeMessageAction/_startCall/
+ *  _openChatMenu) over the Dart ChatyDataStore routing: api backend first when
+ *  authenticated, Supabase-backed repository side tolerated on error.
+ *  Known deviations are listed in docs/chat-detail-host-deviations.md semantics:
+ *  presence refresh is a 3s tick (richRealtime exposes no listener API);
+ *  forward sends text only; task modal has no source-message link param. */
+@Composable
+fun ChatDetailHost(
+    conversation: Conversation,
+    initialMessageId: String?,
+    onBack: () -> Unit,
+) {
+    val api = ServiceLocator.apiBackend
+    val prefs = ServiceLocator.preferencesController
+    val repo = ServiceLocator.conversationsRepository
+    val rt = ServiceLocator.richRealtime
+    val tasksController = ServiceLocator.tasksController
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val theme = LocalThemeConfig.current
+    var rev by remember { mutableIntStateOf(0) }
+    DisposableEffect(conversation.id) {
+        val l: () -> Unit = { rev++ }
+        api.addListener(l)
+        prefs.addListener(l)
+        tasksController.addListener(l)
+        onDispose { api.removeListener(l); prefs.removeListener(l); tasksController.removeListener(l) }
+    }
+    // richRealtime has no listener API: refresh presence/typing on a short tick.
+    LaunchedEffect(conversation.id) {
+        try { rt.trackConversation(conversation.id) } catch (_: Exception) {}
+        while (true) { delay(3000); rev++ }
+    }
+    LaunchedEffect(conversation.id) { try { tasksController.loadTasks() } catch (_: Exception) {} }
+    @Suppress("UNUSED_EXPRESSION") rev
+
+    fun toast(m: String) = Toast.makeText(context, m, Toast.LENGTH_SHORT).show()
+    val me = api.currentUser
+    val myId = me?.id ?: ""
+    val live = api.conversations.firstOrNull { it.id == conversation.id } ?: conversation
+    val messages = api.getMessages(conversation.id)
+    val isDirect = live.type == ConversationType.direct
+    val otherId = live.participantIds.firstOrNull { it != myId }
+    val other = api.users.firstOrNull { it.id == otherId }
+    val conv = prefs.conversation
+    val privacy = prefs.privacy
+    fun gbB(k: String, d: Boolean) = prefs.gbBool(k, d)
+
+    var connection by remember(conversation.id) { mutableStateOf<ContactConnectionStatus?>(null) }
+    suspend fun refreshConnection() {
+        if (isDirect && otherId != null) {
+            try { connection = ServiceLocator.contactRelationships.connectionStatus(otherId) } catch (_: Exception) {}
+        }
+    }
+    LaunchedEffect(conversation.id, otherId) { refreshConnection() }
+    var gateOpen by remember { mutableStateOf(false) }
+    var blockConfirm by remember { mutableStateOf(false) }
+    var forwardMessage by remember { mutableStateOf<ChatMessage?>(null) }
+    var taskEditor by remember { mutableStateOf<Triple<Boolean, ChatTask?, String?>?>(null) }
+    var taskDetail by remember { mutableStateOf<ChatTask?>(null) }
+
+    // Presence text (Dart _buildChat).
+    val activity = otherId?.let { rt.activityFor(conversation.id, it) }
+    val presenceOnline = isDirect && otherId != null && rt.isOnline(otherId)
+    val presenceText: String? = if (isDirect) {
+        when {
+            activity?.isRecording == true -> "recording voice message…"
+            activity?.isTyping == true -> "typing…"
+            otherId == null -> null
+            presenceOnline -> "online"
+            else -> HomeFormatters.formatLastSeen(rt.lastSeenFor(otherId)).ifEmpty { "last seen hidden" }
+        }
+    } else {
+        if (activity?.isTyping == true) "someone is typing…" else "${live.participantIds.size} participants"
+    }
+
+    val wallpaperStore = remember { context.getSharedPreferences("chaty_chat_wallpapers", 0) }
+    val wallpaperInitial = remember(conversation.id) {
+        try { JSONObject(wallpaperStore.getString("chaty_chat_wallpapers_v1", "{}") ?: "{}").optString(conversation.id, "").ifEmpty { null } }
+        catch (_: Exception) { null }
+    }
+    val colorOverrides = com.example.chat.ui.chats.detail.BubbleColorOverrides(
+        rightBubbleColor = conv.rightBubbleColor, leftBubbleColor = conv.leftBubbleColor,
+        rightChatBubbleTextColor = conv.rightChatBubbleTextColor, leftChatBubbleTextColor = conv.leftChatBubbleTextColor,
+        rightBubbleTimeColor = conv.rightBubbleTimeColor, leftBubbleTimeColor = conv.leftBubbleTimeColor,
+        messageTextSize = conv.messageTextSize, groupParticipantNameColor = conv.groupParticipantNameColor,
+        quotedBackgroundColor = conv.quotedBackgroundColor, quotedDividerColor = conv.quotedDividerColor,
+        quotedNameColor = conv.quotedNameColor, quotedMessageColor = conv.quotedMessageColor,
+        deletedMessageIconColor = conv.deletedMessageIconColor,
+        infoBalloonsBgColor = conv.infoBalloonsBgColor, infoBalloonsTextColor = conv.infoBalloonsTextColor,
+    )
+    val convTasks = tasksController.let { api.tasks.filter { t -> t.sourceConversationId == conversation.id } }
+
+    val taskUser = me?.let {
+        com.example.chat.domain.models.UserProfile(
+            id = it.id, displayName = it.displayName, username = it.username,
+            avatarInitials = it.avatarInitials, avatarColorHex = it.avatarColorHex, about = it.about,
+            lastSeenAt = java.time.Instant.now(), email = it.email, phone = it.phone, avatarUrl = it.avatarUrl,
+        )
+    }
+    val lookup: (String) -> com.example.chat.domain.models.UserProfile? = { id -> api.users.firstOrNull { it.id == id } }
+
+    ChatDetailScreen(
+        conversation = live,
+        messages = messages,
+        initialMessageId = initialMessageId,
+        currentUserId = myId,
+        onBack = onBack,
+        onSend = { text -> api.sendMessage(conversation.id, text) },
+        resolveSenderName = { id ->
+            if (id == myId) "You" else (api.users.firstOrNull { it.id == id }?.displayName ?: "Team Member")
+        },
+        presenceText = presenceText,
+        presenceIsOnline = presenceOnline,
+        showHeaderAvatar = !conv.hideProfilePicture && gbB("PicProf", true),
+        showHeaderName = !conv.hideContactName && gbB("NameProf", true),
+        showHeaderCalls = !conv.hideCallButton && gbB("Conv_call_btn", true),
+        showPresenceLine = !conv.disableContactStatus && gbB("statuschat", true),
+        callsAllowed = connection?.callsAllowed ?: true,
+        onStartCall = { isVideo ->
+            if (isDirect && otherId != null) {
+                scope.launch {
+                    val status = try { ServiceLocator.contactRelationships.connectionStatus(otherId) } catch (_: Exception) { null }
+                    if (status != null) connection = status
+                    if (status != null && !status.callsAllowed) {
+                        gateOpen = true
+                    } else {
+                        ServiceLocator.callPresentationController.showFullScreen()
+                        try {
+                            ServiceLocator.callSignaling.initiateCall(
+                                otherId, other?.displayName ?: live.title,
+                                other?.avatarInitials, other?.avatarColorHex, isVideo,
+                            )
+                        } catch (e: Exception) { toast(e.message ?: "Unable to start the call.") }
+                    }
+                }
+            }
+        },
+        connectionState = ServiceLocator.connectionHealth.state,
+        onProbeConnection = { try { ServiceLocator.connectionHealth.probeConnection() } catch (_: Exception) {} },
+        onDraftChanged = { text -> scope.launch { try { repo.setDraft(conversation.id, text) } catch (_: Exception) {} } },
+        onTypingChanged = { typing ->
+            val allowed = privacy.typingIndicators && !prefs.home.ghostMode && !gbB("yo_want_ghostmode", false)
+            if (allowed) scope.launch { try { ServiceLocator.gbFeatures.setTyping(conversation.id, typing) } catch (_: Exception) {} }
+        },
+        quickReplies = prefs.automation.quickReplies,
+        wallpaperType = conv.wallpaperType,
+        wallpaperPatternId = wallpaperInitial ?: ServiceLocator.themeController.globalTheme.wallpaperId,
+        wallpaperPath = conv.wallpaperPath,
+        wallpaperProfilePic = conv.profilePicWallpaper,
+        wallpaperAvatarUrl = other?.avatarUrl,
+        onWallpaperSelected = { id ->
+            try {
+                val obj = JSONObject(wallpaperStore.getString("chaty_chat_wallpapers_v1", "{}") ?: "{}")
+                obj.put(conversation.id, id)
+                wallpaperStore.edit().putString("chaty_chat_wallpapers_v1", obj.toString()).apply()
+            } catch (_: Exception) {}
+        },
+        onToggleMute = {
+            scope.launch {
+                try { repo.setConversationStateAsync(conversation.id, "muted", !live.isMuted) }
+                catch (e: Exception) { toast(e.message ?: "Unable to update chat.") }
+            }
+        },
+        onBlockContact = if (isDirect && otherId != null) ({ blockConfirm = true }) else null,
+        hideDateAndName = conv.hideDateAndName,
+        showDeletedContent = privacy.antiDeleteMessages || gbB("yoAntiRevoke", false),
+        retainViewOnce = privacy.antiViewOnce || gbB("anti_vw_once", false),
+        disableDoubleTapReaction = conv.disableDoubleTapReaction,
+        doubleTapReactionEmoji = conv.doubleTapReactionEmoji,
+        showGroupAvatar = ServiceLocator.templateController.conversation.showAvatarInGroup,
+        colorOverrides = colorOverrides,
+        onEditMessage = { id, newText ->
+            if (api.isAuthenticated) api.editMessage(conversation.id, id, newText)
+            repo.editMessage(conversation.id, id, newText)
+        },
+        onDeleteMessage = { id, forEveryone ->
+            scope.launch {
+                if (api.isAuthenticated) { try { api.deleteMessage(conversation.id, id) } catch (_: Exception) {} }
+                try { repo.deleteMessage(conversation.id, id, forEveryone) } catch (_: Exception) {}
+            }
+        },
+        onToggleStar = { id ->
+            val m = messages.firstOrNull { it.id == id }
+            if (m != null) scope.launch {
+                try { repo.setMessageStateAsync(conversation.id, id, "starred", !m.isStarred) } catch (e: Exception) { toast(e.message ?: "Unable to update message.") }
+            }
+        },
+        onTogglePin = { id ->
+            val m = messages.firstOrNull { it.id == id }
+            if (m != null) scope.launch {
+                try { repo.setMessageStateAsync(conversation.id, id, "pinned", !m.isPinned) } catch (e: Exception) { toast(e.message ?: "Unable to update message.") }
+            }
+        },
+        onToggleReaction = { id, emoji ->
+            repo.optimisticToggleReaction(conversation.id, id, emoji)
+            scope.launch { try { repo.toggleReactionAsync(conversation.id, id, emoji) } catch (_: Exception) {} }
+        },
+        onForward = { forwardMessage = it },
+        onClearConversation = {
+            scope.launch {
+                try {
+                    if (api.isAuthenticated) api.clearConversationMessages(conversation.id)
+                    repo.clearConversation(conversation.id)
+                } catch (e: Exception) { toast(e.message ?: "Unable to clear conversation.") }
+            }
+        },
+        onRetryMessage = { id ->
+            scope.launch {
+                val ok = try { ServiceLocator.outgoingQueue.retryMessage(id) } catch (_: Exception) { false }
+                if (!ok) toast("Retry failed — check your connection.")
+            }
+        },
+        onCreateTask = { title -> taskEditor = Triple(true, null, title) },
+        onCreateTaskFromMessage = { m -> taskEditor = Triple(true, null, m.text) },
+        tasks = convTasks,
+        onOpenTaskDetails = { taskDetail = it },
+        onEditTask = { taskEditor = Triple(true, it, null) },
+        onUpdateTaskStatus = { id, status -> scope.launch { try { tasksController.updateTaskStatus(id, status) } catch (e: Exception) { toast(e.message ?: "Unable to update task.") } } },
+        onDeleteTask = { id -> scope.launch { try { tasksController.deleteTask(id) } catch (e: Exception) { toast(e.message ?: "Unable to delete task.") } } },
+        entryStyle = com.example.chat.ui.chats.detail.normalizeEntryStyle(conv.entryStyle),
+        composerColors = com.example.chat.ui.chats.detail.ComposerColors.resolve(
+            theme, conv.uiButtonsColor, conv.emojiButtonColor, conv.sendButtonColor,
+            conv.micSendBgCircleColor, conv.textEntryBackgroundColor, conv.textEntryColor,
+        ),
+        composerTemplate = ServiceLocator.templateController.composer,
+    )
+
+    if (gateOpen) {
+        val st = connection ?: ContactConnectionStatus()
+        AlertDialog(
+            onDismissRequest = { gateOpen = false },
+            title = { Text(if (st.callsAllowed) "Calls are unlocked" else "Contact acceptance required") },
+            text = {
+                Text(
+                    if (st.callsAllowed) "Both people accepted this contact connection."
+                    else if (st.isWaitingForOther) "You accepted ${other?.displayName ?: live.title}. Calls will unlock after they accept you too."
+                    else "Chatting is available now. Voice and video calls unlock only after both people accept the contact request.",
+                )
+            },
+            confirmButton = {
+                if (!st.myAccepted) {
+                    TextButton(onClick = {
+                        gateOpen = false
+                        scope.launch {
+                            try { if (otherId != null) ServiceLocator.contactRelationships.acceptConnection(otherId); refreshConnection() }
+                            catch (e: Exception) { toast("$e") }
+                        }
+                    }) { Text("Accept contact") }
+                } else TextButton(onClick = { gateOpen = false }) { Text("Done") }
+            },
+        )
+    }
+    if (blockConfirm) {
+        val name = other?.displayName ?: live.title
+        AlertDialog(
+            onDismissRequest = { blockConfirm = false },
+            title = { Text("Block contact?") },
+            text = { Text("$name will no longer be able to send you messages or call you.") },
+            dismissButton = { TextButton(onClick = { blockConfirm = false }) { Text("Cancel") } },
+            confirmButton = {
+                TextButton(onClick = {
+                    blockConfirm = false
+                    scope.launch {
+                        try {
+                            if (otherId != null) ServiceLocator.contactRelationships.setBlocked(otherId, true)
+                            toast("$name was blocked.")
+                        } catch (_: Exception) { toast("Could not block this contact.") }
+                    }
+                }) { Text("Block") }
+            },
+        )
+    }
+    forwardMessage?.let { fm ->
+        val targets = api.conversations.filter { it.id != conversation.id }
+        if (targets.isEmpty()) {
+            LaunchedEffect(fm) { toast("No other chats to forward to."); forwardMessage = null }
+        } else {
+            AlertDialog(
+                onDismissRequest = { forwardMessage = null },
+                title = { Text("Forward to") },
+                text = {
+                    LazyColumn {
+                        items(targets, key = { it.id }) { c ->
+                            TextButton(
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = {
+                                    forwardMessage = null
+                                    scope.launch {
+                                        try { api.sendMessage(c.id, fm.text); toast("Message forwarded") }
+                                        catch (e: Exception) { toast(e.message ?: "Unable to forward.") }
+                                    }
+                                },
+                            ) { Text(c.title) }
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { forwardMessage = null }) { Text("Cancel") } },
+            )
+        }
+    }
+    val ed = taskEditor
+    if (ed != null && taskUser != null) {
+        com.example.chat.ui.tasks.TaskCreateEditModal(
+            controller = tasksController,
+            colors = com.example.chat.ui.tasks.TaskColors(ServiceLocator.themeController.globalTheme),
+            conversations = api.conversations,
+            currentUser = taskUser,
+            getUser = lookup,
+            sourceConversationId = conversation.id,
+            existingTask = ed.second,
+            initialTitle = ed.third,
+            onDismiss = { taskEditor = null },
+            onSaved = { msg -> taskEditor = null; toast(msg) },
+            onError = { msg -> toast(msg) },
+        )
+    }
+    val td = taskDetail
+    if (td != null && taskUser != null) {
+        com.example.chat.ui.tasks.TaskDetailScreen(
+            task = td,
+            controller = tasksController,
+            colors = com.example.chat.ui.tasks.TaskColors(ServiceLocator.themeController.globalTheme),
+            currentUser = taskUser,
+            getUser = lookup,
+            onBack = { taskDetail = null },
+            onEditTask = { taskEditor = Triple(true, it, null) },
+        )
+    }
+}
