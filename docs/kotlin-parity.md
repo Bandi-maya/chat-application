@@ -27,7 +27,13 @@ The build at `6c609002a3b393cb01090faf466441dbe6d45037` passed exactly 783 unit 
 
 The preceding emulator run at `eb4fd2ff` executed 20 tests: 19 passed, one failed because Contact Info's toolbar/title was absent. Actual screenshots showed its body had opened. The same run cold-started twice with changed PIDs and no fatal error, using a synthetic saved session. Follow-up toolbar, bottom inset and atomic connection-state fixes in `6c609002` are now verified in the emulator captures: Contact Info title/back is visible, the unaccepted state is not falsely verified on an authentication error, and Home dock/FAB is above system navigation. This establishes this synthetic scenario, not exhaustive design parity.
 
-Root `.env` build wiring, routing tests and the utilityBar tablet correction are later changes and are not covered by the 783-test result. Their cumulative CI result must be recorded after it finishes.
+The cumulative environment/tablet build `14eae12ed1aa95652da3050322a01988bd7a20fc` passed exactly 786 unit tests in 74 suites, with zero failures, errors or skips; APK assembly succeeded. This includes root `.env` build wiring, three new routing/tenant/WebSocket tests, and the utilityBar tablet mapping/predicate correction. Its runtime run also passed 20 instrumented tests with zero failures/skips, two saved-synthetic-session cold starts (PIDs 2690 -> 2796), zero fatal errors and restart rc=0. Fresh pixels show seeded ChatDetailHost messages/composer, Contact Info back/title and unaccepted error state, and Home dock/FAB above system navigation. Tablet mapping is source/unit checked, not a complete tablet visual proof.
+
+Current evidence links:
+- Build/unit: https://github.com/Bandi-maya/chat-application/actions/runs/40298889568/job/121491604694
+- Runtime/pixel capture: https://github.com/Bandi-maya/chat-application/actions/runs/40298889568/job/121495664506
+
+This is a source-ready-for-configured-testing checkpoint, not a statement that every live/backend/device/design behavior below has been verified. Documentation-only evidence updates do not change the tested code.
 
 ## Still unverified, not silently dropped
 
@@ -42,3 +48,8 @@ Tests use synthetic emulator accounts, fake transports and seeded data. They do 
 ## Installation and handoff
 
 Application ID/version remain unchanged. The older delivered debug APK and the later CI APK have different signing certificates, so an in-place update is not established. Do not uninstall, clear data or change identity to hide that issue. The user now wants source completion first, will supply their own environment and rebuild/test. That does not waive truthful verification limits or imply their installed app has no saved data.
+
+
+## Flutter-only cleanup request
+
+The user requested removal of Flutter-related code on kotlin after the Kotlin port matches api. No Flutter-only removal is included in the tested head above. A tracked-path cleanup manifest is prepared for review, but the completion boundary remains a user decision. Native Kotlin builds only :app. The shared MLS Rust crate at third_party/openmls_android/rust is used by mls-native and currently requires FRB annotations/generated code. It must not be blanket-deleted, stripped of licenses or rewritten to satisfy a naming cleanup. api/main stay untouched. Any authorized source cleanup needs a reviewable kotlin diff and a fresh build/test pass afterward.
