@@ -30,10 +30,10 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.RestartAlt
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.example.chat.ui.kit.ChatyDropdownMenu as DropdownMenu
+import com.example.chat.ui.kit.ChatyDropdownMenuItem as DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -201,7 +201,7 @@ fun ThemeEditorScreen(
             IconButton(onClick = { exportTheme() }) { Icon(Icons.Outlined.FileUpload, "Export Theme JSON", tint = colors.foreground) }
             Box {
                 IconButton(onClick = { menuOpen = true }) { Icon(Icons.Rounded.MoreVert, "More options", tint = colors.foreground) }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape, expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     DropdownMenuItem(
                         text = { Text("Save Theme", color = colors.foreground) },
                         leadingIcon = { Icon(Icons.Rounded.Check, null, Modifier.size(20.dp), tint = colors.foreground) },
@@ -284,7 +284,7 @@ fun ThemeEditorScreen(
                                     TextButton(onClick = { tickMenu = true }) {
                                         Text(current.deliveryTickStyle.displayName, color = colors.foreground, fontSize = 13.sp)
                                     }
-                                    DropdownMenu(expanded = tickMenu, onDismissRequest = { tickMenu = false }, modifier = Modifier.background(colors.surface)) {
+                                    DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape, expanded = tickMenu, onDismissRequest = { tickMenu = false }) {
                                         DeliveryIconStyle.values().forEach { style ->
                                             DropdownMenuItem(
                                                 text = { Text(style.displayName, color = colors.foreground, fontSize = 13.sp) },
@@ -368,7 +368,7 @@ fun ThemeEditorScreen(
     }
 
     if (resetOpen) {
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { resetOpen = false },
             title = { Text("Reset Theme to Defaults?") },
             text = {
@@ -393,7 +393,7 @@ fun ThemeEditorScreen(
     }
 
     if (guideOpen) {
-        ModalBottomSheet(onDismissRequest = { guideOpen = false }, containerColor = colors.surface) {
+        ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = { guideOpen = false }, containerColor = colors.surface) {
             Column(Modifier.padding(24.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.CloudDownload, null, Modifier.size(28.dp), tint = colors.primary)
