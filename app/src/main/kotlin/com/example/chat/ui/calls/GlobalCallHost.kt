@@ -115,7 +115,8 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
             onToggleCamera = { service.toggleCamera() },
             onSwitchCamera = { scope.launch { service.switchCamera() } },
             onToggleScreenShare = { scope.launch { service.toggleScreenShare() } },
-            onToggleAudioRoute = { route: AudioRouteType -> scope.launch { service.setAudioRoute(route) } },
+            // Dart: the unawaited setAudioRoute error never crashes the app (main.dart wraps and logs).
+            onToggleAudioRoute = { route: AudioRouteType -> scope.launch { try { service.setAudioRoute(route) } catch (_: Exception) {} } },
             onEnterNativePip = {
                 // Dart _enterNativePip: settings gate, then system PiP, else a message.
                 if (!prefs.pictureInPictureEnabled) {
