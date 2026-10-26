@@ -9,6 +9,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -81,6 +82,8 @@ fun CameraCaptureViewfinder(
     facePoses: List<FacePose>,
     faceHealth: TrackingHealth,
     flashOn: Boolean,
+    flashSupported: Boolean = true,
+    previewAspect: Float? = null,
     effectsOpen: Boolean,
     onClose: () -> Unit,
     onToggleFlash: () -> Unit,
@@ -107,7 +110,9 @@ fun CameraCaptureViewfinder(
                     onPreviewView(this)
                 }
             },
-            modifier = Modifier.fillMaxSize().then(effectMatrixModifier(effect, effectIntensity)),
+            modifier = Modifier.align(Alignment.Center)
+                .then(if (previewAspect != null) Modifier.fillMaxWidth().aspectRatio(previewAspect) else Modifier.fillMaxSize())
+                .then(effectMatrixModifier(effect, effectIntensity)),
         )
         when (phase) {
             CameraPhase.initializing -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -132,7 +137,8 @@ fun CameraCaptureViewfinder(
             LensOverlay(lens = lens, poses = facePoses, health = faceHealth)
         }
         if (phase == CameraPhase.ready && captureViewMode == CaptureViewMode.document) {
-            DocumentGuideOverlay(Modifier.fillMaxSize())
+            // Paper detection/corner review belongs to the real scanner flow,
+            // not a decorative viewfinder frame pretending detection.
         }
         // Top bar: top = statusBar + 8, horizontal 8.
         Row(
@@ -146,7 +152,7 @@ fun CameraCaptureViewfinder(
             CameraCaptureRoundAction(label = "Close camera", kind = "close", onClick = onClose)
             Spacer(Modifier.weight(1f))
             if (phase == CameraPhase.ready) {
-                CameraCaptureRoundAction(
+                if (flashSupported) CameraCaptureRoundAction(
                     label = if (flashOn) "Turn flash off" else "Turn flash on",
                     kind = "flash",
                     onClick = onToggleFlash,
@@ -314,7 +320,7 @@ fun CameraCaptureBottomControls(
             }
             if (ready && captureViewMode == CaptureViewMode.document) {
                 Text(
-                    "DOCUMENT  •  Fit the page inside the frame",
+                    "DOCUMENT · Tap shutter to scan and review paper edges",
                     color = Color.White,
                     fontSize = 11.sp,
                     letterSpacing = 1.0.sp,
