@@ -15,6 +15,8 @@ import com.example.chat.ui.kit.ChatyLicenseEntry
  */
 object ChatyLicenseData {
     private const val APACHE_2_0 = CHATY_APACHE_2_0
+    private const val CC_BY_4_0 = CHATY_CC_BY_4_0
+    private const val ANIMATED_EMOJI_BSD_3 = CHATY_ANIMATED_EMOJI_BSD_3
 
     val entries: List<ChatyLicenseEntry> = listOf(
         ChatyLicenseEntry("androidx.compose.ui:ui", listOf("Maven coordinate androidx.compose.ui:ui:1.7.6\nLicense declared in the artifact POM:\nThe Apache Software License, Version 2.0 <http://www.apache.org/licenses/LICENSE-2.0.txt>", APACHE_2_0)),
@@ -48,5 +50,14 @@ object ChatyLicenseData {
         ChatyLicenseEntry("androidx.media3:media3-exoplayer", listOf("Maven coordinate androidx.media3:media3-exoplayer:1.8.0\nLicense declared in the artifact POM:\nThe Apache Software License, Version 2.0 <http://www.apache.org/licenses/LICENSE-2.0.txt>", APACHE_2_0)),
         ChatyLicenseEntry("androidx.media3:media3-ui", listOf("Maven coordinate androidx.media3:media3-ui:1.8.0\nLicense declared in the artifact POM:\nThe Apache Software License, Version 2.0 <http://www.apache.org/licenses/LICENSE-2.0.txt>", APACHE_2_0)),
         ChatyLicenseEntry("com.google.mediapipe:tasks-vision", listOf("Maven coordinate com.google.mediapipe:tasks-vision:1.1.1\nLicense declared in the artifact POM:\nThe Apache Software License, Version 2.0 <http://www.apache.org/licenses/LICENSE-2.0.txt>", APACHE_2_0)),
+        ChatyLicenseEntry("com.airbnb.android:lottie-compose", listOf("Maven coordinate com.airbnb.android:lottie-compose:6.7.1\nLicense declared in the artifact POM:\nApache-2.0 <https://www.apache.org/licenses/LICENSE-2.0>", APACHE_2_0)),
+        ChatyLicenseEntry("Animated Noto Emoji (streamed artwork)", listOf(
+            "Animated emojis rendered in chat are Noto Animated Emoji artwork by Google, streamed unmodified at runtime from fonts.gstatic.com (https://fonts.gstatic.com/s/e/notoemoji/latest/<id>/lottie.json); no changes made.\nLicense: Creative Commons Attribution 4.0 International (CC BY 4.0) <https://creativecommons.org/licenses/by/4.0/> - confirmed by the upstream project FAQ <https://googlefonts.github.io/noto-emoji-files/> (\"Animated Noto Emoji is licensed under CC BY 4.0\").\nAttribution: Noto Animated Emoji by Google <https://googlefonts.github.io/noto-emoji-animation/>.",
+            CC_BY_4_0,
+        )),
+        ChatyLicenseEntry("animated_emoji (Flutter package, ported registry data)", listOf(
+            "pub.dev package animated_emoji:3.3.0 <https://pub.dev/packages/animated_emoji> (repository: github.com/RoundedInfinity/animated_emoji)\nLicense: BSD 3-Clause, copyright 2026 Clever Tasks.\nNot an APK dependency: the Noto id registry map in ui/chats/detail/AnimatedEmojiAsset.kt is generated from the package's emojis.g.dart, so its copyright notice is retained here.",
+            ANIMATED_EMOJI_BSD_3,
+        )),
     )
 }
