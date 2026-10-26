@@ -7,3 +7,4 @@ trigger 84 01:25:12Z shell wiring
 trigger 85 01:28:23Z real scheduler/auto-reply screens
 trigger 86 01:29:19Z autoreply send seam
 trigger 87 01:50:27Z settings icons + automation start
+trigger 88 01:52:42Z status picker + status prefs seams
