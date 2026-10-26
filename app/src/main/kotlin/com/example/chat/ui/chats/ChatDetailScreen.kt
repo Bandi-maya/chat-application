@@ -1087,7 +1087,7 @@ fun ChatDetailScreen(
     }
 
     if (attachmentSheetOpen) {
-        ModalBottomSheet(
+        ModalBottomSheet(dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { attachmentSheetOpen = false },
             containerColor = Color.Transparent,
         ) {
@@ -1103,7 +1103,7 @@ fun ChatDetailScreen(
 
     // Per-chat wallpaper picker (Dart _openWallpaperPicker options).
     if (wallpaperPickerOpen) {
-        ModalBottomSheet(
+        ModalBottomSheet(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { wallpaperPickerOpen = false },
             containerColor = Color.Transparent,
         ) {
@@ -1121,7 +1121,7 @@ fun ChatDetailScreen(
 
     // Composer emoji picker (Dart ChatyEmojiPicker.showComposer).
     if (emojiComposerOpen) {
-        ModalBottomSheet(
+        ModalBottomSheet(dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { emojiComposerOpen = false },
             containerColor = Color.Transparent,
         ) {
@@ -1150,7 +1150,7 @@ fun ChatDetailScreen(
 
     // Reaction emoji picker (Dart ChatyEmojiPicker.show reactionMode).
     emojiReactionTarget?.let { target ->
-        ModalBottomSheet(
+        ModalBottomSheet(dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { emojiReactionTarget = null },
             containerColor = Color.Transparent,
         ) {
@@ -1197,7 +1197,7 @@ fun ChatDetailScreen(
 
     // Clear conversation confirmation (Dart _clearConversation).
     if (clearConfirmOpen) {
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { clearConfirmOpen = false },
             title = { Text("Clear conversation?") },
             text = { Text("All messages will be removed from this chat for you.") },
@@ -1403,7 +1403,7 @@ private fun ConversationHeader(
                     tint = Color(theme.primaryTextColor),
                 )
             }
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { onMenuOpenChange(false) }) {
+            DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape, expanded = menuOpen, onDismissRequest = { onMenuOpenChange(false) }) {
                 DropdownMenuItem(
                     text = {
                         Text(
@@ -1699,7 +1699,7 @@ private fun WallpaperPickerSheet(
             .fillMaxWidth()
             .background(
                 Color(theme.surfaceColor),
-                RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
+                com.example.chat.ui.kit.ChatyModalShape,
             )
             .padding(vertical = 14.dp),
     ) {
