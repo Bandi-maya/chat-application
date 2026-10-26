@@ -51,7 +51,7 @@ class HeaderTabStyleSheetProofTest {
     }
 
     private fun launch(dark: Boolean): ActivityScenario<HeaderProofActivity> =
-        ActivityScenario.launch(
+        ActivityScenario.launch<HeaderProofActivity>(
             Intent(inst.targetContext, HeaderProofActivity::class.java)
                 .putExtra(HeaderProofActivity.EXTRA_DARK, dark).putExtra(HeaderProofActivity.EXTRA_SCREEN, HeaderProofActivity.SCREEN_SHEET)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
