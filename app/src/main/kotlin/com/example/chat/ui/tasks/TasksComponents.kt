@@ -12,7 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Flag
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -104,7 +104,7 @@ fun TaskAvatar(initials: String, colorHex: String?, size: Int, colors: TaskColor
 /** Exact port of the delete confirmation from task_detail_screen.dart. */
 @Composable
 fun DeleteTaskDialog(onCancel: () -> Unit, onDelete: () -> Unit) {
-    AlertDialog(
+    AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = onCancel,
         title = { Text("Delete Task") },
         text = { Text("Are you sure you want to delete this task? This action cannot be undone.") },
