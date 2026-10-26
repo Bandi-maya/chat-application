@@ -72,6 +72,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -202,13 +205,15 @@ fun UpdatesScreen(
         }
     }
 
-    Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        Text(
+    val titleAlreadyVisible = com.example.chat.ui.navigation.LocalDestinationTitlePresentation.current ==
+        com.example.chat.core.templates.ChatyNavigationDestinationIds.updates
+    Column(modifier = modifier.fillMaxSize().semantics { paneTitle = "Updates" }.verticalScroll(rememberScrollState())) {
+        if (!titleAlreadyVisible) Text(
             "Updates",
             color = colors.foreground,
             fontSize = 22.sp,
             fontWeight = FontWeight.ExtraBold,
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp),
+            modifier = Modifier.semantics { heading() }.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp),
         )
 
         // My Status composer card
@@ -378,14 +383,18 @@ private fun StatusList(
                         }
                     }
                 } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(columns),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.height(((174 + 10) * ((statuses.size + columns - 1) / columns)).dp),
-                    ) {
-                        items(statuses.size) { index ->
-                            GridStatusCard(statuses[index], template, colors, currentUser, getUser, contactNameColor, onOpen)
+                    // The screen already scrolls. Content-sized rows avoid a second
+                    // fixed-height viewport clipping cards at larger text scales.
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        statuses.chunked(columns).forEach { row ->
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                row.forEach { status ->
+                                    Box(Modifier.weight(1f)) {
+                                        GridStatusCard(status, template, colors, currentUser, getUser, contactNameColor, onOpen)
+                                    }
+                                }
+                                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                            }
                         }
                     }
                 }
@@ -501,7 +510,7 @@ private fun CircularStatusCard(
 }
 
 @Composable
-private fun GridStatusCard(
+internal fun GridStatusCard(
     status: StatusRecord,
     template: com.example.chat.core.templates.UpdatesTemplate,
     colors: ChatyColors,
@@ -514,7 +523,7 @@ private fun GridStatusCard(
         shadowElevation = template.cardElevation.dp,
         color = colors.surface,
         shape = RoundedCornerShape(18.dp),
-        modifier = Modifier.height(174.dp),
+        modifier = Modifier.heightIn(min = 174.dp),
     ) {
         Column(
             modifier = Modifier
@@ -531,7 +540,7 @@ private fun GridStatusCard(
                     modifier = Modifier.size(19.dp),
                 )
             }
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.height(12.dp))
             Text(
                 statusTitle(status, currentUser, getUser),
                 maxLines = 1,
