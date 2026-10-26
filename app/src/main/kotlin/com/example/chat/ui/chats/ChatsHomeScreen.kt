@@ -118,7 +118,6 @@ import kotlinx.coroutines.launch
  *  provided), NotificationPermissionSheet (host seam below, W8 owns the UI),
  *  swipe-call relationship checks (calls slice), GB story *content* (the
  *  strip lists contacts exactly like Dart). */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun ChatsHomeScreen(
     conversations: List<Conversation>,
@@ -316,16 +315,7 @@ fun ChatsHomeScreen(
         )
     }
 
-    if (showEffects) {
-        // Dart EffectPickerSheet.show: transparent modal bottom sheet over the shared EffectEngine.
-        androidx.compose.material3.ModalBottomSheet(
-            onDismissRequest = { showEffects = false },
-            containerColor = Color.Transparent,
-            dragHandle = null,
-        ) {
-            com.example.chat.ui.camera.EffectPickerSheet(engine = com.example.chat.ServiceLocator.effectEngine)
-        }
-    }
+    if (showEffects) com.example.chat.ui.camera.EffectPickerHost(onDismiss = { showEffects = false })
 
     if (showArchived) {
         // Dart _archivedTile: Navigator.push(_ArchivedChatsScreen). Hosted as a full-screen dialog so system
