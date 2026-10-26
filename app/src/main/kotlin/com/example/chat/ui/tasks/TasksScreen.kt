@@ -34,8 +34,8 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.TaskAlt
 import androidx.compose.material.icons.rounded.ViewKanban
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.example.chat.ui.kit.ChatyDropdownMenu as DropdownMenu
+import com.example.chat.ui.kit.ChatyDropdownMenuItem as DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -385,7 +385,7 @@ private fun TaskListCard(
                 IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(24.dp)) {
                     Icon(Icons.Rounded.MoreVert, contentDescription = "Task options", tint = colors.foregroundSecondary, modifier = Modifier.size(20.dp))
                 }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape, expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     DropdownMenuItem(
                         text = { Text("Edit Task") },
                         leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(18.dp)) },
@@ -711,7 +711,7 @@ private fun TaskHistoryDialog(
     colors: TaskColors,
     onClose: () -> Unit,
 ) {
-    androidx.compose.material3.AlertDialog(
+    com.example.chat.ui.kit.ChatyConfirmationDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = onClose,
         title = { Text("History — ${task.title}") },
         text = {
