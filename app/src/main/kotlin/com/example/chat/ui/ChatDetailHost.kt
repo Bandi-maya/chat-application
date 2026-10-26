@@ -275,12 +275,14 @@ fun ChatDetailHost(
                 com.example.chat.ui.chats.detail.AttachmentAction.video -> attachments.onMedia("video")
                 com.example.chat.ui.chats.detail.AttachmentAction.document -> attachments.onMedia("document")
                 com.example.chat.ui.chats.detail.AttachmentAction.audio -> attachments.onMedia("audio")
+                com.example.chat.ui.chats.detail.AttachmentAction.contact -> attachments.onContact()
                 com.example.chat.ui.chats.detail.AttachmentAction.task -> taskEditor = Triple(true, null, null)
                 else -> toast("This attachment type is not connected in this build yet.")
             }
         },
         onGalleryTap = { attachments.onMedia("image") },
         onAudioTap = { attachments.onMedia("audio") },
+        onContactTap = { attachments.onContact() },
         onVoiceTap = voice.onVoiceTap,
         onVoiceHoldStart = voice.onVoiceHoldStart,
         onVoiceMove = voice.onVoiceMove,
