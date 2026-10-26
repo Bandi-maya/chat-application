@@ -277,14 +277,14 @@ internal fun CurvedRadialDrawerShell(
                 // Compact landscape / split-screen: never shrink targets or push them
                 // into system bars to force a circle. Keep every destination reachable.
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(top = 72.dp)
+                    modifier = Modifier.fillMaxSize().padding(top = RadialMenuGeometry.navigationStripHeight.dp)
                         .background(colors.surface)
                         .verticalScroll(rememberScrollState()),
                 ) {
                     navItemIds.forEachIndexed { index, id ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth().height(56.dp)
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
                                 .clickable(role = androidx.compose.ui.semantics.Role.Tab) {
                                     onSelect(index)
                                     menuOpen = false
