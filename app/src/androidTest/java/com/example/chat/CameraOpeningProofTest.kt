@@ -59,7 +59,9 @@ class CameraOpeningProofTest {
                 awaitStream()
             }
         } finally {
-            if (!hadPermission) device.executeShellCommand("pm revoke ${context.packageName} android.permission.CAMERA")
+            // Revoking a runtime permission kills this package, including the instrumentation runner.
+            // The outer emulator harness restores only the permission this test granted AFTER the suite exits.
+            if (!hadPermission) File(context.getExternalFilesDir(null), "camera-permission-cleanup").writeText("revoke")
         }
     }
 }
