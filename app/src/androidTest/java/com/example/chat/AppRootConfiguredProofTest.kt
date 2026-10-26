@@ -45,6 +45,18 @@ class AppRootConfiguredProofTest {
     }
 
     /** Diagnostic only: logs the visible UI texts (synthetic app UI) so a failed wait explains itself. */
+    /** Reachable first-run onboarding (Dart notification education sheet): answer it with the
+     *  real "Not Now" control, exactly as a user would, before asserting on Home. Assertions
+     *  below are unchanged; this only clears the prompt that legitimately covers Home. */
+    private fun dismissOnboardingPrompts(device: UiDevice) {
+        repeat(4) {
+            val btn = device.wait(Until.findObject(By.text("Not Now")), 8000) ?: return
+            btn.click()
+            device.waitForIdle()
+            Thread.sleep(800)
+        }
+    }
+
     private fun logScreenTexts(device: UiDevice, tag: String) {
         try {
             val out = java.io.ByteArrayOutputStream()
@@ -114,6 +126,7 @@ class AppRootConfiguredProofTest {
             assertTrue("synthetic session restored", ServiceLocator.apiBackend.isAuthenticated)
             seedSyntheticChat()
             scenario = ActivityScenario.launch(MainActivity::class.java)
+            dismissOnboardingPrompts(device)
             if (!device.wait(Until.hasObject(By.text("Synthetic Peer")), 30000)) {
                 logScreenTexts(device, "failure"); try { capture(device, "00-failure-state") } catch (_: Exception) {}
                 throw AssertionError("seeded conversation row not shown on Home")
@@ -162,6 +175,7 @@ class AppRootConfiguredProofTest {
             ServiceLocator.apiBackend.initialize()
             assertTrue("synthetic session restored", ServiceLocator.apiBackend.isAuthenticated)
             scenario = ActivityScenario.launch(MainActivity::class.java)
+            dismissOnboardingPrompts(device)
             val shown = device.wait(Until.hasObject(By.text("Chats")), 30000)
             if (!shown) {
                 logScreenTexts(device, "failure"); try { capture(device, "00-failure-state") } catch (_: Exception) {}
