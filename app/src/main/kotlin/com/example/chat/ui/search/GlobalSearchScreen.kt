@@ -18,7 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AlternateEmail
-import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.Search
@@ -171,7 +171,7 @@ fun GlobalSearchScreen(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp),
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.Rounded.ArrowBack, contentDescription = "Back", tint = colors.foreground)
+                Icon(Icons.Rounded.ChevronLeft, contentDescription = "Back", tint = colors.foreground)
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
