@@ -30,10 +30,16 @@ import androidx.compose.material.icons.outlined.ImageNotSupported
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Checklist
+import androidx.compose.material.icons.rounded.MilitaryTech
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.VerifiedUser
+import androidx.compose.material.icons.rounded.WorkspacePremium
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PushPin
@@ -138,6 +144,10 @@ fun ChatMessageBubble(
     senderName: String? = null,
     showGroupAvatar: Boolean = true,
     isSenderAdmin: Boolean = false,
+    makeTextSelectable: Boolean = true,
+    groupAdminIcon: String = "Default",
+    hideAdminNameIcon: Boolean = false,
+    voicePlayButtonColor: Color? = null,
     isSelected: Boolean = false,
     showDeletedContent: Boolean = false,
     showEditedLabel: Boolean = true,
@@ -382,6 +392,24 @@ fun ChatMessageBubble(
                                 fontSize = (11.5 * theme.fontScale).sp,
                                 fontWeight = FontWeight.W700,
                             )
+                            // Dart message_bubble.dart:443: admin badge next to the sender name.
+                            if (isSenderAdmin && !hideAdminNameIcon) {
+                                Box(Modifier.width(4.dp))
+                                Icon(
+                                    when (groupAdminIcon) {
+                                        "Star" -> Icons.Rounded.Star
+                                        "Shield" -> Icons.Rounded.Shield
+                                        "Crown" -> Icons.Rounded.MilitaryTech
+                                        "Badge" -> Icons.Rounded.WorkspacePremium
+                                        else -> Icons.Rounded.VerifiedUser
+                                    },
+                                    contentDescription = null,
+                                    modifier = Modifier.size(13.dp),
+                                    tint = Color(
+                                        colorOverrides?.groupParticipantNameColor ?: theme.accentColor,
+                                    ),
+                                )
+                            }
                         }
                         Box(Modifier.height(3.dp))
                     }
@@ -509,6 +537,7 @@ fun ChatMessageBubble(
                                 attachment = message.attachment!!,
                                 textColor = Color(textColor),
                                 accentColor = Color(theme.accentColor),
+                                playButtonColor = voicePlayButtonColor,
                                 onPlay = onVoicePlay,
                             )
                             "document" -> DocumentPreview(
@@ -553,15 +582,30 @@ fun ChatMessageBubble(
                             verticalAlignment = Alignment.Bottom,
                             horizontalArrangement = Arrangement.End,
                         ) {
-                            BasicText(
-                                text = message.text,
-                                style = TextStyle(
-                                    color = Color(textColor),
-                                    fontSize = (messageTextSize * theme.fontScale).sp,
-                                    lineHeight = (messageTextSize * theme.fontScale * 1.35).sp,
-                                ),
-                                modifier = Modifier.weight(1f, fill = false),
-                            )
+                            // Dart: convPrefs.makeTextSelectable (default true) wraps
+                            // the body text in a selectable region.
+                            if (makeTextSelectable) {
+                                SelectionContainer(Modifier.weight(1f, fill = false)) {
+                                    BasicText(
+                                        text = message.text,
+                                        style = TextStyle(
+                                            color = Color(textColor),
+                                            fontSize = (messageTextSize * theme.fontScale).sp,
+                                            lineHeight = (messageTextSize * theme.fontScale * 1.35).sp,
+                                        ),
+                                    )
+                                }
+                            } else {
+                                BasicText(
+                                    text = message.text,
+                                    style = TextStyle(
+                                        color = Color(textColor),
+                                        fontSize = (messageTextSize * theme.fontScale).sp,
+                                        lineHeight = (messageTextSize * theme.fontScale * 1.35).sp,
+                                    ),
+                                    modifier = Modifier.weight(1f, fill = false),
+                                )
+                            }
                             Box(Modifier.width(8.dp))
                             MessageMetaRow(message, isMe, textColor, timestampColor, theme,
                                 showEditedLabel, bubbleBg, onRetry)
@@ -961,6 +1005,7 @@ private fun VoiceNoteCard(
     attachment: MessageAttachment,
     textColor: Color,
     accentColor: Color,
+    playButtonColor: Color? = null,
     onPlay: ((MessageAttachment) -> Unit)?,
 ) {
     val totalSeconds = attachment.durationSeconds
@@ -976,7 +1021,8 @@ private fun VoiceNoteCard(
         Box(
             Modifier
                 .size(34.dp)
-                .background(accentColor, CircleShape)
+                // Dart _VoiceNotePlayer: playButtonColor ?? accentColor.
+                .background(playButtonColor ?: accentColor, CircleShape)
                 .pointerInput(attachment.id) {
                     detectTapGestures(onTap = { onPlay?.invoke(attachment) })
                 },
