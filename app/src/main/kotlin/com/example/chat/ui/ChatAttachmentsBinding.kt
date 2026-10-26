@@ -21,6 +21,13 @@ import com.example.chat.domain.models.MessageType
 import com.example.chat.ui.chats.detail.AttachmentBackendPort
 import com.example.chat.ui.chats.detail.ChatAttachmentActionController
 import com.example.chat.ui.chats.detail.PickedFile
+import com.example.chat.ui.media.CustomFilePickerScreen
+import com.example.chat.ui.media.DocumentReaderScreen
+import com.example.chat.ui.media.FileSanitizationService
+import com.example.chat.ui.media.MediaCategory
+import com.example.chat.ui.media.MediaFileDescriptor
+import com.example.chat.ui.media.MediaLibraryService
+import com.example.chat.ui.media.PdfProcessingService
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -30,8 +37,9 @@ import kotlinx.coroutines.withContext
  *  Bound: image/video/document/audio pick + upload (ChatMediaService -> REST /chat/upload when the
  *  api session is authenticated) + send through ApiBackendService.sendMessage with the Dart JSON
  *  envelope, view-once sheet, share-limit and size guards.
- *  Not bound here (explicit gaps): location, poll dialog/viewer, camera screen, demo cards.
- *  Deviation: Dart opens its in-app CustomFilePickerScreen; this uses the Android system picker. */
+ *  Not bound here (explicit gaps): poll dialog/viewer.
+ *  document shareMedia routes to the in-app CustomFilePickerScreen (Dart
+ *  chat_attachment_actions.dart:92 Navigator.push), not the system picker. */
 class ChatAttachmentsBindings(
     val onMedia: (String) -> Unit,
     val onContact: () -> Unit,
@@ -53,6 +61,18 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
         pending?.complete(listOfNotNull(uri)); pending = null
     }
     var contactPending by remember { mutableStateOf<CompletableDeferred<Uri?>?>(null) }
+    var docPickerPending by remember { mutableStateOf<CompletableDeferred<List<MediaFileDescriptor>?>?>(null) }
+    // Dart custom_file_picker_screen.dart:33 `final _libraryService = MediaLibraryService();`
+    // with path_provider sources (media_library_service.dart:48-51): app documents dir + temp dir.
+    val mediaLibrary = remember {
+        MediaLibraryService(libraryDirectories = { listOf(context.filesDir, context.cacheDir) })
+    }
+    // Dart document_reader_screen.dart:29 `final _pdfService = PdfProcessingService();`
+    // sanitizer workspace = path_provider temp dir (file_sanitization_service.dart).
+    val pdfService = remember {
+        PdfProcessingService(FileSanitizationService(tempDirectory = { context.cacheDir }))
+    }
+    var readerDoc by remember { mutableStateOf<MediaFileDescriptor?>(null) }
     val contactPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickContact()) { uri ->
         contactPending?.complete(uri); contactPending = null
     }
@@ -189,6 +209,15 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
             controller.shareMedia(
                 type = type,
                 pickFiles = { multiple, maxFiles ->
+                    if (type == "document") {
+                        // Dart shareMedia('document'): Navigator.push -> CustomFilePickerScreen(
+                        // initialCategory: document, title: 'Documents & Files'), multi-pick.
+                        val d = CompletableDeferred<List<MediaFileDescriptor>?>()
+                        docPickerPending = d
+                        return@shareMedia d.await()?.map {
+                            PickedFile(name = it.name, path = it.path, mimeType = it.mimeType)
+                        }
+                    }
                     val d = CompletableDeferred<List<Uri>>()
                     pending = d
                     val mime = when (type) { "image" -> "image/*"; "video" -> "video/*"; "audio" -> "audio/*"; else -> "*/*" }
@@ -217,6 +246,26 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
             text = { Text("Choose how it should be delivered.") },
             dismissButton = { TextButton(onClick = { viewOnceAsk = null; d.complete(false) }) { Text("Send normally") } },
             confirmButton = { TextButton(onClick = { viewOnceAsk = null; d.complete(true) }) { Text("View once") } },
+        )
+    }
+    docPickerPending?.let { d ->
+        CustomFilePickerScreen(
+            libraryService = mediaLibrary,
+            allowMultiple = true,
+            initialCategory = MediaCategory.document,
+            title = "Documents & Files",
+            // Dart custom_file_picker_screen.dart:745-756 _openFile: real files push
+            // DocumentReaderScreen; demo/missing entries toggle selection inside the picker.
+            onOpenDocument = { f -> readerDoc = f },
+            onSendAttachments = { files -> docPickerPending = null; d.complete(files) },
+            onClose = { docPickerPending = null; d.complete(null) },
+        )
+    }
+    readerDoc?.let { f ->
+        DocumentReaderScreen(
+            file = f,
+            pdfService = pdfService,
+            onClose = { readerDoc = null },
         )
     }
     return ChatAttachmentsBindings(onMedia, onContact, onLocation, controller)
