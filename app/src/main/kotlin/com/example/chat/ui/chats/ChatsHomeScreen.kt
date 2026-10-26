@@ -191,15 +191,9 @@ fun ChatsHomeScreen(
     }).copy(onOpenCameraEffects = { nav.onOpenCameraEffects(); showEffects = true })
     // Connection UI defaults to the shared detail-slice components once the
     // owner wires the health snapshot; explicit slots still win.
+    // No Home strip banner: connection state is shown only by the signal icon in the header (headerExtras),
+    // the single tap target for Connection Health. An explicitly supplied slot is still honored.
     val effectiveConnectionBanner: (@Composable () -> Unit)? = connectionBanner
-        ?: connectionHealthState?.let { state ->
-            @Composable {
-                com.example.chat.ui.chats.detail.GlobalConnectionBanner(
-                    state = state,
-                    onTap = onOpenConnectionDetail,
-                )
-            }
-        }
     val effectiveHeaderExtras: (@Composable () -> Unit)? = headerExtras
         ?: connectionHealthState?.let { state ->
             @Composable {
