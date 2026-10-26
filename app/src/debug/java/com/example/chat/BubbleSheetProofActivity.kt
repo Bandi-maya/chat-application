@@ -37,6 +37,10 @@ class BubbleSheetProofActivity : ComponentActivity() {
         val dark = intent.getBooleanExtra(EXTRA_DARK, false)
         val page = intent.getIntExtra(EXTRA_PAGE, 0)
         val withText = intent.getBooleanExtra(EXTRA_TEXT, false)
+        // Readability sheets include the real dome shoulder inset plus a text line.
+        // Silhouette captures and pairwise comparison dimensions remain unchanged.
+        val bubbleHeight = if (withText) 60.dp else 44.dp
+        val cellHeight = if (withText) 88.dp else 72.dp
         val t = ThemePresets.getSystemDefaultTheme(platformIsLight = !dark)
         val ids = BubbleStyleId.values().drop(page * PER_PAGE).take(PER_PAGE)
         setContent {
@@ -47,14 +51,14 @@ class BubbleSheetProofActivity : ComponentActivity() {
                         Row {
                             listOf(true, false).forEach { me ->
                                 Box(
-                                    Modifier.size(178.dp, 72.dp).semantics { contentDescription = "bubble-${id.name}-${if (me) "me" else "them"}" },
+                                    Modifier.size(178.dp, cellHeight).semantics { contentDescription = "bubble-${id.name}-${if (me) "me" else "them"}" },
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     ChatyBubbleContainer(
                                         styleId = id, isMe = me,
                                         fillColor = Color(if (me) t.accentColor else t.cardColor),
                                         accentColor = Color(t.accentColor),
-                                        modifier = Modifier.size(150.dp, 44.dp),
+                                        modifier = Modifier.size(150.dp, bubbleHeight),
                                     ) {
                                         if (withText) Text("Hello there", color = Color(if (me) t.onAccentColor else t.primaryTextColor), fontSize = 14.sp)
                                     }
