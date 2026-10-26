@@ -88,15 +88,15 @@ fun ChatyChoiceTile(
     val filled = prominent || selected
     Row(
         modifier.clip(ChatyModalShape)
-            .background(if (prominent) c.accent else if (selected) c.accent.copy(alpha = 0.12f) else c.surface)
-            .border(1.dp, if (filled) c.accent.copy(alpha = 0.6f) else c.border, ChatyModalShape)
+            .background(if (prominent && !enabled) c.disabled else if (prominent) c.accent else if (selected) c.accent.copy(alpha = 0.12f) else c.surface)
+            .border(1.dp, if (prominent && !enabled) c.border else if (filled) c.accent.copy(alpha = 0.6f) else c.border, ChatyModalShape)
             .then(if (role == Role.Checkbox) Modifier.toggleable(value = selected, enabled = enabled, role = role, onValueChange = { onClick() })
                 else Modifier.selectable(selected = selected, enabled = enabled, role = role, onClick = onClick))
             .heightIn(min = 48.dp).padding(horizontal = if (compact) 2.dp else 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
-        Text(label, color = if (!enabled) c.disabledForeground else if (prominent) c.onAccent else if (selected) c.accent else c.foreground,
+        Text(label, color = if (!enabled) (if (prominent) c.foregroundSecondary else c.disabledForeground) else if (prominent) c.onAccent else if (selected) c.accent else c.foreground,
             fontSize = 13.sp, fontWeight = if (filled) FontWeight.Bold else FontWeight.Medium)
     }
 }
