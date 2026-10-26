@@ -10,6 +10,11 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -191,6 +196,10 @@ fun DynamicIslandOverlayHost(
         screenWidth = anchorInput.screenWidth,
     )
 
+    // The compact island keeps its intended hardware anchor. Expanded controls
+    // move below the status/cutout band instead of obscuring that region.
+    val protectedTop = if (mode == IslandMode.expanded)
+        max(anchor.topOffset, max(anchorInput.viewPaddingTop, anchorInput.paddingTop)) else anchor.topOffset
     Box(Modifier.fillMaxSize()) {
         content()
 
@@ -212,8 +221,11 @@ fun DynamicIslandOverlayHost(
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .padding(top = anchor.topOffset.dp)
-                    .height(max(100.0, screenHeight - anchor.topOffset).dp),
+                    .then(if (mode == IslandMode.expanded) Modifier.windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal),
+                    ) else Modifier)
+                    .padding(top = protectedTop.dp)
+                    .height(max(100.0, screenHeight - protectedTop).dp),
                 contentAlignment = when (anchor.alignment) {
                     CutoutAlignment.topLeft -> Alignment.TopStart
                     CutoutAlignment.topCenter -> Alignment.TopCenter
