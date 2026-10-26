@@ -3,6 +3,7 @@ package com.example.chat.ui.island
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material.icons.rounded.Replay10
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Forward10
@@ -379,7 +380,7 @@ private fun IslandVectorIcon(
     size: androidx.compose.ui.unit.Dp,
 ) {
     androidx.compose.material3.Icon(
-        imageVector = icon ?: androidx.compose.material.icons.Icons.Rounded.Notifications,
+        imageVector = icon ?: androidx.compose.material.icons.Icons.Rounded.NotificationsActive,
         contentDescription = null,
         tint = color,
         modifier = Modifier.size(size),
