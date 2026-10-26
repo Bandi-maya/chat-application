@@ -2,6 +2,7 @@ package com.example.chat.ui
 
 import android.widget.Toast
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -138,6 +139,12 @@ fun ChatDetailHost(
     val lookup: (String) -> com.example.chat.domain.models.UserProfile? = { id -> api.users.firstOrNull { it.id == id } }
 
     val attachments = rememberChatAttachments(conversation.id) { rev++ }
+    val voice = rememberChatVoice(
+        conversation.id,
+        afterSend = { rev++ },
+        clearTyping = { scope.launch { try { ServiceLocator.gbFeatures.setTyping(conversation.id, false) } catch (_: Exception) {} } },
+    )
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     ChatDetailScreen(
         conversation = live,
         messages = messages,
@@ -274,7 +281,13 @@ fun ChatDetailHost(
         },
         onGalleryTap = { attachments.onMedia("image") },
         onAudioTap = { attachments.onMedia("audio") },
+        onVoiceTap = voice.onVoiceTap,
+        onVoiceHoldStart = voice.onVoiceHoldStart,
+        onVoiceMove = voice.onVoiceMove,
+        onVoiceHoldEnd = voice.onVoiceHoldEnd,
     )
+    voice.overlay()
+    }
 
     if (gateOpen) {
         val st = connection ?: ContactConnectionStatus()
