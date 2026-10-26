@@ -1,11 +1,18 @@
 package com.example.chat.ui.kit
 
 import android.content.Context
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 
@@ -39,9 +46,44 @@ object ChatyMotion {
     fun curve(context: Context, preferred: Easing = springSnappy): Easing = if (disableAnimations(context)) LinearEasing else preferred
 }
 
-/** Reads the platform reduce-motion state once per composition entry (Dart MediaQuery.disableAnimationsOf). */
+/** Testable subscription lifecycle; read after subscribing so setup cannot miss a change. */
+internal fun observeChatyMotionPolicy(
+    read: () -> Boolean,
+    subscribe: (onChange: () -> Unit) -> (() -> Unit),
+    onValue: (Boolean) -> Unit,
+): () -> Unit {
+    var active = true
+    val refresh = { if (active) onValue(read()) }
+    val unregister = subscribe(refresh)
+    refresh()
+    return {
+        if (active) {
+            active = false
+            unregister()
+        }
+    }
+}
+
+/** Live platform reduce-motion policy; observer is removed when this composition leaves. */
 @Composable
 fun rememberChatyReduceMotion(): Boolean {
-    val ctx = LocalContext.current
-    return remember(ctx) { ChatyMotion.disableAnimations(ctx) }
+    val ctx = LocalContext.current.applicationContext
+    var reduced by remember(ctx) { mutableStateOf(ChatyMotion.disableAnimations(ctx)) }
+    DisposableEffect(ctx) {
+        val stop = observeChatyMotionPolicy(
+            read = { ChatyMotion.disableAnimations(ctx) },
+            subscribe = { refresh ->
+                val resolver = ctx.contentResolver
+                val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+                    override fun onChange(selfChange: Boolean) { refresh() }
+                }
+                resolver.registerContentObserver(Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE), false, observer)
+                val unsubscribe: () -> Unit = { resolver.unregisterContentObserver(observer) }
+                unsubscribe
+            },
+            onValue = { reduced = it },
+        )
+        onDispose { stop() }
+    }
+    return reduced
 }
