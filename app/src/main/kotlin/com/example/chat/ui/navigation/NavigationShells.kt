@@ -78,47 +78,19 @@ internal fun TopWhatsAppShell(
         activeDestinationId == ChatyNavigationDestinationIds.chats ||
             activeDestinationId == ChatyNavigationDestinationIds.groups
 
-    val tabs: @Composable () -> Unit = {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(template.height.coerceIn(48.0, 88.0).dp)
-                .background(colors.primary)
-                ,
-        ) {
-            navItemIds.forEachIndexed { index, id ->
-                val selected = index == selectedIndex
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clickable { onSelect(index) },
-                ) {
-                    Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text(
-                            NavigationCatalog.labelFor(id),
-                            color = if (selected) colors.onPrimary else colors.onPrimary.copy(alpha = 0.72f),
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                            fontSize = 14.sp,
-                            letterSpacing = 0.2.sp,
-                        )
-                    }
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(3.5.dp)
-                            .background(if (selected) colors.onPrimary else Color.Transparent),
-                    )
-                }
-            }
-        }
+    val heightDp = template.height.coerceIn(48.0, 88.0).toFloat()
+    val headerTabs = LocalHomeHeaderTabs.current
+    // Publish data only (no lambdas in state); cleared when this shell leaves or the root is not Chats/Groups.
+    androidx.compose.runtime.SideEffect {
+        if (tabsBelongUnderHomeHeader && headerTabs != null) headerTabs.publish(navItemIds, selectedIndex, heightDp, onSelect)
+        else headerTabs?.clear()
     }
-    if (tabsBelongUnderHomeHeader) homeHeaderTabsSlot(tabs) else homeHeaderTabsSlot(null)
+    androidx.compose.runtime.DisposableEffect(headerTabs) { onDispose { headerTabs?.clear() } }
+    val underHeaderPublished = tabsBelongUnderHomeHeader && headerTabs != null
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            if (!tabsBelongUnderHomeHeader) tabs()
+            if (!underHeaderPublished) HomeHeaderTabsBar(colors, navItemIds, selectedIndex, heightDp, onSelect)
             Box(Modifier.weight(1f)) { content() }
         }
         Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) { fab() }
