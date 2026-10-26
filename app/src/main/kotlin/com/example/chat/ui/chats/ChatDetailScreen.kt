@@ -46,9 +46,9 @@ import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material.icons.rounded.Reply
 import androidx.compose.material.icons.rounded.VideoCameraFront
 import androidx.compose.material.icons.rounded.StarBorder
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
+import com.example.chat.ui.kit.ChatyDropdownMenu as DropdownMenu
+import com.example.chat.ui.kit.ChatyDropdownMenuItem as DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -1087,7 +1087,7 @@ fun ChatDetailScreen(
     }
 
     if (attachmentSheetOpen) {
-        ModalBottomSheet(dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape,
+        ModalBottomSheet(tonalElevation = 0.dp, dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { attachmentSheetOpen = false },
             containerColor = Color.Transparent,
         ) {
@@ -1103,7 +1103,7 @@ fun ChatDetailScreen(
 
     // Per-chat wallpaper picker (Dart _openWallpaperPicker options).
     if (wallpaperPickerOpen) {
-        ModalBottomSheet(shape = com.example.chat.ui.kit.ChatyModalShape,
+        ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp, shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { wallpaperPickerOpen = false },
             containerColor = Color.Transparent,
         ) {
@@ -1121,7 +1121,7 @@ fun ChatDetailScreen(
 
     // Composer emoji picker (Dart ChatyEmojiPicker.showComposer).
     if (emojiComposerOpen) {
-        ModalBottomSheet(dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape,
+        ModalBottomSheet(tonalElevation = 0.dp, dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { emojiComposerOpen = false },
             containerColor = Color.Transparent,
         ) {
@@ -1150,7 +1150,7 @@ fun ChatDetailScreen(
 
     // Reaction emoji picker (Dart ChatyEmojiPicker.show reactionMode).
     emojiReactionTarget?.let { target ->
-        ModalBottomSheet(dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape,
+        ModalBottomSheet(tonalElevation = 0.dp, dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { emojiReactionTarget = null },
             containerColor = Color.Transparent,
         ) {
