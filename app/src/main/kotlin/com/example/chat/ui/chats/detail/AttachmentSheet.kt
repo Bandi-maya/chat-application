@@ -96,7 +96,7 @@ fun AttachmentSheetContent(
             .fillMaxWidth()
             .background(
                 Color(theme.surfaceColor),
-                RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                com.example.chat.ui.kit.ChatyModalShape,
             )
             .verticalScroll(rememberScrollState())
             .padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 24.dp),
