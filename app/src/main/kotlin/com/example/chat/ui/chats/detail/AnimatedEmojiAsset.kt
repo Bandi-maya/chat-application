@@ -725,6 +725,16 @@ object ChatyEmojiAssetRegistry {
  *  forever in inline/picker modes and played once otherwise
  *  (animated_emoji_view.dart:186-189). A load failure renders the static
  *  glyph, mirroring the Dart chain where a resolver miss renders Text. */
+/** Resolves the Lottie source for a Noto id. Production = the streamed Noto
+ *  JSON. The instrumented loop proof swaps in a bundled composition so the
+ *  same production composable runs offline. */
+internal var emojiLottieSpecResolver: (String) -> LottieCompositionSpec = { notoId ->
+    LottieCompositionSpec.Url("https://fonts.gstatic.com/s/e/notoemoji/latest/$notoId/lottie.json")
+}
+
+/** Test observer: (notoId, progress 0..1, completed iteration count). null in production. */
+internal var emojiLoopObserver: ((String, Float, Int) -> Unit)? = null
+
 @Composable
 fun ChatyAnimatedEmojiAsset(
     notoId: String,
@@ -732,22 +742,27 @@ fun ChatyAnimatedEmojiAsset(
     size: Float,
     repeat: Boolean,
 ) {
-    val url = "https://fonts.gstatic.com/s/e/notoemoji/latest/$notoId/lottie.json"
-    val composition by rememberLottieComposition(LottieCompositionSpec.Url(url))
+    val composition by rememberLottieComposition(emojiLottieSpecResolver(notoId))
     val comp = composition
     if (comp != null) {
-        LottieAnimation(
+        val state = com.airbnb.lottie.compose.animateLottieCompositionAsState(
             composition = comp,
-            modifier = Modifier.size(size.dp),
             iterations = if (repeat) {
                 com.airbnb.lottie.compose.LottieConstants.IterateForever
             } else {
                 1
             },
         )
+        androidx.compose.runtime.SideEffect {
+            emojiLoopObserver?.invoke(notoId, state.progress, state.iteration)
+        }
+        LottieAnimation(
+            composition = comp,
+            progress = { state.progress },
+            modifier = Modifier.size(size.dp),
+        )
     } else {
-        // Loading/failure: Dart's chain renders the static glyph when no
-        // animated asset is available; while streaming, show the same glyph.
+        // Loading/failure: static glyph while streaming or when the load fails.
         Box(Modifier.size(size.dp), contentAlignment = Alignment.Center) {
             Text(unicode, fontSize = (size * 0.82f).sp, lineHeight = (size * 0.82f).sp, maxLines = 1)
         }
