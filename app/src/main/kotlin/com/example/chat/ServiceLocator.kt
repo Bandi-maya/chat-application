@@ -61,6 +61,8 @@ object ServiceLocator {
         // gotrue session restore, mirroring supabase_flutter's initializeAuth
         // which runs during Supabase.initialize before runApp.
         appScope.launch { sessionManager.restore() }
+        // Decrypted media temps never survive a process restart.
+        appScope.launch(kotlinx.coroutines.Dispatchers.IO) { runCatching { mediaCache.purgeTransientTemps() } }
         preferencesController // start load + remote reconcile (Dart controller constructor)
     }
 
@@ -116,15 +118,36 @@ object ServiceLocator {
      *  it recursed until StackOverflowError at launch, CI run 40267033954 job 121395203962). */
     @Volatile private var apiBackendUnderConstruction: com.example.chat.data.api.ApiBackendService? = null
 
+    /** One monitor for the process (created lazily with the single apiBackend). */
+    val networkMonitor: com.example.chat.data.network.NetworkStatusMonitor by lazy {
+        com.example.chat.data.network.NetworkStatusMonitor(requireContext())
+    }
+
+    /** Runs once, from the apiBackend lazy initializer, so there is exactly one collector. Reconnects the
+     *  socket only on an offline -> online transition (validated internet), never disables anything while
+     *  offline: a false 'validated' reading just skips the early reconnect and the backoff timer still runs. */
+    private fun startNetworkRecovery(service: com.example.chat.data.api.ApiBackendService) {
+        networkMonitor.start()
+        appScope.launch {
+            var wasOnline = networkMonitor.state.value.online
+            networkMonitor.state.collect { status ->
+                if (status.online && !wasOnline) service.onNetworkRegained()
+                wasOnline = status.online
+            }
+        }
+    }
+
     val apiBackend: com.example.chat.data.api.ApiBackendService by lazy {
         com.example.chat.data.api.ApiBackendService(requireContext()).also { service ->
             apiBackendUnderConstruction = service
             // Dart locator wiring for _syncFcmToken / unregisterOnLogout:
             // deferred lambdas so the registrar's lazy init cannot cycle
             // back into this lazy block during construction.
+            service.onAttachmentsGone = { refs -> invalidateMediaFor(refs) }
             service.syncFcmTokenHook = { fcmRegistrar.syncTokenOnLogin() }
             service.unregisterFcmHook = { fcmRegistrar.unregisterOnLogout() }
             service.initialize()
+            startNetworkRecovery(service)
         }
     }
 
@@ -279,6 +302,7 @@ object ServiceLocator {
             },
             deleteSnapshots = { snapshotCache.deleteUser(it) },
             deleteAllSecureStorage = { secureStore.deleteAll() },
+            purgeMediaCache = { mediaCache.deleteAccount(it) },
         ).purge(userId)
     }
 
@@ -319,6 +343,7 @@ object ServiceLocator {
             onPendingEnqueued = { appScope.launch { outgoingQueue.processQueue() } },
             snapshotCache = snapshotCache,
             snapshotScope = appScope,
+            onAttachmentsGone = { refs -> invalidateMediaFor(refs) },
             // Dart backend_service _shouldSendReadReceipts: ghost mode, readReceipts and blue-ticks-after-reply.
             shouldSendReadReceipts = { conversationId ->
                 val p = preferencesController
@@ -412,9 +437,24 @@ object ServiceLocator {
             // no-op until the record plane is confirmed.
             callRecordSink = { },
             lowDataUsageEnabled = { callPresentationPrefs.value.lowDataUsageEnabled },
+            captureAccountScope = { apiBackend.authSnapshot() },
+            accountScopeValid = { expected -> apiBackend.authSnapshot() === expected },
+            accountScopeGuard = { expected, action ->
+                (expected as? com.example.chat.data.api.ApiAccountScope)?.let { apiBackend.withAuthScope(it, action) } ?: false
+            },
         ).also { svc ->
-            apiBackend.addCallSignalListener { data ->
-                appScope.launch { svc.handleRemoteSignal(data) }
+            apiBackend.addAuthScopeListener { next ->
+                // Callback only detaches state under auth lock; disposal owns
+                // the captured old peer and runs outside that lock.
+                val cleanup = svc.detachForAccountTransition(next)
+                if (cleanup != null) appScope.launch { cleanup() }
+            }
+            apiBackend.addScopedCallSignalListener { expected, data ->
+                appScope.launch {
+                    svc.handleRemoteSignal(data,
+                        validScope = { apiBackend.authSnapshot() === expected },
+                        guardScope = { action -> apiBackend.withAuthScope(expected, action) })
+                }
             }
         }
     }
@@ -477,6 +517,9 @@ object ServiceLocator {
                 preferencesController.universal.sendImagesFullResolutionMb
             },
             gbSizeLimitMb = { key, fallback -> preferencesController.gbDouble(key, fallback) },
+            imageCompressor = { bytes, quality ->
+                com.example.chat.ui.media.ImageSendCompressor.compress(bytes, quality)
+            },
             apiAuthenticated = { apiBackend.isAuthenticated },
             apiUpload = { bytes, filename -> apiBackend.uploadMedia(filename, bytes) },
         )
@@ -571,6 +614,62 @@ object ServiceLocator {
         )
     }
 
+    /** Encrypted, account-scoped local store for media the user opened/downloaded. Limit = user setting
+     *  (500 MB / 1 GB default / 2 GB); per-entry cap = the existing 50 MB media limit. Decrypted temps from a
+     *  previous process are purged on first use. */
+    val mediaCache: com.example.chat.data.local.AttachmentFileCache by lazy {
+        com.example.chat.data.local.AttachmentFileCache(
+            context = requireContext(),
+            // Same immutable custom-API account/routing scope that owns these messages. No Supabase fallback.
+            identity = {
+                val account = apiBackend.authSnapshot()
+                account.userId?.takeIf { it.isNotBlank() && !account.token.isNullOrBlank() }?.let {
+                    com.example.chat.data.local.SessionEpoch.Identity(account.tenantId, it, account.generation)
+                }
+            },
+            maxBytes = { com.example.chat.data.local.MediaCacheSettings.limitBytes(requireContext()) },
+            maxEntryBytes = com.example.chat.data.services.ChatMediaService.STORAGE_LIMIT_MB * 1024L * 1024L,
+            exportPolicy = { ref -> trustedAttachmentFor(ref)?.let { !it.viewOnce && !it.restricted } == true },
+            editedOutputValidator = com.example.chat.data.media.AndroidEditedOutputValidator,
+        ).also { it.purgeTransientTemps() }
+    }
+
+    /** Trusted state from the signed-in account's loaded message (never caller claims). Unknown/deleted => null. */
+    private fun trustedAttachmentFor(ref: com.example.chat.data.local.AttachmentRef): com.example.chat.data.media.TrustedAttachment? =
+        runCatching {
+            // Custom-backend sessions keep their messages in ApiBackendService; other paths in the repository.
+            val account = apiBackend.authSnapshot()
+            var trusted: com.example.chat.data.media.TrustedAttachment? = null
+            apiBackend.withAuthScope(account) {
+                val m = apiBackend.getMessages(ref.conversationId).firstOrNull { it.id == ref.messageId }
+                val attachment = m?.attachment
+                if (m != null && attachment != null && attachment.id == ref.attachmentId &&
+                    !m.isDeletedForEveryone && !m.isDeletedForMe && !m.isRevokedBySender) {
+                    trusted = com.example.chat.data.media.TrustedAttachment(attachment.type,
+                        com.example.chat.data.local.AttachmentCachePolicy.viewOnceRestricted(m.metadata), false)
+                }
+            }
+            trusted
+        }.getOrNull()
+
+    /** Deleted/removed messages: drop their local media copies off the caller's thread. Never throws. */
+    private fun invalidateMediaFor(refs: List<com.example.chat.data.local.AttachmentRef>) {
+        appScope.launch(kotlinx.coroutines.Dispatchers.IO) { runCatching { refs.forEach { mediaCache.onAttachmentGone(it) } } }
+    }
+
+    /** Resolver for opened/downloaded attachments; consumers decide how to render each ResolvedSource. */
+    val attachmentResolver: com.example.chat.data.media.AttachmentSourceResolver by lazy {
+        val downloader = com.example.chat.data.media.BoundedMediaDownloader(
+            maxBytes = com.example.chat.data.services.ChatMediaService.STORAGE_LIMIT_MB * 1024L * 1024L,
+        )
+        com.example.chat.data.media.AttachmentSourceResolver(
+            store = mediaCache,
+            isOnline = { networkMonitor.state.value.online },
+            lookup = { ref -> trustedAttachmentFor(ref) },
+            download = { url -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { downloader.open(url) } },
+        )
+    }
+
     val sessionLifecycle: SessionLifecycleService by lazy {
         SessionLifecycleService(
             snapshotCache = snapshotCache,
@@ -583,6 +682,7 @@ object ServiceLocator {
             mls = mls,
             authSignOut = { sessionManager.signOut() },
             kickPendingSends = { appScope.launch { outgoingQueue.processQueue() } },
+            onSignedOut = { mediaCache.purgeTransientTemps() },
         )
     }
 
