@@ -20,4 +20,8 @@ echo "--- app lifecycle/crash lines from the full run log (AppsFilter noise remo
 grep -v "AppsFilter\|UiDevice: Searching" screenshots/logcat-full.txt | grep -i "FATAL EXCEPTION\|Process: com.example.chat\|AndroidRuntime\|Caused by\|has died\|ANR in\|PixelProof\|ActivityTaskManager.*com.example.chat\|ActivityManager.*com.example.chat\|Start proc.*com.example.chat\|libjnidispatch\|UnsatisfiedLink\|ChatyApplication\|SIGSEGV\|DEBUG  " | head -150 || true
 echo "--- logcat excerpt (app/crash) ---"
 grep -i "AndroidRuntime\|FATAL EXCEPTION\|com.example.chat\|chaty" screenshots/logcat.txt | grep -v "UiDevice: Searching\|AppsFilter" | tail -120 || true
-exit $rc
+bash ci/restart-check.sh
+rrc=$?
+echo "SMOKE-RC gradle=$rc restart=$rrc"
+[ $rc -ne 0 ] && exit $rc
+exit $rrc
