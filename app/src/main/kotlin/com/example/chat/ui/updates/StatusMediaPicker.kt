@@ -46,7 +46,8 @@ fun rememberStatusMediaPicker(): suspend (String) -> PickedStatusMedia? {
     }
 }
 
-private const val MAX_PICK_BYTES = 256L * 1024L * 1024L
+// Dart StatusService.storageLimitMb (50): no effective limit can exceed it, so nothing larger is read into memory.
+private const val MAX_PICK_BYTES = com.example.chat.data.services.StatusService.STORAGE_LIMIT_MB * 1024L * 1024L
 
 private suspend fun readPicked(context: Context, uri: Uri): PickedStatusMedia = withContext(Dispatchers.IO) {
     var name = "file"
@@ -59,7 +60,7 @@ private suspend fun readPicked(context: Context, uri: Uri): PickedStatusMedia = 
             if (s >= 0 && !c.isNull(s)) size = c.getLong(s)
         }
     }
-    if (size > MAX_PICK_BYTES) throw IllegalStateException("Selected media exceeds the storage limit.")
+    if (size > MAX_PICK_BYTES) throw IllegalStateException("Selected media exceeds the ${com.example.chat.data.services.StatusService.STORAGE_LIMIT_MB} MB storage limit.")
     val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
         // Bounded read: a provider that reports no size still cannot pull more than the cap into memory.
         val out = java.io.ByteArrayOutputStream()
@@ -69,7 +70,7 @@ private suspend fun readPicked(context: Context, uri: Uri): PickedStatusMedia = 
             val n = input.read(buf)
             if (n < 0) break
             total += n
-            if (total > MAX_PICK_BYTES) throw IllegalStateException("Selected media exceeds the storage limit.")
+            if (total > MAX_PICK_BYTES) throw IllegalStateException("Selected media exceeds the ${com.example.chat.data.services.StatusService.STORAGE_LIMIT_MB} MB storage limit.")
             out.write(buf, 0, n)
         }
         out.toByteArray()
