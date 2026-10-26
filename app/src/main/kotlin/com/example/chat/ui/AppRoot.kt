@@ -1280,26 +1280,14 @@ fun AppRoot() {
                 if (conversation == null) {
                     route = AuthRoute.Home
                 } else {
-                    var chatRevision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
-                    androidx.compose.runtime.DisposableEffect(Unit) {
-                        val listener: () -> Unit = { chatRevision++ }
-                        ServiceLocator.apiBackend.addListener(listener)
-                        onDispose { ServiceLocator.apiBackend.removeListener(listener) }
-                    }
-                    @Suppress("UNUSED_EXPRESSION") chatRevision
-                    com.example.chat.ui.chats.ChatDetailScreen(
+                    ChatDetailHost(
                         conversation = conversation,
-                        messages = ServiceLocator.apiBackend.getMessages(conversation.id),
                         initialMessageId = selectedInitialMessageId,
-                        currentUserId = ServiceLocator.apiBackend.currentUser?.id ?: "",
                         onBack = {
                             ServiceLocator.apiBackend.setActiveConversation(null)
                             selectedConversation = null
                             selectedInitialMessageId = null
                             route = AuthRoute.Home
-                        },
-                        onSend = { text ->
-                            ServiceLocator.apiBackend.sendMessage(conversation.id, text)
                         },
                     )
                 }
