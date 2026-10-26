@@ -131,6 +131,9 @@ class AppRootConfiguredProofTest {
                 logScreenTexts(device, "failure"); try { capture(device, "00-failure-state") } catch (_: Exception) {}
                 throw AssertionError("seeded conversation row not shown on Home")
             }
+            assertTrue("all destinations visible, not More", device.findObject(By.text("More")) == null)
+            assertTrue("Settings visible in dock", device.findObject(By.desc("Settings")) != null || device.findObject(By.text("Settings")) != null)
+            capture(device, "10-home-all-destinations")
             device.findObject(By.text("Synthetic Peer")).click()
             if (!device.wait(Until.hasObject(By.text("Synthetic bubble one")), 20000)) {
                 logScreenTexts(device, "failure"); try { capture(device, "00-failure-state") } catch (_: Exception) {}
@@ -149,6 +152,10 @@ class AppRootConfiguredProofTest {
                 "back from Contact Info returns to the chat",
                 device.wait(Until.hasObject(By.text("Synthetic bubble one")), 10000),
             )
+            device.pressBack()
+            assertTrue("system Back from chat returns Home without exiting", device.wait(Until.hasObject(By.text("Synthetic Peer")), 10000))
+            assertTrue("Home composer closed", device.findObject(By.desc("Send message")) == null)
+            capture(device, "13-system-back-home")
         } finally {
             try { scenario?.close() } catch (_: Exception) {}
             try { ServiceLocator.apiBackend.signOut() } catch (_: Exception) {}
