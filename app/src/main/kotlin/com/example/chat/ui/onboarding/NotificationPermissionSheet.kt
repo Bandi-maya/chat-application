@@ -162,10 +162,10 @@ private fun NotificationPermissionSheet(
 ) {
     val colors = LocalAppColors.current
 
-    ModalBottomSheet(
+    ModalBottomSheet(tonalElevation = 0.dp,
         onDismissRequest = onNotNow,
         containerColor = colors.surface,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        shape = com.example.chat.ui.kit.ChatyModalShape,
         dragHandle = {
             Box(
                 modifier = Modifier
@@ -182,7 +182,7 @@ private fun NotificationPermissionSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, colors.borderSubtle, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                .border(1.dp, colors.borderSubtle, com.example.chat.ui.kit.ChatyModalShape)
                 .padding(start = 24.dp, top = 20.dp, end = 24.dp, bottom = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
