@@ -541,14 +541,33 @@ class ApiBackendService(context: Context) {
 
     /** sendMessage: optimistic temp message, POST, confirm replaces temp and
      *  bumps the conversation to the top; failure leaves the temp sending. */
-    suspend fun sendMessage(conversationId: String, text: String): ChatMessage? {
+    suspend fun sendMessage(
+        conversationId: String,
+        text: String,
+        type: MessageType = MessageType.text,
+        attachment: com.example.chat.domain.models.MessageAttachment? = null,
+        extraMetadata: Map<String, Any?>? = null,
+    ): ChatMessage? {
+        // Dart api_backend_service.dart sendMessage: attachments travel as a JSON envelope in `content`.
+        val effectiveContent = if (attachment != null) {
+            val o = org.json.JSONObject()
+            o.put("type", type.name)
+            o.put("url", attachment.url ?: org.json.JSONObject.NULL)
+            o.put("name", attachment.name)
+            o.put("size", attachment.size)
+            o.put("text", text)
+            o.put("duration", attachment.durationSeconds)
+            extraMetadata?.forEach { (k, v) -> o.put(k, v ?: org.json.JSONObject.NULL) }
+            o.toString()
+        } else text
         val tempId = "temp_" + System.currentTimeMillis()
         val tempMsg = ChatMessage(
             id = tempId,
             conversationId = conversationId,
             senderId = session.currentUser?.id ?: "",
-            type = MessageType.text,
+            type = type,
             text = text,
+            attachment = attachment,
             createdAt = Instant.now(),
             deliveryState = DeliveryState.sending,
         )
@@ -557,11 +576,11 @@ class ApiBackendService(context: Context) {
         }
         notifyChatListeners()
 
-        val confirmed = chat.sendMessage(conversationId, text)
+        val confirmed = chat.sendMessage(conversationId, effectiveContent)
         if (confirmed == null) {
             // Dart: fall back to the WebSocket send when HTTP did not confirm;
             // the temp message stays in 'sending' either way.
-            realtime.sendMessageFallback(conversationId, text)
+            realtime.sendMessageFallback(conversationId, effectiveContent)
             return null
         }
         synchronized(chatLock) {
