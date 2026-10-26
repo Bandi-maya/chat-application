@@ -72,7 +72,7 @@ fun MessageActionSheetContent(
     Column(
         Modifier
             .fillMaxWidth()
-            .background(surface, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+            .background(surface, com.example.chat.ui.kit.ChatyModalShape)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
