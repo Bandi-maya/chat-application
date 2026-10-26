@@ -24,7 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.GraphicEq
@@ -335,7 +335,7 @@ internal fun StatusViewerDialog(
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             ) {
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Rounded.ArrowBack, contentDescription = "Back", tint = colors.foreground)
+                    Icon(Icons.Rounded.ChevronLeft, contentDescription = "Back", tint = colors.foreground)
                 }
                 Spacer(Modifier.width(8.dp))
                 val owner = getUser(status.userId)
