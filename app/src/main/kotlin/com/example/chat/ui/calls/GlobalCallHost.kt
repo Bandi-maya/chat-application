@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
  * CallSignalingService. No call is created here: ringing comes only from the
  * signaling service's remote-signal handling.
  *
- * Known gaps (not faked): native system PiP entry is a no-op, the effect
+ * Known gaps (not faked): native system PiP is wired but device-unverified, the effect
  * provider is unset, and call-record persistence is the sink gap noted in
  * ServiceLocator.callSignaling.
  */
@@ -39,6 +39,7 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
     remember { ServiceLocator.callLifecycle }
     val prefsStore = remember { ServiceLocator.callPresentationPrefs }
     val scope = rememberCoroutineScope()
+    val hostContext = androidx.compose.ui.platform.LocalContext.current
     var revision by remember { mutableIntStateOf(0) }
     DisposableEffect(service, presentation) {
         val l: () -> Unit = { revision++ }
@@ -87,7 +88,17 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
             onSwitchCamera = { scope.launch { service.switchCamera() } },
             onToggleScreenShare = { scope.launch { service.toggleScreenShare() } },
             onToggleAudioRoute = { route: AudioRouteType -> scope.launch { service.setAudioRoute(route) } },
-            onEnterNativePip = { },
+            onEnterNativePip = {
+                // Dart _enterNativePip: settings gate, then system PiP, else a message.
+                if (!prefs.pictureInPictureEnabled) {
+                    android.widget.Toast.makeText(hostContext, "Picture-in-picture is disabled in Call settings.", android.widget.Toast.LENGTH_SHORT).show()
+                } else {
+                    val activity = generateSequence(hostContext) { (it as? android.content.ContextWrapper)?.baseContext }
+                        .firstOrNull { it is android.app.Activity } as? android.app.Activity
+                    val entered = activity != null && ServiceLocator.nativeCallPip.enter(activity)
+                    if (!entered) android.widget.Toast.makeText(hostContext, "Picture-in-picture is unavailable.", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            },
         )
         return
     }
