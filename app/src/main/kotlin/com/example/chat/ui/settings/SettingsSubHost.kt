@@ -49,7 +49,10 @@ fun SettingsSubHost(
         SettingsDestination.Effects -> NavigationEffectsScreen(preferences = prefs, onBack = onBack)
         // Dart settings_root_screen '/settings/notifications' => NotificationSettingsPage (the toast-only screen is not
         // instantiated anywhere in Dart). Dynamic Island native bridge has no Kotlin implementation: bridge = null.
-        SettingsDestination.Notifications -> com.example.chat.ui.settings.notifications.NotificationSettingsPage(preferences = prefs, onBack = onBack)
+        SettingsDestination.Notifications -> com.example.chat.ui.settings.notifications.NotificationSettingsPage(
+            preferences = prefs, onBack = onBack,
+            bridge = com.example.chat.ui.island.AndroidDynamicIslandBridge(androidx.compose.ui.platform.LocalContext.current),
+        )
         SettingsDestination.BackupRestore -> BackupAndRestoreScreen(
             preferences = prefs, onBack = onBack, onMessage = toast,
         )
