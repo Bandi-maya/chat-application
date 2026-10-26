@@ -34,7 +34,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DropdownMenuItem
+import com.example.chat.ui.kit.ChatyDropdownMenuItem as DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -319,7 +319,7 @@ private fun ScheduleMessageSheet(
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
 
-    ModalBottomSheet(shape = com.example.chat.ui.kit.ChatyModalShape,
+    ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = onDismiss,
         sheetState = sheetState,
     ) {
@@ -364,7 +364,7 @@ private fun ScheduleMessageSheet(
                         .fillMaxWidth()
                         .menuAnchor(),
                 )
-                ExposedDropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape,
+                ExposedDropdownMenu(containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, tonalElevation = 0.dp, shape = com.example.chat.ui.kit.ChatyModalShape,
                     expanded = convExpanded,
                     onDismissRequest = { convExpanded = false },
                 ) {
@@ -470,7 +470,7 @@ private fun ScheduleMessageSheet(
             initialHour = selectedDateTime.hour,
             initialMinute = selectedDateTime.minute,
         )
-        androidx.compose.material3.AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
+        com.example.chat.ui.kit.ChatyConfirmationDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { showTimePicker = false },
             confirmButton = {
                 TextButton(onClick = {
