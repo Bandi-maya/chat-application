@@ -40,7 +40,7 @@ import java.io.File
 
 /** Non-destructive editor. Apply returns a NEW cache file; no original or remote message is overwritten. */
 @Composable
-fun ImageEditorScreen(source: String, onCancel: () -> Unit, onApply: (File) -> Unit) {
+fun ImageEditorScreen(source: String, onCancel: () -> Unit, onApply: (File) -> Unit, outputFile: File? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var bitmap by remember(source) { mutableStateOf<Bitmap?>(null) }
@@ -80,9 +80,12 @@ fun ImageEditorScreen(source: String, onCancel: () -> Unit, onApply: (File) -> U
                 val original = bitmap ?: return@TextButton
                 saving = true
                 saveJob = scope.launch {
-                    val file = File(context.cacheDir, "chaty_edited-${java.util.UUID.randomUUID()}.jpg")
+                    val file = outputFile ?: File(context.cacheDir, "chaty_edited-${java.util.UUID.randomUUID()}.jpg")
                     var handedOff = false
+                    val sourceUri = android.net.Uri.parse(source)
+                    val aliasesOriginal = sourceUri.scheme == "file" && file.canonicalPath == File(sourceUri.path.orEmpty()).canonicalPath
                     try {
+                        require(!aliasesOriginal) { "Output cannot overwrite the source." }
                         withContext(Dispatchers.IO) {
                             val edited = renderEditedImage(original, brightness, contrast, strokes)
                             try {
@@ -94,7 +97,7 @@ fun ImageEditorScreen(source: String, onCancel: () -> Unit, onApply: (File) -> U
                         if (active) { onApply(file); handedOff = true }
                     } catch (e: CancellationException) { throw e }
                     catch (e: Exception) { error = e.message ?: "Could not save edit" }
-                    finally { if (!handedOff) file.delete(); saving = false }
+                    finally { if (!handedOff && !aliasesOriginal) file.delete(); saving = false }
                 }
             }, enabled = bitmap != null && !saving) { Text(if (saving) "Saving" else "Apply") }
         }
