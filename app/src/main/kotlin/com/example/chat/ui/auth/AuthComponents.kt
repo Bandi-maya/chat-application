@@ -26,7 +26,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.Forum
 import androidx.compose.material.icons.rounded.LockReset
 import androidx.compose.material.icons.rounded.VerifiedUser
@@ -54,7 +54,7 @@ fun AuthBackButton(onClick: () -> Unit) {
     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
         IconButton(onClick = onClick, modifier = Modifier.size(34.dp)) {
             Icon(
-                Icons.AutoMirrored.Rounded.ArrowBack,
+                Icons.Rounded.ChevronLeft,
                 contentDescription = "Back",
                 tint = colors.foreground,
                 modifier = Modifier.size(24.dp),
@@ -302,4 +302,3 @@ private fun ModeTab(
         )
     }
 }
-
