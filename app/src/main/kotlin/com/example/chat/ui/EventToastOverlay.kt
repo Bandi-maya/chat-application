@@ -14,7 +14,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Spacer
@@ -140,7 +141,7 @@ fun ChatyEventToastOverlay(
                 val pad = when (position) {
                     "bottom" -> Modifier.padding(start = 14.dp, end = 14.dp, bottom = 92.dp)
                     "center" -> Modifier.padding(horizontal = 20.dp, vertical = 20.dp)
-                    else -> Modifier.statusBarsPadding().padding(start = 14.dp, end = 14.dp, top = 2.dp)
+                    else -> Modifier.windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.safeDrawing).padding(start = 14.dp, end = 14.dp, top = 2.dp)
                 }
                 Box(pad) {
                     Surface(
