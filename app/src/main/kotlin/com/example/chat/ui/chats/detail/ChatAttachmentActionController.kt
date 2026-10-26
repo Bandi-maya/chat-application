@@ -337,6 +337,42 @@ class ChatAttachmentActionController(
         }
     }
 
+    /** Explicit video submission, not delivery confirmation. Unit backend
+     * send may only enqueue. Never authorizes deletion of the local recording.
+     * Caller must supply an account/session/conversation validity guard. */
+    suspend fun sendCapturedVideo(
+        path: String,
+        durationMs: Long,
+        mimeType: String,
+        caption: String = "",
+        isStillCurrent: () -> Boolean,
+        onSubmitted: suspend () -> Unit = {},
+    ): Boolean {
+        require(path.isNotBlank()) { "Missing recorded video." }
+        require(mimeType == "video/mp4" && durationMs > 0) { "Invalid finalized video." }
+        return try {
+            if (!isStillCurrent()) return false
+            val seconds = ((durationMs / 1000) + if (durationMs % 1000 > 0) 1 else 0)
+                .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+            val attachment = backend.upload("video", PickedFile(
+                name = path.substringAfterLast('/'), path = path, mimeType = mimeType,
+            ), seconds)
+            if (!isStillCurrent()) {
+                toast("Video was not submitted because the account or conversation changed. Local recording kept.")
+                return false
+            }
+            backend.sendMessage(caption, MessageType.video, attachment)
+            if (isStillCurrent()) onSubmitted()
+            toast("Video submission requested. Delivery is not confirmed; local recording kept.")
+            true
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            toast("Could not send video. Your local recording is kept. ${error.message ?: error}")
+            false
+        }
+    }
+
     // ------------------------------------------------------------------ demos
 
     /** Dart sendDemoDocument(). */
