@@ -40,36 +40,35 @@ fun apiUserFromJson(raw: String): ApiUserProfile {
 
 /** Context-free holder mirroring ApiBackendService's session surface:
  *  token + current user, isAuthenticated = token != null && user != null. */
-class ApiAuthSession(private val store: ApiSessionStore) {
-    var token: String? = null
-        private set
-    var currentUser: ApiUserProfile? = null
-        private set
+data class ApiAuthSnapshot(val user: ApiUserProfile?, val token: String?, val generation: Long)
 
-    val isAuthenticated: Boolean get() = token != null && currentUser != null
+class ApiAuthSession(private val store: ApiSessionStore, private val scopeLock: Any = Any(), private val onTransition: () -> Unit = {}) {
+    @Volatile private var state = ApiAuthSnapshot(null, null, 0)
+    fun snapshot(): ApiAuthSnapshot = state
+    val token: String? get() = state.token
+    val currentUser: ApiUserProfile? get() = state.user
+
+    val isAuthenticated: Boolean get() = snapshot().let { it.token != null && it.user != null }
 
     /** ApiBackendService.initialize's session restore. */
-    fun restore() {
-        val savedToken = store.loadToken() ?: return
-        val savedUser = store.loadUserJson() ?: return
-        token = savedToken
-        var user = apiUserFromJson(savedUser)
-        // Dart: recover an empty id from the JWT uid/sub claim.
-        if (user.id.trim().isEmpty()) {
+    fun restore() = synchronized(scopeLock) {
+        val savedToken = store.loadToken()
+        val savedUser = store.loadUserJson()
+        var user = if (savedToken != null && savedUser != null) runCatching { apiUserFromJson(savedUser) }.getOrNull() else null
+        if (user != null && user.id.trim().isEmpty()) {
             try {
-                val jwt = ApiAuthClient({ "" }, { "" }, ApiHttpTransport { _, _, _, _ -> 0 to "" })
-                    .decodeJwt(savedToken)
+                val jwt = ApiAuthClient({ "" }, { "" }, ApiHttpTransport { _, _, _, _ -> 0 to "" }).decodeJwt(savedToken!!)
                 val uid = (if (jwt.has("uid")) jwt.get("uid") else jwt.optString("sub")).toString()
                 if (uid.isNotEmpty()) user = user.copy(id = uid)
-            } catch (_: Exception) {
-            }
+            } catch (_: Exception) { }
         }
-        currentUser = user
+        state = ApiAuthSnapshot(user, savedToken.takeIf { user != null }, state.generation + 1)
+        onTransition()
     }
 
-    fun adopt(result: ApiAuthResult) {
-        token = result.token
-        currentUser = result.user
+    fun adopt(result: ApiAuthResult) = synchronized(scopeLock) {
+        state = ApiAuthSnapshot(result.user, result.token, state.generation + 1)
+        onTransition()
         store.save(result.token, apiUserToJson(result.user))
     }
 
@@ -80,7 +79,7 @@ class ApiAuthSession(private val store: ApiSessionStore) {
         about: String?,
         username: String?,
         avatarUrl: String?,
-    ): ApiUserProfile {
+    ): ApiUserProfile = synchronized(scopeLock) {
         val current = currentUser ?: throw Exception("Not authenticated")
         val effectiveName = if (!displayName.isNullOrBlank()) displayName.trim() else current.displayName
         val initials = if (effectiveName.isNotEmpty()) effectiveName.substring(0, 1).uppercase()
@@ -92,14 +91,14 @@ class ApiAuthSession(private val store: ApiSessionStore) {
             avatarUrl = avatarUrl?.trim() ?: current.avatarUrl,
             avatarInitials = initials,
         )
-        currentUser = updated
+        state = state.copy(user = updated)
         token?.let { store.save(it, apiUserToJson(updated)) }
-        return updated
+        updated
     }
 
-    fun signOut() {
-        token = null
-        currentUser = null
+    fun signOut() = synchronized(scopeLock) {
+        state = ApiAuthSnapshot(null, null, state.generation + 1)
+        onTransition()
         store.clear()
     }
 }
