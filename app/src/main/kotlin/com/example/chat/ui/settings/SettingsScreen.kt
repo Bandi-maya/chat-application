@@ -45,7 +45,7 @@ import androidx.compose.material.icons.outlined.VpnKey
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Diamond
 import androidx.compose.material.icons.rounded.AcUnit
-import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Cast
 import androidx.compose.material.icons.rounded.CleaningServices
@@ -216,7 +216,7 @@ fun SettingsScreen(
                 .padding(horizontal = 18.dp, vertical = 12.dp),
         ) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { onBack?.invoke() }) { Icon(Icons.Rounded.ArrowBack, null, Modifier.size(22.dp), tint = primaryText) }
+                IconButton(onClick = { onBack?.invoke() }) { Icon(Icons.Rounded.ChevronLeft, null, Modifier.size(22.dp), tint = primaryText) }
                 Row {
                     IconButton(onClick = { onOpenSearch(buildSettingsSearchIndex()) }) { Icon(Icons.Rounded.Search, null, Modifier.size(22.dp), tint = primaryText) }
                     IconButton(onClick = { sheet = SettingsSheet.Export }) { Icon(Icons.Rounded.QrCodeScanner, null, Modifier.size(22.dp), tint = primaryText) }
