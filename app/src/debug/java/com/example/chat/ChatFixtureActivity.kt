@@ -23,8 +23,31 @@ class ChatFixtureActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val screen = intent.getStringExtra(EXTRA_SCREEN) ?: SCREEN_HOME
         setContent {
-            ChatyTheme(config = ThemePresets.getSystemDefaultTheme(platformIsLight = true)) {
+            val light = screen != SCREEN_SHELL_DARK
+            ChatyTheme(config = ThemePresets.getSystemDefaultTheme(platformIsLight = light)) {
                 when (screen) {
+                    SCREEN_SHELL, SCREEN_SHELL_DARK -> {
+                        // Real MainNavigationShell (default template/mode, as AppRoot hosts it) with synthetic
+                        // destination content only. No session, no network, no ServiceLocator.
+                        val shellColors = androidx.compose.runtime.remember {
+                            com.example.chat.ui.core.theme.ChatyColors(ThemePresets.getSystemDefaultTheme(platformIsLight = light))
+                        }
+                        com.example.chat.ui.navigation.MainNavigationShell(
+                            colors = shellColors,
+                            screenContent = { destinationId ->
+                                if (destinationId == "chats") {
+                                    ChatsHomeScreen(
+                                        conversations = fixtureConversations(),
+                                        requiresSubscription = false,
+                                        subscriptionMessage = null,
+                                        onOpenConversation = {},
+                                    )
+                                } else {
+                                    androidx.compose.material3.Text("Fixture destination: $destinationId")
+                                }
+                            },
+                        )
+                    }
                     SCREEN_DETAIL -> ChatDetailScreen(
                         conversation = fixtureConversations().first(),
                         messages = fixtureMessages(),
@@ -47,6 +70,8 @@ class ChatFixtureActivity : ComponentActivity() {
         const val EXTRA_SCREEN = "screen"
         const val SCREEN_HOME = "home"
         const val SCREEN_DETAIL = "detail"
+        const val SCREEN_SHELL = "shell"
+        const val SCREEN_SHELL_DARK = "shell_dark"
 
         fun fixtureConversations(): List<Conversation> = listOf(
             Conversation(
