@@ -53,6 +53,13 @@ class StatusService(
     private val currentUserId: () -> String?,
     private val privacy: () -> PrivacyPreferencesSnapshot,
     private val publicationPolicy: PrivacyPublicationPolicy = PrivacyPublicationPolicy(),
+    /** Supabase realtime for the status_updates stream; null keeps the poll stand-in. */
+    private val statusChannelFactory: ((
+        topic: String,
+        tables: List<com.example.chat.data.remote.PostgresChangeSubscription>,
+        onChange: (com.example.chat.data.remote.PostgresChange) -> Unit,
+        onStatus: (com.example.chat.data.remote.RealtimeSubscribeStatus) -> Unit,
+    ) -> com.example.chat.data.remote.RealtimeChannel)? = null,
     /** preferences.preferencesReady */
     private val preferencesReady: () -> Boolean = { true },
     /** gbBool('yoHideStatViewV2') */
@@ -71,30 +78,63 @@ class StatusService(
     fun watchActiveStatuses(
         keepDeleted: () -> Boolean = { false },
         pollMillis: Long = 60_000L,
+    ): kotlinx.coroutines.flow.Flow<List<StatusRecord>> {
+        val factory = statusChannelFactory
+        if (factory == null) return pollActiveStatuses(keepDeleted, pollMillis)
+        // Dart .from('status_updates').stream(primaryKey: id): the full filtered list is re-emitted whenever
+        // the table changes. Realtime change events trigger a re-query; the poll interval stays as a
+        // safety net while the socket is not subscribed (supabase_dart reconnects internally).
+        return kotlinx.coroutines.flow.channelFlow {
+            val refresh = kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.CONFLATED)
+            val subscribed = java.util.concurrent.atomic.AtomicBoolean(false)
+            val userId = currentUserId()
+            val channel = if (userId == null) null else try {
+                factory(
+                    "chaty-status-$userId",
+                    listOf(com.example.chat.data.remote.PostgresChangeSubscription(table = "status_updates")),
+                    { refresh.trySend(Unit) },
+                    { st -> subscribed.set(st == com.example.chat.data.remote.RealtimeSubscribeStatus.subscribed) },
+                )
+            } catch (_: Exception) { null }
+            try {
+                while (true) {
+                    send(queryActive(keepDeleted))
+                    val waitMs = if (subscribed.get()) pollMillis * 10 else pollMillis
+                    kotlinx.coroutines.withTimeoutOrNull(waitMs) { refresh.receive() }
+                }
+            } finally {
+                channel?.close()
+            }
+        }
+    }
+
+    private suspend fun queryActive(keepDeleted: () -> Boolean): List<StatusRecord> {
+        if (currentUserId() == null) return emptyList()
+        val result: List<StatusRecord> = try {
+            val rows = queryClient.from("status_updates")
+                .select()
+                .order("created_at", ascending = false)
+                .execute()
+            val now = Instant.now()
+            val keep = keepDeleted()
+            rows.map { fromRow(it) }.filter { it.expiresAt.isAfter(now) && (!it.isDeleted || keep) }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            lastActive
+        }
+        lastActive = result
+        return result
+    }
+
+    @Volatile private var lastActive: List<StatusRecord> = emptyList()
+
+    private fun pollActiveStatuses(
+        keepDeleted: () -> Boolean,
+        pollMillis: Long,
     ): kotlinx.coroutines.flow.Flow<List<StatusRecord>> = kotlinx.coroutines.flow.flow {
         while (true) {
-            if (currentUserId() == null) {
-                // No Supabase session (custom-backend login): no query, empty list.
-                emit(emptyList())
-                kotlinx.coroutines.delay(pollMillis)
-                continue
-            }
-            try {
-                val rows = queryClient.from("status_updates")
-                    .select()
-                    .order("created_at", ascending = false)
-                    .execute()
-                val now = Instant.now()
-                val keep = keepDeleted()
-                emit(
-                    rows.map { fromRow(it) }
-                        .filter { it.expiresAt.isAfter(now) && (!it.isDeleted || keep) },
-                )
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                // keep the last emission; the next poll retries
-            }
+            emit(queryActive(keepDeleted))
             kotlinx.coroutines.delay(pollMillis)
         }
     }
