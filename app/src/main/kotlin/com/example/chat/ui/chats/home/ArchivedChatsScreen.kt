@@ -16,7 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Unarchive
@@ -84,7 +84,7 @@ fun ArchivedChatsScreen(
                 ) {
                     IconButton(onClick = { selectedIds = emptySet() }) {
                         Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            Icons.Rounded.ChevronLeft,
                             contentDescription = "Clear selection",
                             tint = Color(theme.primaryTextColor),
                         )
@@ -116,7 +116,7 @@ fun ArchivedChatsScreen(
                 ) {
                     IconButton(onClick = onBack) {
                         Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            Icons.Rounded.ChevronLeft,
                             contentDescription = "Back",
                             tint = Color(theme.primaryTextColor),
                         )
