@@ -163,6 +163,9 @@ class AppRootConfiguredProofTest {
                 updatesTitle.visibleBounds.top >= topInset)
             capture(device, "10b-updates-safe-area")
             device.findObject(By.desc("Calls")).click()
+            capture(device, "10c-calls-before-fab-assertion")
+            logScreenTexts(device, "calls-before-fab")
+            assertTrue("Calls page reached", device.wait(Until.hasObject(By.text("Calls")), 10000))
             val addCall = device.wait(Until.findObject(By.text("Add call")), 10000)
                 ?: throw AssertionError("Add call button not visible")
             val callsDock = device.findObject(By.desc("Calls"))
@@ -244,6 +247,10 @@ class AppRootConfiguredProofTest {
             assertTrue("system Back from chat returns Home without exiting", device.wait(Until.hasObject(By.text("Synthetic Peer")), 10000))
             assertTrue("Home composer closed", device.findObject(By.desc("Send message")) == null)
             capture(device, "13-system-back-home")
+        } catch (error: Throwable) {
+            logScreenTexts(device, "failure")
+            try { capture(device, "00-failure-state") } catch (_: Exception) {}
+            throw error
         } finally {
             try { scenario?.close() } catch (_: Exception) {}
             try { ServiceLocator.apiBackend.signOut() } catch (_: Exception) {}
@@ -277,6 +284,10 @@ class AppRootConfiguredProofTest {
                 throw AssertionError("authenticated shell did not render a 'Chats' label")
             }
             capture(device, "10-approot-configured-shell")
+        } catch (error: Throwable) {
+            logScreenTexts(device, "failure")
+            try { capture(device, "00-failure-state") } catch (_: Exception) {}
+            throw error
         } finally {
             try { scenario?.close() } catch (_: Exception) {}
             try { ServiceLocator.apiBackend.signOut() } catch (_: Exception) {}
