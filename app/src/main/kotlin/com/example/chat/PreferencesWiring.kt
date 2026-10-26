@@ -21,7 +21,11 @@ class AndroidPreferencesBlobStore(
 ) : PreferencesBlobStore {
     override suspend fun load(userId: String?) = storage.loadPreferences(userId)
     override suspend fun hasScoped(userId: String) = storage.hasScopedPreferences(userId)
-    override suspend fun save(userId: String?, data: Map<String, Any?>) { storage.savePreferences(data, userId) }
+    override suspend fun save(userId: String?, data: Map<String, Any?>) {
+        // A false commit must surface as a failure so the ordered writer retries and
+        // never marks the snapshot as written.
+        if (!storage.savePreferences(data, userId)) throw java.io.IOException("preferences save failed")
+    }
     override suspend fun clearGlobal() = storage.clearGlobalPreferences()
     override suspend fun storedUserId(): String? = storage.getStoredUserId()
     override suspend fun setStoredUserId(userId: String?) {
