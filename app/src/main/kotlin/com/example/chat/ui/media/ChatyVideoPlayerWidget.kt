@@ -27,8 +27,8 @@ import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.FitScreen
 import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.example.chat.ui.kit.ChatyDropdownMenu as DropdownMenu
+import com.example.chat.ui.kit.ChatyDropdownMenuItem as DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -363,7 +363,7 @@ fun ChatyVideoPlayerWidget(
                     IconButton(onClick = { speedMenuOpen = true }) {
                         Icon(Icons.Rounded.Speed, contentDescription = "Playback Speed", tint = Color.White, modifier = Modifier.size(20.dp))
                     }
-                    DropdownMenu(expanded = speedMenuOpen, onDismissRequest = { speedMenuOpen = false }) {
+                    DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape, expanded = speedMenuOpen, onDismissRequest = { speedMenuOpen = false }) {
                         listOf(0.5, 0.75, 1.0, 1.25, 1.5, 2.0).forEach { s ->
                             DropdownMenuItem(
                                 text = { Text("${s}x") },
