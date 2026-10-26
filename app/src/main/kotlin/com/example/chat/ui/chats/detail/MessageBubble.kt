@@ -145,6 +145,8 @@ fun ChatMessageBubble(
     showGroupAvatar: Boolean = true,
     isSenderAdmin: Boolean = false,
     makeTextSelectable: Boolean = true,
+    enableAnimatedEmojis: Boolean = true,
+    emojiStyle: String = "Chaty Motion",
     groupAdminIcon: String = "Default",
     hideAdminNameIcon: Boolean = false,
     voicePlayButtonColor: Color? = null,
@@ -266,11 +268,24 @@ fun ChatMessageBubble(
                 .padding(vertical = (3 * theme.density).dp, horizontal = 12.dp),
             horizontalAlignment = if (isMe) Alignment.End else Alignment.Start,
         ) {
-            Text(
-                message.text,
-                fontSize = emojiInfo.fontSize(messageTextSize * theme.fontScale).sp,
-                lineHeight = (emojiInfo.fontSize(messageTextSize * theme.fontScale) * 1.25).sp,
-            )
+            // Dart message_bubble.dart:291-304: animated engine when the
+            // pref is on (expressive 64/44/32dp sizing inside
+            // AnimatedEmojiText), else the static Telegram-scale text.
+            if (enableAnimatedEmojis) {
+                AnimatedEmojiText(
+                    text = message.text,
+                    fontSize = emojiInfo.fontSize(messageTextSize * theme.fontScale).toFloat(),
+                    height = 1.25f,
+                    messageId = message.id,
+                    emojiStyle = emojiStyle,
+                )
+            } else {
+                Text(
+                    message.text,
+                    fontSize = emojiInfo.fontSize(messageTextSize * theme.fontScale).sp,
+                    lineHeight = (emojiInfo.fontSize(messageTextSize * theme.fontScale) * 1.25).sp,
+                )
+            }
             Box(Modifier.height(3.dp))
             Row(
                 Modifier
@@ -584,8 +599,21 @@ fun ChatMessageBubble(
                         ) {
                             // Dart: convPrefs.makeTextSelectable (default true) wraps
                             // the body text in a selectable region.
-                            if (makeTextSelectable) {
-                                SelectionContainer(Modifier.weight(1f, fill = false)) {
+                            // Dart message_bubble.dart:1103-1120: the body text
+                            // widget is AnimatedEmojiText when the pref is on,
+                            // plain text otherwise; makeTextSelectable wraps
+                            // whichever text widget the pref produced.
+                            val bodyText: @Composable (Modifier) -> Unit = { mod ->
+                                if (enableAnimatedEmojis) {
+                                    AnimatedEmojiText(
+                                        text = message.text,
+                                        fontSize = (messageTextSize * theme.fontScale).toFloat(),
+                                        color = Color(textColor),
+                                        height = 1.35f,
+                                        messageId = message.id,
+                                        emojiStyle = emojiStyle,
+                                    )
+                                } else {
                                     BasicText(
                                         text = message.text,
                                         style = TextStyle(
@@ -593,18 +621,16 @@ fun ChatMessageBubble(
                                             fontSize = (messageTextSize * theme.fontScale).sp,
                                             lineHeight = (messageTextSize * theme.fontScale * 1.35).sp,
                                         ),
+                                        modifier = mod,
                                     )
                                 }
+                            }
+                            if (makeTextSelectable) {
+                                SelectionContainer(Modifier.weight(1f, fill = false)) {
+                                    bodyText(Modifier)
+                                }
                             } else {
-                                BasicText(
-                                    text = message.text,
-                                    style = TextStyle(
-                                        color = Color(textColor),
-                                        fontSize = (messageTextSize * theme.fontScale).sp,
-                                        lineHeight = (messageTextSize * theme.fontScale * 1.35).sp,
-                                    ),
-                                    modifier = Modifier.weight(1f, fill = false),
-                                )
+                                bodyText(Modifier.weight(1f, fill = false))
                             }
                             Box(Modifier.width(8.dp))
                             MessageMetaRow(message, isMe, textColor, timestampColor, theme,
