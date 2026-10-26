@@ -3,6 +3,7 @@ package com.example.chat.ui.calls
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -57,12 +58,16 @@ fun InAppCallPip(
     onCollapseToIsland: () -> Unit,
     onEndCall: () -> Unit,
 ) {
-    val configuration = LocalConfiguration.current
-    val screenW = configuration.screenWidthDp.toFloat()
-    val screenH = configuration.screenHeightDp.toFloat()
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+    // Parent owns cutout/status safety. Measure its available bounds, not the
+    // physical display, and clamp during every drag rather than only on release.
+    val screenW = maxWidth.value
+    val screenH = maxHeight.value
+    val maxX = (screenW - PIP_WIDTH).coerceAtLeast(0f)
+    val maxY = (screenH - PIP_HEIGHT - 16f).coerceAtLeast(0f)
 
-    var positionX by remember { mutableStateOf(screenW - PIP_WIDTH - 16f) }
-    var positionY by remember { mutableStateOf(110f) }
+    var positionX by remember(screenW) { mutableStateOf((maxX - 16f).coerceAtLeast(0f)) }
+    var positionY by remember(screenH) { mutableStateOf(80f.coerceAtMost(maxY)) }
     var isDragging by remember { mutableStateOf(false) }
     var showControls by remember { mutableStateOf(false) }
 
@@ -74,13 +79,13 @@ fun InAppCallPip(
                 Color(0xFF141416),
                 RoundedCornerShape(20.dp),
             )
-            .pointerInput(Unit) {
+            .pointerInput(screenW, screenH) {
                 detectDragGestures(
                     onDragStart = { isDragging = true },
                     onDrag = { change, dragAmount ->
                         change.consume()
-                        positionX += dragAmount.x / density
-                        positionY += dragAmount.y / density
+                        positionX = (positionX + dragAmount.x / density).coerceIn(0f, maxX)
+                        positionY = (positionY + dragAmount.y / density).coerceIn(0f, maxY)
                     },
                     onDragEnd = {
                         isDragging = false
@@ -93,10 +98,8 @@ fun InAppCallPip(
                         }
                         // Otherwise snap to the closest safe horizontal edge.
                         val targetX = if (centerX < screenCenterX) 14f else screenW - PIP_WIDTH - 14f
-                        val minY = 60f
-                        val maxY = max(minY, screenH - PIP_HEIGHT - 70f)
-                        positionX = targetX
-                        positionY = positionY.coerceIn(minY, maxY)
+                        positionX = targetX.coerceIn(0f, maxX)
+                        positionY = positionY.coerceIn(0f, maxY)
                     },
                     onDragCancel = { isDragging = false },
                 )
@@ -184,6 +187,7 @@ fun InAppCallPip(
             }
         }
     }
+    } // Measured safe-area bounds.
 }
 
 @Composable
