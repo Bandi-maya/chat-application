@@ -32,8 +32,9 @@ class LocalPreferencesStorage(context: Context) : com.example.chat.core.theme.Th
     suspend fun savePreferences(data: Map<String, Any?>, userId: String? = null): Boolean =
         withContext(Dispatchers.IO) {
             try {
-                prefs.edit().putString(keyFor(userId), JSONObject(data).toString()).apply()
-                true
+                // commit(): synchronous on this IO thread so the write is on disk when
+                // this returns (apply() is asynchronous and can be lost on process death).
+                prefs.edit().putString(keyFor(userId), JSONObject(data).toString()).commit()
             } catch (_: Exception) {
                 false
             }
@@ -57,8 +58,7 @@ class LocalPreferencesStorage(context: Context) : com.example.chat.core.theme.Th
 
     override suspend fun saveThemeState(data: Map<String, Any?>): Boolean = withContext(Dispatchers.IO) {
         try {
-            prefs.edit().putString(PreferenceKeys.themeState, JSONObject(data).toString()).apply()
-            true
+            prefs.edit().putString(PreferenceKeys.themeState, JSONObject(data).toString()).commit()
         } catch (_: Exception) { false }
     }
 
@@ -66,8 +66,7 @@ class LocalPreferencesStorage(context: Context) : com.example.chat.core.theme.Th
 
     suspend fun saveTemplateState(data: Map<String, Any?>): Boolean = withContext(Dispatchers.IO) {
         try {
-            prefs.edit().putString(PreferenceKeys.templateState, JSONObject(data).toString()).apply()
-            true
+            prefs.edit().putString(PreferenceKeys.templateState, JSONObject(data).toString()).commit()
         } catch (_: Exception) { false }
     }
 
@@ -78,13 +77,13 @@ class LocalPreferencesStorage(context: Context) : com.example.chat.core.theme.Th
     }
 
     suspend fun setStoredUserId(userId: String): Unit = withContext(Dispatchers.IO) {
-        try { prefs.edit().putString(PreferenceKeys.storedUserId, userId).apply() } catch (_: Exception) {}
+        try { prefs.edit().putString(PreferenceKeys.storedUserId, userId).commit() } catch (_: Exception) {}
     }
 
     suspend fun saveUserId(userId: String) = setStoredUserId(userId)
 
     suspend fun clearStoredUserId(): Unit = withContext(Dispatchers.IO) {
-        try { prefs.edit().remove(PreferenceKeys.storedUserId).apply() } catch (_: Exception) {}
+        try { prefs.edit().remove(PreferenceKeys.storedUserId).commit() } catch (_: Exception) {}
     }
 
     private suspend fun loadJsonMap(key: String): Map<String, Any?> =
