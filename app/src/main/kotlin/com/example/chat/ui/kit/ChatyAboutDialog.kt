@@ -16,7 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -104,7 +104,7 @@ private fun ChatyLicensePage(
         Column(Modifier.fillMaxSize().background(colors.background)) {
             Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { if (selected != null) selected = null else onClose() }) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = colors.foreground)
+                    Icon(Icons.Rounded.ChevronLeft, "Back", tint = colors.foreground)
                 }
                 Column {
                     Text(selected?.packageName ?: "Licenses", color = colors.foreground, fontSize = 20.sp, fontWeight = FontWeight.Medium)
