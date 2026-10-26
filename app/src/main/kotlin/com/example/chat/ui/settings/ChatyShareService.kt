@@ -7,7 +7,7 @@ import android.content.Intent
 object ChatyShareService {
     const val appName = "Chaty"
     /** Dart: String.fromEnvironment('CHATY_PLAY_STORE_URL', defaultValue: ...). */
-    const val playStoreUrl = "https://play.google.com/store/apps/details?id=com.example.chat"
+    val playStoreUrl: String = com.example.chat.BuildConfig.CHATY_PLAY_STORE_URL
     val shareMessage: String
         get() = "Connect with me on $appName \u2014 private, fast, and customizable messaging!\n\nDownload $appName here: $playStoreUrl"
 
