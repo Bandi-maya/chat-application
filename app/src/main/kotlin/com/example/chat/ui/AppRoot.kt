@@ -71,6 +71,7 @@ fun AppRoot() {
         themeController.globalTheme, ServiceLocator.preferencesController,
     )
     ChatyTheme(config = resolvedTheme) {
+    GlobalTypographyScale {
         var route by remember { mutableStateOf(AuthRoute.Splash) }
         // Dart pre-auth Navigator stack: Register is pushed from Welcome or Login, RegisterOrganization from
         // Login or Register; pop returns to whichever pushed it.
@@ -283,6 +284,7 @@ fun AppRoot() {
                 },
             )
         }
+        GlobalRouteLayers {
         when (route) {
             AuthRoute.Splash -> SplashScreen(
                 routeToHome = {
@@ -1302,6 +1304,7 @@ fun AppRoot() {
                 }
             }
         }
+        }
         gate.Host()
         com.example.chat.ui.calls.GlobalCallHost(isAuthenticated = ServiceLocator.apiBackend.isAuthenticated)
         // Dart shouldShowLock: authenticated && lock enabled && _appLockRequired.
@@ -1323,6 +1326,7 @@ fun AppRoot() {
             content = { },
         )
         }
+    }
     }
 }
 
