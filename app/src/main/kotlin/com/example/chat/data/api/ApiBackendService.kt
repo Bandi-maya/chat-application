@@ -21,7 +21,10 @@ import kotlinx.coroutines.withContext
  *  persistence). Mirrors the api branch's ApiBackendService auth surface; the
  *  ChatyBackendService facade prefers this session, so splash/home routing
  *  reads [isAuthenticated]/[currentUser] from here first. */
-class ApiBackendService(context: Context) {
+class ApiBackendService(
+    context: Context,
+    chatTransport: ApiHttpTransport = OkHttpApiTransport(),
+) {
 
     val config = ApiBackendConfig(context)
 
@@ -60,7 +63,7 @@ class ApiBackendService(context: Context) {
         baseUrl = { config.restApiBaseUrl },
         tenantId = { config.tenantId },
         token = { session.token },
-        transport = OkHttpApiTransport(),
+        transport = chatTransport,
     )
 
     private val mediaUpload = ApiMediaUploadClient(
@@ -263,7 +266,14 @@ class ApiBackendService(context: Context) {
 
     fun addListener(listener: () -> Unit) = listeners.add(listener)
     fun removeListener(listener: () -> Unit) { listeners.remove(listener) }
-    private fun notifyChatListeners() = listeners.forEach { it() }
+    private val uiHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private fun notifyChatListeners() {
+        // Socket and polling callbacks run on worker threads. Compose observers must
+        // be notified on the UI thread, just like Flutter's single event loop.
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            listeners.forEach { it() }
+        } else uiHandler.post { listeners.forEach { it() } }
+    }
 
     private val _conversations = mutableListOf<Conversation>()
     private val _users = mutableListOf<UserProfile>()
@@ -293,7 +303,7 @@ class ApiBackendService(context: Context) {
     /** ApiBackendService.loadTasks: GET /tasks into _tasks, keeping prior
      *  state on failure or when unauthenticated (Dart early return/catch). */
     suspend fun loadTasks() {
-        val result = tasksClient.listTasks() ?: return
+        val result = withContext(Dispatchers.IO) { tasksClient.listTasks() } ?: return
         synchronized(chatLock) {
             _tasks.clear()
             _tasks.addAll(result)
@@ -302,7 +312,7 @@ class ApiBackendService(context: Context) {
     }
 
     suspend fun loadConversations() {
-        when (val result = chat.listRooms()) {
+        when (val result = withContext(Dispatchers.IO) { chat.listRooms() }) {
             is ApiChatClient.RoomsResult.Ok -> {
                 synchronized(chatLock) {
                     _conversations.clear()
@@ -324,7 +334,7 @@ class ApiBackendService(context: Context) {
     /** loadMessages with Dart merge semantics: pending (sending/temp) messages
      *  whose text is absent from the remote list survive; merged + sorted. */
     suspend fun loadMessages(chatId: String) {
-        val remote = chat.listMessages(chatId) ?: return
+        val remote = withContext(Dispatchers.IO) { chat.listMessages(chatId) } ?: return
         synchronized(chatLock) {
             val current = _messages[chatId] ?: mutableListOf()
             val pending = current.filter { m ->
@@ -341,7 +351,7 @@ class ApiBackendService(context: Context) {
      *  subscription state with the exact Dart message, notifies, rethrows. */
     suspend fun createOrGetDirectConversation(targetUserId: String): Conversation {
         try {
-            val conversation = chat.createDirectRoom(targetUserId)
+            val conversation = withContext(Dispatchers.IO) { chat.createDirectRoom(targetUserId) }
             synchronized(chatLock) {
                 val idx = _conversations.indexOfFirst { it.id == conversation.id }
                 if (idx != -1) _conversations.removeAt(idx)
@@ -360,7 +370,7 @@ class ApiBackendService(context: Context) {
 
     /** createGroup: upsert at index 0 (replace if the id exists), notify. */
     suspend fun createGroupRoom(name: String, memberUserIds: List<String>): Conversation {
-        val conversation = chat.createGroupRoom(name, memberUserIds)
+        val conversation = withContext(Dispatchers.IO) { chat.createGroupRoom(name, memberUserIds) }
         synchronized(chatLock) {
             val idx = _conversations.indexOfFirst { it.id == conversation.id }
             if (idx != -1) _conversations.removeAt(idx)
@@ -382,7 +392,7 @@ class ApiBackendService(context: Context) {
             }
         }
         notifyChatListeners()
-        chat.deleteUser(userId)
+        withContext(Dispatchers.IO) { chat.deleteUser(userId) }
         if (userId == session.currentUser?.id) signOut()
     }
 
@@ -396,11 +406,11 @@ class ApiBackendService(context: Context) {
             if (activeConversationId == chatId) activeConversationId = null
         }
         notifyChatListeners()
-        chat.deleteRoom(chatId)
+        withContext(Dispatchers.IO) { chat.deleteRoom(chatId) }
     }
 
     suspend fun loadUsers(query: String? = null) {
-        val fetched = chat.listUsers(query) ?: return
+        val fetched = withContext(Dispatchers.IO) { chat.listUsers(query) } ?: return
         synchronized(chatLock) {
             if (query.isNullOrBlank()) {
                 _users.clear()
@@ -436,6 +446,9 @@ class ApiBackendService(context: Context) {
                 delay(4000)
                 if (session.token == null) break
                 ticks++
+                // Flutter's sync loop also recovers an absent WebSocket. connect()
+                // is idempotent while connecting/connected and retains the configured URL.
+                if (!realtime.isConnected) realtime.connect()
                 activeConversationId?.takeIf { it.isNotEmpty() }?.let { syncActiveRoomMessages(it) }
                 if (ticks % 3 == 0) loadConversations()
             }
@@ -461,7 +474,7 @@ class ApiBackendService(context: Context) {
             }
         }
         notifyChatListeners()
-        chat.editMessage(chatId, messageId, newText)
+        withContext(Dispatchers.IO) { chat.editMessage(chatId, messageId, newText) }
     }
 
     /** Dart deleteMessage: local removal + preview recompute, then DELETE. */
@@ -484,7 +497,7 @@ class ApiBackendService(context: Context) {
             }
         }
         notifyChatListeners()
-        chat.deleteMessage(chatId, messageId)
+        withContext(Dispatchers.IO) { chat.deleteMessage(chatId, messageId) }
     }
 
     /** Dart clearConversationMessages: local clear + preview, then DELETE all. */
@@ -497,22 +510,18 @@ class ApiBackendService(context: Context) {
             }
         }
         notifyChatListeners()
-        chat.clearMessages(chatId)
+        withContext(Dispatchers.IO) { chat.clearMessages(chatId) }
     }
 
     private suspend fun syncActiveRoomMessages(chatId: String) {
-        val remote = chat.listMessages(chatId) ?: return
+        val remote = withContext(Dispatchers.IO) { chat.listMessages(chatId) } ?: return
         var changed = false
         synchronized(chatLock) {
             val current = _messages[chatId] ?: mutableListOf()
             val pending = current.filter {
                 it.deliveryState == DeliveryState.sending || it.id.startsWith("temp_")
             }
-            var hasChanges = remote.size != current.size
-            if (!hasChanges && remote.isNotEmpty() && current.isNotEmpty()) {
-                hasChanges = remote.last().id != current.last().id ||
-                    remote.first().id != current.first().id
-            }
+            val hasChanges = remote != current.filterNot { it in pending }
             if (hasChanges) {
                 val merged = remote.toMutableList()
                 for (p in pending) {
@@ -558,7 +567,7 @@ class ApiBackendService(context: Context) {
             extraMetadata?.forEach { (k, v) -> o.put(k, v ?: org.json.JSONObject.NULL) }
             o.toString()
         } else text
-        val tempId = "temp_" + System.currentTimeMillis()
+        val tempId = "temp_" + java.util.UUID.randomUUID().toString()
         val tempMsg = ChatMessage(
             id = tempId,
             conversationId = conversationId,
@@ -574,11 +583,13 @@ class ApiBackendService(context: Context) {
         }
         notifyChatListeners()
 
-        val confirmed = chat.sendMessage(conversationId, effectiveContent)
+        val confirmed = withContext(Dispatchers.IO) { chat.sendMessage(conversationId, effectiveContent) }
         if (confirmed == null) {
             // Dart: fall back to the WebSocket send when HTTP did not confirm;
             // the temp message stays in 'sending' either way.
-            realtime.sendMessageFallback(conversationId, effectiveContent)
+            if (!realtime.sendMessageFallback(conversationId, effectiveContent)) {
+                throw IllegalStateException("Message not confirmed. Check your connection; the pending message will remain visible.")
+            }
             return null
         }
         synchronized(chatLock) {
