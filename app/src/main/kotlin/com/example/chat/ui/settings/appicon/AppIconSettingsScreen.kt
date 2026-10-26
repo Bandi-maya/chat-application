@@ -38,7 +38,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.RotateLeft
 import androidx.compose.material.icons.rounded.RotateRight
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Button
@@ -395,7 +395,7 @@ fun AppIconSettingsScreen(
 
     // ---- ChatyConfirmDialog ----
     confirmRequest?.let { request ->
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = {
                 if (request.barrierDismissible) confirmRequest = null
             },
@@ -425,7 +425,7 @@ fun AppIconSettingsScreen(
 
     // ---- Dart showModalBottomSheet source picker ----
     if (showSourceSheet) {
-        ModalBottomSheet(onDismissRequest = { showSourceSheet = false }) {
+        ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = { showSourceSheet = false }) {
             Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp)) {
                 Text(
                     "Add custom app icon",
