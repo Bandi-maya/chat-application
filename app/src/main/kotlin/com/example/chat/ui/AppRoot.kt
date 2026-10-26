@@ -1181,10 +1181,12 @@ fun AppRoot() {
             AuthRoute.GlobalSearch -> {
                 val repoS = ServiceLocator.conversationsRepository
                 val prefsS = ServiceLocator.preferencesController
-                val searchToastCtx = androidx.compose.ui.platform.LocalContext.current
+                val searchSnackbar = androidx.compose.runtime.remember { androidx.compose.material3.SnackbarHostState() }
+                val searchScope = androidx.compose.runtime.rememberCoroutineScope()
+                androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
                 com.example.chat.ui.search.GlobalSearchScreen(
-                    // Dart SnackBar for the search error strings.
-                    onNotify = { msg -> android.widget.Toast.makeText(searchToastCtx, msg, android.widget.Toast.LENGTH_SHORT).show() },
+                    // Dart ScaffoldMessenger SnackBar for the search error strings (Material3 SnackbarHost below).
+                    onNotify = { msg -> searchScope.launch { searchSnackbar.showSnackbar(msg) } },
                     colors = com.example.chat.ui.core.theme.ChatyColors(resolvedTheme),
                     conversations = ServiceLocator.apiBackend.conversations,
                     searchUsers = { q -> repoS.searchUsersRemote(q) },
@@ -1208,6 +1210,8 @@ fun AppRoot() {
                         }
                     },
                 )
+                androidx.compose.material3.SnackbarHost(searchSnackbar, Modifier.align(Alignment.BottomCenter))
+                }
             }
             AuthRoute.LockedChats -> {
                 val prefsL = ServiceLocator.preferencesController
