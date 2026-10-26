@@ -103,6 +103,31 @@ fun AppRoot() {
             // Dart _scheduleInitialAppLockIfNeeded on reaching the authenticated shell.
             if (route == AuthRoute.Home) ServiceLocator.appLock.scheduleInitialIfNeeded()
         }
+        // Call media permissions (Dart: flutter_webrtc getUserMedia prompts RECORD_AUDIO/CAMERA itself).
+        run {
+            val pendingCall = androidx.compose.runtime.remember {
+                arrayOfNulls<kotlinx.coroutines.CompletableDeferred<Map<String, Boolean>>>(1)
+            }
+            val callPermLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions(),
+            ) { result ->
+                pendingCall[0]?.complete(result)
+                pendingCall[0] = null
+            }
+            androidx.compose.runtime.DisposableEffect(callPermLauncher) {
+                com.example.chat.data.services.CallPermissionGate.requester = { perms ->
+                    val d = kotlinx.coroutines.CompletableDeferred<Map<String, Boolean>>()
+                    pendingCall[0] = d
+                    callPermLauncher.launch(perms.toTypedArray())
+                    d.await()
+                }
+                onDispose {
+                    com.example.chat.data.services.CallPermissionGate.requester = null
+                    pendingCall[0]?.complete(emptyMap())
+                    pendingCall[0] = null
+                }
+            }
+        }
         androidx.compose.runtime.LaunchedEffect(Unit) { try { ServiceLocator.startBadgeSync() } catch (_: Exception) {} }
         androidx.compose.runtime.LaunchedEffect(Unit) {
             // Dart _AppState.initState: locator<MessageAutomationService>() (30s account sync, gated on a session).
