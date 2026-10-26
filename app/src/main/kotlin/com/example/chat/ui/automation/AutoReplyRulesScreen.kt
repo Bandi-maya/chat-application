@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.rounded.ReplyAll
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronLeft
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.RuleFolder
 import androidx.compose.material3.Button
