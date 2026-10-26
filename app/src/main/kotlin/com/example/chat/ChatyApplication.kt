@@ -17,6 +17,17 @@ class ChatyApplication : Application() {
         super.onCreate()
         UniffiMlsEngine.install()
         ServiceLocator.init(this)
+        // Dart main.dart:206: FirebaseNotificationService().initialize() at startup, best-effort
+        // ("Chaty Firebase bootstrap skipped" on failure): eager getToken() plus the refresh
+        // listener, unauthenticated included; api-hub registration stays auth-guarded inside
+        // the registrar exactly like Dart's _registerWithBackends. Touching fcmRegistrar here
+        // also installs it into FcmRegistrarHolder before any early onNewToken can arrive.
+        // Inert until a real google-services.json lands (token fetch then throws and is logged).
+        try {
+            ServiceLocator.fcmRegistrar.fetchAndRegisterToken()
+        } catch (e: Exception) {
+            android.util.Log.w("ChatyApplication", "Chaty Firebase bootstrap skipped: $e")
+        }
         // Dart main() awaits ThemeController.init() before runApp so the first
         // frame already reflects the user's theme; restore it off the main
         // thread into the controller's own scope before AppRoot reads it.
