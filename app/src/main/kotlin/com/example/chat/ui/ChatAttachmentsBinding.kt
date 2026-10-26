@@ -53,6 +53,7 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
     val scope = rememberCoroutineScope()
     val api = ServiceLocator.apiBackend
     var pending by remember { mutableStateOf<CompletableDeferred<List<Uri>>?>(null) }
+    var mediaReview by remember { mutableStateOf<Pair<List<com.example.chat.ui.chats.detail.MediaReviewItem>, CompletableDeferred<com.example.chat.ui.chats.detail.ReviewedMedia?>>?>(null) }
     var viewOnceAsk by remember { mutableStateOf<Pair<String, CompletableDeferred<Boolean>>?>(null) }
     val multi = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
         pending?.complete(uris); pending = null
@@ -206,6 +207,24 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
     val onContact: () -> Unit = { scope.launch { controller.shareContact(contactsPort); afterSend() } }
     val onMedia: (String) -> Unit = { type ->
         scope.launch {
+            if (type == "image" || type == "video") {
+                try {
+                    val d = CompletableDeferred<List<Uri>>()
+                    pending = d
+                    val limit = if (type == "image") ServiceLocator.preferencesController.gbDouble("Img_share_limit", 30.0).toInt().coerceIn(1, 100) else 1
+                    if (limit > 1) multi.launch("image/*") else single.launch(if (type == "image") "image/*" else "video/*")
+                    val uris = d.await()
+                    if (uris.isEmpty()) return@launch
+                    check(uris.size <= limit) { "Your configured send limit is $limit." }
+                    val items = uris.map { uri -> com.example.chat.ui.chats.detail.MediaReviewItem(uri.toString(), read(uri, type), type) }
+                    val review = CompletableDeferred<com.example.chat.ui.chats.detail.ReviewedMedia?>()
+                    mediaReview = items to review
+                    val result = review.await() ?: return@launch
+                    controller.sendReviewedMedia(result.items.map { it.file }, type, result.caption, result.viewOnce)
+                    afterSend()
+                } catch (e: Exception) { toast(e.message ?: "Unable to prepare attachment") }
+                return@launch
+            }
             controller.shareMedia(
                 type = type,
                 pickFiles = { multiple, maxFiles ->
@@ -237,6 +256,18 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                 },
             )
             afterSend()
+        }
+    }
+    mediaReview?.let { (items, deferred) ->
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { mediaReview = null; deferred.complete(null) },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        ) {
+            com.example.chat.ui.chats.detail.MediaReviewScreen(
+                items,
+                onCancel = { mediaReview = null; deferred.complete(null) },
+                onSend = { result -> mediaReview = null; deferred.complete(result) },
+            )
         }
     }
     viewOnceAsk?.let { (t, d) ->
