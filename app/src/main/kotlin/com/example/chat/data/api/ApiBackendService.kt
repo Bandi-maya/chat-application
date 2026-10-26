@@ -425,6 +425,15 @@ class ApiBackendService(
         notifyChatListeners()
     }
 
+    /** Dart ApiBackendService.searchUsers: loadUsers(query) over GET /chat/users?search=
+     *  (with the same fallbacks), then the in-memory directory filtered by lowercase contains on
+     *  displayName/username/email; self excluded unless includeSelf. */
+    suspend fun searchUsers(query: String, includeSelf: Boolean = false): List<UserProfile> {
+        val q = query.lowercase().trim()
+        loadUsers(q)
+        return com.example.chat.ui.chats.newchat.NewChatRules.filterUsers(users, q, session.currentUser?.id, includeSelf)
+    }
+
     /** Dart setActiveConversation: track the room, start sync, load messages. */
     fun setActiveConversation(conversationId: String?) {
         activeConversationId = conversationId
