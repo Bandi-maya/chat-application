@@ -71,6 +71,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -470,6 +472,7 @@ fun CallContactPickerScreen(
                                         .width(68.dp)
                                     .aspectRatio(1f)
                                         .testTag("dial-key-${key.digit}")
+                                        .semantics(mergeDescendants = true) { contentDescription = "Dial ${key.digit}" }
                                         .clip(CircleShape)
                                         .background(
                                             Color(argbWithAlpha(theme.cardColor, 0.5)),
@@ -527,13 +530,14 @@ fun CallContactPickerScreen(
                             modifier = Modifier
                                 .size(60.dp)
                                 .testTag("dial-call")
+                                .semantics(mergeDescendants = true) { contentDescription = "Call number" }
                                 .clip(CircleShape)
                                 .background(Color(0xFF48D597), CircleShape)
                                 .clickable { triggerCall() },
                         ) {
                             Icon(
                                 Icons.Rounded.Call,
-                                contentDescription = "Call",
+                                contentDescription = null,
                                 tint = Color.White,
                                 modifier = Modifier.size(28.dp),
                             )
