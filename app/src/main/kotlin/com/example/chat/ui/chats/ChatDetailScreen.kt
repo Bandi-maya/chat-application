@@ -243,6 +243,7 @@ fun ChatDetailScreen(
     quickContacts: List<QuickContactEntry> = emptyList(),
     onOpenConversation: (String) -> Unit = {},
     homeAvatarShape: String = "circle",
+    universalEmojiStyle: String = "Chaty Motion",
     translateOption: String = "Server + No outside apps",
     translationLanguage: String = "Show All",
     onMediaTap: (ChatMessage) -> Unit = {},
@@ -757,6 +758,8 @@ fun ChatDetailScreen(
                             isSenderAdmin = conversation.isGroup &&
                                 conversation.adminIds.contains(message.senderId),
                             makeTextSelectable = convPrefs.makeTextSelectable,
+            enableAnimatedEmojis = convPrefs.enableAnimatedEmojis,
+            emojiStyle = universalEmojiStyle,
                             groupAdminIcon = convPrefs.groupAdminIcon,
                             hideAdminNameIcon = convPrefs.hideAdminNameIcon,
                             voicePlayButtonColor = convPrefs.voiceNotePlayButtonColor?.let(::Color),
