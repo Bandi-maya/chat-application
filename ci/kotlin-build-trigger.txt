@@ -1,3 +1,5 @@
 2026-10-26 combined phone fixes: main-thread chat REST, realtime UI refresh, authenticated REST directory, search focus, full destination navigation and back history, safe areas and fullbleed lock/calls, FAB clearance, consumed task entry, circular dialer/T9/tones, scoped ten-dp custom modal/menu/task-form and first centered settings selectors, fixed-anchor radial navigation. Synthetic regression candidate; real-account delivery/audio and whole-app selector migration remain unverified. Includes reviewed instance-scoped old-header tab binding and synthetic selector draft/cancel/Apply proof.
 
 Compile correction: retain Close imports for editor-dismiss buttons while page Back uses ChevronLeft.
+
+Independent parallel candidate: centered GB radio/color, icon and launcher choices, bubble/tick/header galleries, emoji style selectors, shared custom switch/radio and single touch owner. Includes all critical fixes from ec0c25b6. Results must remain separate from correction run40334715139.
