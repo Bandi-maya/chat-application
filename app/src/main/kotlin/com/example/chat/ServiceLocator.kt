@@ -111,8 +111,14 @@ object ServiceLocator {
 
     /** REST backend (ApiBackendService on the api branch): the service the
      *  auth screens actually call; its session takes facade precedence. */
+    /** The ApiBackendService under construction. initialize() runs the FCM sync hook synchronously when a session is
+     *  stored; fcmRegistrar must reach the service through this field, not through the apiBackend lazy (re-entering
+     *  it recursed until StackOverflowError at launch, CI run 40267033954 job 121395203962). */
+    @Volatile private var apiBackendUnderConstruction: com.example.chat.data.api.ApiBackendService? = null
+
     val apiBackend: com.example.chat.data.api.ApiBackendService by lazy {
         com.example.chat.data.api.ApiBackendService(requireContext()).also { service ->
+            apiBackendUnderConstruction = service
             // Dart locator wiring for _syncFcmToken / unregisterOnLogout:
             // deferred lambdas so the registrar's lazy init cannot cycle
             // back into this lazy block during construction.
@@ -128,7 +134,7 @@ object ServiceLocator {
      *  inert until a real google-services.json lands. */
     val fcmRegistrar: com.example.chat.data.api.FcmTokenRegistrar by lazy {
         com.example.chat.data.api.FcmTokenRegistrar(
-            apiDevices = apiBackend.deviceTokenClient,
+            apiDevices = (apiBackendUnderConstruction ?: apiBackend).deviceTokenClient,
         ).also { com.example.chat.notifications.FcmRegistrarHolder.registrar = it }
     }
 
