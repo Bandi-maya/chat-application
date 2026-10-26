@@ -114,6 +114,17 @@ class LocalSnapshotCacheService(context: Context) : SnapshotCacheStore {
         }
     }
 
+    override suspend fun listScopes(userId: String): List<String> {
+        if (userId.isEmpty()) return emptyList()
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                com.example.chat.data.local.SnapshotScopeNames.scopesFor(
+                    safe(userId), directory().list()?.toList().orEmpty(),
+                )
+            }.getOrDefault(emptyList())
+        }
+    }
+
     suspend fun deleteUser(userId: String) {
         if (userId.isEmpty()) return
         withContext(Dispatchers.IO) {
