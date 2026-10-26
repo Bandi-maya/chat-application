@@ -1,10 +1,15 @@
 package com.example.chat.ui.calls
 
+import android.media.AudioManager
+import android.media.ToneGenerator
+import android.provider.Settings
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,20 +53,23 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -73,7 +81,6 @@ import com.example.chat.core.theme.argbWithAlpha
 import com.example.chat.domain.models.UserProfile
 import com.example.chat.ui.theme.LocalThemeConfig
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 enum class CallContactPickerMode { contacts, dialpad }
 
@@ -104,7 +111,23 @@ fun CallContactPickerScreen(
 ) {
     val theme = LocalThemeConfig.current
     val haptics = LocalHapticFeedback.current
-    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    // Respect silent/vibrate and the device's dial-pad tone preference.
+    val tones = remember(context) { runCatching { ToneGenerator(AudioManager.STREAM_DTMF, 70) }.getOrNull() }
+    DisposableEffect(tones) { onDispose { tones?.release() } }
+
+    fun playDialTone(digit: String) {
+        val audio = context.getSystemService(AudioManager::class.java)
+        val enabled = Settings.System.getInt(context.contentResolver, Settings.System.DTMF_TONE_WHEN_DIALING, 1) != 0
+        if (!enabled || audio?.ringerMode != AudioManager.RINGER_MODE_NORMAL) return
+        val tone = when (digit) {
+            "*" -> ToneGenerator.TONE_DTMF_S
+            "#" -> ToneGenerator.TONE_DTMF_P
+            "+" -> ToneGenerator.TONE_DTMF_0
+            else -> digit.toIntOrNull()?.let { ToneGenerator.TONE_DTMF_0 + it }
+        } ?: return
+        runCatching { tones?.startTone(tone, 100) }
+    }
 
     var query by remember { mutableStateOf("") }
     var isDialpad by remember { mutableStateOf(initialMode == CallContactPickerMode.dialpad) }
@@ -123,18 +146,11 @@ fun CallContactPickerScreen(
             }
     }
 
-    val visibleContacts by remember(query, contacts) {
+    val visibleContacts by remember(query, contacts, currentUserId) {
         derivedStateOf {
-            val q = query.trim().lowercase()
-            val queryDigits = q.replace(Regex("[^0-9]"), "")
             contacts.filter { contact ->
-                if (contact.id == currentUserId) return@filter false
-                if (q.isEmpty()) return@filter true
-                val name = contact.displayName.trim().lowercase()
-                val phone = contact.phone.trim().lowercase()
-                val contactDigits = phone.replace(Regex("[^0-9]"), "")
-                name.contains(q) || phone.contains(q) ||
-                    (queryDigits.isNotEmpty() && contactDigits.contains(queryDigits))
+                contact.id != currentUserId &&
+                    matchesDialerContact(query, contact.displayName, contact.phone)
             }
         }
     }
@@ -157,6 +173,7 @@ fun CallContactPickerScreen(
         if (startingContactId != null) return
         if (query.length >= 25) return
         query += digit
+        playDialTone(digit)
         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
     }
 
@@ -444,44 +461,51 @@ fun CallContactPickerScreen(
                         userScrollEnabled = false,
                     ) {
                         items(dialKeys) { key ->
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier
-                                    .size(68.dp)
-                                    .background(
-                                        Color(argbWithAlpha(theme.cardColor, 0.5)),
-                                        CircleShape,
-                                    )
-                                    .combinedClickable(
-                                        onClick = { appendDigit(key.digit) },
-                                        onLongClick = if (key.digit == "0") {
-                                            { appendDigit("+") }
-                                        } else null,
-                                    ),
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        key.digit,
-                                        color = Color(theme.primaryTextColor),
-                                        fontSize = 27.sp,
-                                        fontWeight = FontWeight.Normal,
-                                        letterSpacing = (-0.2).sp,
-                                    )
-                                    if (key.digit == "1") {
-                                        Icon(
-                                            Icons.Rounded.Voicemail,
-                                            contentDescription = null,
-                                            tint = Color(theme.secondaryTextColor),
-                                            modifier = Modifier.size(13.dp),
+                            // The grid gives each item its column width. Keep that outer
+                            // cell separate so the actual key remains a 68dp circle.
+                            Box(Modifier.fillMaxWidth().height(68.dp), contentAlignment = Alignment.Center) {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .width(68.dp)
+                                    .aspectRatio(1f)
+                                        .testTag("dial-key-${key.digit}")
+                                        .clip(CircleShape)
+                                        .background(
+                                            Color(argbWithAlpha(theme.cardColor, 0.5)),
+                                            CircleShape,
                                         )
-                                    } else if (key.subtitle.isNotEmpty()) {
+                                        .combinedClickable(
+                                            onClick = { appendDigit(key.digit) },
+                                            onLongClick = if (key.digit == "0") {
+                                                { appendDigit("+") }
+                                            } else null,
+                                        ),
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         Text(
-                                            key.subtitle,
-                                            color = Color(theme.secondaryTextColor),
-                                            fontSize = 9.5.sp,
-                                            letterSpacing = 1.5.sp,
-                                            fontWeight = FontWeight.SemiBold,
+                                            key.digit,
+                                            color = Color(theme.primaryTextColor),
+                                            fontSize = 27.sp,
+                                            fontWeight = FontWeight.Normal,
+                                            letterSpacing = (-0.2).sp,
                                         )
+                                        if (key.digit == "1") {
+                                            Icon(
+                                                Icons.Rounded.Voicemail,
+                                                contentDescription = null,
+                                                tint = Color(theme.secondaryTextColor),
+                                                modifier = Modifier.size(13.dp),
+                                            )
+                                        } else if (key.subtitle.isNotEmpty()) {
+                                            Text(
+                                                key.subtitle,
+                                                color = Color(theme.secondaryTextColor),
+                                                fontSize = 9.5.sp,
+                                                letterSpacing = 1.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -502,6 +526,8 @@ fun CallContactPickerScreen(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 .size(60.dp)
+                                .testTag("dial-call")
+                                .clip(CircleShape)
                                 .background(Color(0xFF48D597), CircleShape)
                                 .clickable { triggerCall() },
                         ) {
