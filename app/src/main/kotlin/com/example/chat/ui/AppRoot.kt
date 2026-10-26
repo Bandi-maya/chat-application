@@ -533,9 +533,7 @@ fun AppRoot() {
                         bottomBarStyle = ServiceLocator.appearanceVariantController.bottomBarStyle,
                         navigationStyleName = ServiceLocator.appearanceVariantController.navigationStyle,
                         homeStyle = shellHome.homeStyle,
-                        animationsDisabled = android.provider.Settings.Global.getFloat(
-                            shellCtx.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f,
-                        ) == 0f,
+                        animationsDisabled = com.example.chat.ui.kit.rememberChatyReduceMotion(),
                     ),
                     myNameOverride = { shellHome.myNameOverride },
                     onNotify = shellToast,
