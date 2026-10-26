@@ -469,7 +469,7 @@ object ServiceLocator {
             query = queryClient,
             rpc = rpcClient,
             channelFactory = { topic, tables, onChange, onStatus ->
-                SupabaseRealtimeChannel(supabaseUrl, publishableKey, accessToken, topic, tables, onChange, onStatus)
+                SupabaseRealtimeChannel(supabaseUrl, publishableKey, accessToken, topic, tables, onChange, onStatus).also { it.start() }
             },
             currentUserId = currentUserId,
             connectionHealth = ConnectionHealthSinkAdapter(connectionHealth),
@@ -521,6 +521,9 @@ object ServiceLocator {
             rpc = rpcClient,
             currentUserId = currentUserId,
             privacy = { preferencesController.privacy.toPublicationSnapshot() },
+            statusChannelFactory = { topic, tables, onChange, onStatus ->
+                SupabaseRealtimeChannel(supabaseUrl, publishableKey, accessToken, topic, tables, onChange, onStatus).also { it.start() }
+            },
         )
     }
 
