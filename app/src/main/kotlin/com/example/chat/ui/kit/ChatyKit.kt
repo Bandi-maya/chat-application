@@ -202,9 +202,9 @@ fun <T> ChatySingleChoiceModal(
         Column(
             Modifier
                 .widthIn(max = 520.dp)
-                .clip(RoundedCornerShape(24.dp))
+                .clip(ChatyModalShape)
                 .background(colors.surface)
-                .border(BorderStroke(1.dp, colors.border), RoundedCornerShape(24.dp)),
+                .border(BorderStroke(1.dp, colors.border), ChatyModalShape),
         ) {
             Column(Modifier.padding(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 12.dp)) {
                 Text(title, color = colors.foreground, fontSize = 16.sp, fontWeight = FontWeight.W800)
