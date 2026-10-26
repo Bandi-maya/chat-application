@@ -41,6 +41,16 @@ object LockBiometricPolicy {
     /** deviceCanSupportBiometrics: canAuthenticate(BIOMETRIC_WEAK) != BIOMETRIC_ERROR_NO_HARDWARE. */
     fun canCheckBiometrics(weakStatusIsNoHardware: Boolean): Boolean = !weakStatusIsNoHardware
 
+    /** Navigation between authenticated routes (Security, LockedChats, HiddenVault, Profile...) never cancels a pending
+     *  prompt: those screens start prompts themselves. Only the lock requirement dropping (unlocked another way, or
+     *  lock disabled), a real sign-out, an explicit stop or an activity detach ends one. */
+    fun stopOnLockTransition(previousLockRequired: Boolean, lockRequired: Boolean): Boolean =
+        previousLockRequired && !lockRequired
+
+    /** A callback or posted re-show from a superseded attempt must do nothing. */
+    fun isStale(attemptGeneration: Int, currentGeneration: Int, sessionStopped: Boolean): Boolean =
+        sessionStopped || attemptGeneration != currentGeneration
+
     /** getEnrolledBiometrics order: weak first, then strong. */
     fun enrolledBiometrics(weakSuccess: Boolean, strongSuccess: Boolean): List<String> =
         buildList { if (weakSuccess) add("weak"); if (strongSuccess) add("strong") }
