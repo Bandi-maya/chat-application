@@ -93,6 +93,15 @@ class ChatyPreferencesController(
     private var disposed = false
     var preferencesReady = false; private set
 
+    // MUST stay above init{}: init launches initLoad and registers the auth listener, which may
+    // run inline (Unconfined/Main.immediate) before later field initialisers would execute.
+    private val localWriter = OrderedBlobWriter { uid, data -> store.save(uid, data) }
+    private val saveTracker = PreferencesSaveTracker { now() }
+    private val loadGeneration = java.util.concurrent.atomic.AtomicLong(0)
+
+    /** Observable local-save outcome; UI shows an inline row only when Failed. */
+    val saveState: kotlinx.coroutines.flow.StateFlow<SaveState> get() = saveTracker.state
+
     private val listeners = mutableListOf<() -> Unit>()
 
     private val authListener: (String?) -> Unit = { newUserId -> handleAuthStateChange(newUserId) }
@@ -163,7 +172,8 @@ class ChatyPreferencesController(
 
     private suspend fun initLoad() {
         scopeUserId = auth.currentUserId()
-        loadForUser(scopeUserId)
+        saveTracker.resetScope(scopeUserId)
+        loadForUser(scopeUserId, loadGeneration.incrementAndGet())
     }
 
     /** Reacts to sign-in, sign-out, and account switches. On any change of
@@ -177,20 +187,26 @@ class ChatyPreferencesController(
             return
         }
         scopeUserId = newUserId
+        saveTracker.resetScope(newUserId)
+        val gen = loadGeneration.incrementAndGet()
         preferencesReady = false
         resetInMemory()
         notifyListeners()
-        scope.launch { loadForUser(newUserId) }
+        scope.launch { loadForUser(newUserId, gen) }
     }
 
     /** Loads, migrates, and applies the preference blob for [userId] (null
      *  when signed out), then reconciles with the backend. */
-    private suspend fun loadForUser(userId: String?) {
-        val raw = resolveLocalBlob(userId)
+    private suspend fun loadForUser(userId: String?, gen: Long) {
+        val raw = resolveLocalBlob(userId, gen)
+        // Account switched (or a newer load started) while we awaited storage: drop this result
+        // before it can touch in-memory state, the store or readiness.
+        if (gen != loadGeneration.get()) return
 
         val migration = PreferencesMigrator.migrate(raw)
         if (raw.isNotEmpty()) applyMap(migration.data)
-        if (migration.migratedSecrets) migrateLegacySecrets(migration)
+        if (migration.migratedSecrets) migrateLegacySecrets(migration, gen)
+        if (gen != loadGeneration.get()) return
 
         // Rewrite the cleaned/upgraded blob so stripped plaintext secrets and
         // stale schema versions never survive to a second load.
@@ -208,7 +224,8 @@ class ChatyPreferencesController(
     /** Resolves the correct local blob for [userId], performing a one-time
      *  adoption of a pre-namespacing legacy global blob into the user's
      *  namespace when it is safe to do so. */
-    private suspend fun resolveLocalBlob(userId: String?): Map<String, Any?> {
+    private suspend fun resolveLocalBlob(userId: String?, gen: Long): Map<String, Any?> {
+        fun stale() = gen != loadGeneration.get()
         if (userId.isNullOrEmpty()) {
             // Signed-out / device-global bucket.
             return store.load(null)
@@ -216,20 +233,27 @@ class ChatyPreferencesController(
 
         if (!store.hasScoped(userId)) {
             val legacy = store.load(null)
+            // Generation re-checked immediately before every mutation below. This is a
+            // check-then-act, not an atomic transaction: a switch landing between the
+            // check and the store call can still slip through (see report).
+            if (stale()) return emptyMap()
             if (legacy.isNotEmpty()) {
                 // Only adopt the un-owned/legacy blob if it is not already
                 // claimed by a different account; otherwise a second account
                 // could inherit the first account's settings.
                 val owner = store.storedUserId()
+                if (stale()) return emptyMap()
                 if (owner == null || owner == userId) {
                     store.save(userId, legacy)
                 }
+                if (stale()) return emptyMap()
                 // Retire the un-namespaced blob regardless, so it can never
                 // be adopted again by a different account.
                 store.clearGlobal()
             }
         }
 
+        if (stale()) return emptyMap()
         store.setStoredUserId(userId)
         return store.load(userId)
     }
@@ -238,12 +262,15 @@ class ChatyPreferencesController(
      *  secure storage. Fail-safe: an existing secure credential is never
      *  overwritten, and a legacy secret that no longer passes validation is
      *  dropped (the user simply re-sets their lock). */
-    private suspend fun migrateLegacySecrets(migration: MigrationResult) {
+    private suspend fun migrateLegacySecrets(migration: MigrationResult, gen: Long = loadGeneration.get()) {
         val methodByLabel = mapOf("PIN" to "pin", "Pattern" to "pattern", "Password" to "password")
         for ((label, secret) in migration.legacySecrets) {
             val method = methodByLabel[label] ?: continue
+            if (gen != loadGeneration.get()) return
             try {
                 if (lockStore.hasCredential(method)) continue
+                // Re-check after the await, immediately before the mutation.
+                if (gen != loadGeneration.get()) return
                 lockStore.setCredential(
                     method,
                     secret,
@@ -347,10 +374,21 @@ class ChatyPreferencesController(
         PreferenceKeys.favorites to starredFavorites.toList(),
     )
 
+    /** Re-saves the current settings (used by an inline Retry action). */
+    fun retrySave() { if (preferencesReady) persist() }
+
     private fun persist() {
         lastLocalMutation = now()
         val snap = snapshot()
-        scope.launch { store.save(scopeUserId, snap) }
+        // Capture the account at call time (not when the coroutine runs) and order
+        // writes so an older snapshot can never overwrite a newer one.
+        val uid = scopeUserId
+        val seq = localWriter.nextSeq()
+        val gen = saveTracker.currentGeneration()
+        scope.launch {
+            val wrote = localWriter.write(seq, uid, snap)
+            saveTracker.onWriteFinished(gen, uid, wrote, localWriter.hasUnsavedFailure(uid))
+        }
         remoteSyncDebounce?.cancel()
         if (remote != null) {
             remoteSyncDebounce = scope.launch {
@@ -389,7 +427,13 @@ class ChatyPreferencesController(
             val migration = PreferencesMigrator.migrate(remoteRaw)
             applyMap(migration.data)
             if (migration.migratedSecrets) migrateLegacySecrets(migration)
-            store.save(scopeUserId, snapshot())
+            run {
+                // Same enqueue-time capture as persist(); tracker ignores it if the account changed.
+                val gen = saveTracker.currentGeneration()
+                val uid = scopeUserId
+                val wrote = localWriter.write(localWriter.nextSeq(), uid, snapshot())
+                saveTracker.onWriteFinished(gen, uid, wrote, localWriter.hasUnsavedFailure(uid))
+            }
             // Overwrite any cloud-stored plaintext or stale-schema blob with
             // the clean one.
             if (needsPurge || migration.fromVersion < PreferenceKeys.currentSchemaVersion) {
