@@ -176,7 +176,7 @@ fun SettingsScreen(
     onOpenSearch: (List<SettingsSearchEntry>) -> Unit,
     onLogout: () -> Unit,
     onBack: (() -> Unit)?,
-    licenses: List<ChatyLicenseEntry> = emptyList(),
+    licenses: List<ChatyLicenseEntry> = ChatyLicenseData.entries,
 ) {
     val colors = LocalAppColors.current
     val scope = rememberCoroutineScope()
