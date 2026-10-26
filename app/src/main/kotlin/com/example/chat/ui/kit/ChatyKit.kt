@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -199,18 +200,17 @@ fun <T> ChatySingleChoiceModal(
     var draft by remember { mutableStateOf(value) }
     val changed = draft != value
     ChatySelectionModal(title = title, onDismiss = onDismiss, onApply = { onApply(draft) }, applyEnabled = changed, applyLabel = applyLabel) {
-        LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+        LazyColumn(
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp).selectableGroup(),
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),
+        ) {
             if (description != null) item { Text(description, color = colors.foregroundSecondary, fontSize = 13.sp) }
-            if (previewBuilder != null) item {
-                Box(Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) { previewBuilder(draft) }
-            }
             itemsIndexed(options) { _, option ->
-                Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    ChatyChoiceTile(labelBuilder(option), { draft = option }, Modifier.fillMaxWidth(),
-                        selected = option == draft, role = androidx.compose.ui.semantics.Role.RadioButton)
-                    descriptionBuilder?.invoke(option)?.takeIf { it.isNotEmpty() }?.let { Text(it, color = colors.foregroundSecondary, fontSize = 12.sp) }
-                    if (previewBuilder != null) previewBuilder(option)
-                }
+                ChatyPreviewRadioRow(
+                    label = labelBuilder(option), selected = option == draft, onSelect = { draft = option },
+                    description = descriptionBuilder?.invoke(option),
+                    preview = previewBuilder?.let { pb -> { pb(option) } },
+                )
             }
         }
     }
