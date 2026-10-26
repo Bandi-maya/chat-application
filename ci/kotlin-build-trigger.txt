@@ -1,2 +1,1 @@
-Verify H Android-test compile corrections on frozen G application features
-No main application changes; explicit ActivityScenario type and nullable permission assertion.
+Next cumulative source-overlay candidate: H5d6e83e846caeba925ee637c3a7babebbef5cbe3 plus 131 reviewed source/assets/test paths; archive SHA256 2e42f0d02ce5682e8b6bf26aff626e4f3a95aa6091e4ef011c00fc60d8c0709a. Calls service reviewV4, WS generation guard, bubbleV4, cumulative map/media/cache/camera/prefs/backup containment. Native build and APK requested, not all tasks complete. 2026-10-27 IST.
