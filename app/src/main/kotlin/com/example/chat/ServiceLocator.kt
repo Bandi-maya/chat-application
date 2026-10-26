@@ -444,6 +444,14 @@ object ServiceLocator {
         GbFeatureBackendService(queryClient = queryClient, rpcClient = rpcClient, currentUserId = currentUserId)
     }
 
+    val scheduledMessageService: com.example.chat.ui.automation.ScheduledMessageService by lazy {
+        com.example.chat.ui.automation.ScheduledMessageService(backend = gbFeatures, scope = appScope)
+    }
+
+    val autoReplyRuleEngine: com.example.chat.ui.automation.AutoReplyRuleEngine by lazy {
+        com.example.chat.ui.automation.AutoReplyRuleEngine(prefs = preferencesController, backend = gbFeatures, scope = appScope)
+    }
+
     val messageAutomation: MessageAutomationService by lazy {
         MessageAutomationService(
             automation = { preferencesController.automation },
