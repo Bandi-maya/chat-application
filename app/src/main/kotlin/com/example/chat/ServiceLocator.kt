@@ -275,31 +275,32 @@ object ServiceLocator {
 
     private val pendingSends: PendingSecureSendStore by lazy { PendingSecureSendStore(snapshotCache) }
 
-    /** Badge sync target. Set ONLY by [startBadgeSync] after the locator is up, so the repository's notifyChanged
-     *  callback never forces lazy initialisation of the manager (no lazy cycle: the callback reads this nullable
-     *  field and the repository constructor/hydration never calls notifyChanged). */
-    @Volatile private var badgeSyncTarget: com.example.chat.data.services.NotificationChannelManager? = null
-
-    /** Dart NotificationChannelManager (badge scope). The conversations lambda is evaluated only inside
-     *  syncUnreadBadgeCount, never at construction. */
+    /** Dart NotificationChannelManager (badge scope). Home's conversation source is ApiBackendService
+     *  (api.conversations, Dart dataStore.conversations), so the badge reads the same list. The lambda is only
+     *  evaluated inside syncUnreadBadgeCount, never at construction. */
     val notificationChannelManager: com.example.chat.data.services.NotificationChannelManager by lazy {
         com.example.chat.data.services.NotificationChannelManager(
             context = requireContext(),
             preferences = preferencesController,
-            conversations = { conversationsRepository.conversationsById.values.toList() },
+            conversations = { apiBackend.conversations },
         )
     }
 
-    /** Explicit post-construction start (AppRoot, after the locator is ready): initialize then subscribe. */
+    @Volatile private var badgeSyncStarted = false
+
+    /** Dart ctor `dataStore.addListener(syncUnreadBadgeCount)`: explicit post-construction start (AppRoot,
+     *  once the locator is ready) - initialize, then subscribe to the api data store. No repository callback,
+     *  so there is no lazy-initialisation cycle. */
     fun startBadgeSync() {
+        if (badgeSyncStarted) return
+        badgeSyncStarted = true
         val m = notificationChannelManager
         m.initialize()
-        badgeSyncTarget = m
+        apiBackend.addListener { m.syncUnreadBadgeCount() }
     }
 
     val conversationsRepository: ConversationsRepository by lazy {
         ConversationsRepository(
-            notifyChanged = { badgeSyncTarget?.syncUnreadBadgeCount() },
             rpc = rpcClient,
             queryClient = queryClient,
             mls = { mls },
