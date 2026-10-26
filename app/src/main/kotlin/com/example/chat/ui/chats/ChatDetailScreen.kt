@@ -433,7 +433,10 @@ fun ChatDetailScreen(
         listState.animateScrollToItem(index, scrollOffset = offset)
     }
     LaunchedEffect(searchOpen) {
-        if (searchOpen) searchFocusRequester.requestFocus()
+        if (searchOpen) {
+            androidx.compose.runtime.withFrameNanos { }
+            runCatching { searchFocusRequester.requestFocus() }
+        }
     }
 
     // Dart _handleComposerChanged: persist draft, publish typing with a 5s
