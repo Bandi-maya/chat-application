@@ -33,7 +33,7 @@ import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.material.icons.rounded.QrCode
 import androidx.compose.material.icons.rounded.WorkspacePremium
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -126,7 +126,7 @@ fun AccountSettingsScreen(
     // -> confirmChatyLogout. The logout confirm is a second dialog, exactly
     // like the source.
     if (showDeleteDialog) {
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { showDeleteDialog = false },
             title = { Text("Delete Account?") },
             text = {
@@ -161,7 +161,7 @@ fun AccountSettingsScreen(
 
     // Dart confirmChatyLogout (profile_actions.dart).
     if (showLogoutDialog) {
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { showLogoutDialog = false },
             title = { Text("Log out of Chaty?") },
             text = {
@@ -430,10 +430,10 @@ private fun EditProfileSheet(
         }
     }
 
-    ModalBottomSheet(
+    ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp,
         onDismissRequest = onDismiss,
         containerColor = colors.surface,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        shape = com.example.chat.ui.kit.ChatyModalShape,
     ) {
         Column(
             modifier = Modifier
