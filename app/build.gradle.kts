@@ -83,6 +83,8 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("io.coil-kt:coil-compose:2.7.0")
+    // Lottie (Apache-2.0) for the animated-emoji Noto JSON fallback (Dart animated_emoji streams Noto Lottie).
+    implementation("com.airbnb.android:lottie-compose:6.7.1")
     // QR render + scanner (linked devices): zxing core + CameraX + ML Kit
     // barcode (same decode engine mobile_scanner uses on Android). All free,
     // on-device. Availability verified 200 on Maven Central / Google Maven.
