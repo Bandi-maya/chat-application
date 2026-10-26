@@ -40,7 +40,7 @@ import androidx.compose.material.icons.rounded.ReplyAll
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.ScheduleSend
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -251,7 +251,7 @@ fun ContextualNavigationFab(
     }
 
     if (restartConfirm) {
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { restartConfirm = false },
             title = { Text("Restart Chaty?") },
             text = { Text("Chaty will close and reopen. Make sure any unsent text is saved first.") },
@@ -396,7 +396,7 @@ private fun FabSecondaryActionsSheet(
     onOpenAutoReplyRules: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = colors.surfaceElevated) {
+    ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = onDismiss, containerColor = colors.surfaceElevated) {
         Column(
             Modifier
                 .heightIn(max = 560.dp)
@@ -464,7 +464,7 @@ private fun DirectNumberDialog(
 ) {
     var input by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
-    AlertDialog(
+    AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = onDismiss,
         title = { Text("Message Unsaved Number") },
         text = {
