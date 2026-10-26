@@ -199,7 +199,7 @@ fun MediaViewerScreen(
         if (local != null) {
             val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", local)
             context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
-                type = when { local.extension == "mp4" -> "video/mp4"; local.extension == "m4a" -> "audio/mp4"; else -> "image/jpeg" }; putExtra(Intent.EXTRA_STREAM, uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                this.type = when { local.extension == "mp4" -> "video/mp4"; local.extension == "m4a" -> "audio/mp4"; else -> "image/jpeg" }; putExtra(Intent.EXTRA_STREAM, uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }, "Share edited copy"))
             return
         }
@@ -310,12 +310,12 @@ fun MediaViewerScreen(
                 .graphicsLayer {
                     val progress = opening.value
                     val source = sourceBounds
-                    val initial = if (source != null && size.width > 0f) (source.width / size.width).coerceIn(0.1f, 1f) else 0.92f
+                    val initial = if (source != null && this.size.width > 0f) (source.width / this.size.width).coerceIn(0.1f, 1f) else 0.92f
                     scaleX = initial + (1f - initial) * progress
                     scaleY = scaleX
                     if (source != null) {
-                        translationX = (source.center.x - size.width / 2f) * (1f - progress)
-                        translationY = (source.center.y - size.height / 2f) * (1f - progress)
+                        translationX = (source.center.x - this.size.width / 2f) * (1f - progress)
+                        translationY = (source.center.y - this.size.height / 2f) * (1f - progress)
                     }
                 },
             contentAlignment = Alignment.Center,
