@@ -1,1 +1,1 @@
-Verify complete messaging/nav batch after correcting back-icon symbol to ChevronLeft; no behavior-test removal.
+Verify messaging and navigation cumulative batch with unique valid ChevronLeft imports.
