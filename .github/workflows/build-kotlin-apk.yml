@@ -188,6 +188,15 @@ jobs:
           arch: x86_64
           profile: pixel_6
           script: bash ci/run-smoke.sh
+      - name: Preserve Android instrumentation results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-instrumentation-results
+          path: |
+            app/build/outputs/androidTest-results/connected/
+            app/build/reports/androidTests/connected/
+          if-no-files-found: warn
       - name: Upload UI pixel proof
         uses: actions/upload-artifact@v4
         if: always()
