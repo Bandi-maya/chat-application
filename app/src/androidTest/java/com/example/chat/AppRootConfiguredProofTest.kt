@@ -134,6 +134,17 @@ class AppRootConfiguredProofTest {
             assertTrue("all destinations visible, not More", device.findObject(By.text("More")) == null)
             assertTrue("Settings visible in dock", device.findObject(By.desc("Settings")) != null || device.findObject(By.text("Settings")) != null)
             capture(device, "10-home-all-destinations")
+            val searchButton = device.wait(Until.findObject(By.desc("Search chats")), 5000)
+                ?: throw AssertionError("Home search entrypoint not accessible")
+            searchButton.click()
+            val searchField = device.wait(Until.findObject(By.clazz("android.widget.EditText")), 10000)
+                ?: throw AssertionError("Search did not open an editable field")
+            searchField.text = "Synthetic"
+            assertTrue("search text accepted without closing app", device.wait(Until.hasObject(By.text("Synthetic Peer")), 10000))
+            capture(device, "10a-home-search-input")
+            device.pressBack() // dismiss IME
+            device.pressBack() // close search, not exit Home
+            assertTrue("search Back leaves app open", device.wait(Until.hasObject(By.text("Synthetic Peer")), 10000))
             var topInset = 0
             scenario?.onActivity { activity ->
                 val insets = activity.window.decorView.rootWindowInsets
@@ -150,8 +161,43 @@ class AppRootConfiguredProofTest {
             assertTrue("Updates title below status bar/cutout: top=${updatesTitle.visibleBounds.top}, inset=$topInset",
                 updatesTitle.visibleBounds.top >= topInset)
             capture(device, "10b-updates-safe-area")
+            device.findObject(By.desc("Calls")).click()
+            val addCall = device.wait(Until.findObject(By.text("Add call")), 10000)
+                ?: throw AssertionError("Add call button not visible")
+            val callsDock = device.findObject(By.desc("Calls"))
+                ?: throw AssertionError("Calls dock item not visible")
+            assertTrue("Add call fully above dock", addCall.visibleBounds.bottom < callsDock.visibleBounds.top)
+            capture(device, "10c-calls-fab-above-dock")
+            addCall.click()
+            assertTrue("dialer opens", device.wait(Until.hasObject(By.desc("Delete digit")), 10000))
+            capture(device, "10d-dialer-round-keys-safe-bottom")
+            device.pressBack()
+            device.pressBack() // Calls -> Updates
             device.pressBack()
             assertTrue("Back from Updates returns Chats", device.wait(Until.hasObject(By.text("Synthetic Peer")), 10000))
+            device.findObject(By.desc("Tasks")).click()
+            assertTrue("Tasks entry does not open editor", !device.wait(Until.hasObject(By.text("New Task")), 1500))
+            val createButtons = device.findObjects(By.desc("Create task"))
+            assertTrue("explicit task add control visible", createButtons.isNotEmpty())
+            createButtons.minByOrNull { it.visibleBounds.top }!!.click()
+            assertTrue("explicit add opens editor", device.wait(Until.hasObject(By.text("New Task")), 10000))
+            capture(device, "10e-task-sheet-single-handle")
+            device.findObject(By.desc("Close")).click()
+            device.findObject(By.desc("Chats")).click()
+            device.findObject(By.desc("Tasks")).click()
+            assertTrue("Tasks reentry keeps editor closed", !device.wait(Until.hasObject(By.text("New Task")), 1500))
+            // Shell-owned FAB is the lower control and uses the consumed hoisted event.
+            device.findObjects(By.desc("Create task")).maxByOrNull { it.visibleBounds.top }!!.click()
+            assertTrue("shell FAB opens editor once", device.wait(Until.hasObject(By.text("New Task")), 10000))
+            device.findObject(By.desc("Close")).click()
+            device.findObject(By.desc("Chats")).click()
+            device.findObject(By.desc("Tasks")).click()
+            assertTrue("consumed FAB event does not reopen editor", !device.wait(Until.hasObject(By.text("New Task")), 1500))
+            device.findObject(By.desc("Chats")).click()
+            device.findObject(By.desc("More options")).click()
+            assertTrue("custom Home menu opens", device.wait(Until.hasObject(By.text("New Group")), 10000))
+            capture(device, "10f-home-custom-menu")
+            device.pressBack()
             device.findObject(By.text("Synthetic Peer")).click()
             if (!device.wait(Until.hasObject(By.text("Synthetic bubble one")), 20000)) {
                 logScreenTexts(device, "failure"); try { capture(device, "00-failure-state") } catch (_: Exception) {}
@@ -166,6 +212,10 @@ class AppRootConfiguredProofTest {
             ))
             assertTrue("incoming event renders in already-open chat", device.wait(Until.hasObject(By.text("Synthetic new incoming")), 10000))
             capture(device, "11-chat-detail-host")
+            device.findObject(By.desc("Emoji")).click()
+            assertTrue("emoji picker opens", device.wait(Until.hasObject(By.desc("Search emoji")), 10000))
+            capture(device, "11a-emoji-ten-dp-container")
+            device.pressBack()
             // Header tap (Dart InkWell title -> ContactInfoScreen).
             device.findObject(By.text("Synthetic Peer")).click()
             if (!device.wait(Until.hasObject(By.text("Contact Info")), 20000)) {
