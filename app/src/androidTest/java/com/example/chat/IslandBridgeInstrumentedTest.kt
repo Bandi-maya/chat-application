@@ -123,7 +123,7 @@ class IslandBridgeInstrumentedTest {
         assertTrue(services.any { it.serviceInfo.name == component.className })
         @Suppress("DEPRECATION")
         val requested = target.packageManager.getPackageInfo(target.packageName, PackageManager.GET_PERMISSIONS).requestedPermissions
-        assertTrue(requested.contains("android.permission.SYSTEM_ALERT_WINDOW"))
+        assertTrue(requested?.contains("android.permission.SYSTEM_ALERT_WINDOW") == true)
     }
 
     @Test
