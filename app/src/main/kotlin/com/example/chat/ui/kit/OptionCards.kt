@@ -1,5 +1,7 @@
 package com.example.chat.ui.kit
 
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
@@ -111,33 +113,15 @@ fun <T> ChatyOptionGallery(
     subtitle: String? = null,
     previewOf: @Composable (T) -> Unit,
 ) {
-    val colors = LocalAppColors.current
-    val density = LocalDensity.current
-    Column(modifier) {
-        Text(
-            title, modifier = Modifier.padding(16.dp, 12.dp, 16.dp, 2.dp),
-            fontSize = 15.sp, fontWeight = FontWeight.W700, color = colors.foreground,
-        )
-        if (subtitle != null) {
-            Text(
-                subtitle, modifier = Modifier.padding(16.dp, 0.dp, 16.dp, 4.dp),
-                fontSize = 12.sp, color = colors.foregroundSecondary,
-            )
-        }
-        Spacer(Modifier.height(6.dp))
-        // Dart: height = textScaler.scale(118)
-        val h = (118f * density.fontScale).dp
-        LazyRow(
-            Modifier.fillMaxWidth().height(h),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            itemsIndexed(values) { _, v ->
-                ChatyOptionCard(
-                    label = labelOf(v), selected = v == selected, onTap = { onSelected(v) },
-                ) { previewOf(v) }
-            }
-        }
+    var showChoices by remember { mutableStateOf(false) }
+    Column(modifier.padding(16.dp, 10.dp)) {
+        ChatyChoiceTile("$title: ${labelOf(selected)}", { showChoices = true }, Modifier.fillMaxWidth())
+        if (subtitle != null) Text("Open to preview choices; Apply saves your selection.",
+            color = LocalAppColors.current.foregroundSecondary, fontSize = 12.sp)
     }
+    if (showChoices) ChatySingleChoiceModal(
+        title = "Select $title", value = selected, options = values, labelBuilder = labelOf,
+        onDismiss = { showChoices = false }, onApply = { choice -> onSelected(choice); showChoices = false },
+        previewBuilder = previewOf,
+    )
 }
-
