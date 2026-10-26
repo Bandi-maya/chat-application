@@ -179,6 +179,7 @@ fun ChatsHomeScreen(
     var messageNumberText by remember { mutableStateOf("") }
     var showWhoCanCallMe by remember { mutableStateOf(false) }
     var showLockedSetup by remember { mutableStateOf(false) }
+    var showArchived by remember { mutableStateOf(false) }
 
     // 'Who can call me?' reuses the shared privacy dialog when the real
     // preferences controller is wired; otherwise the nav seam stands.
@@ -311,6 +312,33 @@ fun ChatsHomeScreen(
             },
             onDismiss = { showDeleteConfirm = false },
         )
+    }
+
+    if (showArchived) {
+        // Dart _archivedTile: Navigator.push(_ArchivedChatsScreen). Hosted as a full-screen dialog so system
+        // Back pops it; opening a conversation replaces this host's route (list position not restored).
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { showArchived = false },
+            properties = androidx.compose.ui.window.DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
+        ) {
+            androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+                ArchivedChatsScreen(
+                    conversations = conversations,
+                    theme = theme,
+                    homePrefs = homePreferences,
+                    onBack = { showArchived = false },
+                    onOpenConversation = { conversation ->
+                        showArchived = false
+                        onAuthorizeConversation(conversation) { onOpenConversation(conversation) }
+                    },
+                    onToggleArchive = onToggleArchive,
+                    onDeleteConversations = onDeleteConversations,
+                )
+            }
+        }
     }
 
     if (showWhoCanCallMe && preferencesController != null) {
@@ -611,7 +639,7 @@ fun ChatsHomeScreen(
                             gbBool = gbBool,
                             gbColor = gbColor,
                             isConversationLocked = isConversationLocked,
-                            onOpenArchived = onOpenArchived,
+                            onOpenArchived = { onOpenArchived(); showArchived = true },
                             onRowTap = { handleConversationTap(it) },
                             onRowLongPress = { conversation ->
                                 selectedIds = if (selectedIds.contains(conversation.id)) {
