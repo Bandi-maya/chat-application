@@ -13,5 +13,7 @@
         <activity
             android:name="com.example.chat.ChatFixtureActivity"
             android:exported="false" />
+        <activity android:name="com.example.chat.ui.chats.location.GeoLibreSyntheticMapActivity" android:exported="false" />
+        <activity android:name="com.example.chat.ui.chats.location.GeoLibreProductionRouteProofActivity" android:exported="false" />
     </application>
 </manifest>
