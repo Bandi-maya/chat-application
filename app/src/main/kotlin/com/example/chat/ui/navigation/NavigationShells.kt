@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -43,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
@@ -199,7 +202,9 @@ internal fun ModernSideMenuShell(
         else if (rawName.isNotEmpty() && rawName != "Chaty User" && rawName != "Bandi Maya") rawName
         else currentUser?.username?.ifEmpty { "User" } ?: "User"
 
-    Box(Modifier.fillMaxSize().background(colors.background)) {
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().background(colors.background)) {
+        val panelWidth = DrawerLayoutMetrics.modernWidth(maxWidth.value).dp
+        androidx.activity.compose.BackHandler(enabled = drawerOpen) { drawerOpen = false }
         Column(Modifier.fillMaxSize()) {
             // TemplateShellHeader equivalent.
             Row(
@@ -233,9 +238,10 @@ internal fun ModernSideMenuShell(
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .width(300.dp)
+                    .width(panelWidth)
                     .background(colors.surfaceSecondary)
-                    .clickable(enabled = false) {},
+                    .verticalScroll(rememberScrollState())
+                    .pointerInput(Unit) {},
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -248,7 +254,7 @@ internal fun ModernSideMenuShell(
                         colors,
                     )
                     Spacer(Modifier.width(14.dp))
-                    Column {
+                    Column(Modifier.weight(1f)) {
                         Text(displayName, color = colors.foreground, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
                         Text(
                             "@${currentUser?.username?.ifEmpty { "chaty" } ?: "chaty"}",
@@ -265,6 +271,7 @@ internal fun ModernSideMenuShell(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .heightIn(min = 48.dp)
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(if (isSel) colors.primary.copy(alpha = 0.16f) else Color.Transparent)
                                 .clickable {
