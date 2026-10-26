@@ -91,7 +91,7 @@ fun GbModalSheet(
 ) {
     val colors = LocalAppColors.current
     val config = LocalThemeConfig.current
-    val shape = RoundedCornerShape(24.dp)
+    val shape = ChatyModalShape
     Dialog(onDismissRequest = onDismiss) {
         Column(
             Modifier.widthIn(max = 480.dp)
@@ -198,11 +198,11 @@ fun ChatyColorPickerModal(
     val ratio = backgroundContextColor?.let { ColorPickerLogic.contrastRatio(color, it) }
     val warn = ColorPickerLogic.hasContrastWarning(ratio)
     val statusColor = if (warn) colors.error else colors.success
-    ModalBottomSheet(
+    ModalBottomSheet(tonalElevation = 0.dp,
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = colors.surface,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        shape = com.example.chat.ui.kit.ChatyModalShape,
         dragHandle = null,
     ) {
         val imeBottom = with(LocalDensity.current) { WindowInsets.ime.getBottom(this).toDp() }
