@@ -57,7 +57,7 @@ private class AuthNavigationState {
     operator fun getValue(owner: Any?, property: kotlin.reflect.KProperty<*>): AuthRoute = current
     operator fun setValue(owner: Any?, property: kotlin.reflect.KProperty<*>, next: AuthRoute) {
         if (next == current) return
-        if (next == AuthRoute.Home && current in listOf(AuthRoute.Splash, AuthRoute.Login, AuthRoute.Register)) {
+        if (next == AuthRoute.Welcome || (next == AuthRoute.Home && current in listOf(AuthRoute.Splash, AuthRoute.Login, AuthRoute.Register, AuthRoute.SubscriptionPlan))) {
             history.clear()
         } else if (current != AuthRoute.Splash) {
             history.add(current)
@@ -467,20 +467,20 @@ fun AppRoot() {
                         text = m.caption, mimeType = "image/jpeg",
                     )
                 }
-                var settingsSub by remember { mutableStateOf<com.example.chat.ui.settings.SettingsDestination?>(null) }
-                var pushedSettings by remember { mutableStateOf(false) }
-                var pushedProfile by remember { mutableStateOf(false) }
+                var settingsSub by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<com.example.chat.ui.settings.SettingsDestination?>(null) }
+                var pushedSettings by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                var pushedProfile by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                 val rootPhoto = rememberRootProfilePhoto()
-                var pushedEditProfile by remember { mutableStateOf(false) }
-                var pushedMessageManagement by remember { mutableStateOf(false) }
-                var pushedScheduled by remember { mutableStateOf(false) }
-                var pushedAutoReply by remember { mutableStateOf(false) }
-                var pushedAccount by remember { mutableStateOf(false) }
-                var pushedUniversalAppearance by remember { mutableStateOf(false) }
-                var pushedComponentStyles by remember { mutableStateOf(false) }
-                var pushedThemeStudio by remember { mutableStateOf(false) }
-                var pushedAppIcon by remember { mutableStateOf(false) }
-                var pushedSettingsSearch by remember { mutableStateOf(false) }
+                var pushedEditProfile by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                var pushedMessageManagement by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                var pushedScheduled by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                var pushedAutoReply by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                var pushedAccount by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                var pushedUniversalAppearance by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                var pushedComponentStyles by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                var pushedThemeStudio by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                var pushedAppIcon by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                var pushedSettingsSearch by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                 val settingsNavigate: (com.example.chat.ui.settings.SettingsDestination) -> Unit = { dest ->
                     if (dest == com.example.chat.ui.settings.SettingsDestination.Security) {
                         route = AuthRoute.Security
