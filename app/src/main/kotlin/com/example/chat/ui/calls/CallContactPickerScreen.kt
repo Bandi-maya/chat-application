@@ -451,7 +451,7 @@ fun CallContactPickerScreen(
                         .fillMaxWidth()
                         .background(
                             Color(theme.surfaceColor),
-                            RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                            com.example.chat.ui.kit.ChatyModalShape,
                         )
                         .padding(start = 28.dp, top = 16.dp, end = 28.dp, bottom = 16.dp),
                 ) {
