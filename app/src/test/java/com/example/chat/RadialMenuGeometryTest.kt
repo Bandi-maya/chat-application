@@ -6,6 +6,16 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RadialMenuGeometryTest {
+    @Test fun `reserved strip places every page below the complete trigger`() {
+        for (width in listOf(160f, 240f, 360f, 800f)) {
+            for (height in listOf(100f, 180f, 360f, 720f)) {
+                val layout = RadialMenuGeometry.layout(width, height, 5)
+                assertTrue(layout.anchor.y - RadialMenuGeometry.targetSize / 2 >= 0f)
+                assertTrue(layout.anchor.y + RadialMenuGeometry.targetSize / 2 < RadialMenuGeometry.navigationStripHeight)
+            }
+        }
+    }
+
     @Test fun `all icons share one radius around persistent trigger`() {
         val layout = RadialMenuGeometry.layout(360f, 720f, 5)
         assertEquals(36f, layout.anchor.x, 0.001f)
