@@ -99,6 +99,9 @@ fun ChatDetailHost(
     // 0 none, 1 info (ContactInfo/GroupInfo), 2 contact privacy; viewer = MediaViewerScreen target.
     var infoRoute by remember(conversation.id) { mutableIntStateOf(0) }
     var viewerMessage by remember { mutableStateOf<ChatMessage?>(null) }
+    var pollCreateOpen by remember(conversation.id) { mutableStateOf(false) }
+    var pollViewId by remember(conversation.id) { mutableStateOf<String?>(null) }
+    var appearanceOpen by remember(conversation.id) { mutableStateOf(false) }
     var infoBusy by remember { mutableStateOf(false) }
     var infoBlocked by remember(conversation.id) { mutableStateOf(false) }
     var infoLoading by remember(conversation.id) { mutableStateOf(false) }
@@ -284,6 +287,7 @@ fun ChatDetailHost(
                 com.example.chat.ui.chats.detail.AttachmentAction.audio -> attachments.onMedia("audio")
                 com.example.chat.ui.chats.detail.AttachmentAction.location -> attachments.onLocation()
                 com.example.chat.ui.chats.detail.AttachmentAction.contact -> attachments.onContact()
+                com.example.chat.ui.chats.detail.AttachmentAction.poll -> pollCreateOpen = true
                 com.example.chat.ui.chats.detail.AttachmentAction.task -> taskEditor = Triple(true, null, null)
                 else -> toast("This attachment type is not connected in this build yet.")
             }
@@ -303,6 +307,8 @@ fun ChatDetailHost(
                 }
             }
         },
+        onOpenAppearance = { appearanceOpen = true },
+        onPollTap = { m -> pollViewId = m.id },
         onMediaTap = { m -> viewerMessage = m },
         onViewOnceOpen = { m -> viewerMessage = m },
         onGalleryTap = { attachments.onMedia("image") },
@@ -377,6 +383,37 @@ fun ChatDetailHost(
                     onBack = { infoRoute = 0 },
                 )
             }
+        }
+    }
+    if (pollCreateOpen) {
+        CreatePollDialog(
+            onCancel = { pollCreateOpen = false },
+            onCreate = { draft ->
+                pollCreateOpen = false
+                scope.launch { attachments.controller.createPoll(draft); rev++ }
+            },
+        )
+    }
+    val pv = pollViewId
+    if (pv != null) {
+        PollViewerSheet(
+            messageId = pv,
+            controller = attachments.controller,
+            onDismiss = { pollViewId = null; scope.launch { try { api.loadMessages(conversation.id) } catch (_: Exception) {} } },
+        )
+    }
+    if (appearanceOpen) {
+        androidx.activity.compose.BackHandler { appearanceOpen = false }
+        val customization = com.example.chat.ui.core.customization.rememberLoadedCustomizationController()
+        val overlayController = com.example.chat.ui.core.components.overlays.rememberChatyOverlayController()
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+            com.example.chat.ui.settings.appearance.ComponentStylesScreen(
+                controller = customization,
+                overlayController = overlayController,
+                onBack = { appearanceOpen = false },
+                conversationId = conversation.id,
+                conversationTitle = live.title,
+            )
         }
     }
     val vm = viewerMessage
