@@ -733,6 +733,7 @@ fun AppRoot() {
                                         getUser = { id -> ServiceLocator.apiBackend.users.firstOrNull { it.id == id } },
                                         statuses = statusFlow,
                                         captureStory = captureStory,
+                                        pickStatusMedia = com.example.chat.ui.updates.rememberStatusMediaPicker(),
                                         onNotify = { msg ->
                                             android.widget.Toast.makeText(toastContext, msg, android.widget.Toast.LENGTH_SHORT).show()
                                         },
