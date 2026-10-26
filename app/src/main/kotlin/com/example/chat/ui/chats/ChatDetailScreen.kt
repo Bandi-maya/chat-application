@@ -250,6 +250,7 @@ fun ChatDetailScreen(
     translationLanguage: String = "Show All",
     onMediaTap: (ChatMessage) -> Unit = {},
     onVoicePlay: (MessageAttachment) -> Unit = {},
+    voiceUrlResolver: (suspend (String) -> String)? = null,
     onViewOnceOpen: (ChatMessage) -> Unit = {},
     onPollTap: (ChatMessage) -> Unit = {},
     loadingMessages: Boolean = false,
@@ -765,6 +766,9 @@ fun ChatDetailScreen(
                             groupAdminIcon = convPrefs.groupAdminIcon,
                             hideAdminNameIcon = convPrefs.hideAdminNameIcon,
                             voicePlayButtonColor = convPrefs.voiceNotePlayButtonColor?.let(::Color),
+                            voicePlayingBarColor = convPrefs.voiceNotePlayingBarColor?.let(::Color),
+                            voicePlaybackSpeed = convPrefs.voicePlaybackSpeed,
+                            voiceUrlResolver = voiceUrlResolver,
                             isSelected = selectedIds.contains(message.id) ||
                                 contextMenuMessage?.id == message.id ||
                                 highlightedMessageId == message.id,
