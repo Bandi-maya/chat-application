@@ -681,21 +681,27 @@ class ApiBackendService(context: Context) {
             }
             val result = auth.login(value, password)
             session.adopt(result)
-            realtime.connect()
-            startBackgroundSync()
-            chatScope.launch { loadConversations() }
-            chatScope.launch { loadUsers() }
-            chatScope.launch { loadTasks() }
-            // Dart _syncFcmToken() (api_backend_service.dart:571).
-            try { syncFcmTokenHook?.invoke() } catch (_: Exception) {
-            }
+            afterAuthAdopted()
             result.user
         }
+
+    /** Dart _parseAuthResponse tail (api_backend_service.dart:565-572), shared by login, register,
+     *  registerOrganization and oauth: connect the socket, load conversations/users/tasks, sync FCM. */
+    private fun afterAuthAdopted() {
+        realtime.connect()
+        startBackgroundSync()
+        chatScope.launch { loadConversations() }
+        chatScope.launch { loadUsers() }
+        chatScope.launch { loadTasks() }
+        try { syncFcmTokenHook?.invoke() } catch (_: Exception) {
+        }
+    }
 
     suspend fun register(email: String, username: String, password: String): ApiUserProfile =
         withContext(Dispatchers.IO) {
             val result = auth.register(email, username, password)
             session.adopt(result)
+            afterAuthAdopted()
             result.user
         }
 
@@ -738,10 +744,7 @@ class ApiBackendService(context: Context) {
         }
         config.setTenantId(tenantId.trim())
         session.adopt(result)
-        realtime.connect()
-        startBackgroundSync()
-        chatScope.launch { loadConversations() }
-        chatScope.launch { loadUsers() }
+        afterAuthAdopted()
         Triple(result.user, orgId, resolvedOrgName)
     }
 
