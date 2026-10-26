@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
@@ -45,7 +46,13 @@ fun ChatySelectionModal(
     val colors = LocalAppColors.current
     val config = LocalConfiguration.current
     val width = (config.screenWidthDp - 32).coerceIn(240, 600)
-    val height = (width * 1.3f).coerceAtMost(config.screenHeightDp * 0.84f).coerceAtLeast(160f)
+    // Max 80% of the screen height, never taller than the safe window (system bars/cutout) minus the 16dp dialog
+    // padding on each side. Content-sized below that: short lists stay short, long lists scroll in the middle
+    // while the title/X and Cancel/Apply stay fixed.
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val insets = androidx.compose.foundation.layout.WindowInsets.safeDrawing
+    val safeHeightDp = with(density) { config.screenHeightDp - (insets.getTop(this) + insets.getBottom(this)).toDp().value }
+    val height = minOf(config.screenHeightDp * 0.80f, safeHeightDp - 32f).coerceAtLeast(160f)
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(
             Modifier.padding(16.dp).imePadding().sizeIn(maxWidth = width.dp, maxHeight = height.dp)
