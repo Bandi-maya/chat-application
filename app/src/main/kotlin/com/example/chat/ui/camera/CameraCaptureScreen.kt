@@ -24,6 +24,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.chat.ui.kit.ChatyHapticsPort
@@ -32,6 +34,14 @@ import com.example.chat.ui.onboarding.rememberPermissionRequester
 import java.io.File
 import java.util.concurrent.Executors
 import kotlin.math.max
+import androidx.core.content.ContextCompat
+import androidx.camera.core.CameraState
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeout
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -111,8 +121,24 @@ private class CameraSession(
     val captureExecutor = Executors.newSingleThreadExecutor()
     var torchOn: Boolean = false
 
-    suspend fun ensureProvider(): ProcessCameraProvider = withContext(Dispatchers.IO) {
-        provider ?: ProcessCameraProvider.getInstance(context).get().also { provider = it }
+    suspend fun ensureProvider(): ProcessCameraProvider {
+        provider?.let { return it }
+        return withTimeout(12_000) {
+            suspendCancellableCoroutine { continuation ->
+                val future = ProcessCameraProvider.getInstance(context)
+                future.addListener({
+                    if (continuation.isActive) {
+                        try {
+                            val ready = future.get()
+                            provider = ready
+                            continuation.resume(ready)
+                        } catch (error: Exception) {
+                            continuation.resumeWithException(error)
+                        }
+                    }
+                }, ContextCompat.getMainExecutor(context))
+            }
+        }
     }
 
     fun bind(
@@ -122,6 +148,7 @@ private class CameraSession(
         onReady: () -> Unit,
     ) {
         val provider = provider ?: return
+        camera?.cameraInfo?.cameraState?.removeObservers(lifecycleOwner)
         provider.unbindAll()
         val selector = if (lensFacing == CameraSelector.LENS_FACING_FRONT) {
             CameraSelector.DEFAULT_FRONT_CAMERA
@@ -147,12 +174,24 @@ private class CameraSession(
         imageCapture = capture
         analysis = analyzer
         try {
-            val bound = provider.bindToLifecycle(
-                lifecycleOwner, selector, preview, capture, analyzer,
-            )
+            val bound = try {
+                provider.bindToLifecycle(lifecycleOwner, selector, preview, capture, analyzer)
+            } catch (_: IllegalArgumentException) {
+                // Some cameras cannot supply all three streams at once. Keep
+                // photo capture working without optional face analysis.
+                provider.unbindAll()
+                analyzer.clearAnalyzer()
+                provider.bindToLifecycle(lifecycleOwner, selector, preview, capture)
+            }
             camera = bound
             bound.cameraControl.enableTorch(torchOn && lensFacing == CameraSelector.LENS_FACING_BACK)
-            onReady()
+            bound.cameraInfo.cameraState.observe(lifecycleOwner) { state ->
+                if (state.error != null) {
+                    onError("The camera could not open (code ${state.error?.code}). Close another app using the camera and try again.")
+                } else if (state.type == CameraState.Type.OPEN) {
+                    onReady()
+                }
+            }
         } catch (error: Exception) {
             onError(error.message ?: "The camera could not start.")
         }
@@ -171,6 +210,7 @@ private class CameraSession(
     }
 
     fun unbind() {
+        camera?.cameraInfo?.cameraState?.removeObservers(lifecycleOwner)
         try { provider?.unbindAll() } catch (_: Exception) {}
     }
 
@@ -210,7 +250,7 @@ fun ChatyCameraCaptureScreen(
     }
     val faceSolver = remember { FaceAnchorSolver() }
     val faceDetection = remember { CameraFaceDetectionBridge(context) }
-    val session = remember { CameraSession(context, lifecycleOwner) }
+    val session = remember(context, lifecycleOwner) { CameraSession(context, lifecycleOwner) }
 
     var phase by remember { mutableStateOf(CameraPhase.initializing) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -223,6 +263,10 @@ fun ChatyCameraCaptureScreen(
     var facePoses by remember { mutableStateOf<List<FacePose>>(emptyList()) }
     var faceHealth by remember { mutableStateOf(TrackingHealth.lost) }
     var previewView by remember { mutableStateOf<PreviewView?>(null) }
+    var cameraPermissionGranted by remember {
+        mutableStateOf(ChatyPermissions.isGranted(context, ChatyPermissions.camera))
+    }
+    var bindJob by remember { mutableStateOf<Job?>(null) }
 
     val wantsFaceTracking = capturedPath == null &&
         captureViewMode == CaptureViewMode.photo &&
@@ -288,34 +332,69 @@ fun ChatyCameraCaptureScreen(
 
     fun bindCamera() {
         val pv = previewView ?: return
-        scope.launch {
+        if (!cameraPermissionGranted || capturedPath != null) return
+        bindJob?.cancel()
+        bindJob = scope.launch {
             phase = CameraPhase.initializing
+            errorMessage = null
             try {
                 session.ensureProvider()
-            } catch (_: Exception) {
+                session.bind(
+                    previewView = pv,
+                    onFrame = { frame, rotation -> processFaceFrame(frame, rotation) },
+                    onError = { message ->
+                        errorMessage = message
+                        phase = CameraPhase.noCamera
+                    },
+                    onReady = { phase = CameraPhase.ready },
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                errorMessage = error.message ?: "The camera could not start. Try reopening it."
                 phase = CameraPhase.noCamera
-                return@launch
             }
-            session.bind(
-                previewView = pv,
-                onFrame = { frame, rotation -> processFaceFrame(frame, rotation) },
-                onError = { message ->
-                    errorMessage = message
-                    phase = CameraPhase.noCamera
-                },
-                onReady = { phase = CameraPhase.ready },
-            )
         }
     }
 
     val requestPermission = rememberPermissionRequester { granted, _ ->
-        if (granted) bindCamera() else phase = CameraPhase.permissionDenied
+        cameraPermissionGranted = granted
+        if (!granted) phase = CameraPhase.permissionDenied
     }
-
-    LaunchedEffect(Unit) {
-        requestPermission(ChatyPermissions.camera)
+    LaunchedEffect(Unit) { requestPermission(ChatyPermissions.camera) }
+    LaunchedEffect(previewView, cameraPermissionGranted, capturedPath) {
+        if (!cameraPermissionGranted) {
+            session.unbind()
+            phase = CameraPhase.permissionDenied
+        } else if (capturedPath == null) bindCamera()
+        else session.unbind()
     }
-    LaunchedEffect(previewView) { if (previewView != null && phase != CameraPhase.permissionDenied) bindCamera() }
+    // Re-check after returning from Android app settings. A granted permission
+    // must not leave this composition stranded in its old denied state.
+    DisposableEffect(lifecycleOwner, session, capturedPath) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val granted = ChatyPermissions.isGranted(context, ChatyPermissions.camera)
+                cameraPermissionGranted = granted
+                if (granted) bindCamera() else {
+                    session.unbind()
+                    phase = CameraPhase.permissionDenied
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    LaunchedEffect(phase, previewView, cameraPermissionGranted) {
+        if (phase == CameraPhase.initializing && previewView != null && cameraPermissionGranted) {
+            kotlinx.coroutines.delay(15_000)
+            if (phase == CameraPhase.initializing) {
+                errorMessage = "The camera did not open. Close another app using it, then reopen the camera. You can also pick from your gallery."
+                phase = CameraPhase.noCamera
+                session.unbind()
+            }
+        }
+    }
 
     // Flash follows the toggle but only on the back camera (Dart parity).
     fun toggleFlash() {
@@ -453,7 +532,11 @@ fun ChatyCameraCaptureScreen(
             }
 
             override fun onError(exception: ImageCaptureException) {
-                capturing = false
+                scope.launch {
+                    capturing = false
+                    errorMessage = exception.message ?: "The photo could not be captured."
+                    phase = CameraPhase.noCamera
+                }
             }
         })
     }
@@ -498,8 +581,8 @@ fun ChatyCameraCaptureScreen(
     // PopScope: back with a staged capture discards instead of leaving.
     BackHandler(enabled = capturedPath != null) { discard() }
 
-    DisposableEffect(Unit) {
-        onDispose { session.dispose(); faceDetection.dispose(); lensManager.dispose() }
+    DisposableEffect(session) {
+        onDispose { bindJob?.cancel(); session.dispose(); faceDetection.dispose(); lensManager.dispose() }
     }
 
     Box(Modifier.fillMaxSize()) {
