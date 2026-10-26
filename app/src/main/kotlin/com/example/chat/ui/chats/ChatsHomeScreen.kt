@@ -598,7 +598,18 @@ fun ChatsHomeScreen(
                     HomeSearchField(
                         theme = theme,
                         value = searchQuery,
-                        onValueChange = { value -> searchQuery = value },
+                        onValueChange = { value ->
+                            searchQuery = value
+                            // Dart _homeSearchField is shared by all placements: onChanged runs
+                            // _checkSecretSearchPhrase everywhere, so this placement unlocks too.
+                            scope.launch {
+                                if (verifySecretPhrase(value)) {
+                                    searchQuery = ""
+                                    isSearchOpen = false
+                                    nav.onOpenLockedVault()
+                                }
+                            }
+                        },
                         hint = if (forcedType == ConversationType.group) "Search groups…" else "Search chats and messages…",
                         focusRequester = searchFocus,
                     )
@@ -783,6 +794,7 @@ private fun HomeConversationList(
                         null
                     }
                     HomeSwipeActions(
+                        enabled = !isSelectionMode,
                         backgroundColor = Color(theme.backgroundColor),
                         leadingActions = if (conversation.type == ConversationType.direct) {
                             listOf(
