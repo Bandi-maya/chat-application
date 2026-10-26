@@ -12,7 +12,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ArrowForward
-import androidx.compose.material.icons.rounded.ArrowBackIosNew
+import androidx.compose.material.icons.rounded.ChevronLeftIosNew
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -898,7 +898,7 @@ fun ExpandedNotificationsListView(
                             },
                     ) {
                         IslandVectorIcon(
-                            icon = androidx.compose.material.icons.Icons.Rounded.ArrowBackIosNew,
+                            icon = androidx.compose.material.icons.Icons.Rounded.ChevronLeftIosNew,
                             color = Color(0xB3FFFFFF),
                             size = 14.dp,
                         )
