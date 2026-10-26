@@ -203,10 +203,7 @@ fun PrivacyCenterScreen(preferences: ChatyPreferencesController, onBack: () -> U
                 checked = value,
                 onCheckedChange = null,
                 enabled = false,
-                colors = SwitchDefaults.colors(
-                    disabledCheckedThumbColor = accent,
-                    disabledCheckedTrackColor = accent.copy(alpha = 0.5f),
-                ),
+                colors = com.example.chat.ui.kit.chatySwitchColors(checkedThumbColor = accent, checkedTrackColor = accent.copy(alpha = 0.5f)),
             )
         }
     }
