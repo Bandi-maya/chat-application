@@ -1,42 +1,24 @@
-# Chaty — Production Messaging, Tasks & Calls
+# Chaty native Android (Kotlin branch)
 
-Chaty is a private, customizable, production-ready communication application engineered with Flutter, Supabase, RFC 9420 MLS End-to-End Encryption, and WebRTC real-time media.
+This branch contains the native Android/Kotlin port of `api@3bee780d`, using Jetpack Compose. The `api` branch retains the original Flutter project. Unused Flutter app sources, tests, platform runners, Dart package metadata and Flutter-specific build workflows have been removed from this branch by the user's request. Git history retains the source baseline and cleanup commits.
 
-## Systems & Architecture
+## Start here
 
-### 1. Messaging & E2EE (RFC 9420 MLS)
-- **OpenMLS Integration**: Client-side MLS ratcheting with SQLCipher storage.
-- **Key Safety**: Private signing keys and database encryption keys never leave device-level secure storage (`FlutterSecureStorage`).
-- **Single MLS Device Identity**: Stable device IDs prevent registration loops and redundant key generation.
-- **Atomic KeyPackage Pooling**: Automatically replenishes KeyPackages (target 10, threshold 5) and claims packages atomically.
-- **Strict FIFO Outgoing Queue**: Client-generated `clientMessageId` for idempotency with exponential backoff and jitter.
-- **Delivery State Machine**: Transparent state transitions:
-  - `Queued` (timer icon): Local buffer / waiting for send
-  - `Sent` (single tick): Server persisted ciphertext
-  - `Delivered` (double tick): Recipient device received & decrypted
-  - `Read` (colored double tick): Recipient opened conversation
-  - `Failed`: Actionable retry state
+- [Configuration and native build requirements](docs/KOTLIN_CONFIGURATION.md)
+- [Checked evidence and remaining verification limits](docs/kotlin-parity.md)
+- Native Android module: `app/`
+- Native build and smoke workflow: `.github/workflows/build-kotlin-apk.yml`
 
-### 2. Tasks Synchronization
-- E2EE structured task payload transport and synchronization.
-- Realtime workflow state management (Todo → In Process → In Review → Testing → Done / Cancelled / Reopened).
-- Bijective database status mapping, exact assignee validation, and message linking.
+Copy root `.env.example` to ignored root `.env`, set your existing public backend routing values, then rebuild. Never put credentials or private server keys there: these values are compiled into the APK. Firebase setup remains separately deferred.
 
-### 3. Voice & Video Calls (WebRTC)
-- **Signaling**: Server-authorized Supabase PostgreSQL (`call_sessions`, `call_ice_candidates`) with RLS.
-- **Media Transport**: WebRTC `RTCPeerConnection` with STUN/TURN traversal.
-- **Lifecycle & Foregrounding**: Android Foreground Service management for active calls, native Picture-in-Picture (PiP), earpiece/speaker/bluetooth routing, and clean teardown.
+After installing the documented Java/Gradle/Android SDK/NDK/Rust/cargo-ndk prerequisites:
 
-## Getting Started
-
-### Prerequisites
-- Flutter SDK `^3.12.2`
-- Android NDK / Android Studio
-- Supabase Project & Auth Configuration
-
-### Run Locally
-```bash
-flutter pub get
-flutter test
-flutter run
 ```
+gradle :app:testDebugUnitTest :app:assembleDebug
+```
+
+Do not skip native MLS in a real test build. `mls-native/` exposes the shared Rust encryption engine from `third_party/openmls_android/rust`. The shared crate still requires its FRB annotations/generated Rust bridge dependency; that is intentionally retained to preserve working encryption, not a Flutter application entrypoint. Its licenses and notices remain.
+
+`assets/`, native launcher assets, backend/schema/security tooling and historical audit/design documents are retained. Legacy patch/QA tools and historical documents may mention Dart paths from the original source; they are not the native build route. Kotlin preference identifiers carrying a `flutter.` prefix are compatibility data contracts, not a Flutter runtime, and have not been renamed.
+
+The tested source is ready for configured testing, not a claim that all server/phone/call/camera/audio/design behavior has been independently verified. Read the evidence record before treating a build as full parity. Application ID/signing identity was not changed; do not assume a debug APK updates an older differently signed APK or clear installed data to work around it.
