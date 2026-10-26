@@ -172,29 +172,9 @@ fun UniversalStylesScreen(
                             }
                             Column(
                                 Modifier.weight(1f).clickable {
-                                    val controller = appIconController
-                                    if (controller == null) {
+                                    if (appIconController == null) {
                                         onMessage("Launcher icon switching is unavailable on this platform.")
-                                        return@clickable
-                                    }
-                                    if (controller.isBusy) return@clickable
-                                    scope.launch {
-                                        val applied = controller.applyLauncherIcon(item.variant)
-                                        if (!applied) {
-                                            onMessage(
-                                                controller.lastError
-                                                    ?: "The launcher did not confirm the selected icon."
-                                            )
-                                            return@launch
-                                        }
-                                        controller.refreshNativeLauncherState()
-                                        preferences.updateUniversal(
-                                            preferences.universal.copy(launcherIcon = item.variant.title)
-                                        )
-                                        onMessage(
-                                            "Launcher icon updated: ${item.variant.title}. Some launchers may cache the previous icon briefly."
-                                        )
-                                    }
+                                    } else if (!appIconController.isBusy) sheet = 4
                                 }.padding(vertical = 5.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
@@ -257,12 +237,7 @@ fun UniversalStylesScreen(
                         .background(
                             if (isSelected) accent.copy(alpha = 0.08f) else Color.Transparent
                         )
-                        .clickable {
-                            preferences.updateUniversal(
-                                prefs.copy(emojiStyle = style.title, emojiVariant = style.title)
-                            )
-                            onMessage("Emoji style set to ${style.title}")
-                        }
+                        .clickable { sheet = 3 }
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -392,6 +367,52 @@ fun UniversalStylesScreen(
         }
     }
 
+    if (sheet == 4) {
+        val controller = appIconController
+        val current = if (controller != null) {
+            if (controller.brandIconSource == BrandIconSource.bundled) controller.launcherIcon else null
+        } else UniversalStylesCatalog.launcherIcons.firstOrNull { it.variant.title == prefs.launcherIcon }?.variant
+        com.example.chat.ui.kit.ChatySingleChoiceModal<LauncherIconVariant?>(
+            title = "Select launcher icon", value = current,
+            options = UniversalStylesCatalog.launcherIcons.map { it.variant }, labelBuilder = { it?.title ?: "Custom icon" },
+            onDismiss = { sheet = 0 },
+            onApply = { chosen ->
+                if (controller != null && !controller.isBusy && chosen != null) {
+                    sheet = 0
+                    scope.launch {
+                        val applied = controller.applyLauncherIcon(chosen)
+                        if (!applied) {
+                            onMessage(controller.lastError ?: "The launcher did not confirm the selected icon.")
+                            return@launch
+                        }
+                        controller.refreshNativeLauncherState()
+                        preferences.updateUniversal(preferences.universal.copy(launcherIcon = chosen.title))
+                        onMessage("Launcher icon updated: ${chosen.title}. Some launchers may cache the previous icon briefly.")
+                    }
+                }
+            },
+            previewBuilder = { chosen ->
+                if (chosen != null) LauncherIconPreview(variant = chosen, size = 64.dp, borderRadius = 10.dp)
+            },
+        )
+    }
+    if (sheet == 3) {
+        com.example.chat.ui.kit.ChatySingleChoiceModal(
+            title = "Select emojis", value = ChatyEmojiStyleId.fromString(prefs.emojiStyle),
+            options = ChatyEmojiStyleId.entries.toList(), labelBuilder = { it.title },
+            onDismiss = { sheet = 0 },
+            onApply = { chosen ->
+                preferences.updateUniversal(preferences.universal.copy(emojiStyle = chosen.title, emojiVariant = chosen.title))
+                onMessage("Emoji style set to ${chosen.title}")
+                sheet = 0
+            },
+            previewBuilder = { style ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("😂", "❤️", "🔥", "👍").forEach { unicode -> ChatyMotionEmoji(unicode = unicode, size = 24.dp, style = style, animate = false) }
+                }
+            },
+        )
+    }
     // All settings selections draft locally; only Apply writes preferences.
     if (sheet == 1) {
         com.example.chat.ui.kit.ChatySingleChoiceModal(
