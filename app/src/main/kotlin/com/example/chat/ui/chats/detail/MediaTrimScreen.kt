@@ -17,7 +17,7 @@ import kotlinx.coroutines.withContext
 
 /** Export-copy editor, honest about keyframe alignment and compatible codecs. */
 @Composable
-internal fun MediaTrimScreen(source: String, video: Boolean, onCancel: () -> Unit, onApply: (MediaTrimResult) -> Unit) {
+internal fun MediaTrimScreen(source: String, video: Boolean, onCancel: () -> Unit, onApply: (MediaTrimResult) -> Unit, outputFile: java.io.File? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var duration by remember { mutableLongStateOf(0) }
@@ -53,7 +53,7 @@ internal fun MediaTrimScreen(source: String, video: Boolean, onCancel: () -> Uni
                         try {
                             val start = (duration * range.start).toLong()
                             val end = (duration * range.endInclusive).toLong()
-                            output = trimMediaCopy(context, source, start, end, video)
+                            output = trimMediaCopy(context, source, start, end, video, outputFile = outputFile)
                             coroutineContext.ensureActive()
                             if (active) { onApply(output!!); handedOff = true }
                         } catch (e: CancellationException) { throw e }
