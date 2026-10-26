@@ -135,6 +135,15 @@ object ServiceLocator {
     val fcmRegistrar: com.example.chat.data.api.FcmTokenRegistrar by lazy {
         com.example.chat.data.api.FcmTokenRegistrar(
             apiDevices = (apiBackendUnderConstruction ?: apiBackend).deviceTokenClient,
+            log = { android.util.Log.d("FcmTokenRegistrar", it) },
+            runAsync = { block -> Thread(block, "fcm-register").start() },
+            // Dart FirebaseMessaging.getToken(); throws IllegalStateException while FirebaseApp is
+            // not initialised (no google-services.json), which the registrar logs.
+            tokenFetcher = { onToken, onError ->
+                com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+                    .addOnSuccessListener { onToken(it) }
+                    .addOnFailureListener { onError(it) }
+            },
         ).also { com.example.chat.notifications.FcmRegistrarHolder.registrar = it }
     }
 
