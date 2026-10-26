@@ -141,7 +141,7 @@ object ServiceLocator {
     }
 
     val localLockService: com.example.chat.data.services.LocalLockService by lazy {
-        com.example.chat.data.services.LocalLockService(secureStore)
+        com.example.chat.data.services.LocalLockService(secureStore, biometrics = com.example.chat.platform.AndroidLockBiometrics(requireContext()))
     }
 
     /** locator.dart TemplateController + AppearanceVariantController, persisted through
