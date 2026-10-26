@@ -39,6 +39,11 @@ sealed class FlutterCurve {
         }
     }
 
+    /** 1 - inner(1 - t): the curve Flutter's CurvedAnimation (no reverseCurve) effectively plays when the controller runs backwards. */
+    data class Flipped(val inner: FlutterCurve) : FlutterCurve() {
+        override fun transform(t: Double): Double = 1.0 - inner.transform(1.0 - t)
+    }
+
     companion object {
         // Values verified against flutter/lib/src/animation/curves.dart (stable).
         val easeOutCubic = Cubic(0.215, 0.61, 0.355, 1.0)
