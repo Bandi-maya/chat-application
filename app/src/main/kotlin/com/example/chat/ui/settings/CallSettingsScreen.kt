@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import com.example.chat.ui.kit.ChatySingleChoiceModal
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material.icons.Icons
@@ -115,16 +116,36 @@ fun CallSettingsScreen(
     }
 
     when (dialog) {
-        1 -> SettingsRadioDialog("Who Can Call Me", audienceOptions, privacy.whoCanCallMe, { chosen ->
-            preferences.updatePrivacy(privacy.copy(whoCanCallMe = chosen), logTitle = "Who Can Call Me")
-            if (chosen == exceptAudience) dialog = 4
-        }, { if (dialog == 1) dialog = 0 })
-        2 -> SettingsRadioDialog("Incoming Call Screen", templates.map { it.label }, label(call.incomingCallTemplate), { picked ->
-            templates.firstOrNull { it.label == picked }?.let { onIncomingTemplate(it.name) }
-        }, { dialog = 0 })
-        3 -> SettingsRadioDialog("Ongoing Call Screen", templates.map { it.label }, label(call.ongoingCallTemplate), { picked ->
-            templates.firstOrNull { it.label == picked }?.let { onOngoingTemplate(it.name) }
-        }, { dialog = 0 })
+        1 -> ChatySingleChoiceModal(
+            title = "Who Can Call Me",
+            description = "Choose who can reach you via audio and video calls.",
+            value = privacy.whoCanCallMe,
+            options = audienceOptions,
+            labelBuilder = { it },
+            onApply = { chosen ->
+                preferences.updatePrivacy(privacy.copy(whoCanCallMe = chosen), logTitle = "Who Can Call Me")
+                dialog = if (chosen == exceptAudience) 4 else 0
+            },
+            onDismiss = { if (dialog == 1) dialog = 0 },
+        )
+        2 -> ChatySingleChoiceModal(
+            title = "Incoming Call Screen",
+            description = "Chaty design applied to the incoming call UI.",
+            value = call.incomingCallTemplate,
+            options = templates.map { it.name },
+            labelBuilder = { label(it) },
+            onApply = { onIncomingTemplate(it); dialog = 0 },
+            onDismiss = { dialog = 0 },
+        )
+        3 -> ChatySingleChoiceModal(
+            title = "Ongoing Call Screen",
+            description = "Chaty design applied while a call is active.",
+            value = call.ongoingCallTemplate,
+            options = templates.map { it.name },
+            labelBuilder = { label(it) },
+            onApply = { onOngoingTemplate(it); dialog = 0 },
+            onDismiss = { dialog = 0 },
+        )
         4 -> {
             val selected = remember { privacy.whoCanCallMeExceptions.toMutableStateList() }
             AlertDialog(
