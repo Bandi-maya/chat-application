@@ -62,3 +62,10 @@ Post-cleanup verification passed at code head `4d5bb180c4d952ed1b6ecae6d3b52ef4e
 - Post-cleanup runtime/pixels: https://github.com/Bandi-maya/chat-application/actions/runs/40304449978/job/121515226361
 
 The root README follow-up and this evidence update are documentation-only. The cleanup outcome is complete; configured live-backend/device/design validation remains separate and is not established by the synthetic tests. No environment secrets, backend, encryption logic, application ID, signing certificate or installed app data were changed.
+
+
+## User-supplied routing defaults (later requested change)
+
+The user supplied and confirmed centralized public defaults: REST_API_BASE_URL=https://api.hub.logybyte.in, WEBSOCKET_URL=wss://api.hub.logybyte.in/api/chat/ws{userId}, TENANT_ID=chat-application. BackendRoutingPolicy.kt is the single code location. Nonempty root .env values override build properties/environment, which override these defaults; saved tenant selection retains its behavior. The WebSocket placeholder is substituted literally with no added slash, as confirmed. This supersedes earlier emulator-default notes in the historical evidence sections.
+
+Synthetic emulator CI writes explicit loopback REST/WebSocket values before its build, so fake sessions do not reach the public server. No live login, message, upload, call or backend mutation was performed. Verification of this later configuration change is pending separately from the completed cleanup run.
