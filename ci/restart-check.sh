@@ -33,6 +33,17 @@ for i in 1 2; do
   [ -z "$PID" ] && RES=1
   PIDS="$PIDS $PID"
   adb shell uiautomator dump /sdcard/r$i.xml >/dev/null 2>&1 || true
+  # Reachable first-run notification education sheet: press its real "Not Now" button (tap at the
+  # node's centre), as a user would, then re-dump. Pixels of the sheet are kept as 13-restart-launch$i-prompt.
+  BOUNDS=$(adb shell cat /sdcard/r$i.xml 2>/dev/null | tr '>' '>\n' | grep 'text="Not Now"' | head -1 | grep -o 'bounds="[^"]*"' | grep -o '[0-9]\+' | tr '\n' ' ')
+  if [ -n "$BOUNDS" ]; then
+    set -- $BOUNDS
+    adb exec-out screencap -p > screenshots/13-restart-launch$i-prompt.png 2>/dev/null || true
+    adb shell input tap $(( ($1 + $3) / 2 )) $(( ($2 + $4) / 2 ))
+    echo "RESTART-PROMPT launch=$i not-now-tapped"
+    sleep 3
+    adb shell uiautomator dump /sdcard/r$i.xml >/dev/null 2>&1 || true
+  fi
   TXT=$(adb shell cat /sdcard/r$i.xml 2>/dev/null | grep -o 'text="[^"]*"' | head -40 | tr '\n' ' ')
   echo "RESTART-SCREEN launch=$i $TXT"
   echo "$TXT" | grep -q 'text="Chats"' && echo "RESTART-SHELL launch=$i authenticated-shell-label-present" || { echo "RESTART-SHELL launch=$i label-missing"; RES=1; }
