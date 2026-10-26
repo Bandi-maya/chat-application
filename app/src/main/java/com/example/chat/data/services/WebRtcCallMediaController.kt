@@ -106,6 +106,7 @@ class WebRtcCallMediaController(
         lowData: Boolean,
         iceServers: List<Map<String, Any?>>,
     ) {
+        CallPermissionGate.ensure(appContext, isVideo)
         disposeInternal()
 
         PeerConnectionFactory.initialize(
