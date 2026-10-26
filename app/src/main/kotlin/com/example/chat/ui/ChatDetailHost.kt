@@ -147,6 +147,7 @@ fun ChatDetailHost(
     var pollViewId by remember(conversation.id) { mutableStateOf<String?>(null) }
     var appearanceOpen by remember(conversation.id) { mutableStateOf(false) }
     var infoBusy by remember { mutableStateOf(false) }
+    var infoConnection by remember(conversation.id) { mutableStateOf(ContactConnectionStatus()) }
     var infoBlocked by remember(conversation.id) { mutableStateOf(false) }
     var infoLoading by remember(conversation.id) { mutableStateOf(false) }
     var infoError by remember(conversation.id) { mutableStateOf<String?>(null) }
@@ -374,10 +375,15 @@ fun ChatDetailHost(
                 infoRoute = 1
                 infoLoading = true
                 infoError = null
+                infoConnection = ContactConnectionStatus()
                 scope.launch {
                     try {
-                        infoBlocked = ServiceLocator.contactRelationships.isBlocked(other.id)
-                        connection = ServiceLocator.contactRelationships.connectionStatus(other.id)
+                        // Dart ContactInfoScreen._load commits both results only if both succeed.
+                        // Keep its fresh default separate from the chat call-gate cache on error.
+                        val nextConnection = ServiceLocator.contactRelationships.connectionStatus(other.id)
+                        val nextBlocked = ServiceLocator.contactRelationships.isBlocked(other.id)
+                        infoConnection = nextConnection
+                        infoBlocked = nextBlocked
                     } catch (e: Exception) { infoError = e.message ?: "Unable to load contact." }
                     infoLoading = false
                 }
@@ -450,7 +456,7 @@ fun ChatDetailHost(
                     conversation = live,
                     contact = other,
                     messages = messages,
-                    connection = connection ?: ContactConnectionStatus(),
+                    connection = infoConnection,
                     blocked = infoBlocked,
                     loading = infoLoading,
                     loadError = infoError,
@@ -464,6 +470,7 @@ fun ChatDetailHost(
                         try {
                             ServiceLocator.contactRelationships.acceptConnection(other.id)
                             refreshConnection()
+                            infoConnection = ServiceLocator.contactRelationships.connectionStatus(other.id)
                         } finally { infoBusy = false }
                     },
                     onSetBlocked = { next ->
@@ -472,6 +479,7 @@ fun ChatDetailHost(
                             ServiceLocator.contactRelationships.setBlocked(other.id, next)
                             infoBlocked = next
                             refreshConnection()
+                            infoConnection = ServiceLocator.contactRelationships.connectionStatus(other.id)
                         } finally { infoBusy = false }
                     },
                     onDeleteConversation = {
