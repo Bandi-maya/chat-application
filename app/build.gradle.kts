@@ -23,6 +23,13 @@ android {
         versionCode = 1
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Dart String.fromEnvironment('CHATY_PLAY_STORE_URL', defaultValue: ...): override with
+        // -PCHATY_PLAY_STORE_URL=... or the CHATY_PLAY_STORE_URL environment variable at build time.
+        val playStoreUrl = providers.gradleProperty("CHATY_PLAY_STORE_URL")
+            .orElse(providers.environmentVariable("CHATY_PLAY_STORE_URL"))
+            .orElse("https://play.google.com/store/apps/details?id=com.example.chat")
+            .get()
+        buildConfigField("String", "CHATY_PLAY_STORE_URL", "\"" + playStoreUrl.replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
     }
 
     buildTypes {
