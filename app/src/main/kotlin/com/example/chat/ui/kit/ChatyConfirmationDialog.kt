@@ -5,6 +5,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -35,6 +38,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.chat.ui.theme.LocalAppColors
 
 /** Custom Chaty confirmation chrome. Existing form fields/actions remain caller-owned. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ChatyConfirmationDialog(
     onDismissRequest: () -> Unit,
@@ -78,12 +82,15 @@ fun ChatyConfirmationDialog(
                 }
             }
             Spacer(Modifier.fillMaxWidth().height(1.dp).background(colors.borderSubtle))
-            Row(
+            FlowRow(
                 Modifier.fillMaxWidth().background(colors.surface).padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.End,
+                horizontalArrangement = Arrangement.spacedBy(8.dp, androidx.compose.ui.Alignment.End),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                dismissButton?.invoke()
-                confirmButton()
+                dismissButton?.let { action ->
+                    Box(Modifier.heightIn(min = 48.dp), propagateMinConstraints = true) { action() }
+                }
+                Box(Modifier.heightIn(min = 48.dp), propagateMinConstraints = true) { confirmButton() }
             }
         }
     }
