@@ -276,8 +276,8 @@ class NavigationTemplateRegistryParityTest {
             com.example.chat.ui.navigation.navigationModeForLayout(com.example.chat.core.templates.NavigationLayoutType.floatingPill))
         assertEquals(com.example.chat.core.theme.AppNavigationMode.bottomNav,
             com.example.chat.ui.navigation.navigationModeForLayout(com.example.chat.core.templates.NavigationLayoutType.centerActionDock))
-        // Dart: compactRail; Kotlin enum lacks compactRail, bottomNav fallback.
-        assertEquals(com.example.chat.core.theme.AppNavigationMode.bottomNav,
+        // Dart utilityBar maps to compactRail; the enum exists and must not fall back.
+        assertEquals(com.example.chat.core.theme.AppNavigationMode.compactRail,
             com.example.chat.ui.navigation.navigationModeForLayout(com.example.chat.core.templates.NavigationLayoutType.utilityBar))
         assertEquals(com.example.chat.core.theme.AppNavigationMode.topWhatsAppBar,
             com.example.chat.ui.navigation.navigationModeForLayout(com.example.chat.core.templates.NavigationLayoutType.identityBar))
