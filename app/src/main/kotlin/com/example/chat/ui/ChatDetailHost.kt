@@ -2,9 +2,12 @@ package com.example.chat.ui
 
 import android.widget.Toast
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
@@ -19,9 +22,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.chat.ServiceLocator
 import com.example.chat.domain.models.ChatMessage
 import com.example.chat.domain.models.ChatTask
@@ -29,7 +37,11 @@ import com.example.chat.domain.models.Conversation
 import com.example.chat.domain.models.ContactConnectionStatus
 import com.example.chat.domain.models.ConversationType
 import com.example.chat.ui.chats.ChatDetailScreen
+import com.example.chat.ui.chats.detail.ForwardSend
+import com.example.chat.ui.chats.detail.ForwardTargets
+import com.example.chat.ui.chats.home.HomeAvatar
 import com.example.chat.ui.chats.home.HomeFormatters
+import com.example.chat.ui.chats.home.parseAvatarColorHex
 import com.example.chat.ui.theme.LocalThemeConfig
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -538,26 +550,88 @@ fun ChatDetailHost(
         )
     }
     forwardMessage?.let { fm ->
-        val targets = api.conversations.filter { it.id != conversation.id }
-        if (targets.isEmpty()) {
+        // Dart _openForwardSheet (chat_detail_screen.dart:2337-2519): sectioned targets
+        // (ForwardTargets), 5/250 limit, and the full-envelope send - text, type and
+        // attachment by reference plus {'forwarded': labelAllowed} metadata
+        // (ForwardSend). Deviation kept from the previous wiring: the sheet container
+        // stays an AlertDialog instead of Dart's modal bottom sheet.
+        val forwardPrefs = ServiceLocator.preferencesController
+        val forwardItems = ForwardTargets.build(
+            conversations = api.conversations,
+            currentConversationId = conversation.id,
+            messageCount = { id -> api.getMessages(id).size },
+            increaseForwardLimit = forwardPrefs.universal.increaseForwardLimit,
+            hideFrequentlyContacted = forwardPrefs.home.hideFrequentlyContacted,
+            hideRecentChats = forwardPrefs.home.hideRecentChats,
+            hideOtherContacts = forwardPrefs.home.hideOtherContacts,
+        )
+        if (forwardItems.isEmpty()) {
             LaunchedEffect(fm) { toast("No other chats to forward to."); forwardMessage = null }
         } else {
             AlertDialog(
                 onDismissRequest = { forwardMessage = null },
-                title = { Text("Forward to") },
+                title = { Text("Forward to (Limit: ${ForwardTargets.maxChats(forwardPrefs.universal.increaseForwardLimit)})") },
                 text = {
                     LazyColumn {
-                        items(targets, key = { it.id }) { c ->
-                            TextButton(
-                                modifier = Modifier.fillMaxWidth(),
-                                onClick = {
-                                    forwardMessage = null
-                                    scope.launch {
-                                        try { api.sendMessage(c.id, fm.text); toast("Message forwarded") }
-                                        catch (e: Exception) { toast(e.message ?: "Unable to forward.") }
+                        items(forwardItems.size) { index ->
+                            val item = forwardItems[index]
+                            val showHeader = index == 0 || forwardItems[index - 1].section != item.section
+                            Column {
+                                if (showHeader) {
+                                    Text(
+                                        item.section.uppercase(),
+                                        modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 4.dp),
+                                        color = Color(theme.secondaryTextColor),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.W800,
+                                        letterSpacing = 0.7.sp,
+                                    )
+                                }
+                                TextButton(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    onClick = {
+                                        forwardMessage = null
+                                        scope.launch {
+                                            val labelAllowed = ForwardSend.labelAllowed(
+                                                disableForwardedLabel = forwardPrefs.privacy.disableForwardedLabel,
+                                                yoDisableFwd = forwardPrefs.gbBool("yoDisableFwd"),
+                                            )
+                                            val payload = ForwardSend.payload(fm, labelAllowed)
+                                            try {
+                                                api.sendMessage(
+                                                    item.conversation.id,
+                                                    payload.text,
+                                                    payload.type,
+                                                    payload.attachment,
+                                                    payload.extraMetadata,
+                                                )
+                                                toast("Forwarded to ${item.conversation.title}.")
+                                            } catch (e: Exception) {
+                                                toast("Could not forward: ${e.message}")
+                                            }
+                                        }
+                                    },
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        HomeAvatar(
+                                            initials = item.conversation.avatarInitials
+                                                ?: item.conversation.title.take(2).uppercase(),
+                                            color = parseAvatarColorHex(
+                                                item.conversation.avatarColorHex,
+                                                Color(0xFF6366F1),
+                                            ),
+                                            size = 36f,
+                                            shape = "circle",
+                                        )
+                                        Spacer(Modifier.width(10.dp))
+                                        Text(
+                                            item.conversation.title,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.ellipsis,
+                                        )
                                     }
-                                },
-                            ) { Text(c.title) }
+                                }
+                            }
                         }
                     }
                 },
