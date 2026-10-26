@@ -98,6 +98,9 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
+      - name: Compile instrumentation tests before emulator setup
+        run: gradle :app:compileDebugAndroidTestKotlin --no-daemon
+
       - name: Unit tests (behavior parity)
         run: gradle :app:testDebugUnitTest --no-daemon
       - name: Report unit test totals
