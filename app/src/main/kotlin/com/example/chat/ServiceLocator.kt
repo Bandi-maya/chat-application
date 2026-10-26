@@ -326,7 +326,7 @@ object ServiceLocator {
     /** locator.dart:48 registerLazySingleton<DynamicIslandController>. Native island bridge: none (null). */
     val dynamicIslandController: com.example.chat.ui.island.DynamicIslandController by lazy {
         com.example.chat.ui.island.DynamicIslandController(
-            nativeBridge = null,
+            nativeBridge = com.example.chat.ui.island.ChatyIslandNativeBridge(requireContext()),
             timerScheduler = com.example.chat.ui.island.IslandTimerScheduler.coroutine(appScope),
             scope = appScope,
         )
