@@ -231,6 +231,7 @@ fun ChatDetailScreen(
     onMediaTap: (ChatMessage) -> Unit = {},
     onVoicePlay: (MessageAttachment) -> Unit = {},
     onViewOnceOpen: (ChatMessage) -> Unit = {},
+    onPollTap: (ChatMessage) -> Unit = {},
 ) {
     val theme = LocalThemeConfig.current
     val scope = rememberCoroutineScope()
@@ -666,6 +667,14 @@ fun ChatDetailScreen(
                             message = message,
                             isMe = isMine,
                             theme = theme,
+                            // Dart: poll messages ([POLL] prefix) open the poll sheet on bubble tap.
+                            modifier = if (message.text.startsWith("[POLL] ")) {
+                                Modifier.pointerInput(message.id) {
+                                    detectTapGestures(onTap = { onPollTap(message) })
+                                }
+                            } else {
+                                Modifier
+                            },
                             senderName = if (conversation.isGroup && !isMine) {
                                 resolveSenderName(message.senderId)
                             } else {
