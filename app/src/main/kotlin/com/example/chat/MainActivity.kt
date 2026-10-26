@@ -1,7 +1,7 @@
 package com.example.chat
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.example.chat.ui.AppRoot
@@ -13,15 +13,22 @@ import com.example.chat.ui.AppRoot
  * (commit 3bee780d). AppRoot wraps itself in ChatyTheme driven by the ported
  * ThemeController; see docs/kotlin-parity.md for the tracking matrix.
  */
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // BiometricPrompt host for the app-lock adapter (FragmentActivity extends ComponentActivity).
+        com.example.chat.platform.LockPromptHost.attach(this)
         // registerForActivityResult must run before STARTED (launcher-icon pickers).
         ServiceLocator.appIconBridge.register(this)
         setContent {
             AppRoot()
         }
+    }
+
+    override fun onDestroy() {
+        com.example.chat.platform.LockPromptHost.detach(this)
+        super.onDestroy()
     }
 
     // Dart native_call_pip_service modeChanges: forward the system PiP state.
