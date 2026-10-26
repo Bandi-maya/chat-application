@@ -218,6 +218,7 @@ fun ChatsHomeScreen(
     LaunchedEffect(Unit) { onShowNotificationPermissionIfNeeded() }
 
     // PopScope(canPop: !selectionMode): back clears the selection first.
+    BackHandler(enabled = isSearchOpen) { isSearchOpen = false; searchQuery = "" }
     BackHandler(enabled = isSelectionMode) { selectedIds = emptySet() }
 
     // ---- build() derivations, in the Dart source's order ----
@@ -268,6 +269,15 @@ fun ChatsHomeScreen(
         userUsername = identity.username,
         largeTitleShown = effectiveTitleCollapse < 0.5f,
     )
+
+    // Focus only after the search field has been composed and attached; requesting it inside the
+    // click handler threw "FocusRequester is not initialized" (field not composed yet) and killed the app.
+    LaunchedEffect(isSearchOpen) {
+        if (isSearchOpen) {
+            androidx.compose.runtime.withFrameNanos { }
+            runCatching { searchFocus.requestFocus() }
+        }
+    }
 
     fun toggleSearch() {
         isSearchOpen = !isSearchOpen
@@ -464,10 +474,7 @@ fun ChatsHomeScreen(
                             isSearchOpen = isSearchOpen,
                             forcedTypeIsSet = forcedType != null,
                             nav = effectiveNav,
-                            onToggleSearch = {
-                                toggleSearch()
-                                if (isSearchOpen) searchFocus.requestFocus()
-                            },
+                            onToggleSearch = { toggleSearch() },
                             onToggleGhost = onToggleGhostMode,
                             // _handleTopLeftIdentityTap: with Locked Chats
                             // configured the vault stays behind the auth gate
