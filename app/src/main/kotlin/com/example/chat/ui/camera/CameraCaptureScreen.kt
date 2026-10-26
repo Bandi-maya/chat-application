@@ -194,7 +194,7 @@ fun ChatyCameraCaptureScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
 
-    val engine = remember { EffectEngine() }
+    val engine = remember { com.example.chat.ServiceLocator.effectEngine }
     val lensSchedulerScope = rememberCoroutineScope()
     val lensManager = remember {
         LensManager(
@@ -499,7 +499,7 @@ fun ChatyCameraCaptureScreen(
     BackHandler(enabled = capturedPath != null) { discard() }
 
     DisposableEffect(Unit) {
-        onDispose { session.dispose(); faceDetection.dispose(); engine.dispose(); lensManager.dispose() }
+        onDispose { session.dispose(); faceDetection.dispose(); lensManager.dispose() }
     }
 
     Box(Modifier.fillMaxSize()) {
