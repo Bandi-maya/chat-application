@@ -1,0 +1,14 @@
+package com.example.chat.data.api
+
+/** Public client routing only. Never a place for credentials or server secrets. */
+object BackendRoutingPolicy {
+    fun restBase(dotenv: String, buildOverride: String): String =
+        dotenv.ifEmpty { buildOverride }.ifEmpty { "http://10.0.2.2:8000" }
+
+    /** Dart loads .env first, then init() overwrites only with a nonempty saved tenant. */
+    fun tenant(dotenv: String, saved: String?, useDefault: Boolean, buildDefault: String): String =
+        if (useDefault) buildDefault.ifEmpty { "chat-application" }
+        else saved?.takeIf { it.isNotBlank() }?.trim()
+            ?: dotenv.takeIf { it.isNotBlank() }?.trim()
+            ?: buildDefault.ifEmpty { "chat-application" }
+                           }
