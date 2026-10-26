@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -111,7 +113,8 @@ fun GbHeaderOverflowMenuDialog(t: ThemeConfig, actions: GbHeaderOverflowActions,
                         scaleX = s; scaleY = s
                         transformOrigin = TransformOrigin(1f, 0f)
                     }
-                    .width(250.dp)
+                    .widthIn(max = (LocalConfiguration.current.screenWidthDp.dp - 24.dp).coerceAtLeast(1.dp))
+                    .width(IntrinsicSize.Max)
                     .heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.8f).dp)
                     .shadow(12.dp, com.example.chat.ui.kit.ChatyModalShape, ambientColor = Color(t.backgroundColor).copy(alpha = 0.55f), spotColor = Color(t.backgroundColor).copy(alpha = 0.55f))
                     .background(Color(t.surfaceColor), com.example.chat.ui.kit.ChatyModalShape)
