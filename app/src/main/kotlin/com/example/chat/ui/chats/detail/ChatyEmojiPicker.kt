@@ -1,5 +1,7 @@
 package com.example.chat.ui.chats.detail
 
+import androidx.compose.ui.draw.clip
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -152,6 +154,7 @@ fun ChatyEmojiPickerSheet(
         Modifier
             .fillMaxWidth()
             .height(sheetHeight.dp)
+            .clip(com.example.chat.ui.kit.ChatyModalShape)
             .background(surface),
     ) {
         // Drag handle (Dart: 42x4, vertical drag resizes 0.32..0.90).
@@ -388,11 +391,11 @@ fun ChatyEmojiPickerSheet(
                 Popup(onDismissRequest = { tonePickerFor = null }) {
                     Row(
                         Modifier
-                            .background(Color(theme.cardColor), RoundedCornerShape(24.dp))
+                            .background(Color(theme.cardColor), com.example.chat.ui.kit.ChatyModalShape)
                             .border(
                                 1.dp,
                                 Color(argbWithAlpha(theme.secondaryTextColor, 0.2)),
-                                RoundedCornerShape(24.dp),
+                                com.example.chat.ui.kit.ChatyModalShape,
                             )
                             .padding(horizontal = 10.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
