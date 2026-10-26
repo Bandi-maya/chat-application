@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.BubbleChart
 import androidx.compose.material.icons.outlined.EventBusy
@@ -91,7 +92,6 @@ import com.example.chat.core.preferences.ChatyPreferencesController
 import com.example.chat.core.theme.AppNavigationMode
 import com.example.chat.domain.models.HomePreferences
 import com.example.chat.ui.kit.ChatyBackButton
-import com.example.chat.ui.kit.ChatyOptionGallery
 import com.example.chat.ui.kit.GbSettingRow
 import com.example.chat.ui.kit.rememberGbPickers
 import com.example.chat.ui.theme.LocalAppColors
@@ -154,6 +154,7 @@ fun HeaderSettingsScreen(
     val home = preferences.home
     val pickers = rememberGbPickers()
     var showStyleSheet by remember { mutableStateOf(false) }
+    var showTabStyleSheet by remember { mutableStateOf(false) }
 
     fun updateHome(p: HomePreferences, logTitle: String? = null) = preferences.updateHome(p, logTitle = logTitle)
 
@@ -207,23 +208,11 @@ fun HeaderSettingsScreen(
                     showChevron = true, onTap = { showStyleSheet = true },
                 )
                 divider()
-                ChatyOptionGallery(
-                    title = "Tab Bubble Style",
-                    subtitle = "Cards show a generic icon. Tap a style and the header preview above shows the one selected.",
-                    values = HomeUiStyles.tabBubbleStyles,
-                    selected = if (home.tabBubbleStyle.isNotEmpty()) home.tabBubbleStyle else "Capsule Pill",
-                    labelOf = { it },
-                    onSelected = { updateHome(home.copy(tabBubbleStyle = it), "Tab Bubble Style") },
-                ) { Icon(Icons.Rounded.ChatBubbleOutline, null, tint = colors.primary, modifier = Modifier.size(26.dp)) }
-                divider()
-                ChatyOptionGallery(
-                    title = "3D Pager / Slider Effect",
-                    subtitle = "Cards show a generic icon. Tap an effect to use it when swiping between tabs.",
-                    values = HomeUiStyles.pager3dStyles,
-                    selected = if (home.pagerTransition3d.isNotEmpty()) home.pagerTransition3d else "Cube 3D",
-                    labelOf = { it },
-                    onSelected = { updateHome(home.copy(pagerTransition3d = it), "3D Slider Effect") },
-                ) { Icon(Icons.Rounded.ViewInAr, null, tint = colors.primary, modifier = Modifier.size(26.dp)) }
+                GbSettingRow(
+                    iconContent = rowIcon(Icons.Rounded.ViewInAr), title = "Header tab style",
+                    subtitle = "${if (home.tabBubbleStyle.isNotEmpty()) home.tabBubbleStyle else "Capsule Pill"} \u00b7 ${if (home.pagerTransition3d.isNotEmpty()) home.pagerTransition3d else "Cube 3D"}",
+                    showChevron = true, onTap = { showTabStyleSheet = true },
+                )
                 divider()
                 GbSettingRow(
                     iconContent = rowIcon(Icons.Rounded.DonutLarge), title = "Enable Instagram-like Stories",
@@ -327,6 +316,13 @@ fun HeaderSettingsScreen(
                 )
                 divider()
                 GbSettingRow(
+                    iconContent = rowIcon(Icons.Outlined.Lock), title = "Tap name to open Locked Chats",
+                    subtitle = "Off by default. When on, tapping your name in the Home header opens Locked Chats.",
+                    switchValue = home.nameTapOpensLocked,
+                    onSwitchChanged = { on -> updateHome(home.copy(nameTapOpensLocked = on), if (on) "Name Tap Opens Locked Chats" else "Name Tap Does Nothing") },
+                )
+                divider()
+                GbSettingRow(
                     iconContent = rowIcon(Icons.Outlined.Palette), title = "Themes", switchValue = home.themesEnabled,
                     onSwitchChanged = { updateHome(home.copy(themesEnabled = it), "Themes Enabled") },
                 )
@@ -354,6 +350,17 @@ fun HeaderSettingsScreen(
                 showStyleSheet = false
                 onSetNavigationMode(HomeUiStyles.navigationModeForHomeUiStyle(chosen, navigationMode))
                 updateHome(preferences.home.copy(homeStyle = chosen), "Home UI Style")
+            },
+        )
+    }
+    if (showTabStyleSheet) {
+        HeaderTabStyleSheet(
+            tabStyle = if (home.tabBubbleStyle.isNotEmpty()) home.tabBubbleStyle else "Capsule Pill",
+            pagerStyle = if (home.pagerTransition3d.isNotEmpty()) home.pagerTransition3d else "Cube 3D",
+            onDismiss = { showTabStyleSheet = false },
+            onApply = { tab, pager ->
+                showTabStyleSheet = false
+                updateHome(preferences.home.copy(tabBubbleStyle = tab, pagerTransition3d = pager), "Header Tab Style")
             },
         )
     }
