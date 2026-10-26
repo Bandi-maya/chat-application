@@ -1,1 +1,1 @@
-Verify approved779path Flutter-only cleanup with native MLS preserved, root Kotlin README and parity record.
+Verify confirmed central public defaults and dotenv precedence, literal websocket placeholder, synthetic emulator loopback isolation.
