@@ -1,7 +1,6 @@
 package com.example.chat.ui.chats.detail
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -10,6 +9,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -89,6 +91,7 @@ import com.example.chat.domain.models.MessageType
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 
 /** Optional color overrides mirroring the Dart convPrefs reads in
  *  message_bubble.dart. Null fields fall back to the ThemeConfig colors.
@@ -170,6 +173,7 @@ fun ChatMessageBubble(
     onReactionTap: ((String) -> Unit)? = null,
     onReactionBadgeTap: ((MessageReaction) -> Unit)? = null,
     onMediaTap: (() -> Unit)? = null,
+    onMediaTapWithBounds: ((Rect) -> Unit)? = null,
     onVoicePlay: ((MessageAttachment) -> Unit)? = null,
     onViewOnceOpen: (() -> Unit)? = null,
     onRetry: (() -> Unit)? = null,
@@ -178,10 +182,16 @@ fun ChatMessageBubble(
     onTaskToggle: (() -> Unit)? = null,
     onTaskMenu: ((Rect) -> Unit)? = null,
 ) {
+    val isVisualMedia = message.attachment?.type in setOf("image", "video")
+    val mediaInset = with(LocalDensity.current) { 1f.toDp() }
     val bubbleBg = if (isMe) {
         colorOverrides?.rightBubbleColor ?: theme.outgoingBubbleColor
     } else {
-        colorOverrides?.leftBubbleColor ?: theme.incomingBubbleColor
+        val incoming = colorOverrides?.leftBubbleColor ?: theme.incomingBubbleColor
+        // Keep the selected hue, but make white-on-white presets visibly filled.
+        if (Color(incoming).luminance() > 0.97f && Color(theme.surfaceColor).luminance() > 0.97f)
+            androidx.compose.ui.graphics.lerp(Color(incoming), Color(theme.secondaryTextColor), 0.08f).toArgb().toLong() and 0xFFFFFFFFL
+        else incoming
     }
     val textColor = if (isMe) {
         colorOverrides?.rightChatBubbleTextColor ?: theme.outgoingTextColor
@@ -387,19 +397,28 @@ fun ChatMessageBubble(
                             bottom = geometry.bubbleMargin.bottom.dp,
                         )
                         .drawBehind {
-                            drawBubble(
+                            if (isVisualMedia) {
+                                drawRoundRect(Color(bubbleBg), cornerRadius = androidx.compose.ui.geometry.CornerRadius(10.dp.toPx()))
+                                drawRoundRect(Color(theme.dividerColor).copy(alpha = 0.45f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(10.dp.toPx()), style = androidx.compose.ui.graphics.drawscope.Stroke(1f))
+                            } else drawBubble(
                                 styleId = theme.bubbleStyle,
                                 isMe = isMe,
                                 fillColor = Color(bubbleBg),
                                 strokeColor = Color(argbWithAlpha(theme.accentColor, 0.4)),
                                 accentColor = Color(theme.accentColor),
                             )
+                            // White incoming bubbles must remain visible on a white wallpaper.
+                            if (!isMe && !isVisualMedia) drawPath(
+                                bubblePath(theme.bubbleStyle, size, false),
+                                Color(theme.secondaryTextColor).copy(alpha = 0.18f),
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(1f),
+                            )
                         }
                         .padding(
-                            start = geometry.contentPadding.left.dp,
-                            top = geometry.contentPadding.top.dp,
-                            end = geometry.contentPadding.right.dp,
-                            bottom = geometry.contentPadding.bottom.dp,
+                            start = if (isVisualMedia) mediaInset else geometry.contentPadding.left.dp,
+                            top = if (isVisualMedia) mediaInset else geometry.contentPadding.top.dp,
+                            end = if (isVisualMedia) mediaInset else geometry.contentPadding.right.dp,
+                            bottom = if (isVisualMedia) mediaInset else geometry.contentPadding.bottom.dp,
                         ),
                     horizontalAlignment = Alignment.Start,
                 ) {
@@ -545,14 +564,16 @@ fun ChatMessageBubble(
                             "image" -> ImageAttachmentPreview(
                                 attachment = message.attachment!!,
                                 remoteImage = remoteImage,
-                                onTap = onMediaTap,
+                                resolveUrl = voiceUrlResolver,
+                                onTap = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke() },
                             )
                             "video" -> VideoAttachmentPreview(
                                 attachment = message.attachment!!,
                                 textColor = Color(textColor),
                                 accentColor = Color(theme.accentColor),
                                 remoteImage = remoteImage,
-                                onTap = onMediaTap,
+                                resolveUrl = voiceUrlResolver,
+                                onTap = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke() },
                             )
                             "audio" -> VoiceNoteCard(
                                 attachment = message.attachment!!,
@@ -602,10 +623,7 @@ fun ChatMessageBubble(
                         message.type != MessageType.contact &&
                         message.text.isNotEmpty()
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.Bottom,
-                            horizontalArrangement = Arrangement.End,
-                        ) {
+                        Column(Modifier.padding(horizontal = if (isVisualMedia) 8.dp else 0.dp, vertical = if (isVisualMedia) 4.dp else 0.dp)) {
                             // Dart: convPrefs.makeTextSelectable (default true) wraps
                             // the body text in a selectable region.
                             // Dart message_bubble.dart:1103-1120: the body text
@@ -635,21 +653,19 @@ fun ChatMessageBubble(
                                 }
                             }
                             if (makeTextSelectable) {
-                                SelectionContainer(Modifier.weight(1f, fill = false)) {
+                                SelectionContainer {
                                     bodyText(Modifier)
                                 }
                             } else {
-                                bodyText(Modifier.weight(1f, fill = false))
+                                bodyText(Modifier)
                             }
-                            Box(Modifier.width(8.dp))
-                            MessageMetaRow(message, isMe, textColor, timestampColor, theme,
-                                showEditedLabel, bubbleBg, onRetry)
                         }
-                    } else {
-                        Row {
-                            MessageMetaRow(message, isMe, textColor, timestampColor, theme,
-                                showEditedLabel, bubbleBg, onRetry)
-                        }
+                    }
+                    Row(
+                        Modifier.align(Alignment.End).padding(horizontal = if (isVisualMedia) 8.dp else 0.dp, vertical = if (isVisualMedia) 4.dp else 0.dp),
+                    ) {
+                        MessageMetaRow(message, isMe, textColor, timestampColor, theme,
+                            showEditedLabel, bubbleBg, onRetry)
                     }
                 }
                 if (message.reactions.isNotEmpty()) {
@@ -885,7 +901,7 @@ private fun MessageMetaRow(
     bubbleBg: Long,
     onRetry: (() -> Unit)?,
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.defaultMinSize(minWidth = 42.dp), verticalAlignment = Alignment.CenterVertically) {
         if (message.editedAt != null && showEditedLabel) {
             Text(
                 "edited",
@@ -916,6 +932,8 @@ private fun MessageMetaRow(
             bubbleMetaTimeFormatter.format(message.createdAt.atZone(ZoneId.systemDefault())),
             color = Color(timestampColor),
             fontSize = (10.5 * theme.fontScale).sp,
+            maxLines = 1,
+            softWrap = false,
         )
         if (isMe) {
             Box(Modifier.width(4.dp))
@@ -976,28 +994,9 @@ private fun ReactionBadge(
 private fun ImageAttachmentPreview(
     attachment: MessageAttachment,
     remoteImage: RemoteImageSlot?,
+    resolveUrl: (suspend (String) -> String)?,
     onTap: (() -> Unit)?,
-) {
-    Box(
-        Modifier
-            .size(width = 270.dp, height = 200.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color.Black.copy(alpha = 0.26f))
-            .pointerInput(attachment.url) { detectTapGestures(onTap = { onTap?.invoke() }) },
-        contentAlignment = Alignment.Center,
-    ) {
-        val url = attachment.url
-        if (url.isNullOrEmpty() || remoteImage == null) {
-            Icon(
-                Icons.Rounded.Description,
-                contentDescription = attachment.name,
-                tint = Color.White.copy(alpha = 0.6f),
-            )
-        } else {
-            remoteImage(url, Modifier.matchParentSize(), attachment.name)
-        }
-    }
-}
+) = MediaAttachmentPreview(attachment, remoteImage, resolveUrl, onTap, false)
 
 @Composable
 private fun VideoAttachmentPreview(
@@ -1005,35 +1004,9 @@ private fun VideoAttachmentPreview(
     textColor: Color,
     accentColor: Color,
     remoteImage: RemoteImageSlot?,
+    resolveUrl: (suspend (String) -> String)?,
     onTap: (() -> Unit)?,
-) {
-    Box(
-        Modifier
-            .size(width = 270.dp, height = 200.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color.Black.copy(alpha = 0.26f))
-            .pointerInput(attachment.url) { detectTapGestures(onTap = { onTap?.invoke() }) },
-        contentAlignment = Alignment.Center,
-    ) {
-        val url = attachment.url
-        if (!url.isNullOrEmpty() && remoteImage != null) {
-            remoteImage(url, Modifier.matchParentSize(), attachment.name)
-        }
-        Box(
-            Modifier
-                .size(52.dp)
-                .background(Color.Black.copy(alpha = 0.45f), CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Rounded.PlayArrow,
-                contentDescription = "Play video",
-                tint = Color.White,
-                modifier = Modifier.size(30.dp),
-            )
-        }
-    }
-}
+) = MediaAttachmentPreview(attachment, remoteImage, resolveUrl, onTap, true)
 
 /** Port of _VoiceNotePlayer (message_bubble.dart:1578-1730): signed-url load on first play,
  *  pause/resume, restart after completion, live speed apply while playing, progress bar
