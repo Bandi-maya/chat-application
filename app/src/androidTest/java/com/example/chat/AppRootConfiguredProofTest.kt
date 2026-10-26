@@ -166,7 +166,7 @@ class AppRootConfiguredProofTest {
             capture(device, "10c-calls-before-fab-assertion")
             logScreenTexts(device, "calls-before-fab")
             assertTrue("Calls page reached", device.wait(Until.hasObject(By.text("Calls")), 10000))
-            val addCall = device.wait(Until.findObject(By.text("Add call")), 10000)
+            val addCall = device.wait(Until.findObject(By.desc("Add call")), 10000)
                 ?: throw AssertionError("Add call button not visible")
             val callsDock = device.findObject(By.desc("Calls"))
                 ?: throw AssertionError("Calls dock item not visible")
