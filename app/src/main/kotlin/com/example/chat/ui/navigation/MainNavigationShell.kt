@@ -272,13 +272,11 @@ fun MainNavigationShell(
                 content = { pageContent() },
             )
             else -> {
-                // Standard bottom navigation / adaptive rail. NOTE: the Dart
-                // useRail check also matches AppNavigationMode.compactRail,
-                // which the Kotlin AppNavigationMode enum is missing
-                // (integration gap).
+                // Dart compactRail explicitly selects a rail on tablet widths.
                 val useRail = maxWidth >= 600.dp &&
-                    (navMode != AppNavigationMode.gestureTabs &&
-                        (layoutMode == UILayoutMode.tabletDesktop || autoRail))
+                    (navMode == AppNavigationMode.compactRail ||
+                        (navMode != AppNavigationMode.gestureTabs &&
+                            (layoutMode == UILayoutMode.tabletDesktop || autoRail)))
                 if (useRail) {
                     RailShell(
                         colors = colors,
