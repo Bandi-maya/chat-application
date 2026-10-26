@@ -17,7 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronLeft
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -65,7 +65,7 @@ fun ChatyAboutDialog(
         return
     }
     val colors = LocalAppColors.current
-    AlertDialog(
+    AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = onDismiss,
         containerColor = colors.surfaceElevated,
         text = {
