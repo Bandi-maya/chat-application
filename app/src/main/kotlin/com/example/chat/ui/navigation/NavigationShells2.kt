@@ -170,8 +170,9 @@ internal fun PerspectiveDrawerShell(
     }
 }
 
-/** Fixed trigger with a true circular quarter-fan. Only the overlay takes remaining
- * safe-drawing insets; the page and global shell keep their own inset ownership. */
+/** Fixed trigger with a true circular quarter-fan. A dedicated navigation strip
+ * reserves space ABOVE page content, so the closed trigger cannot cover a page
+ * title or connection banner. The common safe parent consumes remaining insets once. */
 @Composable
 internal fun CurvedRadialDrawerShell(
     colors: ChatyColors,
@@ -181,8 +182,9 @@ internal fun CurvedRadialDrawerShell(
     onSelect: (Int) -> Unit,
     fab: @Composable () -> Unit,
     content: @Composable () -> Unit,
+    initialOpen: Boolean = false,
 ) {
-    var menuOpen by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(initialOpen) }
     var page by remember { mutableStateOf(0) }
     val progress by animateFloatAsState(
         targetValue = if (menuOpen) 1f else 0f,
@@ -191,14 +193,20 @@ internal fun CurvedRadialDrawerShell(
     )
     androidx.activity.compose.BackHandler(enabled = menuOpen) { menuOpen = false }
 
-    Box(Modifier.fillMaxSize().background(colors.background)) {
-        content()
-        Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) { fab() }
-        androidx.compose.foundation.layout.BoxWithConstraints(
-            Modifier.fillMaxSize()
-                .windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.safeDrawing)
-                .clipToBounds(),
-        ) {
+    androidx.compose.foundation.layout.BoxWithConstraints(
+        Modifier.fillMaxSize().background(colors.background)
+            .windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.safeDrawing)
+            .clipToBounds(),
+    ) {
+            // Content and FAB share the same consumed inset parent as the trigger.
+            // Padding changes measured content bounds, unlike a floating overlay.
+            Box(Modifier.fillMaxSize().padding(top = RadialMenuGeometry.navigationStripHeight.dp)) {
+                content()
+            }
+            Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) { fab() }
+            Box(Modifier.fillMaxWidth().height(RadialMenuGeometry.navigationStripHeight.dp)
+                .background(colors.surface))
+
             val geometry = RadialMenuGeometry.layout(maxWidth.value, maxHeight.value, navItemIds.size)
             val pageCount = if (navItemIds.isEmpty()) 1 else
                 (navItemIds.size + geometry.pageSize - 1) / geometry.pageSize
@@ -301,7 +309,6 @@ internal fun CurvedRadialDrawerShell(
                     modifier = Modifier.size(24.dp),
                 )
             }
-        }
     }
 }
 
