@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
+        <activity android:name="com.example.chat.RadialPlacementProofActivity" android:exported="false" />
+        <activity android:name="com.example.chat.PushedPageFixtureActivity" android:exported="false" />
+        <activity android:name="com.example.chat.HeaderProofActivity" android:exported="false" />
+        <activity android:name="com.example.chat.EmojiLoopFixtureActivity" android:exported="false" />
+        <activity android:name="com.example.chat.SwipeRowFixtureActivity" android:exported="false" />
+        <activity android:name="com.example.chat.MediaFixtureActivity" android:exported="false" />
+        <activity android:name="com.example.chat.CameraOpeningProofActivity" android:exported="false" />
+        <activity android:name="com.example.chat.CallControlsFixtureActivity" android:exported="false" />
         <activity
             android:name="com.example.chat.ChatFixtureActivity"
             android:exported="false" />
