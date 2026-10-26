@@ -1448,6 +1448,11 @@ fun AppRoot() {
             WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         )) {
         gate.Host()
+        // Dart ChatsHomeScreen.initState -> NotificationPermissionSheet.showIfNeeded (education sheet once, skipped when granted).
+        if (route == AuthRoute.Home) {
+            com.example.chat.ui.onboarding.NotificationPermissionSheetHost(modifier = Modifier.fillMaxSize())
+        }
+        } // Shared safe-area app overlays. Island owns its hardware anchor separately.
         com.example.chat.ui.calls.GlobalCallHost(isAuthenticated = ServiceLocator.apiBackend.isAuthenticated)
         // Dart shouldShowLock: authenticated && lock enabled && _appLockRequired.
         if (lockRequired && ServiceLocator.apiBackend.isAuthenticated &&
@@ -1459,11 +1464,6 @@ fun AppRoot() {
                 onUnlocked = { ServiceLocator.appLock.onUnlocked() },
             )
         }
-        // Dart ChatsHomeScreen.initState -> NotificationPermissionSheet.showIfNeeded (education sheet once, skipped when granted).
-        if (route == AuthRoute.Home) {
-            com.example.chat.ui.onboarding.NotificationPermissionSheetHost(modifier = Modifier.fillMaxSize())
-        }
-        } // Shared safe-area app overlays. Island owns its hardware anchor separately.
         val toastPrefs = ServiceLocator.preferencesController
         ChatyEventToastOverlay(
             notificationService = ServiceLocator.notifications,
