@@ -68,10 +68,7 @@ fun SettingsPage(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                Modifier.size(44.dp).clip(CircleShape).clickable(onClick = onBack),
-                contentAlignment = Alignment.Center,
-            ) { Text("\u2039", color = colors.foreground, fontSize = 30.sp) }
+            com.example.chat.ui.kit.ChatyBackButton(onPressed = onBack)
             Spacer(Modifier.width(4.dp))
             Column {
                 Text(title, color = colors.foreground, fontSize = 20.sp, fontWeight = FontWeight.Bold)
