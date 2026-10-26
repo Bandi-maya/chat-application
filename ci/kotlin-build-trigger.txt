@@ -48,3 +48,4 @@ w3c: badge sync, emoji stageA/B + lottie 1792996673
 w3d: fix QuickContact imports + OptIn 1792996974
 # 12:19 quickContacts+voice+badge rewire
 # 12:35 appendInlineContent import + calls/auth/fcm batch
+# 12:49 unit test fix + home connection detail + updates openUrl
