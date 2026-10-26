@@ -30,7 +30,7 @@ import kotlinx.coroutines.withContext
  *  Bound: image/video/document/audio pick + upload (ChatMediaService -> REST /chat/upload when the
  *  api session is authenticated) + send through ApiBackendService.sendMessage with the Dart JSON
  *  envelope, view-once sheet, share-limit and size guards.
- *  Not bound here (explicit gaps): location, contact, poll dialog/viewer, camera screen, demo cards.
+ *  Not bound here (explicit gaps): location, poll dialog/viewer, camera screen, demo cards.
  *  Deviation: Dart opens its in-app CustomFilePickerScreen; this uses the Android system picker. */
 class ChatAttachmentsBindings(
     val onMedia: (String) -> Unit,
@@ -117,21 +117,38 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
         )
     }
 
-    // No READ_CONTACTS in the manifest: Dart's canRead=false path (name only, no phone/email).
+    // Dart shareContact (chat_attachment_actions.dart:212): READ_CONTACTS runtime permission
+    // (manifest entry added with this patch) decides the canRead path; the system picker stands in
+    // for FlutterContacts.native.showPicker. Android has no "limited" contacts access, so the
+    // permission result maps to granted/denied only.
+    var contactReadPending by remember { mutableStateOf<CompletableDeferred<Boolean>?>(null) }
+    val contactReadPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        contactReadPending?.complete(granted); contactReadPending = null
+    }
     val contactsPort = object : com.example.chat.ui.chats.detail.ContactsPort {
-        override suspend fun requestReadAccess() = com.example.chat.ui.chats.detail.ContactReadAccess.denied
+        override suspend fun requestReadAccess(): com.example.chat.ui.chats.detail.ContactReadAccess {
+            if (com.example.chat.data.services.AndroidContactsAccess.hasReadAccess(context)) {
+                return com.example.chat.ui.chats.detail.ContactReadAccess.granted
+            }
+            val d = CompletableDeferred<Boolean>()
+            contactReadPending = d
+            contactReadPermission.launch(android.Manifest.permission.READ_CONTACTS)
+            return if (d.await()) {
+                com.example.chat.ui.chats.detail.ContactReadAccess.granted
+            } else {
+                com.example.chat.ui.chats.detail.ContactReadAccess.denied
+            }
+        }
         override suspend fun showPicker(canRead: Boolean): com.example.chat.ui.chats.detail.PickedContactRef? {
             val d = CompletableDeferred<Uri?>()
             contactPending = d
             contactPicker.launch(null)
             val uri = d.await() ?: return null
-            var name: String? = null
-            context.contentResolver.query(uri, arrayOf(android.provider.ContactsContract.Contacts.DISPLAY_NAME), null, null, null)?.use { c ->
-                if (c.moveToFirst()) name = c.getString(0)
-            }
-            return com.example.chat.ui.chats.detail.PickedContactRef(null, name)
+            val (id, name) = com.example.chat.data.services.AndroidContactsAccess.readPickedContact(context, uri)
+            return com.example.chat.ui.chats.detail.PickedContactRef(id, name)
         }
-        override suspend fun fetchDetails(id: String): com.example.chat.ui.chats.detail.ContactDetails? = null
+        override suspend fun fetchDetails(id: String): com.example.chat.ui.chats.detail.ContactDetails? =
+            com.example.chat.data.services.AndroidContactsAccess.fetchContactDetails(context, id)
     }
     var locPending by remember { mutableStateOf<CompletableDeferred<Boolean>?>(null) }
     val locPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { r ->
