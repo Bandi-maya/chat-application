@@ -58,18 +58,8 @@ class AndroidVoiceRecorderPort(
         next.setAudioChannels(config.numChannels)
         next.setOutputFile(path)
         next.prepare()
-        val sessionId = next.audioSessionId
-        if (sessionId != 0) {
-            if (config.autoGain && AutomaticGainControl.isAvailable()) {
-                gainControl = AutomaticGainControl.create(sessionId)?.apply { enabled = true }
-            }
-            if (config.noiseSuppress && NoiseSuppressor.isAvailable()) {
-                noiseSuppressor = NoiseSuppressor.create(sessionId)?.apply { enabled = true }
-            }
-            if (config.echoCancel && AcousticEchoCanceler.isAvailable()) {
-                echoCanceler = AcousticEchoCanceler.create(sessionId)?.apply { enabled = true }
-            }
-        }
+        // Deviation: MediaRecorder exposes no audio session id, so AGC/NS/AEC effects from the Dart RecordConfig
+        // cannot be attached here; the capture uses the platform defaults for the MIC source.
         next.start()
         recorder = next
         lastPath = path
