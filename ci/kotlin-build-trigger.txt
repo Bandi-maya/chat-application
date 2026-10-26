@@ -49,3 +49,4 @@ w3d: fix QuickContact imports + OptIn 1792996974
 # 12:19 quickContacts+voice+badge rewire
 # 12:35 appendInlineContent import + calls/auth/fcm batch
 # 12:49 unit test fix + home connection detail + updates openUrl
+# 13:12 icon-name test fix + FCM early bootstrap (f3eaeff0 testDebugUnitTest red: IslandBridgeParityTest name prefix)
