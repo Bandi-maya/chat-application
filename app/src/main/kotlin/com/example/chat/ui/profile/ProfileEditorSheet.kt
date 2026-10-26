@@ -139,7 +139,7 @@ fun ProfileEditorSheet(
         }
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = onDismiss) {
         Column(
             Modifier
                 .padding(start = 20.dp, top = 4.dp, end = 20.dp, bottom = 20.dp)
