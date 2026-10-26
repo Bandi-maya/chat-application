@@ -1,6 +1,13 @@
 package com.example.chat
 
 import android.content.Intent
+import androidx.activity.compose.setContent
+import com.example.chat.core.theme.ThemePresets
+import com.example.chat.domain.models.HomePreferences
+import com.example.chat.ui.chats.ChatsHomeScreen
+import com.example.chat.ui.chats.home.ChatListDensity
+import com.example.chat.ui.chats.home.defaultHomeTemplates
+import com.example.chat.ui.theme.ChatyTheme
 import android.graphics.Bitmap
 import android.view.InputDevice
 import android.view.MotionEvent
@@ -105,6 +112,56 @@ class SwipeRowProofTest {
             }
         } finally { device.setOrientationNatural(); device.unfreezeRotation() }
     }
+    @Test fun enteringSelectionClosesTrayAndDisablesActionGestures() {
+        ActivityScenario.launch<SwipeRowFixtureActivity>(Intent(inst.targetContext, SwipeRowFixtureActivity::class.java)).use {
+            assertTrue(device.wait(Until.hasObject(By.desc("Synthetic row 0")), 10000))
+            val initial = device.findObject(By.desc("Synthetic row 0")).visibleBounds
+            val y = initial.centerY()
+            device.swipe(initial.right - 20, y, initial.left + 20, y, 35)
+            Thread.sleep(350)
+            assertTrue(device.hasObject(By.desc("Archive")))
+            capture("selection-open-before")
+            device.findObject(By.text("Enter selection")).click()
+            assertTrue(device.wait(Until.gone(By.desc("Archive")), 5000))
+            assertEquals(initial, device.findObject(By.desc("Synthetic row 0")).visibleBounds)
+            device.swipe(initial.right - 20, y, initial.left + 20, y, 35)
+            Thread.sleep(350)
+            assertEquals(initial, device.findObject(By.desc("Synthetic row 0")).visibleBounds)
+            assertFalse(device.hasObject(By.desc("Archive")))
+            device.click(initial.centerX(), y)
+            assertTrue(device.wait(Until.hasObject(By.text("Events: none/0; row: 1")), 5000))
+            capture("selection-disabled-row-click")
+            device.findObject(By.text("Exit selection")).click()
+            device.swipe(initial.right - 20, y, initial.left + 20, y, 35)
+            Thread.sleep(350)
+            assertTrue(device.hasObject(By.desc("Archive")))
+            device.pressBack()
+            Thread.sleep(350)
+            assertTrue(device.hasObject(By.text("Events: none/0; row: 1")))
+        }
+    }
+
+    @Test fun actualHomeSelectionDisablesSwipeAndKeepsSelectionTaps() {
+        ActivityScenario.launch<ChatFixtureActivity>(Intent(inst.targetContext, ChatFixtureActivity::class.java)).use {
+            assertTrue(device.wait(Until.hasObject(By.text("Alice Rao")), 10000))
+            val alice = device.findObject(By.text("Alice Rao")).visibleBounds
+            // Long press a real production row to enter selection.
+            device.swipe(alice.centerX(), alice.centerY(), alice.centerX(), alice.centerY(), 120)
+            assertTrue(device.wait(Until.hasObject(By.text("1")), 5000))
+            Thread.sleep(350) // Selection header AnimatedContent must settle before comparing bounds.
+            val trek = device.findObject(By.text("Weekend Trek")).visibleBounds
+            device.swipe(device.displayWidth - 20, trek.centerY(), 20, trek.centerY(), 35)
+            Thread.sleep(350)
+            assertEquals("Selection swipe does not translate row", trek, device.findObject(By.text("Weekend Trek")).visibleBounds)
+            device.findObject(By.text("Weekend Trek")).click()
+            assertTrue(device.wait(Until.hasObject(By.text("2")), 5000))
+            capture("actual-home-selection-two")
+            device.pressBack()
+            assertTrue(device.wait(Until.gone(By.text("2")), 5000))
+            assertTrue(device.hasObject(By.text("Alice Rao")))
+        }
+    }
+
     @Test fun actualHomeRowSwipeKeepsFollowingRowInPlace() {
         ActivityScenario.launch<ChatFixtureActivity>(Intent(inst.targetContext, ChatFixtureActivity::class.java)).use {
             assertTrue(device.wait(Until.hasObject(By.text("Alice Rao")), 10000))
@@ -134,6 +191,51 @@ class SwipeRowProofTest {
             capture("real-home-closed")
         }
     }
+    /** Applied typed preferences and real production rows, not synthetic fixed heights.
+     * Does not prove settings navigation or disk persistence; those remain owner checks. */
+    @Test fun productionRowsWithAppliedStylesDensityAndTextSizes() {
+        val styles = listOf("Chaty Default", "Cards", "Telegram Style", "Compact", "Expressive")
+        ActivityScenario.launch<SwipeRowFixtureActivity>(Intent(inst.targetContext, SwipeRowFixtureActivity::class.java)).use { scenario ->
+            for ((index, style) in styles.withIndex()) {
+                val dark = index % 2 != 0
+                val config = ThemePresets.getSystemDefaultTheme(!dark)
+                val prefs = HomePreferences(homeStyle = style, screenTextSize = if (index % 2 == 0) 25.5 else 11.9)
+                val density = if (index % 2 == 0) ChatListDensity.compact else ChatListDensity.comfortable
+                val rows = ChatFixtureActivity.fixtureConversations().take(2).mapIndexed { i, c ->
+                    c.copy(title = "Long fixture contact $i with many words", isPinned = false, unreadCount = 0)
+                }
+                scenario.onActivity { activity ->
+                    activity.setContent {
+                        ChatyTheme(config) {
+                            ChatsHomeScreen(
+                                conversations = rows, currentUserId = "me", requiresSubscription = false,
+                                subscriptionMessage = null, onOpenConversation = {}, homePreferences = prefs,
+                                templates = defaultHomeTemplates.copy(chatList = defaultHomeTemplates.chatList.copy(density = density)),
+                            )
+                        }
+                    }
+                }
+                assertTrue(device.wait(Until.hasObject(By.text(rows.first().title)), 10000))
+                Thread.sleep(350)
+                val title = device.findObject(By.text(rows.first().title)).visibleBounds
+                val next = device.findObject(By.text(rows[1].title)).visibleBounds
+                val label = "applied-style-$index-" + (if (dark) "dark" else "light")
+                capture("$label-closed")
+                device.swipe(device.displayWidth - 20, title.centerY(), 20, title.centerY(), 35)
+                Thread.sleep(350)
+                assertEquals("$style keeps next row in place", next, device.findObject(By.text(rows[1].title)).visibleBounds)
+                for (name in listOf("Pin", "Mute", "Archive")) {
+                    val action = device.findObject(By.desc(name)) ?: error("$style missing $name")
+                    assertTrue("$style $name must not overlap next row", action.visibleBounds.bottom <= next.top)
+                }
+                capture("$label-open")
+                device.pressBack()
+                Thread.sleep(350)
+                assertEquals(title, device.findObject(By.text(rows.first().title)).visibleBounds)
+            }
+        }
+    }
+
     @Test fun lightPortrait() = runFixture(false, false)
     @Test fun darkPortrait() = runFixture(true, false)
     @Test fun lightLandscape() = runFixture(false, true)
