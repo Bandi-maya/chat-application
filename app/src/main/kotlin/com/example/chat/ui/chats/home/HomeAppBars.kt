@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -70,6 +71,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -496,29 +498,59 @@ fun HomeFilterChips(
         "Segmented Tab" -> 6
         else -> 20
     }
+    val segmented = tabBubbleStyle == "Segmented Tab"
+    val glow = tabBubbleStyle == "Glassmorphism Glow"
+    val outlined = tabBubbleStyle == "Outlined Bubble"
+    val soft = tabBubbleStyle == "Soft Rounded Pill"
+    val accent = Color(theme.accentColor)
     LazyRow(
         contentPadding = PaddingValues(start = 16.dp, top = 3.dp, end = 16.dp, bottom = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (segmented) 0.dp else 8.dp),
     ) {
-        items(filters) { filter ->
+        itemsIndexed(filters) { index, filter ->
             val selected = selectedFilter == filter
+            // Segmented Tab joins the chips into one strip: only the ends are rounded.
+            val shape = if (segmented) {
+                val end = chipRadius.dp
+                RoundedCornerShape(
+                    topStart = if (index == 0) end else 0.dp, bottomStart = if (index == 0) end else 0.dp,
+                    topEnd = if (index == filters.lastIndex) end else 0.dp,
+                    bottomEnd = if (index == filters.lastIndex) end else 0.dp,
+                )
+            } else RoundedCornerShape(chipRadius.dp)
+            val fill = when {
+                outlined -> Color.Transparent
+                glow && selected -> Color(argbWithAlpha(theme.accentColor, 0.22))
+                glow -> Color(argbWithAlpha(theme.cardColor, 0.72))
+                soft && selected -> Color(argbWithAlpha(theme.accentColor, 0.14))
+                selected -> Color(argbWithAlpha(theme.accentColor, 0.18))
+                else -> Color(theme.cardColor)
+            }
+            val borderColor = when {
+                outlined && selected -> accent
+                outlined -> Color(argbWithAlpha(theme.secondaryTextColor, 0.45))
+                glow && selected -> Color(argbWithAlpha(theme.accentColor, 0.6))
+                glow -> Color(argbWithAlpha(theme.accentColor, 0.18))
+                soft -> Color.Transparent
+                selected -> Color(argbWithAlpha(theme.accentColor, 0.35))
+                else -> Color(theme.surfaceColor)
+            }
+            val borderWidth = if (outlined) 1.5.dp else 1.dp
             Box(
                 modifier = Modifier
-                    .background(
-                        if (selected) Color(argbWithAlpha(theme.accentColor, 0.18)) else Color(theme.cardColor),
-                        RoundedCornerShape(chipRadius.dp),
+                    .then(
+                        if (glow && selected) {
+                            Modifier.shadow(10.dp, shape, ambientColor = accent.copy(alpha = 0.55f), spotColor = accent.copy(alpha = 0.55f))
+                        } else Modifier,
                     )
-                    .border(
-                        1.dp,
-                        if (selected) Color(argbWithAlpha(theme.accentColor, 0.35)) else Color(theme.surfaceColor),
-                        RoundedCornerShape(chipRadius.dp),
-                    )
+                    .background(fill, shape)
+                    .border(borderWidth, borderColor, shape)
                     .clickable { onSelect(filter) }
                     .padding(horizontal = 12.dp, vertical = 7.dp),
             ) {
                 Text(
                     filter,
-                    color = if (selected) Color(theme.accentColor) else Color(theme.secondaryTextColor),
+                    color = if (selected) accent else Color(theme.secondaryTextColor),
                     fontWeight = if (selected) FontWeight.W700 else FontWeight.W500,
                     fontSize = 13.sp,
                 )
