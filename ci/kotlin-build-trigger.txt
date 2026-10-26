@@ -13,3 +13,4 @@ trigger 90 02:00:20Z shell light/dark fixture
 trigger 91 02:01:34Z picker compile fix
 trigger 92 02:05:04Z biometric adapter
 trigger 93 02:09:18Z biometric faithful + policy tests
+trigger 94 02:11:24Z biometric stop keyed to session
