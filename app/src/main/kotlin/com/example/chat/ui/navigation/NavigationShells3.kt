@@ -328,7 +328,7 @@ internal fun BottomShell(
             }
             Row(
                 modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                horizontalArrangement = Arrangement.SpaceAround,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 val hasCenterAction = template.hasCenterAction && navItemIds.size >= 3
