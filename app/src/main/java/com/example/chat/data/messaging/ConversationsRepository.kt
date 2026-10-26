@@ -53,7 +53,14 @@ class ConversationsRepository(
     private val snapshotCache: SnapshotCacheStore? = null,
     /** Scope for the Dart-unawaited snapshot writes. */
     private val snapshotScope: kotlinx.coroutines.CoroutineScope? = null,
+    /** Called with the attachments of messages that were deleted/removed so local media copies can be invalidated.
+     *  Default no-op; must not throw (guarded) and must not block for long. */
+    private val onAttachmentsGone: (List<com.example.chat.data.local.AttachmentRef>) -> Unit = {},
 ) {
+    private fun notifyGone(refs: List<com.example.chat.data.local.AttachmentRef>) {
+        if (refs.isNotEmpty()) runCatching { onAttachmentsGone(refs) }
+    }
+
     val conversationsById = LinkedHashMap<String, Conversation>()
     val messagesByChatId = HashMap<String, MutableList<ChatMessage>>()
     val usersById = HashMap<String, UserProfile>()
@@ -168,7 +175,9 @@ class ConversationsRepository(
             }
         }
         messages.sortBy { it.createdAt }
+        val heldBefore = messagesByChatId[conversationId]?.toList()
         messagesByChatId[conversationId] = messages
+        notifyGone(com.example.chat.data.media.AttachmentRefs.refsGone(conversationId, heldBefore, messages))
 
         val conversation = conversationsById[conversationId]
         if (conversation != null && messages.isNotEmpty()) {
@@ -441,8 +450,10 @@ class ConversationsRepository(
     /** Exact port of deleteConversation: local removal, RPC with the
      *  direct-table delete fallback, then reload. */
     suspend fun deleteConversation(conversationId: String) {
+        val heldMessages = messagesByChatId[conversationId]?.toList()
         conversationsById.remove(conversationId)
         messagesByChatId.remove(conversationId)
+        notifyGone(com.example.chat.data.media.AttachmentRefs.refsOf(conversationId, heldMessages ?: emptyList()))
         notifyChanged()
         runCatching {
             rpc.rpc(
@@ -680,6 +691,7 @@ class ConversationsRepository(
         messageId: String,
         forEveryone: Boolean = false,
     ) {
+        val target = messagesByChatId[conversationId]?.firstOrNull { it.id == messageId }
         rpc.rpc(
             "delete_chat_message",
             mapOf(
@@ -687,6 +699,8 @@ class ConversationsRepository(
                 "p_for_everyone" to forEveryone,
             ),
         )
+        // RPC succeeded (it throws otherwise): the message is gone for this user, drop its local media now.
+        if (target != null) notifyGone(listOfNotNull(com.example.chat.data.media.AttachmentRefs.refOf(conversationId, target)))
         kotlinx.coroutines.coroutineScope {
             val a = launch { loadMessages(conversationId) }
             val b = launch { loadConversations(loadMembers = false) }
