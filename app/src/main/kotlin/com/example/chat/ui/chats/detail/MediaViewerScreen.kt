@@ -6,6 +6,9 @@ import android.net.Uri
 import android.widget.VideoView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
@@ -100,11 +103,17 @@ fun MediaViewerScreen(
     modifier: Modifier = Modifier,
     createSignedUrl: suspend (objectPath: String, expiresInSeconds: Int) -> String = { path, _ -> path },
     onBack: () -> Unit = {},
+    sourceBounds: Rect? = null,
+    restrictedViewOnce: Boolean = false,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    val opening = remember(storagePath) { Animatable(0f) }
+    LaunchedEffect(storagePath) { opening.animateTo(1f, tween(280)) }
+    var editing by remember { mutableStateOf(false) }
+    var editedCopy by remember(storagePath) { mutableStateOf<java.io.File?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var signedUrl by remember { mutableStateOf<String?>(null) }
 
@@ -162,6 +171,7 @@ fun MediaViewerScreen(
 
     // Dart _openExternally (url_launcher externalApplication).
     fun openExternally() {
+        if (restrictedViewOnce) return
         val url = signedUrl ?: return
         try {
             context.startActivity(
@@ -177,6 +187,15 @@ fun MediaViewerScreen(
 
     // Dart _share (share_plus text + subject).
     fun share() {
+        if (restrictedViewOnce) return
+        val local = editedCopy
+        if (local != null) {
+            val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", local)
+            context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                type = "image/jpeg"; putExtra(Intent.EXTRA_STREAM, uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }, "Share edited copy"))
+            return
+        }
         val url = signedUrl ?: return
         val send = Intent(Intent.ACTION_SEND).apply {
             this.type = "text/plain"
@@ -206,8 +225,15 @@ fun MediaViewerScreen(
     val primary = Color(theme.accentColor)
     val borderSubtle = Color(theme.dividerColor)
 
+    if (editing && signedUrl != null && !restrictedViewOnce) {
+        ImageEditorScreen(editedCopy?.toURI()?.toString() ?: signedUrl!!,
+            onCancel = { editing = false },
+            onApply = { file -> editedCopy = file; editing = false },
+        )
+        return
+    }
     Scaffold(
-        modifier = modifier,
+        modifier = modifier.graphicsLayer { alpha = opening.value },
         containerColor = elevated,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -241,14 +267,17 @@ fun MediaViewerScreen(
                         fontSize = 11.5.sp,
                     )
                 }
-                IconButton(onClick = ::openExternally, enabled = signedUrl != null) {
+                if (type == "image" && !title.endsWith(".gif", ignoreCase = true) && !restrictedViewOnce) IconButton(onClick = { editing = true }, enabled = signedUrl != null) {
+                    Icon(Icons.Rounded.Edit, "Edit a copy", tint = foreground)
+                }
+                if (!restrictedViewOnce) IconButton(onClick = ::openExternally, enabled = signedUrl != null) {
                     Icon(
                         Icons.Rounded.OpenInNew,
                         contentDescription = "Open with app",
                         tint = foreground,
                     )
                 }
-                IconButton(onClick = ::share, enabled = signedUrl != null) {
+                if (!restrictedViewOnce) IconButton(onClick = ::share, enabled = signedUrl != null) {
                     Icon(
                         Icons.Rounded.Share,
                         contentDescription = "Share file link",
@@ -262,7 +291,18 @@ fun MediaViewerScreen(
         Box(
             Modifier
                 .fillMaxSize()
-                .padding(padding),
+                .padding(padding)
+                .graphicsLayer {
+                    val progress = opening.value
+                    val source = sourceBounds
+                    val initial = if (source != null && size.width > 0f) (source.width / size.width).coerceIn(0.1f, 1f) else 0.92f
+                    scaleX = initial + (1f - initial) * progress
+                    scaleY = scaleX
+                    if (source != null) {
+                        translationX = (source.center.x - size.width / 2f) * (1f - progress)
+                        translationY = (source.center.y - size.height / 2f) * (1f - progress)
+                    }
+                },
             contentAlignment = Alignment.Center,
         ) {
             when {
@@ -280,7 +320,7 @@ fun MediaViewerScreen(
                 )
 
                 type == "image" -> ImageViewerContent(
-                    url = signedUrl!!,
+                    url = editedCopy?.toURI()?.toString() ?: signedUrl!!,
                     title = title,
                     primary = primary,
                     foregroundSecondary = foregroundSecondary,
