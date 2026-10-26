@@ -181,9 +181,8 @@ private val bounceSpec = keyframes<Float> {
     1.0f at 360
 }
 
-/** Port of AnimatedEmojiView (animated_emoji_view.dart:135-220): procedural
- *  ChatyMotionEmoji for the 16 supported emojis, streamed Noto Lottie for the
- *  remaining 609-entry registry (ChatyAnimatedEmojiAsset), static glyph when
+/** Port of AnimatedEmojiView (animated_emoji_view.dart:135-220): streamed Noto Lottie for the
+ *  609-entry registry (ChatyAnimatedEmojiAsset), static glyph when
  *  animations are off / style non-animated / registry miss - the exact Dart
  *  chain. MediaQuery.disableAnimations maps to the animator-duration-scale
  *  check in [animationsDisabled]. */
@@ -251,49 +250,33 @@ fun AnimatedEmojiView(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        // Dart build(): style from prefs (universal.emojiStyle, default
-        // Chaty Motion) gates animation via currentStyle.isAnimated.
-        val style = ChatyEmojiStyleId.fromString(emojiStyle)
-        val animationsOn = animate && style.isAnimated && !animationsDisabled()
-        if (chatyMotionEmojiIsSupported(unicode)) {
-            val shouldPlay = messageId?.let {
-                ChatyEmojiPlaybackManager.shouldAutoPlay(it, emojiIndex)
-            } ?: true
-            ChatyMotionEmoji(
+        // Only animated pack: the animated_emoji Noto Lottie set. It loops
+        // forever in every mode (single jumbo emoji included) while composed;
+        // leaving composition (scroll away / leave chat) stops it and
+        // re-entry starts it again. emojiStyle is kept only so callers and
+        // saved prefs stay source compatible; it no longer selects artwork.
+        val animationsOn = animate && !animationsDisabled()
+        val notoId = if (animationsOn) ChatyEmojiAssetRegistry.findNotoId(unicode) else null
+        if (notoId != null) {
+            ChatyAnimatedEmojiAsset(
+                notoId = notoId,
                 unicode = unicode,
                 size = size,
-                animate = animationsOn,
-                autoStart = shouldPlay,
-                style = style,
-                onCompleted = messageId?.let { id ->
-                    { ChatyEmojiPlaybackManager.notifyAnimationCompleted(id, emojiIndex) }
-                },
+                repeat = emojiLoopsForever(mode),
             )
         } else {
-            // ChatyEmojiResolver.resolve + AnimatedEmoji fallback chain.
-            val notoId = if (animationsOn) {
-                ChatyEmojiAssetRegistry.findNotoId(unicode)
-            } else {
-                null
-            }
-            if (notoId != null) {
-                ChatyAnimatedEmojiAsset(
-                    notoId = notoId,
-                    unicode = unicode,
-                    size = size,
-                    repeat = mode == EmojiDisplayMode.inline || mode == EmojiDisplayMode.picker,
-                )
-            } else {
-                Text(
-                    unicode,
-                    fontSize = (size * 0.82f).sp,
-                    lineHeight = (size * 0.82f).sp,
-                    maxLines = 1,
-                )
-            }
+            Text(
+                unicode,
+                fontSize = (size * 0.82f).sp,
+                lineHeight = (size * 0.82f).sp,
+                maxLines = 1,
+            )
         }
     }
 }
+
+/** Every animated emoji loops without stopping, whatever its display mode. */
+internal fun emojiLoopsForever(@Suppress("UNUSED_PARAMETER") mode: EmojiDisplayMode): Boolean = true
 
 /** Flutter MediaQuery.disableAnimations on Android maps to the animator
  *  duration scale being zeroed (Flutter engine AccessibilityBridge). */
