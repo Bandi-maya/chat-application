@@ -120,6 +120,8 @@ fun UniversalChatyIconsScreen(
     val prefs = preferences.universal
     val activeTheme = ChatyIconThemeId.fromString(prefs.iconTheme)
 
+    var showThemeSelector by remember { mutableStateOf(false) }
+    var resetTheme by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("All") }
     var previewIsDark by remember { mutableStateOf(true) }
@@ -137,7 +139,7 @@ fun UniversalChatyIconsScreen(
 
     fun applyTheme(theme: ChatyIconThemeId) {
         ChatyHapticsPort.selection(view)
-        preferences.updateUniversal(prefs.copy(iconTheme = theme.title))
+        preferences.updateUniversal(preferences.universal.copy(iconTheme = theme.title))
         // Dart snackbar: '<title> icon theme applied across Chaty', 2s.
         onMessage("${theme.title} icon theme applied across Chaty")
     }
@@ -146,7 +148,7 @@ fun UniversalChatyIconsScreen(
         title = "Universal Chaty Icons",
         onBack = onBack,
         actions = {
-            TextButton(onClick = { applyTheme(ChatyIconThemeId.chatySigil) }) {
+            TextButton(onClick = { resetTheme = true; showThemeSelector = true }) {
                 Icon(Icons.Rounded.Refresh, contentDescription = null, tint = accent, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(4.dp))
                 Text("Reset", color = accent, fontSize = 12.5.sp)
@@ -256,7 +258,7 @@ fun UniversalChatyIconsScreen(
             Column(
                 Modifier.fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .clickable { applyTheme(itemTheme) }
+                    .clickable { resetTheme = false; showThemeSelector = true }
                     .background(
                         if (isSelected) accent.copy(alpha = 0.12f) else surface,
                         RoundedCornerShape(16.dp),
@@ -481,6 +483,21 @@ fun UniversalChatyIconsScreen(
         Spacer(Modifier.height(30.dp))
     }
 
+    if (showThemeSelector) {
+        com.example.chat.ui.kit.ChatySingleChoiceModal(
+            title = if (resetTheme) "Reset icons" else "Select icons", value = activeTheme,
+            options = if (resetTheme) listOf(ChatyIconThemeId.chatySigil) else ChatyIconThemeId.entries.toList(),
+            labelBuilder = { it.title }, onDismiss = { showThemeSelector = false },
+            onApply = { chosen -> applyTheme(chosen); showThemeSelector = false },
+            previewBuilder = { theme ->
+                Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
+                    UniversalIconsLogic.filteredIcons("All", "").take(4).forEach { iconId ->
+                        ChatyIcon(iconId, size = 24.dp, color = accent, themeOverride = theme)
+                    }
+                }
+            },
+        )
+    }
     // Dart _showIconDetailModal: bottom sheet, top radius 24, one icon across
     // all ten themes.
     detailIcon?.let { iconId ->
