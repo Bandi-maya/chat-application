@@ -394,7 +394,7 @@ fun UniversalStylesScreen(
 
     // Dart _showNotificationIconModal
     if (sheet == 1) {
-        ModalBottomSheet(onDismissRequest = { sheet = 0 }) {
+        ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = { sheet = 0 }) {
             Text(
                 "Change Notification Icon",
                 fontSize = 17.sp * fontScale,
@@ -449,7 +449,7 @@ fun UniversalStylesScreen(
 
     // Dart _showFontStyleModal
     if (sheet == 2) {
-        ModalBottomSheet(onDismissRequest = { sheet = 0 }) {
+        ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = { sheet = 0 }) {
             Text(
                 "Font Style",
                 fontSize = 17.sp * fontScale,
