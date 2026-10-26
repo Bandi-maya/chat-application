@@ -68,13 +68,13 @@ fun GbCustomSwitch(
     val config = LocalThemeConfig.current
     val view = androidx.compose.ui.platform.LocalView.current
     val active = activeColor ?: Color(config.accentColor)
-    val track by animateColorAsState(if (value) active else colors.borderSubtle.copy(alpha = 0.8f), tween(200), label = "gbTrack")
+    val track by animateColorAsState(if (value) active else colors.foregroundSecondary.copy(alpha = 0.22f), tween(200), label = "gbTrack")
     val thumbOffset by animateDpAsState(if (value) 22.dp else 0.dp, tween(200), label = "gbThumb")
     Box(
         Modifier.size(width = 52.dp, height = 30.dp)
             .clip(RoundedCornerShape(15.dp))
             .background(track)
-            .border(1.2.dp, if (value) active else colors.borderSubtle, RoundedCornerShape(15.dp))
+            .border(1.2.dp, if (value) active else colors.foregroundSecondary.copy(alpha = 0.7f), RoundedCornerShape(15.dp))
             .then(if (interactive) Modifier.clickable { ChatyHapticsPort.selection(view); onChanged(!value) } else Modifier)
             .padding(3.dp),
     ) {
@@ -82,11 +82,11 @@ fun GbCustomSwitch(
             Modifier.offset(x = thumbOffset)
                 .size(22.dp)
                 .shadow(4.dp, CircleShape, ambientColor = colors.shadow, spotColor = colors.shadow)
-                .background(if (value) colors.onPrimary else colors.foregroundTertiary, CircleShape),
+                .background(if (value) colors.onPrimary else colors.foregroundSecondary, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             if (value) Icon(Icons.Rounded.Check, null, tint = active, modifier = Modifier.size(14.dp))
-            else Box(Modifier.size(width = 8.dp, height = 2.dp).background(Color.White.copy(alpha = 0.7f), RoundedCornerShape(1.dp)))
+            else Box(Modifier.size(width = 8.dp, height = 2.dp).background(colors.surface, RoundedCornerShape(1.dp)))
         }
     }
 }
