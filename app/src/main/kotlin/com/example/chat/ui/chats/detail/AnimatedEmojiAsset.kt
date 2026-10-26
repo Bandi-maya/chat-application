@@ -25,9 +25,12 @@ import com.airbnb.lottie.compose.rememberLottieComposition
  *  lowercase hex codepoints joined by '_'), keyed by the Dart registry's
  *  lookup keys: toUnicodeEmoji(id) plus its FE0E/FE0F-normalized form.
  *
- *  Artwork provenance: Noto Animated Emoji (googlefonts/noto-emoji, SIL OFL
- *  1.1 artwork family) streamed from Google's own fonts.gstatic.com CDN -
- *  nothing is redistributed by this app; the upstream package is BSD 3-Clause.
+ *  Artwork provenance: Noto Animated Emoji by Google, licensed CC BY 4.0
+ *  (per the upstream FAQ at googlefonts.github.io/noto-emoji-files; the
+ *  static noto-emoji fonts are separately SIL OFL 1.1), streamed unmodified
+ *  from Google's fonts.gstatic.com CDN - nothing is redistributed by this
+ *  app; the upstream Flutter package is BSD 3-Clause. The user-facing
+ *  attribution notice lives in ChatyLicenseData ("Animated Noto Emoji").
  *  REQUIRES the owner-added dependency com.airbnb.android:lottie-compose. */
 object ChatyEmojiAssetRegistry {
     private val idByUnicode: Map<String, String> = mapOf(
