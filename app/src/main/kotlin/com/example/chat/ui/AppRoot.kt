@@ -743,8 +743,10 @@ fun AppRoot() {
                                                             isVideo,
                                                         )
                                                         showCallPicker = false
-                                                    } catch (e: Exception) {
-                                                        android.widget.Toast.makeText(ctx, (e.message ?: e.toString()).replace("Bad state: ", ""), android.widget.Toast.LENGTH_SHORT).show()
+                                                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                                        throw cancelled
+                                                    } catch (_: Exception) {
+                                                        android.widget.Toast.makeText(ctx, "Couldn't start call. Try again.", android.widget.Toast.LENGTH_SHORT).show()
                                                     }
                                                 }
                                             },
@@ -763,9 +765,13 @@ fun AppRoot() {
                                     onRedial = { remoteUserId, displayName, initials, colorHex, isVideo ->
                                         ServiceLocator.callPresentationController.showFullScreen()
                                         callScope.launch {
-                                            ServiceLocator.callSignaling.initiateCall(
-                                                remoteUserId, displayName, initials, colorHex, isVideo,
-                                            )
+                                            com.example.chat.ui.calls.runCallAction(onFailure = {
+                                                android.widget.Toast.makeText(shellCtx, "Couldn't start call. Try again.", android.widget.Toast.LENGTH_SHORT).show()
+                                            }) {
+                                                ServiceLocator.callSignaling.initiateCall(
+                                                    remoteUserId, displayName, initials, colorHex, isVideo,
+                                                )
+                                            }
                                         }
                                     },
                                 )
@@ -793,6 +799,8 @@ fun AppRoot() {
                                 val lookup: (String) -> com.example.chat.domain.models.UserProfile? =
                                     { id -> ServiceLocator.apiBackend.users.firstOrNull { it.id == id } }
                                 val detail = detailTask
+                                // System Back from a task detail returns to the task list, not out of the Tasks tab.
+                                androidx.activity.compose.BackHandler(enabled = detail != null && !editorOpen) { detailTask = null }
                                 if (taskUser != null && detail != null) {
                                     com.example.chat.ui.tasks.TaskDetailScreen(
                                         task = detail,
@@ -1175,7 +1183,13 @@ fun AppRoot() {
                 if (sub != null) {
                     androidx.activity.compose.BackHandler { settingsSub = null }
                     Box(Modifier.fillMaxSize()) {
-                        com.example.chat.ui.settings.SettingsSubHost(sub, onBack = { settingsSub = null }, onSwitch = { settingsSub = it })
+                        val prefsForSave = ServiceLocator.preferencesController
+                        androidx.compose.runtime.CompositionLocalProvider(
+                            com.example.chat.ui.settings.LocalSettingsSaveFailure provides
+                                com.example.chat.ui.settings.SettingsSaveFailure(prefsForSave.saveState, prefsForSave::retrySave),
+                        ) {
+                            com.example.chat.ui.settings.SettingsSubHost(sub, onBack = { settingsSub = null }, onSwitch = { settingsSub = it })
+                        }
                     }
                 }
                 val notice = settingsNotice
