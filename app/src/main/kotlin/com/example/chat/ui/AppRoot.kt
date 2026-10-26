@@ -331,6 +331,40 @@ fun AppRoot() {
                 }
                 var settingsNotice by remember { mutableStateOf<String?>(null) }
                 var showCallPicker by remember { mutableStateOf(false) }
+                var storyCapture by remember {
+                    mutableStateOf<kotlinx.coroutines.CompletableDeferred<com.example.chat.ui.updates.CapturedStoryMedia?>?>(null)
+                }
+                var showCenterEffects by remember { mutableStateOf(false) }
+                var createTaskTick by remember { mutableIntStateOf(0) }
+                var shellRev by remember { mutableIntStateOf(0) }
+                val shellCtx = androidx.compose.ui.platform.LocalContext.current
+                androidx.compose.runtime.DisposableEffect(Unit) {
+                    val l: () -> Unit = { shellRev++ }
+                    ServiceLocator.preferencesController.addListener(l)
+                    ServiceLocator.templateController.addListener(l)
+                    ServiceLocator.appearanceVariantController.addListener(l)
+                    onDispose {
+                        ServiceLocator.preferencesController.removeListener(l)
+                        ServiceLocator.templateController.removeListener(l)
+                        ServiceLocator.appearanceVariantController.removeListener(l)
+                    }
+                }
+                @Suppress("UNUSED_EXPRESSION") shellRev
+                val shellToast: (String) -> Unit = {
+                    android.widget.Toast.makeText(shellCtx, it, android.widget.Toast.LENGTH_SHORT).show()
+                }
+                // ChatyCameraCaptureScreen.open(story): a suspend seam completed by the camera dialog below.
+                val captureStory: suspend () -> com.example.chat.ui.updates.CapturedStoryMedia? = {
+                    val d = kotlinx.coroutines.CompletableDeferred<com.example.chat.ui.updates.CapturedStoryMedia?>()
+                    storyCapture = d
+                    d.await()
+                }
+                val publishStory: suspend (com.example.chat.ui.updates.CapturedStoryMedia) -> Unit = { m ->
+                    ServiceLocator.statusService.publishMediaBytes(
+                        bytes = m.bytes, displayName = "chaty_story.jpg", mediaType = "image",
+                        text = m.caption, mimeType = "image/jpeg",
+                    )
+                }
                 var settingsSub by remember { mutableStateOf<com.example.chat.ui.settings.SettingsDestination?>(null) }
                 var pushedSettings by remember { mutableStateOf(false) }
                 var pushedProfile by remember { mutableStateOf(false) }
@@ -364,8 +398,113 @@ fun AppRoot() {
                         settingsNotice = dest.name
                     }
                 }
+                val shellHome = ServiceLocator.preferencesController.home
+                val shellPrefsCtl = ServiceLocator.preferencesController
+                val shellPrivacy = shellPrefsCtl.privacy
                 com.example.chat.ui.navigation.MainNavigationShell(
                     colors = shellColors,
+                    template = ServiceLocator.templateController.navigation,
+                    navigationMode = themeController.navigationMode,
+                    layoutMode = themeController.layoutMode,
+                    prefs = com.example.chat.ui.navigation.NavigationShellPrefs(
+                        separateChatsAndGroups = shellHome.separateChatsAndGroups,
+                        hasCustomNavigationDestinations = ServiceLocator.templateController.hasCustomNavigationDestinations,
+                        hideTasks = shellPrefsCtl.gbBool("nav_hide_tasks"),
+                        hideUpdates = shellPrefsCtl.gbBool("nav_hide_updates"),
+                        pagerTransition3d = shellHome.pagerTransition3d,
+                        bottomBarStyle = ServiceLocator.appearanceVariantController.bottomBarStyle,
+                        navigationStyleName = ServiceLocator.appearanceVariantController.navigationStyle,
+                        homeStyle = shellHome.homeStyle,
+                        animationsDisabled = android.provider.Settings.Global.getFloat(
+                            shellCtx.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f,
+                        ) == 0f,
+                    ),
+                    myNameOverride = { shellHome.myNameOverride },
+                    onNotify = shellToast,
+                    onExitApp = { (shellCtx as? android.app.Activity)?.finish() },
+                    onCenterAction = {
+                        // Dart _handleNavigationCenterAction.
+                        if (ServiceLocator.templateController.navigation.centerActionId != "camera") {
+                            showCenterEffects = true
+                        } else {
+                            scope.launch {
+                                val r = captureStory()
+                                if (r != null) {
+                                    try {
+                                        publishStory(r)
+                                        shellToast("Status posted.")
+                                    } catch (e: Exception) {
+                                        shellToast((e.message ?: e.toString()).replaceFirst("Exception: ", ""))
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    fab = { activeId ->
+                        com.example.chat.ui.navigation.ContextualNavigationFab(
+                            activeDestinationId = activeId,
+                            colors = shellColors,
+                            prefs = com.example.chat.ui.navigation.NavigationFabPrefs(
+                                hideFab = shellHome.hideFab,
+                                showMetaAiIcon = shellHome.showMetaAiIcon,
+                                fabNormalColor = shellHome.fabNormalColor,
+                                fabPressedColor = shellHome.fabPressedColor,
+                                fabIconsColor = shellHome.fabIconsColor,
+                                hideNewMessageFab = shellHome.hideNewMessageFab,
+                                hideLastSeenFab = shellHome.hideLastSeenFab,
+                                hideCutEditFab = shellHome.hideCutEditFab,
+                                hidePluginsList = shellHome.hidePluginsList,
+                                hideGbwaSettingsFab = shellHome.hideGbwaSettingsFab,
+                                freezeLastSeen = shellPrivacy.freezeLastSeen,
+                            ),
+                            actions = com.example.chat.ui.navigation.NavigationFabActions(
+                                onNewChat = { g -> newChatGroup = g; newChatBroadcast = false; route = AuthRoute.NewChat },
+                                onCreateTask = { createTaskTick++ },
+                                onNewCall = { showCallPicker = true },
+                                onScanQr = { linkedDevicesOnly = false; route = AuthRoute.LinkedDevices },
+                                onOpenSettings = { pushedSettings = true },
+                                onOpenThemeStudio = { settingsSub = com.example.chat.ui.settings.SettingsDestination.ThemeEngine },
+                                onOpenMessageScheduler = { pushedMessageManagement = true },
+                                onOpenAutoReplyRules = { pushedMessageManagement = true },
+                                onToggleFreezeLastSeen = { frozen ->
+                                    shellPrefsCtl.updatePrivacy(shellPrefsCtl.privacy.copy(freezeLastSeen = frozen))
+                                },
+                                onRestartApp = {
+                                    val launch = shellCtx.packageManager.getLaunchIntentForPackage(shellCtx.packageName)
+                                    if (launch != null) {
+                                        launch.addFlags(
+                                            android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK,
+                                        )
+                                        shellCtx.startActivity(launch)
+                                        Runtime.getRuntime().exit(0)
+                                    }
+                                },
+                                captureStory = captureStory,
+                                publishStory = publishStory,
+                                openDirectConversation = { target ->
+                                    val api = ServiceLocator.apiBackend
+                                    val number = target.trim()
+                                    val existing = api.users.firstOrNull { it.phone.trim() == number || it.username.trim() == number }
+                                    val digits = number.filter { it.isDigit() }
+                                    val user = existing ?: com.example.chat.domain.models.UserProfile(
+                                        id = if (digits.isNotEmpty()) "user_$digits" else number,
+                                        displayName = number, username = number,
+                                        avatarInitials = number.take(1).uppercase(), avatarColorHex = "#25D366",
+                                        about = "Chaty User", lastSeenAt = java.time.Instant.now(), phone = number,
+                                    )
+                                    ServiceLocator.conversationsRepository.getOrCreateDirectConversationAsync(user).id
+                                },
+                                onOpenConversation = { id ->
+                                    ServiceLocator.apiBackend.conversations.firstOrNull { it.id == id }?.let { c ->
+                                        ServiceLocator.apiBackend.setActiveConversation(c.id)
+                                        selectedConversation = c
+                                        route = AuthRoute.ChatDetail
+                                    }
+                                },
+                            ),
+                            onNotify = shellToast,
+                        )
+                    },
                     currentUser = ServiceLocator.apiBackend.currentUser?.let { u ->
                         com.example.chat.domain.models.UserProfile(
                             id = u.id, displayName = u.displayName, username = u.username,
@@ -521,6 +660,10 @@ fun AppRoot() {
                                 var detailTask by remember { mutableStateOf<com.example.chat.domain.models.ChatTask?>(null) }
                                 var editorOpen by remember { mutableStateOf(false) }
                                 var editorTask by remember { mutableStateOf<com.example.chat.domain.models.ChatTask?>(null) }
+                                // Contextual FAB 'Create task' (hoisted tick from the shell FAB).
+                                androidx.compose.runtime.LaunchedEffect(createTaskTick) {
+                                    if (createTaskTick > 0) { editorTask = null; editorOpen = true }
+                                }
                                 androidx.compose.runtime.DisposableEffect(controller) {
                                     val l: () -> Unit = { tasksRevision++ }
                                     controller.addListener(l)
@@ -583,6 +726,7 @@ fun AppRoot() {
                                         currentUser = updUser,
                                         getUser = { id -> ServiceLocator.apiBackend.users.firstOrNull { it.id == id } },
                                         statuses = statusFlow,
+                                        captureStory = captureStory,
                                         onNotify = { msg ->
                                             android.widget.Toast.makeText(toastContext, msg, android.widget.Toast.LENGTH_SHORT).show()
                                         },
@@ -596,6 +740,31 @@ fun AppRoot() {
                         }
                     },
                 )
+                if (showCenterEffects) com.example.chat.ui.camera.EffectPickerHost(onDismiss = { showCenterEffects = false })
+                storyCapture?.let { pending ->
+                    androidx.compose.ui.window.Dialog(
+                        onDismissRequest = { pending.complete(null); storyCapture = null },
+                        properties = androidx.compose.ui.window.DialogProperties(
+                            usePlatformDefaultWidth = false, decorFitsSystemWindows = false,
+                        ),
+                    ) {
+                        Box(Modifier.fillMaxSize()) {
+                            com.example.chat.ui.camera.ChatyCameraCaptureScreen(
+                                mode = com.example.chat.ui.camera.ChatyCaptureMode.story,
+                                onResult = { r ->
+                                    scope.launch {
+                                        val bytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                            java.io.File(r.path).readBytes()
+                                        }
+                                        pending.complete(com.example.chat.ui.updates.CapturedStoryMedia(bytes, r.caption))
+                                        storyCapture = null
+                                    }
+                                },
+                                onDismiss = { pending.complete(null); storyCapture = null },
+                            )
+                        }
+                    }
+                }
                 if (pushedProfile) {
                     androidx.activity.compose.BackHandler(enabled = settingsSub == null && !pushedSettings) { pushedProfile = false }
                     val profUser = ServiceLocator.apiBackend.currentUser?.let { toDomainUser(it) }
