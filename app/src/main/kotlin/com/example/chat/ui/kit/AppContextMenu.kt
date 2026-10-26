@@ -125,10 +125,10 @@ fun AppContextMenu(
         )
         return
     }
-    ModalBottomSheet(
+    ModalBottomSheet(tonalElevation = 0.dp,
         onDismissRequest = onDismiss,
         containerColor = bg,
-        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+        shape = com.example.chat.ui.kit.ChatyModalShape,
         dragHandle = null,
     ) {
         Column(
@@ -248,10 +248,10 @@ private fun AnchoredContextSurface(
                         scaleX = sc; scaleY = sc
                         transformOrigin = TransformOrigin((o.x + 1f) / 2f, (o.y + 1f) / 2f)
                     }
-                    .shadow(12.dp, RoundedCornerShape(16.dp), ambientColor = Color.Black.copy(alpha = 0.16f), spotColor = Color.Black.copy(alpha = 0.16f))
-                    .background(bg, RoundedCornerShape(16.dp))
-                    .border(1.1.dp, secondary.copy(alpha = 0.18f), RoundedCornerShape(16.dp))
-                    .clip(RoundedCornerShape(16.dp))
+                    .shadow(12.dp, ChatyModalShape, ambientColor = Color.Black.copy(alpha = 0.16f), spotColor = Color.Black.copy(alpha = 0.16f))
+                    .background(bg, ChatyModalShape)
+                    .border(1.1.dp, secondary.copy(alpha = 0.18f), ChatyModalShape)
+                    .clip(ChatyModalShape)
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {})
                     .verticalScroll(rememberScrollState()),
             ) {
