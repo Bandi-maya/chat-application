@@ -6,11 +6,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Shortcut
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -25,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -312,6 +320,16 @@ fun ChatDetailHost(
         onUpdateTaskStatus = { id, status -> scope.launch { try { tasksController.updateTaskStatus(id, status) } catch (e: Exception) { toast(e.message ?: "Unable to update task.") } } },
         onDeleteTask = { id -> scope.launch { try { tasksController.deleteTask(id) } catch (e: Exception) { toast(e.message ?: "Unable to delete task.") } } },
         entryStyle = com.example.chat.ui.chats.detail.normalizeEntryStyle(conv.entryStyle),
+        convPrefs = ServiceLocator.preferencesController.conversation,
+        disableSwipeToExit = ServiceLocator.preferencesController.universal.disableSwipeToExit,
+        homeAvatarShape = ServiceLocator.preferencesController.home.avatarShape,
+        // quickContacts + onOpenConversation stay at their ChatDetailScreen
+        // defaults for now: the API layer has no contacts list source yet, so
+        // the integration owner binds both seams when that lands (the rail
+        // renders an empty 62dp column until then, exactly like Dart with an
+        // empty dataStore.contacts).
+        translateOption = ServiceLocator.preferencesController.universal.translateOption,
+        translationLanguage = ServiceLocator.preferencesController.universal.translationLanguage,
         composerColors = com.example.chat.ui.chats.detail.ComposerColors.resolve(
             theme, conv.uiButtonsColor, conv.emojiButtonColor, conv.sendButtonColor,
             conv.micSendBgCircleColor, conv.textEntryBackgroundColor, conv.textEntryColor,
@@ -568,10 +586,35 @@ fun ChatDetailHost(
         if (forwardItems.isEmpty()) {
             LaunchedEffect(fm) { toast("No other chats to forward to."); forwardMessage = null }
         } else {
-            AlertDialog(
+            // Dart showModalBottomSheet (chat_detail_screen.dart:2402-2499): isScrollControlled,
+            // surfaceColor sheet, top rounded 18, max height 0.7x screen, shortcut icon + limit
+            // title, sectioned avatar rows.
+            ModalBottomSheet(
                 onDismissRequest = { forwardMessage = null },
-                title = { Text("Forward to (Limit: ${ForwardTargets.maxChats(forwardPrefs.universal.increaseForwardLimit)})") },
-                text = {
+                containerColor = Color(theme.surfaceColor),
+                shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
+            ) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.7f).dp),
+                ) {
+                    Spacer(Modifier.height(14.dp))
+                    Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Rounded.Shortcut,
+                            contentDescription = null,
+                            tint = Color(theme.accentColor),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Forward to (Limit: ${ForwardTargets.maxChats(forwardPrefs.universal.increaseForwardLimit)})",
+                            color = Color(theme.primaryTextColor),
+                            fontWeight = FontWeight.W800,
+                            fontSize = 15.sp,
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
                     LazyColumn {
                         items(forwardItems.size) { index ->
                             val item = forwardItems[index]
@@ -628,15 +671,16 @@ fun ChatDetailHost(
                                             item.conversation.title,
                                             maxLines = 1,
                                             overflow = TextOverflow.ellipsis,
+                                            color = Color(theme.primaryTextColor),
                                         )
                                     }
                                 }
                             }
                         }
                     }
-                },
-                confirmButton = { TextButton(onClick = { forwardMessage = null }) { Text("Cancel") } },
-            )
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
         }
     }
     val ed = taskEditor
