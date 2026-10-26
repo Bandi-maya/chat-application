@@ -192,6 +192,9 @@ fun ChatDetailHost(
         showHeaderName = !conv.hideContactName && gbB("NameProf", true),
         showHeaderCalls = !conv.hideCallButton && gbB("Conv_call_btn", true),
         showPresenceLine = !conv.disableContactStatus && gbB("statuschat", true),
+        headerBarColor = conv.actionBarColor,
+        presencePillColor = conv.contactStatusBgColor ?: prefs.gbColor("ModChatGStatusB"),
+        presenceTextColor = conv.contactStatusTextColor ?: prefs.gbColor("ModChatGStatusT"),
         callsAllowed = connection?.callsAllowed ?: true,
         onStartCall = { isVideo ->
             if (isDirect && otherId != null) {
