@@ -29,3 +29,4 @@ poll+appearance 2026-10-26T04:05:00Z
 load-states 2026-10-26T04:12:04Z
 trigger 041505 themestudio+notifpage
 trigger 041731 notif-permission-sheet
+trigger 042600 themestudio-reapply
