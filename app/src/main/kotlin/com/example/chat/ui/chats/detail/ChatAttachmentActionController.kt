@@ -167,6 +167,22 @@ class ChatAttachmentActionController(
         }
     }
 
+    /** Explicit local review completes before this method uploads anything. */
+    suspend fun sendReviewedMedia(files: List<PickedFile>, type: String, caption: String, viewOnce: Boolean) {
+        require(type == "image" || type == "video")
+        require(files.isNotEmpty()) { "Choose an attachment first." }
+        val limit = if (type == "image") imageShareLimit().coerceIn(1, 100) else 1
+        require(files.size <= limit) { "Your configured send limit is $limit." }
+        for ((index, file) in files.withIndex()) {
+            val attachment = backend.upload(type, file)
+            backend.sendMessage(
+                if (index == 0) caption else "",
+                messageTypeFor(type), attachment,
+                if (viewOnce) mapOf("view_once" to true) else null,
+            )
+        }
+    }
+
     // --------------------------------------------------------------- location
 
     /** Dart shareLocation(): permission ladder with the exact error strings,
