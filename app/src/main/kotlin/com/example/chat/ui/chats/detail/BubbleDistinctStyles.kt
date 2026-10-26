@@ -117,14 +117,27 @@ internal fun distinctBubblePath(id: BubbleStyleId, size: Size, isMe: Boolean): P
         // Small swept hook
         BubbleStyleId.cvIos -> withTail(tailRect(size, isMe, min(18f, h / 2), 0f), size, isMe, false, 3f, 8f, 4f, 8f)
         BubbleStyleId.gabiDot2 -> tailRect(size, isMe, 14f, 2f, top = true)
-        BubbleStyleId.ilkhang -> tailRect(size, isMe, 18f, 2f)
+        BubbleStyleId.ilkhang -> tailRect(size, isMe, 10f, 2f)
         // Chamfered "boxy" frame
         BubbleStyleId.aranbor -> chamfered(size, isMe, 6f, 4f, top = false).let { p ->
             // chamfer both bottom corners by drawing the opposite one too
             Path().apply { op(p, chamfered(size, !isMe, 6f, 4f, top = false), PathOperation.Intersect) }
         }
         // Thought-bubble pill, circles drawn as accent
-        BubbleStyleId.gabyRon -> rr(size, min(24f, h / 2), min(24f, h / 2), min(24f, h / 2), min(24f, h / 2))
+        BubbleStyleId.gabyRon -> Path().apply {
+            // Thought bubble: scalloped rim, with satellite circles below.
+            val w = size.width
+            moveTo(12f, 2f)
+            cubicTo(w * 0.22f, -3f, w * 0.30f, 5f, w * 0.38f, 2f)
+            cubicTo(w * 0.52f, -3f, w * 0.66f, 5f, w - 12f, 2f)
+            cubicTo(w + 4f, 2f, w - 3f, h * 0.40f, w, h * 0.50f)
+            cubicTo(w + 4f, h * 0.75f, w - 3f, h - 1f, w - 12f, h - 2f)
+            cubicTo(w * 0.70f, h + 3f, w * 0.58f, h - 5f, w * 0.48f, h - 2f)
+            cubicTo(w * 0.32f, h + 3f, w * 0.20f, h - 5f, 12f, h - 2f)
+            cubicTo(-4f, h - 2f, 3f, h * 0.60f, 0f, h * 0.50f)
+            cubicTo(-4f, h * 0.25f, 3f, 1f, 12f, 2f)
+            close()
+        }
         // WhatsApp-like tail on the top outer corner
         BubbleStyleId.whatsappLb -> withTail(tailRect(size, isMe, 12f, 0f, top = true), size, isMe, true, 6f, 10f, 4f, 8f)
         // Telegram-like hook at the bottom corner
@@ -132,7 +145,7 @@ internal fun distinctBubblePath(id: BubbleStyleId, size: Size, isMe: Boolean): P
         // Samsung ChatOn: big triangular tail
         BubbleStyleId.waChatOn -> withTail(tailRect(size, isMe, 10f, 0f), size, isMe, false, 8f, 16f, 2f, 6f)
         // Twitter DM: one sharp corner
-        BubbleStyleId.twitter -> tailRect(size, isMe, 18f, 0f)
+        BubbleStyleId.twitter -> if (isMe) rr(size, 22f, 0f, 0f, 22f) else rr(size, 0f, 22f, 22f, 0f)
         BubbleStyleId.plusMessengerEd -> tailRect(size, isMe, 18f, 4f, top = true)
         BubbleStyleId.newHangouts4 -> if (isMe) rr(size, 16f, 0f, 16f, 16f) else rr(size, 0f, 16f, 16f, 16f)
         BubbleStyleId.doodleHang -> doodle(size)
@@ -147,10 +160,10 @@ internal fun distinctBubblePath(id: BubbleStyleId, size: Size, isMe: Boolean): P
         BubbleStyleId.bryed -> rr(size, 14f, 4f, 4f, 14f)
         BubbleStyleId.hike -> withTail(tailRect(size, isMe, 10f, 0f), size, isMe, false, 5f, 9f, 3f, 9f)
         BubbleStyleId.win -> rr(size, 2f, 2f, 2f, 2f)
-        BubbleStyleId.samyadeepDual -> tailRect(size, isMe, 20f, 6f)
+        BubbleStyleId.samyadeepDual -> tailRect(size, isMe, 12f, 6f)
         BubbleStyleId.popzup -> rr(size, h / 2, h / 2, h / 2, h / 2)
         BubbleStyleId.line -> tailRect(size, isMe, 20f, 0f)
-        BubbleStyleId.mood -> tailRect(size, isMe, 24f, 8f)
+        BubbleStyleId.mood -> if (isMe) rr(size, 22f, 12f, 4f, 22f) else rr(size, 12f, 22f, 22f, 4f)
         // Swept tail on the top outer corner instead of the bottom
         BubbleStyleId.rcGoSms -> withTail(tailRect(size, isMe, min(16f, h / 2), 4f, top = true), size, isMe, true, 12f, 14f, 10f, 2f)
         BubbleStyleId.rcImess -> dome(size, 26f, 10f, bevel = false)
