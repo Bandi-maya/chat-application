@@ -34,21 +34,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import com.example.chat.ui.chats.home.HomeFilterChips
 import com.example.chat.ui.kit.ChatyPreviewRadioRow
 import com.example.chat.ui.kit.ChatySelectionModal
 import com.example.chat.ui.navigation.pagerTransition
 import com.example.chat.ui.theme.LocalAppColors
 import com.example.chat.ui.theme.LocalThemeConfig
-
-/** Same corner mapping HomeFilterChips applies, so the preview matches the real tab chips. */
-private fun tabChipRadiusDp(style: String): Int = when (style) {
-    "Capsule Pill" -> 20
-    "Glassmorphism Glow" -> 14
-    "Soft Rounded Pill" -> 10
-    "Outlined Bubble" -> 18
-    "Segmented Tab" -> 6
-    else -> 20
-}
 
 /**
  * One grouped selector for the two related header options (tab bubble style and 3D pager effect).
@@ -98,21 +92,27 @@ private fun SectionLabel(text: String) {
     )
 }
 
+/**
+ * The ACTUAL HomeFilterChips (same component, same tabBubbleStyle handling as the home screen), laid out in a
+ * fixed viewport and scaled uniformly into the row's preview slot, so text and chips are never clipped and the
+ * motif (radius, fill, outline, glow, segmenting) is exactly what the home screen draws.
+ */
 @Composable
 private fun TabChipPreview(style: String) {
-    val colors = LocalAppColors.current
-    val shape = RoundedCornerShape(tabChipRadiusDp(style).dp)
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier.size(width = 38.dp, height = 22.dp).clip(shape).background(colors.primary.copy(alpha = 0.18f))
-                .border(1.dp, colors.primary.copy(alpha = 0.45f), shape),
-            contentAlignment = Alignment.Center,
-        ) { Text("All", color = colors.primary, fontSize = 10.sp, fontWeight = FontWeight.W700, maxLines = 1) }
-        Box(
-            Modifier.size(width = 30.dp, height = 22.dp).clip(shape).background(colors.surfaceSecondary)
-                .border(1.dp, colors.border, shape),
-            contentAlignment = Alignment.Center,
-        ) { Text("Un", color = colors.foregroundSecondary, fontSize = 10.sp, fontWeight = FontWeight.W500, maxLines = 1) }
+    val vw = 150.dp
+    val vh = 36.dp
+    androidx.compose.foundation.layout.BoxWithConstraints {
+        val avail = if (constraints.hasBoundedWidth) maxWidth else vw
+        val scale = (avail.value / vw.value).coerceAtMost(1f)
+        Box(Modifier.size(vw * scale, vh * scale)) {
+            Box(
+                Modifier.requiredSize(vw, vh).graphicsLayer {
+                    scaleX = scale; scaleY = scale; transformOrigin = TransformOrigin(0f, 0f)
+                },
+            ) {
+                HomeFilterChips(LocalThemeConfig.current, style, listOf("All", "Unread"), "All") {}
+            }
+        }
     }
 }
 
