@@ -304,10 +304,10 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
             IslandAction(actionTitle.take(24), actionIntent)
         }
 
-        // If enabled, silence/hide notification from the Android system notification shade so it ONLY displays in Dynamic Island
-        if (isHideSystemNotificationsEnabled(this) && !isCall && Settings.canDrawOverlays(this)) {
-            runCatching { cancelNotification(sbn.key) }
-        }
+        // Preserve the original Android notification. Dismissing it here
+        // races lock/disable checks and the removal callback can erase the
+        // island item too. Reduce banners only through Android channel settings;
+        // the legacy hide preference remains stored, not destructive takeover.
 
         val notificationKey = sbn.key ?: "${sbn.packageName}:${sbn.id}"
         Handler(Looper.getMainLooper()).post {
