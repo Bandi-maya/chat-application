@@ -323,6 +323,7 @@ fun ChatDetailHost(
         convPrefs = ServiceLocator.preferencesController.conversation,
         disableSwipeToExit = ServiceLocator.preferencesController.universal.disableSwipeToExit,
         homeAvatarShape = ServiceLocator.preferencesController.home.avatarShape,
+        universalEmojiStyle = ServiceLocator.preferencesController.universal.emojiStyle,
         // quickContacts + onOpenConversation stay at their ChatDetailScreen
         // defaults for now: the API layer has no contacts list source yet, so
         // the integration owner binds both seams when that lands (the rail
