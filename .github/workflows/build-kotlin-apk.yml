@@ -16,6 +16,27 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Restore pinned cumulative candidate source
+        run: |
+          python3 - <<'PYOVERLAY'
+          import base64,hashlib,json,pathlib,zipfile,io
+          d=pathlib.Path('ci/candidate-overlay')
+          m=json.loads((d/'manifest.json').read_text())
+          raw=base64.b64decode(''.join(p.read_text().strip() for p in sorted(d.glob('part-*.b64'))),validate=True)
+          assert hashlib.sha256(raw).hexdigest()==m['archive_sha256']
+          z=zipfile.ZipFile(io.BytesIO(raw))
+          assert set(z.namelist())==set(m['files'])
+          for p in z.infolist():
+              n=p.filename; q=pathlib.PurePosixPath(n)
+              assert not q.is_absolute() and '..' not in q.parts and not n.startswith('.') and not n.endswith('/')
+              assert n.startswith(('app/','ci/')) and '/build/' not in n and '/.env' not in n
+              assert (p.external_attr >> 16) & 0o170000 != 0o120000
+              data=z.read(p); assert hashlib.sha256(data).hexdigest()==m['files'][n]
+              target=pathlib.Path(n); assert not target.is_symlink()
+              assert all(not parent.is_symlink() for parent in target.parents)
+              target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(data)
+          print('CANDIDATE-OVERLAY',m['archive_sha256'],'files',len(m['files']))
+          PYOVERLAY
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -98,6 +119,27 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      - name: Restore pinned cumulative candidate source
+        run: |
+          python3 - <<'PYOVERLAY'
+          import base64,hashlib,json,pathlib,zipfile,io
+          d=pathlib.Path('ci/candidate-overlay')
+          m=json.loads((d/'manifest.json').read_text())
+          raw=base64.b64decode(''.join(p.read_text().strip() for p in sorted(d.glob('part-*.b64'))),validate=True)
+          assert hashlib.sha256(raw).hexdigest()==m['archive_sha256']
+          z=zipfile.ZipFile(io.BytesIO(raw))
+          assert set(z.namelist())==set(m['files'])
+          for p in z.infolist():
+              n=p.filename; q=pathlib.PurePosixPath(n)
+              assert not q.is_absolute() and '..' not in q.parts and not n.startswith('.') and not n.endswith('/')
+              assert n.startswith(('app/','ci/')) and '/build/' not in n and '/.env' not in n
+              assert (p.external_attr >> 16) & 0o170000 != 0o120000
+              data=z.read(p); assert hashlib.sha256(data).hexdigest()==m['files'][n]
+              target=pathlib.Path(n); assert not target.is_symlink()
+              assert all(not parent.is_symlink() for parent in target.parents)
+              target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(data)
+          print('CANDIDATE-OVERLAY',m['archive_sha256'],'files',len(m['files']))
+          PYOVERLAY
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
