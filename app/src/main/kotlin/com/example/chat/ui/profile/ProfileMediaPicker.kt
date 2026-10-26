@@ -166,7 +166,8 @@ class ProfileMediaPickerState internal constructor(
     private val launchCamera: () -> Unit,
 ) {
     /** Start picking from [source]; the crop dialog follows automatically. */
-    fun launch(source: ProfileMediaSource, isAvatar: Boolean) {
+    fun launch(source: ProfileMediaSource, isAvatar: Boolean, square: Int = pendingSquare) {
+        pendingSquare = square
         pendingIsAvatar = isAvatar
         pendingTitle = if (isAvatar) "Crop Avatar Photo" else "Crop Profile Banner"
         when (source) {
@@ -176,6 +177,7 @@ class ProfileMediaPickerState internal constructor(
     }
 
     internal var pendingIsAvatar: Boolean = true
+    internal var pendingSquare: Int = 512
     internal var pendingTitle: String = "Crop Avatar Photo"
 }
 
@@ -187,9 +189,9 @@ class ProfileMediaPickerState internal constructor(
  */
 @Composable
 fun rememberProfileMediaPicker(
-    square: Int,
     onResult: (File?) -> Unit,
     onError: (String) -> Unit = {},
+    square: Int = 512,
 ): ProfileMediaPickerState {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -203,7 +205,7 @@ fun rememberProfileMediaPicker(
             return
         }
         scope.launch {
-            val file = copyPickToCache(context, uri, square)
+            val file = copyPickToCache(context, uri, state.value?.pendingSquare ?: square)
             if (file == null) {
                 onError("The selected image is no longer accessible.")
             } else {
@@ -226,7 +228,15 @@ fun rememberProfileMediaPicker(
             onResult(null)
         } else {
             val s = state.value ?: return@rememberLauncherForActivityResult
-            pendingCrop = PendingCrop(file, s.pendingIsAvatar, s.pendingTitle)
+            // Dart image_picker bounds camera captures to the same max dimension and quality.
+            scope.launch {
+                val bounded = boundPickedFile(context, file, s.pendingSquare)
+                if (bounded == null) {
+                    onError("The captured image could not be read.")
+                } else {
+                    pendingCrop = PendingCrop(bounded, s.pendingIsAvatar, s.pendingTitle)
+                }
+            }
         }
     }
 
@@ -278,9 +288,23 @@ fun rememberProfileMediaPicker(
  *  applied, matching what Image.file shows. */
 private suspend fun copyPickToCache(context: Context, uri: Uri, square: Int): File? =
     withContext(Dispatchers.IO) {
-        runCatching {
-            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                ?: return@runCatching null
+        val bytes = runCatching {
+            context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+        }.getOrNull() ?: return@withContext null
+        boundImageBytesToCache(context, bytes, square)
+    }
+
+/** Camera-capture variant (Dart image_picker bounds camera captures the same way). */
+private suspend fun boundPickedFile(context: Context, file: File, square: Int): File? =
+    withContext(Dispatchers.IO) {
+        val bytes = runCatching { file.readBytes() }.getOrNull() ?: return@withContext null
+        val out = boundImageBytesToCache(context, bytes, square)
+        runCatching { file.delete() }
+        out
+    }
+
+private fun boundImageBytesToCache(context: Context, bytes: ByteArray, square: Int): File? =
+    runCatching {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
@@ -297,11 +321,10 @@ private suspend fun copyPickToCache(context: Context, uri: Uri, square: Int): Fi
                 "chaty_pick_${System.currentTimeMillis()}.jpg",
             )
             file.outputStream().use { oriented.compress(Bitmap.CompressFormat.JPEG, 95, it) }
-            oriented.recycle()
+            if (oriented !== decoded) oriented.recycle()
             decoded.recycle()
             file
         }.getOrNull()
-    }
 
 /** Port of image_editor_cropper_dialog.dart as a full-screen dialog. */
 @Composable
