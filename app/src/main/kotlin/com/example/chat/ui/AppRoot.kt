@@ -60,8 +60,17 @@ fun AppRoot() {
         onDispose { themeController.removeListener(listener) }
     }
     // themeRevision re-reads the controller's current theme on every mutation.
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val prefsListener: () -> Unit = { themeRevision++ }
+        ServiceLocator.preferencesController.addListener(prefsListener)
+        onDispose { ServiceLocator.preferencesController.removeListener(prefsListener) }
+    }
     @Suppress("UNUSED_EXPRESSION") themeRevision
-    ChatyTheme(config = themeController.globalTheme) {
+    // Dart main.dart:725 GbThemeOverrides.resolve(themeController.globalTheme, prefs).
+    val resolvedTheme = com.example.chat.ui.theme.GbThemeOverrides.resolve(
+        themeController.globalTheme, ServiceLocator.preferencesController,
+    )
+    ChatyTheme(config = resolvedTheme) {
         var route by remember { mutableStateOf(AuthRoute.Splash) }
         // Dart pre-auth Navigator stack: Register is pushed from Welcome or Login, RegisterOrganization from
         // Login or Register; pop returns to whichever pushed it.
@@ -341,8 +350,8 @@ fun AppRoot() {
                 @Suppress("UNUSED_EXPRESSION") chatRevision
                 // chats destination content
                 // (ChatsHomeScreen below)
-                val shellColors = remember(themeController.globalTheme) {
-                    com.example.chat.ui.core.theme.ChatyColors(themeController.globalTheme)
+                val shellColors = remember(resolvedTheme) {
+                    com.example.chat.ui.core.theme.ChatyColors(resolvedTheme)
                 }
                 var settingsNotice by remember { mutableStateOf<String?>(null) }
                 var showCallPicker by remember { mutableStateOf(false) }
@@ -695,7 +704,7 @@ fun AppRoot() {
                                     com.example.chat.ui.tasks.TaskDetailScreen(
                                         task = detail,
                                         controller = controller,
-                                        colors = com.example.chat.ui.tasks.TaskColors(themeController.globalTheme),
+                                        colors = com.example.chat.ui.tasks.TaskColors(resolvedTheme),
                                         currentUser = taskUser,
                                         getUser = lookup,
                                         onBack = { detailTask = null },
@@ -715,7 +724,7 @@ fun AppRoot() {
                                 if (editorOpen && taskUser != null) {
                                     com.example.chat.ui.tasks.TaskCreateEditModal(
                                         controller = controller,
-                                        colors = com.example.chat.ui.tasks.TaskColors(themeController.globalTheme),
+                                        colors = com.example.chat.ui.tasks.TaskColors(resolvedTheme),
                                         conversations = ServiceLocator.apiBackend.conversations,
                                         currentUser = taskUser,
                                         getUser = lookup,
@@ -1100,7 +1109,7 @@ fun AppRoot() {
                 val repoS = ServiceLocator.conversationsRepository
                 val prefsS = ServiceLocator.preferencesController
                 com.example.chat.ui.search.GlobalSearchScreen(
-                    colors = com.example.chat.ui.core.theme.ChatyColors(themeController.globalTheme),
+                    colors = com.example.chat.ui.core.theme.ChatyColors(resolvedTheme),
                     conversations = ServiceLocator.apiBackend.conversations,
                     searchUsers = { q -> repoS.searchUsersRemote(q) },
                     openDirectConversation = { u -> repoS.getOrCreateDirectConversationAsync(u) },
