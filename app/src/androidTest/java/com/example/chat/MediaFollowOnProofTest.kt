@@ -121,7 +121,7 @@ class MediaFollowOnProofTest {
         source.delete()
     }
 
-    private fun createAvcWithAudio(file: File, audio: File) {
+    internal fun createAvcWithAudio(file: File, audio: File) {
         val codec = MediaCodec.createEncoderByType("video/avc")
         val format = MediaFormat.createVideoFormat("video/avc", 64, 64).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible)
