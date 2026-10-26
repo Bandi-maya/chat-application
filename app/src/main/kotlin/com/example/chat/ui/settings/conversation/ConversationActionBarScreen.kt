@@ -16,7 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.PersonOff
-import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.FormatColorText
 import androidx.compose.material.icons.rounded.FormatPaint
@@ -105,7 +105,7 @@ fun ConversationActionBarScreen(preferences: ChatyPreferencesController, onBack:
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Rounded.ArrowBack, null, tint = primaryText, modifier = Modifier.size(22.dp))
+                        Icon(Icons.Rounded.ChevronLeft, null, tint = primaryText, modifier = Modifier.size(22.dp))
                         Spacer(Modifier.width(8.dp))
                         if (!p.hideProfilePicture) {
                             Box(Modifier.size(36.dp).background(colors.surfaceSecondary, CircleShape), contentAlignment = Alignment.Center) {
