@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -42,6 +43,14 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
     val prefsStore = remember { ServiceLocator.callPresentationPrefs }
     val scope = rememberCoroutineScope()
     val hostContext = androidx.compose.ui.platform.LocalContext.current
+    fun callAction(callId: String?, failureMessage: String, action: suspend () -> Unit) {
+        scope.launch {
+            if (callId == null || service.currentSession?.callId != callId) return@launch
+            runCallAction(onFailure = {
+                android.widget.Toast.makeText(hostContext, failureMessage, android.widget.Toast.LENGTH_SHORT).show()
+            }, action = action)
+        }
+    }
     var revision by remember { mutableIntStateOf(0) }
     DisposableEffect(service, presentation) {
         val l: () -> Unit = { revision++ }
@@ -53,6 +62,14 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
             presentation.removeListener(l)
             prefsStore.removeListener(l)
         }
+    }
+    val hostView = androidx.compose.ui.platform.LocalView.current
+    DisposableEffect(service, hostView) {
+        val waiting: () -> Unit = {
+            hostView.post { if (hostView.isAttachedToWindow) com.example.chat.ui.kit.ChatyHapticsPort.error(hostView) }
+        }
+        service.addCallWaitingListener(waiting)
+        onDispose { service.removeCallWaitingListener(waiting) }
     }
     @Suppress("UNUSED_EXPRESSION") revision
     // Dart main.dart:808-830: the DynamicIslandController is always registered, so the call island is a controller
@@ -74,8 +91,10 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
                     isVideo = cs.isVideo,
                     isSpeaker = cs.audioRoute == AudioRouteType.speaker,
                     onTap = { if (cs.isVideo) presentation.expandFromIsland() else presentation.showFullScreen() },
-                    onAcceptCall = { scope.launch { service.acceptCall() } },
-                    onDeclineCall = { service.endCall() },
+                    onAcceptCall = { callAction(cs.callId, "Unable to accept the call. Check microphone and camera permissions.") { service.acceptCall() } },
+                    onDeclineCall = { callAction(cs.callId, "Unable to decline the call.") {
+                        if (service.currentSession?.state == CallSessionState.incoming) service.declineCall() else service.endCall()
+                    } },
                 ),
                 autoExpand = cs.state == CallSessionState.incoming,
             )
@@ -92,16 +111,18 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
             template = CallScreenTemplate.fromName(prefs.incomingCallTemplate),
             onAccept = {
                 presentation.showFullScreen()
-                scope.launch { service.acceptCall() }
+                callAction(session.callId, "Unable to accept the call. Check microphone and camera permissions.") { service.acceptCall() }
             },
-            onDecline = { scope.launch { service.declineCall() } },
+            onDecline = { callAction(session.callId, "Unable to decline the call.") { service.declineCall() } },
         )
         return
     }
-    if (!session.isActive) return
+    val terminalNotice = session.state == CallSessionState.busy || session.state == CallSessionState.failed
+    var dismissedNotice by remember(session.callId, session.state) { mutableStateOf(false) }
+    if (!session.isActive && (!terminalNotice || dismissedNotice)) return
 
     val surfaces = service.activeMedia as? CallVideoSurfaceProvider
-    if (presentation.isFullScreen) {
+    if (presentation.isFullScreen || terminalNotice) {
         OngoingCallScreen(
             session = session,
             callDurationSeconds = service.callDurationSeconds,
@@ -111,14 +132,16 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
             template = CallScreenTemplate.fromName(prefs.ongoingCallTemplate),
             pictureInPictureEnabled = prefs.pictureInPictureEnabled,
             onBack = { presentation.minimizeToPipOrIsland() },
-            onSessionGone = { presentation.minimizeToPipOrIsland() },
+            onSessionGone = {
+                if (terminalNotice) dismissedNotice = true
+                else presentation.minimizeToPipOrIsland()
+            },
             onEndCall = { service.endCall() },
             onToggleMute = { service.toggleMute() },
             onToggleCamera = { service.toggleCamera() },
-            onSwitchCamera = { scope.launch { service.switchCamera() } },
-            onToggleScreenShare = { scope.launch { service.toggleScreenShare() } },
-            // Dart: the unawaited setAudioRoute error never crashes the app (main.dart wraps and logs).
-            onToggleAudioRoute = { route: AudioRouteType -> scope.launch { try { service.setAudioRoute(route) } catch (e: Exception) { android.util.Log.w("GlobalCallHost", "audio route switch failed: $e") } } },
+            onSwitchCamera = { callAction(session.callId, "Unable to switch camera.") { service.switchCamera() } },
+            onToggleScreenShare = { callAction(session.callId, "Unable to change screen sharing.") { service.toggleScreenShare() } },
+            onToggleAudioRoute = { route: AudioRouteType -> callAction(session.callId, "Choose Bluetooth or a headset through the system audio controls.") { service.setAudioRoute(route) } },
             onEnterNativePip = {
                 // Dart _enterNativePip: settings gate, then system PiP, else a message.
                 if (!prefs.pictureInPictureEnabled) {
