@@ -377,10 +377,10 @@ fun CustomFilePickerScreen(
     // Attachment summary sheet
     summaryFiles?.let { files ->
         var caption by remember { mutableStateOf("") }
-        ModalBottomSheet(
+        ModalBottomSheet(tonalElevation = 0.dp, dragHandle = null,
             onDismissRequest = { summaryFiles = null },
             containerColor = if (isDark) Color(0xFF141923) else Color.White,
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            shape = com.example.chat.ui.kit.ChatyModalShape,
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 20.dp)) {
                 Box(
