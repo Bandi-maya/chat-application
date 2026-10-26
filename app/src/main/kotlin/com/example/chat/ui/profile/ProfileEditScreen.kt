@@ -18,7 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.PersonOutline
@@ -203,7 +203,7 @@ fun ProfileEditScreen(
                 navigationIcon = {
                     IconButton(onClick = { attemptBack() }) {
                         Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            Icons.Rounded.ChevronLeft,
                             contentDescription = "Back",
                             tint = Color(theme.primaryTextColor),
                         )
