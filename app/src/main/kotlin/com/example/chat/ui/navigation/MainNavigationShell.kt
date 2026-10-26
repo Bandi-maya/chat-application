@@ -148,7 +148,8 @@ fun MainNavigationShell(
     }
 
     fun handleRootBack() {
-        if (rootHistory.isNotEmpty()) {
+        if (currentDestinationId == ChatyNavigationDestinationIds.chats) rootHistory = emptyList()
+        if (currentDestinationId != ChatyNavigationDestinationIds.chats && rootHistory.isNotEmpty()) {
             val previous = rootHistory.last()
             rootHistory = rootHistory.dropLast(1)
             val index = allDestinationIds.indexOf(previous)
@@ -411,6 +412,7 @@ fun NavDestinationIcon(
     if (registryId != null) {
         com.example.chat.ui.icons.ChatyIcon(
             registryId,
+            semanticLabel = NavigationCatalog.labelFor(id),
             modifier = modifier,
             size = size.dp,
             color = if (tint != Color.Unspecified) tint else null,
