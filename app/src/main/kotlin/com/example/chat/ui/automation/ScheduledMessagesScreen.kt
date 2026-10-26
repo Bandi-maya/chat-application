@@ -319,7 +319,7 @@ private fun ScheduleMessageSheet(
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
 
-    ModalBottomSheet(
+    ModalBottomSheet(shape = com.example.chat.ui.kit.ChatyModalShape,
         onDismissRequest = onDismiss,
         sheetState = sheetState,
     ) {
@@ -364,7 +364,7 @@ private fun ScheduleMessageSheet(
                         .fillMaxWidth()
                         .menuAnchor(),
                 )
-                ExposedDropdownMenu(
+                ExposedDropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape,
                     expanded = convExpanded,
                     onDismissRequest = { convExpanded = false },
                 ) {
@@ -441,7 +441,7 @@ private fun ScheduleMessageSheet(
                 }
             },
         )
-        DatePickerDialog(
+        DatePickerDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
@@ -470,7 +470,7 @@ private fun ScheduleMessageSheet(
             initialHour = selectedDateTime.hour,
             initialMinute = selectedDateTime.minute,
         )
-        androidx.compose.material3.AlertDialog(
+        androidx.compose.material3.AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { showTimePicker = false },
             confirmButton = {
                 TextButton(onClick = {
