@@ -77,6 +77,10 @@ fun AppRoot() {
             // Dart _scheduleInitialAppLockIfNeeded on reaching the authenticated shell.
             if (route == AuthRoute.Home) ServiceLocator.appLock.scheduleInitialIfNeeded()
         }
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            // Dart _AppState.initState: locator<MessageAutomationService>() (30s account sync, gated on a session).
+            ServiceLocator.messageAutomation
+        }
         var promptPending by remember { mutableStateOf(false) }
         val gate = remember { GatePrompts() }
         var newChatGroup by remember { mutableStateOf(false) }
