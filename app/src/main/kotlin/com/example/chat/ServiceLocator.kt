@@ -313,6 +313,15 @@ object ServiceLocator {
 
     val notifications: ChatyNotificationService by lazy { ChatyNotificationService() }
 
+    /** locator.dart:48 registerLazySingleton<DynamicIslandController>. Native island bridge: none (null). */
+    val dynamicIslandController: com.example.chat.ui.island.DynamicIslandController by lazy {
+        com.example.chat.ui.island.DynamicIslandController(
+            nativeBridge = null,
+            timerScheduler = com.example.chat.ui.island.IslandTimerScheduler.coroutine(appScope),
+            scope = appScope,
+        )
+    }
+
     // ── core audio (locator.dart:147-176) ───────────────────────────────
 
     val audioPlatform: com.example.chat.core.audio.AndroidChatyAudioPlatform by lazy {
