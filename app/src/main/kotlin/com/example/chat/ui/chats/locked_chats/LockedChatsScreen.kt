@@ -28,7 +28,7 @@ import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -292,7 +292,7 @@ fun LockedChatsScreen(
         AlertDialog(
             onDismissRequest = { showSecretDialog = false },
             containerColor = colors.surface,
-            shape = RoundedCornerShape(20.dp),
+            shape = com.example.chat.ui.kit.ChatyModalShape,
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
@@ -393,10 +393,11 @@ fun LockedChatsScreen(
     val target = settingsTarget
     if (target != null) {
         val isHidden = isConversationHidden(target.id)
-        ModalBottomSheet(
+        ModalBottomSheet(tonalElevation = 0.dp,
+            dragHandle = null,
             onDismissRequest = { settingsTarget = null },
             containerColor = colors.surface,
-            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+            shape = com.example.chat.ui.kit.ChatyModalShape,
         ) {
             Column(Modifier.padding(vertical = 12.dp, horizontal = 16.dp)) {
                 Box(
