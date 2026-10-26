@@ -35,7 +35,7 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Wallpaper
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Wallpaper
-import androidx.compose.material3.AlertDialog
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -212,7 +212,7 @@ fun ProfileScreen(
 
     if (showLogoutConfirm) {
         // Exact confirmChatyLogout copy from profile_actions.dart.
-        AlertDialog(
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { showLogoutConfirm = false },
             title = { Text("Log out of Chaty?") },
             text = {
