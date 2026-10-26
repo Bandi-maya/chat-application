@@ -721,7 +721,7 @@ fun AppRoot() {
                                         onDismissRequest = { showCallPicker = false },
                                         properties = androidx.compose.ui.window.DialogProperties(
                                             usePlatformDefaultWidth = false,
-                                            decorFitsSystemWindows = false,
+                                            decorFitsSystemWindows = true,
                                         ),
                                     ) {
                                         val ctx = androidx.compose.ui.platform.LocalContext.current
@@ -873,7 +873,7 @@ fun AppRoot() {
                     androidx.compose.ui.window.Dialog(
                         onDismissRequest = { pending.complete(null); storyCapture = null },
                         properties = androidx.compose.ui.window.DialogProperties(
-                            usePlatformDefaultWidth = false, decorFitsSystemWindows = false,
+                            usePlatformDefaultWidth = false, decorFitsSystemWindows = true,
                         ),
                     ) {
                         Box(Modifier.fillMaxSize()) {
@@ -1437,6 +1437,11 @@ fun AppRoot() {
         // API 35+: chosen status/navigation bar colors are drawn under the bars (no-op below 35 and for default colors).
         ChatySystemBarScrims(ServiceLocator.preferencesController)
         }
+        // App-level calls, locks and notification islands are outside the route
+        // container, so they need the same consumed safe-area boundary.
+        Box(Modifier.fillMaxSize().windowInsetsPadding(
+            WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+        )) {
         gate.Host()
         com.example.chat.ui.calls.GlobalCallHost(isAuthenticated = ServiceLocator.apiBackend.isAuthenticated)
         // Dart shouldShowLock: authenticated && lock enabled && _appLockRequired.
@@ -1453,6 +1458,7 @@ fun AppRoot() {
         if (route == AuthRoute.Home) {
             com.example.chat.ui.onboarding.NotificationPermissionSheetHost(modifier = Modifier.fillMaxSize())
         }
+        } // Shared safe-area app overlays. Island owns its hardware anchor separately.
         val toastPrefs = ServiceLocator.preferencesController
         ChatyEventToastOverlay(
             notificationService = ServiceLocator.notifications,
