@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material.icons.rounded.Clear
@@ -79,7 +79,7 @@ fun <T> SettingsSearchScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Close search", tint = colors.foreground)
+                    Icon(Icons.Rounded.ChevronLeft, contentDescription = "Close search", tint = colors.foreground)
                 }
                 TextField(
                     value = query,
