@@ -1,1 +1,1 @@
-E bounded phone fixes 2026-10-26 21:48 IST: menus calls camera Island media selectors swipe emoji hidden taps radial; synthetic checks only
+F responsive phone followups plus E compiler corrections. Frozen scope:37paths, no network cache backup or new icons. Verify native unit emulator and pixels. 2026-10-26 22:02 IST.
