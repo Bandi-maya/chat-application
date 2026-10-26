@@ -1,6 +1,8 @@
 package com.example.chat
 
 import android.graphics.Rect
+import androidx.test.platform.app.InstrumentationRegistry
+import java.io.File
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
@@ -60,7 +62,18 @@ internal object DialerUiAssertions {
         assertTrue("Typed digits are displayed", device.wait(Until.hasObject(By.text("796")), 5000))
         assertTrue("T9 keeps Synthetic Peer", device.wait(Until.hasObject(By.text("Synthetic Peer")), 5000))
         reach("Delete digit").click()
-        assertTrue("Backspace removes one digit", device.wait(Until.hasObject(By.text("79")), 5000))
+        val deleted = device.wait(Until.hasObject(By.text("79")), 5000)
+        if (!deleted) {
+            val dir = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+            // Capture immediately, before throwing or any recovery gesture.
+            device.takeScreenshot(File(dir, "dialer-delete-failure.png"))
+            device.dumpWindowHierarchy(File(dir, "dialer-delete-failure.xml"))
+            val nodes = device.findObjects(By.pkg("com.example.chat"))
+                .map { "class=${it.className} text=${it.text} desc=${it.contentDescription} bounds=${it.visibleBounds}" }
+            File(dir, "dialer-delete-nodes.txt").writeText(nodes.joinToString("\n"))
+            android.util.Log.e("DialerProof", "Delete expected79 not found: ${nodes.joinToString(" | ")}")
+        }
+        assertTrue("Backspace removes one digit", deleted)
         device.findObject(By.desc("Clear number")).click()
         assertTrue("Clear number removes query", device.wait(Until.gone(By.desc("Clear number")), 5000))
         reach("Hide dialpad").click()
