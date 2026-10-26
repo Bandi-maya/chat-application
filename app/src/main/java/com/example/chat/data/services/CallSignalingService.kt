@@ -167,6 +167,10 @@ class CallSignalingService(
     private val iceServersProvider: suspend () -> List<Map<String, Any?>> = { defaultIceServers() },
     private val lowDataUsageEnabled: () -> Boolean = { false },
     private val now: () -> Instant = { Instant.now() },
+    private val onCallWaiting: (String) -> Unit = {},
+    private val captureAccountScope: () -> Any? = { null },
+    private val accountScopeValid: (Any?) -> Boolean = { true },
+    private val accountScopeGuard: (Any?, () -> Unit) -> Boolean = { _, action -> action(); true },
 ) {
     var currentSession: ChatyCallSession? = null
         private set
@@ -175,13 +179,49 @@ class CallSignalingService(
 
     private var cachedRemoteOfferSdp: String? = null
     private var media: CallMediaController? = null
+    private var callAccountScope: Any? = null
+    private fun requireCallScope(expected: Any?) {
+        if (!accountScopeValid(expected)) throw kotlinx.coroutines.CancellationException("Call account scope changed")
+    }
+    private fun requireCallIdentity(expected: Any?, callId: String, peer: CallMediaController? = null) {
+        var matches = false
+        accountScopeGuard(expected) {
+            matches = callAccountScope === expected && currentSession?.callId == callId &&
+                currentSession?.state?.isTerminal == false && (peer == null || media === peer)
+        }
+        if (!matches) throw kotlinx.coroutines.CancellationException("Call session changed")
+    }
+    private fun guardCall(expected: Any?, callId: String, peer: CallMediaController? = null, action: () -> Unit): Boolean {
+        var ran = false
+        accountScopeGuard(expected) {
+            if (callAccountScope === expected && currentSession?.callId == callId &&
+                currentSession?.state?.isTerminal == false && (peer == null || media === peer)) {
+                action(); ran = true
+            }
+        }
+        return ran
+    }
     private val queuedRemoteCandidates = mutableListOf<QueuedCandidate>()
     private var remoteDescriptionReady = false
+    private var localDescriptionSignaled = false
+    private val pendingLocalCandidates = linkedSetOf<QueuedCandidate>()
+
+    /** Run under the captured account/call/peer guard, after offer/answer enqueue. */
+    private fun flushLocalCandidates(session: ChatyCallSession) {
+        localDescriptionSignaled = true
+        val pending = pendingLocalCandidates.toList()
+        pendingLocalCandidates.clear()
+        pending.forEach { candidate ->
+            signalSender.sendCallSignal(session.remoteUserId,
+                CallSignalCodec.outgoingCandidate(session.callId, candidate.candidate, candidate.sdpMid, candidate.sdpMLineIndex))
+        }
+    }
 
     private var ringTimeoutJob: Job? = null
     private var connectionTimeoutJob: Job? = null
     private var durationJob: Job? = null
     private val loggedCallIds = mutableSetOf<String>()
+    private var acceptingCallId: String? = null
     private var endingCallId: String? = null
     private var endCallJob: Job? = null
 
@@ -190,6 +230,9 @@ class CallSignalingService(
     private var initializeJob: Job? = null
 
     /** Dart ChangeNotifier surface (addListener/removeListener/notifyListeners). */
+    private val callWaitingListeners = java.util.concurrent.CopyOnWriteArrayList<() -> Unit>()
+    fun addCallWaitingListener(listener: () -> Unit) { callWaitingListeners.add(listener) }
+    fun removeCallWaitingListener(listener: () -> Unit) { callWaitingListeners.remove(listener) }
     private val stateListeners = java.util.concurrent.CopyOnWriteArrayList<() -> Unit>()
 
     fun addStateListener(listener: () -> Unit) {
@@ -219,6 +262,23 @@ class CallSignalingService(
                 it.state == CallSessionState.reconnecting
         } == true
 
+    val hasActiveSession: Boolean get() = currentSession?.state?.isTerminal == false
+
+    /** Auth-transition hook: synchronous detach only. Returned cleanup owns the
+     * detached peer and cannot touch a later account's media/session. */
+    fun detachForAccountTransition(next: Any?): (suspend () -> Unit)? {
+        if (callAccountScope === next) return null
+        val old = media
+        media = null; currentSession = null; callAccountScope = next
+        acceptingCallId = null
+        cachedRemoteOfferSdp = null; remoteDescriptionReady = false; queuedRemoteCandidates.clear()
+        localDescriptionSignaled = false; pendingLocalCandidates.clear()
+        ringTimeoutJob?.cancel(); connectionTimeoutJob?.cancel(); endCallJob?.cancel()
+        ringTimeoutJob = null; connectionTimeoutJob = null; endCallJob = null; endingCallId = null
+        stopDurationTimer(); callDurationSeconds = 0
+        return { old?.dispose(); notifyChanged() }
+    }
+
     /** Dart initialize(): one-time guard shared by concurrent callers. */
     fun initialize() {
         if (initialized) return
@@ -228,7 +288,12 @@ class CallSignalingService(
 
     /** Inbound `call_signal` WebSocket payload (Dart _handleApiCallSignal).
      *  Wire from the realtime client's call_signal event stream. */
-    suspend fun handleRemoteSignal(signal: Map<String, Any?>) {
+    suspend fun handleRemoteSignal(
+        signal: Map<String, Any?>,
+        validScope: () -> Boolean = { true },
+        guardScope: ((() -> Unit) -> Boolean) = { action -> action(); true },
+    ) {
+        if (!validScope()) return
         val signalType = signal["signal_type"]?.toString()
         val callId = signal["call_id"]?.toString() ?: ""
         val senderId = signal["sender_id"]?.toString()
@@ -237,22 +302,48 @@ class CallSignalingService(
         val myId = currentUserId()
 
         if (myId == null || callId.isEmpty()) return
-        if (senderId == myId) return // Ignore echo of our own signals
+        if (senderId.isBlank() || senderId == myId) return // Ignore missing sender and own echo
+        if (signalType != "offer") {
+            val active = currentSession ?: return
+            if (active.callId != callId || active.remoteUserId != senderId || active.state.isTerminal) return
+        }
 
+        val expectedAccount = callAccountScope
+        val receiveValid = {
+            validScope() && (signalType == "offer" || runCatching { requireCallIdentity(expectedAccount, callId) }.isSuccess)
+        }
+        val receiveGuard: ((() -> Unit) -> Boolean) = { action ->
+            var applied = false
+            guardScope {
+                if (signalType == "offer") { action(); applied = true }
+                else applied = guardCall(expectedAccount, callId, action = action)
+            }
+            applied
+        }
         when (signalType) {
             "offer" -> {
+                receiveGuard offerGuard@{
                 val active = currentSession
-                if (active != null && active.callId != callId && isInActiveCall) {
+                if (active != null && active.callId != callId && !active.state.isTerminal) {
                     signalSender.sendCallSignal(senderId, mapOf(
                         "signal_type" to "busy",
                         "call_id" to callId,
+                        "reason" to "already_in_call",
                     ))
-                    return
+                    onCallWaiting(signal["caller_name"]?.toString() ?: "Contact")
+                    callWaitingListeners.forEach { it() }
+                    return@offerGuard
                 }
 
-                cachedRemoteOfferSdp = signal["sdp"]?.toString()
+                // Dual-channel delivery can repeat an offer. Never reset an
+                // existing session or revive a terminal call with the same ID.
+                if (active?.callId == callId) return@offerGuard
+                val offerSdp = CallSignalCodec.sdp(signal["sdp"] ?: signal["offer"])
+                if (offerSdp.isBlank()) return@offerGuard
+                callAccountScope = captureAccountScope()
+                cachedRemoteOfferSdp = offerSdp
                 callDurationSeconds = 0
-                val isVideo = signal["is_video"] == true || signal["is_video"] == "true"
+                val isVideo = CallSignalCodec.isVideo(signal)
                 currentSession = ChatyCallSession(
                     callId = callId,
                     remoteUserId = senderId,
@@ -271,50 +362,57 @@ class CallSignalingService(
                 ringTimeoutJob = scope.launch {
                     delay(40_000)
                     val s = currentSession
-                    if (s?.callId == callId && s.state == CallSessionState.incoming) {
-                        endCall(reason = "no_answer")
+                    if (receiveValid() && s?.callId == callId && s.state == CallSessionState.incoming) {
+                        receiveGuard { endCall(reason = "no_answer") }
                     }
+                }
                 }
             }
 
             "answer" -> {
                 val session = currentSession
                 if (session?.callId == callId && session.isOutgoing) {
-                    val answerSdp = signal["sdp"]?.toString() ?: ""
+                    val answerSdp = CallSignalCodec.sdp(signal["sdp"] ?: signal["answer"])
                     val peer = media
                     if (answerSdp.isNotEmpty() && !remoteDescriptionReady && peer != null) {
                         ringTimeoutJob?.cancel()
+                        if (!receiveValid()) return
                         peer.setRemoteDescription(answerSdp, "answer")
-                        remoteDescriptionReady = true
-                        currentSession = session.copy(state = CallSessionState.connecting)
-                        startConnectionTimeout(callId)
-                        flushRemoteCandidates()
-                        notifyChanged()
+                        if (!receiveValid()) return
+                        if (!receiveGuard {
+                            if (currentSession?.callId == callId && media === peer) {
+                                remoteDescriptionReady = true
+                                currentSession = session.copy(state = CallSessionState.connecting)
+                                startConnectionTimeout(callId)
+                                notifyChanged()
+                            }
+                        }) return
+                        flushRemoteCandidates(receiveValid, receiveGuard)
                     }
                 }
             }
 
-            "ice_candidate" -> {
+            "ice_candidate", "candidate" -> {
                 if (currentSession?.callId == callId) {
-                    val candidateText = signal["candidate"]?.toString()
-                    if (!candidateText.isNullOrEmpty()) {
-                        val sdpMid = signal["sdpMid"]?.toString()
-                        val sdpMLineIndex = (signal["sdpMLineIndex"] as? Int)
-                            ?: signal["sdpMLineIndex"]?.toString()?.toIntOrNull()
-                        val candidate = QueuedCandidate(candidateText, sdpMid, sdpMLineIndex)
+                    val decoded = CallSignalCodec.candidate(signal)
+                    if (decoded != null) {
+                        val candidate = QueuedCandidate(decoded.candidate, decoded.sdpMid, decoded.sdpMLineIndex)
                         val peer = media
-                        if (!remoteDescriptionReady || peer == null) {
-                            queuedRemoteCandidates.add(candidate)
-                        } else {
+                        if (!remoteDescriptionReady || peer == null) receiveGuard { queuedRemoteCandidates.add(candidate) }
+                        else {
+                            if (!receiveValid()) return
                             peer.addRemoteCandidate(candidate.candidate, candidate.sdpMid, candidate.sdpMLineIndex)
+                            if (!receiveValid()) return
                         }
                     }
                 }
             }
 
-            "busy", "decline" -> {
+            "busy", "decline", "reject" -> {
                 val session = currentSession
                 if (session?.callId == callId) {
+                    var oldPeer: CallMediaController? = null
+                    if (!receiveGuard {
                     ringTimeoutJob?.cancel()
                     connectionTimeoutJob?.cancel()
                     stopDurationTimer()
@@ -328,14 +426,21 @@ class CallSignalingService(
                         state = if (signalType == "busy") CallSessionState.busy else CallSessionState.declined,
                         endedAt = now(),
                     )
-                    disposeMediaTransport()
-                    notifyChanged()
+                        oldPeer = media
+                        media = null; remoteDescriptionReady = false; queuedRemoteCandidates.clear()
+                        localDescriptionSignaled = false; pendingLocalCandidates.clear()
+                        notifyChanged()
+                    }) return
+                    oldPeer?.dispose()
+                    if (!receiveValid()) return
                 }
             }
 
-            "hangup" -> {
+            "hangup", "end" -> {
                 val session = currentSession
                 if (session?.callId == callId) {
+                    var oldPeer: CallMediaController? = null
+                    if (!receiveGuard {
                     ringTimeoutJob?.cancel()
                     connectionTimeoutJob?.cancel()
                     stopDurationTimer()
@@ -350,8 +455,13 @@ class CallSignalingService(
                         state = CallSessionState.ended,
                         endedAt = now(),
                     )
-                    disposeMediaTransport()
-                    notifyChanged()
+                        oldPeer = media
+                        media = null; remoteDescriptionReady = false; queuedRemoteCandidates.clear()
+                        localDescriptionSignaled = false; pendingLocalCandidates.clear()
+                        notifyChanged()
+                    }) return
+                    oldPeer?.dispose()
+                    if (!receiveValid()) return
                 }
             }
         }
@@ -366,24 +476,25 @@ class CallSignalingService(
         isVideo: Boolean,
     ) {
         initialize()
+        val expectedAccount = captureAccountScope()
+        requireCallScope(expectedAccount)
         val myId = currentUserId() ?: throw IllegalStateException("Authentication required.")
         require(remoteUserId.isNotEmpty() && remoteUserId != myId) {
             "A different call participant is required."
         }
         val existing = currentSession
-        if (existing != null &&
-            existing.state != CallSessionState.ended &&
-            existing.state != CallSessionState.declined &&
-            existing.state != CallSessionState.failed
-        ) {
-            throw IllegalStateException("Another call is already active.")
+        if (existing != null && !existing.state.isTerminal) {
+            throw IllegalStateException("You are already in another call. Please end it before starting a new one.")
         }
 
-        disposeMediaTransport()
         val callId = UUID.randomUUID().toString()
+        var previousPeer: CallMediaController? = null
+        if (!accountScopeGuard(expectedAccount) {
+        check(!hasActiveSession) { "Another call is active" }
+        previousPeer = detachMediaTransport()
         callDurationSeconds = 0
         cachedRemoteOfferSdp = null
-
+        callAccountScope = expectedAccount
         currentSession = ChatyCallSession(
             callId = callId,
             remoteUserId = remoteUserId,
@@ -397,17 +508,24 @@ class CallSignalingService(
             audioRoute = if (isVideo) AudioRouteType.speaker else AudioRouteType.earpiece,
         )
         notifyChanged()
+        }) return
 
         try {
-            createMediaTransport(isVideo)
-            val offerSdp = media!!.createOffer(isVideo)
+            previousPeer?.dispose()
+            requireCallIdentity(expectedAccount, callId)
+            val peer = createMediaTransport(isVideo, expectedAccount, callId)
+            requireCallIdentity(expectedAccount, callId, peer)
+            val offerSdp = peer.createOffer(isVideo)
+            requireCallIdentity(expectedAccount, callId, peer)
             if (offerSdp.isEmpty()) {
                 throw IllegalStateException("WebRTC did not produce an SDP offer.")
             }
 
+            if (!guardCall(expectedAccount, callId, peer) {
             signalSender.sendCallSignal(remoteUserId, mapOf(
                 "signal_type" to "offer",
                 "call_id" to callId,
+                "call_type" to if (isVideo) "video" else "voice",
                 "caller_id" to myId,
                 "caller_name" to currentUserDisplayName(),
                 "caller_avatar_initials" to currentUserAvatarInitials(),
@@ -416,22 +534,27 @@ class CallSignalingService(
                 "sdp" to offerSdp,
             ))
 
+            currentSession?.let { flushLocalCandidates(it) }
             currentSession = currentSession?.copy(state = CallSessionState.ringing)
             notifyChanged()
 
+            }) return
+            if (!guardCall(expectedAccount, callId) {
             ringTimeoutJob?.cancel()
             ringTimeoutJob = scope.launch {
                 delay(40_000)
                 val state = currentSession?.state
+                if (!accountScopeValid(expectedAccount) || currentSession?.callId != callId) return@launch
                 if (state == CallSessionState.ringing ||
                     state == CallSessionState.initiating ||
                     state == CallSessionState.connecting
                 ) {
-                    endCall(reason = "no_answer")
+                    guardCall(expectedAccount, callId) { endCall(reason = "no_answer") }
                 }
             }
+            }) return
         } catch (error: Throwable) {
-            failCurrentCall(error)
+            guardCall(expectedAccount, callId) { markTransportFailed(error.toString()) }
             throw error
         }
     }
@@ -439,11 +562,14 @@ class CallSignalingService(
     /** Accepts an incoming call (Dart acceptCall, api-hub path). */
     suspend fun acceptCall() {
         initialize()
+        val expectedAccount = callAccountScope
+        requireCallScope(expectedAccount)
         val session = currentSession
         if (session == null || session.state != CallSessionState.incoming) {
             throw IllegalStateException("No authorized incoming call is available.")
         }
 
+        check(acceptingCallId != session.callId) { "Call is already being accepted" }
         ringTimeoutJob?.cancel()
         if (session.isDemo) {
             callDurationSeconds = 0
@@ -461,16 +587,25 @@ class CallSignalingService(
                 throw IllegalStateException("Incoming call has no SDP offer.")
             }
 
-            createMediaTransport(session.isVideo)
-            media!!.setRemoteDescription(offerSdp, "offer")
-            remoteDescriptionReady = true
-            flushRemoteCandidates()
-
-            val answerSdp = media!!.createAnswer(session.isVideo)
+            if (!guardCall(expectedAccount, session.callId) {
+                check(currentSession?.state == CallSessionState.incoming && acceptingCallId != session.callId) { "Call is already being accepted" }
+                acceptingCallId = session.callId
+            }) return
+            val peer = createMediaTransport(session.isVideo, expectedAccount, session.callId)
+            requireCallIdentity(expectedAccount, session.callId, peer)
+            peer.setRemoteDescription(offerSdp, "offer")
+            requireCallIdentity(expectedAccount, session.callId, peer)
+            if (!guardCall(expectedAccount, session.callId, peer) { remoteDescriptionReady = true }) return
+            flushRemoteCandidates({ runCatching { requireCallIdentity(expectedAccount, session.callId, peer) }.isSuccess },
+                { action -> guardCall(expectedAccount, session.callId, peer, action) })
+            requireCallIdentity(expectedAccount, session.callId, peer)
+            val answerSdp = peer.createAnswer(session.isVideo)
+            requireCallIdentity(expectedAccount, session.callId, peer)
             if (answerSdp.isEmpty()) {
                 throw IllegalStateException("WebRTC did not produce an SDP answer.")
             }
 
+            if (!guardCall(expectedAccount, session.callId, peer) {
             signalSender.sendCallSignal(session.remoteUserId, mapOf(
                 "signal_type" to "answer",
                 "call_id" to session.callId,
@@ -478,49 +613,42 @@ class CallSignalingService(
                 "sdp" to answerSdp,
             ))
 
+            flushLocalCandidates(session)
             currentSession = session.copy(state = CallSessionState.connecting)
             startConnectionTimeout(session.callId)
             notifyChanged()
+            }) return
         } catch (error: Throwable) {
-            failCurrentCall(error)
+            guardCall(expectedAccount, session.callId) { markTransportFailed(error.toString()) }
             throw error
+        } finally {
+            accountScopeGuard(expectedAccount) { if (acceptingCallId == session.callId) acceptingCallId = null }
         }
     }
 
     /** Dart declineCall. */
     suspend fun declineCall() {
-        initialize()
-        val session = currentSession
-        if (session == null || session.state != CallSessionState.incoming) return
-
-        ringTimeoutJob?.cancel()
-        if (session.isDemo) {
-            currentSession = session.copy(
-                state = CallSessionState.declined,
-                endedAt = now(),
-            )
-            notifyChanged()
-            return
-        }
-        try {
-            signalSender.sendCallSignal(session.remoteUserId, mapOf(
-                "signal_type" to "decline",
-                "call_id" to session.callId,
-            ))
-        } finally {
-            connectionTimeoutJob?.cancel()
-            logCallRecordOnce(session, CallDirection.missed, 0)
-            currentSession = session.copy(
-                state = CallSessionState.declined,
-                endedAt = now(),
-            )
-            disposeMediaTransport()
-            notifyChanged()
-        }
+        val expected = callAccountScope
+        var detached: CallMediaController? = null
+        if (!accountScopeGuard(expected) {
+            val session = currentSession
+            if (session != null && session.state == CallSessionState.incoming) {
+                ringTimeoutJob?.cancel(); connectionTimeoutJob?.cancel()
+                if (!session.isDemo) signalSender.sendCallSignal(session.remoteUserId, mapOf("signal_type" to "decline", "call_id" to session.callId))
+                logCallRecordOnce(session, CallDirection.missed, 0)
+                currentSession = session.copy(state = CallSessionState.declined, endedAt = now())
+                detached = media; media = null; remoteDescriptionReady = false; queuedRemoteCandidates.clear()
+                        localDescriptionSignaled = false; pendingLocalCandidates.clear()
+                notifyChanged()
+            }
+        }) return
+        detached?.dispose()
     }
 
     /** Dart endCall: idempotent per call id. */
     fun endCall(reason: String = "ended") {
+        val expected = callAccountScope
+        if (!accountScopeValid(expected)) return
         val session = currentSession
         if (session == null || session.state.isTerminal) {
             return
@@ -535,9 +663,11 @@ class CallSignalingService(
             notifyChanged()
             scope.launch {
                 delay(350)
-                currentSession = null
-                callDurationSeconds = 0
-                notifyChanged()
+                accountScopeGuard(expected) {
+                    if (currentSession?.callId == session.callId) {
+                        currentSession = null; callDurationSeconds = 0; notifyChanged()
+                    }
+                }
             }
             return
         }
@@ -547,7 +677,7 @@ class CallSignalingService(
         endingCallId = session.callId
         endCallJob = scope.launch {
             try {
-                endCallSession(session)
+                if (accountScopeValid(expected) && currentSession?.callId == session.callId) endCallSession(session, expected)
             } finally {
                 if (endingCallId == session.callId) {
                     endCallJob = null
@@ -557,27 +687,21 @@ class CallSignalingService(
         }
     }
 
-    private suspend fun endCallSession(session: ChatyCallSession) {
-        ringTimeoutJob?.cancel()
-        connectionTimeoutJob?.cancel()
-        stopDurationTimer()
-        val duration = callDurationSeconds
-        try {
-            signalSender.sendCallSignal(session.remoteUserId, mapOf(
-                "signal_type" to "hangup",
-                "call_id" to session.callId,
-            ))
-        } finally {
-            val direction = if (session.isOutgoing) CallDirection.outgoing
-                else (if (duration > 0) CallDirection.incoming else CallDirection.missed)
-            logCallRecordOnce(session, direction, duration)
-            currentSession = session.copy(
-                state = CallSessionState.ended,
-                endedAt = now(),
-            )
-            disposeMediaTransport()
-            notifyChanged()
-        }
+    private suspend fun endCallSession(session: ChatyCallSession, expected: Any?) {
+        var detached: CallMediaController? = null
+        if (!accountScopeGuard(expected) {
+            if (currentSession?.callId == session.callId) {
+                ringTimeoutJob?.cancel(); connectionTimeoutJob?.cancel(); stopDurationTimer()
+                signalSender.sendCallSignal(session.remoteUserId, mapOf("signal_type" to "hangup", "call_id" to session.callId))
+                val direction = if (session.isOutgoing) CallDirection.outgoing else if (callDurationSeconds > 0) CallDirection.incoming else CallDirection.missed
+                logCallRecordOnce(session, direction, callDurationSeconds)
+                currentSession = session.copy(state = CallSessionState.ended, endedAt = now())
+                detached = media; media = null; remoteDescriptionReady = false; queuedRemoteCandidates.clear()
+                        localDescriptionSignaled = false; pendingLocalCandidates.clear()
+                notifyChanged()
+            }
+        }) return
+        detached?.dispose()
     }
 
     /** Demo walk: initiating -> ringing (1.2s) -> connected (1.8s), or a held
@@ -667,55 +791,69 @@ class CallSignalingService(
     }
 
     fun toggleMute() {
-        val session = currentSession ?: return
+        accountScopeGuard(callAccountScope) control@{
+        val session = currentSession ?: return@control
         val nextMuted = !session.isMuted
         if (session.isDemo) {
             currentSession = session.copy(isMuted = nextMuted)
             notifyChanged()
-            return
+            return@control
         }
-        val stream = media ?: return
-        if (!stream.hasLocalMedia) return
+        val stream = media ?: return@control
+        if (!stream.hasLocalMedia) return@control
         stream.setAudioEnabled(!nextMuted)
         currentSession = session.copy(isMuted = nextMuted)
         notifyChanged()
+        }
     }
 
     fun toggleCamera() {
+        accountScopeGuard(callAccountScope) control@{
         val session = currentSession
-        if (session == null || !session.isVideo) return
+        if (session == null || !session.isVideo) return@control
         val nextCameraOff = !session.isCameraOff
         if (session.isDemo) {
             currentSession = session.copy(isCameraOff = nextCameraOff)
             notifyChanged()
-            return
+            return@control
         }
-        val stream = media ?: return
-        if (!stream.hasLocalMedia) return
+        val stream = media ?: return@control
+        if (!stream.hasLocalMedia) return@control
         stream.setVideoEnabled(!nextCameraOff)
         currentSession = session.copy(isCameraOff = nextCameraOff)
         notifyChanged()
+        }
     }
 
     val isSharingScreen: Boolean get() = currentSession?.isSharingScreen == true
 
     suspend fun startScreenShare() {
+        val expected = callAccountScope
+        requireCallScope(expected)
         val session = currentSession
         val peer = media
         if (session == null || peer == null || !session.isVideo) return
         if (session.isSharingScreen) return
         if (!peer.startScreenShare()) return
+        requireCallScope(expected)
+        if (!guardCall(expected, session.callId) {
         currentSession = session.copy(isSharingScreen = true)
         notifyChanged()
+        }) return
     }
 
     suspend fun stopScreenShare() {
+        val expected = callAccountScope
+        requireCallScope(expected)
         val session = currentSession
         val peer = media
         if (session == null || !session.isSharingScreen) return
         peer?.stopScreenShare()
+        requireCallScope(expected)
+        if (!guardCall(expected, session.callId) {
         currentSession = session.copy(isSharingScreen = false)
         notifyChanged()
+        }) return
     }
 
     suspend fun toggleScreenShare() {
@@ -723,6 +861,8 @@ class CallSignalingService(
     }
 
     suspend fun switchCamera() {
+        val expected = callAccountScope
+        requireCallScope(expected)
         val session = currentSession
         val stream = media
         if (session == null || stream == null || !session.isVideo) return
@@ -730,15 +870,23 @@ class CallSignalingService(
         if (!stream.hasLocalMedia) return
         val switched = stream.switchCamera()
         if (!switched) return
+        requireCallScope(expected)
+        if (!guardCall(expected, session.callId) {
         currentSession = session.copy(isFrontCamera = !session.isFrontCamera)
         notifyChanged()
+        }) return
     }
 
     suspend fun setAudioRoute(route: AudioRouteType) {
+        val expected = callAccountScope
+        requireCallScope(expected)
         val session = currentSession ?: return
         if (session.isDemo) {
-            currentSession = session.copy(audioRoute = route)
+            requireCallScope(expected)
+        if (!guardCall(expected, session.callId) {
+        currentSession = session.copy(audioRoute = route)
             notifyChanged()
+        }) return
             return
         }
         if (route != AudioRouteType.speaker && route != AudioRouteType.earpiece) {
@@ -746,39 +894,54 @@ class CallSignalingService(
                 "Select Bluetooth/headset through the system audio route.",
             )
         }
-        media?.setSpeakerphoneOn(route == AudioRouteType.speaker)
+        val oldPeer = media
+        requireCallIdentity(expected, session.callId, oldPeer)
+        oldPeer?.setSpeakerphoneOn(route == AudioRouteType.speaker)
+        requireCallScope(expected)
+        if (!guardCall(expected, session.callId) {
         currentSession = session.copy(audioRoute = route)
         notifyChanged()
+        }) return
     }
 
-    private suspend fun createMediaTransport(isVideo: Boolean) {
-        disposeMediaTransport()
+    private suspend fun createMediaTransport(isVideo: Boolean, expectedAccount: Any?, callId: String): CallMediaController {
+        requireCallIdentity(expectedAccount, callId)
+        var previous: CallMediaController? = null
+        if (!guardCall(expectedAccount, callId) {
+            // Incoming trickle ICE can arrive while ringing, before media exists.
+            // Preserve this call's candidates while replacing only its old transport.
+            val pending = queuedRemoteCandidates.toList()
+            previous = detachMediaTransport()
+            queuedRemoteCandidates.addAll(pending)
+        }) throw kotlinx.coroutines.CancellationException("Call changed")
+        previous?.dispose()
+        requireCallIdentity(expectedAccount, callId)
         val iceServers = iceServersProvider()
+        requireCallIdentity(expectedAccount, callId)
         val peer = mediaFactory()
-        media = peer
+        if (!guardCall(expectedAccount, callId) { media = peer }) { peer.dispose(); throw kotlinx.coroutines.CancellationException("Call changed") }
 
         peer.onLocalIceCandidate = { candidate, sdpMid, sdpMLineIndex ->
-            val session = currentSession
-            if (candidate.isNotEmpty() && session != null) {
-                signalSender.sendCallSignal(session.remoteUserId, mapOf(
-                    "signal_type" to "ice_candidate",
-                    "call_id" to session.callId,
-                    "candidate" to candidate,
-                    "sdpMid" to sdpMid,
-                    "sdpMLineIndex" to sdpMLineIndex,
-                ))
+            if (candidate.isNotEmpty()) guardCall(expectedAccount, callId, peer) {
+                val session = currentSession!!
+                val item = QueuedCandidate(candidate, sdpMid, sdpMLineIndex)
+                if (localDescriptionSignaled) {
+                    signalSender.sendCallSignal(session.remoteUserId,
+                        CallSignalCodec.outgoingCandidate(callId, candidate, sdpMid, sdpMLineIndex))
+                } else if (pendingLocalCandidates.size < 128) {
+                    pendingLocalCandidates.add(item)
+                }
             }
         }
-        peer.onRemoteStream = {
-            notifyChanged()
-        }
-        peer.onConnectionState = { state -> handlePeerConnectionState(state) }
-        peer.onIceFailed = {
-            markTransportFailed("ICE negotiation failed.")
-        }
-
+        peer.onRemoteStream = { guardCall(expectedAccount, callId, peer) { notifyChanged() } }
+        peer.onConnectionState = { state -> guardCall(expectedAccount, callId, peer) { handlePeerConnectionState(state) } }
+        peer.onIceFailed = { guardCall(expectedAccount, callId, peer) { markTransportFailed("ICE negotiation failed.") } }
         peer.prepare(isVideo, lowDataUsageEnabled(), iceServers)
+        try { requireCallIdentity(expectedAccount, callId, peer) }
+        catch (cancelled: kotlinx.coroutines.CancellationException) { peer.dispose(); throw cancelled }
         peer.setSpeakerphoneOn(isVideo)
+        requireCallIdentity(expectedAccount, callId, peer)
+        return peer
     }
 
     private fun handlePeerConnectionState(state: CallTransportState) {
@@ -811,8 +974,9 @@ class CallSignalingService(
     }
 
     private fun markTransportFailed(message: String) {
+        accountScopeGuard(callAccountScope) failed@{
         val session = currentSession
-        if (session == null || session.state == CallSessionState.failed) return
+        if (session == null || session.state == CallSessionState.failed) return@failed
         ringTimeoutJob?.cancel()
         connectionTimeoutJob?.cancel()
         stopDurationTimer()
@@ -826,8 +990,10 @@ class CallSignalingService(
             state = CallSessionState.failed,
             endedAt = now(),
         )
+        val oldPeer = detachMediaTransport()
         notifyChanged()
-        scope.launch { disposeMediaTransport() }
+        scope.launch { oldPeer?.dispose() }
+        }
     }
 
     private suspend fun failCurrentCall(error: Throwable) {
@@ -835,6 +1001,7 @@ class CallSignalingService(
     }
 
     private fun startConnectionTimeout(callId: String) {
+        val expected = callAccountScope
         connectionTimeoutJob?.cancel()
         connectionTimeoutJob = scope.launch {
             delay(25_000)
@@ -846,18 +1013,19 @@ class CallSignalingService(
             ) {
                 return@launch
             }
-            endCall(reason = "connection_timeout")
+            guardCall(expected, callId) { endCall(reason = "connection_timeout") }
         }
     }
 
     private fun startDurationTimer() {
         if (durationJob != null) return
         callDurationSeconds = 0
+        val expected = callAccountScope
+        val callId = currentSession?.callId ?: return
         durationJob = scope.launch {
             while (isActive) {
                 delay(1000)
-                callDurationSeconds++
-                notifyChanged()
+                if (!guardCall(expected, callId) { callDurationSeconds++; notifyChanged() }) return@launch
             }
         }
     }
@@ -887,21 +1055,35 @@ class CallSignalingService(
         )
     }
 
-    private suspend fun flushRemoteCandidates() {
+    private suspend fun flushRemoteCandidates(
+        validScope: () -> Boolean = { true },
+        guardScope: ((() -> Unit) -> Boolean) = { action -> action(); true },
+    ) {
+        if (!validScope()) return
         val peer = media
         if (peer == null || !remoteDescriptionReady) return
         val pending = queuedRemoteCandidates.toList()
-        queuedRemoteCandidates.clear()
+        if (!guardScope { queuedRemoteCandidates.clear() }) return
         for (candidate in pending) {
+            if (!validScope()) return
             peer.addRemoteCandidate(candidate.candidate, candidate.sdpMid, candidate.sdpMLineIndex)
+            if (!validScope()) return
         }
     }
 
-    private suspend fun disposeMediaTransport() {
+    /** Called only while the caller owns the expected account guard. */
+    private fun detachMediaTransport(): CallMediaController? {
+        localDescriptionSignaled = false; pendingLocalCandidates.clear()
         remoteDescriptionReady = false
         queuedRemoteCandidates.clear()
         val peer = media
         media = null
+        return peer
+    }
+
+    private suspend fun disposeMediaTransport(expected: Any?) {
+        var peer: CallMediaController? = null
+        if (!accountScopeGuard(expected) { peer = detachMediaTransport() }) return
         peer?.dispose()
     }
 
@@ -910,7 +1092,9 @@ class CallSignalingService(
         ringTimeoutJob?.cancel()
         connectionTimeoutJob?.cancel()
         stopDurationTimer()
-        scope.launch { disposeMediaTransport() }
+        var peer: CallMediaController? = null
+        accountScopeGuard(callAccountScope) { peer = detachMediaTransport() }
+        scope.launch { peer?.dispose() }
     }
 
     companion object {
