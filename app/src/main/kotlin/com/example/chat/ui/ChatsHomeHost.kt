@@ -64,7 +64,20 @@ fun ChatsHomeHost(
         scope.launch { try { repo.setConversationStateAsync(id, field, value) } catch (e: Exception) { toast(e.message ?: "Unable to update chat.") } }
     }
     val security = prefs.security
+    val headerTabs = com.example.chat.ui.navigation.LocalHomeHeaderTabs.current
+    val headerTabsTheme = com.example.chat.ui.theme.LocalThemeConfig.current
+    val headerTabsColors = androidx.compose.runtime.remember(headerTabsTheme) {
+        com.example.chat.ui.core.theme.ChatyColors(headerTabsTheme)
+    }
+    val headerBottom: (@Composable () -> Unit)? = if (headerTabs != null && headerTabs.active) {
+        {
+            com.example.chat.ui.navigation.HomeHeaderTabsBar(
+                headerTabsColors, headerTabs.ids, headerTabs.selectedIndex, headerTabs.heightDp,
+            ) { index -> headerTabs.onSelect(index) }
+        }
+    } else null
     ChatsHomeScreen(
+        headerBottom = headerBottom,
         conversations = conversations,
         requiresSubscription = api.requiresSubscription,
         subscriptionMessage = api.subscriptionErrorMessage,
