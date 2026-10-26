@@ -1337,6 +1337,8 @@ fun AppRoot() {
                 }
             }
         }
+        // API 35+: chosen status/navigation bar colors are drawn under the bars (no-op below 35 and for default colors).
+        com.example.chat.ui.core.system.ChatySystemBarScrims(ServiceLocator.preferencesController)
         }
         gate.Host()
         com.example.chat.ui.calls.GlobalCallHost(isAuthenticated = ServiceLocator.apiBackend.isAuthenticated)
