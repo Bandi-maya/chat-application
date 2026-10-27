@@ -1,5 +1,5 @@
 {
- "archive_sha256": "f727efbcd087681871eb29ee646c055df3d4dff3e554f0e0439f6ef362d23f65",
+ "archive_sha256": "7b0eb320b78af2acf06c3ddfe79946ef1561ca507c0e24be914ddece022451e3",
  "base": "e465747abe825fb30a76226cfcebda10bb56d7d8",
  "files": {
   "app/build.gradle.kts": "757337b47457c0937c5490f4854b2ea8aefdd3ac7c5f493128bc447885b47880",
@@ -29,7 +29,7 @@
   "app/src/androidTest/java/com/example/chat/InlineDocumentProcessorTest.kt": "eb50dbd8b544c147a833245f5d00db7b87855fa93004e9e04f27c10b28c81f40",
   "app/src/androidTest/java/com/example/chat/InlineDocumentReviewTest.kt": "d17cf31115e41c26369e6c5d8e02b68df89843e77871b97b5abdc59dd9212c99",
   "app/src/androidTest/java/com/example/chat/LocalVideoScopeProofTest.kt": "308759d89308eb2ee362103acabd87defc19d892e2d012a9b9fee320b9529a5a",
-  "app/src/androidTest/java/com/example/chat/LockBadgeMotionProofTest.kt": "05359764a171f2a5cc0ada12e8bca2f867f223bf6ab49bd96a1ee852136c0a86",
+  "app/src/androidTest/java/com/example/chat/LockBadgeMotionProofTest.kt": "08a6002dfd82dcff00b116e7546e8a090b3cd6e11d7f9c308a070069f5e06087",
   "app/src/androidTest/java/com/example/chat/MediaEnvelopeRestrictionParserProofTest.kt": "d5618dfa2c7d0efb36953386a06565327ba1ddb596005748400135019df8228c",
   "app/src/androidTest/java/com/example/chat/MediaFollowOnProofTest.kt": "d07a8b1cf2244e942c23a4fff33698fc2523f8aaf35b437194d337cc7d2f6c3c",
   "app/src/androidTest/java/com/example/chat/MediaInteractionProofTest.kt": "05348e8eb1fba124372f56d05358bea11fd5ea422f17da5ace7d14d1cb9687c9",
