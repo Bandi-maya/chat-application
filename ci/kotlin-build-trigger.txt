@@ -1,4 +1,3 @@
-Build Next16 coherent camera map shared interactions regression
-Overlay d09c9b1b99c5899621271c35c98822198b537c917676a8a6c85887af4cd1672a
-222 files. Identical synthetic APK pair across three free emulator shards.
-Not all tasks complete. Queue and draft restoration unsafe increments excluded.
+Publish verified Next16 APK only
+Exact source a3e451d4747edbbb3c8e229cd24d32e81e8adeda existing artifact12708675148
+User approved public developer APK release. No rebuild.
