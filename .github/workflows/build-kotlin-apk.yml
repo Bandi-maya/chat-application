@@ -436,19 +436,44 @@ jobs:
         if: always()
         run: |
           python3 - <<'PYSEL'
-          import glob, sys, xml.etree.ElementTree as ET
+          import glob, sys, xml.etree.ElementTree as ET, re, pathlib
           want = {'com.example.chat.SwipeRowProofTest','com.example.chat.SwipeRtlAndRowSettingsProofTest','com.example.chat.RadialVariantsProofTest','com.example.chat.HeaderTabStyleSheetProofTest','com.example.chat.VoiceComposerGestureProofTest'}
-          seen = {}
+          # Expected method counts come from the restored pinned source, not from
+          # the runner: a crashed runner must not shrink the expectation.
+          expected = {}
+          for c in sorted(want):
+              p = pathlib.Path('app/src/androidTest/java/com/example/chat/' + c.rsplit('.', 1)[-1] + '.kt')
+              expected[c] = len(re.findall(r'@Test\b', p.read_text()))
+          seen = {}; failures = []; errors = []; integrity = []
           for f in glob.glob('app/build/outputs/androidTest-results/connected/TEST-*.xml'):
               r = ET.parse(f).getroot()
-              n = r.get('classname') or r.get('name', '')
-              seen[n] = seen.get(n, 0) + int(r.get('tests', 0))
-          print('CAPTURE-SELECTION', seen)
+              for tc in r.findall('testcase'):
+                  cn = tc.get('classname')
+                  if cn == 'shard.integrity':
+                      e = tc.find('error')
+                      integrity.append(e.text if e is not None and e.text else '')
+                      continue
+                  seen[cn] = seen.get(cn, 0) + 1
+                  if tc.find('failure') is not None: failures.append(cn + '#' + tc.get('name'))
+                  if tc.find('error') is not None: errors.append(cn + '#' + tc.get('name'))
+          print('CAPTURE-SELECTION completed=%s expected=%s' % (seen, expected))
+          print('CAPTURE-TESTFAILURES retained-not-repaired: %s' % failures)
+          print('CAPTURE-ERRORS %s' % errors)
+          print('CAPTURE-INTEGRITY %s' % integrity)
+          hard = []
           missing = sorted(want - set(seen))
-          zero = sorted(c for c in want if seen.get(c, 0) == 0)
-          if missing or zero:
-              print('CAPTURE-SELECTION-FAIL missing=%s zero=%s' % (missing, zero))
+          if missing: hard.append('missing classes: %s' % missing)
+          for c in sorted(want):
+              if c in seen and expected[c] and seen[c] != expected[c]:
+                  hard.append('method count mismatch %s: completed=%d expected=%d' % (c, seen[c], expected[c]))
+          itext = '\n'.join(integrity)
+          for marker in ('INCOMPLETE', 'Runner failed', 'adb exit', 'count-mismatched', 'coverage differs', 'Duplicate'):
+              if marker in itext: hard.append('integrity marker: ' + marker)
+          if errors: hard.append('test errors (not plain assertions): %s' % errors)
+          if hard:
+              print('CAPTURE-SELECTION-FAIL ' + '; '.join(hard))
               sys.exit(1)
+          print('CAPTURE-SELECTION-OK classes=5 methods-completed=all ordinary-assert-failures=%d (retained, still TEST FAILURE in report)' % len(failures))
           PYSEL
       - name: Upload retry pixel proof
         if: always()
