@@ -413,6 +413,25 @@ jobs:
             app/build/outputs/androidTest-results/connected/
             app/build/reports/androidTests/connected/
           if-no-files-found: warn
+      - name: Verify targeted capture selection (3 classes, nonzero cases)
+        id: select
+        if: always()
+        run: |
+          python3 - <<'PYSEL'
+          import glob, sys, xml.etree.ElementTree as ET
+          want = {'com.example.chat.SwipeRowProofTest','com.example.chat.SwipeRtlAndRowSettingsProofTest','com.example.chat.RadialVariantsProofTest'}
+          seen = {}
+          for f in glob.glob('app/build/outputs/androidTest-results/connected/TEST-*.xml'):
+              r = ET.parse(f).getroot()
+              n = r.get('classname') or r.get('name', '')
+              seen[n] = seen.get(n, 0) + int(r.get('tests', 0))
+          print('CAPTURE-SELECTION', seen)
+          missing = sorted(want - set(seen))
+          zero = sorted(c for c in want if seen.get(c, 0) == 0)
+          if missing or zero:
+              print('CAPTURE-SELECTION-FAIL missing=%s zero=%s' % (missing, zero))
+              sys.exit(1)
+          PYSEL
       - name: Upload retry pixel proof
         if: always()
         uses: actions/upload-artifact@v4
@@ -437,5 +456,5 @@ jobs:
       - name: Retry verdict (media failure never hides emoji)
         if: always()
         run: |
-          echo "RETRY-OUTCOMES media=${{ steps.media.outcome }} emoji-real=${{ steps.emoji.outcome }} captures=${{ steps.captures.outcome }}"
-          [ "${{ steps.media.outcome }}" = "success" ] && [ "${{ steps.emoji.outcome }}" = "success" ] && [ "${{ steps.captures.outcome }}" = "success" ]
+          echo "RETRY-OUTCOMES media=${{ steps.media.outcome }} emoji-real=${{ steps.emoji.outcome }} captures=${{ steps.captures.outcome }} selection=${{ steps.select.outcome }}"
+          [ "${{ steps.media.outcome }}" = "success" ] && [ "${{ steps.emoji.outcome }}" = "success" ] && [ "${{ steps.captures.outcome }}" = "success" ] && [ "${{ steps.select.outcome }}" = "success" ]
