@@ -1,5 +1,5 @@
 {
- "archive_sha256": "7b0eb320b78af2acf06c3ddfe79946ef1561ca507c0e24be914ddece022451e3",
+ "archive_sha256": "124d40b4bfdaeba887adb24709c0dc10188d27e274f66df4a858674c6a013747",
  "base": "e465747abe825fb30a76226cfcebda10bb56d7d8",
  "files": {
   "app/build.gradle.kts": "757337b47457c0937c5490f4854b2ea8aefdd3ac7c5f493128bc447885b47880",
@@ -361,7 +361,7 @@
   "app/src/test/java/com/example/chat/location/LocationMapBridgePolicyTest.kt": "a7db2c4abca96d3f8d361464b46dc1ec296c12f19a6f717a3c33e62ead43d7b7",
   "app/src/test/java/com/example/chat/location/LocationSendScopeTest.kt": "80a4dc897ef8e4ed0fc8264416ea3bf3d670f1f810478c624bfefa1b15aaa32d",
   "app/src/test/java/com/example/chat/notifications/ChatyNotificationLaneTest.kt": "5ec08e7c582a4486bdd14bf88311986034fd2fb982e7c261d33e00e94d2271e3",
-  "app/src/test/java/com/example/chat/notifications/ChatyNotificationPolicyTest.kt": "2b6637afa10a41b85216b21761837b2c8283d653dd974c7ce355ef985727e297",
+  "app/src/test/java/com/example/chat/notifications/ChatyNotificationPolicyTest.kt": "376487cd757fca4e704c75418ce254ecefeb917d675d04b783a071196d63154e",
   "app/src/test/java/com/example/chat/ui/calls/CallPipStatusTest.kt": "d3d3ab50c51f7bc75fcd0efe4f853004101f29e60a31db5768c0f25453a26c1d",
   "app/src/test/java/com/example/chat/ui/calls/DialpadToneDispatcherTest.kt": "4a9ccf593c59b993e699b9c711c81ff08cbe6fe121295b4bea46704bf898cf74",
   "app/src/test/java/com/example/chat/ui/camera/CameraOwnedFilesTest.kt": "4f60b8736f304e6c93d6c87b3140a013b6c14861af69c38aaf2df751b1d8f44c",
