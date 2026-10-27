@@ -1,3 +1,3 @@
-Next14 diagnostic compile fix and native local call proof
-Overlay c071700091df744cfa4d4b4358464a5d57f8f39cbceb894793136a9c341cca93
-Next13 unit/runtime skipped. Native two-local-peer and explicit denial tests are unrun; not production call acceptance. Latest verified runtime Next11 108cases5failures.
+Next15 bounded header diagnostic and preview tap plus call geometry proof
+Overlay 42a82081cff3b54e0b725945237e024492fd4412ce3e345a8827b66ceb68bd2f
+Next14 1015unitpass Android110cases4fail. Native local baseline only. Camera expanded layout/document/video excluded pending review.
