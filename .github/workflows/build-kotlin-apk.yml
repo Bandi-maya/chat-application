@@ -259,7 +259,7 @@ jobs:
           # Allowlist only: deterministic test captures of the app's own auth screens (no input typed) and the
           # ChatFixtureActivity synthetic conversations. The failure-state capture is included: it only ever shows the app under the synthetic fixture session. Never the final screen or logcat.
           # This repository is public, so the job log is public: keep it bounded and fixture-only.
-          for n in 00-failure-state 01-welcome 02-login 03-register 04-forgot-password 05-register-organization 06-chats-home 07-chat-detail 08-shell-light 09-shell-dark 10-approot-configured-shell 11-chat-detail-host 12-contact-info 13-restart-launch1-prompt 13-restart-launch1 13-restart-launch2-prompt 13-restart-launch2 real-host-hold-preready-toggle-before real-host-hold-preready-toggle-after real-host-hold-preready-toggle-decision real-host-hold-preready-finally real-host-hold-release-toggle-before real-host-hold-release-toggle-after real-host-hold-release-toggle-decision real-host-hold-release-finally real-host-hold-cancel-toggle-before real-host-hold-cancel-toggle-after real-host-hold-cancel-toggle-decision real-host-hold-cancel-finally real-host-hold-locked-toggle-before real-host-hold-locked-toggle-after real-host-hold-locked-toggle-decision real-host-hold-locked-finally real-host-hold-auth-toggle-before real-host-hold-auth-toggle-after real-host-hold-auth-toggle-decision real-host-hold-auth-finally real-host-hold-tenant-toggle-before real-host-hold-tenant-toggle-after real-host-hold-tenant-toggle-decision real-host-hold-tenant-finally 31-swipe-light-portrait-closed 31-swipe-light-portrait-progress 31-swipe-light-portrait-after-gesture 31-swipe-light-portrait-open 31-swipe-light-portrait-back-closed 31-swipe-light-portrait-leading 31-swipe-light-portrait-final 31-swipe-real-home-before 31-swipe-real-home-open 31-swipe-real-home-closed 31-swipe-applied-style-0-light-closed 31-swipe-applied-style-0-light-after-gesture 31-swipe-applied-style-0-light-open 31-swipe-applied-style-1-dark-closed 31-swipe-applied-style-1-dark-after-gesture 31-swipe-applied-style-1-dark-open 31-swipe-applied-style-2-light-closed 31-swipe-applied-style-2-light-after-gesture 31-swipe-applied-style-2-light-open 31-swipe-applied-style-3-dark-closed 31-swipe-applied-style-3-dark-after-gesture 31-swipe-applied-style-3-dark-open 31-swipe-applied-style-4-light-closed 31-swipe-applied-style-4-light-after-gesture 31-swipe-applied-style-4-light-open radial-dark-rtl-closed radial-dark-rtl-first-page radial-dark-rtl-page-2 radial-dark-rtl-page-3; do
+          for n in 00-failure-state 01-welcome 02-login 03-register 04-forgot-password 05-register-organization 06-chats-home 07-chat-detail 08-shell-light 09-shell-dark 10-approot-configured-shell 11-chat-detail-host 12-contact-info 13-restart-launch1-prompt 13-restart-launch1 13-restart-launch2-prompt 13-restart-launch2 real-host-hold-preready-toggle-before real-host-hold-preready-toggle-after real-host-hold-preready-toggle-decision real-host-hold-preready-finally real-host-hold-release-toggle-before real-host-hold-release-toggle-after real-host-hold-release-toggle-decision real-host-hold-release-finally real-host-hold-cancel-toggle-before real-host-hold-cancel-toggle-after real-host-hold-cancel-toggle-decision real-host-hold-cancel-finally real-host-hold-locked-toggle-before real-host-hold-locked-toggle-after real-host-hold-locked-toggle-decision real-host-hold-locked-finally real-host-hold-auth-toggle-before real-host-hold-auth-toggle-after real-host-hold-auth-toggle-decision real-host-hold-auth-finally real-host-hold-tenant-toggle-before real-host-hold-tenant-toggle-after real-host-hold-tenant-toggle-decision real-host-hold-tenant-finally 31-swipe-light-portrait-closed 31-swipe-light-portrait-progress 31-swipe-light-portrait-after-gesture 31-swipe-light-portrait-open 31-swipe-light-portrait-back-closed 31-swipe-light-portrait-leading 31-swipe-light-portrait-final 31-swipe-real-home-before 31-swipe-real-home-open 31-swipe-real-home-closed 31-swipe-applied-style-0-light-closed 31-swipe-applied-style-0-light-after-gesture 31-swipe-applied-style-0-light-open 31-swipe-applied-style-1-dark-closed 31-swipe-applied-style-1-dark-after-gesture 31-swipe-applied-style-1-dark-open 31-swipe-applied-style-2-light-closed 31-swipe-applied-style-2-light-after-gesture 31-swipe-applied-style-2-light-open 31-swipe-applied-style-3-dark-closed 31-swipe-applied-style-3-dark-after-gesture 31-swipe-applied-style-3-dark-open 31-swipe-applied-style-4-light-closed 31-swipe-applied-style-4-light-after-gesture 31-swipe-applied-style-4-light-open radial-dark-rtl-closed radial-dark-rtl-first-page radial-dark-rtl-first-page-missing radial-dark-rtl-page-2 radial-dark-rtl-page-2-missing radial-dark-rtl-page-3 radial-dark-rtl-page-3-missing radial-dark-rtl-missing-close-semantics 32-swipe-rtl-left-trailing 32-swipe-rtl-production-row-applied 32-swipe-rtl-production-row-reloaded 32-swipe-rtl-production-settings-before-navigation 32-swipe-rtl-production-settings-toggled 32-swipe-rtl-recreated-closed 32-swipe-rtl-right-leading hdr-sheet-light-initial hdr-sheet-light-before-preview-tap hdr-sheet-light-after-preview-tap hdr-sheet-light-selected hdr-sheet-light-scrolled-diag hdr-sheet-light-scrolled hdr-sheet-dark-initial hdr-sheet-dark-before-preview-tap hdr-sheet-dark-after-preview-tap hdr-sheet-dark-selected hdr-sheet-dark-scrolled-diag hdr-sheet-dark-scrolled voice-gesture-tap-toggle-false voice-gesture-tap-toggle-true voice-gesture-drag-cancel-false voice-gesture-drag-cancel-true voice-gesture-drag-locked-false voice-gesture-drag-locked-true voice-gesture-hold-release-false voice-gesture-hold-release-true voice-gesture-locked-delete-false voice-gesture-locked-delete-true voice-gesture-system-cancel-false voice-gesture-system-cancel-true; do
             f="screenshots/$n.png"
             [ -f "$f" ] || { echo "PNGMISSING $n"; continue; }
             sz=$(stat -c %s "$f")
@@ -267,6 +267,15 @@ jobs:
             echo "PNGB64-BEGIN $n $sz"
             base64 -w 0 "$f" | fold -w 4000 | sed 's/^/PNGB64 /'
             echo "PNGB64-END $n"
+          done
+          for n in hdr-sheet-scroll-light hdr-sheet-last-row-light hdr-sheet-scroll-dark hdr-sheet-last-row-dark; do
+            f="screenshots/$n.txt"
+            [ -f "$f" ] || { echo "TXTMISSING $n"; continue; }
+            sz=$(stat -c %s "$f")
+            if [ "$sz" -gt 200000 ]; then echo "TXTSKIP $n size=$sz"; continue; fi
+            echo "TXT-BEGIN $n $sz"
+            cat "$f"
+            echo "TXT-END $n"
           done
           # Sanitized per-case toggle timing (no account data): budget/decision/elapsed/entry/native-state counts only.
           for k in preready release cancel locked auth tenant; do
@@ -291,10 +300,11 @@ jobs:
         run: |
           # ci/kotlin-retry-trigger.txt: "retry <source-run-id> <archive_sha256>"
           read -r TAG RUN_ID ARCH < ci/kotlin-retry-trigger.txt
-          [ "$TAG" = "retry" ] && [ -n "$RUN_ID" ] && [ -n "$ARCH" ] || { echo "Bad retry trigger pin"; exit 1; }
+          { [ "$TAG" = "retry" ] || [ "$TAG" = "capture-only" ]; } && [ -n "$RUN_ID" ] && [ -n "$ARCH" ] || { echo "Bad retry trigger pin"; exit 1; }
           echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
           echo "arch=$ARCH" >> "$GITHUB_OUTPUT"
-          echo "RETRY-PIN run=$RUN_ID archive=$ARCH"
+          echo "mode=$TAG" >> "$GITHUB_OUTPUT"
+          echo "RETRY-PIN mode=$TAG run=$RUN_ID archive=$ARCH"
       - name: Restore pinned cumulative candidate source
         run: |
           python3 - <<'PYOVERLAY'
@@ -347,6 +357,7 @@ jobs:
           printf '%s\n' 'REST_API_BASE_URL=http://10.0.2.2:8000' 'WEBSOCKET_URL=ws://10.0.2.2:8000/chat/ws/{userId}' 'TENANT_ID=chat-application' > .env
       - name: Retry media shard (serial emulator 1)
         id: media
+        if: steps.pin.outputs.mode == 'retry'
         continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         env:
@@ -359,7 +370,8 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
           script: bash ci/run-smoke.sh
       - name: Preserve media retry results
-        if: always()
+        if: always() && steps.pin.outputs.mode == 'retry'
+
         uses: actions/upload-artifact@v4
         with:
           name: android-instrumentation-results-media-retry
@@ -369,6 +381,7 @@ jobs:
           if-no-files-found: warn
       - name: Retry emoji-real shard (serial emulator 2)
         id: emoji
+        if: steps.pin.outputs.mode == 'retry'
         continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         env:
@@ -381,7 +394,8 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
           script: bash ci/run-smoke.sh
       - name: Preserve emoji-real retry results
-        if: always()
+        if: always() && steps.pin.outputs.mode == 'retry'
+
         uses: actions/upload-artifact@v4
         with:
           name: android-instrumentation-results-emoji-real-retry
@@ -389,11 +403,15 @@ jobs:
             app/build/outputs/androidTest-results/connected/
             app/build/reports/androidTests/connected/
           if-no-files-found: warn
-      # Targeted diagnostic captures: exactly the three core-ui proof classes
-      # whose fixture PNGs the emit allowlist covers. Inline one-liner keeps the
-      # gradle exit code (emulator-runner splits multi-line scripts). Original
-      # classes/shards unchanged; this is an additional targeted session.
-      - name: Targeted swipe/radial diagnostic captures (serial emulator 3)
+      # Targeted diagnostic captures: five core-ui proof classes whose fixture
+      # PNGs the emit allowlist covers (swipe/rtl/radial + the retained header
+      # and voice failures; diagnostics are emitted by the tests before their
+      # asserts, so failures stay failures). Uses the pinned verified APK pair
+      # and the same am-instrument process/component/args/result collection as
+      # ci/run-smoke.sh; NO gradle invocation (a rebuild needs cargo-ndk, which
+      # this job does not have). Inline one-liner keeps the exit code
+      # (emulator-runner splits multi-line scripts). Originals retained.
+      - name: Targeted swipe/radial/header/voice diagnostic captures (serial emulator 3)
         id: captures
         continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
@@ -403,7 +421,7 @@ jobs:
           arch: x86_64
           profile: pixel_6
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
-          script: mkdir -p screenshots && gradle :app:connectedDebugAndroidTest --no-daemon -Pandroid.testInstrumentationRunnerArguments.class=com.example.chat.SwipeRowProofTest,com.example.chat.SwipeRtlAndRowSettingsProofTest,com.example.chat.RadialVariantsProofTest ; rc=$? ; adb pull /sdcard/Android/data/com.example.chat/files/screenshots/. screenshots/ || true ; exit $rc
+          script: mkdir -p screenshots && classes="com.example.chat.SwipeRowProofTest,com.example.chat.SwipeRtlAndRowSettingsProofTest,com.example.chat.RadialVariantsProofTest,com.example.chat.HeaderTabStyleSheetProofTest,com.example.chat.VoiceComposerGestureProofTest" && printf '%s\n' "$classes" > screenshots/instrumentation-class-filter.txt && (cd runtime-apks && sha256sum -c SHA256SUMS) && adb install -r -t runtime-apks/app-debug.apk && adb install -r -t runtime-apks/app-debug-androidTest.apk && python3 ci/run-instrumentation-shard.py "$classes" ; rc=$? ; adb pull /sdcard/Android/data/com.example.chat/files/screenshots/. screenshots/ || true ; exit $rc
       - name: Preserve diagnostic capture results
         if: always()
         uses: actions/upload-artifact@v4
@@ -413,13 +431,13 @@ jobs:
             app/build/outputs/androidTest-results/connected/
             app/build/reports/androidTests/connected/
           if-no-files-found: warn
-      - name: Verify targeted capture selection (3 classes, nonzero cases)
+      - name: Verify targeted capture selection (5 classes, nonzero cases)
         id: select
         if: always()
         run: |
           python3 - <<'PYSEL'
           import glob, sys, xml.etree.ElementTree as ET
-          want = {'com.example.chat.SwipeRowProofTest','com.example.chat.SwipeRtlAndRowSettingsProofTest','com.example.chat.RadialVariantsProofTest'}
+          want = {'com.example.chat.SwipeRowProofTest','com.example.chat.SwipeRtlAndRowSettingsProofTest','com.example.chat.RadialVariantsProofTest','com.example.chat.HeaderTabStyleSheetProofTest','com.example.chat.VoiceComposerGestureProofTest'}
           seen = {}
           for f in glob.glob('app/build/outputs/androidTest-results/connected/TEST-*.xml'):
               r = ET.parse(f).getroot()
@@ -444,7 +462,7 @@ jobs:
       - name: Emit allowlisted synthetic fixture screenshots (base64)
         if: always()
         run: |
-          for n in 31-swipe-light-portrait-closed 31-swipe-light-portrait-progress 31-swipe-light-portrait-after-gesture 31-swipe-light-portrait-open 31-swipe-light-portrait-back-closed 31-swipe-light-portrait-leading 31-swipe-light-portrait-final 31-swipe-real-home-before 31-swipe-real-home-open 31-swipe-real-home-closed 31-swipe-applied-style-0-light-closed 31-swipe-applied-style-0-light-after-gesture 31-swipe-applied-style-0-light-open 31-swipe-applied-style-1-dark-closed 31-swipe-applied-style-1-dark-after-gesture 31-swipe-applied-style-1-dark-open 31-swipe-applied-style-2-light-closed 31-swipe-applied-style-2-light-after-gesture 31-swipe-applied-style-2-light-open 31-swipe-applied-style-3-dark-closed 31-swipe-applied-style-3-dark-after-gesture 31-swipe-applied-style-3-dark-open 31-swipe-applied-style-4-light-closed 31-swipe-applied-style-4-light-after-gesture 31-swipe-applied-style-4-light-open radial-dark-rtl-closed radial-dark-rtl-first-page radial-dark-rtl-page-2 radial-dark-rtl-page-3; do
+          for n in 31-swipe-light-portrait-closed 31-swipe-light-portrait-progress 31-swipe-light-portrait-after-gesture 31-swipe-light-portrait-open 31-swipe-light-portrait-back-closed 31-swipe-light-portrait-leading 31-swipe-light-portrait-final 31-swipe-real-home-before 31-swipe-real-home-open 31-swipe-real-home-closed 31-swipe-applied-style-0-light-closed 31-swipe-applied-style-0-light-after-gesture 31-swipe-applied-style-0-light-open 31-swipe-applied-style-1-dark-closed 31-swipe-applied-style-1-dark-after-gesture 31-swipe-applied-style-1-dark-open 31-swipe-applied-style-2-light-closed 31-swipe-applied-style-2-light-after-gesture 31-swipe-applied-style-2-light-open 31-swipe-applied-style-3-dark-closed 31-swipe-applied-style-3-dark-after-gesture 31-swipe-applied-style-3-dark-open 31-swipe-applied-style-4-light-closed 31-swipe-applied-style-4-light-after-gesture 31-swipe-applied-style-4-light-open radial-dark-rtl-closed radial-dark-rtl-first-page radial-dark-rtl-first-page-missing radial-dark-rtl-page-2 radial-dark-rtl-page-2-missing radial-dark-rtl-page-3 radial-dark-rtl-page-3-missing radial-dark-rtl-missing-close-semantics 32-swipe-rtl-left-trailing 32-swipe-rtl-production-row-applied 32-swipe-rtl-production-row-reloaded 32-swipe-rtl-production-settings-before-navigation 32-swipe-rtl-production-settings-toggled 32-swipe-rtl-recreated-closed 32-swipe-rtl-right-leading hdr-sheet-light-initial hdr-sheet-light-before-preview-tap hdr-sheet-light-after-preview-tap hdr-sheet-light-selected hdr-sheet-light-scrolled-diag hdr-sheet-light-scrolled hdr-sheet-dark-initial hdr-sheet-dark-before-preview-tap hdr-sheet-dark-after-preview-tap hdr-sheet-dark-selected hdr-sheet-dark-scrolled-diag hdr-sheet-dark-scrolled voice-gesture-tap-toggle-false voice-gesture-tap-toggle-true voice-gesture-drag-cancel-false voice-gesture-drag-cancel-true voice-gesture-drag-locked-false voice-gesture-drag-locked-true voice-gesture-hold-release-false voice-gesture-hold-release-true voice-gesture-locked-delete-false voice-gesture-locked-delete-true voice-gesture-system-cancel-false voice-gesture-system-cancel-true; do
             f="screenshots/$n.png"
             [ -f "$f" ] || { echo "PNGMISSING $n"; continue; }
             sz=$(stat -c %s "$f")
@@ -453,8 +471,24 @@ jobs:
             base64 -w 0 "$f" | fold -w 4000 | sed 's/^/PNGB64 /'
             echo "PNGB64-END $n"
           done
+          for n in hdr-sheet-scroll-light hdr-sheet-last-row-light hdr-sheet-scroll-dark hdr-sheet-last-row-dark; do
+            f="screenshots/$n.txt"
+            [ -f "$f" ] || { echo "TXTMISSING $n"; continue; }
+            sz=$(stat -c %s "$f")
+            if [ "$sz" -gt 200000 ]; then echo "TXTSKIP $n size=$sz"; continue; fi
+            echo "TXT-BEGIN $n $sz"
+            cat "$f"
+            echo "TXT-END $n"
+          done
       - name: Retry verdict (media failure never hides emoji)
         if: always()
         run: |
-          echo "RETRY-OUTCOMES media=${{ steps.media.outcome }} emoji-real=${{ steps.emoji.outcome }} captures=${{ steps.captures.outcome }} selection=${{ steps.select.outcome }}"
-          [ "${{ steps.media.outcome }}" = "success" ] && [ "${{ steps.emoji.outcome }}" = "success" ] && [ "${{ steps.captures.outcome }}" = "success" ] && [ "${{ steps.select.outcome }}" = "success" ]
+          echo "RETRY-OUTCOMES mode=${{ steps.pin.outputs.mode }} media=${{ steps.media.outcome }} emoji-real=${{ steps.emoji.outcome }} captures=${{ steps.captures.outcome }} selection=${{ steps.select.outcome }}"
+          if [ "${{ steps.pin.outputs.mode }}" = "capture-only" ]; then
+            # Evidence recovery only: retained failures in the five targeted classes
+            # are expected and preserved in the derived XML/raw status; selection
+            # completeness (5 classes, nonzero cases) is the gate.
+            [ "${{ steps.select.outcome }}" = "success" ]
+          else
+            [ "${{ steps.media.outcome }}" = "success" ] && [ "${{ steps.emoji.outcome }}" = "success" ] && [ "${{ steps.captures.outcome }}" = "success" ] && [ "${{ steps.select.outcome }}" = "success" ]
+          fi
