@@ -1,6 +1,6 @@
 {
   "base": "5d6e83e846caeba925ee637c3a7babebbef5cbe3",
-  "archive_sha256": "a9bab04a46dcc8e554bba56b8823e68fc93f98252fef7661aed698166103fc67",
+  "archive_sha256": "932847cfd1b9b03421e6eb50f66eeb40981df1512eb95b0b1dcd0bc77e5852e6",
   "files": {
     "app/build.gradle.kts": "362c7958e391f4219bf7e53384678eae2e2457ee64e560713cd2f968180080dc",
     "app/src/androidTest/java/com/example/chat/AppRootConfiguredProofTest.kt": "6db051531b4f3bab1084641018eb91de548fecbd30820890af5c6ae7c6b1c036",
@@ -80,6 +80,7 @@
     "app/src/main/kotlin/com/example/chat/ui/AppRoot.kt": "1c70e57ca4650ef988ad46899427cc08538c144a4bd7759b65031f92888ed28a",
     "app/src/main/kotlin/com/example/chat/ui/ChatAttachmentsBinding.kt": "3c7ba976d6afd04703dd3d727e5ddfa476b381be4e2fa5f56a772e9556f48365",
     "app/src/main/kotlin/com/example/chat/ui/ChatDetailHost.kt": "18c0c73322e08aa2a1994c2972c9733be50095b94c120b9fefd620a9727d62ec",
+    "app/src/main/kotlin/com/example/chat/ui/ChatsHomeHost.kt": "ec7691adb20deb315d76d4bca27514d08aa75c9cd5ddf787bff28f91a888d5aa",
     "app/src/main/kotlin/com/example/chat/ui/calls/CallActionRunner.kt": "e1b014b3bf0aa1bf4aeac4c9ebff91a6fd67722d8aff2e1b0651dd631dc39f80",
     "app/src/main/kotlin/com/example/chat/ui/calls/CallContactPickerScreen.kt": "ff720ab3804df12bb2a257a2399e59bbbef457823b271b15f3a2a75eaa72b9f1",
     "app/src/main/kotlin/com/example/chat/ui/calls/GlobalCallHost.kt": "ff8a43fbc1938c2d54a0ca9c5becd21b07ec536f6fcf7ec35738a0cc69ab39a9",
