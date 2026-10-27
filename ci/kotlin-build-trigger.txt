@@ -1,3 +1,4 @@
-Next15 bounded header diagnostic and preview tap plus call geometry proof
-Overlay 42a82081cff3b54e0b725945237e024492fd4412ce3e345a8827b66ceb68bd2f
-Next14 1015unitpass Android110cases4fail. Native local baseline only. Camera expanded layout/document/video excluded pending review.
+Build Next16 coherent camera map shared interactions regression
+Overlay d09c9b1b99c5899621271c35c98822198b537c917676a8a6c85887af4cd1672a
+222 files. Identical synthetic APK pair across three free emulator shards.
+Not all tasks complete. Queue and draft restoration unsafe increments excluded.
