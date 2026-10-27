@@ -1,1 +1,1 @@
-candidate-27 trigger 2026-10-27T17:05:00+05:30 zip sha256 ab2d1a4bbdc9afdc6f12a937d5c15fff019e69abfa410b5f8d15fa143c2183ba - combined: notification lane v3 production + camera isolation v2 + map landscape/label trial + compact semantics-freshness probe
+candidate-28 trigger 2026-10-27T18:20:00+05:30 zip sha256 a554f66c490831a405243975e391f2c072592c43f04aa835f206c1002c6bf648 - poster symbol fix + typed profile preview + map controls diagnostic wiring
