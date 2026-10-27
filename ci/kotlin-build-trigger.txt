@@ -1,1 +1,1 @@
-Next23 bounded SettingsRoot callback compile fix with cumulative Next22 diagnostics. Synthetic-only, not install-safe or full-port proof.
+Next24 bounded camera options single-scroll semantics + map 3D toggle semantics + two peer contract tests (icon selection, new-chat rules) on cumulative Next23 source. Synthetic-only, not install-safe or full-port proof.
