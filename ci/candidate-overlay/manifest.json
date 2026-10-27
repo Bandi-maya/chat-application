@@ -1,5 +1,5 @@
 {
- "archive_sha256": "8dd78c0bf7baa55163dfc13e44cf27a2168d4747352e3c2e806459139e100fb9",
+ "archive_sha256": "f727efbcd087681871eb29ee646c055df3d4dff3e554f0e0439f6ef362d23f65",
  "base": "e465747abe825fb30a76226cfcebda10bb56d7d8",
  "files": {
   "app/build.gradle.kts": "757337b47457c0937c5490f4854b2ea8aefdd3ac7c5f493128bc447885b47880",
@@ -29,7 +29,7 @@
   "app/src/androidTest/java/com/example/chat/InlineDocumentProcessorTest.kt": "eb50dbd8b544c147a833245f5d00db7b87855fa93004e9e04f27c10b28c81f40",
   "app/src/androidTest/java/com/example/chat/InlineDocumentReviewTest.kt": "d17cf31115e41c26369e6c5d8e02b68df89843e77871b97b5abdc59dd9212c99",
   "app/src/androidTest/java/com/example/chat/LocalVideoScopeProofTest.kt": "308759d89308eb2ee362103acabd87defc19d892e2d012a9b9fee320b9529a5a",
-  "app/src/androidTest/java/com/example/chat/LockBadgeMotionProofTest.kt": "18b31e354d1e095826f77ed99e58e0229511abd8cee832b4fd8d6eb98bb253c7",
+  "app/src/androidTest/java/com/example/chat/LockBadgeMotionProofTest.kt": "05359764a171f2a5cc0ada12e8bca2f867f223bf6ab49bd96a1ee852136c0a86",
   "app/src/androidTest/java/com/example/chat/MediaEnvelopeRestrictionParserProofTest.kt": "d5618dfa2c7d0efb36953386a06565327ba1ddb596005748400135019df8228c",
   "app/src/androidTest/java/com/example/chat/MediaFollowOnProofTest.kt": "d07a8b1cf2244e942c23a4fff33698fc2523f8aaf35b437194d337cc7d2f6c3c",
   "app/src/androidTest/java/com/example/chat/MediaInteractionProofTest.kt": "05348e8eb1fba124372f56d05358bea11fd5ea422f17da5ace7d14d1cb9687c9",
@@ -70,7 +70,7 @@
   "app/src/debug/java/com/example/chat/EmojiRealPackFixtureActivity.kt": "00bdae9cdc9210bdbd87978332396b1aa985bb50b61c02bbecc4afefad64b389",
   "app/src/debug/java/com/example/chat/HeaderProofActivity.kt": "b24fe33f4c548f72cb17a3b18c65502a57ebc4ed5dd01f56e5fa03191dbf8783",
   "app/src/debug/java/com/example/chat/HomeHeaderProofActivity.kt": "1932cf095a94209298baf8de140dddabd29ac9ea3d7e730f3c880c7b2a816785",
-  "app/src/debug/java/com/example/chat/LockBadgeProofActivity.kt": "3f3d77ac2d3c15fc75b827da02e19d369c5215ac80c73e7551b3a305be5c239f",
+  "app/src/debug/java/com/example/chat/LockBadgeProofActivity.kt": "dc14211c634603e1354f0fed32f142d8317042ef74a794d8041b820be8bce1ca",
   "app/src/debug/java/com/example/chat/ProfileHostFixtureActivity.kt": "93bb86089d9de7c405796ff17c12be9572ff7fe7262e1dbccdd92ba7e1a6cc3e",
   "app/src/debug/java/com/example/chat/StatusUnavailableFixtureActivity.kt": "64d9f07421b44dc25788e315f9995698c6e242e1a2cadb87551bcd174df0150a",
   "app/src/debug/java/com/example/chat/SwipeRowFixtureActivity.kt": "f6caea05fd00f9a13b350e40a21535c63a265e02d9ea3f267373a1ff2ef135aa",
