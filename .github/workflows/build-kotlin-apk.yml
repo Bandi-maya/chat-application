@@ -9,9 +9,35 @@ on:
       # slice to fire exactly one build (editor commits land one file at a
       # time, so a broad push trigger would queue a full build per file).
       - ci/kotlin-build-trigger.txt
+      - ci/kotlin-retry-trigger.txt
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.d.outputs.build }}
+      retry: ${{ steps.d.outputs.retry }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: d
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "retry=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          B="${{ github.event.before }}"
+          if [ -z "$B" ] || [ "$B" = "0000000000000000000000000000000000000000" ]; then B="HEAD~1"; fi
+          CH=$(git diff --name-only "$B" HEAD)
+          printf 'GATE-CHANGED\n%s\n' "$CH"
+          if printf '%s\n' "$CH" | grep -qx 'ci/kotlin-build-trigger.txt'; then echo "build=true" >> "$GITHUB_OUTPUT"; else echo "build=false" >> "$GITHUB_OUTPUT"; fi
+          if printf '%s\n' "$CH" | grep -qx 'ci/kotlin-retry-trigger.txt'; then echo "retry=true" >> "$GITHUB_OUTPUT"; else echo "retry=false" >> "$GITHUB_OUTPUT"; fi
+
   build:
+    needs: gate
+    if: needs.gate.outputs.build == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -142,7 +168,7 @@ jobs:
   # E2E messaging). Separate job so the compile/test/APK job keeps its
   # duration. Same Rust cache as the build job, so its native build is warm.
   runtime-smoke:
-    needs: build
+    needs: [build, gate]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -247,3 +273,169 @@ jobs:
             t="screenshots/real-host-hold-$k-toggle-timing.txt"
             [ -f "$t" ] && { echo "TIMING-BEGIN $k"; cat "$t"; echo; echo "TIMING-END $k"; } || echo "TIMING-MISSING $k"
           done
+
+  # Bounded infrastructure experiment (authorized 19:23): re-run ONLY the two
+  # 175 lost shards (media, emoji-real) serially on one runner - one emulator
+  # at a time - plus one targeted capture session for the core-ui diagnostic
+  # fixtures (swipe-row + radial) whose pixels the emit allowlist now covers.
+  # Not a proven contention fix; original 175 artifacts/results preserved.
+  retry-media-emoji:
+    needs: gate
+    if: needs.gate.outputs.retry == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read pinned retry source
+        id: pin
+        run: |
+          # ci/kotlin-retry-trigger.txt: "retry <source-run-id> <archive_sha256>"
+          read -r TAG RUN_ID ARCH < ci/kotlin-retry-trigger.txt
+          [ "$TAG" = "retry" ] && [ -n "$RUN_ID" ] && [ -n "$ARCH" ] || { echo "Bad retry trigger pin"; exit 1; }
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "arch=$ARCH" >> "$GITHUB_OUTPUT"
+          echo "RETRY-PIN run=$RUN_ID archive=$ARCH"
+      - name: Restore pinned cumulative candidate source
+        run: |
+          python3 - <<'PYOVERLAY'
+          import base64,hashlib,json,pathlib,zipfile,io,os
+          d=pathlib.Path('ci/candidate-overlay')
+          m=json.loads((d/'manifest.json').read_text())
+          raw=base64.b64decode(''.join(p.read_text().strip() for p in sorted(d.glob('part-*.b64'))),validate=True)
+          assert hashlib.sha256(raw).hexdigest()==m['archive_sha256']
+          assert m['archive_sha256']==os.environ['PIN_ARCH'], 'overlay archive mismatch vs retry pin'
+          z=zipfile.ZipFile(io.BytesIO(raw))
+          assert set(z.namelist())==set(m['files'])
+          for p in z.infolist():
+              n=p.filename; q=pathlib.PurePosixPath(n)
+              assert not q.is_absolute() and '..' not in q.parts and not n.startswith('.') and not n.endswith('/')
+              assert (n == 'build.gradle.kts' or n.startswith(('app/','ci/','tools/location-map/'))) and '/build/' not in n and '/.env' not in n
+              assert (p.external_attr >> 16) & 0o170000 != 0o120000
+              data=z.read(p); assert hashlib.sha256(data).hexdigest()==m['files'][n]
+              target=pathlib.Path(n); assert not target.is_symlink()
+              assert all(not parent.is_symlink() for parent in target.parents)
+              target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(data)
+          print('CANDIDATE-OVERLAY',m['archive_sha256'],'files',len(m['files']))
+          PYOVERLAY
+        env:
+          PIN_ARCH: ${{ steps.pin.outputs.arch }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+      - uses: actions/download-artifact@v4
+        with:
+          name: synthetic-runtime-apk-pair
+          path: runtime-apks
+          repository: Bandi-maya/chat-application
+          run-id: ${{ steps.pin.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify identical runtime APK pair
+        run: |
+          (cd runtime-apks && sha256sum -c SHA256SUMS)
+          cp runtime-apks/SHA256SUMS runtime-apk-pair-SHA256SUMS.txt
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Isolate synthetic emulator backend routing
+        run: |
+          printf '%s\n' 'REST_API_BASE_URL=http://10.0.2.2:8000' 'WEBSOCKET_URL=ws://10.0.2.2:8000/chat/ws/{userId}' 'TENANT_ID=chat-application' > .env
+      - name: Retry media shard (serial emulator 1)
+        id: media
+        continue-on-error: true
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          CHATY_TEST_SHARD: media
+        with:
+          api-level: 34
+          target: default
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
+          script: bash ci/run-smoke.sh
+      - name: Preserve media retry results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-instrumentation-results-media-retry
+          path: |
+            app/build/outputs/androidTest-results/connected/
+            app/build/reports/androidTests/connected/
+          if-no-files-found: warn
+      - name: Retry emoji-real shard (serial emulator 2)
+        id: emoji
+        continue-on-error: true
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          CHATY_TEST_SHARD: emoji-real
+        with:
+          api-level: 34
+          target: default
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
+          script: bash ci/run-smoke.sh
+      - name: Preserve emoji-real retry results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-instrumentation-results-emoji-real-retry
+          path: |
+            app/build/outputs/androidTest-results/connected/
+            app/build/reports/androidTests/connected/
+          if-no-files-found: warn
+      # Targeted diagnostic captures: exactly the three core-ui proof classes
+      # whose fixture PNGs the emit allowlist covers. Inline one-liner keeps the
+      # gradle exit code (emulator-runner splits multi-line scripts). Original
+      # classes/shards unchanged; this is an additional targeted session.
+      - name: Targeted swipe/radial diagnostic captures (serial emulator 3)
+        id: captures
+        continue-on-error: true
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: default
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
+          script: mkdir -p screenshots && gradle :app:connectedDebugAndroidTest --no-daemon -Pandroid.testInstrumentationRunnerArguments.class=com.example.chat.SwipeRowProofTest,com.example.chat.SwipeRtlAndRowSettingsProofTest,com.example.chat.RadialVariantsProofTest ; rc=$? ; adb pull /sdcard/Android/data/com.example.chat/files/screenshots/. screenshots/ || true ; exit $rc
+      - name: Preserve diagnostic capture results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-instrumentation-results-capture-diag-retry
+          path: |
+            app/build/outputs/androidTest-results/connected/
+            app/build/reports/androidTests/connected/
+          if-no-files-found: warn
+      - name: Upload retry pixel proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-screens-pixel-proof-retry
+          path: |
+            screenshots/
+            runtime-apk-pair-SHA256SUMS.txt
+          if-no-files-found: warn
+      - name: Emit allowlisted synthetic fixture screenshots (base64)
+        if: always()
+        run: |
+          for n in 31-swipe-light-portrait-closed 31-swipe-light-portrait-progress 31-swipe-light-portrait-after-gesture 31-swipe-light-portrait-open 31-swipe-light-portrait-back-closed 31-swipe-light-portrait-leading 31-swipe-light-portrait-final 31-swipe-real-home-before 31-swipe-real-home-open 31-swipe-real-home-closed 31-swipe-applied-style-0-light-closed 31-swipe-applied-style-0-light-after-gesture 31-swipe-applied-style-0-light-open 31-swipe-applied-style-1-dark-closed 31-swipe-applied-style-1-dark-after-gesture 31-swipe-applied-style-1-dark-open 31-swipe-applied-style-2-light-closed 31-swipe-applied-style-2-light-after-gesture 31-swipe-applied-style-2-light-open 31-swipe-applied-style-3-dark-closed 31-swipe-applied-style-3-dark-after-gesture 31-swipe-applied-style-3-dark-open 31-swipe-applied-style-4-light-closed 31-swipe-applied-style-4-light-after-gesture 31-swipe-applied-style-4-light-open radial-dark-rtl-closed radial-dark-rtl-first-page radial-dark-rtl-page-2 radial-dark-rtl-page-3; do
+            f="screenshots/$n.png"
+            [ -f "$f" ] || { echo "PNGMISSING $n"; continue; }
+            sz=$(stat -c %s "$f")
+            if [ "$sz" -gt 600000 ]; then echo "PNGSKIP $n size=$sz"; continue; fi
+            echo "PNGB64-BEGIN $n $sz"
+            base64 -w 0 "$f" | fold -w 4000 | sed 's/^/PNGB64 /'
+            echo "PNGB64-END $n"
+          done
+      - name: Retry verdict (media failure never hides emoji)
+        if: always()
+        run: |
+          echo "RETRY-OUTCOMES media=${{ steps.media.outcome }} emoji-real=${{ steps.emoji.outcome }} captures=${{ steps.captures.outcome }}"
+          [ "${{ steps.media.outcome }}" = "success" ] && [ "${{ steps.emoji.outcome }}" = "success" ] && [ "${{ steps.captures.outcome }}" = "success" ]
