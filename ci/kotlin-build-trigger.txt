@@ -1,3 +1,1 @@
-Publish verified Next16 APK only
-Exact source a3e451d4747edbbb3c8e229cd24d32e81e8adeda existing artifact12708675148
-User approved public developer APK release. No rebuild.
+Next17 diagnostic: 231-file immutable overlay 8100b3137bb0acd9eec2bfa5763b0cd020745a15e8c4c4dd656208a5316a6571. Header tab scroll clipping known open. No cache/native-home-menu/capsule followups included. No all-pass or production acceptance claim.
