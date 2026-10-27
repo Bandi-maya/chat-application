@@ -29,7 +29,7 @@ jobs:
           for p in z.infolist():
               n=p.filename; q=pathlib.PurePosixPath(n)
               assert not q.is_absolute() and '..' not in q.parts and not n.startswith('.') and not n.endswith('/')
-              assert n.startswith(('app/','ci/','tools/location-map/')) and '/build/' not in n and '/.env' not in n
+              assert (n == 'build.gradle.kts' or n.startswith(('app/','ci/','tools/location-map/'))) and '/build/' not in n and '/.env' not in n
               assert (p.external_attr >> 16) & 0o170000 != 0o120000
               data=z.read(p); assert hashlib.sha256(data).hexdigest()==m['files'][n]
               target=pathlib.Path(n); assert not target.is_symlink()
@@ -42,6 +42,8 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
@@ -120,6 +122,21 @@ jobs:
           path: app/build/test-results/testDebugUnitTest/
           if-no-files-found: warn
 
+      # A separate synthetic pair is built once; never install the configured production artifact in fixtures.
+      - name: Build isolated runtime APK pair once
+        run: |
+          printf '%s\n' 'REST_API_BASE_URL=http://10.0.2.2:8000' 'WEBSOCKET_URL=ws://10.0.2.2:8000/chat/ws/{userId}' 'TENANT_ID=chat-application' > .env
+          gradle :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon
+          mkdir -p runtime-apks
+          cp app/build/outputs/apk/debug/app-debug.apk runtime-apks/
+          cp app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk runtime-apks/
+          (cd runtime-apks && sha256sum *.apk > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-runtime-apk-pair
+          path: runtime-apks/
+          if-no-files-found: error
+
   # Runtime verification tier: boots the real app on an emulator and executes
   # the OpenMLS native engine over JNI (two-party protocol roundtrip, not app
   # E2E messaging). Separate job so the compile/test/APK job keeps its
@@ -128,6 +145,13 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        shard: [core-ui, media-maps, calls-camera]
+    env:
+      CHATY_TEST_SHARD: ${{ matrix.shard }}
     steps:
       - uses: actions/checkout@v4
       - name: Restore pinned cumulative candidate source
@@ -143,7 +167,7 @@ jobs:
           for p in z.infolist():
               n=p.filename; q=pathlib.PurePosixPath(n)
               assert not q.is_absolute() and '..' not in q.parts and not n.startswith('.') and not n.endswith('/')
-              assert n.startswith(('app/','ci/','tools/location-map/')) and '/build/' not in n and '/.env' not in n
+              assert (n == 'build.gradle.kts' or n.startswith(('app/','ci/','tools/location-map/'))) and '/build/' not in n and '/.env' not in n
               assert (p.external_attr >> 16) & 0o170000 != 0o120000
               data=z.read(p); assert hashlib.sha256(data).hexdigest()==m['files'][n]
               target=pathlib.Path(n); assert not target.is_symlink()
@@ -156,21 +180,16 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
-      - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
-      - uses: Swatinem/rust-cache@v2
+          gradle-version: "8.11.1"
+      - uses: actions/download-artifact@v4
         with:
-          workspaces: |
-            mls-native -> target
-          cache-on-failure: true
-      - name: Install cargo-ndk
-        run: command -v cargo-ndk >/dev/null || cargo install cargo-ndk --locked
-      - name: Set Android NDK for cargo-ndk
+          name: synthetic-runtime-apk-pair
+          path: runtime-apks
+      - name: Verify identical runtime APK pair
         run: |
-          NDK=$(ls -d "$ANDROID_HOME"/ndk/* | sort -V | tail -1)
-          echo "ANDROID_NDK_HOME=$NDK" >> "$GITHUB_ENV"
-          echo "ANDROID_NDK_ROOT=$NDK" >> "$GITHUB_ENV"
+          (cd runtime-apks && sha256sum -c SHA256SUMS)
+          cp runtime-apks/SHA256SUMS runtime-apk-pair-SHA256SUMS.txt
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -192,7 +211,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-instrumentation-results
+          name: android-instrumentation-results-${{ matrix.shard }}
           path: |
             app/build/outputs/androidTest-results/connected/
             app/build/reports/androidTests/connected/
@@ -201,8 +220,10 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: auth-screens-pixel-proof
-          path: screenshots/
+          name: auth-screens-pixel-proof-${{ matrix.shard }}
+          path: |
+            screenshots/
+            runtime-apk-pair-SHA256SUMS.txt
           if-no-files-found: warn
       - name: Emit allowlisted synthetic fixture screenshots (base64)
         if: always()
