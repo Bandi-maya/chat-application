@@ -1,6 +1,6 @@
 {
   "base": "5d6e83e846caeba925ee637c3a7babebbef5cbe3",
-  "archive_sha256": "49a446f26e20c9d691e4f13af72a80a01c6e774b574af44cca7c9ca56c603391",
+  "archive_sha256": "0f128bb8a6081302f9987a3be8696c3ec6d6d4b4958675bcf5350bb4d0e4c668",
   "files": {
     "app/build.gradle.kts": "362c7958e391f4219bf7e53384678eae2e2457ee64e560713cd2f968180080dc",
     "app/src/androidTest/java/com/example/chat/AppRootConfiguredProofTest.kt": "6db051531b4f3bab1084641018eb91de548fecbd30820890af5c6ae7c6b1c036",
@@ -120,7 +120,7 @@
     "app/src/main/kotlin/com/example/chat/ui/chats/location/LocationMapBridgePolicy.kt": "9e5dc41fb7cdc14742f151ef95397848ee59634a6cdb83db334536004c6b7053",
     "app/src/main/kotlin/com/example/chat/ui/chats/location/LocationSendScope.kt": "a96af33853d5a35bd84e0f5eaf47f52f7163229f67aafb5ccd8ea873179d7e41",
     "app/src/main/kotlin/com/example/chat/ui/chats/location/MapViewerScreen.kt": "e2587862902e3e7531c4e90d5bf7b7a60cf5ec9d9ee9692094114da68e6b861d",
-    "app/src/main/kotlin/com/example/chat/ui/kit/ChatyChoiceControls.kt": "c07b28dc7437ca39baccb4e0e3641ce79f3faaa2c0250dd885ba47efeec7ab44",
+    "app/src/main/kotlin/com/example/chat/ui/kit/ChatyChoiceControls.kt": "2f5daa5f3416c672b39cd1c308be4c0f7cf8f9c2e9868fbe25d7f308e8be5859",
     "app/src/main/kotlin/com/example/chat/ui/kit/ChatyConfirmationDialog.kt": "d69a9e37ef666455cf73e73bf9a977515c70ce858c241d73d211d352ba445ff8",
     "app/src/main/kotlin/com/example/chat/ui/media/ImageSendCompressor.kt": "980ee4a1b9e7c4c106d06972a8ba77f9966964a370e91d53c4fb5034ba126f74",
     "app/src/main/kotlin/com/example/chat/ui/navigation/HomeHeaderTabs.kt": "3a507eb3e55079ea86aadb9f367d37563d33e1cdd7d6681d05c3290bc13160fd",
