@@ -12,7 +12,6 @@ on:
 
 jobs:
   build:
-    if: ${{ !contains(github.event.head_commit.message, 'Publish verified Next16 APK only') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -241,24 +240,3 @@ jobs:
             base64 -w 0 "$f" | fold -w 4000 | sed 's/^/PNGB64 /'
             echo "PNGB64-END $n"
           done
-
-  publish-verified-next16:
-    if: ${{ contains(github.event.head_commit.message, 'Publish verified Next16 APK only') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      actions: read
-      contents: write
-    steps:
-      - name: Download exact already-built production APK
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh run download 40444260619 --repo Bandi-maya/chat-application --name chaty-kotlin-debug-apk --dir verified-apk
-          mv verified-apk/app-debug.apk verified-apk/Chaty-Next16-a3e451d-test.apk
-          echo '1e134848bf1c376f242f6811d4c4439327cfd026d59019441ede5f9b3c044357  verified-apk/Chaty-Next16-a3e451d-test.apk' | sha256sum -c -
-      - name: Publish developer test APK without rebuilding
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create next16-developer-test verified-apk/Chaty-Next16-a3e451d-test.apk --repo Bandi-maya/chat-application --target a3e451d4747edbbb3c8e229cd24d32e81e8adeda --prerelease --title 'Chaty Next16 developer test' --notes 'Developer test APK from immutable commit a3e451d4747edbbb3c8e229cd24d32e81e8adeda. Compiled and 1039 unit tests passed. Android emulator checks are still in progress. Latest later-requested notification, album, launcher, header-brand and PiP refinements are not included. Clean test installation uses a different debug signing certificate from prior builds. APK SHA-256: 1e134848bf1c376f242f6811d4c4439327cfd026d59019441ede5f9b3c044357.'
