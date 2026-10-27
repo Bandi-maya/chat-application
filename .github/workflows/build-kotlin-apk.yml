@@ -206,6 +206,8 @@ jobs:
           target: default
           arch: x86_64
           profile: pixel_6
+          # Preserve upstream v2 default flags and explicitly expose both synthetic cameras.
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
           script: bash ci/run-smoke.sh
       - name: Preserve Android instrumentation results
         if: always()
