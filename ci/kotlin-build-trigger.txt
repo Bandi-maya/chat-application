@@ -1,1 +1,1 @@
-candidate-30-fix trigger 2026-10-27T22:17 IST archive 68bac66e5d4530fd2ed2b7e9a98e152744787165a1c80bccb39f6be7fd149934
+candidate-32 combined trigger 2026-10-27T23:17 IST archive c8d2056c16cccb1abea2efd1a69991da0d6268c979e4679cb712c2ddca73b9c8 - albums+account-guard on 30fix pin 68bac66e; candidate-31 content (b36100e1) included; runs all album+guard tests previously unrun
