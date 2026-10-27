@@ -233,7 +233,7 @@ jobs:
           # Allowlist only: deterministic test captures of the app's own auth screens (no input typed) and the
           # ChatFixtureActivity synthetic conversations. The failure-state capture is included: it only ever shows the app under the synthetic fixture session. Never the final screen or logcat.
           # This repository is public, so the job log is public: keep it bounded and fixture-only.
-          for n in 00-failure-state 01-welcome 02-login 03-register 04-forgot-password 05-register-organization 06-chats-home 07-chat-detail 08-shell-light 09-shell-dark 10-approot-configured-shell 11-chat-detail-host 12-contact-info 13-restart-launch1-prompt 13-restart-launch1 13-restart-launch2-prompt 13-restart-launch2; do
+          for n in 00-failure-state 01-welcome 02-login 03-register 04-forgot-password 05-register-organization 06-chats-home 07-chat-detail 08-shell-light 09-shell-dark 10-approot-configured-shell 11-chat-detail-host 12-contact-info 13-restart-launch1-prompt 13-restart-launch1 13-restart-launch2-prompt 13-restart-launch2 real-host-hold-preready-toggle-before real-host-hold-preready-toggle-after real-host-hold-preready-toggle-decision real-host-hold-preready-finally real-host-hold-release-toggle-before real-host-hold-release-toggle-after real-host-hold-release-toggle-decision real-host-hold-release-finally real-host-hold-cancel-toggle-before real-host-hold-cancel-toggle-after real-host-hold-cancel-toggle-decision real-host-hold-cancel-finally real-host-hold-locked-toggle-before real-host-hold-locked-toggle-after real-host-hold-locked-toggle-decision real-host-hold-locked-finally real-host-hold-auth-toggle-before real-host-hold-auth-toggle-after real-host-hold-auth-toggle-decision real-host-hold-auth-finally real-host-hold-tenant-toggle-before real-host-hold-tenant-toggle-after real-host-hold-tenant-toggle-decision real-host-hold-tenant-finally; do
             f="screenshots/$n.png"
             [ -f "$f" ] || { echo "PNGMISSING $n"; continue; }
             sz=$(stat -c %s "$f")
@@ -241,4 +241,9 @@ jobs:
             echo "PNGB64-BEGIN $n $sz"
             base64 -w 0 "$f" | fold -w 4000 | sed 's/^/PNGB64 /'
             echo "PNGB64-END $n"
+          done
+          # Sanitized per-case toggle timing (no account data): budget/decision/elapsed/entry/native-state counts only.
+          for k in preready release cancel locked auth tenant; do
+            t="screenshots/real-host-hold-$k-toggle-timing.txt"
+            [ -f "$t" ] && { echo "TIMING-BEGIN $k"; cat "$t"; echo; echo "TIMING-END $k"; } || echo "TIMING-MISSING $k"
           done
