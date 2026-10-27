@@ -1,1 +1,1 @@
-candidate-26 trigger 2026-10-27T15:18:45+05:30 zip sha256 422e1fd2de7f407c8c4c0a54bf0328a315e4032402f4f1741291cbd1d694c7ef - compile fix ChatVoiceBinding padding overload + camera hold proofs + map draw-only label + V3 media reset diagnostic
+candidate-27 trigger 2026-10-27T17:05:00+05:30 zip sha256 ab2d1a4bbdc9afdc6f12a937d5c15fff019e69abfa410b5f8d15fa143c2183ba - combined: notification lane v3 production + camera isolation v2 + map landscape/label trial + compact semantics-freshness probe
