@@ -421,7 +421,7 @@ jobs:
           arch: x86_64
           profile: pixel_6
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
-          script: mkdir -p screenshots && classes="com.example.chat.SwipeRowProofTest,com.example.chat.SwipeRtlAndRowSettingsProofTest,com.example.chat.RadialVariantsProofTest,com.example.chat.HeaderTabStyleSheetProofTest,com.example.chat.VoiceComposerGestureProofTest,com.example.chat.LockBadgeMotionProofTest" && printf '%s\n' "$classes" > screenshots/instrumentation-class-filter.txt && (cd runtime-apks && sha256sum -c SHA256SUMS) && adb install -r -t runtime-apks/app-debug.apk && adb install -r -t runtime-apks/app-debug-androidTest.apk && python3 ci/run-instrumentation-shard.py "$classes" ; rc=$? ; adb pull /sdcard/Android/data/com.example.chat/files/screenshots/. screenshots/ || true ; exit $rc
+          script: mkdir -p screenshots && classes="com.example.chat.SwipeRowProofTest,com.example.chat.SwipeRtlAndRowSettingsProofTest,com.example.chat.RadialVariantsProofTest,com.example.chat.HeaderTabStyleSheetProofTest,com.example.chat.VoiceComposerGestureProofTest,com.example.chat.LockBadgeMotionProofTest,com.example.chat.MediaInteractionProofTest" && printf '%s\n' "$classes" > screenshots/instrumentation-class-filter.txt && (cd runtime-apks && sha256sum -c SHA256SUMS) && adb install -r -t runtime-apks/app-debug.apk && adb install -r -t runtime-apks/app-debug-androidTest.apk && python3 ci/run-instrumentation-shard.py "$classes" ; rc=$? ; adb pull /sdcard/Android/data/com.example.chat/files/screenshots/. screenshots/ || true ; exit $rc
       - name: Preserve diagnostic capture results
         if: always()
         uses: actions/upload-artifact@v4
@@ -431,13 +431,13 @@ jobs:
             app/build/outputs/androidTest-results/connected/
             app/build/reports/androidTests/connected/
           if-no-files-found: warn
-      - name: Verify targeted capture selection (6 classes, nonzero cases)
+      - name: Verify targeted capture selection (7 classes, nonzero cases)
         id: select
         if: always()
         run: |
           python3 - <<'PYSEL'
           import glob, sys, xml.etree.ElementTree as ET, re, pathlib
-          want = {'com.example.chat.SwipeRowProofTest','com.example.chat.SwipeRtlAndRowSettingsProofTest','com.example.chat.RadialVariantsProofTest','com.example.chat.HeaderTabStyleSheetProofTest','com.example.chat.VoiceComposerGestureProofTest','com.example.chat.LockBadgeMotionProofTest'}
+          want = {'com.example.chat.SwipeRowProofTest','com.example.chat.SwipeRtlAndRowSettingsProofTest','com.example.chat.RadialVariantsProofTest','com.example.chat.HeaderTabStyleSheetProofTest','com.example.chat.VoiceComposerGestureProofTest','com.example.chat.LockBadgeMotionProofTest','com.example.chat.MediaInteractionProofTest'}
           # Expected method counts come from the restored pinned source, not from
           # the runner: a crashed runner must not shrink the expectation.
           expected = {}
@@ -473,7 +473,7 @@ jobs:
           if hard:
               print('CAPTURE-SELECTION-FAIL ' + '; '.join(hard))
               sys.exit(1)
-          print('CAPTURE-SELECTION-OK classes=5 methods-completed=all ordinary-assert-failures=%d (retained, still TEST FAILURE in report)' % len(failures))
+          print('CAPTURE-SELECTION-OK classes=%d methods-completed=all ordinary-assert-failures=%d (retained, still TEST FAILURE in report)' % (len(want), len(failures)))
           PYSEL
       - name: Upload retry pixel proof
         if: always()
