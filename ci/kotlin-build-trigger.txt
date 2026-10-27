@@ -1,1 +1,1 @@
-candidate-28 trigger 2026-10-27T18:20:00+05:30 zip sha256 a554f66c490831a405243975e391f2c072592c43f04aa835f206c1002c6bf648 - poster symbol fix + typed profile preview + map controls diagnostic wiring
+candidate-29 trigger 2026-10-27T19:31 IST archive 76fff031ff3928b5d50d822faf18d06a7150359f181068474cc45867ea904b92
