@@ -1,6 +1,6 @@
 {
   "base": "5d6e83e846caeba925ee637c3a7babebbef5cbe3",
-  "archive_sha256": "95ab951e0fbf43e338add9ff8d1f68bc87deb17c5070105816c2139fa35fb035",
+  "archive_sha256": "71fe36e95d10d25651d5be10ee0fcfd9d34aad5dc035c420132f0a98243817bc",
   "files": {
     "app/build.gradle.kts": "757337b47457c0937c5490f4854b2ea8aefdd3ac7c5f493128bc447885b47880",
     "app/src/androidTest/java/com/example/chat/AppRootConfiguredProofTest.kt": "ada5168e8ded67b498f8f45c1277f6db58fa73db9c83da0de6307738ef3329b0",
@@ -134,7 +134,7 @@
     "app/src/main/kotlin/com/example/chat/ServiceLocator.kt": "957a4daedc62ddd12b1ad8be499973cd4fae9b70cc298f0eb3a65d0dd73d2602",
     "app/src/main/kotlin/com/example/chat/data/api/ApiBackendConfig.kt": "33e6daceb709eeb4605a2199e6a896ace7b4bc85c01a48a44d6599e06b0fc554",
     "app/src/main/kotlin/com/example/chat/data/api/ApiBackendService.kt": "36669d2890ca7d86f2e00c3048345d32aa5da2324a5d37224ee05718629232e2",
-    "app/src/main/kotlin/com/example/chat/ui/AppRoot.kt": "b150a6d92fbb7c33a8d1434153d8d58ba973d16fe75b844f610699c9408965c9",
+    "app/src/main/kotlin/com/example/chat/ui/AppRoot.kt": "8598af2c6433c3151c0ca87f8a554031450837c60425b36283a1d4c192f5fb8d",
     "app/src/main/kotlin/com/example/chat/ui/ChatAttachmentsBinding.kt": "9c52f8465309c438fc58a3c7e666f25cdb833e6e78621dd9d1f1eec37cc25f72",
     "app/src/main/kotlin/com/example/chat/ui/ChatDetailHost.kt": "cd78ffa460ca76d7f3aa96709dba10ef7206287f6a0dd2156a3be0d8479514fa",
     "app/src/main/kotlin/com/example/chat/ui/ChatVoiceBinding.kt": "27ad1167224671facef4268265317dd399d7e1f035b3a1a12914164884b05e80",
@@ -218,6 +218,7 @@
     "app/src/main/kotlin/com/example/chat/ui/profile/ScopedProfileEditorHost.kt": "73321c911ce1a70cac60dd457f582587fa58cd6e76370d4da0a32ad2070d66ad",
     "app/src/main/kotlin/com/example/chat/ui/settings/ChatyLicenseData.kt": "cb90028f1ceb0ecb739fd4c36a4e2af6191bdb524b066585fd3b83d1a3bad44e",
     "app/src/main/kotlin/com/example/chat/ui/settings/SettingsComponents.kt": "8e7ae26e9e9f0e7e35fa9584f25b033b56c401f1611a6c569618957afacc0744",
+    "app/src/main/kotlin/com/example/chat/ui/settings/SettingsRootScreen.kt": "04f92859561ea76c4808fa0d3f6cff6b87c12be73443f21d14188f0f8a96d2c7",
     "app/src/main/kotlin/com/example/chat/ui/settings/SettingsSubHost.kt": "b7df67d36c38d60867a2b9ce9463e471b75a51e761fe99b4ee7a95beb39389a1",
     "app/src/main/kotlin/com/example/chat/ui/settings/StorageMediaScreen.kt": "87eb19b6483f82bbc001cdc5def5904a0776e6c1c2f58800cf8c94bf5051dda2",
     "app/src/main/kotlin/com/example/chat/ui/settings/conversation/ConversationEntryStyleScreen.kt": "97098e4f37722f18aabaa7fa3550cd1dc636b42bd71b143aaac64b258e2f54ae",
