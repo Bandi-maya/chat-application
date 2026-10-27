@@ -1,6 +1,6 @@
 {
   "base": "5d6e83e846caeba925ee637c3a7babebbef5cbe3",
-  "archive_sha256": "5f2d36c4daa7ad288c5fd8898bd9d4f507d61f062153049793050d10595328fb",
+  "archive_sha256": "3a871444a75ad1252e68390abc20751c991024432e192742b0924b89d4264d40",
   "files": {
     "app/build.gradle.kts": "757337b47457c0937c5490f4854b2ea8aefdd3ac7c5f493128bc447885b47880",
     "app/src/androidTest/java/com/example/chat/AppRootConfiguredProofTest.kt": "ada5168e8ded67b498f8f45c1277f6db58fa73db9c83da0de6307738ef3329b0",
@@ -233,6 +233,7 @@
     "app/src/test/java/com/example/chat/CallSignalDeduplicatorTest.kt": "5f5823c0e9ddc0f28a27133aa78a5fb2b1784b632456df23490d11eb63b2c2be",
     "app/src/test/java/com/example/chat/CallSignalingParityTest.kt": "1c581f5dc30e88c4dd2cbc6dd74d9c0d502b975d406b32b37f3e33bdacd65a95",
     "app/src/test/java/com/example/chat/CapturedPhotoSubmissionTest.kt": "b9803a57919cfc5d960c8d2dff4ab0b590a3ca469e1532f4116a27728e583773",
+    "app/src/test/java/com/example/chat/ChatAttachmentVoiceTest.kt": "31f63b9b98134a28e5fec75f4293fd10db029f442a6de6fac29fb4b6c804bec8",
     "app/src/test/java/com/example/chat/ChatDetailSliceParityTest.kt": "8599648e519e158cd97f96350cb4c53ebad9e15a2252609abd0bd4040c9ade0c",
     "app/src/test/java/com/example/chat/ChatMediaServiceScopeTest.kt": "9b59b3361744545842a3146dd5e33347dbd2f75ad8a17d0bf06fd306d809db02",
     "app/src/test/java/com/example/chat/ChatyEmojiPackTest.kt": "ad385ea9a13838d9555825a18c57abab77a0a1de7ada4d897126b9d1c45531ca",
