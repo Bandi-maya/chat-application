@@ -1,6 +1,6 @@
 {
   "base": "5d6e83e846caeba925ee637c3a7babebbef5cbe3",
-  "archive_sha256": "932847cfd1b9b03421e6eb50f66eeb40981df1512eb95b0b1dcd0bc77e5852e6",
+  "archive_sha256": "c071700091df744cfa4d4b4358464a5d57f8f39cbceb894793136a9c341cca93",
   "files": {
     "app/build.gradle.kts": "362c7958e391f4219bf7e53384678eae2e2457ee64e560713cd2f968180080dc",
     "app/src/androidTest/java/com/example/chat/AppRootConfiguredProofTest.kt": "6db051531b4f3bab1084641018eb91de548fecbd30820890af5c6ae7c6b1c036",
@@ -11,12 +11,13 @@
     "app/src/androidTest/java/com/example/chat/ConfirmationFooterResponsiveProofTest.kt": "7c2826fe3dad524ecb811d89311f90313b8addf260823bc2ddd8f95f5162c171",
     "app/src/androidTest/java/com/example/chat/DialerUiAssertions.kt": "0f40989d313a9177c0c30b367ac8201e8212bf8d40218b6797326a1d56d9a1e2",
     "app/src/androidTest/java/com/example/chat/DrawerNarrowLayoutProofTest.kt": "c04c2c3472995468cdbfd25ce7b4aeee18b1e94d158bed0b13e028d062971df2",
-    "app/src/androidTest/java/com/example/chat/HeaderTabStyleSheetProofTest.kt": "18b875f60975dcd541896d8bbc5a81294748a5993a301941489131e1b2f8ba82",
+    "app/src/androidTest/java/com/example/chat/HeaderTabStyleSheetProofTest.kt": "111a6b5a6324d12cc942be2fb43bd1073cb5b0c7ac4bf49f0752aa95a9f916dc",
     "app/src/androidTest/java/com/example/chat/HomeHeaderTabsResponsiveProofTest.kt": "7ea24f1b8bb288ba627dc78e90ac56c7d1c962b0583229e1537d45fcd60a1bdb",
     "app/src/androidTest/java/com/example/chat/ImageEditorPixelsTest.kt": "6be16d7098acd96f696bcfc9acdfe143230c400e50a51b43a13eec8a922949dc",
     "app/src/androidTest/java/com/example/chat/ImageSendCompressorExifTest.kt": "376fd5fe0f08c51ca1d312ec20115db89e12b01419ec3d54e8413fac4ee4c511",
     "app/src/androidTest/java/com/example/chat/MediaFollowOnProofTest.kt": "d07a8b1cf2244e942c23a4fff33698fc2523f8aaf35b437194d337cc7d2f6c3c",
     "app/src/androidTest/java/com/example/chat/MediaInteractionProofTest.kt": "e34211b9d484bed3172872db21d7cfe0d43faa419a30c7e307fde3ed76123ec1",
+    "app/src/androidTest/java/com/example/chat/NativeCallLoopbackProofTest.kt": "bbbfb8713fcdc161bfb70608268981d0b8e8327e246344192d9ba8241c487447",
     "app/src/androidTest/java/com/example/chat/OverflowSizingProofTest.kt": "2c7f7ebc3117f1324ff8a98c93ebe897b395220067f4bf1fcd9b5c50c8685e8f",
     "app/src/androidTest/java/com/example/chat/RadialCompactFontProofTest.kt": "f59f3c059d7117b7a26c07785626c59cd1cb03a476baa2923b514c1fde31be24",
     "app/src/androidTest/java/com/example/chat/RadialPlacementProofTest.kt": "3fdb7e0d66a9ec39b3b45811b184bd8b549e7fac8198f7fc7671877f14fc07c5",
