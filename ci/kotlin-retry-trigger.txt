@@ -1,2 +1,2 @@
 capture-only 40652380967 7addcad01f28699ff0ffec7953fe24156f0e5456f0eeff90db76c2db78e1dbfb
-# re-pin 4: same V10 source; probe now ci/demo-probe.sh (runner-safe single-line call; pre-seeds notif-education pref, taps App Lock Not now, clean home capture + window dump)
+# re-pin 5: same V10 source; probe taps Welcome->Log In before the demo card; adds skiavk renderer A/B on restored session
