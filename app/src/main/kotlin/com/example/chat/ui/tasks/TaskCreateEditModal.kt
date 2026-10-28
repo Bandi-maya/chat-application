@@ -210,7 +210,14 @@ fun TaskCreateEditModal(
     // sheet expands it instead of scrolling the form, leaving the end controls unreachable
     // (capture 40772281420). Drag-down to half after open still works; scrim-tap, back, cancel
     // and save dismissal are untouched (onDismissRequest only via user paths; draft hoisted).
-    val sheetState = rememberModalBottomSheetState(initialValue = androidx.compose.material3.SheetValue.Expanded)
+    val sheetDensity = androidx.compose.ui.platform.LocalDensity.current
+    val sheetState = androidx.compose.runtime.remember {
+        androidx.compose.material3.SheetState(
+            skipPartiallyExpanded = false,
+            density = sheetDensity,
+            initialValue = androidx.compose.material3.SheetValue.Expanded,
+        )
+    }
     ModalBottomSheet(sheetState = sheetState, tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = { if (!isSaving) onDismiss() }) {
         Column(
             modifier = Modifier
