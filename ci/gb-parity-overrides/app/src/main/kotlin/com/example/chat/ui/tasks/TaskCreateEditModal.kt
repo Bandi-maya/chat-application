@@ -209,7 +209,14 @@ fun TaskCreateEditModal(
     // LaunchedEffect show() lands on Expanded - the recovery the recreate() path already proves
     // (AccountDraftIsolationProofTest recreate + font2 legs). Scrim-tap, back, cancel and save
     // dismissal are untouched (onDismissRequest only via user paths; the draft stays hoisted).
-    val sheetState = rememberModalBottomSheetState(initialValue = androidx.compose.material3.SheetValue.Expanded)
+    val sheetDensity = androidx.compose.ui.platform.LocalDensity.current
+    val sheetState = androidx.compose.runtime.remember {
+        androidx.compose.material3.SheetState(
+            skipPartiallyExpanded = false,
+            density = sheetDensity,
+            initialValue = androidx.compose.material3.SheetValue.Expanded,
+        )
+    }
     ModalBottomSheet(sheetState = sheetState, tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = { if (!isSaving) onDismiss() }) {
         Column(
             modifier = Modifier
