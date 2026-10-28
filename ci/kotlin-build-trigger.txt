@@ -1,1 +1,1 @@
-candidate-50c: adds synchronous auth-invalidation recomposition (authScope listener -> authRevision) to cancelled c50b (40724685850); per-account quarantine keys re-read on transition lock, not load timing; overlay archive 31cd09b1
+candidate-50d: androidTest compile fix on c50c - AccountDraftIsolationProofTest sh() used nonexistent ParcelFileDescriptor.inputStream/waitFor; now AutoCloseInputStream per codebase pattern; overlay archive e2b25914
