@@ -1,1 +1,1 @@
-candidate-50e: pin corrected stock tick label in ThemeConfigParityTest.fromMapEmpty (was pinning the stale RC iOS 11 fallback that contradicted stock enum; c50d 1327 unit / 1 fail only this)
+candidate-50f: rotation sheet-dismiss fix (material3 292204649, configuration-keyed sheet window) + theme-surface system bar paint under transparent window + demo prompt-aware test flow; overlay archive c102a771
