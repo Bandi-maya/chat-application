@@ -91,6 +91,12 @@ fun AppRoot() {
         onDispose { ServiceLocator.preferencesController.removeListener(prefsListener) }
     }
     @Suppress("UNUSED_EXPRESSION") themeRevision
+    // Follow-system must be LIVE, not birth-only: SyncChatySystemTheme was dead code
+    // (never composed), so an OS night-mode change after controller creation never
+    // re-resolved the default theme. Mounted at the real root it covers every screen
+    // including the unauthenticated auth flow; explicitly chosen/custom themes stay
+    // protected by the controller's followSystem guard.
+    com.example.chat.ui.theme.SyncChatySystemTheme(themeController, themeRevision)
     // Dart main.dart:725 GbThemeOverrides.resolve(themeController.globalTheme, prefs).
     val resolvedTheme = com.example.chat.ui.theme.GbThemeOverrides.resolve(
         themeController.globalTheme, ServiceLocator.preferencesController,
@@ -300,6 +306,9 @@ fun AppRoot() {
                     val user = ServiceLocator.apiBackend.login(identifier, password, tenant, isDefaultTenant)
                     user.id
                 },
+                // Offline demo entry (user-requested keep-demo): the card stays hidden
+                // unless wired here; loginDemo owns all fail-closed real-credential guards.
+                demoLogin = { ServiceLocator.apiBackend.loginDemo().id },
             )
         }
         val registerScreen: @Composable () -> Unit = {
@@ -779,14 +788,81 @@ fun AppRoot() {
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.tasks -> {
                                 val controller = ServiceLocator.tasksController
                                 var tasksRevision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
-                                var detailTask by remember { mutableStateOf<com.example.chat.domain.models.ChatTask?>(null) }
-                                var editorOpen by remember { mutableStateOf(false) }
-                                var editorTask by remember { mutableStateOf<com.example.chat.domain.models.ChatTask?>(null) }
+                                // Editor/detail state survives configuration changes (font scale,
+                                // rotation) via saveable task IDs, quarantined PER ACCOUNT: an entry
+                                // written under account A is never read, rendered, resolved, or
+                                // cleared under account B. ChatTask is not saveable, so IDs resolve
+                                // against the controller's current-account snapshot.
+                                val tasksAccountKey = ServiceLocator.apiBackend.currentUser?.id ?: ""
+                                var detailTaskIds by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Map<String, String>>(emptyMap()) }
+                                var editorOpenByAccount by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
+                                var editorTaskIds by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Map<String, String>>(emptyMap()) }
+                                // Draft safety cache (this activity only): once an edit target has
+                                // resolved, keep its last object per account so a mid-edit server-side
+                                // delete can never silently drop the sheet or its unsaved draft.
+                                var lastResolvedEditorByAccount by remember { mutableStateOf<Map<String, com.example.chat.domain.models.ChatTask>>(emptyMap()) }
+                                // Typed unsaved drafts, quarantined per account+task: returning to
+                                // account A restores A's in-progress text, B never sees it. Bundle-safe
+                                // string maps only. Keyed "<account>|<taskId|new>".
+                                var editorDrafts by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Map<String, Map<String, String>>>(emptyMap()) }
+                                fun editorDraftKey(taskId: String?) = tasksAccountKey + "|" + (taskId ?: "new")
+                                fun storeEditorDraft(taskId: String?, d: com.example.chat.ui.tasks.TaskDraftValues) {
+                                    editorDrafts = editorDrafts + (editorDraftKey(taskId) to mapOf(
+                                        "title" to d.title,
+                                        "description" to d.description,
+                                        "assignees" to d.assigneeIds.joinToString(""),
+                                        "priority" to d.priorityName,
+                                        "dueAt" to d.dueAtIso,
+                                    ))
+                                }
+                                fun loadEditorDraft(taskId: String?): com.example.chat.ui.tasks.TaskDraftValues? =
+                                    editorDrafts[editorDraftKey(taskId)]?.let { e ->
+                                        com.example.chat.ui.tasks.TaskDraftValues(
+                                            title = e["title"] ?: "",
+                                            description = e["description"] ?: "",
+                                            assigneeIds = (e["assignees"] ?: "").split("").filter { it.isNotEmpty() },
+                                            priorityName = e["priority"] ?: "medium",
+                                            dueAtIso = e["dueAt"] ?: "",
+                                        )
+                                    }
+                                fun clearEditorDraft(taskId: String?) {
+                                    editorDrafts = editorDrafts - editorDraftKey(taskId)
+                                }
+                                val detailTaskId = detailTaskIds[tasksAccountKey]
+                                val editorOpen = editorOpenByAccount[tasksAccountKey] == true
+                                val editorTaskId = editorTaskIds[tasksAccountKey]
+                                fun setDetailTaskId(id: String?) {
+                                    detailTaskIds = if (id == null) detailTaskIds - tasksAccountKey else detailTaskIds + (tasksAccountKey to id)
+                                }
+                                fun setEditorState(open: Boolean, taskId: String?) {
+                                    editorOpenByAccount = if (open) editorOpenByAccount + (tasksAccountKey to true) else editorOpenByAccount - tasksAccountKey
+                                    editorTaskIds = if (taskId == null) editorTaskIds - tasksAccountKey else editorTaskIds + (tasksAccountKey to taskId)
+                                }
+                                // Snapshot counts only loads validated for the CURRENT account:
+                                // prior-account cache can neither resolve nor close restored state.
+                                val tasksLoaded = tasksRevision.let { controller.hasLoadedOnce }
+                                val tasksSnapshot = if (tasksLoaded) controller.tasks else emptyList()
+                                val detailTask = detailTaskId?.let { id -> tasksSnapshot.firstOrNull { it.id == id } }
+                                val editorResolved = editorTaskId?.let { id -> tasksSnapshot.firstOrNull { it.id == id } }
+                                if (editorResolved != null) lastResolvedEditorByAccount = lastResolvedEditorByAccount + (tasksAccountKey to editorResolved)
+                                val editorTask = editorResolved ?: lastResolvedEditorByAccount[tasksAccountKey]
+                                // Non-destructive settle: a restore target confirmed gone AFTER a
+                                // current-account load (and never resolved here, so no draft exists)
+                                // closes with a notice instead of vanishing; never flashes create flow.
+                                androidx.compose.runtime.LaunchedEffect(tasksLoaded, editorTaskId, editorResolved == null && lastResolvedEditorByAccount[tasksAccountKey] == null) {
+                                    if (tasksLoaded && editorTaskId != null && editorResolved == null && lastResolvedEditorByAccount[tasksAccountKey] == null) {
+                                        setEditorState(false, null)
+                                        settingsNotice = "This task is no longer available."
+                                    }
+                                }
+                                androidx.compose.runtime.LaunchedEffect(tasksLoaded, detailTaskId, detailTask == null) {
+                                    if (tasksLoaded && detailTaskId != null && detailTask == null) setDetailTaskId(null)
+                                }
                                 // Contextual FAB 'Create task' (hoisted tick from the shell FAB).
                                 androidx.compose.runtime.LaunchedEffect(createTaskTick) {
                                     if (createTaskTick > handledCreateTaskTick) {
                                         handledCreateTaskTick = createTaskTick
-                                        editorTask = null; editorOpen = true
+                                        setEditorState(true, null)
                                     }
                                 }
                                 androidx.compose.runtime.DisposableEffect(controller) {
@@ -800,7 +876,7 @@ fun AppRoot() {
                                     { id -> ServiceLocator.apiBackend.users.firstOrNull { it.id == id } }
                                 val detail = detailTask
                                 // System Back from a task detail returns to the task list, not out of the Tasks tab.
-                                androidx.activity.compose.BackHandler(enabled = detail != null && !editorOpen) { detailTask = null }
+                                androidx.activity.compose.BackHandler(enabled = detail != null && !editorOpen) { setDetailTaskId(null) }
                                 if (taskUser != null && detail != null) {
                                     com.example.chat.ui.tasks.TaskDetailScreen(
                                         task = detail,
@@ -808,8 +884,8 @@ fun AppRoot() {
                                         colors = com.example.chat.ui.tasks.TaskColors(resolvedTheme),
                                         currentUser = taskUser,
                                         getUser = lookup,
-                                        onBack = { detailTask = null },
-                                        onEditTask = { editorTask = it; editorOpen = true },
+                                        onBack = { setDetailTaskId(null) },
+                                        onEditTask = { setEditorState(true, it.id) },
                                     )
                                 } else {
                                     com.example.chat.ui.tasks.TasksScreen(
@@ -817,12 +893,12 @@ fun AppRoot() {
                                         tasksRevision = tasksRevision,
                                         conversations = ServiceLocator.apiBackend.conversations,
                                         getUser = lookup,
-                                        onOpenDetail = { detailTask = it },
-                                        onEditTask = { editorTask = it; editorOpen = true },
-                                        onCreateTask = { editorTask = null; editorOpen = true },
+                                        onOpenDetail = { setDetailTaskId(it.id) },
+                                        onEditTask = { setEditorState(true, it.id) },
+                                        onCreateTask = { setEditorState(true, null) },
                                     )
                                 }
-                                if (editorOpen && taskUser != null) {
+                                if (editorOpen && taskUser != null && (editorTaskId == null || editorTask != null)) {
                                     com.example.chat.ui.tasks.TaskCreateEditModal(
                                         controller = controller,
                                         colors = com.example.chat.ui.tasks.TaskColors(resolvedTheme),
@@ -831,8 +907,10 @@ fun AppRoot() {
                                         getUser = lookup,
                                         sourceConversationId = "",
                                         existingTask = editorTask,
-                                        onDismiss = { editorOpen = false },
-                                        onSaved = { msg -> editorOpen = false; settingsNotice = msg },
+                                        initialDraft = loadEditorDraft(editorTaskId),
+                                        onDraftChange = { d -> storeEditorDraft(editorTaskId, d) },
+                                        onDismiss = { clearEditorDraft(editorTaskId); setEditorState(false, null) },
+                                        onSaved = { msg -> clearEditorDraft(editorTaskId); setEditorState(false, null); settingsNotice = msg },
                                         onError = { msg -> settingsNotice = msg },
                                     )
                                 }
