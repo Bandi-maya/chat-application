@@ -12,7 +12,12 @@ data class ChatyTypographySpec(val family: String?, val letterSpacingDelta: Doub
             val effective = if (preset.isEmpty() || preset == "Default") (universalPreset ?: preset) else preset
             val family = when (effective) {
                 "Editorial", "Classic" -> "serif"
-                "Rounded", "Comfortaa" -> "sans-serif-rounded"
+                "Rounded" -> "sans-serif-rounded"
+                // OFL-bundled real faces (res/font, SIL OFL 1.1 - licenses in
+                // assets/font-licenses/); these two names previously rendered only
+                // generic-family approximations while claiming the real font.
+                "Comfortaa" -> "ofl-comfortaa"
+                "BEBASNEUE" -> "ofl-bebasneue"
                 "Technical", "TRANSFORMERS" -> "monospace"
                 "ComicSans" -> "cursive"
                 "Bariol" -> "sans-serif-condensed"
