@@ -98,7 +98,7 @@ import kotlinx.coroutines.launch
 
 /** Route keys for the root rows; AppRoot maps each to a destination. */
 enum class SettingsDestination {
-    LinkedDevices, Privacy, Security, ThemeEngine, TemplateStudio, HomeScreen, AdvancedFeatures,
+    LinkedDevices, Privacy, Security, ThemeEngine, TemplateStudio, HomeScreen, AdvancedFeatures, ChatyCustomizationHub,
     Conversation, Effects, Universal, HomeShortcuts, Notifications, Automation,
     Calls, StorageMedia, Permissions, BackupRestore, WasteCleaning, About,
     PrivacyPolicy, ShareChaty,
@@ -123,6 +123,7 @@ private val rootGroups: List<RootGroup> = listOf(
     RootGroup("Look and feel", listOf(
         RootRow(SettingsDestination.ThemeEngine, Icons.Outlined.ColorLens, { LocalAppColors.current.accent }, "Theme & Color Engine", "13+ dark & light theme presets, token editor & palette"),
         RootRow(SettingsDestination.TemplateStudio, Icons.Rounded.DashboardCustomize, { LocalAppColors.current.info }, "Global Template Studio", "App-wide templates and independent component styles"),
+        RootRow(SettingsDestination.ChatyCustomizationHub, Icons.Rounded.Tune, { LocalAppColors.current.accent }, "Chaty Customization Hub", "GB-style home, conversation, notification, media and theme settings"),
         RootRow(SettingsDestination.AdvancedFeatures, Icons.Rounded.DashboardCustomize, { LocalAppColors.current.warning }, "Advanced Feature Center", "Detailed controls for home, privacy, status, calls, bubbles, colors and media"),
         RootRow(SettingsDestination.HomeScreen, Icons.Outlined.Home, { LocalAppColors.current.accent }, "Home Screen", "Header, chat rows, floating button & status"),
         RootRow(SettingsDestination.Conversation, Icons.Outlined.ChatBubbleOutline, { LocalAppColors.current.success }, "Conversation Customization", "Bubbles, ticks, contact sidebar & message appearance"),
