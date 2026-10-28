@@ -424,7 +424,51 @@ jobs:
           arch: x86_64
           profile: pixel_6
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
-          script: mkdir -p screenshots && classes="com.example.chat.DemoModeProofTest,com.example.chat.SystemBarThemeProofTest,com.example.chat.AppRootConfiguredProofTest" && printf '%s\n' "$classes" > screenshots/instrumentation-class-filter.txt && (cd runtime-apks && sha256sum -c SHA256SUMS) && adb install -r -t runtime-apks/app-debug.apk && adb install -r -t runtime-apks/app-debug-androidTest.apk && python3 ci/run-instrumentation-shard.py "$classes" ; rc=$? ; adb pull /sdcard/Android/data/com.example.chat/files/screenshots/. screenshots/ || true ; adb logcat -d -v threadtime > screenshots/logcat.txt || true ; ( adb shell pm clear com.example.chat || true ; adb shell am instrument -w -r -e class com.example.chat.DemoModeProofTest#demoLoginShowsSampleDataAndExitsCleanly com.example.chat.test/androidx.test.runner.AndroidJUnitRunner > screenshots/demo-probe-status.txt 2>&1 & ICPID=$! ; sleep 12 ; adb exec-out screencap -p > screenshots/demo-post-click.png || true ; adb shell uiautomator dump /sdcard/demo-window.xml >/dev/null 2>&1 || true ; adb pull /sdcard/demo-window.xml screenshots/demo-window.xml || true ; sleep 6 ; adb exec-out screencap -p > screenshots/demo-post-click-late.png || true ; adb shell uiautomator dump /sdcard/demo-window-late.xml >/dev/null 2>&1 || true ; adb pull /sdcard/demo-window-late.xml screenshots/demo-window-late.xml || true ; wait $ICPID || true ) ; exit $rc
+          script: |
+            mkdir -p screenshots && classes="com.example.chat.DemoModeProofTest,com.example.chat.SystemBarThemeProofTest,com.example.chat.AppRootConfiguredProofTest" && printf '%s\n' "$classes" > screenshots/instrumentation-class-filter.txt && (cd runtime-apks && sha256sum -c SHA256SUMS) && adb install -r -t runtime-apks/app-debug.apk && adb install -r -t runtime-apks/app-debug-androidTest.apk && python3 ci/run-instrumentation-shard.py "$classes" ; rc=$? ; adb pull /sdcard/Android/data/com.example.chat/files/screenshots/. screenshots/ || true ; adb logcat -d -v threadtime > screenshots/logcat.txt || true
+            cat > /tmp/tap.py <<'PY'
+            import re, sys
+            label = sys.argv[1]
+            try:
+                data = open('/tmp/probe-win.xml', encoding='utf-8', errors='replace').read()
+            except Exception:
+                sys.exit(0)
+            for m in re.finditer(r'<node[^>]*?text="([^"]*)"[^>]*?bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', data):
+                if m.group(1).strip() == label:
+                    x1, y1, x2, y2 = map(int, m.group(2, 3, 4, 5))
+                    print((x1 + x2) // 2, (y1 + y2) // 2)
+                    break
+            PY
+            tap_text() {
+              label="$1"; tries="$2"; i=0
+              while [ "$i" -lt "$tries" ]; do
+                adb shell uiautomator dump /sdcard/probe-win.xml >/dev/null 2>&1
+                adb pull /sdcard/probe-win.xml /tmp/probe-win.xml >/dev/null 2>&1
+                PT=$(python3 /tmp/tap.py "$label")
+                if [ -n "$PT" ]; then adb shell input tap $PT; echo "probe tapped: $label at $PT"; return 0; fi
+                i=$((i + 1)); sleep 3
+              done
+              echo "probe not found: $label"; return 1
+            }
+            ( set +e
+              adb shell pm clear com.example.chat
+              adb shell monkey -p com.example.chat -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
+              tap_text "Try the demo" 25
+              sleep 8
+              adb exec-out screencap -p > screenshots/demo-post-click.png
+              adb shell uiautomator dump /sdcard/demo-window.xml >/dev/null 2>&1
+              adb pull /sdcard/demo-window.xml screenshots/demo-window.xml
+              tap_text "Not now" 4
+              sleep 2
+              tap_text "Not Now" 4
+              sleep 4
+              adb exec-out screencap -p > screenshots/demo-home-clean.png
+              adb shell uiautomator dump /sdcard/demo-window-clean.xml >/dev/null 2>&1
+              adb pull /sdcard/demo-window-clean.xml screenshots/demo-window-clean.xml
+              adb logcat -d -v threadtime -t 500 > screenshots/demo-probe-logcat.txt
+              echo "shell-driven probe done" > screenshots/demo-probe-status.txt
+            )
+            exit $rc
       - name: Preserve diagnostic capture results
         if: always()
         uses: actions/upload-artifact@v4
