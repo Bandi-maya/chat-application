@@ -1,5 +1,5 @@
 {
-  "archive_sha256": "0f82b97656ea85d0c273fa18cc23f57b4d46f907603a62a0d8a3e0ea5d4e31cb",
+  "archive_sha256": "c102a771c3c75492285e6436b1595b5cc854636685013a166a7324113ac0c3e1",
   "base": "e465747abe825fb30a76226cfcebda10bb56d7d8",
   "files": {
     "app/build.gradle.kts": "757337b47457c0937c5490f4854b2ea8aefdd3ac7c5f493128bc447885b47880",
@@ -325,7 +325,7 @@
     "app/src/main/kotlin/com/example/chat/ui/settings/notifications/NotificationSettingsPage.kt": "ba093523b4f226a049fb4992fe71f0d3b4ffbead5d99ce7003157d0ca08d0809",
     "app/src/main/kotlin/com/example/chat/ui/settings/universal/UniversalEmojiPackScreen.kt": "63648533f24020f1233b09eb7c00f2b1a038068276510d04fe922724160240cd",
     "app/src/main/kotlin/com/example/chat/ui/settings/universal/UniversalScreen.kt": "ce4b5dc74c1310d7415dcc8ef2e75f8df53c830fc75c28e091048afd8a9ffbd0",
-    "app/src/main/kotlin/com/example/chat/ui/tasks/TaskCreateEditModal.kt": "877acb0e4fe52f0a3f9973fabede139a18d02d20e8b5ab671922964782ff718d",
+    "app/src/main/kotlin/com/example/chat/ui/tasks/TaskCreateEditModal.kt": "7785ad83a3a0103fcbc6e84790a6b3bc867fc668390bf9d6a7a79e4cb84f841e",
     "app/src/main/kotlin/com/example/chat/ui/tasks/TaskDetailScreen.kt": "765f75929679ae4ea443a2fc840736f0052f5e8361447f2d31415beaf6e76eee",
     "app/src/main/kotlin/com/example/chat/ui/tasks/TasksComponents.kt": "8a6b69798004974206b62d3c3e41c1c3f9c8827d06e830d9bd72830251e7200d",
     "app/src/main/kotlin/com/example/chat/ui/tasks/TasksScreen.kt": "38ef1bf8d0ed4790bdc169700e75d1cc3d61ea25175be1c28620f1e12dadc026",
