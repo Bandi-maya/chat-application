@@ -63,6 +63,28 @@ jobs:
               target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(data)
           print('CANDIDATE-OVERLAY',m['archive_sha256'],'files',len(m['files']))
           PYOVERLAY
+      - name: Apply Chaty Kotlin GB feature overrides
+        run: |
+          python3 - <<'PYOVERRIDES'
+          from pathlib import Path
+          import shutil
+
+          root = Path("ci/gb-parity-overrides")
+          applied = 0
+          for source in sorted(root.rglob("*")):
+              if not source.is_file():
+                  continue
+              relative = source.relative_to(root)
+              if not relative.parts or relative.parts[0] != "app":
+                  raise SystemExit(f"Unexpected override path: {relative}")
+              target = Path(*relative.parts)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(source, target)
+              print(f"Applied {target}")
+              applied += 1
+          if applied != 6:
+              raise SystemExit(f"Expected 6 override files, applied {applied}")
+          PYOVERRIDES
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
