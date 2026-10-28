@@ -433,6 +433,7 @@ jobs:
           path: |
             app/build/outputs/androidTest-results/connected/
             app/build/reports/androidTests/connected/
+            screenshots/
           if-no-files-found: warn
       - name: Verify targeted capture selection (3 classes, nonzero cases)
         id: select
