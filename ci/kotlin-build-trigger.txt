@@ -1,1 +1,1 @@
-2026-10-28T18:05 IST — rebuild after including two current Kotlin sources that were stale in the pinned archive. Apply nine explicit overrides: customization hub, GB feature center, native root/subhost/search/share fixes plus the current UniversalScreen and ChatySystemBarScrims sources so their APIs match call sites. Preserve active backend, account/session handling, encryption and app identity; publish chaty-kotlin-debug-apk.
+candidate-46 probe build trigger (P1 scrim-0 + P3 cyan on override copies, P2 magenta live; diag only, removed before delivery)
