@@ -1,5 +1,5 @@
 {
- "archive_sha256": "8c2da0b30bf9ad039a9c738aff4916b4706c9665dcf12a8878d3fe8e7edae149",
+ "archive_sha256": "7addcad01f28699ff0ffec7953fe24156f0e5456f0eeff90db76c2db78e1dbfb",
  "base": "e465747abe825fb30a76226cfcebda10bb56d7d8",
  "files": {
   "app/build.gradle.kts": "757337b47457c0937c5490f4854b2ea8aefdd3ac7c5f493128bc447885b47880",
@@ -198,7 +198,7 @@
   "app/src/main/java/com/example/chat/data/api/OkHttpApiTransport.kt": "d7980e455d71d0e06185cf1f151c73dde3f24079a6e9edb8d3ad7643d2082871",
   "app/src/main/java/com/example/chat/data/api/ScopedMessageSender.kt": "02ed03669968ef4c92083cd4434cba70560a84f8db1ece8d174b06f88a467f73",
   "app/src/main/java/com/example/chat/data/demo/DemoMode.kt": "ed584843eadc8637692f7b927f0efeebaf0b962578a548e6a55f733d335b88d1",
-  "app/src/main/java/com/example/chat/data/demo/DemoSampleData.kt": "d7193ac9b17de4d086cee680107b0914066a39ceba4ee7d4260c9edea646ec45",
+  "app/src/main/java/com/example/chat/data/demo/DemoSampleData.kt": "c081d8a59330784de43ffc5965cab69e373258a3bf821be6447026f55cc5e2dc",
   "app/src/main/java/com/example/chat/data/local/AttachmentFileCache.kt": "cae36e60630e5c0748672d150c3309f92f20aad7df8638bd483ed6d34da11bdf",
   "app/src/main/java/com/example/chat/data/media/BoundedMediaDownloader.kt": "a076911a5a27ef011abfae0d4ba2280b5a75d2d8209dcfce492941bece21c6e1",
   "app/src/main/java/com/example/chat/data/messaging/ConversationsRepository.kt": "fa76ac630997e110dc6a073fba98486011efdd437761affcac242a9f3604ab72",
@@ -360,7 +360,7 @@
   "app/src/test/java/com/example/chat/LauncherShortcutPolicyTest.kt": "68101d1b7549d09977bfa83ce7d444f9a1f6b3f783ae58cbbf6f93991fc415c1",
   "app/src/test/java/com/example/chat/LauncherShortcutRouterTest.kt": "121bf29c29e4119f5d6cad592ab2d6ef1266e4a789caf09cc4eb29cf1b4358e4",
   "app/src/test/java/com/example/chat/MediaAlbumProjectionTest.kt": "c8d4b94278f6f85bfc1251d963415529bb52e381a22ab289fbb7a0c4f0cdd464",
-  "app/src/test/java/com/example/chat/MixedSessionQuarantineTest.kt": "a00df2355b6dbd7a64d074f5ccf5627ed82525db41146e1bfd75137b6d8f1d86",
+  "app/src/test/java/com/example/chat/MixedSessionQuarantineTest.kt": "7492e81d849005d00a36084b8fb02fd87a5f98358ee405158c86185002e810e7",
   "app/src/test/java/com/example/chat/PeerIconSelectionContractTest.kt": "6f4b2e7cac7733eec836256b6a786bad42bf158d2d96d1acc5674e119f739575",
   "app/src/test/java/com/example/chat/PeerNewChatRulesContractTest.kt": "75007ecb94fd9e73f84a296917d386f29595de0855b630d235f2622eeb9debb6",
   "app/src/test/java/com/example/chat/ProfileAvatarDraftTest.kt": "8a483562fce6d7bf861bccba75ba7825d5451bdc1f987f647f8fa9b8fbb30106",
