@@ -807,24 +807,10 @@ fun AppRoot() {
                                 var editorDrafts by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Map<String, Map<String, String>>>(emptyMap()) }
                                 fun editorDraftKey(taskId: String?) = tasksAccountKey + "|" + (taskId ?: "new")
                                 fun storeEditorDraft(taskId: String?, d: com.example.chat.ui.tasks.TaskDraftValues) {
-                                    editorDrafts = editorDrafts + (editorDraftKey(taskId) to mapOf(
-                                        "title" to d.title,
-                                        "description" to d.description,
-                                        "assignees" to d.assigneeIds.joinToString(""),
-                                        "priority" to d.priorityName,
-                                        "dueAt" to d.dueAtIso,
-                                    ))
+                                    editorDrafts = editorDrafts + (editorDraftKey(taskId) to com.example.chat.ui.tasks.TaskDraftCodec.encode(d))
                                 }
                                 fun loadEditorDraft(taskId: String?): com.example.chat.ui.tasks.TaskDraftValues? =
-                                    editorDrafts[editorDraftKey(taskId)]?.let { e ->
-                                        com.example.chat.ui.tasks.TaskDraftValues(
-                                            title = e["title"] ?: "",
-                                            description = e["description"] ?: "",
-                                            assigneeIds = (e["assignees"] ?: "").split("").filter { it.isNotEmpty() },
-                                            priorityName = e["priority"] ?: "medium",
-                                            dueAtIso = e["dueAt"] ?: "",
-                                        )
-                                    }
+                                    editorDrafts[editorDraftKey(taskId)]?.let { e -> com.example.chat.ui.tasks.TaskDraftCodec.decode(e) }
                                 fun clearEditorDraft(taskId: String?) {
                                     editorDrafts = editorDrafts - editorDraftKey(taskId)
                                 }
