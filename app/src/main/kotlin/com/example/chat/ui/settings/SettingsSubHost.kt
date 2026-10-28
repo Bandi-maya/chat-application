@@ -26,6 +26,7 @@ val hostedSettingsDestinations: Set<SettingsDestination> = setOf(
     SettingsDestination.Conversation, SettingsDestination.HomeScreen, SettingsDestination.Calls,
     SettingsDestination.Permissions, SettingsDestination.StorageMedia,
     SettingsDestination.TemplateStudio, SettingsDestination.ThemeEngine,
+    SettingsDestination.AdvancedFeatures,
     SettingsDestination.HomeShortcuts, SettingsDestination.WasteCleaning,
 )
 
@@ -47,6 +48,10 @@ fun SettingsSubHost(
     val toast: (String) -> Unit = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
     when (destination) {
         SettingsDestination.Privacy -> PrivacyCenterScreen(preferences = prefs, onBack = onBack)
+        SettingsDestination.AdvancedFeatures -> com.example.chat.ui.settings.gb.GbFeatureCenterScreen(
+            preferences = prefs,
+            onBack = onBack,
+        )
         SettingsDestination.Effects -> NavigationEffectsScreen(preferences = prefs, onBack = onBack)
         // Dart settings_root_screen '/settings/notifications' => NotificationSettingsPage (the toast-only screen is not
         // instantiated anywhere in Dart). Dynamic Island native bridge has no Kotlin implementation: bridge = null.
