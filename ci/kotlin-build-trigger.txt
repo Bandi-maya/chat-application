@@ -1,1 +1,1 @@
-candidate-50b: like cancelled c50 (40724120473) plus no-recreation immediate account-switch draft quarantine proof; overlay archive a2861f88; supersedes c49 (compile/unit green, known draft-restore bug)
+candidate-50c: adds synchronous auth-invalidation recomposition (authScope listener -> authRevision) to cancelled c50b (40724685850); per-account quarantine keys re-read on transition lock, not load timing; overlay archive 31cd09b1
