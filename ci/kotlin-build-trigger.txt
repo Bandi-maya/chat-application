@@ -1,1 +1,1 @@
-candidate-50: structured draft codec (indexed assignee keys) + tick resolved-label fallback + per-account draft quarantine/rotation instrumented proofs + codec unit tests; overlay archive a2f83b28; supersedes c49 (40721806815, compile/unit green but known draft-restore bug)
+candidate-50b: like cancelled c50 (40724120473) plus no-recreation immediate account-switch draft quarantine proof; overlay archive a2861f88; supersedes c49 (compile/unit green, known draft-restore bug)
