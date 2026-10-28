@@ -1,1 +1,1 @@
-candidate-50d: androidTest compile fix on c50c - AccountDraftIsolationProofTest sh() used nonexistent ParcelFileDescriptor.inputStream/waitFor; now AutoCloseInputStream per codebase pattern; overlay archive e2b25914
+candidate-50e: pin corrected stock tick label in ThemeConfigParityTest.fromMapEmpty (was pinning the stale RC iOS 11 fallback that contradicted stock enum; c50d 1327 unit / 1 fail only this)
