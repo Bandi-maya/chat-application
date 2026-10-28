@@ -633,10 +633,15 @@ class ApiBackendService extends ChangeNotifier {
     _isConnecting = true;
 
     try {
-      final wsUrl = Uri.parse(
+      // The server authenticates the socket with the access token (?token=...)
+      final baseWsUri = Uri.parse(
         ApiBackendConfig.getWebSocketUrl(_currentUser!.id),
       );
-      debugPrint('[ApiBackendService] Connecting WebSocket to: $wsUrl');
+      final wsUrl = baseWsUri.replace(queryParameters: {
+        ...baseWsUri.queryParameters,
+        'token': _token!,
+      });
+      debugPrint('[ApiBackendService] Connecting WebSocket to: ${baseWsUri.toString()}');
       _channel = WebSocketChannel.connect(wsUrl);
       _isConnecting = false;
 
