@@ -7,9 +7,12 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -249,6 +252,8 @@ fun AppRoot() {
         Box(Modifier.fillMaxSize().windowInsetsPadding(
             WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         )) {
+        // TEMP DIAG c46: cyan origin strip, first child of the padded route container; removed before delivery.
+        Box(Modifier.fillMaxWidth().height(4.dp).background(Color.Cyan)) {}
         // Dart Navigator.pop for the pre-auth stack (Welcome > Login/Register > Forgot/RegisterOrganization);
         // system Back must follow the same targets as each screen's on-screen back arrow.
         androidx.activity.compose.BackHandler(
@@ -1563,7 +1568,6 @@ private fun rememberRootProfilePhoto(): RootProfilePhoto {
 @Composable
 private fun MessageManagementHost(onBack: () -> Unit) {
                 val mmToast = androidx.compose.ui.platform.LocalContext.current
-                com.example.chat.ui.settings.messagemanagement.MessageManagementPage(
                     preferencesController = ServiceLocator.preferencesController,
                     server = ServiceLocator.gbFeatures,
                     conversationSource = object : com.example.chat.ui.settings.messagemanagement.MessageManagementConversationSource {
@@ -1612,5 +1616,5 @@ private fun ChatyPushedPage(visible: Boolean, content: @Composable () -> Unit) {
     ) {
         // Pushed pages own their touches; see PushedPageTouchGuard.
         com.example.chat.ui.kit.PushedPageTouchGuard { content() }
-    }
-}
+
+                com.example.chat.ui.settings.messagemanagement.MessageManagementPage(
