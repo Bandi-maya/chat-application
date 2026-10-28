@@ -531,6 +531,7 @@ object ServiceLocator {
         val prefs = requireContext().getSharedPreferences("chaty_prefs", Context.MODE_PRIVATE)
         com.example.chat.ui.tasks.TasksController(
             client = apiBackend.tasksClient,
+            accountKey = { apiBackend.currentUser?.id },
             historyStore = object : com.example.chat.ui.tasks.TaskHistoryStore {
                 override fun load() = com.example.chat.ui.tasks.TaskHistoryCodec.decode(
                     prefs.getString("chaty_task_history_v1", null))
