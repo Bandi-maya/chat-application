@@ -1,1 +1,1 @@
-candidate-50f: rotation sheet-dismiss fix (material3 292204649, configuration-keyed sheet window) + theme-surface system bar paint under transparent window + demo prompt-aware test flow; overlay archive c102a771
+candidate-50f2: gb-parity-overrides AppRoot.kt shadowed the 2-arg scrims call (50f compile e: AppRoot.kt:1532 No value passed for themeSurfaceArgb); overrides copy now carries the same fix; archive c102a771 unchanged
