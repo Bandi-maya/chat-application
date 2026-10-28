@@ -1,5 +1,5 @@
 {
-  "archive_sha256": "a2f83b28021aede04cc6e88b493b133e47dfb5ffdbc9d6d4e9850e42918d34f5",
+  "archive_sha256": "a2861f88dabbdbd4799910dea2f4c17d4676f1ac380b4933beba9bbcc1f167e3",
   "base": "e465747abe825fb30a76226cfcebda10bb56d7d8",
   "files": {
     "app/build.gradle.kts": "757337b47457c0937c5490f4854b2ea8aefdd3ac7c5f493128bc447885b47880",
@@ -413,6 +413,6 @@
     "tools/location-map/map.js": "d4d42e470004574e68b78d79be3f5573e11ce089bd8c98ea71c93f95467f64a3",
     "tools/location-map/package-lock.json": "9dc0e587615c769f462b2aa1ccc769a921c207bed25406542944347b834f4796",
     "tools/location-map/package.json": "1981188c08704aadbd8c87f1a6d090d474d7c437fe225b3d9f14a9da05739afc",
-    "app/src/androidTest/java/com/example/chat/AccountDraftIsolationProofTest.kt": "252994c0210930349d6b26b058398628474712557956acd63cc5a1184f0d01de"
+    "app/src/androidTest/java/com/example/chat/AccountDraftIsolationProofTest.kt": "da2f3dd261541799b4252c702bab3d3902130fdf8851623e2180356bfaef4051"
   }
 }
