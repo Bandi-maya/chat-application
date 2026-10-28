@@ -869,6 +869,10 @@ fun AppRoot() {
                                 }
                                 androidx.compose.runtime.LaunchedEffect(Unit) { controller.loadTasks() }
                                 val taskUser = ServiceLocator.apiBackend.currentUser?.let { toDomainUser(it) }
+                                // DIAG-50g TEMP: editor host-condition transitions (ids only; no content).
+                                androidx.compose.runtime.LaunchedEffect(editorOpen, editorTaskId, editorTask != null, taskUser != null) {
+                                    android.util.Log.w("SheetDiag", "hostCond open=$editorOpen taskId=$editorTaskId task=${editorTask != null} user=${taskUser != null} acct=${tasksAccountKey.hashCode()}")
+                                }
                                 val lookup: (String) -> com.example.chat.domain.models.UserProfile? =
                                     { id -> ServiceLocator.apiBackend.users.firstOrNull { it.id == id } }
                                 val detail = detailTask
@@ -896,6 +900,8 @@ fun AppRoot() {
                                     )
                                 }
                                 if (editorOpen && taskUser != null && (editorTaskId == null || editorTask != null)) {
+                                    // DIAG-50g TEMP: destination-unmount signal for the editor host.
+                                    androidx.compose.runtime.DisposableEffect(tasksAccountKey, editorTaskId) { onDispose { android.util.Log.w("SheetDiag", "hostDispose acct=${tasksAccountKey.hashCode()} taskId=$editorTaskId") } }
                                     com.example.chat.ui.tasks.TaskCreateEditModal(
                                         controller = controller,
                                         colors = com.example.chat.ui.tasks.TaskColors(resolvedTheme),
@@ -906,7 +912,7 @@ fun AppRoot() {
                                         existingTask = editorTask,
                                         initialDraft = loadEditorDraft(editorTaskId),
                                         onDraftChange = { d -> storeEditorDraft(editorTaskId, d) },
-                                        onDismiss = { clearEditorDraft(editorTaskId); setEditorState(false, null) },
+                                        onDismiss = { android.util.Log.w("SheetDiag", "AppRoot.onDismiss taskId=$editorTaskId acct=${tasksAccountKey.hashCode()}", Throwable("dismiss-src")); clearEditorDraft(editorTaskId); setEditorState(false, null) },
                                         onSaved = { msg -> clearEditorDraft(editorTaskId); setEditorState(false, null); settingsNotice = msg },
                                         onError = { msg -> settingsNotice = msg },
                                     )
