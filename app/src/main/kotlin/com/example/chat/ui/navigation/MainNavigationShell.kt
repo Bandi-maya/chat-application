@@ -372,8 +372,12 @@ fun MainNavigationShell(
     }
 }
 
-/** Dart _buildTransitionPage: the five named 3D pager transitions. Delta is
- *  page index minus live pager position, clamped to [-1, 1]. */
+/** Dart _buildTransitionPage: the five named 3D pager transitions, plus the thirteen
+ *  GB-reference transformer names (PDF v8 section 7b mapping 0..13 = default + 13
+ *  options). The GB-named cases are Compose approximations of the well-known
+ *  eftimoff ViewPagerTransformer behaviors; exact GB timings/curves are unverified
+ *  and these must not be presented as exact parity. Delta is page index minus live
+ *  pager position, clamped to [-1, 1]. */
 fun Modifier.pagerTransition(transition: String, delta: Float): Modifier = when (transition) {
     "Cube 3D" -> graphicsLayer {
         transformOrigin = TransformOrigin(if (delta >= 0f) 0f else 1f, 0.5f)
@@ -404,6 +408,78 @@ fun Modifier.pagerTransition(transition: String, delta: Float): Modifier = when 
         val scale = (1f - abs(delta) * 0.045f).coerceIn(0.92f, 1f)
         scaleX = scale
         scaleY = scale
+    }
+    // ── GB-reference transformer names (approximations, see header comment) ──
+    "Accordion" -> graphicsLayer {
+        transformOrigin = TransformOrigin(if (delta >= 0f) 0f else 1f, 0.5f)
+        scaleX = if (delta < 0f) 1f + delta else 1f - delta
+    }
+    "Background To Foreground" -> graphicsLayer {
+        val scale = 1f - abs(delta) * 0.5f
+        scaleX = scale; scaleY = scale
+        translationX = delta * size.width * 0.5f
+    }
+    "Cube In" -> graphicsLayer {
+        transformOrigin = TransformOrigin(if (delta >= 0f) 0f else 1f, 0.5f)
+        cameraDistance = 16f
+        rotationY = delta * 90f
+        translationX = -delta * size.width * 0.25f
+    }
+    "Depth Page" -> graphicsLayer {
+        if (delta <= 0f) {
+            alpha = 1f
+        } else {
+            val scale = (1f - abs(delta)).coerceIn(0.75f, 1f)
+            scaleX = scale; scaleY = scale
+            alpha = 1f - delta
+            translationX = -delta * size.width
+        }
+    }
+    "Draw From Back" -> graphicsLayer {
+        val scale = 0.5f + 0.5f * (1f - abs(delta))
+        scaleX = scale; scaleY = scale
+        rotationZ = -30f * delta
+        alpha = (1f - abs(delta) * 0.5f).coerceIn(0f, 1f)
+    }
+    "Flip Horizontal" -> graphicsLayer {
+        cameraDistance = 16f
+        rotationY = 180f * delta
+        alpha = if (abs(delta) > 0.5f) 0f else 1f
+    }
+    "Flip Vertical" -> graphicsLayer {
+        cameraDistance = 16f
+        rotationX = 180f * delta
+        alpha = if (abs(delta) > 0.5f) 0f else 1f
+    }
+    "Foreground To Background" -> graphicsLayer {
+        val scale = 1f - abs(delta) * 0.5f
+        scaleX = scale; scaleY = scale
+        translationX = -delta * size.width * 0.5f
+    }
+    "Tablet" -> graphicsLayer {
+        transformOrigin = TransformOrigin(if (delta >= 0f) 0f else 1f, 0.5f)
+        cameraDistance = 16f
+        rotationY = 30f * delta
+        translationX = -delta * size.width * 0.25f
+    }
+    "Rotate Down" -> graphicsLayer {
+        transformOrigin = TransformOrigin(0.5f, 1f)
+        rotationZ = -15f * delta
+        alpha = (1f - abs(delta)).coerceIn(0f, 1f)
+    }
+    "Rotate Up" -> graphicsLayer {
+        transformOrigin = TransformOrigin(0.5f, 1f)
+        rotationZ = 15f * delta
+        alpha = (1f - abs(delta)).coerceIn(0f, 1f)
+    }
+    "Stack" -> graphicsLayer {
+        translationX = -delta * size.width
+    }
+    "Zoom Out Slide" -> graphicsLayer {
+        val scale = (1f - abs(delta)).coerceIn(0.85f, 1f)
+        scaleX = scale; scaleY = scale
+        alpha = (0.5f + (1f - abs(delta)) * 0.5f).coerceIn(0.5f, 1f)
+        translationX = -delta * size.width * 0.5f
     }
     else -> this
 }
