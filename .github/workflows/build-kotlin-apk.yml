@@ -446,7 +446,7 @@ jobs:
           arch: x86_64
           profile: pixel_6
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
-          script: mkdir -p screenshots && classes="com.example.chat.DemoModeProofTest,com.example.chat.SystemBarThemeProofTest,com.example.chat.AppRootConfiguredProofTest" && printf '%s\n' "$classes" > screenshots/instrumentation-class-filter.txt && (cd runtime-apks && sha256sum -c SHA256SUMS) && adb install -r -t runtime-apks/app-debug.apk && adb install -r -t runtime-apks/app-debug-androidTest.apk && python3 ci/run-instrumentation-shard.py "$classes" ; rc=$? ; adb pull /sdcard/Android/data/com.example.chat/files/screenshots/. screenshots/ || true ; adb logcat -d -v threadtime > screenshots/logcat.txt || true ; bash ci/demo-probe.sh || true ; exit $rc
+          script: mkdir -p screenshots && classes="com.example.chat.DemoModeProofTest,com.example.chat.SystemBarThemeProofTest,com.example.chat.AppRootConfiguredProofTest,com.example.chat.ChatScreensPixelProofTest,com.example.chat.HeaderTabStyleSheetProofTest" && printf '%s\n' "$classes" > screenshots/instrumentation-class-filter.txt && (cd runtime-apks && sha256sum -c SHA256SUMS) && adb install -r -t runtime-apks/app-debug.apk && adb install -r -t runtime-apks/app-debug-androidTest.apk && python3 ci/run-instrumentation-shard.py "$classes" ; rc=$? ; adb pull /sdcard/Android/data/com.example.chat/files/screenshots/. screenshots/ || true ; adb logcat -d -v threadtime > screenshots/logcat.txt || true ; bash ci/demo-probe.sh || true ; exit $rc
       - name: Preserve diagnostic capture results
         if: always()
         uses: actions/upload-artifact@v4
@@ -463,7 +463,7 @@ jobs:
         run: |
           python3 - <<'PYSEL'
           import glob, sys, xml.etree.ElementTree as ET, re, pathlib
-          want = {'com.example.chat.DemoModeProofTest','com.example.chat.SystemBarThemeProofTest','com.example.chat.AppRootConfiguredProofTest'}
+          want = {'com.example.chat.DemoModeProofTest','com.example.chat.SystemBarThemeProofTest','com.example.chat.AppRootConfiguredProofTest','com.example.chat.ChatScreensPixelProofTest','com.example.chat.HeaderTabStyleSheetProofTest'}
           # Expected method counts come from the restored pinned source, not from
           # the runner: a crashed runner must not shrink the expectation.
           excluded = {'com.example.chat.LockBadgeMotionProofTest#animationFrameCalibrationDiag'}
