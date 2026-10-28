@@ -33,8 +33,6 @@ fun ChatySystemBarsEffect(preferences: ChatyPreferencesController, themeSurfaceA
     val style = SystemBarsPolicy.resolve(u.statusBarColor, u.navigationBarColor, themeSurfaceArgb)
     val view = LocalView.current
     SideEffect {
-        // DIAG-50g TEMP: runtime environment for the bar-paint path (removed before delivery).
-        android.util.Log.w("BarDiag", "effect sdk=${android.os.Build.VERSION.SDK_INT} rootStatusTopPx=${androidx.core.view.ViewCompat.getRootWindowInsets(view)?.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())?.top} rootNavBottomPx=${androidx.core.view.ViewCompat.getRootWindowInsets(view)?.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())?.bottom} status=${java.lang.Long.toHexString(style.statusBarColor)} nav=${java.lang.Long.toHexString(style.navigationBarColor)} surface=${java.lang.Long.toHexString(themeSurfaceArgb)}")
         val window = (view.context as? Activity)?.window ?: return@SideEffect
         @Suppress("DEPRECATION") run {
             // The window-level status bar background can be painted by the decor past
