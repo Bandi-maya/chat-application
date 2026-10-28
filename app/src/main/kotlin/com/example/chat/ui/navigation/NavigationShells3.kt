@@ -81,7 +81,7 @@ internal fun PresetNavigationShell(
         else -> colors.surface
     }
 
-    Box(Modifier.fillMaxSize().background(colors.background)) {
+    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFFFF0000))) { // TEMP DIAG (remove before delivery): red shell background - a hole in route content shows red; a white painter stays white
         content()
         Box(
             modifier = Modifier
@@ -292,7 +292,7 @@ internal fun BottomShell(
         "Classic Label Bar", "Soft Square Tile",
     )
 
-    Box(Modifier.fillMaxSize().background(colors.background)) {
+    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFFFF0000))) { // TEMP DIAG (remove before delivery): red shell background - a hole in route content shows red; a white painter stays white
         // Reserve the complete dock footprint for every destination. Page-owned
         // Scaffold FABs (Calls) and last rows must not be drawn underneath it.
         Box(Modifier.fillMaxSize().padding(bottom = (barHeight + bottomMargin).dp)) { content() }
