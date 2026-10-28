@@ -49,8 +49,16 @@ sleep 3
 adb exec-out screencap -p > screenshots/demo-home-clean.png
 adb shell uiautomator dump /sdcard/demo-window-clean.xml >/dev/null 2>&1
 adb pull /sdcard/demo-window-clean.xml screenshots/demo-window-clean.xml
+# Runtime window/insets measurement for the header investigation: the painted
+# system-bar scrim covers window y0..statusBars.top as the root Box's last
+# child; the safeDrawing-padded content starts below its own top inset. These
+# dumps capture decorFits/edge-to-edge state, insets frames and display cutout
+# so scrim bounds can be compared against the header band in raw pixels.
+adb shell dumpsys window windows > screenshots/demo-dumpsys-windows.txt 2>&1
+adb shell dumpsys window displays > screenshots/demo-dumpsys-displays.txt 2>&1
 adb logcat -d -v threadtime -t 500 > screenshots/demo-probe-logcat.txt
 echo "shell-driven probe done" > screenshots/demo-probe-status.txt
+{ adb shell wm size; adb shell wm density; } >> screenshots/demo-probe-status.txt 2>&1
 
 # Renderer A/B: force Vulkan-backed HWUI (skiavk) on the same emulator,
 # relaunch into the RESTORED demo session (no fresh-login overlays), and
