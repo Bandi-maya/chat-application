@@ -1,1 +1,1 @@
-candidate-50f2: gb-parity-overrides AppRoot.kt shadowed the 2-arg scrims call (50f compile e: AppRoot.kt:1532 No value passed for themeSurfaceArgb); overrides copy now carries the same fix; archive c102a771 unchanged
+candidate-50g: DIAG build - fresh SheetState inside configuration-keyed window (sheet vanish: AnchoredDraggable retarget on 0-size anchor pass), BarDiag scrim geometry markers + env log (strip white in dark), HeaderTabStyleSheet last-row a11y poll; archive 3217dd76
