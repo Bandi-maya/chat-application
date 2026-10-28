@@ -150,7 +150,11 @@ fun GbFeatureCenterScreen(
         if (item.key == "mas_key_cleanlog_blocklist") {
             scope.launch {
                 try {
-                    if (onClearBlockList()) toast("Your block list was cleared.")
+                    if (onClearBlockList()) {
+                        toast("Your block list was cleared.")
+                    } else {
+                        toast("Bulk block-list clearing is not available with the active Chaty backend.")
+                    }
                 } catch (e: Exception) {
                     toast("Unable to clear block list: $e")
                 }
