@@ -380,6 +380,26 @@ fun AppRoot() {
                 },
             )
         }
+        // Tasks editor/detail/draft state is hoisted to AppRoot level, NOT kept in the tasks
+        // destination: the navigation shell swaps composable branches on rotation (width-driven
+        // rail), which disposes the destination subtree and re-enters it at a new composition
+        // position, and position-scoped rememberSaveable state is then lost (editor sheet and
+        // typed draft vanished on rotation; capture 40760917570). At this position the maps
+        // survive shell branch swaps as intended. Editor/detail state survives configuration
+        // changes (font scale, rotation) via saveable task IDs, quarantined PER ACCOUNT: an
+        // entry written under account A is never read, rendered, resolved, or cleared under
+        // account B. ChatTask is not saveable, so IDs resolve against the controller's
+        // current-account snapshot.
+        var detailTaskIds by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Map<String, String>>(emptyMap()) }
+        var editorOpenByAccount by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
+        var editorTaskIds by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Map<String, String>>(emptyMap()) }
+        // Draft safety cache (this activity only): once an edit target has resolved, keep its
+        // last object per account so a mid-edit server-side delete can never silently drop
+        // the sheet or its unsaved draft.
+        var lastResolvedEditorByAccount by remember { mutableStateOf<Map<String, com.example.chat.domain.models.ChatTask>>(emptyMap()) }
+        // Typed unsaved drafts, quarantined per account+task: returning to account A restores
+        // A's in-progress text, B never sees it. Bundle-safe string maps only. Keyed "<account>|<taskId|new>".
+        var editorDrafts by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Map<String, Map<String, String>>>(emptyMap()) }
         GlobalRouteLayers {
         when (route) {
             AuthRoute.Splash -> SplashScreen(
@@ -799,23 +819,7 @@ fun AppRoot() {
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.tasks -> {
                                 val controller = ServiceLocator.tasksController
                                 var tasksRevision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
-                                // Editor/detail state survives configuration changes (font scale,
-                                // rotation) via saveable task IDs, quarantined PER ACCOUNT: an entry
-                                // written under account A is never read, rendered, resolved, or
-                                // cleared under account B. ChatTask is not saveable, so IDs resolve
-                                // against the controller's current-account snapshot.
                                 val tasksAccountKey = ServiceLocator.apiBackend.currentUser?.id ?: ""
-                                var detailTaskIds by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Map<String, String>>(emptyMap()) }
-                                var editorOpenByAccount by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
-                                var editorTaskIds by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Map<String, String>>(emptyMap()) }
-                                // Draft safety cache (this activity only): once an edit target has
-                                // resolved, keep its last object per account so a mid-edit server-side
-                                // delete can never silently drop the sheet or its unsaved draft.
-                                var lastResolvedEditorByAccount by remember { mutableStateOf<Map<String, com.example.chat.domain.models.ChatTask>>(emptyMap()) }
-                                // Typed unsaved drafts, quarantined per account+task: returning to
-                                // account A restores A's in-progress text, B never sees it. Bundle-safe
-                                // string maps only. Keyed "<account>|<taskId|new>".
-                                var editorDrafts by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Map<String, Map<String, String>>>(emptyMap()) }
                                 fun editorDraftKey(taskId: String?) = tasksAccountKey + "|" + (taskId ?: "new")
                                 fun storeEditorDraft(taskId: String?, d: com.example.chat.ui.tasks.TaskDraftValues) {
                                     editorDrafts = editorDrafts + (editorDraftKey(taskId) to com.example.chat.ui.tasks.TaskDraftCodec.encode(d))
@@ -869,10 +873,6 @@ fun AppRoot() {
                                 }
                                 androidx.compose.runtime.LaunchedEffect(Unit) { controller.loadTasks() }
                                 val taskUser = ServiceLocator.apiBackend.currentUser?.let { toDomainUser(it) }
-                                // DIAG-50g TEMP: editor host-condition transitions (ids only; no content).
-                                androidx.compose.runtime.LaunchedEffect(editorOpen, editorTaskId, editorTask != null, taskUser != null) {
-                                    android.util.Log.w("SheetDiag", "hostCond open=$editorOpen taskId=$editorTaskId task=${editorTask != null} user=${taskUser != null} acct=${tasksAccountKey.hashCode()}")
-                                }
                                 val lookup: (String) -> com.example.chat.domain.models.UserProfile? =
                                     { id -> ServiceLocator.apiBackend.users.firstOrNull { it.id == id } }
                                 val detail = detailTask
@@ -900,8 +900,6 @@ fun AppRoot() {
                                     )
                                 }
                                 if (editorOpen && taskUser != null && (editorTaskId == null || editorTask != null)) {
-                                    // DIAG-50g TEMP: destination-unmount signal for the editor host.
-                                    androidx.compose.runtime.DisposableEffect(tasksAccountKey, editorTaskId) { onDispose { android.util.Log.w("SheetDiag", "hostDispose acct=${tasksAccountKey.hashCode()} taskId=$editorTaskId") } }
                                     com.example.chat.ui.tasks.TaskCreateEditModal(
                                         controller = controller,
                                         colors = com.example.chat.ui.tasks.TaskColors(resolvedTheme),
@@ -912,7 +910,7 @@ fun AppRoot() {
                                         existingTask = editorTask,
                                         initialDraft = loadEditorDraft(editorTaskId),
                                         onDraftChange = { d -> storeEditorDraft(editorTaskId, d) },
-                                        onDismiss = { android.util.Log.w("SheetDiag", "AppRoot.onDismiss taskId=$editorTaskId acct=${tasksAccountKey.hashCode()}", Throwable("dismiss-src")); clearEditorDraft(editorTaskId); setEditorState(false, null) },
+                                        onDismiss = { clearEditorDraft(editorTaskId); setEditorState(false, null) },
                                         onSaved = { msg -> clearEditorDraft(editorTaskId); setEditorState(false, null); settingsNotice = msg },
                                         onError = { msg -> settingsNotice = msg },
                                     )
@@ -1534,10 +1532,13 @@ fun AppRoot() {
             }
         }
         } // Shared safe-area route container.
+        }
         // Resolved status/navigation bar colours are drawn under the bars (Compose owns the painting;
         // the window stays transparent). User-picked colours win; unset bars take the theme surface.
+        // Painted from the full-window root Box, NOT the route container above: the container
+        // consumes the safeDrawing top/horizontal insets, so a top-anchored child there lands
+        // BELOW the status bar (capture 40760917570: scrim at window y=128-255, bar y=0-128 bare).
         ChatySystemBarScrims(ServiceLocator.preferencesController, resolvedTheme.surfaceColor)
-        }
         // App-level calls, locks and notification islands are outside the route
         // container, so they need the same consumed safe-area boundary.
         Box(Modifier.fillMaxSize().windowInsetsPadding(
