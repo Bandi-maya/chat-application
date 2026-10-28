@@ -196,13 +196,24 @@ fun TaskCreateEditModal(
     // anchors collapse and a spurious dismiss fires, discarding the editor draft (upstream bug
     // issuetracker.google.com/issues/292204649; fixed upstream by recreating the window on
     // configuration change, androidx commit ca9123c5). Apply the same repair at the call site:
-    // key the sheet on the configuration so rotation rebuilds the dialog window. sheetState is
-    // remembered OUTSIDE the key, so the sheet re-enters expanded with the hoisted per-account
-    // draft intact; scrim-tap, back-press, cancel and save dismissal paths are untouched.
-    val sheetState = rememberModalBottomSheetState()
+    // key the sheet on the configuration so rotation rebuilds the dialog window. The SheetState
+    // is recreated WITH the window (see DIAG-50g note below); the hoisted per-account draft
+    // reseeds every field, so no user input is lost across the rebuild.
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     androidx.compose.runtime.key(configuration) {
-    ModalBottomSheet(sheetState = sheetState, tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = { if (!isSaving) onDismiss() }) {
+    // DIAG-50g: fresh SheetState per recreated window. The rebuilt dialog's first anchor pass
+    // measures sheetSize=0 (Expanded anchor absent) and AnchoredDraggableState.updateAnchors
+    // retargets by closestAnchor(offset) WITHOUT confirmValueChange, so a SURVIVED state
+    // (offset=0 at the top) snapped to Hidden and the sheet vanished (capture 40751995833).
+    // A fresh state starts offset=NaN; the retarget then keeps targetValue and the sheet's own
+    // LaunchedEffect show() lands on Expanded - the recovery the recreate() path already proves
+    // (AccountDraftIsolationProofTest recreate + font2 legs). Scrim-tap, back, cancel and save
+    // dismissal are untouched (onDismissRequest only via user paths; the draft stays hoisted).
+    val sheetState = rememberModalBottomSheetState()
+    android.util.Log.w("SheetDiag", "compose cfg=o${configuration.orientation}/${configuration.screenWidthDp}x${configuration.screenHeightDp}/f${configuration.fontScale}/d${configuration.densityDpi} edit=${existingTask != null}")
+    androidx.compose.runtime.LaunchedEffect(sheetState.currentValue) { android.util.Log.w("SheetDiag", "state cur=${sheetState.currentValue} tgt=${sheetState.targetValue}") }
+    androidx.compose.runtime.DisposableEffect(sheetState) { onDispose { android.util.Log.w("SheetDiag", "modalDispose cur=${sheetState.currentValue}") } }
+    ModalBottomSheet(sheetState = sheetState, tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = { android.util.Log.w("SheetDiag", "onDismissRequest isSaving=$isSaving cur=${sheetState.currentValue} tgt=${sheetState.targetValue}", Throwable("src")); if (!isSaving) onDismiss() }) {
         Column(
             modifier = Modifier
                 // One bottom inset owner: max(IME, nav bar, cutout). Applied outside the scroller so the last rows
