@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.chat.core.preferences.ChatyPreferencesController
+import com.example.chat.ui.effects.ListEntranceAnimations
 import com.example.chat.ui.theme.LocalAppColors
 import androidx.compose.ui.Modifier
 
@@ -108,6 +109,15 @@ fun NavigationEffectsScreen(preferences: ChatyPreferencesController, onBack: () 
                     preferences.updateEffects(fx.copy(fallingParticleScope = it), logTitle = "Falling Scope")
                 })
             }
+        }
+        ChatySettingsSection("List Arrival Animations", "Entrance motion for chat rows and conversation messages as they arrive (GB reference keys key_chats_listanimation / key_chat_animation, 15 values, default Standard).") {
+            ChatyChoiceTile("Chats List Animation", ListEntranceAnimations.styles, fx.homeListAnimation, { it }, {
+                preferences.updateEffects(fx.copy(homeListAnimation = it), logTitle = "Chats List Animation")
+            })
+            ChatySettingsRowDivider()
+            ChatyChoiceTile("Conversation Animation", ListEntranceAnimations.styles, fx.conversationListAnimation, { it }, {
+                preferences.updateEffects(fx.copy(conversationListAnimation = it), logTitle = "Conversation Animation")
+            })
         }
     }
 }
