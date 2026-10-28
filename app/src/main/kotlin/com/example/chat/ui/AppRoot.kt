@@ -1528,8 +1528,9 @@ fun AppRoot() {
             }
         }
         } // Shared safe-area route container.
-        // API 35+: chosen status/navigation bar colors are drawn under the bars (no-op below 35 and for default colors).
-        ChatySystemBarScrims(ServiceLocator.preferencesController)
+        // Resolved status/navigation bar colours are drawn under the bars (Compose owns the painting;
+        // the window stays transparent). User-picked colours win; unset bars take the theme surface.
+        ChatySystemBarScrims(ServiceLocator.preferencesController, resolvedTheme.surfaceColor)
         }
         // App-level calls, locks and notification islands are outside the route
         // container, so they need the same consumed safe-area boundary.
