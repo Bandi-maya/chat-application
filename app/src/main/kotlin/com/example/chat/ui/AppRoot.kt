@@ -820,7 +820,7 @@ fun AppRoot() {
                                         com.example.chat.ui.tasks.TaskDraftValues(
                                             title = e["title"] ?: "",
                                             description = e["description"] ?: "",
-                                            assigneeIds = (e["assignees"] ?: "").split("").filter { it.isNotEmpty() },
+                                            assigneeIds = (e["assignees"] ?: "").split("").filter { it.isNotEmpty() },
                                             priorityName = e["priority"] ?: "medium",
                                             dueAtIso = e["dueAt"] ?: "",
                                         )
