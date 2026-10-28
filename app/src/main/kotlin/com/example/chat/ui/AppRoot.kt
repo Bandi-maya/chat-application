@@ -995,6 +995,7 @@ fun AppRoot() {
                                     "/settings/storage" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.StorageMedia)
                                     "/settings/effects" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Effects)
                                     "/settings/permissions" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Permissions)
+                                    "/settings/gb_features" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.AdvancedFeatures)
                                     "/settings/home" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.HomeScreen)
                                     "/settings/devices" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.LinkedDevices)
                                     "/settings/account" -> pushedAccount = true
