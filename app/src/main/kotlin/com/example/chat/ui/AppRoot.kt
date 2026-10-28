@@ -446,6 +446,17 @@ fun AppRoot() {
                     onDispose { ServiceLocator.apiBackend.removeListener(listener) }
                 }
                 @Suppress("UNUSED_EXPRESSION") chatRevision
+                // Auth invalidation: recompose Home synchronously on ANY account
+                // transition (listener fires under the transition lock), so the
+                // per-account quarantine keys re-read immediately instead of
+                // depending on chat-plane load timing.
+                var authRevision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                androidx.compose.runtime.DisposableEffect(Unit) {
+                    val authListener: (com.example.chat.data.api.ApiAccountScope) -> Unit = { authRevision++ }
+                    ServiceLocator.apiBackend.addAuthScopeListener(authListener)
+                    onDispose { ServiceLocator.apiBackend.removeAuthScopeListener(authListener) }
+                }
+                @Suppress("UNUSED_EXPRESSION") authRevision
                 // chats destination content
                 // (ChatsHomeScreen below)
                 val shellColors = remember(resolvedTheme) {
