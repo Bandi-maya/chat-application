@@ -1,1 +1,1 @@
-candidate-50i: CLEAN delivery build - 50h fixes (AppRoot state hoist, root-Box status scrim) + task sheet starts at SheetValue.Expanded so the open pass never rests at the Partial anchor (early scroll gestures expanded instead of scrolling; capture 40772281420 Save-unreachable); all DIAG removed; archive 3217dd76
+build 50j ovrmodal-expanded-diagfree
