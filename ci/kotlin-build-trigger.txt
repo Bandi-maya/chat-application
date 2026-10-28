@@ -1,1 +1,1 @@
-candidate-46 probe build trigger (P1 scrim-0 + P3 cyan on override copies, P2 magenta live; diag only, removed before delivery)
+candidate-47: GB-reference list arrival animations (15 styles, settings controls + home/detail wiring) + 13 pager transformers; probes still live, removed in cleanup batch
