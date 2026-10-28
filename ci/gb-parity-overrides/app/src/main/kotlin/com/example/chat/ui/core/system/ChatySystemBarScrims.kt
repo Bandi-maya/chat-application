@@ -1,6 +1,5 @@
 package com.example.chat.ui.core.system
 
-import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -18,25 +17,24 @@ import com.example.chat.core.preferences.ChatyPreferencesController
 import com.example.chat.ui.settings.rememberPreferencesVersion
 
 /**
- * API 35+ fallback for universal.statusBarColor / navigationBarColor: from Android 15 (targetSdk 35 here) the platform
- * enforces edge-to-edge and ignores Window.setStatusBarColor/setNavigationBarColor, so the chosen colour has to be drawn
- * under the bars. Draw this as the LAST child of the app root Box (above content, below nothing), it ignores touches
- * because the bar areas are not interactive. Only draws for bars where the user actually picked a colour (null = Dart
- * default, which Flutter itself also cannot apply on API 35, so nothing is added). On API <= 34 ChatySystemBarsEffect
- * already paints the real window colours and this draws nothing.
+ * Paints the resolved system bar colours under the bars. The window itself stays transparent
+ * (ChatySystemBarsEffect): from Android 15 (targetSdk 35 here) the platform enforces edge-to-edge
+ * and ignores Window.setStatusBarColor/setNavigationBarColor, so Compose owns the bar painting.
+ * universal.statusBarColor / navigationBarColor win when the user picked a colour; when unset the
+ * bar takes the theme surface colour (SystemBarsPolicy, the same fallback the window setter applies
+ * on API <= 34) so the strip always matches the app theme and the icon contrast resolved for it,
+ * instead of leaking the decor background through (white strip under light icons in dark themes).
+ * Draw this as the LAST child of the app root Box (above content, below nothing); it ignores
+ * touches because the bar areas are not interactive.
  */
 @Composable
-fun BoxScope.ChatySystemBarScrims(preferences: ChatyPreferencesController) {
-    if (Build.VERSION.SDK_INT < 35) return
+fun BoxScope.ChatySystemBarScrims(preferences: ChatyPreferencesController, themeSurfaceArgb: Long) {
     rememberPreferencesVersion(preferences)
     val u = preferences.universal
+    val style = SystemBarsPolicy.resolve(u.statusBarColor, u.navigationBarColor, themeSurfaceArgb)
     val density = LocalDensity.current
-    u.statusBarColor?.let { c ->
-        val h = with(density) { WindowInsets.statusBars.getTop(density).toDp() }
-        Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(h).background(Color(c.toInt())))
-    }
-    u.navigationBarColor?.let { c ->
-        val h = with(density) { WindowInsets.navigationBars.getBottom(density).toDp() }
-        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(h).background(Color(c.toInt())))
-    }
+    val statusH = with(density) { WindowInsets.statusBars.getTop(density).toDp() }
+    Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(statusH).background(Color(style.statusBarColor.toInt())))
+    val navH = with(density) { WindowInsets.navigationBars.getBottom(density).toDp() }
+    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(navH).background(Color(style.navigationBarColor.toInt())))
 }
