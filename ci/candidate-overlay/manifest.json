@@ -1,8 +1,9 @@
 {
-  "archive_sha256": "31cd09b179ea63b00eaedf214b2afcb78ff224455db8ba352d0e6c8f98c12adc",
+  "archive_sha256": "e2b25914c351567755d8d498a7fb8cb286be49914dcdfab222680bb7482708e4",
   "base": "e465747abe825fb30a76226cfcebda10bb56d7d8",
   "files": {
     "app/build.gradle.kts": "757337b47457c0937c5490f4854b2ea8aefdd3ac7c5f493128bc447885b47880",
+    "app/src/androidTest/java/com/example/chat/AccountDraftIsolationProofTest.kt": "1a6753da78a2bc872216b885bbba08c0fdce642eec4765a311172ce695a1c4cc",
     "app/src/androidTest/java/com/example/chat/AppRootConfiguredProofTest.kt": "b3d387f5541caaf02cad3d4aab50fed9111f2c542f590006d15c6343cd763ebd",
     "app/src/androidTest/java/com/example/chat/AttachmentInitialOpenProofTest.kt": "53845396a8fa0e228c6c4381673cad7b4690746a0f4bf7c9bc116ed68e061de1",
     "app/src/androidTest/java/com/example/chat/CallControlsBoundsTest.kt": "758ac269c8e57fecdfd741714640629fd98f072dcb6a6bda89f935a0796d5f7d",
@@ -412,7 +413,6 @@
     "tools/location-map/latest-style-proof.mjs": "878bb6a91666bae6122a9ffbc1935cc3424eb193d4f9a9ff901e3e300c9259f3",
     "tools/location-map/map.js": "d4d42e470004574e68b78d79be3f5573e11ce089bd8c98ea71c93f95467f64a3",
     "tools/location-map/package-lock.json": "9dc0e587615c769f462b2aa1ccc769a921c207bed25406542944347b834f4796",
-    "tools/location-map/package.json": "1981188c08704aadbd8c87f1a6d090d474d7c437fe225b3d9f14a9da05739afc",
-    "app/src/androidTest/java/com/example/chat/AccountDraftIsolationProofTest.kt": "da2f3dd261541799b4252c702bab3d3902130fdf8851623e2180356bfaef4051"
+    "tools/location-map/package.json": "1981188c08704aadbd8c87f1a6d090d474d7c437fe225b3d9f14a9da05739afc"
   }
 }
