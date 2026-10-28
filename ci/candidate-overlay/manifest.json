@@ -1,5 +1,5 @@
 {
-  "archive_sha256": "80d941c137fc10dcb605f065af79276f0058f57534158991c76cb76eb1fddf02",
+  "archive_sha256": "96cdcbbacd131f4081f1684ca53945f3d05a8020a9b3a9ec9450b2d7b339a152",
   "base": "e465747abe825fb30a76226cfcebda10bb56d7d8",
   "files": {
     "app/build.gradle.kts": "757337b47457c0937c5490f4854b2ea8aefdd3ac7c5f493128bc447885b47880",
@@ -236,7 +236,7 @@
     "app/src/main/kotlin/com/example/chat/ServiceLocator.kt": "e6cbba7680abd48a782bba0f89dd55b261c87f19ec0bbd60ef182b77fc97644d",
     "app/src/main/kotlin/com/example/chat/data/api/ApiBackendService.kt": "9f3f388222a338dccda7697f2deb8024e839dbc2289173b37db0275666f0f6d5",
     "app/src/main/kotlin/com/example/chat/data/auth/AuthSessionManager.kt": "4e05c64a3de5868b47fb7bf2c5a3d74e6bfd7f614dd5b9d991ccb1ded3274903",
-    "app/src/main/kotlin/com/example/chat/ui/AppRoot.kt": "edda3144b6f2c2fa55e4f7745255b45930bec144566cd444498c111e70006ba6",
+    "app/src/main/kotlin/com/example/chat/ui/AppRoot.kt": "b8276d1d329f8908e690fcd0b7649993c0c12a569b18772079d119d56f0558bc",
     "app/src/main/kotlin/com/example/chat/ui/ChatAttachmentsBinding.kt": "9c52f8465309c438fc58a3c7e666f25cdb833e6e78621dd9d1f1eec37cc25f72",
     "app/src/main/kotlin/com/example/chat/ui/ChatDetailHost.kt": "0af73ce820de70e072132642141b8b9e71c8b1b1fee41eeddb4322c72694f70d",
     "app/src/main/kotlin/com/example/chat/ui/ChatVoiceBinding.kt": "355311ec4d84377f4344c9d8c8182938ce6933c9a501c90e3060127357266401",
@@ -293,7 +293,7 @@
     "app/src/main/kotlin/com/example/chat/ui/chats/location/GeoLibreLocationMapView.kt": "c93c6ad133f9358df725dc5a4dd3e93e1a040a7a61b32ee8659867513e8dee05",
     "app/src/main/kotlin/com/example/chat/ui/chats/location/LocationMapBridgePolicy.kt": "685421790f48faa0976451abc90892645b1df7b1c8e4826312cccd92c36d1fc8",
     "app/src/main/kotlin/com/example/chat/ui/chats/location/MapViewerScreen.kt": "8de5f91e23a7f0215c576b3e1f79f1a950d84ed74643b9542f9d32a353497154",
-    "app/src/main/kotlin/com/example/chat/ui/core/system/ChatySystemBarScrims.kt": "9e0ed2694c85e391c68f610f6a8a2045b1f5af35775f0aa2a830467d6bb86c7d",
+    "app/src/main/kotlin/com/example/chat/ui/core/system/ChatySystemBarScrims.kt": "7e8db0eb0f4ebea5b15195f495000d6f6578848b8cee41bccd13c9444be270a8",
     "app/src/main/kotlin/com/example/chat/ui/icons/ChatyBaseOutlines.kt": "56e01eec6064dc30d7515d95a6bd4b6e8fc91da7fc172762fd034784306c94fc",
     "app/src/main/kotlin/com/example/chat/ui/icons/ChatyIcon.kt": "7302ef4f235216b8251c8b51d6bd6f4866a6468439b4ebe5c918305e024bbb55",
     "app/src/main/kotlin/com/example/chat/ui/icons/ChatyIconMotion.kt": "5cca38dbd4d4b1042d4f74a424f6fa588f9a35709182849d02017b243f73769d",
