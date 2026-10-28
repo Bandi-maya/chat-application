@@ -32,7 +32,10 @@ tap_text() {
   echo "probe not found: $label"; return 1
 }
 adb shell monkey -p com.example.chat -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
-tap_text "Try the demo" 25
+# Fresh launch lands on Welcome ("Fast & Private"); the demo card lives on
+# the LOGIN screen behind "Log In".
+tap_text "Log In" 12
+tap_text "Try the demo" 15
 sleep 8
 adb exec-out screencap -p > screenshots/demo-post-click.png
 adb shell uiautomator dump /sdcard/demo-window.xml >/dev/null 2>&1
@@ -44,3 +47,18 @@ adb shell uiautomator dump /sdcard/demo-window-clean.xml >/dev/null 2>&1
 adb pull /sdcard/demo-window-clean.xml screenshots/demo-window-clean.xml
 adb logcat -d -v threadtime -t 500 > screenshots/demo-probe-logcat.txt
 echo "shell-driven probe done" > screenshots/demo-probe-status.txt
+
+# Renderer A/B: force Vulkan-backed HWUI (skiavk) on the same emulator,
+# relaunch into the RESTORED demo session (no fresh-login overlays), and
+# recapture the same home. If the header paints here but not under the
+# default SwiftShader GLES path, the blanking is renderer-layer behavior,
+# not app code. Runs last; restores the prop afterwards.
+adb shell setprop debug.hwui.renderer skiavk
+adb shell getprop debug.hwui.renderer > screenshots/demo-probe-renderer.txt
+adb shell am force-stop com.example.chat
+adb shell monkey -p com.example.chat -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
+sleep 12
+adb exec-out screencap -p > screenshots/demo-home-vk.png
+adb shell uiautomator dump /sdcard/demo-window-vk.xml >/dev/null 2>&1
+adb pull /sdcard/demo-window-vk.xml screenshots/demo-window-vk.xml
+adb shell setprop debug.hwui.renderer ""
