@@ -321,3 +321,32 @@ data class TaskDraftValues(
     val priorityName: String,
     val dueAtIso: String,
 )
+
+/** Structured draft <-> Bundle-safe string-map codec. Indexed keys instead of
+ *  a joined delimiter so assignee ids round-trip exactly regardless of their
+ *  characters. */
+object TaskDraftCodec {
+    fun encode(d: TaskDraftValues): Map<String, String> {
+        val out = linkedMapOf(
+            "title" to d.title,
+            "description" to d.description,
+            "priority" to d.priorityName,
+            "dueAt" to d.dueAtIso,
+            "assigneeCount" to d.assigneeIds.size.toString(),
+        )
+        d.assigneeIds.forEachIndexed { i, id -> out["assignee.$i"] = id }
+        return out
+    }
+
+    fun decode(e: Map<String, String>): TaskDraftValues {
+        val n = e["assigneeCount"]?.toIntOrNull() ?: 0
+        val ids = (0 until n).mapNotNull { e["assignee.$it"] }
+        return TaskDraftValues(
+            title = e["title"] ?: "",
+            description = e["description"] ?: "",
+            assigneeIds = ids,
+            priorityName = e["priority"] ?: "medium",
+            dueAtIso = e["dueAt"] ?: "",
+        )
+    }
+}
