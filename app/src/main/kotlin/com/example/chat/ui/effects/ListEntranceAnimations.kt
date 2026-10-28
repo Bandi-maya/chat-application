@@ -5,9 +5,9 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -31,92 +31,100 @@ object ListEntranceAnimations {
 }
 
 /**
- * Animate this item in when it enters composition (which for LazyColumn items is when
- * it scrolls into view, matching the reference's "arrival" behavior). Standard or
- * unknown styles return the modifier unchanged, so existing behavior is preserved.
+ * Animate this list item in when it arrives. Semantics, stated precisely:
+ *  - Plays when an item first enters composition. LazyColumn disposes offscreen
+ *    items, so scrolling an item away and back REPLAYS the entrance - this matches
+ *    the reference library's per-arrival behavior.
+ *  - Recomposition and list reorder do NOT replay: remember(key) state moves with
+ *    the keyed item composition.
+ *  - Changing the style preference never conceals content: an item that already
+ *    arrived renders settled in the new style; a mid-arrival item continues from
+ *    its current progress.
+ *  - Honors the system animator scale (reduced motion): scale 0 renders settled.
+ *  - "Standard" or unknown styles return the modifier unchanged.
  */
-fun Modifier.listEntrance(style: String, key: Any): Modifier = composed(key1 = key, key2 = style) {
-    if (style == "Standard" || style !in ListEntranceAnimations.styles) return@composed this@composed
-    // Honor the system animator scale: 0 (animators off / reduced motion) renders
-    // items settled, matching platform accessibility expectations.
+@Composable
+fun Modifier.listEntrance(style: String, key: Any): Modifier {
+    if (style == "Standard" || style !in ListEntranceAnimations.styles) return this
     val context = LocalContext.current
     val animatorScale = remember {
         Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
     }
-    if (animatorScale == 0f) return@composed this@composed
-    // remember(key): state moves with the LazyColumn item key, so recomposition and
-    // reorder keep progress (no replay); replay happens only when an item newly
-    // enters composition, matching the reference's "arrival" behavior.
+    if (animatorScale == 0f) return this
     val progress = remember(key) { Animatable(0f) }
-    LaunchedEffect(key) { progress.animateTo(1f, tween(durationMillis = 420)) }
-    val p = progress.value
-    when (style) {
-        "Fade" -> this@composed.alpha(p)
-        "Grow" -> this@composed.graphicsLayer {
+    val arrived = remember(key) { mutableStateOf(false) }
+    LaunchedEffect(key) {
+        progress.animateTo(1f, tween(durationMillis = 420))
+        arrived.value = true
+    }
+    val p = if (arrived.value) 1f else progress.value
+    return when (style) {
+        "Fade" -> this.alpha(p)
+        "Grow" -> this.graphicsLayer {
             val s = 0.5f + 0.5f * p
             scaleX = s; scaleY = s; alpha = p
         }
-        "Cards" -> this@composed.graphicsLayer {
+        "Cards" -> this.graphicsLayer {
             translationX = (1f - p) * 260f
             rotationZ = (1f - p) * 6f
             alpha = p
         }
-        "Curl" -> this@composed.graphicsLayer {
+        "Curl" -> this.graphicsLayer {
             transformOrigin = TransformOrigin(0.5f, 0f)
             rotationX = -90f * (1f - p)
             alpha = p
         }
-        "Wave" -> this@composed.graphicsLayer {
+        "Wave" -> this.graphicsLayer {
             translationY = (1f - p) * 120f
             rotationZ = (1f - p) * 4f
             alpha = p
         }
-        "Flip" -> this@composed.graphicsLayer {
+        "Flip" -> this.graphicsLayer {
             transformOrigin = TransformOrigin(0.5f, 0.5f)
             cameraDistance = 16f
             rotationY = -90f * (1f - p)
             alpha = p
         }
-        "Fly" -> this@composed.graphicsLayer {
+        "Fly" -> this.graphicsLayer {
             translationX = -(1f - p) * size.width
             alpha = p
         }
-        "Reverse Fly" -> this@composed.graphicsLayer {
+        "Reverse Fly" -> this.graphicsLayer {
             translationX = (1f - p) * size.width
             alpha = p
         }
-        "Helix" -> this@composed.graphicsLayer {
+        "Helix" -> this.graphicsLayer {
             rotationZ = 360f * (1f - p)
             val s = 0.3f + 0.7f * p
             scaleX = s; scaleY = s
             alpha = p
         }
-        "Fan" -> this@composed.graphicsLayer {
+        "Fan" -> this.graphicsLayer {
             transformOrigin = TransformOrigin(0.5f, 1f)
             rotationZ = -45f * (1f - p)
             alpha = p
         }
-        "Tilt" -> this@composed.graphicsLayer {
+        "Tilt" -> this.graphicsLayer {
             transformOrigin = TransformOrigin(0.5f, 0.5f)
             rotationX = 30f * (1f - p)
             val s = 0.7f + 0.3f * p
             scaleX = s; scaleY = s
             alpha = p
         }
-        "Zipper" -> this@composed.graphicsLayer {
+        "Zipper" -> this.graphicsLayer {
             translationY = (1f - p) * size.height
             alpha = p
         }
-        "Twirl" -> this@composed.graphicsLayer {
+        "Twirl" -> this.graphicsLayer {
             rotationZ = 720f * (1f - p)
             val s = p
             scaleX = s; scaleY = s
             alpha = p
         }
-        "Slide In" -> this@composed.graphicsLayer {
+        "Slide In" -> this.graphicsLayer {
             translationY = (1f - p) * size.height
             alpha = 0.3f + 0.7f * p
         }
-        else -> this@composed
+        else -> this
     }
 }
