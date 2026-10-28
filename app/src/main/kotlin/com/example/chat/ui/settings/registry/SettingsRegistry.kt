@@ -463,6 +463,30 @@ object SettingsRegistry {
             ),
             ),
         ),
+        SettingsCluster(
+            id = "cluster_advanced_feature_center",
+            title = "Advanced Feature Center",
+            description = "Searchable Chaty controls for home, privacy, status, media and visual behavior",
+            category = SettingsCategory.appearance,
+            settings = listOf(
+                SettingDefinition(
+                    id = "appearance_advanced_feature_center",
+                    title = "Advanced Feature Center",
+                    description = "Browse the expanded compatibility controls for home header, privacy, status, notifications, bubbles, colors, calls and media limits",
+                    category = SettingsCategory.appearance,
+                    subcategory = "Advanced Controls",
+                    controlType = SettingControlType.navigationLink,
+                    iconName = "tune_rounded",
+                    searchKeywords = listOf(
+                        "advanced features", "feature center", "gb style", "home header",
+                        "privacy", "anti delete", "view once", "status", "chat bubbles",
+                        "colors", "media limits", "notifications", "calls", "presence",
+                    ),
+                    canonicalRoute = "/settings/gb_features",
+                    defaultValue = null,
+                ),
+            ),
+        ),
     )
 
     val allSettings: List<SettingDefinition> get() = clusters.flatMap { it.settings }
