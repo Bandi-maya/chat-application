@@ -13,7 +13,14 @@ object HomeUiStyles {
         "Curved Radial Menu", "Instagram Style", "Telegram Style",
     )
     val storiesStyles = listOf("Instagram", "Facebook", "Stock", "Circular", "Squircle", "Card", "Wide Card")
-    val pager3dStyles = listOf("Cube 3D", "Accordion Fold", "Card Flip", "Depth Zoom", "Stack Rotate")
+    // GB-reference mapping 0..13 = default (current saved style) + these thirteen
+    // transformer names; kept with Chaty's existing five, never replacing them.
+    val pager3dStyles = listOf(
+        "Cube 3D", "Accordion Fold", "Card Flip", "Depth Zoom", "Stack Rotate",
+        "Accordion", "Background To Foreground", "Cube In", "Depth Page", "Draw From Back",
+        "Flip Horizontal", "Flip Vertical", "Foreground To Background", "Tablet",
+        "Rotate Down", "Rotate Up", "Stack", "Zoom Out Slide",
+    )
     val tabBubbleStyles = listOf("Capsule Pill", "Glassmorphism Glow", "Soft Rounded Pill", "Outlined Bubble", "Segmented Tab")
     val searchPlacementOptions = listOf("Header action", "Below header", "Above chat filters")
 
