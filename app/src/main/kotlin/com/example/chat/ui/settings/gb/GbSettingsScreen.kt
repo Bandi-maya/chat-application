@@ -105,6 +105,7 @@ import com.example.chat.domain.models.ConversationPreferences
 import com.example.chat.domain.models.HomePreferences
 import com.example.chat.domain.models.NavigationEffectPreferences
 import com.example.chat.domain.models.UniversalPreferences
+import com.example.chat.ui.settings.ChatyShareService
 import com.example.chat.ui.kit.ChatyBackButton
 import com.example.chat.ui.kit.ChatyHapticsPort
 import com.example.chat.ui.theme.LocalAppColors
@@ -183,8 +184,7 @@ fun GbSettingsScreen(
     } catch (_: Exception) { false }
     fun shareApp() {
         ChatyHapticsPort.light(view)
-        copyText("Download GBWhatsApp Pro: Enjoy privacy, themes, anti-delete and more! https://chaty.app/download")
-        toast("GBWhatsApp invite link copied to clipboard! Share it with your friends! \uD83D\uDE0D\u2764\uFE0F")
+        ChatyShareService.shareApp(context) { toast(it) }
     }
     fun openSheet(s: GbSheet) { ChatyHapticsPort.light(view); sheet = s }
 
@@ -240,7 +240,7 @@ fun GbSettingsScreen(
             }
             Spacer(Modifier.height(12.dp))
             GbGroupCard {
-                GbRow(Icons.Rounded.Security, accent.copy(alpha = 0.14f), accent, "Privacy and Security", "Privacy settings • Lock WhatsApp") { onOpenPrivacy() }
+                GbRow(Icons.Rounded.Security, accent.copy(alpha = 0.14f), accent, "Privacy and Security", "Privacy controls • app lock") { onOpenPrivacy() }
                 GbDivider()
                 GbRow(Icons.Rounded.FormatPaint, colors.warning.copy(alpha = 0.14f), colors.warning, "GBThemes", "23 Presets • Photo Palette • Import/Export • Reset") { onOpenThemeEditor() }
                 GbDivider()
@@ -274,7 +274,7 @@ fun GbSettingsScreen(
                 GbDivider()
                 GbRow(Icons.Outlined.Info, colors.info.copy(alpha = 0.14f), colors.info, "About", "Follow the developer for the latest news") { dialog = GbDialog.About }
                 GbDivider()
-                GbRow(Icons.Rounded.Share, Color(0xFF7C4DFF).copy(alpha = 0.14f), Color(0xFF7C4DFF), "Share GBWhatsApp with friends!", "Share GBWhatsApp with your friends! 😍❤️") { shareApp() }
+                GbRow(Icons.Rounded.Share, Color(0xFF7C4DFF).copy(alpha = 0.14f), Color(0xFF7C4DFF), "Share Chaty", "Invite friends and family to join Chaty") { shareApp() }
             }
             Spacer(Modifier.height(32.dp))
 
