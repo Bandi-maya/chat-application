@@ -1,5 +1,5 @@
 {
-  "archive_sha256": "a2861f88dabbdbd4799910dea2f4c17d4676f1ac380b4933beba9bbcc1f167e3",
+  "archive_sha256": "31cd09b179ea63b00eaedf214b2afcb78ff224455db8ba352d0e6c8f98c12adc",
   "base": "e465747abe825fb30a76226cfcebda10bb56d7d8",
   "files": {
     "app/build.gradle.kts": "757337b47457c0937c5490f4854b2ea8aefdd3ac7c5f493128bc447885b47880",
@@ -236,7 +236,7 @@
     "app/src/main/kotlin/com/example/chat/ServiceLocator.kt": "f6c9218aa5f449e3645dbaa8ce418c53fa7be0191b4cde3df1aa913e8e538184",
     "app/src/main/kotlin/com/example/chat/data/api/ApiBackendService.kt": "9f3f388222a338dccda7697f2deb8024e839dbc2289173b37db0275666f0f6d5",
     "app/src/main/kotlin/com/example/chat/data/auth/AuthSessionManager.kt": "4e05c64a3de5868b47fb7bf2c5a3d74e6bfd7f614dd5b9d991ccb1ded3274903",
-    "app/src/main/kotlin/com/example/chat/ui/AppRoot.kt": "882ca9075221a077899521a381f0670477364ce4565ce097f6492e76887dc315",
+    "app/src/main/kotlin/com/example/chat/ui/AppRoot.kt": "fa18d091ad1c1a3410bb2139ddca2ec8eb44ad8264eeec11b1a1c40e9ce91d0c",
     "app/src/main/kotlin/com/example/chat/ui/ChatAttachmentsBinding.kt": "9c52f8465309c438fc58a3c7e666f25cdb833e6e78621dd9d1f1eec37cc25f72",
     "app/src/main/kotlin/com/example/chat/ui/ChatDetailHost.kt": "0af73ce820de70e072132642141b8b9e71c8b1b1fee41eeddb4322c72694f70d",
     "app/src/main/kotlin/com/example/chat/ui/ChatVoiceBinding.kt": "355311ec4d84377f4344c9d8c8182938ce6933c9a501c90e3060127357266401",
