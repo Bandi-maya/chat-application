@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.sp
+import com.example.chat.R
 import com.example.chat.core.templates.AppearanceVariantController
 
 /**
@@ -69,6 +70,12 @@ object ChatyTypography {
         "sans-serif" -> FontFamily.SansSerif
         "monospace" -> FontFamily.Monospace
         "cursive" -> FontFamily.Cursive
+        // SIL OFL 1.1 bundled faces (see ChatyTypographySpec.resolve).
+        "ofl-bebasneue" -> FontFamily(Font(R.font.bebasneue_regular, FontWeight(900)))
+        "ofl-comfortaa" -> FontFamily(
+            Font(R.font.comfortaa_regular, FontWeight.Normal),
+            Font(R.font.comfortaa_bold, FontWeight.Bold),
+        )
         else -> deviceFamily(name) // sans-serif-rounded, sans-serif-condensed
     }
 
