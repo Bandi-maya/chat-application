@@ -242,7 +242,7 @@ fun GbSettingsScreen(
             GbGroupCard {
                 GbRow(Icons.Rounded.Security, accent.copy(alpha = 0.14f), accent, "Privacy and Security", "Privacy controls • app lock") { onOpenPrivacy() }
                 GbDivider()
-                GbRow(Icons.Rounded.FormatPaint, colors.warning.copy(alpha = 0.14f), colors.warning, "GBThemes", "23 Presets • Photo Palette • Import/Export • Reset") { onOpenThemeEditor() }
+                GbRow(Icons.Rounded.FormatPaint, colors.warning.copy(alpha = 0.14f), colors.warning, "Theme Studio", "23 Presets • Photo Palette • Import/Export • Reset") { onOpenThemeEditor() }
                 GbDivider()
                 GbRow(Icons.Rounded.SettingsSuggest, colors.info.copy(alpha = 0.14f), colors.info, "Universal", "Colors • Icons and Fonts • Language • Other") { onOpenUniversal() }
             }
