@@ -11,8 +11,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.BoxScope
 import com.example.chat.core.preferences.ChatyPreferencesController
@@ -35,16 +33,8 @@ fun BoxScope.ChatySystemBarScrims(preferences: ChatyPreferencesController, theme
     val u = preferences.universal
     val style = SystemBarsPolicy.resolve(u.statusBarColor, u.navigationBarColor, themeSurfaceArgb)
     val density = LocalDensity.current
-    val statusTopPx = WindowInsets.statusBars.getTop(density)
-    val statusH = with(density) { statusTopPx.toDp() }
-    // DIAG-50g TEMP: magenta marker + runtime geometry. Restore Color(style.statusBarColor.toInt()) before delivery.
-    Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(statusH).background(Color(0xFFFF00FF)).onGloballyPositioned { c ->
-        android.util.Log.w("BarDiag", "statusScrim window=${c.boundsInWindow()} parent=${c.parentLayoutCoordinates?.boundsInWindow()} statusTopPx=$statusTopPx resolved=${java.lang.Long.toHexString(style.statusBarColor)} surface=${java.lang.Long.toHexString(themeSurfaceArgb)} customStatus=${u.statusBarColor != null}")
-    })
-    val navBottomPx = WindowInsets.navigationBars.getBottom(density)
-    val navH = with(density) { navBottomPx.toDp() }
-    // DIAG-50g TEMP: cyan marker. Restore Color(style.navigationBarColor.toInt()) before delivery.
-    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(navH).background(Color(0xFF00FFFF)).onGloballyPositioned { c ->
-        android.util.Log.w("BarDiag", "navScrim window=${c.boundsInWindow()} navBottomPx=$navBottomPx resolved=${java.lang.Long.toHexString(style.navigationBarColor)}")
-    })
+    val statusH = with(density) { WindowInsets.statusBars.getTop(density).toDp() }
+    Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(statusH).background(Color(style.statusBarColor.toInt())))
+    val navH = with(density) { WindowInsets.navigationBars.getBottom(density).toDp() }
+    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(navH).background(Color(style.navigationBarColor.toInt())))
 }
