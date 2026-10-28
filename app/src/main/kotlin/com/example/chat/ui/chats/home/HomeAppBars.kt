@@ -205,7 +205,7 @@ fun StandardHomeAppBar(
     val showStatus = !homePrefs.disableStatusUnderName && userAbout.isNotEmpty()
 
     Row(
-        modifier = Modifier.padding(start = 16.dp, top = 8.dp, end = 4.dp, bottom = 6.dp),
+        modifier = Modifier.background(Color.Magenta).padding(start = 16.dp, top = 8.dp, end = 4.dp, bottom = 6.dp), // TEMP PROBE P2 (remove before delivery): header Row draw position
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
