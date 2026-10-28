@@ -33,7 +33,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -191,14 +190,18 @@ fun TaskCreateEditModal(
         }
     }
 
-    // material3 ModalBottomSheet re-anchors its draggable state across configuration changes; with
-    // MainActivity handling orientation|screenSize|screenLayout itself (no recreation), the sheet can
-    // spuriously settle to Hidden on rotation and fire onDismissRequest, discarding the editor draft
-    // (issuetracker.google.com/issues/292204649). The draft is hoisted per-account saveable state, so
-    // rotation must not dismiss. Reject Hidden at the state level: dragHandle is null (no swipe
-    // affordance) and scrim taps / back press call onDismissRequest directly, so this blocks only the
-    // framework's spurious settle - every intentional close still flows through onDismiss.
-    val sheetState = rememberModalBottomSheetState(confirmValueChange = { it != SheetValue.Hidden })
+    // material3 1.3.1 ModalBottomSheetDialog remembers its dialog window keyed only on (view,
+    // density) (ModalBottomSheet.android.kt). MainActivity handles orientation|screenSize|
+    // screenLayout itself (no recreation), so the stale window survives rotation, the sheet's
+    // anchors collapse and a spurious dismiss fires, discarding the editor draft (upstream bug
+    // issuetracker.google.com/issues/292204649; fixed upstream by recreating the window on
+    // configuration change, androidx commit ca9123c5). Apply the same repair at the call site:
+    // key the sheet on the configuration so rotation rebuilds the dialog window. sheetState is
+    // remembered OUTSIDE the key, so the sheet re-enters expanded with the hoisted per-account
+    // draft intact; scrim-tap, back-press, cancel and save dismissal paths are untouched.
+    val sheetState = rememberModalBottomSheetState()
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    androidx.compose.runtime.key(configuration) {
     ModalBottomSheet(sheetState = sheetState, tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = { if (!isSaving) onDismiss() }) {
         Column(
             modifier = Modifier
@@ -319,6 +322,7 @@ fun TaskCreateEditModal(
             )
         }
     }
+    } // key(configuration)
 
     if (showDatePicker) {
         com.example.chat.ui.kit.ChatyTaskCalendar(dueDate, { showDatePicker = false }) { selected ->
