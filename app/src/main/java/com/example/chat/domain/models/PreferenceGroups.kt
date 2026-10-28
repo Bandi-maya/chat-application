@@ -218,6 +218,11 @@ data class NavigationEffectPreferences(
     val fallingParticleObject: String = "Stars",
     /** 'Home only', 'Chat only', 'Both' */
     val fallingParticleScope: String = "Home only",
+    /** GB-reference keys key_chats_listanimation / key_chat_animation (fifteen-value
+     *  mapping 0..14, default "0" Standard). Stored as the effect's display name.
+     *  Renders as entrance animations on the home chat list / conversation list rows. */
+    val homeListAnimation: String = "Standard",
+    val conversationListAnimation: String = "Standard",
 ) {
     fun toMap(): Map<String, Any?> = mapOf(
         "enableClickParticles" to enableClickParticles,
@@ -226,6 +231,8 @@ data class NavigationEffectPreferences(
         "enableFallingParticles" to enableFallingParticles,
         "fallingParticleObject" to fallingParticleObject,
         "fallingParticleScope" to fallingParticleScope,
+        "homeListAnimation" to homeListAnimation,
+        "conversationListAnimation" to conversationListAnimation,
     )
 
     companion object {
@@ -236,6 +243,8 @@ data class NavigationEffectPreferences(
             enableFallingParticles = map["enableFallingParticles"] as Boolean? ?: false,
             fallingParticleObject = map["fallingParticleObject"] as String? ?: "Stars",
             fallingParticleScope = map["fallingParticleScope"] as String? ?: "Home only",
+            homeListAnimation = map["homeListAnimation"] as String? ?: "Standard",
+            conversationListAnimation = map["conversationListAnimation"] as String? ?: "Standard",
         )
     }
 }
