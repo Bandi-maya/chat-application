@@ -10,7 +10,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,7 +33,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -185,10 +191,20 @@ fun TaskCreateEditModal(
         }
     }
 
-    ModalBottomSheet(tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = { if (!isSaving) onDismiss() }) {
+    // material3 ModalBottomSheet re-anchors its draggable state across configuration changes; with
+    // MainActivity handling orientation|screenSize|screenLayout itself (no recreation), the sheet can
+    // spuriously settle to Hidden on rotation and fire onDismissRequest, discarding the editor draft
+    // (issuetracker.google.com/issues/292204649). The draft is hoisted per-account saveable state, so
+    // rotation must not dismiss. Reject Hidden at the state level: dragHandle is null (no swipe
+    // affordance) and scrim taps / back press call onDismissRequest directly, so this blocks only the
+    // framework's spurious settle - every intentional close still flows through onDismiss.
+    val sheetState = rememberModalBottomSheetState(confirmValueChange = { it != SheetValue.Hidden })
+    ModalBottomSheet(sheetState = sheetState, tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = { if (!isSaving) onDismiss() }) {
         Column(
             modifier = Modifier
-                .imePadding()
+                // One bottom inset owner: max(IME, nav bar, cutout). Applied outside the scroller so the last rows
+                // (Priority/Due/Save) can scroll fully clear of the OS nav bar; the sheet surface still extends behind it.
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
                 .verticalScroll(rememberScrollState())
                 .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 20.dp),
         ) {
@@ -259,7 +275,8 @@ fun TaskCreateEditModal(
             Spacer(Modifier.height(16.dp))
             Text("Due Date", color = colors.foreground, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            // api uses a Wrap here: at large font scale the tiles wrap to the next line instead of crushing "Next Week" to one letter per line.
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 com.example.chat.ui.kit.ChatyChoiceTile(
                     label = "Today 6 PM", enabled = !isSaving,
                     onClick = {
