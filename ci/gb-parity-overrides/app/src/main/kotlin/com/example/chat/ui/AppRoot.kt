@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -252,6 +255,8 @@ fun AppRoot() {
         Box(Modifier.fillMaxSize().windowInsetsPadding(
             WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         )) {
+        // TEMP DIAG c46: cyan origin strip, first child of the padded route container; removed before delivery.
+        Box(Modifier.fillMaxWidth().height(4.dp).background(Color.Cyan)) {}
         // TEMP DIAG c46: cyan origin strip, first child of the padded route container; removed before delivery.
         Box(Modifier.fillMaxWidth().height(4.dp).background(Color.Cyan)) {}
         // Dart Navigator.pop for the pre-auth stack (Welcome > Login/Register > Forgot/RegisterOrganization);
