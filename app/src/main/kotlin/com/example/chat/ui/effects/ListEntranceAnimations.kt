@@ -1,5 +1,6 @@
 package com.example.chat.ui.effects
 
+import android.provider.Settings
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
@@ -10,6 +11,7 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 
 /**
  * GB-reference list-arrival animations (reference keys key_chats_listanimation for the
@@ -33,8 +35,18 @@ object ListEntranceAnimations {
  * it scrolls into view, matching the reference's "arrival" behavior). Standard or
  * unknown styles return the modifier unchanged, so existing behavior is preserved.
  */
-fun Modifier.listEntrance(style: String, key: Any): Modifier = composed {
+fun Modifier.listEntrance(style: String, key: Any): Modifier = composed(key1 = key, key2 = style) {
     if (style == "Standard" || style !in ListEntranceAnimations.styles) return@composed this@composed
+    // Honor the system animator scale: 0 (animators off / reduced motion) renders
+    // items settled, matching platform accessibility expectations.
+    val context = LocalContext.current
+    val animatorScale = remember {
+        Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+    }
+    if (animatorScale == 0f) return@composed this@composed
+    // remember(key): state moves with the LazyColumn item key, so recomposition and
+    // reorder keep progress (no replay); replay happens only when an item newly
+    // enters composition, matching the reference's "arrival" behavior.
     val progress = remember(key) { Animatable(0f) }
     LaunchedEffect(key) { progress.animateTo(1f, tween(durationMillis = 420)) }
     val p = progress.value
