@@ -35,7 +35,12 @@ fun ChatySystemBarsEffect(preferences: ChatyPreferencesController, themeSurfaceA
     SideEffect {
         val window = (view.context as? Activity)?.window ?: return@SideEffect
         @Suppress("DEPRECATION") run {
-            window.statusBarColor = style.statusBarColor.toInt()
+            // The window-level status bar background can be painted by the decor past
+            // the bar region and cover app content (measured: a 2x status-inset band,
+            // top 256px at a 128px status inset, on the CI emulator). ChatySystemBarScrims
+            // already paints the resolved colour under the bar, so the window setter
+            // stays transparent and Compose owns the bar painting.
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
             window.navigationBarColor = style.navigationBarColor.toInt()
         }
         val c = WindowCompat.getInsetsController(window, view)
