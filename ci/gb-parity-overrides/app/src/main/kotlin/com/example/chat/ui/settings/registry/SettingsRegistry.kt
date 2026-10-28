@@ -464,6 +464,30 @@ object SettingsRegistry {
             ),
         ),
         SettingsCluster(
+            id = "cluster_chaty_customization_hub",
+            title = "Chaty Customization Hub",
+            description = "Original Chaty presentation of GB-style customization categories",
+            category = SettingsCategory.appearance,
+            settings = listOf(
+                SettingDefinition(
+                    id = "appearance_chaty_customization_hub",
+                    title = "Chaty Customization Hub",
+                    description = "Open the integrated settings hub for themes, privacy controls, home layout, conversation appearance, notifications, media and navigation effects",
+                    category = SettingsCategory.appearance,
+                    subcategory = "Customization",
+                    controlType = SettingControlType.navigationLink,
+                    iconName = "tune_rounded",
+                    searchKeywords = listOf(
+                        "customization hub", "advanced appearance", "gb-style settings",
+                        "home screen", "conversation screen", "universal", "media settings",
+                        "navigation effects", "privacy and security", "theme editor",
+                    ),
+                    canonicalRoute = "/settings/chaty_customization_hub",
+                    defaultValue = null,
+                ),
+            ),
+        ),
+        SettingsCluster(
             id = "cluster_advanced_feature_center",
             title = "Advanced Feature Center",
             description = "Searchable Chaty controls for home, privacy, status, media and visual behavior",
