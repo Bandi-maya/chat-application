@@ -1,5 +1,5 @@
 {
- "archive_sha256": "b8827f6fc57208c4d1fc6759a161d4610883f8132d33b64aaa5206696cd0b781",
+ "archive_sha256": "5f2cc86e2bfbaa8a12571ac25eb92bccef06951e88b6423ec50c6b6db5c415a1",
  "base": "e465747abe825fb30a76226cfcebda10bb56d7d8",
  "files": {
   "app/build.gradle.kts": "757337b47457c0937c5490f4854b2ea8aefdd3ac7c5f493128bc447885b47880",
@@ -234,7 +234,7 @@
   "app/src/main/kotlin/com/example/chat/ServiceLocator.kt": "e6cbba7680abd48a782bba0f89dd55b261c87f19ec0bbd60ef182b77fc97644d",
   "app/src/main/kotlin/com/example/chat/data/api/ApiBackendService.kt": "9f3f388222a338dccda7697f2deb8024e839dbc2289173b37db0275666f0f6d5",
   "app/src/main/kotlin/com/example/chat/data/auth/AuthSessionManager.kt": "4e05c64a3de5868b47fb7bf2c5a3d74e6bfd7f614dd5b9d991ccb1ded3274903",
-  "app/src/main/kotlin/com/example/chat/ui/AppRoot.kt": "2d9e7f76fce2d7279044e295536c34010a770f2de052965d116418fa27fb8a4f",
+  "app/src/main/kotlin/com/example/chat/ui/AppRoot.kt": "6f8b00036d5e8da6e3b7997967446ca78a43db9fe4274a6cd6cb091b0eab754d",
   "app/src/main/kotlin/com/example/chat/ui/ChatAttachmentsBinding.kt": "9c52f8465309c438fc58a3c7e666f25cdb833e6e78621dd9d1f1eec37cc25f72",
   "app/src/main/kotlin/com/example/chat/ui/ChatDetailHost.kt": "8144c8a4520aadadee8e66ef1402cdd9183f89e1ae673bd324b35cd51e9ec117",
   "app/src/main/kotlin/com/example/chat/ui/ChatVoiceBinding.kt": "355311ec4d84377f4344c9d8c8182938ce6933c9a501c90e3060127357266401",
@@ -268,7 +268,7 @@
   "app/src/main/kotlin/com/example/chat/ui/camera/VideoCaptureReview.kt": "0092b137040b5e3a429674898a67db7335bb165f8a1241f333f5e07f163795c1",
   "app/src/main/kotlin/com/example/chat/ui/camera/VideoHoldRequest.kt": "d72e7979131088adaf66501b78c4a7c902682a97b8d8af8111830d3b80d0e9be",
   "app/src/main/kotlin/com/example/chat/ui/chats/ChatDetailScreen.kt": "367e2dced65908567a8f137a62b4682dc91ce1dcfb5b6c4f52d773dae91e29e6",
-  "app/src/main/kotlin/com/example/chat/ui/chats/ChatsHomeScreen.kt": "e7322bb07c7d324c33cdfeb6f45496e3a40002b663c4e72ebeec1db47d9942c6",
+  "app/src/main/kotlin/com/example/chat/ui/chats/ChatsHomeScreen.kt": "103e555f243a4b950b4f9e3402e5debd905b4ab41649eee8380d01118a796b13",
   "app/src/main/kotlin/com/example/chat/ui/chats/detail/ActiveVoiceClock.kt": "f2f18fde2003d0338e532691619d9e45fcca2ea4a582a505e320834500fd25b6",
   "app/src/main/kotlin/com/example/chat/ui/chats/detail/AnimatedEmoji.kt": "99978bb6902aa80c849596d5f11dcb0e2fab209a017f0392fc8cb541b4796b43",
   "app/src/main/kotlin/com/example/chat/ui/chats/detail/AnimatedEmojiAsset.kt": "af311b39f88daa58328afd4101cb0f52f5b6c95f67c7531b02df1b716f77b994",
