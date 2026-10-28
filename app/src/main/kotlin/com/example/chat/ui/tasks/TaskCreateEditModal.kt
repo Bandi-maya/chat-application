@@ -71,16 +71,21 @@ fun TaskCreateEditModal(
     sourceConversationId: String,
     existingTask: ChatTask? = null,
     initialTitle: String? = null,
+    /** Hoisted per-account draft (see AppRoot): seed wins over existingTask
+     *  values; every field change is reported so a configuration change or
+     *  account switch cannot silently discard unsaved edits. */
+    initialDraft: TaskDraftValues? = null,
+    onDraftChange: ((TaskDraftValues) -> Unit)? = null,
     onDismiss: () -> Unit,
     onSaved: (message: String) -> Unit,
     onError: (message: String) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    var title by remember { mutableStateOf(existingTask?.title ?: initialTitle ?: "") }
-    var description by remember { mutableStateOf(existingTask?.description ?: "") }
+    var title by remember { mutableStateOf(initialDraft?.title ?: existingTask?.title ?: initialTitle ?: "") }
+    var description by remember { mutableStateOf(initialDraft?.description ?: existingTask?.description ?: "") }
     var selectedAssigneeIds by remember {
         mutableStateOf(
-            existingTask?.assigneeIds ?: run {
+            initialDraft?.assigneeIds ?: existingTask?.assigneeIds ?: run {
                 val me = currentUser.id
                 val conversation = conversations.firstOrNull { it.id == sourceConversationId }
                 val other = conversation?.participantIds?.firstOrNull { it != me }
@@ -88,13 +93,32 @@ fun TaskCreateEditModal(
             },
         )
     }
-    var priority by remember { mutableStateOf(existingTask?.priority ?: TaskPriority.medium) }
+    var priority by remember {
+        mutableStateOf(
+            initialDraft?.priorityName?.let { n -> TaskPriority.entries.firstOrNull { it.name == n } }
+                ?: existingTask?.priority ?: TaskPriority.medium,
+        )
+    }
     var dueDate by remember {
         mutableStateOf(
-            existingTask?.dueAt ?: Instant.now().plus(java.time.Duration.ofDays(3)),
+            initialDraft?.dueAtIso?.let { runCatching { Instant.parse(it) }.getOrNull() }
+                ?: existingTask?.dueAt ?: Instant.now().plus(java.time.Duration.ofDays(3)),
         )
     }
     var isSaving by remember { mutableStateOf(false) }
+    if (onDraftChange != null) {
+        androidx.compose.runtime.LaunchedEffect(title, description, selectedAssigneeIds, priority, dueDate) {
+            onDraftChange.invoke(
+                TaskDraftValues(
+                    title = title,
+                    description = description,
+                    assigneeIds = selectedAssigneeIds,
+                    priorityName = priority.name,
+                    dueAtIso = dueDate.toString(),
+                ),
+            )
+        }
+    }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
 
@@ -286,3 +310,14 @@ fun TaskCreateEditModal(
         }
     }
 }
+
+/** Serializable-safe hoisted draft for [TaskCreateEditModal]; strings/lists
+ *  only so it can live in per-account saveable storage without leaking
+ *  across accounts. */
+data class TaskDraftValues(
+    val title: String,
+    val description: String,
+    val assigneeIds: List<String>,
+    val priorityName: String,
+    val dueAtIso: String,
+)
