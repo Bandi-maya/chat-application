@@ -41,6 +41,10 @@ adb exec-out screencap -p > screenshots/demo-post-click.png
 adb shell uiautomator dump /sdcard/demo-window.xml >/dev/null 2>&1
 adb pull /sdcard/demo-window.xml screenshots/demo-window.xml
 tap_text "Not now" 6
+sleep 2
+# Notification sheet ("Not Now", capital N) - distinct control from the App
+# Lock prompt; dismissing persists (NotificationEducationStore.markShown).
+tap_text "Not Now" 6
 sleep 3
 adb exec-out screencap -p > screenshots/demo-home-clean.png
 adb shell uiautomator dump /sdcard/demo-window-clean.xml >/dev/null 2>&1
