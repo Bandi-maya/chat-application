@@ -1,5 +1,5 @@
 {
- "archive_sha256": "7addcad01f28699ff0ffec7953fe24156f0e5456f0eeff90db76c2db78e1dbfb",
+ "archive_sha256": "002958848cd6b991e68280a55b38d8bbb1341586d38b6af0befc8de8f8d17184",
  "base": "e465747abe825fb30a76226cfcebda10bb56d7d8",
  "files": {
   "app/build.gradle.kts": "757337b47457c0937c5490f4854b2ea8aefdd3ac7c5f493128bc447885b47880",
@@ -268,7 +268,7 @@
   "app/src/main/kotlin/com/example/chat/ui/camera/VideoCaptureReview.kt": "0092b137040b5e3a429674898a67db7335bb165f8a1241f333f5e07f163795c1",
   "app/src/main/kotlin/com/example/chat/ui/camera/VideoHoldRequest.kt": "d72e7979131088adaf66501b78c4a7c902682a97b8d8af8111830d3b80d0e9be",
   "app/src/main/kotlin/com/example/chat/ui/chats/ChatDetailScreen.kt": "367e2dced65908567a8f137a62b4682dc91ce1dcfb5b6c4f52d773dae91e29e6",
-  "app/src/main/kotlin/com/example/chat/ui/chats/ChatsHomeScreen.kt": "d694118f4cf68c92c740ada2528c305c973fed5b259e7f8450e996d9921d5c93",
+  "app/src/main/kotlin/com/example/chat/ui/chats/ChatsHomeScreen.kt": "4f2cf30e5319b0aae0e4c3209474ffda1578c3e9b70261bac6686b7f37996789",
   "app/src/main/kotlin/com/example/chat/ui/chats/detail/ActiveVoiceClock.kt": "f2f18fde2003d0338e532691619d9e45fcca2ea4a582a505e320834500fd25b6",
   "app/src/main/kotlin/com/example/chat/ui/chats/detail/AnimatedEmoji.kt": "99978bb6902aa80c849596d5f11dcb0e2fab209a017f0392fc8cb541b4796b43",
   "app/src/main/kotlin/com/example/chat/ui/chats/detail/AnimatedEmojiAsset.kt": "af311b39f88daa58328afd4101cb0f52f5b6c95f67c7531b02df1b716f77b994",
