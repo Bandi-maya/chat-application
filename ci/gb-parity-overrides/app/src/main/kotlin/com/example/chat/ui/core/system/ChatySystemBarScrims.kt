@@ -32,7 +32,7 @@ fun BoxScope.ChatySystemBarScrims(preferences: ChatyPreferencesController) {
     val u = preferences.universal
     val density = LocalDensity.current
     u.statusBarColor?.let { c ->
-        val h = with(density) { WindowInsets.statusBars.getTop(density).toDp() }
+        val h = with(density) { 0.toDp() } // TEMP DIAG c46: status scrim height forced 0; removed before delivery.
         Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(h).background(Color(c.toInt())))
     }
     u.navigationBarColor?.let { c ->
