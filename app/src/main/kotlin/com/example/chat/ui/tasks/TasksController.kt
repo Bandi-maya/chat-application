@@ -55,12 +55,25 @@ class TasksController(
     private val client: ApiTasksClient,
     private val historyStore: TaskHistoryStore,
     private val now: () -> ZonedDateTime = { ZonedDateTime.now(ZoneId.systemDefault()) },
+    /** Current signed-in account identity; load snapshots are only valid for
+     *  the account they were fetched under. */
+    private val accountKey: () -> String? = { null },
 ) {
     private val lock = Any()
     private val _tasks = mutableListOf<ChatTask>()
     private val listeners = CopyOnWriteArrayList<() -> Unit>()
 
     val tasks: List<ChatTask> get() = synchronized(lock) { _tasks.toList() }
+
+    /** Account the current snapshot was successfully loaded for; a failed
+     *  load keeps the prior snapshot AND its account marker. */
+    @Volatile private var loadedAccountKey: String? = null
+    private var hasSnapshot = false
+
+    /** True only when a completed (200) load for the CURRENT account exists.
+     *  False after account switch until the next successful load, so stale
+     *  prior-account tasks can neither resolve nor dismiss restored UI state. */
+    val hasLoadedOnce: Boolean get() = hasSnapshot && loadedAccountKey == accountKey()
 
     fun addListener(listener: () -> Unit) = listeners.add(listener)
     fun removeListener(listener: () -> Unit) { listeners.remove(listener) }
@@ -72,6 +85,8 @@ class TasksController(
         synchronized(lock) {
             _tasks.clear()
             _tasks.addAll(fetched)
+            loadedAccountKey = accountKey()
+            hasSnapshot = true
         }
         notifyListeners()
     }
