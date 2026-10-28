@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -85,7 +86,17 @@ internal fun notificationGlyphIcon(key: String): ImageVector = when (key) {
     else -> Icons.Rounded.ChatBubble
 }
 
-internal fun FontStyleEntry.composeFamily(): FontFamily? = when (fontFamilyKey) {
+internal fun FontStyleEntry.composeFamily(): FontFamily? = when (name) {
+    // Preview the same bundled OFL faces the applied theme resolves (see ChatyTypography).
+    "BEBASNEUE" -> FontFamily(Font(com.example.chat.R.font.bebasneue_regular, FontWeight(900)))
+    "Comfortaa" -> FontFamily(
+        Font(com.example.chat.R.font.comfortaa_regular, FontWeight.Normal),
+        Font(com.example.chat.R.font.comfortaa_bold, FontWeight.Bold),
+    )
+    else -> composeGenericFamily()
+}
+
+private fun FontStyleEntry.composeGenericFamily(): FontFamily? = when (fontFamilyKey) {
     null -> null
     "sans-serif" -> FontFamily.SansSerif
     // No direct condensed generic family in Compose; Dart maps the custom
