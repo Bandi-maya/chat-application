@@ -37,9 +37,11 @@ class ThemeConfigParityTest {
         assertEquals(1.0, c.fontScale, 0.0)
         assertEquals(AppNavigationMode.bottomNav, c.navigationMode)
         assertEquals(BubbleStyleId.stock, c.bubbleStyle)
-        // Dart: tickStyleRaw is null -> fromString(null) returns stock, not the field default
+        // Dart: tickStyleRaw is null -> fromString(null) returns stock, not the field default.
+        // Label now matches the resolved stock default; the old "RC iOS 11" fallback contradicted
+        // the enum and a save/reload re-parse would have flipped ticks to rcIos11.
         assertEquals(DeliveryIconStyle.stock, c.deliveryTickStyle)
-        assertEquals("RC iOS 11", c.tickStyle)
+        assertEquals("Stock", c.tickStyle)
         assertEquals("subtle_dots", c.wallpaperId)
         assertFalse(c.highContrast)
     }
