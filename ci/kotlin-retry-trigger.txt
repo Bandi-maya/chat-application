@@ -1,1 +1,1 @@
-capture-only 40683589366 7addcad01f28699ff0ffec7953fe24156f0e5456f0eeff90db76c2db78e1dbfb candidate-44 remedy capture 2026-10-28T17:57 IST: V10-exact archive restore + transparent window status bar + all diags removed. Compare vs candidate-43: y256 boundary, header geometry, top protection, light/dark/override.
+capture-only 40683589366 7addcad01f28699ff0ffec7953fe24156f0e5456f0eeff90db76c2db78e1dbfb
