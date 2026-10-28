@@ -1568,6 +1568,7 @@ private fun rememberRootProfilePhoto(): RootProfilePhoto {
 @Composable
 private fun MessageManagementHost(onBack: () -> Unit) {
                 val mmToast = androidx.compose.ui.platform.LocalContext.current
+                com.example.chat.ui.settings.messagemanagement.MessageManagementPage(
                     preferencesController = ServiceLocator.preferencesController,
                     server = ServiceLocator.gbFeatures,
                     conversationSource = object : com.example.chat.ui.settings.messagemanagement.MessageManagementConversationSource {
@@ -1616,5 +1617,5 @@ private fun ChatyPushedPage(visible: Boolean, content: @Composable () -> Unit) {
     ) {
         // Pushed pages own their touches; see PushedPageTouchGuard.
         com.example.chat.ui.kit.PushedPageTouchGuard { content() }
-
-                com.example.chat.ui.settings.messagemanagement.MessageManagementPage(
+    }
+}
