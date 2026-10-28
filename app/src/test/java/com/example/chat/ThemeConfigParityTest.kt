@@ -47,6 +47,27 @@ class ThemeConfigParityTest {
     }
 
     @Test
+    fun missingTickPrefSerializeReloadKeepsStockNoFlip() {
+        // Missing pref: load -> serialize -> reload must keep the stock tick style.
+        // The pre-fix fallback labeled the stock default "RC iOS 11"; a reload re-parsed
+        // that label and silently flipped the effective style to rcIos11.
+        val first = ThemeConfig.fromMap(emptyMap())
+        assertEquals(DeliveryIconStyle.stock, first.deliveryTickStyle)
+        assertEquals("Stock", first.tickStyle)
+        val reloaded = ThemeConfig.fromMap(first.toMap())
+        assertEquals(DeliveryIconStyle.stock, reloaded.deliveryTickStyle)
+        // Dart quirk: the reload label is the raw enum name; it must still re-resolve
+        // to the same stock style, never to rcIos11.
+        assertEquals(DeliveryIconStyle.stock, deliveryIconStyleFromString(reloaded.tickStyle))
+        // An explicit rcIos11 choice rides the same cycle unchanged.
+        val explicit = ThemeConfig.fromMap(mapOf("tickStyle" to "RC iOS 11"))
+        assertEquals(DeliveryIconStyle.rcIos11, explicit.deliveryTickStyle)
+        val explicitReload = ThemeConfig.fromMap(explicit.toMap())
+        assertEquals(DeliveryIconStyle.rcIos11, explicitReload.deliveryTickStyle)
+        assertEquals(DeliveryIconStyle.rcIos11, deliveryIconStyleFromString(explicitReload.tickStyle))
+    }
+
+    @Test
     fun toMapFromMapRoundTrips() {
         val c = base().copyWith(
             id = "custom", name = "Custom", isDark = false,
