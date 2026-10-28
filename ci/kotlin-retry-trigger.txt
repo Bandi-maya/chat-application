@@ -1,1 +1,2 @@
 capture-only 40652380967 7addcad01f28699ff0ffec7953fe24156f0e5456f0eeff90db76c2db78e1dbfb
+# re-pin: same V10 source; workflow now preserves screenshots dir + device logcat
