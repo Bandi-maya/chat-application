@@ -268,7 +268,10 @@ data class ThemeConfig(
                 layoutMode = enumByName<UILayoutMode>(map["layoutMode"], UILayoutMode.classic),
                 bubbleStyle = bubbleStyleIdFromString(bubbleStyleRaw),
                 deliveryTickStyle = deliveryIconStyleFromString(tickStyleRaw),
-                tickStyle = tickStyleRaw ?: "RC iOS 11",
+                // Fallback must name the actual resolved default (deliveryIconStyleFromString
+                // returns stock for an unset key); a different raw label would re-resolve to a
+                // different style downstream and mislabel the picker current value.
+                tickStyle = tickStyleRaw ?: DeliveryIconStyle.stock.displayName,
                 wallpaperId = (map["wallpaperId"] as? String) ?: "subtle_dots",
                 animationLevel = doubleOf(map["animationLevel"], 1.0).coerceIn(0.0, 1.0),
             )
