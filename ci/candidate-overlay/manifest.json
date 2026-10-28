@@ -1,5 +1,5 @@
 {
- "archive_sha256": "325266f0cad7e6c832b9fb14f692768b6e729638fe68a2a7d78c902e10116e7a",
+ "archive_sha256": "9e69671a2b66c745bff9f6a93b9291fb2b2f39bf8f29019cde6105bf038a8fb0",
  "base": "e465747abe825fb30a76226cfcebda10bb56d7d8",
  "files": {
   "app/build.gradle.kts": "757337b47457c0937c5490f4854b2ea8aefdd3ac7c5f493128bc447885b47880",
@@ -402,7 +402,7 @@
   "app/src/main/kotlin/com/example/chat/data/auth/AuthSessionManager.kt": "4e05c64a3de5868b47fb7bf2c5a3d74e6bfd7f614dd5b9d991ccb1ded3274903",
   "app/src/main/kotlin/com/example/chat/ui/DemoModeBanner.kt": "238c7316948bb83cccbc190e62f8f5468796bacf20cbde5f48719d9e3dce6d3c",
   "app/src/main/kotlin/com/example/chat/ui/auth/LoginScreen.kt": "2d6c54db2533fca04cba09f569452f91bcf52412b0bfc599aac19ca336e0112a",
-  "app/src/test/java/com/example/chat/ApiRealtimeDemoGuardTest.kt": "be78aa5c32f9e506ae1013cea0e92a54822fee3802c121e6e1640782bddc5acb",
+  "app/src/test/java/com/example/chat/ApiRealtimeDemoGuardTest.kt": "e28c37fa3a9b6d3a7090cac3c526dab13bdf83263b49840b7e43fe5a519b0a3f",
   "app/src/test/java/com/example/chat/DemoNonRestGuardTest.kt": "290701fdf1d355f1d43b2998ec0872cbf9dc42bc33ea2e48f5f4158ff421da36",
   "app/src/test/java/com/example/chat/DemoRestSessionIdentityTest.kt": "b2953ab3055a05460701f498f52938eb3fff3e1b450c85386ae6ffdec3551937",
   "app/src/test/java/com/example/chat/DemoSampleDataTest.kt": "4846d62c7dd070f2e98ca06ed84c4be75bd9b258fbfb2decd8d70a13c76f7213",
