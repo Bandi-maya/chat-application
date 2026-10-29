@@ -43,7 +43,7 @@ class MediaDownloadStatesProofTest {
         val dir = File(ins.targetContext.getExternalFilesDir(null), "screenshots")
         dir.mkdirs()
         dev.waitForIdle(3000)
-        val bmp = dev.uiAutomation.takeScreenshot() ?: return
+        val bmp = ins.uiAutomation.takeScreenshot() ?: return
         FileOutputStream(File(dir, "$name.png")).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bmp.recycle()
     }
@@ -90,7 +90,7 @@ class MediaDownloadStatesProofTest {
     @Test
     fun offlineShowsWaitingForNetwork() {
         val store = cacheFor("states-offline")
-        val stamp = store.session() ?: fail("signed-in fixture must yield a session stamp")
+        val stamp = store.session() ?: throw AssertionError("signed-in fixture must yield a session stamp")
         val resolver = AttachmentSourceResolver(
             store,
             { false },
@@ -113,13 +113,13 @@ class MediaDownloadStatesProofTest {
 
     @Test
     fun retryAfterOfflineSurfacesDownloadFailed() {
-        @Volatile var online = false
+        val online = java.util.concurrent.atomic.AtomicBoolean(false)
         val downloadCalls = AtomicInteger(0)
         val store = cacheFor("states-retry")
-        val stamp = store.session() ?: fail("signed-in fixture must yield a session stamp")
+        val stamp = store.session() ?: throw AssertionError("signed-in fixture must yield a session stamp")
         val resolver = AttachmentSourceResolver(
             store,
-            { online },
+            { online.get() },
             { TrustedAttachment("image", false, false) },
             { downloadCalls.incrementAndGet(); throw IOException("synthetic network failure") },
         )
@@ -133,7 +133,7 @@ class MediaDownloadStatesProofTest {
             "pre-condition: offline tile shows 'Waiting for network'",
             dev.wait(Until.hasObject(By.text("Waiting for network")), 10000),
         )
-        online = true
+        online.set(true)
         dev.findObject(By.text("Waiting for network")).click()
         assertTrue(
             "failed re-download must render 'Retry download'",
@@ -147,7 +147,7 @@ class MediaDownloadStatesProofTest {
     @Test
     fun unknownAttachmentShowsNotAvailableAndIsStatic() {
         val store = cacheFor("states-unknown")
-        val stamp = store.session() ?: fail("signed-in fixture must yield a session stamp")
+        val stamp = store.session() ?: throw AssertionError("signed-in fixture must yield a session stamp")
         val resolver = AttachmentSourceResolver(
             store,
             { true },
