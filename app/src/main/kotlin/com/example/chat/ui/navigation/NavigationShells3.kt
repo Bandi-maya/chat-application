@@ -409,10 +409,10 @@ private fun CustomNavItem(
                     .padding(horizontal = if (isSelected) 14.dp else 8.dp, vertical = 7.dp),
             ) {
                 NavDestinationIcon(id, size = 20, tint = if (isSelected) accent else unselectedFg)
-                if (isSelected) {
-                    Spacer(Modifier.width(6.dp))
-                    Text(label, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = accent)
-                }
+                Spacer(Modifier.width(5.dp))
+                Text(label, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, fontSize = 11.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isSelected) accent else unselectedFg)
             }
             "Top Indicator Line" -> Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -435,23 +435,39 @@ private fun CustomNavItem(
                 Spacer(Modifier.height(2.dp))
             }
             "Bottom Indicator Dot" -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                NavDestinationIcon(id, size = 22, tint = if (isSelected) accent else unselectedFg)
-                Spacer(Modifier.height(4.dp))
+                NavDestinationIcon(id, size = 20, tint = if (isSelected) accent else unselectedFg)
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    label, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
+                    fontSize = 10.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isSelected) accent else unselectedFg,
+                )
+                Spacer(Modifier.height(2.dp))
                 Box(
                     Modifier
-                        .size(if (isSelected) 5.5.dp else 0.dp)
+                        .size(if (isSelected) 4.5.dp else 0.dp)
                         .clip(CircleShape)
                         .background(if (isSelected) accent else Color.Transparent),
                 )
             }
-            "Circle Accent Pop" -> Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(if (isSelected) 42.dp else 36.dp)
-                    .clip(CircleShape)
-                    .background(if (isSelected) accent else Color.Transparent),
-            ) {
-                NavDestinationIcon(id, size = 20, tint = if (isSelected) colors.onPrimary else unselectedFg)
+            "Circle Accent Pop" -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(if (isSelected) 34.dp else 28.dp)
+                        .clip(CircleShape)
+                        .background(if (isSelected) accent else Color.Transparent),
+                ) {
+                    NavDestinationIcon(id, size = 17, tint = if (isSelected) colors.onPrimary else unselectedFg)
+                }
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    label, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
+                    fontSize = 10.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isSelected) accent else unselectedFg,
+                )
             }
             "Curved Notch Teardrop" -> Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -481,10 +497,10 @@ private fun CustomNavItem(
                     .padding(horizontal = if (isSelected) 12.dp else 8.dp, vertical = 6.dp),
             ) {
                 NavDestinationIcon(id, size = 19, tint = if (isSelected) colors.onPrimary else unselectedFg)
-                if (isSelected) {
-                    Spacer(Modifier.width(5.dp))
-                    Text(label, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, fontSize = 11.5.sp, fontWeight = FontWeight.ExtraBold, color = colors.onPrimary)
-                }
+                Spacer(Modifier.width(5.dp))
+                Text(label, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, fontSize = 11.sp,
+                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                    color = if (isSelected) colors.onPrimary else unselectedFg)
             }
             "Raised Center Action" -> if (isCenter) {
                 Box(
@@ -516,13 +532,29 @@ private fun CustomNavItem(
                     .then(if (isSelected) Modifier.border(1.dp, accent.copy(alpha = 0.4f), RoundedCornerShape(16.dp)) else Modifier)
                     .padding(horizontal = 10.dp, vertical = 6.dp),
             ) {
-                NavDestinationIcon(id, size = 21, tint = if (isSelected) accent else unselectedFg)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    NavDestinationIcon(id, size = 19, tint = if (isSelected) accent else unselectedFg)
+                    Spacer(Modifier.height(1.dp))
+                    Text(
+                        label, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
+                        fontSize = 9.5.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isSelected) accent else unselectedFg,
+                    )
+                }
             }
-            "Minimal Icon Dock" -> Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.graphicsLayerScale(if (isSelected) 1.15f else 1f),
+            "Minimal Icon Dock" -> Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.graphicsLayerScale(if (isSelected) 1.1f else 1f),
             ) {
-                NavDestinationIcon(id, size = 22, tint = if (isSelected) accent else unselectedFg)
+                NavDestinationIcon(id, size = 20, tint = if (isSelected) accent else unselectedFg)
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    label, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
+                    fontSize = 9.5.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isSelected) accent else unselectedFg,
+                )
             }
             "Classic Label Bar" -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 NavDestinationIcon(id, size = 21, tint = if (isSelected) accent else unselectedFg)
@@ -549,24 +581,26 @@ private fun CustomNavItem(
                     color = if (isSelected) accent else unselectedFg,
                 )
             }
-            // 'Floating Pill' default
-            else -> androidx.compose.foundation.layout.BoxWithConstraints {
-                val narrow = maxWidth < 100.dp
-                val pill = Modifier.clip(RoundedCornerShape(20.dp))
-                    .background(if (isSelected) accent.copy(alpha = if (isDark) 0.2f else 0.12f) else Color.Transparent)
-                    .padding(horizontal = if (narrow) 4.dp else 10.dp, vertical = 6.dp)
-                if (narrow) Column(pill, horizontalAlignment = Alignment.CenterHorizontally) {
-                    NavDestinationIcon(id, size = 20, tint = if (isSelected) accent else unselectedFg)
-                    if (isSelected) Text(label, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
-                        fontSize = 10.sp, fontWeight = FontWeight.Bold, color = accent)
-                } else Row(pill, verticalAlignment = Alignment.CenterVertically) {
-                    NavDestinationIcon(id, size = 20, tint = if (isSelected) accent else unselectedFg)
-                    if (isSelected) {
-                        Spacer(Modifier.width(5.dp))
-                        Text(label, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
-                            fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = accent)
-                    }
-                }
+            // 'Floating Pill' default: every destination shows its icon and name
+            // (Apple-style tab bar), the selected one tinted and softly pill-backed.
+            else -> Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(if (isSelected) accent.copy(alpha = if (isDark) 0.18f else 0.10f) else Color.Transparent)
+                    .padding(horizontal = 8.dp, vertical = 5.dp),
+            ) {
+                NavDestinationIcon(id, size = 20, tint = if (isSelected) accent else unselectedFg)
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    label,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                    fontSize = 10.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isSelected) accent else unselectedFg,
+                )
             }
         }
     }
