@@ -1,1 +1,1 @@
-build 52 added-styles helper fix (stale-node refind, end-aware scroll) + capture emit-list for added-* and AppRoot edit frames
+build 53 added-styles diagnostics: a11y tree dump + open-settings failure capture (evidence for settings-root reachability)
