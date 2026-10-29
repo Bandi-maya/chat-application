@@ -58,6 +58,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -449,30 +450,6 @@ fun ContactInfoScreen(
             }
             Spacer(Modifier.height(12.dp))
 
-            // Groups in Common (the Dart screen ships these as static entries).
-            SectionTitle("Groups in Common", colors)
-            Column(Modifier.fillMaxWidth().background(colors.surface, RoundedCornerShape(16.dp))) {
-                InfoTile(
-                    icon = {
-                        Box(Modifier.size(40.dp).background(colors.primary.copy(alpha = 0.15f), CircleShape), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Rounded.Groups, contentDescription = null, tint = colors.primary)
-                        }
-                    },
-                    title = "Flutter Architects & Core Devs",
-                    titleColor = colors.foreground,
-                    subtitle = "You, ${contact.displayName}, Alex, Maya and 12 others",
-                )
-                InfoTile(
-                    icon = {
-                        Box(Modifier.size(40.dp).background(colors.secondary.copy(alpha = 0.15f), CircleShape), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Rounded.Palette, contentDescription = null, tint = colors.secondary)
-                        }
-                    },
-                    title = "Design Systems & Motion Craft",
-                    titleColor = colors.foreground,
-                    subtitle = "You, ${contact.displayName}, and 4 others",
-                )
-            }
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -534,16 +511,24 @@ fun ContactInfoScreen(
 @Composable
 private fun QuickAction(icon: ImageVector, label: String, onTap: () -> Unit) {
     val colors = LocalAppColors.current
+    // Round icon button with its label underneath, GB/WhatsApp contact-info style.
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .background(colors.surfaceSecondary, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onTap)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .padding(horizontal = 10.dp, vertical = 4.dp),
     ) {
-        Icon(icon, contentDescription = label, tint = colors.primary, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.height(4.dp))
-        Text(label, color = colors.foreground, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(46.dp)
+                .background(colors.surfaceSecondary, CircleShape),
+        ) {
+            Icon(icon, contentDescription = null, tint = colors.primary, modifier = Modifier.size(21.dp))
+        }
+        Spacer(Modifier.height(5.dp))
+        Text(label, color = colors.foregroundSecondary, fontSize = 11.5.sp, fontWeight = FontWeight.Medium)
     }
 }
 
