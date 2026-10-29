@@ -44,7 +44,7 @@ class BubbleOptionsModalProofTest {
         val dir = File(ins.targetContext.getExternalFilesDir(null), "screenshots")
         dir.mkdirs()
         dev.waitForIdle(3000)
-        val bmp = dev.uiAutomation.takeScreenshot() ?: return
+        val bmp = ins.uiAutomation.takeScreenshot() ?: return
         FileOutputStream(File(dir, "$name.png")).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bmp.recycle()
     }
@@ -132,7 +132,7 @@ class BubbleOptionsModalProofTest {
         val bb = bubble.visibleBounds
         dev.click(bb.centerX(), bb.centerY())
         val first = dev.wait(Until.findObject(By.text(actions.first().label)), 6000)
-            ?: fail("single tap did not open the options menu in the production screen")
+            ?: throw AssertionError("single tap did not open the options menu in the production screen")
         for (a in actions) {
             assertTrue("missing option '${a.label}' after single tap", dev.hasObject(By.text(a.label)))
         }
