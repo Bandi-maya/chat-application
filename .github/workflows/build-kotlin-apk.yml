@@ -510,7 +510,12 @@ jobs:
           target: default
           arch: x86_64
           profile: pixel_6
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
+          # CONTROLLED DIAGNOSTIC (run 40942544305 mid-run qemu deaths): treatment = AVD RAM
+          # 2GB -> 4GB (-memory 4096). Emulator build pinned to the exact build that died in 91
+          # (37.2.13.0 / build_id 16740729) so RAM is the only changed variable vs that death.
+          # Original 91 partial records retained untouched; retried shard reruns ALL its tests.
+          emulator-build: "16740729"
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated -memory 4096
           script: bash ci/run-smoke.sh
       - name: Preserve media retry results
         if: always() && steps.pin.outputs.mode == 'retry'
@@ -534,6 +539,9 @@ jobs:
           target: default
           arch: x86_64
           profile: pixel_6
+          # CONTROL for the RAM diagnostic: byte-identical config to the shard that died in run
+          # 40942544305 (stock ~2GB RAM), emulator build pinned to the same 37.2.13.0 / 16740729.
+          emulator-build: "16740729"
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
           script: bash ci/run-smoke.sh
       - name: Preserve emoji-real retry results
