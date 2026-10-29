@@ -28,6 +28,15 @@ class ThemeStudioLogicParityTest {
     }
 
     @Test
+    fun themeStudioTransitionsMatchNativePagerRendererOptions() {
+        assertEquals(19, ThemeStudioLogic.TRANSITION_TYPES.size)
+        assertEquals("Default", ThemeStudioLogic.TRANSITION_TYPES.first())
+        assertTrue("Cube 3D" in ThemeStudioLogic.TRANSITION_TYPES)
+        assertTrue("Flip Vertical" in ThemeStudioLogic.TRANSITION_TYPES)
+        assertTrue("Zoom Out Slide" in ThemeStudioLogic.TRANSITION_TYPES)
+    }
+
+    @Test
     fun unsupportedLegacyParticleValuesFallBackSafely() {
         for (legacy in listOf("Neon Embers", "Sakura", "Snow", "Cyber Matrix", "None", null)) {
             assertEquals("Stars", ThemeStudioLogic.normalizeParticleType(legacy))
