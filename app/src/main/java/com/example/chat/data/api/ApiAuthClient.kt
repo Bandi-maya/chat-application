@@ -28,7 +28,7 @@ data class ApiUserProfile(
     val avatarUrl: String? = null,
 )
 
-data class ApiAuthResult(val token: String, val user: ApiUserProfile)
+data class ApiAuthResult(val token: String, val user: ApiUserProfile, val refreshToken: String? = null)
 
 /** Transport seam so the request/response logic is JVM-testable.
  *  Returns (statusCode, body); throws on transport failure. */
@@ -159,6 +159,45 @@ class ApiAuthClient(
             return transport.execute("POST", "${baseUrl()}/api/v1/$path", headers, body)
         }
         return response
+    }
+
+    /** Outcome of POST /auth/refresh. [Rejected] means the refresh token is
+     *  expired/revoked (the user must sign in again); [Unavailable] is a
+     *  network/server problem worth retrying later. */
+    sealed interface RefreshResult {
+        data class Ok(val accessToken: String) : RefreshResult
+        data object Rejected : RefreshResult
+        data object Unavailable : RefreshResult
+    }
+
+    /** POST /auth/refresh {refreshToken} -> new access token (data.token). */
+    fun refresh(refreshToken: String): RefreshResult {
+        val body = JSONObject().put("refreshToken", refreshToken).toString()
+        val response = try {
+            postWithFallback("auth/refresh", body)
+        } catch (_: Exception) {
+            return RefreshResult.Unavailable
+        }
+        return when (response.first) {
+            200 -> try {
+                val parsed = JSONObject(response.second)
+                val data = parsed.optJSONObject("data") ?: parsed
+                val token = data.optString("token", "").ifEmpty { data.optString("access_token", "") }
+                if (token.isEmpty()) RefreshResult.Unavailable else RefreshResult.Ok(token)
+            } catch (_: Exception) {
+                RefreshResult.Unavailable
+            }
+            401, 403 -> RefreshResult.Rejected
+            else -> RefreshResult.Unavailable
+        }
+    }
+
+    /** Seconds until the JWT expires, or null when the token has no readable exp. */
+    fun secondsUntilExpiry(token: String, nowEpochSeconds: Long = System.currentTimeMillis() / 1000): Long? = try {
+        val exp = decodeJwt(token).optLong("exp", 0L)
+        if (exp <= 0L) null else exp - nowEpochSeconds
+    } catch (_: Exception) {
+        null
     }
 
     /** ApiBackendService.forgotPassword — returns the server message. */
@@ -335,7 +374,9 @@ class ApiAuthClient(
                 phone = firstString(userObj, "mobile", "phone") ?: "",
                 avatarUrl = photo,
             )
-            return ApiAuthResult(token = token, user = user)
+            val refresh = if (dataObj.has("refresh_token") && !dataObj.isNull("refresh_token")) dataObj.get("refresh_token").toString()
+                else if (dataObj.has("refreshToken") && !dataObj.isNull("refreshToken")) dataObj.get("refreshToken").toString() else null
+            return ApiAuthResult(token = token, user = user, refreshToken = refresh?.ifBlank { null })
         }
 
         // Error path mirrors the Dart else branch: detail/message passthrough.

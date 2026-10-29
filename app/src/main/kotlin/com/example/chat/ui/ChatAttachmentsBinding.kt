@@ -121,8 +121,11 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                     api.sendMessage(conversationId, text, type, attachment, extraMetadata)
                 }
                 override suspend fun sendStructuredMessage(type: String, body: String, metadata: Map<String, Any?>) {
-                    ServiceLocator.gbFeatures.sendStructuredMessage(conversationId, type, body, metadata)
+                    // Location / contact go to backend_python as a normal text message: the body already
+                    // carries the maps link or the contact details. (Was a Supabase call that never ran.)
+                    api.sendMessage(conversationId, body)
                 }
+                // Polls are hidden in this release (ReleaseFeatures.POLLS); these stay on the old backend.
                 override suspend fun createPoll(question: String, options: List<String>, allowMultiple: Boolean) {
                     ServiceLocator.gbFeatures.createPoll(conversationId, question, options, allowMultiple)
                 }

@@ -84,6 +84,17 @@ class ApiRealtimeClient(
         /** call_signal: payload['data'] ?? payload, only when it is a Map. */
         fun onCallSignal(data: Map<String, Any?>) {}
         fun onScopedCallSignal(data: Map<String, Any?>, capturedScope: Any?) { onCallSignal(data) }
+        /** messages_read: another participant read [messageIds] in [roomId]. */
+        fun onMessagesRead(roomId: String, messageIds: List<String>, readerId: String) {}
+        /** initial_presence: ids online in the tenant right after connecting. */
+        fun onInitialPresence(onlineUserIds: List<String>) {}
+        /** user_presence: one user went online/offline (lastSeen is ISO-8601 or null when hidden). */
+        fun onPresence(userId: String, isOnline: Boolean, lastSeen: String?) {}
+        /** typing: [userId] started/stopped typing in [roomId]. */
+        fun onTyping(roomId: String, userId: String, isTyping: Boolean) {}
+        /** messages_delivered: my messages in [roomId] created at or before [deliveredUpTo]
+         *  (ISO-8601) reached every other participant's device. */
+        fun onMessagesDelivered(roomId: String, deliveredUpTo: String) {}
     }
 
     @Volatile
@@ -136,7 +147,7 @@ class ApiRealtimeClient(
         val created = try {
             if (!connectionScopeGuard(expectedScope) {
                 if (socketToken == token() && socketUrl == webSocketUrl()) {
-                    registered = socketFactory.connect(url, socketListener)
+                    registered = socketFactory.connect(withAuthToken(url, socketToken), socketListener)
                     socket = registered
                 }
             } || registered == null) {
@@ -176,6 +187,28 @@ class ApiRealtimeClient(
                     .put("content", content)
                     .toString(),
             )
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /** Typing indicator for [roomId]; the server only relays it to that room's
+     *  participants (and only while the sender's typing indicators are enabled). */
+    fun sendTyping(roomId: String, isTyping: Boolean): Boolean {
+        val s = socket ?: return false
+        return try {
+            s.send(JSONObject().put("type", "typing").put("room_id", roomId).put("is_typing", isTyping).toString())
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /** Delivery ack: tells the server a new message for [roomId] reached this device
+     *  (the sender's second grey tick). No-op when disconnected. */
+    fun sendDelivered(roomId: String): Boolean {
+        val s = socket ?: return false
+        return try {
+            s.send(JSONObject().put("type", "delivered").put("room_id", roomId).toString())
         } catch (_: Exception) {
             false
         }
@@ -319,6 +352,35 @@ class ApiRealtimeClient(
                     val roomId = raw?.let { str(it, "room_id") } ?: ""
                     if (roomId.isNotEmpty()) listener?.onMessagesCleared(roomId)
                 }
+                "messages_read" -> {
+                    val raw = dataOrMessage(payload) ?: return
+                    val roomId = str(raw, "room_id") ?: return
+                    val ids = raw.optJSONArray("message_ids") ?: return
+                    val list = (0 until ids.length()).mapNotNull { i -> ids.optString(i, "").ifEmpty { null } }
+                    listener?.onMessagesRead(roomId, list, str(raw, "reader_id") ?: "")
+                }
+                "messages_delivered" -> {
+                    val raw = dataOrMessage(payload) ?: return
+                    val roomId = str(raw, "room_id") ?: return
+                    val upTo = str(raw, "delivered_up_to") ?: return
+                    listener?.onMessagesDelivered(roomId, upTo)
+                }
+                "initial_presence" -> {
+                    val raw = dataOrMessage(payload) ?: return
+                    val ids = raw.optJSONArray("online_user_ids") ?: return
+                    listener?.onInitialPresence((0 until ids.length()).mapNotNull { i -> ids.optString(i, "").ifEmpty { null } })
+                }
+                "user_presence" -> {
+                    val raw = dataOrMessage(payload) ?: return
+                    val userId = str(raw, "user_id") ?: return
+                    listener?.onPresence(userId, raw.optBoolean("is_online", false), str(raw, "last_seen"))
+                }
+                "typing" -> {
+                    val raw = dataOrMessage(payload) ?: return
+                    val roomId = str(raw, "room_id") ?: return
+                    val userId = str(raw, "user_id") ?: return
+                    listener?.onTyping(roomId, userId, raw.optBoolean("is_typing", true))
+                }
             }
         } catch (_: Exception) {
             // Dart: debugPrint + swallow; the channel stays up.
@@ -340,6 +402,14 @@ class ApiRealtimeClient(
     }
 
     companion object {
+        /** The backend authenticates the socket with ?token=<access token> (browsers and
+         *  OkHttp both send it on the upgrade request); without it the server closes with 4401. */
+        fun withAuthToken(url: String, token: String?): String {
+            if (token.isNullOrBlank() || Regex("[?&]token=").containsMatchIn(url)) return url
+            val encoded = java.net.URLEncoder.encode(token, "UTF-8")
+            return url + (if (url.contains('?')) "&" else "?") + "token=" + encoded
+        }
+
         const val PING_INTERVAL_MS = 25_000L
         const val RECONNECT_DELAY_MS = 4_000L
 

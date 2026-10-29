@@ -95,6 +95,49 @@ class ApiChatClient(
      *  Dart lands with the realtime slice; without it a failed send leaves
      *  the optimistic temp message in 'sending' state, exactly like Dart
      *  with no channel. */
+    /** Outcome of a send attempt, so the outbox knows whether to retry. */
+    sealed interface SendResult {
+        data class Ok(val message: ChatMessage) : SendResult
+        /** No network / server unreachable / 5xx: keep it queued (clock) and retry later. */
+        data object Offline : SendResult
+        /** The server refused it (4xx, e.g. recipient deactivated): retrying will not help. */
+        data class Rejected(val code: Int, val detail: String?) : SendResult
+    }
+
+    /** POST /chat/rooms/<id>/messages {content, client_id} (+ /api/v1 fallback). [clientId] lets
+     *  the server drop a duplicate when a retry follows a send whose response was lost. */
+    fun sendMessageResult(roomId: String, content: String, clientId: String?): SendResult {
+        if (token() == null) return SendResult.Offline
+        return try {
+            val payload = JSONObject().put("content", content)
+            if (!clientId.isNullOrEmpty()) payload.put("client_id", clientId)
+            val body = payload.toString()
+            var response = transport.execute(
+                "POST", "${base()}/chat/rooms/$roomId/messages", authHeaders(json = true), body,
+            )
+            if (response.first == 404) {
+                response = transport.execute(
+                    "POST", "${base()}/api/v1/chat/rooms/$roomId/messages", authHeaders(json = true), body,
+                )
+            }
+            val code = response.first
+            when {
+                code == 200 || code == 201 -> {
+                    val json = JSONObject(response.second)
+                    val raw = if (json.has("data") && !json.isNull("data")) json.get("data") else json
+                    if (raw is JSONObject) SendResult.Ok(ChatMessage.fromApi(deepMap(raw))) else SendResult.Offline
+                }
+                // 401 = token expired: the refresh logic renews it, then the outbox retries.
+                code <= 0 || code == 401 || code == 408 || code == 429 || code >= 500 -> SendResult.Offline
+                else -> SendResult.Rejected(code, try {
+                    JSONObject(response.second).optString("detail").ifEmpty { null }
+                } catch (_: Exception) { null })
+            }
+        } catch (_: Exception) {
+            SendResult.Offline
+        }
+    }
+
     fun sendMessage(roomId: String, content: String): ChatMessage? {
         val authToken = token() ?: return null
         return try {
@@ -163,6 +206,59 @@ class ApiChatClient(
                 )
             }
         } catch (_: Exception) {
+        }
+    }
+
+    /** POST /chat/rooms/<id>/read (+ /api/v1 fallback): marks everything the
+     *  server has for this user in the room as read (clears the unread count and,
+     *  per the reader's server-side privacy settings, sends blue ticks). Returns
+     *  the ids the server marked, or null on failure. */
+    /** POST /chat/rooms/<id>/delivered (+ /api/v1 fallback): messages reached this device
+     *  without the WebSocket (push). Returns true when the server accepted it. */
+    fun markRoomDelivered(roomId: String): Boolean {
+        if (token() == null) return false
+        return try {
+            var response = transport.execute("POST", "${base()}/chat/rooms/$roomId/delivered", authHeaders(json = true), "{}")
+            if (response.first == 404) {
+                response = transport.execute("POST", "${base()}/api/v1/chat/rooms/$roomId/delivered", authHeaders(json = true), "{}")
+            }
+            response.first in 200..299
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun markRoomRead(roomId: String): List<String>? {
+        if (token() == null) return null
+        return try {
+            var response = transport.execute("POST", "${base()}/chat/rooms/$roomId/read", authHeaders(json = true), "{}")
+            if (response.first == 404) {
+                response = transport.execute("POST", "${base()}/api/v1/chat/rooms/$roomId/read", authHeaders(json = true), "{}")
+            }
+            if (response.first != 200) return null
+            val data = JSONObject(response.second).optJSONObject("data") ?: return emptyList()
+            val ids = data.optJSONArray("message_ids") ?: return emptyList()
+            (0 until ids.length()).map { ids.optString(it, "") }.filter { it.isNotEmpty() }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** PATCH /chat/settings (+ /api/v1 fallback) with the privacy fields the
+     *  server enforces (last seen / online audience, read receipts, typing).
+     *  Returns true when the server accepted the update. */
+    fun updateChatSettings(settings: Map<String, Any?>): Boolean {
+        if (token() == null) return false
+        val body = JSONObject()
+        for ((k, v) in settings) body.put(k, v ?: JSONObject.NULL)
+        return try {
+            var response = transport.execute("PATCH", "${base()}/chat/settings", authHeaders(json = true), body.toString())
+            if (response.first == 404) {
+                response = transport.execute("PATCH", "${base()}/api/v1/chat/settings", authHeaders(json = true), body.toString())
+            }
+            response.first in 200..299
+        } catch (_: Exception) {
+            false
         }
     }
 
@@ -354,8 +450,20 @@ class ApiChatClient(
                 avatarInitials = initials,
                 avatarColorHex = "0xFF6366F1",
                 about = about,
-                presence = PresenceState.online,
-                lastSeenAt = Instant.now(),
+                // backend_python /chat/users returns is_online + last_seen; older payloads have
+                // neither, so those keep the previous "online now" default.
+                presence = when (val online = json["is_online"]) {
+                    null -> PresenceState.online
+                    true, "true" -> PresenceState.online
+                    else -> PresenceState.offline
+                },
+                lastSeenAt = (json["last_seen"] ?: json["lastSeen"])?.toString()
+                    ?.let { v -> try { Instant.parse(v) } catch (_: Exception) {
+                        try { java.time.OffsetDateTime.parse(v).toInstant() } catch (_: Exception) {
+                            try { java.time.LocalDateTime.parse(v).toInstant(java.time.ZoneOffset.UTC) } catch (_: Exception) { null }
+                        }
+                    } }
+                    ?: Instant.now(),
                 isVerified = false,
                 email = (json["email"] ?: "").toString(),
                 phone = (json["mobile"] ?: json["phone"] ?: "").toString(),

@@ -1,5 +1,7 @@
 package com.example.chat.ui.settings.home
 
+import com.example.chat.ReleaseFeatures
+
 import androidx.compose.ui.draw.clip
 
 import androidx.compose.animation.core.CubicBezierEasing
@@ -125,14 +127,17 @@ fun GbHeaderOverflowMenuDialog(t: ThemeConfig, actions: GbHeaderOverflowActions,
                     .padding(vertical = 8.dp),
             ) {
                 Item(t, Icons.Rounded.Tune, "Header & Navigation", pick(actions.onGbSettings))
-                Item(t, Icons.Outlined.ScheduleSend, "Message Scheduler", pick(actions.onMessageScheduler))
-                Item(t, Icons.Outlined.ReplyAll, "Auto Reply", pick(actions.onAutoReply))
+                // Scheduler / Auto Reply / Linked devices: deferred to the next release (ReleaseFeatures).
+                if (ReleaseFeatures.MESSAGE_AUTOMATION) {
+                    Item(t, Icons.Outlined.ScheduleSend, "Message Scheduler", pick(actions.onMessageScheduler))
+                    Item(t, Icons.Outlined.ReplyAll, "Auto Reply", pick(actions.onAutoReply))
+                }
                 Item(t, Icons.Rounded.RestartAlt, "Restart Chaty", pick(actions.onRestart))
                 Item(t, Icons.Rounded.EditNote, "Message a number", pick(actions.onMessageNumber))
                 Item(t, Icons.Rounded.ForwardToInbox, "Mass Message Sender", pick(actions.onMassMessage))
                 Item(t, Icons.Outlined.GroupAdd, "New group", pick(actions.onNewGroup))
                 Item(t, Icons.Outlined.Groups, "New community", pick(actions.onNewCommunity))
-                Item(t, Icons.Rounded.Devices, "Linked devices", pick(actions.onLinkedDevices))
+                if (ReleaseFeatures.LINKED_DEVICES) Item(t, Icons.Rounded.Devices, "Linked devices", pick(actions.onLinkedDevices))
                 Item(t, Icons.Outlined.StarOutline, "Starred", pick(actions.onStarred))
                 Item(t, Icons.Rounded.DoneAll, "Read all", pick(actions.onReadAll))
                 Item(t, Icons.Outlined.Settings, "Settings", pick(actions.onSettings))

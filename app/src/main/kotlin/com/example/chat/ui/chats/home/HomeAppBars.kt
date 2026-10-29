@@ -317,12 +317,13 @@ fun HomeOverflowMenu(
     onMarkAllAsRead: () -> Unit,
     onMessageANumber: () -> Unit,
 ) {
-    val items: List<Triple<ImageVector, String, () -> Unit>> = listOf(
+    // Linked Devices / Scheduler / Auto Reply are deferred to the next release (ReleaseFeatures).
+    val items: List<Triple<ImageVector, String, () -> Unit>> = listOfNotNull(
         Triple(Icons.Rounded.GroupAdd, "New Group") { nav.onOpenNewChat(true, false) },
-        Triple(Icons.Outlined.Devices, "Linked Devices") { nav.onOpenLinkedDevices() },
+        if (ReleaseFeatures.LINKED_DEVICES) Triple(Icons.Outlined.Devices, "Linked Devices") { nav.onOpenLinkedDevices() } else null,
         Triple(Icons.Rounded.Star, "Starred Messages") { nav.onOpenStarredMessages() },
-        Triple(Icons.Outlined.ScheduleSend, "Message Scheduler") { nav.onOpenMessageManagement() },
-        Triple(Icons.Outlined.Reply, "Auto Reply") { nav.onOpenMessageManagement() },
+        if (ReleaseFeatures.MESSAGE_AUTOMATION) Triple(Icons.Outlined.ScheduleSend, "Message Scheduler") { nav.onOpenMessageManagement() } else null,
+        if (ReleaseFeatures.MESSAGE_AUTOMATION) Triple(Icons.Outlined.Reply, "Auto Reply") { nav.onOpenMessageManagement() } else null,
         Triple(Icons.Outlined.Dialpad, "Message a Number") { onMessageANumber() },
         Triple(Icons.Outlined.Campaign, "Mass Message") { nav.onOpenNewChat(false, true) },
         Triple(Icons.Outlined.Call, "Who can call me?") { nav.onWhoCanCallMe() },

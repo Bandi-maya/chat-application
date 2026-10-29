@@ -1,5 +1,7 @@
 package com.example.chat.ui.chats
 
+import com.example.chat.ReleaseFeatures
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -784,12 +786,12 @@ fun ChatDetailScreen(
                             onLongPress = { openMessageMenu(message, null) },
                             onLongPressWithRect = { rect -> openMessageMenu(message, rect) },
                             onSwipeReply = { replyTarget = message },
-                            onDoubleTap = if (disableDoubleTapReaction) {
+                            onDoubleTap = if (disableDoubleTapReaction || !ReleaseFeatures.MESSAGE_REACTIONS) {
                                 null
                             } else {
                                 { onToggleReaction(message.id, doubleTapReactionEmoji) }
                             },
-                            onReactionTap = { emoji -> onToggleReaction(message.id, emoji) },
+                            onReactionTap = { emoji -> if (ReleaseFeatures.MESSAGE_REACTIONS) onToggleReaction(message.id, emoji) },
                             onMediaTapWithBounds = { rect -> onMediaTapWithBounds?.invoke(message, rect) ?: onMediaTap(message) },
                             onMediaTap = if (message.attachment == null) {
                                 null
@@ -1016,11 +1018,16 @@ fun ChatDetailScreen(
             secondaryTextColor = Color(theme.secondaryTextColor),
             destructiveColor = Color(theme.dangerColor),
             anchorRect = contextMenuAnchor,
-            reactionRail = ReactionRail(
-                emojis = quickReactionEmojis,
-                onReact = { emoji -> onToggleReaction(menuMessage.id, emoji) },
-                onAdd = { emojiReactionTarget = menuMessage },
-            ),
+            // Reactions are deferred to the next release (see ReleaseFeatures).
+            reactionRail = if (ReleaseFeatures.MESSAGE_REACTIONS) {
+                ReactionRail(
+                    emojis = quickReactionEmojis,
+                    onReact = { emoji -> onToggleReaction(menuMessage.id, emoji) },
+                    onAdd = { emojiReactionTarget = menuMessage },
+                )
+            } else {
+                null
+            },
         )
     }
 

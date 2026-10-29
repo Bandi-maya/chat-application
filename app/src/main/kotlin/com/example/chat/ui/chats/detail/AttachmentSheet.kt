@@ -1,5 +1,7 @@
 package com.example.chat.ui.chats.detail
 
+import com.example.chat.ReleaseFeatures
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -80,14 +82,15 @@ fun AttachmentSheetContent(
     val foreground = Color(theme.primaryTextColor)
     val foregroundSecondary = Color(theme.secondaryTextColor)
 
-    val items = listOf(
+    // Poll is deferred to the next release (ReleaseFeatures.POLLS).
+    val items = listOfNotNull(
         AttachmentItem(Icons.Rounded.PhotoLibrary, "Gallery", gradientGallery, AttachmentAction.image),
         AttachmentItem(Icons.Rounded.Videocam, "Video", gradientVideo, AttachmentAction.video),
         AttachmentItem(Icons.Rounded.InsertDriveFile, "Document", gradientDocument, AttachmentAction.document),
         AttachmentItem(Icons.Rounded.GraphicEq, "Audio", gradientAudio, AttachmentAction.audio),
         AttachmentItem(Icons.Rounded.LocationOn, "Location", gradientLocation, AttachmentAction.location),
         AttachmentItem(Icons.Rounded.Person, "Contact", gradientContact, AttachmentAction.contact),
-        AttachmentItem(Icons.Rounded.Poll, "Poll", gradientPoll, AttachmentAction.poll),
+        if (ReleaseFeatures.POLLS) AttachmentItem(Icons.Rounded.Poll, "Poll", gradientPoll, AttachmentAction.poll) else null,
         AttachmentItem(Icons.Rounded.TaskAlt, "Task", gradientTask, AttachmentAction.task),
     )
 
@@ -113,8 +116,8 @@ fun AttachmentSheetContent(
         )
         Box(Modifier.height(12.dp))
 
-        // Demo sandbox dock
-        Column(
+        // Demo sandbox dock: developer-only test actions, hidden in release builds (ReleaseFeatures.DEMO_TOOLS).
+        if (ReleaseFeatures.DEMO_TOOLS) Column(
             Modifier
                 .fillMaxWidth()
                 .padding(bottom = 12.dp)

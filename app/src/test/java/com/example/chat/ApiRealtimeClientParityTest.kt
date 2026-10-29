@@ -258,7 +258,7 @@ class ApiRealtimeClientParityTest {
     @Test
     fun connectOpensSocketAndIsConnected() {
         val rig = Rig().connect()
-        assertEquals(listOf("ws://10.0.2.2:8000/chat/ws/u1"), rig.factory.urls)
+        assertEquals(listOf("ws://10.0.2.2:8000/chat/ws/u1?token=tok"), rig.factory.urls)
         assertTrue(rig.client.isConnected)
     }
 

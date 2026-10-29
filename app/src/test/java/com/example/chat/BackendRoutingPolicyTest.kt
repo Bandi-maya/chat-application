@@ -20,8 +20,8 @@ class BackendRoutingPolicyTest {
     @Test fun suppliedDefaultsStayLiteralAndOverridesWin() {
         assertEquals("chat-application", BackendRoutingPolicy.DEFAULT_TENANT_ID)
         val template = BackendRoutingPolicy.websocketTemplate("", "")
-        assertEquals("wss://api.hub.logybyte.in/api/chat/ws{userId}", template)
-        assertEquals("wss://api.hub.logybyte.in/api/chat/wsu-42", ApiRealtimeClient.resolveWebSocketUrl(
+        assertEquals("wss://api.hub.logybyte.in/api/v1/chat/ws/{userId}", template)
+        assertEquals("wss://api.hub.logybyte.in/api/v1/chat/ws/u-42", ApiRealtimeClient.resolveWebSocketUrl(
             "u-42", template, "", BackendRoutingPolicy.DEFAULT_REST_API_BASE_URL))
         assertEquals("wss://local.invalid/{userId}", BackendRoutingPolicy.websocketTemplate("wss://local.invalid/{userId}", "wss://build.invalid/{userId}"))
         assertEquals("wss://build.invalid/{userId}", BackendRoutingPolicy.websocketTemplate("", "wss://build.invalid/{userId}"))

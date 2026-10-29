@@ -7,6 +7,7 @@ import com.example.chat.domain.models.Conversation
 import com.example.chat.domain.models.ConversationType
 import com.example.chat.domain.models.DeliveryState
 import com.example.chat.domain.models.MessageType
+import com.example.chat.domain.models.PresenceState
 import com.example.chat.domain.models.UserProfile
 import java.time.Instant
 import kotlinx.coroutines.CoroutineScope
@@ -220,13 +221,20 @@ class ApiBackendService(
                 val list = _messages.getOrPut(roomId) { mutableListOf() }
                 // Dart: replace the optimistic sending/temp message matching
                 // text + sender; otherwise append if the id is new.
-                val optIdx = list.indexOfFirst { m ->
-                    (m.deliveryState == DeliveryState.sending || m.id.startsWith("temp_")) &&
-                        m.text == message.text &&
-                        (m.senderId == message.senderId || m.senderId == session.currentUser?.id)
+                // Already confirmed over HTTP: never let the echo claim another queued message.
+                // Only our own messages can replace a pending one (an incoming "ok" must not
+                // swallow the "ok" we are still sending).
+                val myId = session.currentUser?.id
+                val optIdx = if (list.any { it.id == message.id } || message.senderId != myId) -1
+                else list.indexOfFirst { m ->
+                    m.deliveryState == DeliveryState.sending && m.id.startsWith("temp_") &&
+                        m.text == message.text && m.senderId == myId
                 }
                 if (optIdx != -1) {
+                    // Our own queued message came back from the server: it is sent (one tick).
+                    removeFromOutbox(list[optIdx].id)
                     list[optIdx] = message
+                    list.removeAll { it !== message && it.id == message.id }
                 } else if (list.none { it.id == message.id }) {
                     list.add(message)
                 }
@@ -248,6 +256,15 @@ class ApiBackendService(
                 }
             }
             if (unknownRoom) chatScope.launch { loadConversations() }
+            // Tell the sender it reached this phone (their second grey tick).
+            if (message.senderId.isNotEmpty() && message.senderId != session.currentUser?.id) {
+                realtime.sendDelivered(message.conversationId)
+                try { onIncomingMessage(message) } catch (_: Exception) {}
+            }
+            typingUntil.remove("${message.conversationId}|${message.senderId}")
+            if (message.conversationId == activeConversationId && message.senderId != session.currentUser?.id) {
+                markConversationRead(message.conversationId)
+            }
             notifyChatListeners()
         }
 
@@ -308,7 +325,162 @@ class ApiBackendService(
             val expected = capturedScope as? ApiAccountScope ?: return
             callCoordinator.socketSignal(expected, data)
         }
+
+        override fun onMessagesRead(roomId: String, messageIds: List<String>, readerId: String) {
+            val myId = session.currentUser?.id
+            if (readerId.isNotEmpty() && readerId == myId) return
+            val ids = messageIds.toSet()
+            var changed = false
+            synchronized(chatLock) {
+                val list = _messages[roomId] ?: return@synchronized
+                for (i in list.indices) {
+                    val m = list[i]
+                    if (m.id in ids && m.senderId == myId && m.deliveryState != DeliveryState.read) {
+                        list[i] = m.copy(deliveryState = DeliveryState.read)
+                        changed = true
+                    }
+                }
+            }
+            if (changed) notifyChatListeners()
+        }
+
+        override fun onInitialPresence(onlineUserIds: List<String>) {
+            onlineIds.clear()
+            onlineIds.addAll(onlineUserIds)
+            notifyChatListeners()
+        }
+
+        override fun onPresence(userId: String, isOnline: Boolean, lastSeen: String?) {
+            if (isOnline) onlineIds.add(userId) else onlineIds.remove(userId)
+            val seen = parseIsoOrNull(lastSeen)
+            if (seen != null) lastSeenById[userId] = seen
+            else if (!isOnline) lastSeenById.remove(userId)
+            notifyChatListeners()
+        }
+
+        override fun onMessagesDelivered(roomId: String, deliveredUpTo: String) {
+            val upTo = parseIsoOrNull(deliveredUpTo) ?: return
+            val myId = session.currentUser?.id ?: return
+            var changed = false
+            synchronized(chatLock) {
+                val list = _messages[roomId] ?: return@synchronized
+                for (i in list.indices) {
+                    val m = list[i]
+                    if (m.senderId == myId && m.deliveryState == DeliveryState.sent && !m.createdAt.isAfter(upTo)) {
+                        list[i] = m.copy(deliveryState = DeliveryState.delivered)
+                        changed = true
+                    }
+                }
+            }
+            if (changed) notifyChatListeners()
+        }
+
+        override fun onTyping(roomId: String, userId: String, isTyping: Boolean) {
+            if (userId == session.currentUser?.id) return
+            val key = "$roomId|$userId"
+            if (isTyping) typingUntil[key] = System.currentTimeMillis() + TYPING_TTL_MS else typingUntil.remove(key)
+            notifyChatListeners()
+        }
     }
+
+    // ---- Presence / typing / read state from the custom backend socket ----
+
+    private val onlineIds: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+    private val lastSeenById = java.util.concurrent.ConcurrentHashMap<String, Instant>()
+    private val typingUntil = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    /** Online per the backend (respects the other user's "who can see me online" setting). */
+    fun isUserOnline(userId: String): Boolean = userId in onlineIds
+
+    /** Last-seen time the backend published, or null when unknown/hidden. */
+    fun lastSeenOf(userId: String): Instant? = lastSeenById[userId]
+
+    /** True while [userId] is typing in [roomId] (expires after a few seconds without updates). */
+    fun isTyping(roomId: String, userId: String): Boolean {
+        val until = typingUntil["$roomId|$userId"] ?: return false
+        if (until >= System.currentTimeMillis()) return true
+        typingUntil.remove("$roomId|$userId")
+        return false
+    }
+
+    /** Any other participant typing in [roomId]. */
+    fun anyoneTyping(roomId: String): Boolean =
+        typingUntil.keys.any { it.startsWith("$roomId|") && isTyping(roomId, it.substringAfter('|')) }
+
+    /** Publishes our typing state to the room (fire-and-forget). */
+    fun sendTyping(roomId: String, isTyping: Boolean) {
+        if (session.token == null) return
+        realtime.sendTyping(roomId, isTyping)
+    }
+
+    /** Marks the room read on the server and clears the local unread badge. */
+    fun markConversationRead(chatId: String) {
+        if (session.token == null || chatId.isEmpty()) return
+        try { onConversationRead(chatId) } catch (_: Exception) {}
+        var hadUnread = false
+        synchronized(chatLock) {
+            val idx = _conversations.indexOfFirst { it.id == chatId }
+            if (idx != -1 && _conversations[idx].unreadCount > 0) {
+                _conversations[idx] = _conversations[idx].copy(unreadCount = 0)
+                hadUnread = true
+            }
+        }
+        if (hadUnread) notifyChatListeners()
+        chatScope.launch { chat.markRoomRead(chatId) }
+    }
+
+    // ---- Push / background notification hooks (set by the locator) ----
+
+    /** A message from someone else arrived over the socket (app may be in the background). */
+    @Volatile var onIncomingMessage: (ChatMessage) -> Unit = {}
+    /** A chat was opened / read here: its notification can go. */
+    @Volatile var onConversationRead: (String) -> Unit = {}
+
+    fun activeConversationIdOrNull(): String? = activeConversationId
+
+    fun isConversationMuted(roomId: String): Boolean = conversations.firstOrNull { it.id == roomId }?.isMuted == true
+
+    fun conversationTitle(roomId: String): String? = conversations.firstOrNull { it.id == roomId }?.title
+
+    /** A push arrived (app in background or just started by it): reconnect the socket, tell the
+     *  server the message reached this phone, and resync so the chat is current when opened. */
+    fun onPushMessage(roomId: String?) {
+        if (session.token == null) return
+        realtime.connect()
+        startBackgroundSync()
+        chatScope.launch {
+            if (!roomId.isNullOrEmpty()) chat.markRoomDelivered(roomId)
+            loadConversations()
+            if (!roomId.isNullOrEmpty() && roomId == activeConversationId) loadMessages(roomId)
+        }
+    }
+
+    @Volatile private var lastPrivacySync: String? = null
+
+    /** Pushes the server-enforced privacy settings (PATCH /chat/settings) when they changed
+     *  for the signed-in user. Safe to call often: identical payloads are not re-sent. */
+    fun syncChatPrivacy(settings: Map<String, Any?>) {
+        val userId = session.currentUser?.id ?: return
+        if (session.token == null) return
+        val key = userId + ":" + settings.toSortedMap().toString()
+        if (key == lastPrivacySync) return
+        lastPrivacySync = key
+        chatScope.launch {
+            val ok = chat.updateChatSettings(settings)
+            if (!ok && lastPrivacySync == key) lastPrivacySync = null // retry on the next change/tick
+        }
+    }
+
+    /** Hook set by the locator: true while a call is in progress (token refresh waits until it ends). */
+    @Volatile var isCallActive: () -> Boolean = { false }
+
+    /** Reachability probe for the connection banner: GET <base>/health. Throws on failure. */
+    suspend fun pingBackend() = withContext(Dispatchers.IO) {
+        val base = config.restApiBaseUrl.trimEnd('/').replace(Regex("/api/v[0-9]+$"), "")
+        val response = healthTransport.execute("GET", "$base/health", emptyMap(), null)
+        if (response.first !in 200..299) throw Exception("Backend health check failed (${response.first})")
+    }
+    private val healthTransport = OkHttpApiTransport()
 
     private val realtime = ApiRealtimeClient(
         webSocketUrl = { resolveWebSocketUrl() },
@@ -320,7 +492,10 @@ class ApiBackendService(
 
     /** Network regained after loss: reconnect the socket now instead of waiting out the backoff.
      *  No-op while connected, connecting or signed out. */
-    fun onNetworkRegained() = realtime.reconnectNow()
+    fun onNetworkRegained() {
+        realtime.reconnectNow()
+        chatScope.launch { flushOutbox() } // send what was typed while offline
+    }
 
     /** Invalidates local media copies for deleted/removed messages. Set by the locator BEFORE initialize(). */
     @Volatile var onAttachmentsGone: (List<com.example.chat.data.local.AttachmentRef>) -> Unit = {}
@@ -356,10 +531,76 @@ class ApiBackendService(
     @Volatile private var activeConversationId: String? = null
     @Volatile private var syncRunning = false
 
-    val conversations: List<Conversation> get() = synchronized(chatLock) { _conversations.toList() }
+    val conversations: List<Conversation> get() {
+        val list = synchronized(chatLock) { _conversations.toList() }
+        val state = localState("conv")
+        if (state.length() == 0) return list
+        return list.map { c ->
+            val o = state.optJSONObject(c.id) ?: return@map c
+            c.copy(
+                isPinned = o.optBoolean("pinned", c.isPinned),
+                isMuted = o.optBoolean("muted", c.isMuted),
+                isArchived = o.optBoolean("archived", c.isArchived),
+            )
+        }
+    }
     val users: List<UserProfile> get() = synchronized(chatLock) { _users.toList() }
-    fun getMessages(chatId: String): List<ChatMessage> =
-        synchronized(chatLock) { (_messages[chatId] ?: emptyList()).toList() }
+    fun getMessages(chatId: String): List<ChatMessage> {
+        val list = synchronized(chatLock) { (_messages[chatId] ?: emptyList()).toList() }
+        val state = localState("msg").optJSONObject(chatId) ?: return list
+        return list.map { m ->
+            val o = state.optJSONObject(m.id) ?: return@map m
+            m.copy(isStarred = o.optBoolean("starred", m.isStarred), isPinned = o.optBoolean("pinned", m.isPinned))
+        }
+    }
+
+    // ---- Device-local chat state ----
+    // The custom backend has no per-user pin/mute/archive or star/pin-message API yet, so these
+    // are kept on this device per account (they do not sync to the user's other devices).
+
+    private val localStateLock = Any()
+    private val localStateCache = HashMap<String, org.json.JSONObject>()
+
+    private fun localStateKey(kind: String) = "api_local_${kind}_" + (session.currentUser?.id ?: "anon")
+
+    private fun localState(kind: String): org.json.JSONObject = synchronized(localStateLock) {
+        val key = localStateKey(kind)
+        localStateCache.getOrPut(key) {
+            try { org.json.JSONObject(prefs.getString(key, "{}") ?: "{}") } catch (_: Exception) { org.json.JSONObject() }
+        }
+    }
+
+    private fun saveLocalState(kind: String, value: org.json.JSONObject) = synchronized(localStateLock) {
+        val key = localStateKey(kind)
+        localStateCache[key] = value
+        try { prefs.edit().putString(key, value.toString()).apply() } catch (_: Exception) {}
+    }
+
+    /** field: pinned | muted | archived. */
+    fun setConversationLocalState(conversationId: String, field: String, value: Boolean) {
+        synchronized(localStateLock) {
+            val state = org.json.JSONObject(localState("conv").toString())
+            val entry = state.optJSONObject(conversationId) ?: org.json.JSONObject()
+            entry.put(field, value)
+            state.put(conversationId, entry)
+            saveLocalState("conv", state)
+        }
+        notifyChatListeners()
+    }
+
+    /** field: starred | pinned. */
+    fun setMessageLocalState(conversationId: String, messageId: String, field: String, value: Boolean) {
+        synchronized(localStateLock) {
+            val state = org.json.JSONObject(localState("msg").toString())
+            val room = state.optJSONObject(conversationId) ?: org.json.JSONObject()
+            val entry = room.optJSONObject(messageId) ?: org.json.JSONObject()
+            entry.put(field, value)
+            room.put(messageId, entry)
+            state.put(conversationId, room)
+            saveLocalState("msg", state)
+        }
+        notifyChatListeners()
+    }
 
     var requiresSubscription: Boolean = false
         private set
@@ -408,7 +649,7 @@ class ApiBackendService(
             val current = _messages[chatId] ?: mutableListOf()
             val pending = current.filter { m ->
                 (m.deliveryState == DeliveryState.sending || m.id.startsWith("temp_")) &&
-                    remote.none { it.text == m.text }
+                    (isQueued(m.id) || remote.none { it.text == m.text })
             }
             val merged = (remote + pending).sortedBy { it.createdAt }.toMutableList()
             gone = com.example.chat.data.media.AttachmentRefs.refsGone(chatId, current.toList(), merged)
@@ -486,6 +727,12 @@ class ApiBackendService(
 
     suspend fun loadUsers(query: String? = null) {
         val fetched = withContext(Dispatchers.IO) { chat.listUsers(query) } ?: return
+        // Seed "last seen" from the directory (last_seen) for offline users. Online state itself
+        // comes from the WebSocket (initial_presence / user_presence), which is always fresher.
+        for (u in fetched) {
+            if (u.id.isEmpty() || u.id == session.currentUser?.id) continue
+            if (u.presence == PresenceState.offline) lastSeenById.putIfAbsent(u.id, u.lastSeenAt)
+        }
         synchronized(chatLock) {
             if (query.isNullOrBlank()) {
                 _users.clear()
@@ -515,7 +762,10 @@ class ApiBackendService(
         if (!conversationId.isNullOrEmpty()) {
             realtime.connect()
             startBackgroundSync()
-            chatScope.launch { loadMessages(conversationId) }
+            chatScope.launch {
+                loadMessages(conversationId)
+                markConversationRead(conversationId)
+            }
         }
     }
 
@@ -529,11 +779,14 @@ class ApiBackendService(
             while (true) {
                 delay(4000)
                 if (session.token == null) break
+                ensureFreshToken()
+                if (session.token == null) break
                 ticks++
                 callCoordinator.tick()
                 // Flutter's sync loop also recovers an absent WebSocket. connect()
                 // is idempotent while connecting/connected and retains the configured URL.
                 if (!realtime.isConnected) realtime.connect()
+                flushOutbox() // messages typed while offline
                 activeConversationId?.takeIf { it.isNotEmpty() }?.let { syncActiveRoomMessages(it) }
                 if (ticks % 3 == 0) loadConversations()
             }
@@ -616,7 +869,7 @@ class ApiBackendService(
             if (hasChanges) {
                 val merged = remote.toMutableList()
                 for (p in pending) {
-                    if (remote.none { it.text == p.text }) merged.add(p)
+                    if (isQueued(p.id) || remote.none { it.text == p.text }) merged.add(p)
                 }
                 merged.sortBy { it.createdAt }
                 _messages[chatId] = merged
@@ -667,43 +920,238 @@ class ApiBackendService(
             text = text,
             attachment = attachment,
             createdAt = Instant.now(),
-            deliveryState = DeliveryState.sending,
+            deliveryState = DeliveryState.sending, // clock until the server has it
         )
         synchronized(chatLock) {
             _messages.getOrPut(conversationId) { mutableListOf() }.add(tempMsg)
+            touchConversationPreview(conversationId, tempMsg)
         }
+        // Queue first, so the message survives no internet / app restarts until the server has it.
+        enqueueOutbox(OutboxEntry(tempId, conversationId, effectiveContent, tempMsg))
         notifyChatListeners()
 
-        val confirmed = withContext(Dispatchers.IO) { chat.sendMessage(conversationId, effectiveContent) }
-        if (confirmed == null) {
-            // Dart: fall back to the WebSocket send when HTTP did not confirm;
-            // the temp message stays in 'sending' either way.
-            if (!realtime.sendMessageFallback(conversationId, effectiveContent)) {
-                throw IllegalStateException("Message not confirmed. Check your connection; the pending message will remain visible.")
-            }
-            return null
+        // Sends the queue in order (older offline messages first). If it is still queued afterwards
+        // there is no internet: it keeps the clock and goes out automatically when back online.
+        flushOutbox()
+        synchronized(outboxLock) { rejectedSends.remove(tempId) }?.let { detail ->
+            throw IllegalStateException(detail)
         }
-        synchronized(chatLock) {
-            val list = _messages.getOrPut(conversationId) { mutableListOf() }
-            val idx = list.indexOfFirst { it.id == tempId }
-            if (idx != -1) list[idx] = confirmed else list.add(confirmed)
-            list.sortBy { it.createdAt }
-            val convIdx = _conversations.indexOfFirst { it.id == conversationId }
-            if (convIdx != -1) {
-                val old = _conversations.removeAt(convIdx)
-                _conversations.add(
-                    0,
-                    old.copy(
-                        lastMessageText = if (confirmed.text.isNotEmpty()) confirmed.text
-                        else if (confirmed.type == MessageType.image) "📷 Photo" else "📎 Attachment",
-                        lastMessageTime = confirmed.createdAt,
-                        lastMessageSenderId = confirmed.senderId,
-                    ),
+        return synchronized(outboxLock) { confirmedSends.remove(tempId) }
+    }
+
+    // ---- Outbox: messages typed without internet (clock icon), sent when the connection returns ----
+
+    private data class OutboxEntry(
+        val tempId: String,
+        val conversationId: String,
+        val content: String,
+        val message: ChatMessage,
+    )
+
+    private val outboxLock = Any()
+    private val outbox = mutableListOf<OutboxEntry>()
+    @Volatile private var outboxLoadedFor: String? = null
+    private val flushMutex = kotlinx.coroutines.sync.Mutex()
+    // Outcome hand-off from the flush loop back to the sendMessage call that queued the message.
+    private val confirmedSends = HashMap<String, ChatMessage>()
+    private val rejectedSends = HashMap<String, String>()
+
+    private fun outboxKey(userId: String) = "api_outbox_$userId"
+
+    /** Loads the signed-in user's queued messages once and puts them back in their chats. */
+    private fun ensureOutboxLoaded() {
+        val userId = session.currentUser?.id ?: return
+        if (outboxLoadedFor == userId) return
+        val restored = mutableListOf<OutboxEntry>()
+        try {
+            val arr = org.json.JSONArray(prefs.getString(outboxKey(userId), "[]") ?: "[]")
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                val att = o.optJSONObject("attachment")?.let { a ->
+                    com.example.chat.domain.models.MessageAttachment(
+                        id = a.optString("id"), type = a.optString("type"), name = a.optString("name"),
+                        size = a.optString("size"), url = a.optString("url").ifEmpty { null },
+                        durationSeconds = a.optInt("duration", 0),
+                    )
+                }
+                val msg = ChatMessage(
+                    id = o.getString("temp_id"),
+                    conversationId = o.getString("room_id"),
+                    senderId = userId,
+                    type = runCatching { MessageType.valueOf(o.optString("type", "text")) }.getOrDefault(MessageType.text),
+                    text = o.optString("text"),
+                    attachment = att,
+                    createdAt = runCatching { Instant.parse(o.optString("created_at")) }.getOrDefault(Instant.now()),
+                    deliveryState = DeliveryState.sending,
                 )
+                restored += OutboxEntry(msg.id, msg.conversationId, o.getString("content"), msg)
             }
+        } catch (_: Exception) {
+        }
+        synchronized(outboxLock) {
+            outbox.clear()
+            outbox.addAll(restored)
+            outboxLoadedFor = userId
+        }
+        if (restored.isNotEmpty()) {
+            synchronized(chatLock) {
+                for (e in restored) {
+                    val list = _messages.getOrPut(e.conversationId) { mutableListOf() }
+                    if (list.none { it.id == e.tempId }) list.add(e.message)
+                    list.sortBy { it.createdAt }
+                }
+            }
+            notifyChatListeners()
+        }
+    }
+
+    private fun persistOutboxLocked() {
+        val userId = outboxLoadedFor ?: return
+        val arr = org.json.JSONArray()
+        for (e in outbox) {
+            val o = org.json.JSONObject()
+                .put("temp_id", e.tempId)
+                .put("room_id", e.conversationId)
+                .put("content", e.content)
+                .put("text", e.message.text)
+                .put("type", e.message.type.name)
+                .put("created_at", e.message.createdAt.toString())
+            e.message.attachment?.let { a ->
+                o.put("attachment", org.json.JSONObject()
+                    .put("id", a.id).put("type", a.type).put("name", a.name).put("size", a.size)
+                    .put("url", a.url ?: "").put("duration", a.durationSeconds))
+            }
+            arr.put(o)
+        }
+        try { prefs.edit().putString(outboxKey(userId), arr.toString()).apply() } catch (_: Exception) {}
+    }
+
+    private fun enqueueOutbox(entry: OutboxEntry) {
+        ensureOutboxLoaded()
+        synchronized(outboxLock) {
+            if (outbox.none { it.tempId == entry.tempId }) outbox.add(entry)
+            persistOutboxLocked()
+        }
+    }
+
+    private fun removeFromOutbox(tempId: String) {
+        synchronized(outboxLock) {
+            if (outbox.removeAll { it.tempId == tempId }) persistOutboxLocked()
+        }
+    }
+
+    /** True while [tempId] is still waiting in the outbox. */
+    private fun isQueued(tempId: String) = synchronized(outboxLock) { outbox.any { it.tempId == tempId } }
+
+    /** One HTTP attempt for a queued message; updates the chat and the outbox from the result. */
+    private suspend fun sendOutboxEntry(entry: OutboxEntry): ApiChatClient.SendResult {
+        val result = withContext(Dispatchers.IO) {
+            chat.sendMessageResult(entry.conversationId, entry.content, clientId = entry.tempId)
+        }
+        when (result) {
+            is ApiChatClient.SendResult.Ok -> {
+                removeFromOutbox(entry.tempId)
+                val confirmed = result.message
+                synchronized(outboxLock) {
+                    confirmedSends[entry.tempId] = confirmed
+                    if (confirmedSends.size > 50) confirmedSends.keys.firstOrNull()?.let { confirmedSends.remove(it) }
+                }
+                synchronized(chatLock) {
+                    val list = _messages.getOrPut(entry.conversationId) { mutableListOf() }
+                    // The WebSocket echo may already have added the confirmed message: never keep two.
+                    list.removeAll { it.id == entry.tempId }
+                    val idx = list.indexOfFirst { it.id == confirmed.id }
+                    if (idx != -1) {
+                        // Keep whichever tick is further along (the echo/receipts may have arrived first).
+                        if (list[idx].deliveryState.ordinal < confirmed.deliveryState.ordinal) list[idx] = confirmed
+                    } else {
+                        list.add(confirmed)
+                    }
+                    list.sortBy { it.createdAt }
+                    touchConversationPreview(entry.conversationId, confirmed)
+                }
+                notifyChatListeners()
+            }
+            is ApiChatClient.SendResult.Rejected -> {
+                removeFromOutbox(entry.tempId)
+                synchronized(outboxLock) {
+                    rejectedSends[entry.tempId] = result.detail ?: "Message could not be sent (${result.code})."
+                    if (rejectedSends.size > 50) rejectedSends.keys.firstOrNull()?.let { rejectedSends.remove(it) }
+                }
+                setLocalDeliveryState(entry.conversationId, entry.tempId, DeliveryState.failed)
+            }
+            ApiChatClient.SendResult.Offline -> Unit // stays queued (clock)
+        }
+        return result
+    }
+
+    /** Sends everything queued, oldest first. Stops at the first "still offline" so order is kept. */
+    suspend fun flushOutbox() {
+        if (session.token == null) return
+        ensureOutboxLoaded()
+        if (!flushMutex.tryLock()) return
+        try {
+            while (session.token != null) {
+                val next = synchronized(outboxLock) { outbox.firstOrNull() } ?: break
+                val r = sendOutboxEntry(next)
+                if (r == ApiChatClient.SendResult.Offline) break
+            }
+        } finally {
+            flushMutex.unlock()
+        }
+    }
+
+    /** Retry for a failed (red) message: queue it again and try now. */
+    suspend fun retryMessage(messageId: String): Boolean {
+        val msg = synchronized(chatLock) {
+            _messages.values.firstNotNullOfOrNull { list -> list.firstOrNull { it.id == messageId } }
+        } ?: return false
+        if (msg.deliveryState != DeliveryState.failed) return false
+        val att = msg.attachment
+        val content = if (att != null) {
+            val o = org.json.JSONObject()
+            o.put("type", msg.type.name)
+            o.put("url", att.url ?: org.json.JSONObject.NULL)
+            o.put("name", att.name)
+            o.put("size", att.size)
+            o.put("text", msg.text)
+            o.put("duration", att.durationSeconds)
+            o.toString()
+        } else msg.text
+        setLocalDeliveryState(msg.conversationId, msg.id, DeliveryState.sending)
+        val entry = OutboxEntry(msg.id, msg.conversationId, content, msg.copy(deliveryState = DeliveryState.sending))
+        enqueueOutbox(entry)
+        flushOutbox()
+        synchronized(outboxLock) { rejectedSends.remove(msg.id); confirmedSends.remove(msg.id) }
+        // Still queued = no internet yet; it will go out by itself, so the retry itself worked.
+        return synchronized(chatLock) {
+            _messages[msg.conversationId]?.none { it.id == msg.id && it.deliveryState == DeliveryState.failed } ?: true
+        }
+    }
+
+    private fun setLocalDeliveryState(conversationId: String, messageId: String, state: DeliveryState) {
+        synchronized(chatLock) {
+            val list = _messages[conversationId] ?: return@synchronized
+            val i = list.indexOfFirst { it.id == messageId }
+            if (i != -1) list[i] = list[i].copy(deliveryState = state)
         }
         notifyChatListeners()
-        return confirmed
+    }
+
+    /** Call with chatLock held: moves the room to the top with [message] as its preview. */
+    private fun touchConversationPreview(conversationId: String, message: ChatMessage) {
+        val convIdx = _conversations.indexOfFirst { it.id == conversationId }
+        if (convIdx == -1) return
+        val old = _conversations.removeAt(convIdx)
+        _conversations.add(
+            0,
+            old.copy(
+                lastMessageText = if (message.text.isNotEmpty()) message.text
+                else if (message.type == MessageType.image) "📷 Photo" else "📎 Attachment",
+                lastMessageTime = message.createdAt,
+                lastMessageSenderId = message.senderId,
+            ),
+        )
     }
 
     val isAuthenticated: Boolean get() = session.isAuthenticated
@@ -759,8 +1207,10 @@ class ApiBackendService(
         }
         // Dart initialize(): after session restore, fire the chat-plane loads.
         if (session.isAuthenticated) {
+            chatScope.launch { ensureFreshToken() }
             realtime.connect()
             startBackgroundSync()
+            chatScope.launch { ensureOutboxLoaded(); flushOutbox() }
             chatScope.launch { loadConversations() }
             chatScope.launch { loadUsers() }
             chatScope.launch { loadTasks() }
@@ -782,6 +1232,7 @@ class ApiBackendService(
             }
             val result = auth.login(value, password)
             session.adopt(result)
+            saveRefreshToken(result.refreshToken)
             afterAuthAdopted()
             result.user
         }
@@ -802,6 +1253,7 @@ class ApiBackendService(
         withContext(Dispatchers.IO) {
             val result = auth.register(email, username, password)
             session.adopt(result)
+            saveRefreshToken(result.refreshToken)
             afterAuthAdopted()
             result.user
         }
@@ -845,6 +1297,7 @@ class ApiBackendService(
         }
         config.setTenantId(tenantId.trim())
         session.adopt(result)
+        saveRefreshToken(result.refreshToken)
         afterAuthAdopted()
         Triple(result.user, orgId, resolvedOrgName)
     }
@@ -888,7 +1341,9 @@ class ApiBackendService(
      *  refresh the active conversation's messages. */
     fun onAppResumed() {
         if (session.token == null) return
+        chatScope.launch { ensureFreshToken() }
         realtime.connect()
+        chatScope.launch { flushOutbox() }
         chatScope.launch { loadConversations() }
         activeConversationId?.takeIf { it.isNotEmpty() }?.let { id ->
             chatScope.launch { loadMessages(id) }
@@ -901,6 +1356,10 @@ class ApiBackendService(
         }
         realtime.disconnect()
         session.signOut()
+        saveRefreshToken(null)
+        onlineIds.clear(); lastSeenById.clear(); typingUntil.clear()
+        // Queued messages stay saved for this account and are sent after its next login.
+        synchronized(outboxLock) { outbox.clear(); outboxLoadedFor = null; confirmedSends.clear(); rejectedSends.clear() }
         // Dart signOut: drop the active room and all in-memory chat state
         // (tasks are intentionally untouched, as in Dart), then notify.
         activeConversationId = null
@@ -910,5 +1369,67 @@ class ApiBackendService(
             _messages.clear()
         }
         notifyChatListeners()
+    }
+
+    // ---- Access-token refresh (/auth/refresh) ----
+    // Access tokens live JWT_EXPIRE_MINUTES (60 by default). Without a refresh every
+    // request starts failing with 401 an hour after login.
+
+    private val refreshMutex = kotlinx.coroutines.sync.Mutex()
+
+    private fun saveRefreshToken(token: String?) {
+        try {
+            if (token.isNullOrBlank()) prefs.edit().remove("api_hub_refresh_token").apply()
+            else prefs.edit().putString("api_hub_refresh_token", token).apply()
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun loadRefreshToken(): String? =
+        try { prefs.getString("api_hub_refresh_token", null) } catch (_: Exception) { null }
+
+    /** Renews the access token when it expires within [REFRESH_MARGIN_SECONDS]. Waits while a
+     *  call is active (a new token is a new account scope, which would end the call). Signs the
+     *  user out when the token is already expired and cannot be renewed. */
+    suspend fun ensureFreshToken() {
+        val current = session.token ?: return
+        val remaining = auth.secondsUntilExpiry(current) ?: return
+        if (remaining > REFRESH_MARGIN_SECONDS) return
+        if (remaining > 0 && isCallActive()) return
+        refreshMutex.lock()
+        try {
+            if (session.token != current) return // someone else refreshed meanwhile
+            val user = session.currentUser ?: return
+            val refreshToken = loadRefreshToken()
+            if (refreshToken == null) {
+                if (remaining <= 0) withContext(Dispatchers.Main) { signOut() }
+                return
+            }
+            when (val result = withContext(Dispatchers.IO) { auth.refresh(refreshToken) }) {
+                is ApiAuthClient.RefreshResult.Ok -> {
+                    session.adopt(ApiAuthResult(token = result.accessToken, user = user, refreshToken = refreshToken))
+                    realtime.connect()
+                }
+                ApiAuthClient.RefreshResult.Rejected -> withContext(Dispatchers.Main) { signOut() }
+                ApiAuthClient.RefreshResult.Unavailable -> Unit // retry on the next tick
+            }
+        } finally {
+            refreshMutex.unlock()
+        }
+    }
+
+    private fun parseIsoOrNull(value: String?): Instant? = try {
+        if (value.isNullOrBlank()) null
+        else java.time.OffsetDateTime.parse(value).toInstant()
+    } catch (_: Exception) {
+        try { Instant.parse(value) } catch (_: Exception) {
+            // backend_python may send naive UTC timestamps ("2026-10-29T10:00:00.123456").
+            try { java.time.LocalDateTime.parse(value).toInstant(java.time.ZoneOffset.UTC) } catch (_: Exception) { null }
+        }
+    }
+
+    private companion object {
+        const val REFRESH_MARGIN_SECONDS = 10 * 60L
+        const val TYPING_TTL_MS = 6_000L
     }
 }

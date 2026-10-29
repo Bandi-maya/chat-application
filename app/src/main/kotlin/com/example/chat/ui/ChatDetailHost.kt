@@ -1,5 +1,7 @@
 package com.example.chat.ui
 
+import com.example.chat.ReleaseFeatures
+
 import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -188,18 +190,21 @@ fun ChatDetailHost(
     var infoError by remember(conversation.id) { mutableStateOf<String?>(null) }
 
     // Presence text (Dart _buildChat).
+    // Presence and typing come from the custom backend socket (ApiBackendService); the legacy
+    // Supabase realtime plane (rt) is only consulted for the recording indicator.
     val activity = otherId?.let { rt.activityFor(conversation.id, it) }
-    val presenceOnline = isDirect && otherId != null && rt.isOnline(otherId)
+    val otherTyping = otherId != null && api.isTyping(conversation.id, otherId)
+    val presenceOnline = isDirect && otherId != null && api.isUserOnline(otherId)
     val presenceText: String? = if (isDirect) {
         when {
             activity?.isRecording == true -> "recording voice message…"
-            activity?.isTyping == true -> "typing…"
+            otherTyping -> "typing…"
             otherId == null -> null
             presenceOnline -> "online"
-            else -> HomeFormatters.formatLastSeen(rt.lastSeenFor(otherId)).ifEmpty { "last seen hidden" }
+            else -> HomeFormatters.formatLastSeen(api.lastSeenOf(otherId)).ifEmpty { null }
         }
     } else {
-        if (activity?.isTyping == true) "someone is typing…" else "${live.participantIds.size} participants"
+        if (api.anyoneTyping(conversation.id)) "someone is typing…" else "${live.participantIds.size} participants"
     }
 
     val wallpaperStore = remember { context.getSharedPreferences("chaty_chat_wallpapers", 0) }
@@ -232,7 +237,7 @@ fun ChatDetailHost(
     val voice = rememberChatVoice(
         conversation.id,
         afterSend = { rev++ },
-        clearTyping = { scope.launch { try { ServiceLocator.gbFeatures.setTyping(conversation.id, false) } catch (_: Exception) {} } },
+        clearTyping = { api.sendTyping(conversation.id, false) },
     )
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     androidx.compose.runtime.key(mediaStamp, conversation.id) {
@@ -285,7 +290,7 @@ fun ChatDetailHost(
         onDraftChanged = { text -> scope.launch { try { repo.setDraft(conversation.id, text) } catch (_: Exception) {} } },
         onTypingChanged = { typing ->
             val allowed = privacy.typingIndicators && !prefs.home.ghostMode && !gbB("yo_want_ghostmode", false)
-            if (allowed) scope.launch { try { ServiceLocator.gbFeatures.setTyping(conversation.id, typing) } catch (_: Exception) {} }
+            if (allowed) api.sendTyping(conversation.id, typing)
         },
         quickReplies = prefs.automation.quickReplies,
         wallpaperType = conv.wallpaperType,
@@ -300,13 +305,9 @@ fun ChatDetailHost(
                 wallpaperStore.edit().putString("chaty_chat_wallpapers_v1", obj.toString()).apply()
             } catch (_: Exception) {}
         },
-        onToggleMute = {
-            scope.launch {
-                try { repo.setConversationStateAsync(conversation.id, "muted", !live.isMuted) }
-                catch (e: Exception) { toast(e.message ?: "Unable to update chat.") }
-            }
-        },
-        onBlockContact = if (isDirect && otherId != null) ({ blockConfirm = true }) else null,
+        onToggleMute = { api.setConversationLocalState(conversation.id, "muted", !live.isMuted) },
+        // Blocking needs a block-list API; deferred to the next release (ReleaseFeatures).
+        onBlockContact = if (ReleaseFeatures.BLOCK_CONTACTS && isDirect && otherId != null) ({ blockConfirm = true }) else null,
         hideDateAndName = conv.hideDateAndName,
         showDeletedContent = privacy.antiDeleteMessages || gbB("yoAntiRevoke", false),
         retainViewOnce = privacy.antiViewOnce || gbB("anti_vw_once", false),
@@ -316,25 +317,19 @@ fun ChatDetailHost(
         colorOverrides = colorOverrides,
         onEditMessage = { id, newText ->
             if (api.isAuthenticated) api.editMessage(conversation.id, id, newText)
-            repo.editMessage(conversation.id, id, newText)
         },
         onDeleteMessage = { id, forEveryone ->
             scope.launch {
                 if (api.isAuthenticated) { try { api.deleteMessage(conversation.id, id) } catch (_: Exception) {} }
-                try { repo.deleteMessage(conversation.id, id, forEveryone) } catch (_: Exception) {}
             }
         },
         onToggleStar = { id ->
             val m = messages.firstOrNull { it.id == id }
-            if (m != null) scope.launch {
-                try { repo.setMessageStateAsync(conversation.id, id, "starred", !m.isStarred) } catch (e: Exception) { toast(e.message ?: "Unable to update message.") }
-            }
+            if (m != null) api.setMessageLocalState(conversation.id, id, "starred", !m.isStarred)
         },
         onTogglePin = { id ->
             val m = messages.firstOrNull { it.id == id }
-            if (m != null) scope.launch {
-                try { repo.setMessageStateAsync(conversation.id, id, "pinned", !m.isPinned) } catch (e: Exception) { toast(e.message ?: "Unable to update message.") }
-            }
+            if (m != null) api.setMessageLocalState(conversation.id, id, "pinned", !m.isPinned)
         },
         onToggleReaction = { id, emoji ->
             repo.optimisticToggleReaction(conversation.id, id, emoji)
@@ -345,13 +340,13 @@ fun ChatDetailHost(
             scope.launch {
                 try {
                     if (api.isAuthenticated) api.clearConversationMessages(conversation.id)
-                    repo.clearConversation(conversation.id)
                 } catch (e: Exception) { toast(e.message ?: "Unable to clear conversation.") }
             }
         },
         onRetryMessage = { id ->
             scope.launch {
-                val ok = try { ServiceLocator.outgoingQueue.retryMessage(id) } catch (_: Exception) { false }
+                // Re-queues the failed message on the REST outbox (was the old Supabase queue).
+                val ok = try { api.retryMessage(id) } catch (_: Exception) { false }
                 if (!ok) toast("Retry failed — check your connection.")
             }
         },
@@ -375,7 +370,7 @@ fun ChatDetailHost(
         onOpenConversation = { contactId ->
             val contact = api.users.firstOrNull { it.id == contactId }
             if (contact != null) scope.launch {
-                try { onOpenConversation(repo.getOrCreateDirectConversationAsync(contact)) } catch (_: Exception) {}
+                try { onOpenConversation(api.createOrGetDirectConversation(contact.id)) } catch (_: Exception) {}
             }
         },
         attachmentBinding = attachmentBinding,
