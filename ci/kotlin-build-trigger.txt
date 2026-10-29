@@ -1,1 +1,1 @@
-build 63: fix unit-test compile - escaped regex escapes in BackupPortableArchiveTest. Debug APK from build 62 compiled and assembled; test source-set fix only.
+build 64: fix 5 unit-test failures from build 63 (1349 ran / 5 failed). Passphrase crypto now uses kotlin.io.encoding.Base64 (android.util.Base64 is unavailable on the JVM test runner); archive-cap guard extracted and tested without a 512MB allocation (CI OOM); GbFeatureCatalog restored to the exact Dart table - PreferencesParityTest assertions retained unchanged.
