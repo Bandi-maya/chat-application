@@ -54,6 +54,7 @@ import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material.icons.rounded.Reply
 import androidx.compose.material.icons.rounded.VideoCameraFront
 import androidx.compose.material.icons.rounded.StarBorder
+import com.example.chat.ReleaseFeatures
 import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import com.example.chat.ui.effects.listEntrance
 import com.example.chat.ui.kit.ChatyDropdownMenu as DropdownMenu
@@ -832,12 +833,12 @@ fun ChatDetailScreen(
                             onLongPressWithRect = { rect -> openMessageMenu(message, rect) },
                             onBubbleTap = { rect -> openMessageMenu(message, rect) },
                             onSwipeReply = if (row.messages.size > 1) null else ({ replyTarget = message }),
-                            onDoubleTap = if (disableDoubleTapReaction || row.messages.size > 1) {
+                            onDoubleTap = if (disableDoubleTapReaction || !ReleaseFeatures.MESSAGE_REACTIONS || row.messages.size > 1) {
                                 null
                             } else {
                                 { onToggleReaction(message.id, doubleTapReactionEmoji) }
                             },
-                            onReactionTap = { emoji -> onToggleReaction(message.id, emoji) },
+                            onReactionTap = { emoji -> if (ReleaseFeatures.MESSAGE_REACTIONS) onToggleReaction(message.id, emoji) },
                             mediaContent = if (row.messages.size > 1) ({
                                 com.example.chat.ui.chats.detail.CompactMediaAlbum(row.messages, attachmentBinding, remoteImage, voiceUrlResolver,
                                     onOpen = { item, rect -> if (rect != null && onMediaTapWithBounds != null) onMediaTapWithBounds(item, rect) else onMediaTap(item) },
@@ -1102,11 +1103,16 @@ fun ChatDetailScreen(
             secondaryTextColor = Color(theme.secondaryTextColor),
             destructiveColor = Color(theme.dangerColor),
             anchorRect = contextMenuAnchor,
-            reactionRail = ReactionRail(
-                emojis = quickReactionEmojis,
-                onReact = { emoji -> onToggleReaction(menuMessage.id, emoji) },
-                onAdd = { emojiReactionTarget = menuMessage },
-            ),
+            // Reactions are deferred to the next release (see ReleaseFeatures).
+            reactionRail = if (ReleaseFeatures.MESSAGE_REACTIONS) {
+                ReactionRail(
+                    emojis = quickReactionEmojis,
+                    onReact = { emoji -> onToggleReaction(menuMessage.id, emoji) },
+                    onAdd = { emojiReactionTarget = menuMessage },
+                )
+            } else {
+                null
+            },
         )
     }
 
