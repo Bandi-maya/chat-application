@@ -1,1 +1,1 @@
-build 54 compile fix for 53 diag probe (boundsInScreen Rect); same tree-dump probe, no hypothesis change
+build 55 tree-grounded helper fixes: dock-disambiguated Settings entry, in-bounds flick scroll with no-progress detector, 4s settle; assertions intact
