@@ -7,3 +7,5 @@ build 66: synchronize camera zoom and changelog overlay, remove modal top accent
 build 67: include new changelog host and borderless modal in pinned-source overlay, sync camera zoom, selected color swatches, and restored app-lock scheduling; run APK build and tests.
 
 build 68: include current release notes (camera, color selection, modal, startup lock), selected swatches, and source overlays; compile APK and run unit/instrumentation compilation checks.
+
+build 69: include lock-method key in startup lock scheduling and verify the complete latest Kotlin branch build.
