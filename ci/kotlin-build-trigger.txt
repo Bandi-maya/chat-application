@@ -1,3 +1,4 @@
 build 80 trigger: fix demo-signout Compose crash (defer in-composition route write via SideEffect in AppRoot ChatDetail branch) + gate stale test expectations on ReleaseFeatures (Updates tab, reaction rail) + backup archive fixture sections + applicationId com.logybyte.chat with fail-closed stable signing
 build 81: patch pinned overlay CI scripts + shortcuts targetPackage for com.logybyte.chat runtime retest
 build 82: crash fix v2 (defer sign-out route reset across frame boundary) + restart-check full component + dialer Clear-number stale-assertion aligned with X-removal direction
+build 83: bubble-options flag-off dismiss fix + RouteLayersDiag crash instrumentation 2026-10-29T22:29+05:30
