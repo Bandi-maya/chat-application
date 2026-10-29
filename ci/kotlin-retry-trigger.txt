@@ -1,1 +1,2 @@
-retry 40942544305 3217dd76fac6dbc2d8871a27a095af8377c4dcbc25a031791250a6ca48c64c68 refire1
+retry 40942544305 3217dd76fac6dbc2d8871a27a095af8377c4dcbc25a031791250a6ca48c64c68
+# refire2 after d9016fa9 workflow fix (PIN_ARCH env) - line 2 ignored by read -r TAG RUN_ID ARCH
