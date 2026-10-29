@@ -8,7 +8,6 @@ import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/design_system/design_system.dart';
 import '../../ui/core/theme/chaty_theme_manager.dart';
 import '../../ui/core/theme/image_theme_generator.dart';
-import '../../ui/core/templates/applied_pair_preview.dart';
 import '../../ui/core/theme/theme_preview_card.dart';
 import '../../ui/core/ticks/delivery_icon_style.dart';
 
