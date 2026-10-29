@@ -57,8 +57,8 @@ data class NavigationShellPrefs(
     val hasCustomNavigationDestinations: Boolean = false,
     val hideTasks: Boolean = false,
     val hideUpdates: Boolean = false,
-    /** preferences.home.pagerTransition3d (default 'Cube 3D'). */
-    val pagerTransition3d: String = "Cube 3D",
+    /** preferences.home.pagerTransition3d (default 'Default' = identity, GB key_pager_animation 0). */
+    val pagerTransition3d: String = "Default",
     /** appearance.bottomBarStyle (default 'Floating Pill'). */
     val bottomBarStyle: String = "Floating Pill",
     /** appearance.navigation style name; the rail index derives through
