@@ -1,1 +1,1 @@
-build 75 trigger: three-way integration of Firebase-notifications commit (outbox send path, coordinator-owned alerts, ReleaseFeatures gates) + HomeAppBars import fix
+build 76 trigger: merge-defect fixes (ApiBackendService conflict re-resolution, MainActivity onNewIntent dedupe + PendingCallAction classifier, ServiceLocator startBadgeSync restore)
