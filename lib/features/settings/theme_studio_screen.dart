@@ -10,6 +10,7 @@ import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/theme/app_theme.dart';
 import 'appearance/component_styles_screen.dart';
 import '../../ui/core/theme/chaty_theme_manager.dart';
+import '../../domain/models/chat_message.dart';
 import '../../ui/core/templates/applied_pair_preview.dart';
 import '../../ui/core/ticks/delivery_icon_style.dart';
 import '../../ui/core/ticks/delivery_status_icon.dart';
