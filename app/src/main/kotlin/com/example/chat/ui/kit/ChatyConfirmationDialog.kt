@@ -1,7 +1,6 @@
 package com.example.chat.ui.kit
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -58,12 +57,10 @@ fun ChatyConfirmationDialog(
         Column(
             modifier.widthIn(max = 480.dp).fillMaxWidth().imePadding()
                 .shadow(20.dp, shape).clip(shape).background(containerColor)
-                .border(1.dp, colors.border, shape)
                 .heightIn(max = maxHeight)
                 .semantics { paneTitle = "Chaty dialog" },
         ) {
-            // App-accent edge and compact header, not the stock centered Material dialog layout.
-            Spacer(Modifier.fillMaxWidth().height(3.dp).background(colors.accent))
+            // Compact, borderless modal chrome; elevation and rounded clipping define the edge.
             Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(20.dp)) {
                 icon?.let {
                     CompositionLocalProvider(LocalContentColor provides colors.accent) { it() }
