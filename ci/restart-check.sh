@@ -4,7 +4,7 @@
 # (token "synthetic-test-token") into the app's own prefs via run-as, kill the app process
 # from the host, cold start MainActivity twice, and observe from outside the app process:
 # PID changes between launches, process alive, no FATAL EXCEPTION, authenticated shell on screen.
-PKG=com.example.chat
+PKG=com.logybyte.chat
 mkdir -p screenshots
 RES=0
 adb shell am force-stop $PKG
