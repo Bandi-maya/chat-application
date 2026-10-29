@@ -2,8 +2,12 @@ package com.example.chat
 
 import com.example.chat.domain.models.NavigationEffectPreferences
 import com.example.chat.ui.effects.ListEntranceAnimations
+import androidx.compose.ui.Modifier
+import com.example.chat.ui.navigation.pagerTransition
 import com.example.chat.ui.settings.home.HomeUiStyles
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -65,5 +69,15 @@ class GbReferenceAdditionsTest {
         )
         assertTrue(styles.containsAll(expectedAdditions))
         assertEquals(1 + 5 + 13, styles.size)
+    }
+
+    @Test fun `pager Default transition is the identity modifier`() {
+        val base = Modifier
+        assertSame(
+            "Default must be the identity (GB key_pager_animation 0 = no transformer)",
+            base, base.pagerTransition("Default", 0.5f),
+        )
+        assertSame("unknown names must fall back to identity", base, base.pagerTransition("no-such-transition", 0.5f))
+        assertNotSame("a named transition must wrap the modifier", base, base.pagerTransition("Cube 3D", 0.5f))
     }
 }
