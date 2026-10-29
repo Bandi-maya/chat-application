@@ -9,3 +9,5 @@ build 67: include new changelog host and borderless modal in pinned-source overl
 build 68: include current release notes (camera, color selection, modal, startup lock), selected swatches, and source overlays; compile APK and run unit/instrumentation compilation checks.
 
 build 69: include lock-method key in startup lock scheduling and verify the complete latest Kotlin branch build.
+
+build 70: gate app-lock overlay until first-run/update release notes are dismissed; preserve existing lock protection; build latest source overlays and run compile/unit tests.
