@@ -132,6 +132,13 @@ fun ThemeStudioScreen(
     var particlesEnabled by remember {
         mutableStateOf(preferencesController.effects.enableFallingParticles)
     }
+    var particleSpeed by remember { mutableStateOf(preferencesController.effects.fallingParticleSpeed.toFloat().coerceIn(0.25f, 3f)) }
+    var particleDensity by remember { mutableStateOf(preferencesController.effects.fallingParticleDensity.toFloat().coerceIn(1f, 60f)) }
+    var active3DTransition by remember {
+        mutableStateOf(
+            preferencesController.home.pagerTransition3d.takeIf { it in ThemeStudioLogic.TRANSITION_TYPES } ?: "Default",
+        )
+    }
     var gradientStart by remember { mutableLongStateOf(current.outgoingBubbleColor) }
     var gradientEnd by remember { mutableLongStateOf(current.accentColor) }
     var tickChanged by remember { mutableStateOf(false) }
@@ -160,9 +167,17 @@ fun ThemeStudioScreen(
             fx.copy(
                 enableFallingParticles = particlesEnabled,
                 fallingParticleObject = activeParticleEffect,
+                fallingParticleSpeed = particleSpeed.toDouble(),
+                fallingParticleDensity = particleDensity.toInt(),
             ),
             logTitle = "Theme Studio Particle Engine",
         )
+        if (preferencesController.home.pagerTransition3d != active3DTransition) {
+            preferencesController.updateHome(
+                preferencesController.home.copy(pagerTransition3d = active3DTransition),
+                logTitle = "3D Page Transition",
+            )
+        }
         scope.launch { snackbar.showSnackbar("Theme Studio configuration applied & saved!") }
     }
 
@@ -260,8 +275,9 @@ fun ThemeStudioScreen(
                     selectedValue = selectedTab,
                     items = listOf(
                         MorphingSegmentItem(0, "Bubbles", Icons.Outlined.ChatBubbleOutline),
-                        MorphingSegmentItem(1, "Particles", Icons.Rounded.AutoAwesome),
-                        MorphingSegmentItem(2, "Ticks", Icons.Rounded.DoneAll),
+                        MorphingSegmentItem(1, "3D Motion", Icons.Rounded.RoundedCorner),
+                        MorphingSegmentItem(2, "Particles", Icons.Rounded.AutoAwesome),
+                        MorphingSegmentItem(3, "Ticks", Icons.Rounded.DoneAll),
                     ),
                     onSelected = {
                         ChatyHapticsPort.selection(view)
@@ -284,13 +300,21 @@ fun ThemeStudioScreen(
                         gradientEnd = gradientEnd,
                         onGradientChange = { s, e -> gradientStart = s; gradientEnd = e },
                     )
-                    1 -> ParticlesTab(
+                    1 -> MotionTab(
+                        activeTransition = active3DTransition,
+                        onTransitionChange = { active3DTransition = it },
+                    )
+                    2 -> ParticlesTab(
                         activeEffect = activeParticleEffect,
                         onEffectChange = { activeParticleEffect = it },
                         enabled = particlesEnabled,
                         onEnabledChange = { particlesEnabled = it },
+                        speed = particleSpeed,
+                        onSpeedChange = { particleSpeed = it },
+                        density = particleDensity,
+                        onDensityChange = { particleDensity = it },
                     )
-                    2 -> TicksTab(
+                    3 -> TicksTab(
                         current = current,
                         onSelect = { style ->
                             tickChanged = true
@@ -446,6 +470,10 @@ private fun ParticlesTab(
     onEffectChange: (String) -> Unit,
     enabled: Boolean,
     onEnabledChange: (Boolean) -> Unit,
+    speed: Float,
+    onSpeedChange: (Float) -> Unit,
+    density: Float,
+    onDensityChange: (Float) -> Unit,
 ) {
     val theme = LocalThemeConfig.current
     val appColors = LocalAppColors.current
@@ -494,11 +522,83 @@ private fun ParticlesTab(
             if (rowItems.size == 1) Spacer(Modifier.weight(1f))
         }
     }
+    Spacer(Modifier.height(12.dp))
+    BentoCard(
+        title = "Particle Motion & Density",
+        subtitle = "These values control the actual falling overlay, not a preview-only animation.",
+        headerLeading = { Icon(Icons.Rounded.AutoAwesome, contentDescription = null) },
+    ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Fall speed", color = Color(theme.primaryTextColor), fontSize = 13.sp)
+            Text("${"%.2f".format(speed)}x", color = Color(theme.primaryTextColor), fontWeight = FontWeight.Bold)
+        }
+        Slider(
+            value = speed.coerceIn(0.25f, 3f),
+            onValueChange = onSpeedChange,
+            valueRange = 0.25f..3f,
+            steps = 10,
+            colors = SliderDefaults.colors(thumbColor = Color(theme.accentColor), activeTrackColor = Color(theme.accentColor)),
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Particle density", color = Color(theme.primaryTextColor), fontSize = 13.sp)
+            Text("${density.toInt()} particles", color = Color(theme.primaryTextColor), fontWeight = FontWeight.Bold)
+        }
+        Slider(
+            value = density.coerceIn(1f, 60f),
+            onValueChange = onDensityChange,
+            valueRange = 1f..60f,
+            steps = 58,
+            colors = SliderDefaults.colors(thumbColor = Color(theme.accentColor), activeTrackColor = Color(theme.accentColor)),
+        )
+    }
     Text(
-        "Only effects supported by the app runtime are listed. Changes are saved when you tap Apply & Save Theme.",
+        "Changes are saved and applied to the app's falling-particle overlay when you tap Apply & Save Theme.",
         fontSize = 12.sp,
         color = appColors.secondaryText,
     )
+}
+
+@Composable
+private fun MotionTab(
+    activeTransition: String,
+    onTransitionChange: (String) -> Unit,
+) {
+    val theme = LocalThemeConfig.current
+    val colors = LocalAppColors.current
+    Text("3D Spatial Page Transitions", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(theme.primaryTextColor))
+    Spacer(Modifier.height(8.dp))
+    Text(
+        "Select a transition for the Home pager. It is saved with Home preferences and used by the native navigation shell.",
+        fontSize = 12.sp,
+        color = colors.secondaryText,
+    )
+    Spacer(Modifier.height(12.dp))
+    ThemeStudioLogic.TRANSITION_TYPES.forEach { transition ->
+        val selected = activeTransition == transition
+        Surface(
+            color = if (selected) Color(theme.accentColor).copy(alpha = 0.15f) else Color(theme.cardColor),
+            shape = RoundedCornerShape(12.dp),
+            border = androidx.compose.foundation.BorderStroke(
+                if (selected) 2.dp else 1.dp,
+                if (selected) Color(theme.accentColor) else colors.border,
+            ),
+            onClick = { onTransitionChange(transition) },
+        ) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    if (selected) Icons.Rounded.CheckCircle else Icons.Rounded.RoundedCorner,
+                    contentDescription = null,
+                    tint = if (selected) Color(theme.accentColor) else Color(theme.secondaryTextColor),
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(transition, modifier = Modifier.weight(1f), color = Color(theme.primaryTextColor), fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+    }
 }
 
 @Composable
