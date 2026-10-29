@@ -1,18 +1,1 @@
-build 64: fix 5 unit-test failures from build 63 (1349 ran / 5 failed). Passphrase crypto now uses kotlin.io.encoding.Base64 (android.util.Base64 is unavailable on the JVM test runner); archive-cap guard extracted and tested without a 512MB allocation (CI OOM); GbFeatureCatalog restored to the exact Dart table - PreferencesParityTest assertions retained unchanged.
-
-build 65: add direct camera zoom presets/circular dial to camera screen and show version-aware release notes on home entry; validate Kotlin compile, unit tests, and debug APK artifact.
-
-build 66: synchronize camera zoom and changelog overlay, remove modal top accent/border, and fix cold-start app-lock scheduling after restored auth/preferences. Verify existing feature catalog before adding duplicate options.
-
-build 67: include new changelog host and borderless modal in pinned-source overlay, sync camera zoom, selected color swatches, and restored app-lock scheduling; run APK build and tests.
-
-build 68: include current release notes (camera, color selection, modal, startup lock), selected swatches, and source overlays; compile APK and run unit/instrumentation compilation checks.
-
-build 69: include lock-method key in startup lock scheduling and verify the complete latest Kotlin branch build.
-
-build 70: gate app-lock overlay until first-run/update release notes are dismissed; preserve existing lock protection; build latest source overlays and run compile/unit tests.
-
-build 71: audit existing 133 GB-style setting keys before duplicates, retain CameraX night/portrait extension modes with device capability checks, fix camera mode cleanup, and enforce changelog-before-lock; build latest APK/tests.
-
-build 72: use the existing shared Chaty color-picker modal for every GB feature color setting, including preview, selected swatches, validated ARGB hex, and explicit Apply; compile and test latest source overlay.
-build 73 trigger: consolidated verification - 7 proof classes + dialer leg fix + 21st unit test
+build 74 trigger: fixed proof-test compile + camera dial leg override
