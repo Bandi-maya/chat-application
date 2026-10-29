@@ -114,3 +114,11 @@ The feature is **in implementation**, not production-ready. Preserve MLS end-to-
 - Removed the state-only “3D Motion” tab and temporary particle speed/density sliders because they were not persisted or consumed by the app's runtime effect service.
 - Theme Studio now restores the saved enabled flag and falling-object selection, limits choices to the four values actually consumed by FallingParticlesOverlay (Stars, Hearts, Snowflakes, Leaves), and saves the switch and chosen object through the existing preferences controller.
 - Added source-contract coverage for no-live-preview behavior, supported particle values and persistence wiring. Latest-head formatter/analyzer/tests are pending CI; this update is not a passing test report.
+
+
+### Analyzer hygiene from first CI pass — 2026-10-29
+
+- Removed unused fields/imports identified by the Flutter analyzer in the registration and welcome screens and the GB call/home render tests.
+- Simplified checkOrganization response handling after control-flow analysis showed the response is non-null on every continuing path; exceptions still exit through the existing error path.
+- Added a CI setup step to create the declared .env asset before dependency resolution/analysis, avoiding a false missing-asset analyzer warning in CI.
+- These are source-level fixes prompted by the first CI log. The current branch still requires fresh-head analyzer/test/build results before sign-off.
