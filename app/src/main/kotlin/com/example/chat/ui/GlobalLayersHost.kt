@@ -29,10 +29,19 @@ fun GlobalTypographyScale(content: @Composable () -> Unit) {
     val prefs = ServiceLocator.preferencesController
     var rev by remember { mutableIntStateOf(0) }
     DisposableEffect(appearance, prefs) {
-        val l: () -> Unit = { rev++ }
-        appearance.addListener(l)
-        prefs.addListener(l)
-        onDispose { appearance.removeListener(l); prefs.removeListener(l) }
+        // Temporary RouteLayersDiag instrumentation (debug builds only): names the
+        // exact listener firing before a recompose, to locate the demo crash write.
+        val appL: () -> Unit = {
+            if (com.example.chat.BuildConfig.DEBUG) android.util.Log.d("RouteLayersDiag", "rev-appearance t=" + android.os.SystemClock.uptimeMillis())
+            rev++
+        }
+        val prefsL: () -> Unit = {
+            if (com.example.chat.BuildConfig.DEBUG) android.util.Log.d("RouteLayersDiag", "rev-prefs t=" + android.os.SystemClock.uptimeMillis())
+            rev++
+        }
+        appearance.addListener(appL)
+        prefs.addListener(prefsL)
+        onDispose { appearance.removeListener(appL); prefs.removeListener(prefsL) }
     }
     @Suppress("UNUSED_EXPRESSION") rev
     val typography = ChatyTypography.apply(MaterialTheme.typography, appearance.typographyStyle, prefs.universal.fontStyle)
@@ -51,10 +60,17 @@ fun GlobalRouteLayers(content: @Composable () -> Unit) {
     val scope = rememberCoroutineScope()
     var rev by remember { mutableIntStateOf(0) }
     DisposableEffect(service, presentation) {
-        val l: () -> Unit = { rev++ }
-        service.addStateListener(l)
-        presentation.addListener(l)
-        onDispose { service.removeStateListener(l); presentation.removeListener(l) }
+        val callL: () -> Unit = {
+            if (com.example.chat.BuildConfig.DEBUG) android.util.Log.d("RouteLayersDiag", "rev-callSignaling t=" + android.os.SystemClock.uptimeMillis())
+            rev++
+        }
+        val presL: () -> Unit = {
+            if (com.example.chat.BuildConfig.DEBUG) android.util.Log.d("RouteLayersDiag", "rev-callPresentation t=" + android.os.SystemClock.uptimeMillis())
+            rev++
+        }
+        service.addStateListener(callL)
+        presentation.addListener(presL)
+        onDispose { service.removeStateListener(callL); presentation.removeListener(presL) }
     }
     @Suppress("UNUSED_EXPRESSION") rev
     // main.dart _buildMinimizedCallCapsule.
