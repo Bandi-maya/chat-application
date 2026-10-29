@@ -38,8 +38,10 @@ class AppRootConfiguredProofTest {
     private fun capture(device: UiDevice, name: String) {
         device.waitForIdle(3000)
         Thread.sleep(1500)
+        android.util.Log.w("PixelProof", "SHOT-REQ " + name + " ms=" + System.currentTimeMillis())
         val bitmap: Bitmap = instrumentation.uiAutomation.takeScreenshot()
             ?: throw AssertionError("takeScreenshot returned null")
+        android.util.Log.w("PixelProof", "SHOT-DONE " + name + " ms=" + System.currentTimeMillis())
         FileOutputStream(File(outDir, "$name.png")).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bitmap.recycle()
     }
@@ -397,13 +399,16 @@ class AppRootConfiguredProofTest {
                 )
             }
             val passiveRefreshOk = device.wait(Until.hasObject(By.text("Synthetic Task Beta")), 10000)
-            // DIAGNOSTIC ONLY (does not change the original verdict below): distinguish a
-            // stale open-detail snapshot from a persisted-update failure. The open detail
-            // holds the task instance captured at open (ChatDetailHost taskDetail var +
-            // remember(task) in TaskDetailScreen), so a controller-side update does not
-            // re-render it. Close and reopen: the reopened detail re-reads the controller,
-            // so it must show the edited title if the update persisted.
+            // DIAGNOSTIC ONLY (does not change the original verdict below): at passive-wait
+            // expiry, record controller state and the open detail's a11y exposure BEFORE any
+            // navigation; screenshot request/completion times come from SHOT-REQ/SHOT-DONE.
             runCatching {
+                val ctlTitle = ServiceLocator.tasksController.tasks.firstOrNull { it.id == "synthetic-task-1" }?.title
+                val a11yBeta = device.hasObject(By.text("Synthetic Task Beta"))
+                val a11yAlpha = device.hasObject(By.text("Synthetic Task Alpha"))
+                val a11yProps = device.hasObject(By.text("Task Properties"))
+                android.util.Log.w("PixelProof", "DETAIL-DIAG at-expiry controllerTitle=" + ctlTitle + " a11yBeta=" + a11yBeta + " a11yAlpha=" + a11yAlpha + " a11yTaskProps=" + a11yProps)
+                logScreenTexts(device, "at-expiry")
                 capture(device, "10f2a-open-detail-after-controller-update")
                 device.pressBack()
                 device.wait(Until.gone(By.text("Task Properties")), 10000)
