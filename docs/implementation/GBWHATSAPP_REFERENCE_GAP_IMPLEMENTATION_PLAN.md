@@ -123,8 +123,10 @@ The repository already contains a global customization/template system and an ex
 |---|---|
 | Review latest APK report and current Chaty plan/source | Reviewed statically |
 | Remove misleading sample safety-number/verified security UI | Implemented in this branch |
-| Widget regression test for the disclosure | Added in this branch; pending CI execution |
-| Full Flutter formatter/analyzer/test/build run from this environment | Not run by the GitHub connector; must be verified by CI or a local Flutter environment |
+| Remove Theme Editor/Theme Studio live chat preview and non-persistent preview controls | Implemented in this branch; new source-contract tests added; latest-head CI pending |
+| Align Theme Studio falling-particle settings with the actual overlay and restore saved values | Implemented in this branch; latest-head CI pending |
+| Widget/source-contract regression tests | Added in this branch; latest-head CI pending |
+| Full Flutter formatter/analyzer/test/build run | CI runs are being used; the initial runs found and prompted fixes for source/workflow issues. Latest-head full validation is still pending |
 | APK + Chaty screen-by-screen emulator comparison | Not run; device/runtime evidence still required |
 
 
