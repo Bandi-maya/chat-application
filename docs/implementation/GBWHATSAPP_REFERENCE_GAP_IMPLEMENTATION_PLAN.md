@@ -133,6 +133,6 @@ The repository already contains a global customization/template system and an ex
 
 The first PR validation exposed two unrelated-to-feature but release-blocking repository defects, so this branch also includes narrowly scoped fixes:
 - Removed the extra trailing closing brace at the end of `lib/features/auth/login_screen.dart` after the Android analyzer reported `expected_executable` at line 527.
-- Converted `.github/workflows/diag.yml` and `.github/workflows/settings-render.yml` from single-line JSON to equivalent structured YAML and quoted shell summary markers/paths so workflow lint can parse the actual run scripts.
+- Converted `.github/workflows/diag.yml`, `.github/workflows/settings-render.yml` and `.github/workflows/build-themes-apk.yml` from single-line JSON to equivalent structured YAML and quoted shell summary markers/paths so workflow lint can parse the actual run scripts.
 
 These are marked **fixed in source, CI re-run pending**, not “verified”; the latest head's analyzer, full test and runtime-audit results are the acceptance evidence.
