@@ -18,7 +18,9 @@ void main() {
 
       expect(find.text('MLS-based encryption'), findsOneWidget);
       expect(
-        find.textContaining('contact fingerprint verification is not available here'),
+        find.textContaining(
+          'contact fingerprint verification is not available here',
+        ),
         findsOneWidget,
       );
       expect(find.textContaining('05423 89104'), findsNothing);
@@ -32,7 +34,10 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.textContaining('does not currently derive or verify a contact-specific cryptographic fingerprint'),
+        find.textContaining(
+          'does not currently derive or verify a contact-specific '
+          'cryptographic fingerprint',
+        ),
         findsOneWidget,
       );
       expect(
