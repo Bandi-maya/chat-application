@@ -1,0 +1,272 @@
+package com.example.chat.ui
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import com.example.chat.data.demo.DemoMode
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
+import com.example.chat.ServiceLocator
+import com.example.chat.data.services.ProtectedResourceGate
+import com.example.chat.domain.models.Conversation
+import com.example.chat.domain.models.ConversationType
+import com.example.chat.ui.chats.ChatsHomeScreen
+import com.example.chat.ui.chats.home.ChatsHomeNav
+import com.example.chat.ui.chats.home.HomeIdentity
+import kotlinx.coroutines.launch
+
+/**
+ * Shared host for ChatsHomeScreen (chats and groups destinations). Wires the
+ * screen's preference, identity, row-action, call, lock and vault seams to the
+ * real services. Conversation row state changes go through
+ * ConversationsRepository, as Dart ChatyDataStore does (toggle and mark methods).
+ */
+@Composable
+fun ChatsHomeHost(
+    forcedType: ConversationType?,
+    pageTitle: String?,
+    gate: GatePrompts,
+    onOpenConversation: (Conversation) -> Unit,
+    onOpenSecurity: () -> Unit,
+    onOpenLockedChats: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenNewChat: (groupMode: Boolean, broadcastMode: Boolean) -> Unit = { _, _ -> },
+    onOpenGlobalSearch: () -> Unit = {},
+    onOpenMessageManagement: () -> Unit = {},
+    onOpenStarredMessages: () -> Unit = {},
+    onSelectPlan: () -> Unit = {},
+    onOpenProfile: () -> Unit = {},
+    onOpenQr: () -> Unit = {},
+    onOpenLinkedDevices: () -> Unit = {},
+    /** Offline demo (NOT in Flutter): exit action for the demo banner. */
+    onExitDemo: () -> Unit = {},
+) {
+    val api = ServiceLocator.apiBackend
+    val prefs = ServiceLocator.preferencesController
+    val repo = ServiceLocator.conversationsRepository
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var rev by remember { mutableIntStateOf(0) }
+    var connectionSheetOpen by remember { androidx.compose.runtime.mutableStateOf(false) }
+    var connectionTesting by remember { androidx.compose.runtime.mutableStateOf(false) }
+    DisposableEffect(prefs) {
+        val l: () -> Unit = { rev++ }
+        prefs.addListener(l)
+        onDispose { prefs.removeListener(l) }
+    }
+    @Suppress("UNUSED_EXPRESSION") rev
+    val me = api.currentUser
+    val conversations = api.conversations
+    fun find(id: String) = conversations.firstOrNull { it.id == id }
+    fun toast(m: String) = Toast.makeText(context, m, Toast.LENGTH_SHORT).show()
+    fun setState(id: String, field: String, value: Boolean) {
+        // Offline demo: conversation state is server-side; refuse visibly.
+        if (api.isDemoSession) { toast(DemoMode.UNAVAILABLE_MESSAGE); return }
+        // Stored on this device: the custom backend has no per-user chat state API yet.
+        api.setConversationLocalState(id, field, value)
+    }
+    val security = prefs.security
+    val headerTabs = com.example.chat.ui.navigation.LocalHomeHeaderTabs.current
+    val headerTabsTheme = com.example.chat.ui.theme.LocalThemeConfig.current
+    val headerTabsColors = androidx.compose.runtime.remember(headerTabsTheme) {
+        com.example.chat.ui.core.theme.ChatyColors(headerTabsTheme)
+    }
+    val headerBottom: (@Composable () -> Unit)? = if (headerTabs != null && headerTabs.active) {
+        {
+            com.example.chat.ui.navigation.HomeHeaderTabsBar(
+                headerTabsColors, headerTabs.ids, headerTabs.selectedIndex, headerTabs.heightDp,
+                onSelect = { index -> headerTabs.onSelect(index) },
+            )
+        }
+    } else null
+    // Offline demo (NOT in Flutter): visible marker + exit under the home header.
+    val demoBanner: (@Composable () -> Unit)? = if (api.isDemoSession) {
+        { DemoModeBanner(theme = headerTabsTheme, onExit = onExitDemo) }
+    } else null
+    val effectiveHeaderBottom: (@Composable () -> Unit)? = when {
+        demoBanner != null && headerBottom != null -> { { demoBanner(); headerBottom() } }
+        demoBanner != null -> demoBanner
+        else -> headerBottom
+    }
+    ChatsHomeScreen(
+        headerBottom = effectiveHeaderBottom,
+        conversations = conversations,
+        requiresSubscription = api.requiresSubscription,
+        subscriptionMessage = api.subscriptionErrorMessage,
+        onOpenConversation = onOpenConversation,
+        currentUserId = me?.id ?: "",
+        // Presence/typing published by the custom backend socket.
+        presenceFor = { conversationId, otherUserId ->
+            com.example.chat.ui.chats.home.HomePresence(
+                isOnline = api.isUserOnline(otherUserId),
+                isTyping = api.isTyping(conversationId, otherUserId),
+                lastSeenAt = api.lastSeenOf(otherUserId),
+            )
+        },
+        identity = HomeIdentity(
+            displayName = me?.displayName ?: "",
+            username = me?.username ?: "",
+            about = me?.about ?: "",
+            avatarInitials = me?.avatarInitials ?: "C",
+            avatarColorHex = me?.avatarColorHex,
+            avatarUrl = me?.avatarUrl,
+        ),
+        contacts = api.users,
+        homePreferences = prefs.home,
+        securityPreferences = security,
+        forcedType = forcedType,
+        pageTitle = pageTitle,
+        messagesFor = { id -> api.getMessages(id) },
+        gbBool = { key, fallback -> prefs.gbBool(key, fallback) },
+        gbColor = { key -> prefs.gbColor(key) },
+        isConversationLocked = { id -> prefs.isConversationLocked(id) },
+        isConversationHidden = { id -> prefs.isConversationHidden(id) },
+        onToggleLockConversation = { id, lock -> prefs.toggleLockConversation(id, lock) },
+        onToggleGhostMode = { on -> prefs.updateHome(prefs.home.copy(ghostMode = on)) },
+        verifySecretPhrase = { phrase -> ServiceLocator.localLockService.verifySecretPhrase(phrase) },
+        nav = ChatsHomeNav(
+            onOpenSettings = onOpenSettings,
+            onOpenSecuritySettings = onOpenSecurity,
+            onOpenLockedVault = onOpenLockedChats,
+            onOpenNewChat = onOpenNewChat,
+            onOpenGlobalSearch = onOpenGlobalSearch,
+            onOpenMessageManagement = onOpenMessageManagement,
+            onOpenStarredMessages = onOpenStarredMessages,
+            onSelectPlan = onSelectPlan,
+            onOpenProfile = onOpenProfile,
+            onOpenQr = onOpenQr,
+            onShareApp = { com.example.chat.ui.settings.ChatyShareService.shareApp(context) { toast(it) } },
+            onOpenLinkedDevices = onOpenLinkedDevices,
+            // Dart _promptMessageNumber: match an existing contact by phone/username, else
+            // synthesize user_<digits>, then open the direct conversation.
+            onMessageNumber = { raw ->
+                val number = raw.trim()
+                if (number.isNotEmpty()) {
+                    scope.launch {
+                        try {
+                            val existing = api.users.firstOrNull { it.phone.trim() == number || it.username.trim() == number }
+                            val digits = number.filter { it.isDigit() }
+                            val target = existing ?: com.example.chat.domain.models.UserProfile(
+                                id = if (digits.isNotEmpty()) "user_$digits" else number,
+                                displayName = number,
+                                username = number,
+                                avatarInitials = number.substring(0, 1).uppercase(),
+                                avatarColorHex = "#25D366",
+                                about = "Chaty User",
+                                lastSeenAt = java.time.Instant.now(),
+                                phone = number,
+                            )
+                            val conv = repo.getOrCreateDirectConversationAsync(target)
+                            onOpenConversation(conv)
+                        } catch (e: Exception) {
+                            toast("Could not start chat: $e")
+                        }
+                    }
+                }
+            },
+            // Dart: widget.themeController.toggleBrightness.
+            onToggleBrightness = { ServiceLocator.themeController.toggleBrightness() },
+            // Dart: MethodChannel('chaty/launcher_icon').restartApp -> relaunch the app task.
+            onRestartApp = {
+                try {
+                    val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                        ?: throw IllegalStateException("no launch intent")
+                    launch.addFlags(
+                        android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK,
+                    )
+                    context.startActivity(launch)
+                    Runtime.getRuntime().exit(0)
+                } catch (e: Exception) {
+                    toast("Chaty could not restart: ${e}")
+                }
+            },
+        ),
+        onTogglePin = { id -> find(id)?.let { setState(id, "pinned", !it.isPinned) } },
+        onToggleMute = { id -> find(id)?.let { setState(id, "muted", !it.isMuted) } },
+        onToggleArchive = { id -> find(id)?.let { setState(id, "archived", !it.isArchived) } },
+        onMarkRead = { id -> scope.launch { try { repo.markAsRead(id) } catch (_: Exception) {} } },
+        onMarkUnread = { id -> scope.launch { try { repo.markAsUnread(id) } catch (_: Exception) {} } },
+        onMarkAllRead = { scope.launch { try { repo.markAllAsRead() } catch (_: Exception) {} } },
+        onDeleteConversations = { ids ->
+            // Dart ChatyDataStore.deleteConversation: custom-backend delete, then the Supabase one.
+            scope.launch {
+                for (id in ids) {
+                    try { if (api.isAuthenticated) api.deleteConversation(id) } catch (_: Exception) {}
+                    try { repo.deleteConversation(id) } catch (_: Exception) {}
+                }
+            }
+        },
+        onStartCall = { conversation, isVideo ->
+            val myId = me?.id
+            val otherId = conversation.participantIds.firstOrNull { it != myId }
+            val other = api.users.firstOrNull { it.id == otherId }
+            if (otherId != null && conversation.type == ConversationType.direct) {
+                ServiceLocator.callPresentationController.showFullScreen()
+                scope.launch {
+                    try {
+                        ServiceLocator.callSignaling.initiateCall(
+                            otherId, other?.displayName ?: conversation.title,
+                            other?.avatarInitials, other?.avatarColorHex, isVideo,
+                        )
+                    } catch (e: Exception) { toast(e.message ?: "Unable to start the call.") }
+                }
+            }
+        },
+        onSnack = { toast(it) },
+        onAuthorizeConversation = { conversation, proceed ->
+            scope.launch {
+                val ok = ProtectedResourceGate.authorizeConversation(
+                    conversationId = conversation.id,
+                    isProtected = prefs.isConversationLocked(conversation.id),
+                    autoLockTimeout = security.autoLockTimeout,
+                    lockMethod = security.lockMethod,
+                    lockService = ServiceLocator.localLockService,
+                    setupPrompt = gate.setupPrompt,
+                    lockPrompt = gate.lockPrompt,
+                )
+                if (ok) proceed()
+            }
+        },
+        preferencesController = prefs,
+        connectionHealthState = ServiceLocator.connectionHealth.state,
+        // Dart GlobalConnectionBanner/indicator tap: ConnectionDetailSheet.show(context).
+        onOpenConnectionDetail = { connectionSheetOpen = true },
+        lockedChatsConfigured = security.lockedConversationIds.isNotEmpty() || security.isAppLockEnabled,
+        onRequestVaultAuth = { authorized ->
+            scope.launch {
+                val ok = ProtectedResourceGate.authorizeGeneralAction(
+                    lockMethod = security.lockMethod,
+                    lockService = ServiceLocator.localLockService,
+                    lockPrompt = gate.lockPrompt,
+                    title = "Locked Chats",
+                    reason = "Authenticate to open Locked Chats",
+                )
+                if (ok) authorized()
+            }
+        },
+    )
+    // Dart ConnectionDetailSheet.show: diagnostics dialog with a Run test action.
+    if (connectionSheetOpen) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { connectionSheetOpen = false }) {
+            com.example.chat.ui.chats.detail.ConnectionDetailSheetContent(
+                state = ServiceLocator.connectionHealth.state,
+                theme = com.example.chat.ui.theme.LocalThemeConfig.current,
+                testing = connectionTesting,
+                onRunTest = {
+                    if (!connectionTesting) {
+                        connectionTesting = true
+                        scope.launch {
+                            try { ServiceLocator.connectionHealth.probeConnection() } catch (_: Exception) {} finally { connectionTesting = false }
+                        }
+                    }
+                },
+                onDismiss = { connectionSheetOpen = false },
+            )
+        }
+    }
+
+}
