@@ -40,7 +40,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.chat"
+        applicationId = "com.logybyte.chat"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -54,9 +54,29 @@ android {
         // -PCHATY_PLAY_STORE_URL=... or the CHATY_PLAY_STORE_URL environment variable at build time.
         val playStoreUrl = providers.gradleProperty("CHATY_PLAY_STORE_URL")
             .orElse(providers.environmentVariable("CHATY_PLAY_STORE_URL"))
-            .orElse("https://play.google.com/store/apps/details?id=com.example.chat")
+            .orElse("https://play.google.com/store/apps/details?id=com.logybyte.chat")
             .get()
         buildConfigField("String", "CHATY_PLAY_STORE_URL", "\"" + playStoreUrl.replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
+    }
+
+    signingConfigs {
+        create("chaty") {
+            // Stable release identity for com.logybyte.chat (user-directed 2026-10-29).
+            // CI materializes the keystore from the CHATY_KEYSTORE_B64 repo secret into
+            // ci/keystore/chaty-release.jks (gitignored); the offline backup lives in the
+            // user's vault. Fail closed: an absent keystore or password fails
+            // validateSigning* at assemble time - never an ephemeral fallback.
+            val ksPath = providers.gradleProperty("CHATY_KEYSTORE_PATH")
+                .orElse(providers.environmentVariable("CHATY_KEYSTORE_PATH"))
+                .orElse("ci/keystore/chaty-release.jks")
+                .get()
+            storeFile = rootProject.file(ksPath)
+            keyAlias = "chaty"
+            storePassword = providers.gradleProperty("CHATY_KEYSTORE_PASSWORD")
+                .orElse(providers.environmentVariable("CHATY_KEYSTORE_PASSWORD"))
+                .orNull.orEmpty()
+            keyPassword = storePassword
+        }
     }
 
     buildTypes {
@@ -64,9 +84,11 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs["chaty"]
         }
         debug {
             isMinifyEnabled = false
+            signingConfig = signingConfigs["chaty"]
         }
     }
 
