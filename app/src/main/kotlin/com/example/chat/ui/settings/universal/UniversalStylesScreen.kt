@@ -22,6 +22,7 @@ import androidx.compose.material.icons.rounded.Chat
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.EmojiEmotions
 import androidx.compose.material.icons.rounded.FontDownload
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Forum
@@ -60,6 +61,7 @@ import com.example.chat.core.preferences.ChatyPreferencesController
 import com.example.chat.core.theme.ThemeController
 import com.example.chat.ui.core.controllers.AppIconControllerContract
 import com.example.chat.ui.core.controllers.BrandIconSource
+import com.example.chat.ui.chats.detail.ChatyEmojiPack
 import com.example.chat.ui.core.controllers.LauncherIconVariant
 import com.example.chat.ui.core.controllers.title
 import com.example.chat.ui.core.notifications.ChatyNotificationIconPresets
@@ -117,7 +119,7 @@ private fun FontStyleEntry.composeGenericFamily(): FontFamily? = when (fontFamil
  * wiring for the SAF document picker (Dart file_picker); null surfaces the
  * Dart error snackbar text.
  *
- * Emoji styles were removed; the Noto animated pack is the only emoji artwork.
+ * Emoji variant row restores the 5-pack chooser (UniversalEmojiPackScreen); launcher tiles apply on tap.
  * launcher tiles render the real GROUP H LauncherIconPreview
  * (ui/settings/appicon/AppBrandIcon.kt - compile dependency, lands with the
  * app-icon drop). Compose compile is CI-gated; no runtime pixels verified.
@@ -163,6 +165,7 @@ fun UniversalStylesScreen(
         }
     }
 
+  androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     SettingsPage(title = "Styles (Look and feel)", onBack = onBack) {
         // SECTION 1: LAUNCHER ICONS
         SettingsSection(title = "LAUNCHER ICONS") {
@@ -181,9 +184,23 @@ fun UniversalStylesScreen(
                             }
                             Column(
                                 Modifier.weight(1f).clickable {
-                                    if (appIconController == null) {
-                                        onMessage("Launcher icon switching is unavailable on this platform.")
-                                    } else if (!appIconController.isBusy) sheet = 4
+                                    val controller = appIconController
+                                    when {
+                                        controller == null ->
+                                            onMessage("Launcher icon switching is unavailable on this platform.")
+                                        controller.isBusy -> Unit
+                                        isSelected -> Unit
+                                        else -> scope.launch {
+                                            val applied = controller.applyLauncherIcon(item.variant)
+                                            if (!applied) {
+                                                onMessage(controller.lastError ?: "The launcher did not confirm the selected icon.")
+                                                return@launch
+                                            }
+                                            controller.refreshNativeLauncherState()
+                                            preferences.updateUniversal(preferences.universal.copy(launcherIcon = item.variant.title))
+                                            onMessage("Launcher icon updated: ${item.variant.title}. Some launchers may cache the previous icon briefly.")
+                                        }
+                                    }
                                 }.padding(vertical = 5.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
@@ -236,8 +253,15 @@ fun UniversalStylesScreen(
             }
         }
 
-        // SECTION 3: CHANGE NOTIFICATION ICON & FONTS
+        // SECTION 3: EMOJI VARIANT, NOTIFICATION ICON & FONTS
         SettingsSection(title = null) {
+            StylesNavRow(
+                icon = Icons.Rounded.EmojiEmotions,
+                title = "Emoji variant",
+                subtitle = "Selected: ${ChatyEmojiPack.normalize(prefs.emojiStyle)}
+Choose the emoji artwork used in chats",
+                onClick = { sheet = 3 },
+            )
             StylesNavRow(
                 icon = Icons.Rounded.NotificationsActive,
                 title = "Change Notification Icon",
@@ -337,6 +361,15 @@ fun UniversalStylesScreen(
         )
     }
 
+    // Emoji variant chooser (restored): all 5 packs, applies live.
+    if (sheet == 3) {
+        UniversalEmojiPackScreen(
+            preferences = preferences,
+            onBack = { sheet = 0 },
+            onMessage = onMessage,
+        )
+    }
+  }
 }
 
 @Composable
