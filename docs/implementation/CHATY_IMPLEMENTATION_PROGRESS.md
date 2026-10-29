@@ -104,4 +104,13 @@ The feature is **in implementation**, not production-ready. Preserve MLS end-to-
 - The earlier failures refer to earlier PR head commits. Final verification is pending the CI results for the latest branch head; no local Flutter runner was available through the GitHub connector.
 
 
-- Latest-head runtime audit inventory completed successfully on commit `241e0e61c22991e1bffcc24b51ce5a086ee95662`, including GitHub workflow lint and Playwright type-check/discovery/source inventory. Android analyzer/tests/build, integration gate, native emulator smoke and database replay still need their own completion results.
+- Runtime audit inventory completed successfully on an earlier branch head (`241e0e61c22991e1bffcc24b51ce5a086ee95662`), including GitHub workflow lint and Playwright type-check/discovery/source inventory. Subsequent UI/test commits have triggered fresh checks; Android analyzer/tests/build, integration gate, native emulator smoke and database replay must be confirmed against the newest SHA before sign-off.
+
+
+### Theme settings parity and no-live-preview correction — 2026-10-29
+
+- Removed the live sample message-bubble preview from Theme Editor while preserving static theme preset cards.
+- Removed Theme Studio's animated canvas preview and always-running particle animation loop. The existing “Current applied appearance” view is a static reference to the saved theme, not a live preview of unsaved settings.
+- Removed the state-only “3D Motion” tab and temporary particle speed/density sliders because they were not persisted or consumed by the app's runtime effect service.
+- Theme Studio now restores the saved enabled flag and falling-object selection, limits choices to the four values actually consumed by FallingParticlesOverlay (Stars, Hearts, Snowflakes, Leaves), and saves the switch and chosen object through the existing preferences controller.
+- Added source-contract coverage for no-live-preview behavior, supported particle values and persistence wiring. Latest-head formatter/analyzer/tests are pending CI; this update is not a passing test report.
