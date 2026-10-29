@@ -1,1 +1,1 @@
-build 51c default-correction + added-styles proof (unit test aligned to Default-first list)
+build 52 added-styles helper fix (stale-node refind, end-aware scroll) + capture emit-list for added-* and AppRoot edit frames
