@@ -42,7 +42,7 @@ private val currentReleaseNotes = listOf(
 )
 
 @Composable
-fun UpdateChangelogHost() {
+fun UpdateChangelogHost(onFinished: () -> Unit = {}) {
     val context = LocalContext.current
     var show by remember { mutableStateOf(false) }
     var resolved by remember { mutableStateOf(false) }
@@ -57,12 +57,13 @@ fun UpdateChangelogHost() {
         val previous = prefs.getString(LAST_SEEN_VERSION, null)
         show = previous != installVersion
         resolved = true
+        if (previous == installVersion) onFinished()
     }
 
     if (!resolved || !show) return
 
     AlertDialog(
-        onDismissRequest = { markSeen(context, installVersion); show = false },
+        onDismissRequest = { markSeen(context, installVersion); show = false; onFinished() },
         title = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("What’s new in Chaty")
@@ -84,7 +85,7 @@ fun UpdateChangelogHost() {
             }
         },
         confirmButton = {
-            TextButton(onClick = { markSeen(context, installVersion); show = false }) { Text("Continue") }
+            TextButton(onClick = { markSeen(context, installVersion); show = false; onFinished() }) { Text("Continue") }
         },
     )
 }
