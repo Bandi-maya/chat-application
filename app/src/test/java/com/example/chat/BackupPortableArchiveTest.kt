@@ -186,7 +186,7 @@ class BackupPortableArchiveTest {
         assertEquals(5, result.includedFiles)
         assertTrue(result.sections.size >= 2)
         for (s in result.sections) {
-            assertTrue(s.name.matches(Regex("media\.\d{3}\.zip")))
+            assertTrue(s.name.matches(Regex("media\\.\\d{3}\\.zip")))
             assertTrue(s.data.size <= BackupArchiveLogic.MAX_ENTRY_BYTES)
         }
         val zip = BackupArchiveLogic.buildZip("u", "t", result.sections)
