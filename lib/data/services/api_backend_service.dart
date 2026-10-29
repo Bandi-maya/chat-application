@@ -237,19 +237,17 @@ class ApiBackendService extends ChangeNotifier {
       }
     }
 
-    if (response != null && response.statusCode == 200) {
+    if (response.statusCode == 200) {
       final body = jsonDecode(response.body);
       final data = body['data'] ?? body;
       return Map<String, dynamic>.from(data);
-    } else if (response != null && response.statusCode == 404) {
+    } else if (response.statusCode == 404) {
       throw Exception('Organization "$clean" not found. Please verify the ID or register a new organization.');
     } else {
-      String detail = 'Organization check failed (${response?.statusCode ?? 'No response'})';
+      String detail = 'Organization check failed (${response.statusCode})';
       try {
-        if (response != null) {
-          final body = jsonDecode(response.body);
-          detail = body['detail'] ?? body['message'] ?? detail;
-        }
+        final body = jsonDecode(response.body);
+        detail = body['detail'] ?? body['message'] ?? detail;
       } catch (_) {}
       throw Exception(detail);
     }
