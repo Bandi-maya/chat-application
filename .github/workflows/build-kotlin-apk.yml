@@ -452,10 +452,23 @@ jobs:
         run: |
           # ci/kotlin-retry-trigger.txt: "retry <source-run-id> <archive_sha256>"
           read -r TAG RUN_ID ARCH < ci/kotlin-retry-trigger.txt
-          { [ "$TAG" = "retry" ] || [ "$TAG" = "capture-only" ]; } && [ -n "$RUN_ID" ] && [ -n "$ARCH" ] || { echo "Bad retry trigger pin"; exit 1; }
+          { [ "$TAG" = "retry" ] || [ "$TAG" = "capture-only" ] || [ "$TAG" = "diag-single" ]; } && [ -n "$RUN_ID" ] && [ -n "$ARCH" ] || { echo "Bad retry trigger pin"; exit 1; }
           echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
           echo "arch=$ARCH" >> "$GITHUB_OUTPUT"
           echo "mode=$TAG" >> "$GITHUB_OUTPUT"
+          if [ "$TAG" = "diag-single" ]; then
+            # D1 reproduction targets: the four classes carrying the 5 remaining 93 core
+            # failures (original assertions/timing untouched; whole classes preserve
+            # intra-class setup/navigation state). calib INCLUDED: pressHome cleanup on
+            # the pinned 93 pair makes it runner-safe (validated by 93's full completion).
+            echo "capture_classes=com.example.chat.AddedStylesProofTest,com.example.chat.HomeHeaderTabsResponsiveProofTest,com.example.chat.LockBadgeMotionProofTest,com.example.chat.RadialVariantsProofTest" >> "$GITHUB_OUTPUT"
+            echo "select_want=com.example.chat.AddedStylesProofTest,com.example.chat.HomeHeaderTabsResponsiveProofTest,com.example.chat.LockBadgeMotionProofTest,com.example.chat.RadialVariantsProofTest" >> "$GITHUB_OUTPUT"
+            echo "select_excluded=" >> "$GITHUB_OUTPUT"
+          else
+            echo "capture_classes=com.example.chat.DemoModeProofTest,com.example.chat.SystemBarThemeProofTest,com.example.chat.AppRootConfiguredProofTest,com.example.chat.ChatScreensPixelProofTest,com.example.chat.HeaderTabStyleSheetProofTest,com.example.chat.AccountDraftIsolationProofTest,com.example.chat.SystemThemeFollowProofTest,com.example.chat.AddedStylesProofTest" >> "$GITHUB_OUTPUT"
+            echo "select_want=com.example.chat.DemoModeProofTest,com.example.chat.SystemBarThemeProofTest,com.example.chat.AppRootConfiguredProofTest,com.example.chat.ChatScreensPixelProofTest,com.example.chat.HeaderTabStyleSheetProofTest,com.example.chat.AccountDraftIsolationProofTest,com.example.chat.SystemThemeFollowProofTest" >> "$GITHUB_OUTPUT"
+            echo "select_excluded=com.example.chat.LockBadgeMotionProofTest#animationFrameCalibrationDiag" >> "$GITHUB_OUTPUT"
+          fi
           echo "RETRY-PIN mode=$TAG run=$RUN_ID archive=$ARCH"
       - name: Restore pinned cumulative candidate source
         run: |
@@ -534,6 +547,26 @@ jobs:
       - name: Isolate synthetic emulator backend routing
         run: |
           printf '%s\n' 'REST_API_BASE_URL=http://10.0.2.2:8000' 'WEBSOCKET_URL=ws://10.0.2.2:8000/chat/ws/{userId}' 'TENANT_ID=chat-application' > .env
+      # D1 (authorized once, 2026-10-30): media's peak-memory test ALONE on the pinned 93
+      # pair, stock RAM and emulator build 16740729 (37.2.13.0) matching 93's death
+      # conditions; selection-only, no app/test/baseline change. D2: passive host-side
+      # evidence (qemu RSS + MemAvailable sampler, dmesg tail, cgroup/pressure memory) to
+      # discriminate host OOM-kill vs qemu-internal exit; crashpad capture step stays.
+      # Survival alone supports cumulative-pressure only as a lead; death alone shows the
+      # 34 preceding tests aren't required under this run's conditions.
+      - name: Single memory-test diagnostic + passive host capture (serial emulator 1)
+        id: single
+        if: steps.pin.outputs.mode == 'diag-single'
+        continue-on-error: true
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: default
+          arch: x86_64
+          profile: pixel_6
+          emulator-build: "16740729"
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
+          script: mkdir -p screenshots && while :; do p=$(pgrep -f qemu-system | head -1); if [ -n "$p" ]; then echo "{\"t\":$(date +%s),\"pid\":$p,\"rss_kb\":\"$(awk '/VmRSS/{print $2}' /proc/$p/status 2>/dev/null)\",\"memavail_kb\":\"$(awk '/MemAvailable/{print $2}' /proc/meminfo)\"}"; fi; sleep 5; done > screenshots/host-watch.jsonl & echo $! > /tmp/hostwatch.pid ; (cd runtime-apks && sha256sum -c SHA256SUMS) && adb install -r -t runtime-apks/app-debug.apk && adb install -r -t runtime-apks/app-debug-androidTest.apk && python3 ci/run-instrumentation-shard.py "com.example.chat.EmojiPackAssetsAndPerfTest#microsoftGridVisibleScrollOffAndBackMemory" ; rc=$? ; kill $(cat /tmp/hostwatch.pid) 2>/dev/null ; ( sudo dmesg 2>/dev/null | tail -60 || echo "dmesg unavailable" ) > screenshots/host-dmesg-tail.txt 2>&1 ; ( cat /sys/fs/cgroup/memory.events 2>/dev/null ; cat /proc/pressure/memory 2>/dev/null ; free -m ) > screenshots/host-memory-evidence.txt 2>&1 ; cp app/build/outputs/androidTest-results/connected/TEST-shard-runner-derived.xml screenshots/single-shard-derived.xml 2>/dev/null || true ; adb logcat -d -v threadtime > screenshots/logcat-single.txt 2>/dev/null || true ; exit $rc
       - name: Retry media shard (serial emulator 1)
         id: media
         if: steps.pin.outputs.mode == 'retry'
@@ -635,7 +668,7 @@ jobs:
           arch: x86_64
           profile: pixel_6
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
-          script: mkdir -p screenshots && classes="com.example.chat.DemoModeProofTest,com.example.chat.SystemBarThemeProofTest,com.example.chat.AppRootConfiguredProofTest,com.example.chat.ChatScreensPixelProofTest,com.example.chat.HeaderTabStyleSheetProofTest,com.example.chat.AccountDraftIsolationProofTest,com.example.chat.SystemThemeFollowProofTest,com.example.chat.AddedStylesProofTest" && printf '%s\n' "$classes" > screenshots/instrumentation-class-filter.txt && (cd runtime-apks && sha256sum -c SHA256SUMS) && adb install -r -t runtime-apks/app-debug.apk && adb install -r -t runtime-apks/app-debug-androidTest.apk && python3 ci/run-instrumentation-shard.py "$classes" ; rc=$? ; adb pull /sdcard/Android/data/com.logybyte.chat/files/screenshots/. screenshots/ || true ; adb logcat -d -v threadtime > screenshots/logcat.txt || true ; bash ci/demo-probe.sh || true ; exit $rc
+          script: mkdir -p screenshots && classes="${{ steps.pin.outputs.capture_classes }}" && printf '%s\n' "$classes" > screenshots/instrumentation-class-filter.txt && (cd runtime-apks && sha256sum -c SHA256SUMS) && adb install -r -t runtime-apks/app-debug.apk && adb install -r -t runtime-apks/app-debug-androidTest.apk && python3 ci/run-instrumentation-shard.py "$classes" ; rc=$? ; adb pull /sdcard/Android/data/com.logybyte.chat/files/screenshots/. screenshots/ || true ; adb logcat -d -v threadtime > screenshots/logcat.txt || true ; bash ci/demo-probe.sh || true ; exit $rc
       - name: Capture emulator crash evidence (passive)
         if: always()
         run: |
@@ -658,16 +691,19 @@ jobs:
             app/build/reports/androidTests/connected/
             screenshots/
           if-no-files-found: warn
-      - name: Verify targeted capture selection (7 classes, nonzero cases)
+      - name: Verify targeted capture selection (nonzero cases)
         id: select
         if: always()
+        env:
+          SELECT_WANT: ${{ steps.pin.outputs.select_want }}
+          SELECT_EXCLUDED: ${{ steps.pin.outputs.select_excluded }}
         run: |
           python3 - <<'PYSEL'
-          import glob, sys, xml.etree.ElementTree as ET, re, pathlib
-          want = {'com.example.chat.DemoModeProofTest','com.example.chat.SystemBarThemeProofTest','com.example.chat.AppRootConfiguredProofTest','com.example.chat.ChatScreensPixelProofTest','com.example.chat.HeaderTabStyleSheetProofTest','com.example.chat.AccountDraftIsolationProofTest','com.example.chat.SystemThemeFollowProofTest'}
+          import glob, os, sys, xml.etree.ElementTree as ET, re, pathlib
+          want = set(x for x in os.environ.get('SELECT_WANT', '').split(',') if x)
           # Expected method counts come from the restored pinned source, not from
           # the runner: a crashed runner must not shrink the expectation.
-          excluded = {'com.example.chat.LockBadgeMotionProofTest#animationFrameCalibrationDiag'}
+          excluded = set(x for x in os.environ.get('SELECT_EXCLUDED', '').split(',') if x)
           for e in sorted(excluded):
               print('CAPTURE-EXCLUSION diagnostic-not-accepted: ' + e)
           # Exact method identities from pinned source; count alone must not hide a swapped method.
@@ -763,8 +799,13 @@ jobs:
       - name: Retry verdict (media failure never hides emoji)
         if: always()
         run: |
-          echo "RETRY-OUTCOMES mode=${{ steps.pin.outputs.mode }} media=${{ steps.media.outcome }} emoji-real=${{ steps.emoji.outcome }} captures=${{ steps.captures.outcome }} selection=${{ steps.select.outcome }}"
-          if [ "${{ steps.pin.outputs.mode }}" = "capture-only" ]; then
+          echo "RETRY-OUTCOMES mode=${{ steps.pin.outputs.mode }} media=${{ steps.media.outcome }} emoji-real=${{ steps.emoji.outcome }} single=${{ steps.single.outcome }} captures=${{ steps.captures.outcome }} selection=${{ steps.select.outcome }}"
+          if [ "${{ steps.pin.outputs.mode }}" = "diag-single" ]; then
+            # Evidence run: the single-test outcome (survival / assertion failure /
+            # emulator loss) and the reproduction failures are data, not gates;
+            # selection completeness and evidence preservation gate the job.
+            [ "${{ steps.select.outcome }}" = "success" ] && [ "${{ steps.single.outcome }}" != "cancelled" ]
+          elif [ "${{ steps.pin.outputs.mode }}" = "capture-only" ]; then
             # Evidence recovery only: retained failures in the five targeted classes
             # are expected and preserved in the derived XML/raw status; selection
             # completeness (5 classes, nonzero cases) is the gate.
