@@ -65,6 +65,8 @@ object FallingSim {
     fun step(
         items: MutableList<FallingItem>, enabled: Boolean, scope: String, objectName: String,
         currentScope: String, random: Random,
+        density: Int = 15,
+        speedMultiplier: Double = 1.0,
     ): Boolean {
         if (!enabled) {
             if (items.isNotEmpty()) { items.clear(); return true }
@@ -73,10 +75,12 @@ object FallingSim {
         if (scope == "Home only" && currentScope != "Home") return false
         if (scope == "Chat only" && currentScope != "Chat") return false
         val symbol = symbolFor(objectName)
-        if (items.size < 15) {
+        val safeDensity = density.coerceIn(1, 60)
+        val safeSpeed = speedMultiplier.coerceIn(0.25, 3.0)
+        if (items.size < safeDensity) {
             items.add(
                 FallingItem(
-                    x = random.nextDouble(), y = -0.05, speed = 0.002 + random.nextDouble() * 0.003,
+                    x = random.nextDouble(), y = -0.05, speed = (0.002 + random.nextDouble() * 0.003) * safeSpeed,
                     size = 12.0 + random.nextDouble() * 10.0, opacity = 0.3 + random.nextDouble() * 0.5, symbol = symbol,
                 ),
             )
