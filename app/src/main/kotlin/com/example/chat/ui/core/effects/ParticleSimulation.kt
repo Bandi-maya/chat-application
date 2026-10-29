@@ -48,9 +48,13 @@ class FallingItem(var x: Double, var y: Double, val speed: Double, val size: Dou
 
 object FallingSim {
     fun symbolFor(objectName: String): String = when (objectName) {
+        "Neon Embers" -> "\uD83D\uDD25"
+        "Sakura" -> "\uD83C\uDF38"
+        "Snow", "Snowflakes" -> "\u2744\uFE0F"
+        "Cyber Matrix" -> "\u26A1"
         "Hearts" -> "\u2764\uFE0F"
-        "Snowflakes" -> "\u2744\uFE0F"
         "Leaves" -> "\uD83C\uDF42"
+        "None" -> ""
         else -> "\u2B50" // 'Stars' and default
     }
 
@@ -75,6 +79,10 @@ object FallingSim {
         if (scope == "Home only" && currentScope != "Home") return false
         if (scope == "Chat only" && currentScope != "Chat") return false
         val symbol = symbolFor(objectName)
+        if (objectName == "None") {
+            if (items.isNotEmpty()) { items.clear(); return true }
+            return false
+        }
         val safeDensity = density.coerceIn(1, 60)
         val safeSpeed = speedMultiplier.coerceIn(0.25, 3.0)
         if (items.size < safeDensity) {
