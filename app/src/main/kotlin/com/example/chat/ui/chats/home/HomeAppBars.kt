@@ -85,6 +85,7 @@ import androidx.compose.ui.unit.sp
 import com.example.chat.core.theme.ThemeConfig
 import com.example.chat.core.theme.argbWithAlpha
 import com.example.chat.domain.models.HomePreferences
+import com.example.chat.ReleaseFeatures
 import androidx.compose.foundation.ExperimentalFoundationApi
 
 /** Identity shown in the home header (mapped by the integrator from whatever
