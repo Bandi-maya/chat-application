@@ -73,6 +73,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -285,11 +288,21 @@ fun GbFeatureCenterScreen(
                     Spacer(Modifier.height(16.dp))
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         for (color in GbFeatureCenterLogic.colorPresets) {
+                            val selected = current == color
                             Box(
-                                Modifier.size(34.dp).background(Color(color), CircleShape)
-                                    .border(1.dp, scheme.outlineVariant, CircleShape)
-                                    .clickable { preferences.updateGbFeature(item.key, color); colorEdit = null },
-                            )
+                                Modifier.size(38.dp)
+                                    .background(Color(color), CircleShape)
+                                    .border(if (selected) 2.dp else 1.dp, if (selected) scheme.primary else scheme.outlineVariant, CircleShape)
+                                    .clickable { preferences.updateGbFeature(item.key, color); colorEdit = null }
+                                    .semantics {
+                                        contentDescription = "Color " + GbFeatureCenterLogic.initialColorText(color)
+                                        this.selected = selected
+                                        role = Role.Button
+                                    },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (selected) Icon(Icons.Rounded.Check, contentDescription = "Selected color", tint = if (color == 0xFFFFFFFFL) Color.Black else Color.White)
+                            }
                         }
                     }
                     Spacer(Modifier.height(16.dp))
