@@ -112,12 +112,11 @@ fun ChatyEmojiPickerSheet(
         mutableStateOf(
             when {
                 reactionMode -> 0.32f
-                composerMode -> 0.72f
+                composerMode -> 0.50f
                 else -> 0.42f
             },
         )
     }
-    var draftText by remember { mutableStateOf(initialText) }
     var searchQuery by remember { mutableStateOf("") }
     var searchOpen by remember { mutableStateOf(false) }
     var selectedCategory by remember { mutableStateOf(0) } // 0 = recents
@@ -130,11 +129,9 @@ fun ChatyEmojiPickerSheet(
     fun recordAndPick(entry: EmojiEntry, emoji: String) {
         recentCache.recordUsage(emoji, entry.name)
         recentsVersion++
-        if (composerMode) {
-            draftText += emoji
-        } else {
-            onEmojiPicked(emoji)
-        }
+        // GB-style: the real composer above the panel owns the text; every pick
+        // appends straight into it, in composer mode too.
+        onEmojiPicked(emoji)
     }
 
     val recentItems = remember(recentsVersion) { recentCache.items() }
@@ -202,7 +199,7 @@ fun ChatyEmojiPickerSheet(
             )
             if (composerMode) {
                 IconButton(onClick = {
-                    onComposerDone(ChatyEmojiComposerResult(draftText, ChatyEmojiComposerAction.keyboard))
+                    onComposerDone(ChatyEmojiComposerResult("", ChatyEmojiComposerAction.keyboard))
                 }) {
                     Icon(Icons.Rounded.Keyboard, contentDescription = "Return to keyboard",
                         tint = headerForeground)
@@ -210,76 +207,12 @@ fun ChatyEmojiPickerSheet(
             }
             IconButton(onClick = {
                 if (composerMode) {
-                    onComposerDone(ChatyEmojiComposerResult(draftText, ChatyEmojiComposerAction.close))
+                    onComposerDone(ChatyEmojiComposerResult("", ChatyEmojiComposerAction.close))
                 } else {
                     onEmojiPicked("")
                 }
             }) {
                 Icon(Icons.Rounded.Close, contentDescription = "Close", tint = headerForeground)
-            }
-        }
-
-        // Composer draft row
-        if (composerMode) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(start = 12.dp, top = 8.dp, end = 12.dp, bottom = 10.dp),
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .background(
-                            Color(argbWithAlpha(theme.secondaryTextColor, 0.1)),
-                            RoundedCornerShape(20.dp),
-                        )
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                ) {
-                    if (draftText.isEmpty()) {
-                        Text("Type or select emojis…", color = foregroundSecondary, fontSize = 14.sp)
-                    }
-                    BasicTextField(
-                        value = draftText,
-                        onValueChange = { draftText = it },
-                        textStyle = TextStyle(color = foreground, fontSize = 14.sp),
-                        cursorBrush = SolidColor(accent),
-                        maxLines = 2,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                Box(Modifier.width(8.dp))
-                val canSend = draftText.trim().isNotEmpty()
-                Box(
-                    Modifier
-                        .size(46.dp)
-                        .background(
-                            if (canSend) accent else accent.copy(alpha = 0.35f),
-                            CircleShape,
-                        )
-                        .pointerInput(canSend, draftText) {
-                            detectTapGestures(
-                                onTap = {
-                                    if (canSend) {
-                                        onComposerDone(
-                                            ChatyEmojiComposerResult(
-                                                draftText,
-                                                ChatyEmojiComposerAction.send,
-                                            ),
-                                        )
-                                    }
-                                },
-                            )
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Rounded.Send,
-                        contentDescription = "Send",
-                        tint = Color(theme.onAccentColor),
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
             }
         }
 
@@ -367,7 +300,7 @@ fun ChatyEmojiPickerSheet(
                     items(gridEntries, key = { it.emoji }) { entry ->
                         Box(
                             Modifier
-                                .size(40.dp)
+                                .size(46.dp)
                                 .pointerInput(entry.emoji) {
                                     detectTapGestures(
                                         onTap = { recordAndPick(entry, entry.emoji) },
@@ -385,7 +318,7 @@ fun ChatyEmojiPickerSheet(
                             // miss / load failure / animator scale 0. Taps stay on the parent Box.
                             AnimatedEmojiView(
                                 unicode = entry.emoji,
-                                size = 24f,
+                                size = 28f,
                                 mode = EmojiDisplayMode.picker,
                             )
                         }
