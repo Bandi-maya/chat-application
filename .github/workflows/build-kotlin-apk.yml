@@ -445,6 +445,8 @@ jobs:
               target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(data)
           print('CANDIDATE-OVERLAY',m['archive_sha256'],'files',len(m['files']))
           PYOVERLAY
+        env:
+          PIN_ARCH: ${{ steps.pin.outputs.arch }}
       - name: Patch pinned candidate sources for com.logybyte.chat
         run: |
           python3 - <<'PYLOGYPATCH'
