@@ -73,9 +73,13 @@ class NavStyleLabelsProofTest {
             scenario.onActivity { modeState.value = m }
             dev.waitForIdle(3000)
             Thread.sleep(900)
-            var missing = labels.filter { !dev.hasObject(By.text(it)) }
+            // instagramStyle is icon-only by design (NavigationShells3); its items carry the
+            // label as the icon's contentDescription (NavDestinationIcon semanticLabel), so the
+            // label contract there is a11y exposure. All other styles must render visible text.
+            val iconOnly = m == AppNavigationMode.instagramStyle
+            var missing = labels.filter { if (iconOnly) !dev.hasObject(By.desc(it)) else !dev.hasObject(By.text(it)) }
             var openedDrawer = false
-            if (missing.isNotEmpty() && dev.hasObject(By.desc("Open menu"))) {
+            if (missing.isNotEmpty() && !iconOnly && dev.hasObject(By.desc("Open menu"))) {
                 dev.findObject(By.desc("Open menu")).click()
                 openedDrawer = true
                 Thread.sleep(900)
