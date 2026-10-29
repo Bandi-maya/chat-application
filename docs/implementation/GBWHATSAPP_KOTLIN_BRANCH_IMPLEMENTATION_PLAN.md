@@ -11,7 +11,7 @@
 3. Before changing a feature, trace its UI event through controller/state, persistence, runtime consumer, and tests. Reuse existing components and state models; do not add a second parallel settings system.
 4. The APK report is static evidence only. Treat strings/resources as candidates, not proof of runtime behavior. Record actual APK walkthrough evidence separately.
 5. Do not copy proprietary GBWhatsApp assets/branding or implement privacy/security bypasses, reversible PIN storage, TLS weakening, unauthorized message automation, or claims of identity verification without real cryptographic verification.
-6. Do not add live previews to individual settings screens unless the actual reference interaction and the product requirement explicitly require one. Prefer selection state and a static applied-state reference.
+6. Preserve existing feature options. Do not delete a tab, setting, effect, or control because its first implementation is incomplete; connect it to the existing state model, persistence, and runtime consumer, or mark the precise blocker while retaining the option. The Theme Studio live-chat preview remains intentionally absent per the prior requirement, but this does not authorize removing its other features.
 
 ## Phased implementation
 
@@ -97,10 +97,11 @@ Start with the existing Kotlin customization and template registry rather than F
 - Closed the Flutter-oriented PR #59 rather than merging its branch into this Kotlin-native codebase.
 - Added the Kotlin-specific plan and linked it from `docs/implementation/00_MASTER_EXECUTION_INDEX.md`.
 - Removed the animated, unsaved live-chat preview from native `ThemeStudioScreen.kt`; retained the separate static applied-theme/home reference.
-- Removed the state-only 3D Motion tab and the particle speed/density controls that were local preview-only state and not consumed by the runtime overlay.
-- Replaced unsupported Theme Studio particle values (`Neon Embers`, `Sakura`, `Snow`, `Cyber Matrix`, `None`) with the runtime-supported `Stars`, `Hearts`, `Snowflakes`, and `Leaves`.
-- Restored the saved particle object when opening Theme Studio, added an explicit enabled switch, and persisted both the enabled flag and selected object through the existing preferences controller.
-- Simplified `ThemeStudioLogic.kt` to the behavior still used by native Theme Studio and added regression tests for supported options, legacy-value fallback, stable gradient presets, and tick-style synchronization.
+- The initial Kotlin pass removed the 3D Motion tab and particle speed/density controls; this was corrected after review. Existing feature options must be preserved and connected, not discarded.
+- Theme Studio now restores and saves the selected 3D pager transition through the existing `HomePreferences.pagerTransition3d` field, and lists the transition styles supported by the native `MainNavigationShell.pagerTransition` renderer.
+- Theme Studio now persists falling-particle speed and density in `NavigationEffectPreferences`; `FallingParticlesOverlay` passes those values to `FallingSim`, where speed changes the per-item fall velocity and density changes the maximum active item count.
+- The selected particle type and enable switch continue to use the existing preference controller and runtime overlay. Only values supported by the actual Kotlin renderer are presented as selectable effects.
+- Regression tests cover stable gradient presets, supported particle options and legacy fallback, native pager transition option parity, tick-style synchronization, and slider bounds. CI is required to determine whether the current patch compiles and tests pass.
 - Triggered Kotlin APK/verification workflow run: [Build kotlin APK](https://github.com/Bandi-maya/chat-application/actions/runs/40928203722). At the time this plan was updated, the build job had started but had not completed. Do not mark the slice verified until the build and unit-test steps finish on the latest Kotlin commit.
 
 ### Current status
@@ -110,7 +111,8 @@ Start with the existing Kotlin customization and template registry rather than F
 | All new implementation commits target `kotlin` | Confirmed |
 | Flutter-oriented PR #59 | Closed; not merged |
 | Kotlin plan/index documentation | Committed |
-| Theme Studio live-preview and fake-control cleanup | Committed |
-| Particle option/persistence regression tests | Committed; CI pending |
+| Theme Studio live-chat preview remains absent per the existing no-live-preview requirement | Preserved as requested |
+| 3D Motion tab and particle speed/density controls | Restored and wired to persisted state/runtime; CI pending |
+| Particle option/persistence and transition regression tests | Committed; CI pending |
 | Kotlin APK build and unit tests | Running / not yet verified |
 | Full GBWhatsApp device walkthrough and all-screen parity | Still pending |
