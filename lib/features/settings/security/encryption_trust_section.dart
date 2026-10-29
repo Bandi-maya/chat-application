@@ -9,8 +9,8 @@ import '../../../ui/core/design_system/settings_primitives.dart';
 class EncryptionTrustSection extends StatelessWidget {
   const EncryptionTrustSection({super.key});
 
-  Future<void> _showDetails(BuildContext context) {
-    return showDialog<void>(
+  Future<void> _showDetails(BuildContext context) async {
+    await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Encryption and identity verification'),
