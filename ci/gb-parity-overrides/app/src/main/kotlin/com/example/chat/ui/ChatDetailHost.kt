@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Shortcut
+import com.example.chat.ReleaseFeatures
 import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -205,19 +206,22 @@ fun ChatDetailHost(
     var infoLoading by remember(conversation.id) { mutableStateOf(false) }
     var infoError by remember(conversation.id) { mutableStateOf<String?>(null) }
 
-    // Presence text (Dart _buildChat).
+    // Presence text (Dart _buildChat). Presence and typing come from the custom backend socket
+    // (ApiBackendService); the legacy Supabase realtime plane (rt) is only consulted for the
+    // recording indicator.
     val activity = otherId?.let { rt.activityFor(conversation.id, it) }
-    val presenceOnline = isDirect && otherId != null && rt.isOnline(otherId)
+    val otherTyping = otherId != null && api.isTyping(conversation.id, otherId)
+    val presenceOnline = isDirect && otherId != null && api.isUserOnline(otherId)
     val presenceText: String? = if (isDirect) {
         when {
             activity?.isRecording == true -> "recording voice message…"
-            activity?.isTyping == true -> "typing…"
+            otherTyping -> "typing…"
             otherId == null -> null
             presenceOnline -> "online"
-            else -> HomeFormatters.formatLastSeen(rt.lastSeenFor(otherId)).ifEmpty { "last seen hidden" }
+            else -> HomeFormatters.formatLastSeen(api.lastSeenOf(otherId)).ifEmpty { null }
         }
     } else {
-        if (activity?.isTyping == true) "someone is typing…" else "${live.participantIds.size} participants"
+        if (api.anyoneTyping(conversation.id)) "someone is typing…" else "${live.participantIds.size} participants"
     }
 
     val wallpaperStore = remember { context.getSharedPreferences("chaty_chat_wallpapers", 0) }
@@ -276,7 +280,7 @@ fun ChatDetailHost(
         conversation.id,
         afterSend = { rev++ },
         referenceTwo = com.example.chat.ui.chats.detail.normalizeEntryStyle(conv.entryStyle) == com.example.chat.ui.chats.detail.SECOND_REFERENCE_ENTRY_STYLE,
-        clearTyping = { scope.launch { try { ServiceLocator.gbFeatures.setTyping(conversation.id, false) } catch (_: Exception) {} } },
+        clearTyping = { api.sendTyping(conversation.id, false) },
     )
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
@@ -338,7 +342,7 @@ fun ChatDetailHost(
         onDraftChanged = { text -> scope.launch { try { repo.setDraft(conversation.id, text) } catch (_: Exception) {} } },
         onTypingChanged = { typing ->
             val allowed = privacy.typingIndicators && !prefs.home.ghostMode && !gbB("yo_want_ghostmode", false)
-            if (allowed) scope.launch { try { ServiceLocator.gbFeatures.setTyping(conversation.id, typing) } catch (_: Exception) {} }
+            if (allowed) api.sendTyping(conversation.id, typing)
         },
         quickReplies = prefs.automation.quickReplies,
         wallpaperType = conv.wallpaperType,
@@ -354,12 +358,12 @@ fun ChatDetailHost(
             } catch (_: Exception) {}
         },
         onToggleMute = {
-            if (api.isDemoSession) { toast(DemoMode.UNAVAILABLE_MESSAGE) } else scope.launch {
-                try { repo.setConversationStateAsync(conversation.id, "muted", !live.isMuted) }
-                catch (e: Exception) { toast(e.message ?: "Unable to update chat.") }
-            }
+            // Stored on this device: the custom backend has no per-user chat state API yet.
+            if (api.isDemoSession) { toast(DemoMode.UNAVAILABLE_MESSAGE) } else
+                api.setConversationLocalState(conversation.id, "muted", !live.isMuted)
         },
-        onBlockContact = if (isDirect && otherId != null) ({ blockConfirm = true }) else null,
+        // Blocking needs a block-list API; deferred to the next release (ReleaseFeatures).
+        onBlockContact = if (ReleaseFeatures.BLOCK_CONTACTS && isDirect && otherId != null) ({ blockConfirm = true }) else null,
         hideDateAndName = conv.hideDateAndName,
         showDeletedContent = privacy.antiDeleteMessages || gbB("yoAntiRevoke", false),
         retainViewOnce = privacy.antiViewOnce || gbB("anti_vw_once", false),
@@ -370,26 +374,22 @@ fun ChatDetailHost(
         onEditMessage = { id, newText ->
             if (api.isDemoSession) { toast(DemoMode.UNAVAILABLE_MESSAGE) } else {
                 if (api.isAuthenticated) api.editMessage(conversation.id, id, newText)
-                repo.editMessage(conversation.id, id, newText)
             }
         },
         onDeleteMessage = { id, forEveryone ->
             if (api.isDemoSession) { toast(DemoMode.UNAVAILABLE_MESSAGE) } else scope.launch {
                 if (api.isAuthenticated) { try { api.deleteMessage(conversation.id, id) } catch (_: Exception) {} }
-                try { repo.deleteMessage(conversation.id, id, forEveryone) } catch (_: Exception) {}
             }
         },
         onToggleStar = { id ->
             val m = messages.firstOrNull { it.id == id }
-            if (api.isDemoSession) { toast(DemoMode.UNAVAILABLE_MESSAGE) } else if (m != null) scope.launch {
-                try { repo.setMessageStateAsync(conversation.id, id, "starred", !m.isStarred) } catch (e: Exception) { toast(e.message ?: "Unable to update message.") }
-            }
+            if (api.isDemoSession) { toast(DemoMode.UNAVAILABLE_MESSAGE) } else if (m != null)
+                api.setMessageLocalState(conversation.id, id, "starred", !m.isStarred)
         },
         onTogglePin = { id ->
             val m = messages.firstOrNull { it.id == id }
-            if (api.isDemoSession) { toast(DemoMode.UNAVAILABLE_MESSAGE) } else if (m != null) scope.launch {
-                try { repo.setMessageStateAsync(conversation.id, id, "pinned", !m.isPinned) } catch (e: Exception) { toast(e.message ?: "Unable to update message.") }
-            }
+            if (api.isDemoSession) { toast(DemoMode.UNAVAILABLE_MESSAGE) } else if (m != null)
+                api.setMessageLocalState(conversation.id, id, "pinned", !m.isPinned)
         },
         onToggleReaction = { id, emoji ->
             repo.optimisticToggleReaction(conversation.id, id, emoji)
@@ -400,13 +400,13 @@ fun ChatDetailHost(
             scope.launch {
                 try {
                     if (api.isAuthenticated) api.clearConversationMessages(conversation.id)
-                    repo.clearConversation(conversation.id)
                 } catch (e: Exception) { toast(e.message ?: "Unable to clear conversation.") }
             }
         },
         onRetryMessage = { id ->
             scope.launch {
-                val ok = try { ServiceLocator.outgoingQueue.retryMessage(id) } catch (_: Exception) { false }
+                // Re-queues the failed message on the REST outbox (was the old Supabase queue).
+                val ok = try { api.retryMessage(id) } catch (_: Exception) { false }
                 if (!ok) toast("Retry failed — check your connection.")
             }
         },
@@ -431,7 +431,7 @@ fun ChatDetailHost(
         onOpenConversation = { contactId ->
             val contact = api.users.firstOrNull { it.id == contactId }
             if (contact != null) scope.launch {
-                try { onOpenConversation(repo.getOrCreateDirectConversationAsync(contact)) } catch (_: Exception) {}
+                try { onOpenConversation(api.createOrGetDirectConversation(contact.id)) } catch (_: Exception) {}
             }
         },
         attachmentBinding = attachmentBinding,
@@ -635,8 +635,8 @@ fun ChatDetailHost(
                     loading = infoLoading,
                     loadError = infoError,
                     busy = infoBusy,
-                    isOnline = { id -> rt.isOnline(id) },
-                    lastSeenFor = { id -> rt.lastSeenFor(id) },
+                    isOnline = { id -> api.isUserOnline(id) },
+                    lastSeenFor = { id -> api.lastSeenOf(id) },
                     activityFor = { cid, uid -> rt.activityFor(cid, uid) },
                     hydrateMessage = { m -> rt.hydrateMessage(m) },
                     onAccept = {
