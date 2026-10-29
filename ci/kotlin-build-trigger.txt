@@ -11,3 +11,5 @@ build 68: include current release notes (camera, color selection, modal, startup
 build 69: include lock-method key in startup lock scheduling and verify the complete latest Kotlin branch build.
 
 build 70: gate app-lock overlay until first-run/update release notes are dismissed; preserve existing lock protection; build latest source overlays and run compile/unit tests.
+
+build 71: audit existing 133 GB-style setting keys before duplicates, retain CameraX night/portrait extension modes with device capability checks, fix camera mode cleanup, and enforce changelog-before-lock; build latest APK/tests.
