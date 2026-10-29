@@ -158,15 +158,10 @@ fun HeaderSettingsScreen(
 
     fun updateHome(p: HomePreferences, logTitle: String? = null) = preferences.updateHome(p, logTitle = logTitle)
 
-    val override = home.myNameOverride.trim()
-    val effectiveOverride = if (override.isNotEmpty() && override != "Alex Rivera" && override != "Bandi Maya") override else ""
-    val rawName = currentUserDisplayName?.trim() ?: ""
-    val displayName = when {
-        effectiveOverride.isNotEmpty() -> effectiveOverride
-        rawName.isNotEmpty() && rawName != "Bandi Maya" && rawName != "Chaty User" -> rawName
-        !currentUserUsername.isNullOrEmpty() -> currentUserUsername
-        else -> "User"
-    }
+    // Same identity rules as the real Home bar (setMyName is applied by the preview itself).
+    val displayName = com.example.chat.ui.chats.home.homeIdentityName(
+        true, home.myNameOverride, currentUserDisplayName ?: "", currentUserUsername ?: "",
+    )
     val statusText = if (!currentUserAbout.isNullOrEmpty()) currentUserAbout else "Available"
     val effectiveSearchPlacement =
         if (home.disableSearchBar && home.searchPlacement.trim().lowercase() == "header action") "Below header" else home.searchPlacement
