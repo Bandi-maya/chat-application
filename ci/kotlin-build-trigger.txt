@@ -13,3 +13,5 @@ build 69: include lock-method key in startup lock scheduling and verify the comp
 build 70: gate app-lock overlay until first-run/update release notes are dismissed; preserve existing lock protection; build latest source overlays and run compile/unit tests.
 
 build 71: audit existing 133 GB-style setting keys before duplicates, retain CameraX night/portrait extension modes with device capability checks, fix camera mode cleanup, and enforce changelog-before-lock; build latest APK/tests.
+
+build 72: use the existing shared Chaty color-picker modal for every GB feature color setting, including preview, selected swatches, validated ARGB hex, and explicit Apply; compile and test latest source overlay.
