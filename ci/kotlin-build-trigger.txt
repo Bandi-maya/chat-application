@@ -1,1 +1,1 @@
-build 78 trigger: recursive-type annotation fix (ApiBackendService connectionScopeGuard) + foreground call ringer restoration (coordinator-owned, 8 JVM tests) + override count gate 43->44
+build 79 trigger: break realtime/realtimeListener inference cycle with explicit ApiRealtimeClient property type (his listener body calls realtime.* at 3 sites; pinned's does not)
