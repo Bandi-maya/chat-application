@@ -1,1 +1,1 @@
-build 58 clustered: settle-bounded search checks, header sheet nav mechanic, task detail freshness diagnostic; assertions preserved
+build 59: compile repair of authorized build-58 cluster (HeaderTab shadow string literal newline); no other change
