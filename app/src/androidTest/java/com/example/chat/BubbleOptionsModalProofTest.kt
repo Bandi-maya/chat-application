@@ -136,7 +136,13 @@ class BubbleOptionsModalProofTest {
         for (a in actions) {
             assertTrue("missing option '${a.label}' after single tap", dev.hasObject(By.text(a.label)))
         }
-        assertTrue("reaction rail missing after single tap", dev.hasObject(By.text("👍")))
+        // ReleaseFeatures.MESSAGE_REACTIONS gates the rail off for this release
+        // (approved: hide backend-unsupported features, no dummy controls).
+        if (ReleaseFeatures.MESSAGE_REACTIONS) {
+            assertTrue("reaction rail missing after single tap", dev.hasObject(By.text("👍")))
+        } else {
+            assertFalse("reaction rail must stay hidden while MESSAGE_REACTIONS is off", dev.hasObject(By.text("👍")))
+        }
         // Anchored popover: the menu opens adjacent to the tapped bubble, not as
         // a full-width bottom sheet pinned to the screen bottom.
         val mb = first.visibleBounds
@@ -145,9 +151,11 @@ class BubbleOptionsModalProofTest {
             mb.top > bb.top - 500 && mb.top < bb.bottom + 700,
         )
         shot("bubble-options-production-single-tap")
-        dev.findObject(By.text("👍")).click()
-        Thread.sleep(900)
-        assertEquals("rail reaction must reach the screen callback", listOf("one" to "👍"), reactions.toList())
+        if (ReleaseFeatures.MESSAGE_REACTIONS) {
+            dev.findObject(By.text("👍")).click()
+            Thread.sleep(900)
+            assertEquals("rail reaction must reach the screen callback", listOf("one" to "👍"), reactions.toList())
+        }
         assertTrue(
             "menu must dismiss after a reaction",
             dev.wait(Until.gone(By.text(actions.first().label)), 5000),
@@ -183,7 +191,11 @@ class BubbleOptionsModalProofTest {
         for (a in actions) {
             assertTrue("missing option '${a.label}' after long-press", dev.hasObject(By.text(a.label)))
         }
-        assertTrue("reaction rail missing after long-press", dev.hasObject(By.text("👍")))
+        if (ReleaseFeatures.MESSAGE_REACTIONS) {
+            assertTrue("reaction rail missing after long-press", dev.hasObject(By.text("👍")))
+        } else {
+            assertFalse("reaction rail must stay hidden while MESSAGE_REACTIONS is off", dev.hasObject(By.text("👍")))
+        }
         shot("bubble-options-production-long-press")
         dev.pressBack()
         assertTrue(
