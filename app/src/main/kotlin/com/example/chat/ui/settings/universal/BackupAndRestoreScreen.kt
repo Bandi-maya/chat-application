@@ -163,7 +163,7 @@ fun BackupAndRestoreScreen(
     val apiBackend = remember { com.example.chat.ServiceLocator.apiBackend }
     val mediaCache = remember { com.example.chat.ServiceLocator.mediaCache }
     val prefsStorage = remember { com.example.chat.ServiceLocator.preferencesStorage }
-    val currentAccountId: String? get() = apiBackend.currentUser?.id
+    fun currentAccountId(): String? = apiBackend.currentUser?.id
 
     var exportPass1 by remember { mutableStateOf("") }
     var exportPass2 by remember { mutableStateOf("") }
@@ -179,7 +179,7 @@ fun BackupAndRestoreScreen(
             portableBusy = true
             val message = withContext(Dispatchers.IO) {
                 try {
-                    val account = currentAccountId ?: return@withContext "Sign in before creating a backup."
+                    val account = currentAccountId() ?: return@withContext "Sign in before creating a backup."
                     var mediaNote = ""
                     val collector = BackupSectionCollector(
                         context, prefsStorage, account,
@@ -246,7 +246,7 @@ fun BackupAndRestoreScreen(
             if (parsed == null) {
                 onMessage("Could not open the backup: wrong passphrase or damaged file.")
             } else {
-                preview = BackupPortableLogic.preview(parsed, currentAccountId, BackupSectionCollector(context, prefsStorage, currentAccountId ?: "", { emptyList() }).storeFor())
+                preview = BackupPortableLogic.preview(parsed, currentAccountId(), BackupSectionCollector(context, prefsStorage, currentAccountId() ?: "", { emptyList() }).storeFor())
                 pendingRestoreParsed = parsed
             }
             restorePass = ""
@@ -259,8 +259,8 @@ fun BackupAndRestoreScreen(
             portableBusy = true
             val result = withContext(Dispatchers.IO) {
                 BackupPortableLogic.importArchive(
-                    parsed, currentAccountId,
-                    BackupSectionCollector(context, prefsStorage, currentAccountId ?: "", { emptyList() }).storeFor(),
+                    parsed, currentAccountId(),
+                    BackupSectionCollector(context, prefsStorage, currentAccountId() ?: "", { emptyList() }).storeFor(),
                 )
             }
             portableBusy = false
