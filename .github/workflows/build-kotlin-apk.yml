@@ -290,6 +290,15 @@ jobs:
             base64 -w 0 "$f" | fold -w 4000 | sed 's/^/PNGB64 /'
             echo "PNGB64-END $n"
           done
+          for f in screenshots/added-*.png screenshots/10f1d-edit-sheet-after-mode-restore.png screenshots/10f1d-edit-before-close.png screenshots/10f2-task-detail-after-edit.png; do
+            [ -f "$f" ] || continue
+            n=$(basename "$f" .png)
+            sz=$(stat -c %s "$f")
+            if [ "$sz" -gt 600000 ]; then echo "PNGSKIP $n size=$sz"; continue; fi
+            echo "PNGB64-BEGIN $n $sz"
+            base64 -w 0 "$f" | fold -w 4000 | sed 's/^/PNGB64 /'
+            echo "PNGB64-END $n"
+          done
           for n in hdr-sheet-scroll-light hdr-sheet-last-row-light hdr-sheet-scroll-dark hdr-sheet-last-row-dark; do
             f="screenshots/$n.txt"
             [ -f "$f" ] || { echo "TXTMISSING $n"; continue; }
@@ -526,6 +535,15 @@ jobs:
           for n in 31-swipe-light-portrait-closed 31-swipe-light-portrait-progress 31-swipe-light-portrait-after-gesture 31-swipe-light-portrait-open 31-swipe-light-portrait-back-closed 31-swipe-light-portrait-leading 31-swipe-light-portrait-final 31-swipe-real-home-before 31-swipe-real-home-open 31-swipe-real-home-closed 31-swipe-applied-style-0-light-closed 31-swipe-applied-style-0-light-after-gesture 31-swipe-applied-style-0-light-open 31-swipe-applied-style-1-dark-closed 31-swipe-applied-style-1-dark-after-gesture 31-swipe-applied-style-1-dark-open 31-swipe-applied-style-2-light-closed 31-swipe-applied-style-2-light-after-gesture 31-swipe-applied-style-2-light-open 31-swipe-applied-style-3-dark-closed 31-swipe-applied-style-3-dark-after-gesture 31-swipe-applied-style-3-dark-open 31-swipe-applied-style-4-light-closed 31-swipe-applied-style-4-light-after-gesture 31-swipe-applied-style-4-light-open radial-dark-rtl-closed radial-dark-rtl-first-page radial-dark-rtl-first-page-missing radial-dark-rtl-page-2 radial-dark-rtl-page-2-missing radial-dark-rtl-page-3 radial-dark-rtl-page-3-missing radial-dark-rtl-missing-close-semantics 32-swipe-rtl-left-trailing 32-swipe-rtl-production-row-applied 32-swipe-rtl-production-row-reloaded 32-swipe-rtl-production-settings-before-navigation 32-swipe-rtl-production-settings-toggled 32-swipe-rtl-recreated-closed 32-swipe-rtl-right-leading hdr-sheet-light-initial hdr-sheet-light-before-preview-tap hdr-sheet-light-after-preview-tap hdr-sheet-light-selected hdr-sheet-light-scrolled-diag hdr-sheet-light-scrolled hdr-sheet-dark-initial hdr-sheet-dark-before-preview-tap hdr-sheet-dark-after-preview-tap hdr-sheet-dark-selected hdr-sheet-dark-scrolled-diag hdr-sheet-dark-scrolled voice-gesture-tap-toggle-false voice-gesture-tap-toggle-true voice-gesture-drag-cancel-false voice-gesture-drag-cancel-true voice-gesture-drag-locked-false voice-gesture-drag-locked-true voice-gesture-hold-release-false voice-gesture-hold-release-true voice-gesture-locked-delete-false voice-gesture-locked-delete-true voice-gesture-system-cancel-false voice-gesture-system-cancel-true system-bars-follow-dark system-bars-follow-light system-bars-follow-app-override; do
             f="screenshots/$n.png"
             [ -f "$f" ] || { echo "PNGMISSING $n"; continue; }
+            sz=$(stat -c %s "$f")
+            if [ "$sz" -gt 600000 ]; then echo "PNGSKIP $n size=$sz"; continue; fi
+            echo "PNGB64-BEGIN $n $sz"
+            base64 -w 0 "$f" | fold -w 4000 | sed 's/^/PNGB64 /'
+            echo "PNGB64-END $n"
+          done
+          for f in screenshots/added-*.png screenshots/10f1d-edit-sheet-after-mode-restore.png screenshots/10f1d-edit-before-close.png screenshots/10f2-task-detail-after-edit.png; do
+            [ -f "$f" ] || continue
+            n=$(basename "$f" .png)
             sz=$(stat -c %s "$f")
             if [ "$sz" -gt 600000 ]; then echo "PNGSKIP $n size=$sz"; continue; fi
             echo "PNGB64-BEGIN $n $sz"
