@@ -24,7 +24,6 @@ import 'package:chat/features/calls/ongoing_call_screen.dart';
 import 'package:chat/features/settings/calls/call_presentation_preferences.dart';
 import 'package:chat/injection/locator.dart';
 import 'package:chat/ui/core/controllers/preferences_controller.dart';
-import 'package:chat/ui/core/theme/theme_config.dart';
 import 'package:chat/ui/core/theme/theme_controller.dart';
 
 Future<void> _loadFont(String family, String file) async {
