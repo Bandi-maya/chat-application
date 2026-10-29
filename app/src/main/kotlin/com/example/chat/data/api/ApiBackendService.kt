@@ -1,6 +1,10 @@
 package com.example.chat.data.api
 
+import kotlinx.coroutines.ensureActive
+
 import android.content.Context
+import com.example.chat.data.demo.DemoMode
+import com.example.chat.data.demo.DemoSampleData
 import com.example.chat.domain.models.ChatMessage
 import com.example.chat.domain.models.ChatTask
 import com.example.chat.domain.models.Conversation
@@ -73,6 +77,7 @@ class ApiBackendService(
     fun removeAuthScopeListener(listener: (ApiAccountScope) -> Unit) { authScopeListeners.remove(listener) }
     private fun notifyAuthScopeTransition() {
         val next = authSnapshot()
+        sendRequests.cancelAll() // in-flight scope-bound sends die with the account they were built for
         authScopeListeners.forEach { listener -> runCatching { listener(next) } }
     }
 
@@ -168,6 +173,7 @@ class ApiBackendService(
     private val scopedCallListeners = java.util.concurrent.CopyOnWriteArrayList<(ApiAccountScope, Map<String, Any?>) -> Unit>()
     fun addScopedCallSignalListener(listener: (ApiAccountScope, Map<String, Any?>) -> Unit) = scopedCallListeners.add(listener)
     private val callRequests = CallRequestRegistry()
+    private val sendRequests = CallRequestRegistry()
     private val callCoordinator by lazy {
         ScopedCallCoordinator(chatScope, ::authSnapshot, ::withAuthScope,
             clientFor = { expected, wire ->
@@ -180,7 +186,8 @@ class ApiBackendService(
     private fun startCallScopeMonitoring() {
         addAuthScopeListener(callCoordinator::transition)
         // connect posts work; the callback itself must stay short under authScopeLock.
-        addAuthScopeListener { realtime.connect() }
+        // Offline demo: never connect from the transition listener either.
+        addAuthScopeListener { if (!DemoMode.active) realtime.connect() }
         android.os.Handler(android.os.Looper.getMainLooper()).post {
             val lifecycle = androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle
             callCoordinator.foreground(lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED))
@@ -216,6 +223,9 @@ class ApiBackendService(
     private val realtimeListener = object : ApiRealtimeClient.Listener {
         override fun onNewMessage(message: ChatMessage) {
             var unknownRoom = false
+            var isNewToList = false
+            var convoTitle: String? = null
+            var convoMuted = false
             synchronized(chatLock) {
                 val roomId = message.conversationId
                 val list = _messages.getOrPut(roomId) { mutableListOf() }
@@ -237,11 +247,14 @@ class ApiBackendService(
                     list.removeAll { it !== message && it.id == message.id }
                 } else if (list.none { it.id == message.id }) {
                     list.add(message)
+                    isNewToList = true
                 }
                 list.sortBy { it.createdAt }
                 val convIdx = _conversations.indexOfFirst { it.id == roomId }
                 if (convIdx != -1) {
                     val old = _conversations.removeAt(convIdx)
+                    convoTitle = old.title
+                    convoMuted = old.isMuted
                     _conversations.add(
                         0,
                         old.copy(
@@ -259,13 +272,13 @@ class ApiBackendService(
             // Tell the sender it reached this phone (their second grey tick).
             if (message.senderId.isNotEmpty() && message.senderId != session.currentUser?.id) {
                 realtime.sendDelivered(message.conversationId)
-                try { onIncomingMessage(message) } catch (_: Exception) {}
             }
             typingUntil.remove("${message.conversationId}|${message.senderId}")
             if (message.conversationId == activeConversationId && message.senderId != session.currentUser?.id) {
                 markConversationRead(message.conversationId)
             }
             notifyChatListeners()
+            if (isNewToList) runCatching { onIncomingMessage?.invoke(message, convoTitle, convoMuted) }
         }
 
         override fun onMessageEdited(roomId: String, messageId: String, newContent: String, editedAt: Instant) {
@@ -431,8 +444,6 @@ class ApiBackendService(
 
     // ---- Push / background notification hooks (set by the locator) ----
 
-    /** A message from someone else arrived over the socket (app may be in the background). */
-    @Volatile var onIncomingMessage: (ChatMessage) -> Unit = {}
     /** A chat was opened / read here: its notification can go. */
     @Volatile var onConversationRead: (String) -> Unit = {}
 
@@ -529,6 +540,9 @@ class ApiBackendService(
 
     /** Active-conversation id drives the 4s poll (Dart setActiveConversation). */
     @Volatile private var activeConversationId: String? = null
+    val activeConversation: String? get() = activeConversationId
+    /** Incoming (not own) realtime message: (message, conversation title, muted). Invoked outside chatLock. */
+    @Volatile var onIncomingMessage: ((ChatMessage, String?, Boolean) -> Unit)? = null
     @Volatile private var syncRunning = false
 
     val conversations: List<Conversation> get() {
@@ -602,6 +616,74 @@ class ApiBackendService(
         notifyChatListeners()
     }
 
+
+    /** True while the adopted session is the offline demo ([DemoMode]). */
+    /** STRICT: a session is demo only when BOTH the token and the user are
+     *  the synthetic demo identity. A mixed/corrupt restore (real token +
+     *  demo user JSON) is treated as a real session: never demo-armed and
+     *  never eligible for demo cleanup (peer mixed-store blocker). */
+    val isDemoSession: Boolean get() =
+        DemoMode.isDemoUser(session.currentUser?.id) && session.token == DemoMode.TOKEN
+
+    /**
+     * Offline demo login (NOT in Flutter): adopts a synthetic session with
+     * sample data while the server is unreachable. No network calls, no
+     * realtime, no FCM registration and no backend identity; real login is
+     * unchanged. Refused while any session is active.
+     */
+    suspend fun loginDemo(): ApiUserProfile = withContext(Dispatchers.IO) {
+        // Fail closed on RAW persisted credentials, not just the composed
+        // isAuthenticated: a real token with an unloadable user must still
+        // block demo entry (never overwritten). A STRICTLY-demo persisted
+        // pair is the one exception: re-entering the demo replaces it.
+        run {
+            val storedToken = try { prefs.getString("api_hub_token", null) } catch (_: Exception) { null }
+            val storedUser = try { prefs.getString("api_hub_user", null) } catch (_: Exception) { null }
+            val anyRaw = storedToken != null || storedUser != null ||
+                session.token != null || session.currentUser != null
+            val strictDemo = DemoMode.isDemoRestSession(storedToken, storedUser) &&
+                (session.currentUser == null || DemoMode.isDemoUser(session.currentUser?.id))
+            check(!anyRaw || strictDemo) { "Sign out before starting the demo." }
+        }
+        // Fail closed: any live or persisted real GoTrue identity blocks demo
+        // entry (never cleared as prep); hook absence also refuses.
+        val goTruePresent = demoGoTruePresentHook?.invoke() ?: true
+        check(!goTruePresent) { "A saved sign-in exists on this device. Sign out fully before starting the demo." }
+        val user = DemoSampleData.demoUser()
+        try {
+            // Arm the offline guard BEFORE adopt: the adopt transition notifies
+            // listeners, and no request may pass once demo entry has begun.
+            DemoMode.active = true
+            session.adopt(ApiAuthResult(DemoMode.TOKEN, user))
+            // Seed AFTER adopt: an adopt failure leaves no demo residue in memory.
+            seedDemoState()
+        } catch (e: Exception) {
+            // Rollback: no demo session, no demo state, no armed flag.
+            synchronized(chatLock) {
+                _conversations.clear()
+                _messages.clear()
+                _users.clear()
+            }
+            DemoMode.active = false
+            try { session.signOut() } catch (_: Exception) {
+            }
+            throw e
+        }
+        notifyChatListeners()
+        user
+    }
+
+    private fun seedDemoState() {
+        synchronized(chatLock) {
+            _conversations.clear()
+            _conversations.addAll(DemoSampleData.demoConversations())
+            _messages.clear()
+            DemoSampleData.demoMessages().forEach { (id, list) -> _messages[id] = list.toMutableList() }
+            _users.clear()
+            _users.addAll(DemoSampleData.demoUsers())
+        }
+    }
+
     var requiresSubscription: Boolean = false
         private set
     var subscriptionErrorMessage: String? = null
@@ -643,18 +725,22 @@ class ApiBackendService(
     /** loadMessages with Dart merge semantics: pending (sending/temp) messages
      *  whose text is absent from the remote list survive; merged + sorted. */
     suspend fun loadMessages(chatId: String) {
+        val expected = authSnapshot()
         val remote = withContext(Dispatchers.IO) { chat.listMessages(chatId) } ?: return
         var gone: List<com.example.chat.data.local.AttachmentRef> = emptyList()
-        synchronized(chatLock) {
-            val current = _messages[chatId] ?: mutableListOf()
-            val pending = current.filter { m ->
-                (m.deliveryState == DeliveryState.sending || m.id.startsWith("temp_")) &&
-                    (isQueued(m.id) || remote.none { it.text == m.text })
+        val applied = withAuthScope(expected) {
+            synchronized(chatLock) {
+                val current = _messages[chatId] ?: mutableListOf()
+                val pending = current.filter { m ->
+                    (m.deliveryState == DeliveryState.sending || m.id.startsWith("temp_")) &&
+                        (isQueued(m.id) || remote.none { it.text == m.text })
+                }
+                val merged = (remote + pending).sortedBy { it.createdAt }.toMutableList()
+                gone = com.example.chat.data.media.AttachmentRefs.refsGone(chatId, current.toList(), merged)
+                _messages[chatId] = merged
             }
-            val merged = (remote + pending).sortedBy { it.createdAt }.toMutableList()
-            gone = com.example.chat.data.media.AttachmentRefs.refsGone(chatId, current.toList(), merged)
-            _messages[chatId] = merged
         }
+        if (!applied) return
         notifyGone(gone)
         notifyChatListeners()
     }
@@ -890,6 +976,31 @@ class ApiBackendService(
         if (changed) notifyChatListeners()
     }
 
+    /**
+     * Notification Reply seam. Sends [text] as the account captured in [expected] and nothing else: base URL, tenant
+     * and token come from that scope object (never re-read from the current session), the HTTP call is registered
+     * under the auth guard before it starts and cancelled on any auth transition, and no redirect/retry happens.
+     * Returns true only when the server confirmed the message AND [expected] is still the live scope. No temp message
+     * is created; the confirmed message is merged into the local list only if the scope still matches.
+     */
+    suspend fun sendMessageForScope(expected: ApiAccountScope, conversationId: String, text: String): Boolean {
+        var merged = false
+        val sender = ScopedMessageSender(
+            current = ::authSnapshot, guarded = ::withAuthScope,
+            transportFor = { ScopedCallHttpTransport(it, ::withAuthScope, sendRequests) },
+            merge = { confirmed ->
+                merged = true
+                synchronized(chatLock) {
+                    val list = _messages.getOrPut(conversationId) { mutableListOf() }
+                    if (list.none { it.id == confirmed.id }) { list.add(confirmed); list.sortBy { it.createdAt } }
+                }
+            },
+        )
+        val ok = withContext(Dispatchers.IO) { sender.send(expected, conversationId, text) }
+        if (merged) notifyChatListeners()
+        return ok && merged
+    }
+
     /** sendMessage: optimistic temp message, POST, confirm replaces temp and
      *  bumps the conversation to the top; failure leaves the temp sending. */
     suspend fun sendMessage(
@@ -898,7 +1009,50 @@ class ApiBackendService(
         type: MessageType = MessageType.text,
         attachment: com.example.chat.domain.models.MessageAttachment? = null,
         extraMetadata: Map<String, Any?>? = null,
+        /** Scope the user action started under (picker/review flows pass theirs). Default: captured now. */
+        expectedScope: ApiAccountScope? = null,
     ): ChatMessage? {
+        val expected = expectedScope ?: authSnapshot()
+        if (expected.userId.isNullOrBlank() || expected.token.isNullOrBlank() || authSnapshot() !== expected) {
+            throw IllegalStateException("Account changed or signed out; message not sent.")
+        }
+        if (DemoMode.isDemoUser(expected.userId)) {
+            // Offline demo: record locally as 'queued'; the message never leaves
+            // the device, so it must not claim a server-confirmed state.
+            val confirmed = ChatMessage(
+                id = "demo_" + java.util.UUID.randomUUID().toString(),
+                conversationId = conversationId,
+                senderId = expected.userId!!,
+                type = type,
+                text = text,
+                attachment = attachment,
+                metadata = extraMetadata?.toMap().orEmpty(),
+                createdAt = Instant.now(),
+                deliveryState = DeliveryState.queued,
+            )
+            withAuthScope(expected) {
+                synchronized(chatLock) {
+                    val list = _messages.getOrPut(conversationId) { mutableListOf() }
+                    list.add(confirmed)
+                    list.sortBy { it.createdAt }
+                    val convIdx = _conversations.indexOfFirst { it.id == conversationId }
+                    if (convIdx != -1) {
+                        val old = _conversations.removeAt(convIdx)
+                        _conversations.add(
+                            0,
+                            old.copy(
+                                lastMessageText = if (confirmed.text.isNotEmpty()) confirmed.text
+                                else if (confirmed.type == MessageType.image) "📷 Photo" else "📎 Attachment",
+                                lastMessageTime = confirmed.createdAt,
+                                lastMessageSenderId = confirmed.senderId,
+                            ),
+                        )
+                    }
+                }
+            }
+            notifyChatListeners()
+            return confirmed
+        }
         // Dart api_backend_service.dart sendMessage: attachments travel as a JSON envelope in `content`.
         val effectiveContent = if (attachment != null) {
             val o = org.json.JSONObject()
@@ -915,17 +1069,23 @@ class ApiBackendService(
         val tempMsg = ChatMessage(
             id = tempId,
             conversationId = conversationId,
-            senderId = session.currentUser?.id ?: "",
+            senderId = expected.userId,
             type = type,
             text = text,
             attachment = attachment,
+            // Keep protection/forward hints on the optimistic row too. Metadata is not authority.
+            metadata = extraMetadata?.toMap().orEmpty(),
             createdAt = Instant.now(),
             deliveryState = DeliveryState.sending, // clock until the server has it
         )
-        synchronized(chatLock) {
-            _messages.getOrPut(conversationId) { mutableListOf() }.add(tempMsg)
-            touchConversationPreview(conversationId, tempMsg)
+        // Lock order: authScopeLock (withAuthScope) then chatLock; nothing takes chatLock before authSnapshot().
+        val added = withAuthScope(expected) {
+            synchronized(chatLock) {
+                _messages.getOrPut(conversationId) { mutableListOf() }.add(tempMsg)
+                touchConversationPreview(conversationId, tempMsg)
+            }
         }
+        if (!added) throw IllegalStateException("Account changed or signed out; message not sent.")
         // Queue first, so the message survives no internet / app restarts until the server has it.
         enqueueOutbox(OutboxEntry(tempId, conversationId, effectiveContent, tempMsg))
         notifyChatListeners()
@@ -1170,6 +1330,10 @@ class ApiBackendService(
      *  ServiceLocator wires these hooks instead (same effect, no cycle). */
     var syncFcmTokenHook: (() -> Unit)? = null
     var unregisterFcmHook: (() -> Unit)? = null
+    /** Offline demo: returns true when any real GoTrue identity is live or
+     *  persisted (wired by ServiceLocator). Demo entry FAILS CLOSED in that
+     *  case; a real stored session is never cleared as demo prep. */
+    var demoGoTruePresentHook: (suspend () -> Boolean)? = null
 
     /** Dart ApiBackendService.uploadMedia (api_backend_service.dart:1569):
      *  multipart POST /chat/upload with the /api/v1 404 fallback. */
@@ -1179,8 +1343,12 @@ class ApiBackendService(
     /** Byte-array form used by ChatMediaService's post-compression payload;
      *  Dart uploads the (possibly compressed) File, whose filename is the
      *  attachment name - here the name travels alongside the bytes. */
-    suspend fun uploadMedia(filename: String, bytes: ByteArray): Map<String, Any> =
-        withContext(Dispatchers.IO) { mediaUpload.uploadMedia(filename, bytes) }
+    suspend fun uploadMedia(filename: String, bytes: ByteArray, expectedScope: ApiAccountScope? = null): Map<String, Any> {
+        val expected = expectedScope ?: authSnapshot()      // captured ONCE: primary, 404 retry and result check share it
+        return withContext(Dispatchers.IO) {
+            mediaUpload.uploadMedia(expected, { authSnapshot() === expected }, filename, bytes)
+        }
+    }
 
     /** Dart ApiBackendService.registerDeviceToken
      *  (api_backend_service.dart:1975): POST /me/devices, /app-users
@@ -1199,6 +1367,18 @@ class ApiBackendService(
         initialized = true
         startCallScopeMonitoring()
         config.init()
+        // Offline demo: if the persisted session is the demo, arm the offline
+        // guard BEFORE restore() fires its transition listeners.
+        try {
+            if (DemoMode.isDemoRestSession(
+                    prefs.getString("api_hub_token", null),
+                    prefs.getString("api_hub_user", null),
+                )
+            ) {
+                DemoMode.active = true
+            }
+        } catch (_: Exception) {
+        }
         session.restore()
         // Dart initialize(): restore _currentOrg from the persisted org payload.
         try {
@@ -1207,21 +1387,64 @@ class ApiBackendService(
         }
         // Dart initialize(): after session restore, fire the chat-plane loads.
         if (session.isAuthenticated) {
-            chatScope.launch { ensureFreshToken() }
-            realtime.connect()
-            startBackgroundSync()
-            chatScope.launch { ensureOutboxLoaded(); flushOutbox() }
-            chatScope.launch { loadConversations() }
-            chatScope.launch { loadUsers() }
-            chatScope.launch { loadTasks() }
-            // Dart _syncFcmToken() (api_backend_service.dart:119).
-            try { syncFcmTokenHook?.invoke() } catch (_: Exception) {
+            if (isDemoSession) {
+                // Offline demo session restored from disk: re-seed the sample
+                // data locally; no realtime, background sync or FCM. (Demo entry
+                // already refused while any real GoTrue identity existed.)
+                seedDemoState()
+                DemoMode.active = true
+            } else {
+                chatScope.launch { ensureFreshToken() }
+                realtime.connect()
+                startBackgroundSync()
+                chatScope.launch { ensureOutboxLoaded(); flushOutbox() }
+                chatScope.launch { loadConversations() }
+                chatScope.launch { loadUsers() }
+                chatScope.launch { loadTasks() }
+                // Dart _syncFcmToken() (api_backend_service.dart:119).
+                try { syncFcmTokenHook?.invoke() } catch (_: Exception) {
+                }
             }
         }
     }
 
     /** UsernameLoginService.login: strip leading @, apply tenant selection,
      *  then delegate to ApiBackendService.login. */
+    /** Any REAL auth adoption (REST or GoTrue) must never inherit demo
+     *  residue: demo echoes are local-only and no flush path may ever see
+     *  them. Idempotent; touches only demo:-prefixed in-memory state. */
+    internal fun purgeDemoResidueForRealAdopt() {
+        // Peer review Edge A: if the REST session itself is the demo identity
+        // (in-memory or persisted), sign it out FIRST - a real adoption must
+        // not leave a persisted demo session behind with the flag-only guards
+        // disarmed (isDemoSession would stay true while DemoMode.active=false).
+        // Only the demo identity is cleared, never real credentials; the
+        // transition fires while the guard is still armed, so gated listeners
+        // stay offline.
+        // STRICT proof before any erasure (peer mixed-store blocker): a pair
+        // is demo only when BOTH sides match. A mixed/corrupt store keeps its
+        // raw bytes - the in-memory demo session is dropped without touching
+        // the store, and demo disk residue is erased only when provably demo.
+        val storedToken = try { prefs.getString("api_hub_token", null) } catch (_: Exception) { null }
+        val storedUser = try { prefs.getString("api_hub_user", null) } catch (_: Exception) { null }
+        val storedStrictDemo = DemoMode.isDemoRestSession(storedToken, storedUser)
+        val memoryIsDemo = DemoMode.isDemoUser(session.currentUser?.id) || session.token == DemoMode.TOKEN
+        when {
+            memoryIsDemo && storedStrictDemo -> try { session.signOut() } catch (_: Exception) {
+            }
+            memoryIsDemo -> try { session.clearInMemoryOnly() } catch (_: Exception) {
+            }
+            storedStrictDemo -> try { sessionStore.clear() } catch (_: Exception) {
+            }
+        }
+        DemoMode.active = false
+        synchronized(chatLock) {
+            _conversations.removeAll { DemoMode.isDemoId(it.id) }
+            _messages.keys.filter { DemoMode.isDemoId(it) }.forEach { _messages.remove(it) }
+            _users.removeAll { DemoMode.isDemoId(it.id) }
+        }
+    }
+
     suspend fun login(identifier: String, password: String, tenant: String?, isDefaultTenant: Boolean): ApiUserProfile =
         withContext(Dispatchers.IO) {
             val value = identifier.trim().replace(Regex("^@+"), "")
@@ -1240,6 +1463,7 @@ class ApiBackendService(
     /** Dart _parseAuthResponse tail (api_backend_service.dart:565-572), shared by login, register,
      *  registerOrganization and oauth: connect the socket, load conversations/users/tasks, sync FCM. */
     private fun afterAuthAdopted() {
+        purgeDemoResidueForRealAdopt()
         realtime.connect()
         startBackgroundSync()
         chatScope.launch { loadConversations() }
@@ -1309,12 +1533,20 @@ class ApiBackendService(
         about: String? = null,
         username: String? = null,
         avatarUrl: String? = null,
-    ): ApiUserProfile = withContext(Dispatchers.IO) {
-        if (session.token == null || session.currentUser == null) throw Exception("Not authenticated")
-        auth.updateProfile(displayName, about, username, avatarUrl)
-        val updated = session.updateProfileFields(displayName, about, username, avatarUrl)
-        notifyChatListeners()
-        updated
+        expectedScope: ApiAccountScope? = null,
+    ): ApiUserProfile {
+        val expected = expectedScope ?: authSnapshot()
+        return withContext(Dispatchers.IO) {
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            auth.updateProfile(expected, { authSnapshot() === expected }, displayName, about, username, avatarUrl)
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            var updated: ApiUserProfile? = null
+            if (!withAuthScope(expected) {
+                updated = session.updateProfileFields(displayName, about, username, avatarUrl)
+            }) throw ApiScopeChangedException()
+            notifyChatListeners()
+            updated ?: throw ApiScopeChangedException()
+        }
     }
 
     /** Dart updateOrganizationRegistrationSupport (PATCH /organization/<id>/registration). */
@@ -1323,13 +1555,22 @@ class ApiBackendService(
 
     /** Dart uploadProfilePhoto: multipart POST /app-users/upload-photo; on a non-empty URL the current user's
      *  avatarUrl is updated and persisted (api_hub_user), then listeners are notified. */
-    suspend fun uploadProfilePhoto(filename: String, bytes: ByteArray): String = withContext(Dispatchers.IO) {
-        val url = accountClient.uploadProfilePhoto(filename, bytes)
-        if (url.isNotEmpty() && session.currentUser != null) {
-            session.updateProfileFields(null, null, null, url)
-            notifyChatListeners()
+    suspend fun uploadProfilePhoto(filename: String, bytes: ByteArray, expectedScope: ApiAccountScope? = null): String {
+        val expected = expectedScope ?: authSnapshot()
+        return withContext(Dispatchers.IO) {
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            val url = accountClient.uploadProfilePhoto(expected, { authSnapshot() === expected }, filename, bytes)
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            var changed = false
+            if (!withAuthScope(expected) {
+                if (url.isNotEmpty()) {
+                    session.updateProfileFields(null, null, null, url)
+                    changed = true
+                }
+            }) throw ApiScopeChangedException()
+            if (changed) notifyChatListeners()
+            url
         }
-        url
     }
 
     suspend fun checkOrganization(workspace: String): Map<String, Any?> = withContext(Dispatchers.IO) {
@@ -1350,12 +1591,44 @@ class ApiBackendService(
         }
     }
 
+    /** Wipes published chat caches after a non-null account switch. Runs inside
+     *  the scope-owner lock (withAuthScope), so it is atomic with guarded async
+     *  writes: an old-account completion either applied before this clear (and
+     *  is wiped) or fails its identity check after. Lock order everywhere:
+     *  scope-owner lock -> chatLock. */
+    fun clearChatCachesForAccountSwitch() {
+        val applied = withAuthScope(authSnapshot()) {
+            synchronized(chatLock) {
+                _messages.clear()
+                _conversations.clear()
+                requiresSubscription = false
+                subscriptionErrorMessage = null
+            }
+        }
+        if (applied) notifyChatListeners()
+    }
+
     fun signOut() {
         // Dart signOut: FirebaseNotificationService.unregisterOnLogout first.
         try { unregisterFcmHook?.invoke() } catch (_: Exception) {
         }
         realtime.disconnect()
-        session.signOut()
+        DemoMode.active = false
+        // Preservation (peer mixed-store blocker): signing out a demo session
+        // may only erase a STRICTLY-demo persisted pair; a mixed/corrupt store
+        // keeps its raw bytes and only the in-memory demo session is dropped.
+        val signingOutDemo = isDemoSession
+        val storedStrictDemo = try {
+            DemoMode.isDemoRestSession(
+                prefs.getString("api_hub_token", null),
+                prefs.getString("api_hub_user", null),
+            )
+        } catch (_: Exception) { false }
+        if (signingOutDemo && !storedStrictDemo) {
+            session.clearInMemoryOnly()
+        } else {
+            session.signOut()
+        }
         saveRefreshToken(null)
         onlineIds.clear(); lastSeenById.clear(); typingUntil.clear()
         // Queued messages stay saved for this account and are sent after its next login.
