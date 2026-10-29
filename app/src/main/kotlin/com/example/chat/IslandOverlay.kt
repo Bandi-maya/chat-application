@@ -513,7 +513,7 @@ buildExpandedStackView(context, targetHeight)
 }
 }
 IslandVisualState.MEDIA_EXPANDED -> buildMediaExpandedView(context, media)
-IslandVisualState.CALL_EXPANDED -> buildCallExpandedView(context, primaryNotif ?: activeNotifications.firstOrNull { it.isCall } ?: IslandNotificationItem("call_fallback", "com.example.chat", "Incoming Call", "Voice Call", true, null, null, emptyList(), null))
+IslandVisualState.CALL_EXPANDED -> buildCallExpandedView(context, primaryNotif ?: activeNotifications.firstOrNull { it.isCall } ?: IslandNotificationItem("call_fallback", context.packageName, "Incoming Call", "Voice Call", true, null, null, emptyList(), null))
 IslandVisualState.REPLY -> buildReplyView(context, activeReplyItem ?: primaryNotif)
 }
 val startW = winParams.width
