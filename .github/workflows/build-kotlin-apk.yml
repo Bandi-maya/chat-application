@@ -63,6 +63,27 @@ jobs:
               target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(data)
           print('CANDIDATE-OVERLAY',m['archive_sha256'],'files',len(m['files']))
           PYOVERLAY
+      - name: Patch pinned candidate sources for com.logybyte.chat
+        run: |
+          python3 - <<'PYLOGYPATCH'
+          import pathlib
+          subs = {
+              'ci/run-instrumentation-shard.py': [('com.example.chat.test/', 'com.logybyte.chat.test/')],
+              'ci/collect-runtime-resources.py': [("meminfo','com.example.chat'", "meminfo','com.logybyte.chat'")],
+              'ci/run-smoke.sh': [('com.example.chat', 'com.logybyte.chat')],
+              'app/src/androidTest/java/com/example/chat/DialerUiAssertions.kt': [('By.pkg("com.example.chat")', 'By.pkg(InstrumentationRegistry.getInstrumentation().targetContext.packageName)')],
+              'app/src/main/res/xml/shortcuts.xml': [('android:targetPackage="com.example.chat"', 'android:targetPackage="com.logybyte.chat"')],
+          }
+          for rel, pairs in subs.items():
+              p = pathlib.Path(rel)
+              if not p.exists():
+                  continue
+              s = p.read_text()
+              for old, new in pairs:
+                  if old in s:
+                      s = s.replace(old, new)
+              p.write_text(s)
+          PYLOGYPATCH
       - name: Apply Chaty Kotlin GB feature overrides
         run: |
           python3 - <<'PYOVERRIDES'
@@ -251,6 +272,27 @@ jobs:
               target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(data)
           print('CANDIDATE-OVERLAY',m['archive_sha256'],'files',len(m['files']))
           PYOVERLAY
+      - name: Patch pinned candidate sources for com.logybyte.chat
+        run: |
+          python3 - <<'PYLOGYPATCH'
+          import pathlib
+          subs = {
+              'ci/run-instrumentation-shard.py': [('com.example.chat.test/', 'com.logybyte.chat.test/')],
+              'ci/collect-runtime-resources.py': [("meminfo','com.example.chat'", "meminfo','com.logybyte.chat'")],
+              'ci/run-smoke.sh': [('com.example.chat', 'com.logybyte.chat')],
+              'app/src/androidTest/java/com/example/chat/DialerUiAssertions.kt': [('By.pkg("com.example.chat")', 'By.pkg(InstrumentationRegistry.getInstrumentation().targetContext.packageName)')],
+              'app/src/main/res/xml/shortcuts.xml': [('android:targetPackage="com.example.chat"', 'android:targetPackage="com.logybyte.chat"')],
+          }
+          for rel, pairs in subs.items():
+              p = pathlib.Path(rel)
+              if not p.exists():
+                  continue
+              s = p.read_text()
+              for old, new in pairs:
+                  if old in s:
+                      s = s.replace(old, new)
+              p.write_text(s)
+          PYLOGYPATCH
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -395,6 +437,27 @@ jobs:
               target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(data)
           print('CANDIDATE-OVERLAY',m['archive_sha256'],'files',len(m['files']))
           PYOVERLAY
+      - name: Patch pinned candidate sources for com.logybyte.chat
+        run: |
+          python3 - <<'PYLOGYPATCH'
+          import pathlib
+          subs = {
+              'ci/run-instrumentation-shard.py': [('com.example.chat.test/', 'com.logybyte.chat.test/')],
+              'ci/collect-runtime-resources.py': [("meminfo','com.example.chat'", "meminfo','com.logybyte.chat'")],
+              'ci/run-smoke.sh': [('com.example.chat', 'com.logybyte.chat')],
+              'app/src/androidTest/java/com/example/chat/DialerUiAssertions.kt': [('By.pkg("com.example.chat")', 'By.pkg(InstrumentationRegistry.getInstrumentation().targetContext.packageName)')],
+              'app/src/main/res/xml/shortcuts.xml': [('android:targetPackage="com.example.chat"', 'android:targetPackage="com.logybyte.chat"')],
+          }
+          for rel, pairs in subs.items():
+              p = pathlib.Path(rel)
+              if not p.exists():
+                  continue
+              s = p.read_text()
+              for old, new in pairs:
+                  if old in s:
+                      s = s.replace(old, new)
+              p.write_text(s)
+          PYLOGYPATCH
         env:
           PIN_ARCH: ${{ steps.pin.outputs.arch }}
       - uses: actions/setup-java@v4
