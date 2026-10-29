@@ -45,7 +45,10 @@ fun UpdateChangelogHost() {
     var show by remember { mutableStateOf(false) }
     var resolved by remember { mutableStateOf(false) }
     val versionName = BuildConfig.VERSION_NAME.ifBlank { "current build" }
-    val installVersion = "$versionName (${BuildConfig.VERSION_CODE})"
+    val packageUpdatedAt = remember(context) {
+        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime }.getOrDefault(0L)
+    }
+    val installVersion = "$versionName (${BuildConfig.VERSION_CODE}) @$packageUpdatedAt"
 
     LaunchedEffect(installVersion) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
