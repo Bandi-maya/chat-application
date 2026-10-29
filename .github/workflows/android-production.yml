@@ -141,6 +141,9 @@ jobs:
           dart --version
           java -version
 
+      - name: Prepare local environment asset
+        run: touch .env
+
       - name: Resolve dependencies
         run: flutter pub get
 
