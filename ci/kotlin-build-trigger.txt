@@ -1,1 +1,1 @@
-build 57 clustered verification: return-to-root nav fix, failure-path per-drag pixel+tree evidence sweep with active-window record, capture .png emit alignment; assertions preserved
+build 58 clustered: settle-bounded search checks, header sheet nav mechanic, task detail freshness diagnostic; assertions preserved
