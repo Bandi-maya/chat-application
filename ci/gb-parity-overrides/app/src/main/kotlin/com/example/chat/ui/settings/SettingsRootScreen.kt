@@ -55,6 +55,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Storage
+import com.example.chat.ReleaseFeatures
 import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -111,8 +112,21 @@ enum class ProfileMediaSource { camera, gallery }
 private data class RootRow(val dest: SettingsDestination, val icon: ImageVector, val tint: @Composable () -> Color, val title: String, val subtitle: String)
 private data class RootGroup(val title: String, val rows: List<RootRow>)
 
-/** Same 6 groups, order, icons, colors and copy as settings_root_screen.dart (L507-720). */
-private val rootGroups: List<RootGroup> = listOf(
+/** Rows whose screens need backend support that is not shipped yet (see ReleaseFeatures). */
+private val deferredDestinations: Set<SettingsDestination> = buildSet {
+    // Linked Devices: device list needs a device-link API. (QR stays reachable from Profile.)
+    if (!ReleaseFeatures.LINKED_DEVICES) add(SettingsDestination.LinkedDevices)
+    // Message Automation & Scheduler: needs server-side scheduled sends / auto-reply.
+    if (!ReleaseFeatures.MESSAGE_AUTOMATION) add(SettingsDestination.Automation)
+}
+
+/** Same 6 groups, order, icons, colors and copy as settings_root_screen.dart (L507-720),
+ *  minus the deferred rows; empty groups are dropped. */
+private val rootGroups: List<RootGroup> get() = allRootGroups
+    .map { g -> g.copy(rows = g.rows.filterNot { it.dest in deferredDestinations }) }
+    .filter { it.rows.isNotEmpty() }
+
+private val allRootGroups: List<RootGroup> = listOf(
     RootGroup("Devices", listOf(
         RootRow(SettingsDestination.LinkedDevices, Icons.Rounded.Devices, { LocalAppColors.current.foregroundSecondary }, "Linked Devices", "Use Chaty on web and desktop, view active sessions"),
     )),
@@ -265,7 +279,7 @@ fun SettingsRootScreen(
                         ) {
                             val fallback: @Composable () -> Unit = {
                                 Box(Modifier.fillMaxSize().background(colors.surfaceElevated), contentAlignment = Alignment.Center) {
-                                    Text(if (user.avatarInitials.isNotEmpty()) user.avatarInitials else "BM", color = colors.foreground, fontSize = (84 * 0.46f).sp, fontWeight = FontWeight.Bold)
+                                    Text(if (user.avatarInitials.isNotEmpty()) user.avatarInitials else "U", color = colors.foreground, fontSize = (84 * 0.46f).sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                             if (!user.avatarUrl.isNullOrEmpty()) ChatyAsyncImage(user.avatarUrl, "Change profile photo", Modifier.fillMaxSize(), error = fallback)
