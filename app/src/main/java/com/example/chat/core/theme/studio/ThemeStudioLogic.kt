@@ -8,6 +8,14 @@ package com.example.chat.core.theme.studio
 object ThemeStudioLogic {
     val PARTICLE_TYPES = listOf("Stars", "Hearts", "Snowflakes", "Leaves")
 
+    /** Must remain aligned with MainNavigationShell.pagerTransition. */
+    val TRANSITION_TYPES = listOf(
+        "Default", "Cube 3D", "Accordion Fold", "Card Flip", "Depth Zoom", "Stack Rotate",
+        "Accordion", "Background To Foreground", "Cube In", "Depth Page", "Draw From Back",
+        "Flip Horizontal", "Flip Vertical", "Foreground To Background", "Tablet",
+        "Rotate Down", "Rotate Up", "Stack", "Zoom Out Slide",
+    )
+
     data class GradientPreset(val name: String, val start: Long, val end: Long)
 
     val GRADIENT_PRESETS = listOf(
