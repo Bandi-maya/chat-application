@@ -276,7 +276,10 @@ class AppRootConfiguredProofTest {
                 device.swipe(device.displayWidth / 2, (device.displayHeight * 0.85).toInt(),
                     device.displayWidth / 2, (device.displayHeight * 0.35).toInt(), 20)
             }
-            val saveTile = device.wait(Until.findObject(By.text("Save Changes")), 5000)
+            // CI swiftshader settles the sheet's expansion + a11y exposure slower than the
+            // pixels (build 82: hierarchy truncated at Urgent while the capture already showed
+            // the full form) - 15s window, the app's end state is verified by 00-failure-state.
+            val saveTile = device.wait(Until.findObject(By.text("Save Changes")), 15000)
                 ?: throw AssertionError("Save Changes not reachable in edit sheet")
             assertTrue("Save Changes above nav bar: bottom=${saveTile.visibleBounds.bottom}, limit=$sheetBottomLimit",
                 saveTile.visibleBounds.bottom <= sheetBottomLimit)
