@@ -442,13 +442,18 @@ class LockBadgeMotionProofTest {
                 assertTrue("calibration sampling captured no frames", n > 0)
             }
         } finally {
-            // Process-level cleanup bound: the fixture process dies even if any earlier step
-            // wedged it; a stuck force-stop is recorded, never masks the diagnostic outcome.
+            // Non-lethal cleanup only: the instrumentation runs INSIDE the target package's
+            // process, so `am force-stop <targetContext.packageName>` kills the test runner
+            // itself (build 92 core-ui: "Process crashed" at test 45/121 after
+            // "Force stopping com.logybyte.chat ... from pid", aborting the remaining 77
+            // tests). 91 proved the suite survives a wedged calib fixture with no process
+            // cleanup at all, so cleanup here is pressHome; a stuck cleanup is recorded,
+            // never masks the diagnostic outcome.
             try {
-                withDeadline(15000, "calib-force-stop") { sh("am force-stop " + inst.targetContext.packageName) }
+                withDeadline(15000, "calib-press-home") { device.pressHome() }
             } catch (t: Throwable) {
                 File(inst.targetContext.getExternalFilesDir(null), "screenshots/calib-loop-verdict.txt")
-                    .appendText("forceStopDeadline=${t.message}\n")
+                    .appendText("cleanupDeadline=${t.message}\n")
             }
         }
     }
