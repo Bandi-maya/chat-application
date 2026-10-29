@@ -6,6 +6,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.Direction
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
@@ -114,18 +115,31 @@ class AddedStylesProofTest {
         ctl.updateUniversal(ctl.universal.copy(fontStyle = "Default"))
     }
 
-    /** Scroll the first scrollable down until [text] is visible (bounded). */
-    private fun scrollToText(text: String, maxSwipes: Int = 12): Boolean {
+    /**
+     * Bounded end-aware search for [text]: every scrollable container is tried
+     * in turn; inside a container, swipes stop as soon as the container reports
+     * it cannot scroll further (end reached) before moving to the next one.
+     * A diagnostic frame is saved when the text stays unreachable.
+     */
+    private fun scrollToText(text: String, maxSwipes: Int = 24): Boolean {
         if (device.wait(Until.hasObject(By.text(text)), 1500)) return true
         val margin = (16f * instrumentation.targetContext.resources.displayMetrics.density).toInt()
-        repeat(maxSwipes) {
-            val scroll = device.findObject(By.scrollable(true)) ?: return device.hasObject(By.text(text))
-            scroll.setGestureMargins(margin, margin, margin, margin)
-            scroll.scroll(Direction.DOWN, 0.6f)
-            device.waitForIdle(600)
-            if (device.hasObject(By.text(text))) return true
+        var budget = maxSwipes
+        val scrollables = device.findObjects(By.scrollable(true)) ?: emptyList()
+        for (scroll in scrollables) {
+            while (budget > 0) {
+                budget--
+                try { scroll.setGestureMargins(margin, margin, margin, margin) } catch (_: StaleObjectException) { break }
+                val moved = try { scroll.scroll(Direction.DOWN, 0.8f) } catch (_: StaleObjectException) { break }
+                device.waitForIdle(500)
+                if (device.hasObject(By.text(text))) return true
+                if (!moved) break
+            }
+            if (budget <= 0) break
         }
-        return device.hasObject(By.text(text))
+        val found = device.hasObject(By.text(text))
+        if (!found) capture("added-scroll-fail-" + text.replace(Regex("[^A-Za-z0-9]+"), "-").take(40) + ".png")
+        return found
     }
 
     private fun clickText(text: String, timeoutMs: Long = 10000): UiObject2 {
@@ -142,9 +156,22 @@ class AddedStylesProofTest {
     }
 
     private fun openSettings() {
-        val settings = device.findObject(By.desc("Settings")) ?: device.findObject(By.text("Settings"))
-        settings?.click()
-        assertTrue("settings root never appeared", device.wait(Until.hasObject(By.text("Privacy Center")), 15000))
+        var opened = false
+        var attempts = 0
+        while (!opened && attempts < 3) {
+            attempts++
+            val settings = device.wait(Until.findObject(By.desc("Settings")), 5000)
+                ?: device.findObject(By.text("Settings"))
+            try {
+                settings?.click()
+            } catch (_: StaleObjectException) {
+                device.waitForIdle(1000)
+                continue
+            }
+            opened = device.wait(Until.hasObject(By.text("Privacy Center")), 15000)
+            if (!opened) device.waitForIdle(1000)
+        }
+        assertTrue("settings root never appeared", opened)
     }
 
     private fun clickDock(label: String) {
