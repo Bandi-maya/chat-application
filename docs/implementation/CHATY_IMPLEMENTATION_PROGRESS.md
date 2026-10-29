@@ -95,3 +95,10 @@ The feature is **in implementation**, not production-ready. Preserve MLS end-to-
 - Removed a hard-coded sample safety number and a “Verified” dialog from Security Center because the screen did not derive or verify a contact-specific cryptographic fingerprint. Replaced them with an explicit disclosure that distinguishes MLS encryption from identity verification.
 - Added a widget regression test for the truthful identity-verification disclosure.
 - Verification status: changes are on a fresh branch from current `main`; Flutter format/analyze/tests/build and the APK-vs-Chaty emulator walkthrough remain **pending** until CI or a Flutter/device environment produces actual results. Do not treat this update as a passing test report.
+
+
+### Additional validation blockers found during the reference review — 2026-10-29
+
+- The first Android verification run failed at `flutter analyze` because `lib/features/auth/login_screen.dart` contained an extra closing brace at the end of the file. Removed only that trailing brace; the next head must confirm the analyzer result.
+- The runtime-audit workflow initially failed at its workflow-lint step because `.github/workflows/diag.yml` and `.github/workflows/settings-render.yml` were stored as single-line JSON blobs, causing embedded shell scripts to be linted as if they were the whole workflow. Converted both into readable YAML and quoted shell markers/paths. Re-run status is still required to establish the outcome.
+- The earlier failures refer to earlier PR head commits. Final verification is pending the CI results for the latest branch head; no local Flutter runner was available through the GitHub connector.
