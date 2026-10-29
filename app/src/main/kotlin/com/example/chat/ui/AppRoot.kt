@@ -1547,19 +1547,22 @@ fun AppRoot() {
         ChatySystemBarScrims(ServiceLocator.preferencesController, resolvedTheme.surfaceColor)
         // App-level calls, locks and notification islands are outside the route
         // container, so they need the same consumed safe-area boundary.
+        var releaseNotesFinished by androidx.compose.runtime.remember(route) { androidx.compose.runtime.mutableStateOf(false) }
         Box(Modifier.fillMaxSize().windowInsetsPadding(
             WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         )) {
         gate.Host()
-        // Dart ChatsHomeScreen.initState -> NotificationPermissionSheet.showIfNeeded (education sheet once, skipped when granted).
+        // Release notes must be dismissed before app-lock UI is presented.
         if (route == AuthRoute.Home) {
             com.example.chat.ui.onboarding.NotificationPermissionSheetHost(modifier = Modifier.fillMaxSize())
-            com.example.chat.ui.updates.UpdateChangelogHost()
+            com.example.chat.ui.updates.UpdateChangelogHost(onFinished = { releaseNotesFinished = true })
+        } else {
+            releaseNotesFinished = false
         }
         } // Shared safe-area app overlays. Island owns its hardware anchor separately.
         com.example.chat.ui.calls.GlobalCallHost(isAuthenticated = ServiceLocator.apiBackend.isAuthenticated)
         // Dart shouldShowLock: authenticated && lock enabled && _appLockRequired.
-        if (lockRequired && ServiceLocator.apiBackend.isAuthenticated &&
+        if (releaseNotesFinished && lockRequired && ServiceLocator.apiBackend.isAuthenticated &&
             ServiceLocator.preferencesController.security.isAppLockEnabled
         ) {
             com.example.chat.ui.settings.security.AppLockOverlay(
