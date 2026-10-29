@@ -82,8 +82,8 @@ jobs:
               shutil.copy2(source, target)
               print(f"Applied {target}")
               applied += 1
-          if applied != 12:
-              raise SystemExit(f"Expected 10 override files, applied {applied}")
+          if applied != 14:
+              raise SystemExit(f"Expected 14 override files, applied {applied}")
           PYOVERRIDES
       - uses: actions/setup-java@v4
         with:
