@@ -1,2 +1,2 @@
-retry 40942544305 3217dd76fac6dbc2d8871a27a095af8377c4dcbc25a031791250a6ca48c64c68
-# refire2 after d9016fa9 workflow fix (PIN_ARCH env) - line 2 ignored by read -r TAG RUN_ID ARCH
+diag-single 40958477111 3217dd76fac6dbc2d8871a27a095af8377c4dcbc25a031791250a6ca48c64c68
+# D1+D2 authorized once (main 2026-10-30): microsoftGridVisibleScrollOffAndBackMemory ALONE on pinned 93 pair (stock RAM, emu 37.2.13.0/16740729 = 93 death config) + passive host capture; captures retargeted to the 5 remaining 93 core failures
