@@ -275,51 +275,18 @@ fun GbFeatureCenterScreen(
         }
     }
 
-    // ---- color dialog (Dart _editColor) ----
+    // Reuse Chaty's shared color picker so all settings have the same
+    // selected-swatch, hex validation, contrast preview, and Apply behavior.
     colorEdit?.let { item ->
-        val current = (preferences.gbFeatures[item.key] as? Number)?.toLong() ?: 0L
-        var text by remember(item.key) { mutableStateOf(GbFeatureCenterLogic.initialColorText(current)) }
-        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
-            onDismissRequest = { colorEdit = null },
-            title = { Text(item.title) },
-            text = {
-                Column(Modifier.width(360.dp)) {
-                    Text(item.description)
-                    Spacer(Modifier.height(16.dp))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        for (color in GbFeatureCenterLogic.colorPresets) {
-                            val selected = current == color
-                            Box(
-                                Modifier.size(38.dp)
-                                    .background(Color(color), CircleShape)
-                                    .border(if (selected) 2.dp else 1.dp, if (selected) scheme.primary else scheme.outlineVariant, CircleShape)
-                                    .clickable { preferences.updateGbFeature(item.key, color); colorEdit = null }
-                                    .semantics {
-                                        contentDescription = "Color " + GbFeatureCenterLogic.initialColorText(color)
-                                        this.selected = selected
-                                        role = Role.Button
-                                    },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                if (selected) Icon(Icons.Rounded.Check, contentDescription = "Selected color", tint = if (color == 0xFFFFFFFFL) Color.Black else Color.White)
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(16.dp))
-                    OutlinedTextField(value = text, onValueChange = { text = it }, label = { Text("ARGB hex") }, placeholder = { Text("#FF6366F1") })
-                }
+        val current = preferences.gbColor(item.key) ?: scheme.primary.value.toLong()
+        com.example.chat.ui.kit.ChatyColorPickerModal(
+            title = item.title,
+            currentColor = current,
+            onColorSelected = { color ->
+                preferences.updateGbFeature(item.key, color)
+                colorEdit = null
             },
-            dismissButton = {
-                Row {
-                    TextButton(onClick = { preferences.updateGbFeature(item.key, 0L); colorEdit = null }) { Text("Theme default") }
-                    TextButton(onClick = { colorEdit = null }) { Text("Cancel") }
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    GbFeatureCenterLogic.parseArgbHex(text)?.let { preferences.updateGbFeature(item.key, it); colorEdit = null }
-                }) { Text("Apply") }
-            },
+            onDismiss = { colorEdit = null },
         )
     }
 
