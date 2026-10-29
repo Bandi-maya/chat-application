@@ -82,7 +82,7 @@ fun UpdateChangelogHost() {
             }
         },
         confirmButton = {
-            TextButton(onClick = { markSeen(context, versionName); show = false }) { Text("Continue") }
+            TextButton(onClick = { markSeen(context, installVersion); show = false }) { Text("Continue") }
         },
     )
 }
