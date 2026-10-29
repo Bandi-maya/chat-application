@@ -272,7 +272,6 @@ class ApiBackendService(
             // Tell the sender it reached this phone (their second grey tick).
             if (message.senderId.isNotEmpty() && message.senderId != session.currentUser?.id) {
                 realtime.sendDelivered(message.conversationId)
-                try { onIncomingMessage(message) } catch (_: Exception) {}
             }
             typingUntil.remove("${message.conversationId}|${message.senderId}")
             if (message.conversationId == activeConversationId && message.senderId != session.currentUser?.id) {
@@ -445,8 +444,6 @@ class ApiBackendService(
 
     // ---- Push / background notification hooks (set by the locator) ----
 
-    /** A message from someone else arrived over the socket (app may be in the background). */
-    @Volatile var onIncomingMessage: (ChatMessage) -> Unit = {}
     /** A chat was opened / read here: its notification can go. */
     @Volatile var onConversationRead: (String) -> Unit = {}
 
@@ -562,6 +559,63 @@ class ApiBackendService(
         }
     }
     val users: List<UserProfile> get() = synchronized(chatLock) { _users.toList() }
+    fun getMessages(chatId: String): List<ChatMessage> {
+        val list = synchronized(chatLock) { (_messages[chatId] ?: emptyList()).toList() }
+        val state = localState("msg").optJSONObject(chatId) ?: return list
+        return list.map { m ->
+            val o = state.optJSONObject(m.id) ?: return@map m
+            m.copy(isStarred = o.optBoolean("starred", m.isStarred), isPinned = o.optBoolean("pinned", m.isPinned))
+        }
+    }
+
+    // ---- Device-local chat state ----
+    // The custom backend has no per-user pin/mute/archive or star/pin-message API yet, so these
+    // are kept on this device per account (they do not sync to the user's other devices).
+
+    private val localStateLock = Any()
+    private val localStateCache = HashMap<String, org.json.JSONObject>()
+
+    private fun localStateKey(kind: String) = "api_local_${kind}_" + (session.currentUser?.id ?: "anon")
+
+    private fun localState(kind: String): org.json.JSONObject = synchronized(localStateLock) {
+        val key = localStateKey(kind)
+        localStateCache.getOrPut(key) {
+            try { org.json.JSONObject(prefs.getString(key, "{}") ?: "{}") } catch (_: Exception) { org.json.JSONObject() }
+        }
+    }
+
+    private fun saveLocalState(kind: String, value: org.json.JSONObject) = synchronized(localStateLock) {
+        val key = localStateKey(kind)
+        localStateCache[key] = value
+        try { prefs.edit().putString(key, value.toString()).apply() } catch (_: Exception) {}
+    }
+
+    /** field: pinned | muted | archived. */
+    fun setConversationLocalState(conversationId: String, field: String, value: Boolean) {
+        synchronized(localStateLock) {
+            val state = org.json.JSONObject(localState("conv").toString())
+            val entry = state.optJSONObject(conversationId) ?: org.json.JSONObject()
+            entry.put(field, value)
+            state.put(conversationId, entry)
+            saveLocalState("conv", state)
+        }
+        notifyChatListeners()
+    }
+
+    /** field: starred | pinned. */
+    fun setMessageLocalState(conversationId: String, messageId: String, field: String, value: Boolean) {
+        synchronized(localStateLock) {
+            val state = org.json.JSONObject(localState("msg").toString())
+            val room = state.optJSONObject(conversationId) ?: org.json.JSONObject()
+            val entry = room.optJSONObject(messageId) ?: org.json.JSONObject()
+            entry.put(field, value)
+            room.put(messageId, entry)
+            state.put(conversationId, room)
+            saveLocalState("msg", state)
+        }
+        notifyChatListeners()
+    }
+
 
     /** True while the adopted session is the offline demo ([DemoMode]). */
     /** STRICT: a session is demo only when BOTH the token and the user are
@@ -628,63 +682,6 @@ class ApiBackendService(
             _users.clear()
             _users.addAll(DemoSampleData.demoUsers())
         }
-    }
-
-    fun getMessages(chatId: String): List<ChatMessage> {
-        val list = synchronized(chatLock) { (_messages[chatId] ?: emptyList()).toList() }
-        val state = localState("msg").optJSONObject(chatId) ?: return list
-        return list.map { m ->
-            val o = state.optJSONObject(m.id) ?: return@map m
-            m.copy(isStarred = o.optBoolean("starred", m.isStarred), isPinned = o.optBoolean("pinned", m.isPinned))
-        }
-    }
-
-    // ---- Device-local chat state ----
-    // The custom backend has no per-user pin/mute/archive or star/pin-message API yet, so these
-    // are kept on this device per account (they do not sync to the user's other devices).
-
-    private val localStateLock = Any()
-    private val localStateCache = HashMap<String, org.json.JSONObject>()
-
-    private fun localStateKey(kind: String) = "api_local_${kind}_" + (session.currentUser?.id ?: "anon")
-
-    private fun localState(kind: String): org.json.JSONObject = synchronized(localStateLock) {
-        val key = localStateKey(kind)
-        localStateCache.getOrPut(key) {
-            try { org.json.JSONObject(prefs.getString(key, "{}") ?: "{}") } catch (_: Exception) { org.json.JSONObject() }
-        }
-    }
-
-    private fun saveLocalState(kind: String, value: org.json.JSONObject) = synchronized(localStateLock) {
-        val key = localStateKey(kind)
-        localStateCache[key] = value
-        try { prefs.edit().putString(key, value.toString()).apply() } catch (_: Exception) {}
-    }
-
-    /** field: pinned | muted | archived. */
-    fun setConversationLocalState(conversationId: String, field: String, value: Boolean) {
-        synchronized(localStateLock) {
-            val state = org.json.JSONObject(localState("conv").toString())
-            val entry = state.optJSONObject(conversationId) ?: org.json.JSONObject()
-            entry.put(field, value)
-            state.put(conversationId, entry)
-            saveLocalState("conv", state)
-        }
-        notifyChatListeners()
-    }
-
-    /** field: starred | pinned. */
-    fun setMessageLocalState(conversationId: String, messageId: String, field: String, value: Boolean) {
-        synchronized(localStateLock) {
-            val state = org.json.JSONObject(localState("msg").toString())
-            val room = state.optJSONObject(conversationId) ?: org.json.JSONObject()
-            val entry = room.optJSONObject(messageId) ?: org.json.JSONObject()
-            entry.put(field, value)
-            room.put(messageId, entry)
-            state.put(conversationId, room)
-            saveLocalState("msg", state)
-        }
-        notifyChatListeners()
     }
 
     var requiresSubscription: Boolean = false
@@ -1089,7 +1086,6 @@ class ApiBackendService(
             }
         }
         if (!added) throw IllegalStateException("Account changed or signed out; message not sent.")
-
         // Queue first, so the message survives no internet / app restarts until the server has it.
         enqueueOutbox(OutboxEntry(tempId, conversationId, effectiveContent, tempMsg))
         notifyChatListeners()
@@ -1298,11 +1294,6 @@ class ApiBackendService(
             val list = _messages[conversationId] ?: return@synchronized
             val i = list.indexOfFirst { it.id == messageId }
             if (i != -1) list[i] = list[i].copy(deliveryState = state)
-        }
-        if (!inScope) {
-            // Server accepted it under the old account, but nothing may be published into the new one.
-            dropTemp()
-            throw IllegalStateException("Account changed during send; the message was not shown here.")
         }
         notifyChatListeners()
     }
@@ -1638,7 +1629,6 @@ class ApiBackendService(
         } else {
             session.signOut()
         }
-
         saveRefreshToken(null)
         onlineIds.clear(); lastSeenById.clear(); typingUntil.clear()
         // Queued messages stay saved for this account and are sent after its next login.
