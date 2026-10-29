@@ -445,8 +445,14 @@ class AddedStylesProofTest {
                 clickAndWait("Navigation & Touch Effects", "Chats List Animation")
                 clickAndWait("Chats List Animation", "Select Chats List Animation")
                 clickText("Wave")
-                device.wait(Until.findObject(By.text("Apply")), 5000)?.click()
+                // DIAGNOSTIC ONLY: record whether Apply ever appeared, whether the click
+                // cleared it, and the controller value right after - distinguishes
+                // route/click-miss from applied-but-not-persisted. Waits/verdict unchanged.
+                val waveApply = device.wait(Until.findObject(By.text("Apply")), 5000)
+                android.util.Log.w("AddedStyles", "ENTRANCE-DIAG preApply waveVisible=" + device.hasObject(By.text("Wave")) + " applyFound=" + (waveApply != null))
+                waveApply?.click()
                 device.waitForIdle(2000)
+                android.util.Log.w("AddedStyles", "ENTRANCE-DIAG postApply controllerEntrance=" + ctl.effects.homeListAnimation + " applyStillVisible=" + device.hasObject(By.text("Apply")))
                 assertEquals("entrance selection must persist in the controller", "Wave", ctl.effects.homeListAnimation)
                 capture("added-effects-wave-selected")
 
