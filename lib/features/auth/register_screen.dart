@@ -4,14 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../../data/services/api_backend_service.dart';
 import '../../data/services/backend_config.dart';
-import '../../data/services/backend_service.dart';
 import '../../injection/locator.dart';
-import '../../ui/core/design_system/components/chaty_kit.dart';
 import '../../ui/core/persistence/preferences_storage.dart';
 import '../../ui/core/theme/theme_config.dart';
 import '../../ui/core/theme/theme_controller.dart';
 import '../../ui/core/validators/input_validators.dart';
-import '../../ui/core/widgets/username_availability_field.dart';
 import '../chats/main_navigation_shell.dart';
 import 'register_organization_screen.dart';
 import 'widgets/auth_components.dart';
@@ -30,13 +27,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _workspaceController = TextEditingController();
 
-  late final ChatyBackendService _backend;
   late final ApiBackendService _apiBackend;
 
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _useOrganization = false;
-  bool? _usernameAvailable;
   String? _errorMessage;
 
   Timer? _orgCheckTimer;
@@ -49,7 +44,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void initState() {
     super.initState();
-    _backend = locator<ChatyBackendService>();
     _apiBackend = locator<ApiBackendService>();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
