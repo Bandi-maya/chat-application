@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckBox
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -210,14 +209,6 @@ fun TaskCreateEditModal(
     // LaunchedEffect show() lands on Expanded - the recovery the recreate() path already proves
     // (AccountDraftIsolationProofTest recreate + font2 legs). Scrim-tap, back, cancel and save
     // dismissal are untouched (onDismissRequest only via user paths; the draft stays hoisted).
-    val probeView = androidx.compose.ui.platform.LocalView.current
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        android.util.Log.w("SheetProbe", "decor h=${'$'}{probeView.rootView.height} w=${'$'}{probeView.rootView.width}")
-        repeat(8) { i ->
-            android.util.Log.w("SheetProbe", "t=${'$'}{i}s cur=${'$'}{sheetState.currentValue} tgt=${'$'}{sheetState.targetValue} off=${'$'}{runCatching { sheetState.requireOffset() }.getOrDefault(-2f)}")
-            kotlinx.coroutines.delay(1000)
-        }
-    }
     val sheetDensity = androidx.compose.ui.platform.LocalDensity.current
     val sheetState = androidx.compose.runtime.remember {
         androidx.compose.material3.SheetState(
@@ -229,7 +220,6 @@ fun TaskCreateEditModal(
     ModalBottomSheet(sheetState = sheetState, tonalElevation = 0.dp, containerColor = com.example.chat.ui.theme.LocalAppColors.current.surfaceElevated, dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = { if (!isSaving) onDismiss() }) {
         Column(
             modifier = Modifier
-                .onGloballyPositioned { android.util.Log.w("SheetProbe", "content boundsInWindow=${'$'}{it.boundsInWindow()}") }
                 // One bottom inset owner: max(IME, nav bar, cutout). Applied outside the scroller so the last rows
                 // (Priority/Due/Save) can scroll fully clear of the OS nav bar; the sheet surface still extends behind it.
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
