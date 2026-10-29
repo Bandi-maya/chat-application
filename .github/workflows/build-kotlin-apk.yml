@@ -301,6 +301,28 @@ jobs:
                       s = s.replace(old, new)
               p.write_text(s)
           PYLOGYPATCH
+      - name: Apply Chaty Kotlin GB feature overrides (discovery parity with compiled test APK)
+        run: |
+          python3 - <<'PYOVERRIDES'
+          from pathlib import Path
+          import shutil
+
+          root = Path("ci/gb-parity-overrides")
+          applied = 0
+          for source in sorted(root.rglob("*")):
+              if not source.is_file():
+                  continue
+              relative = source.relative_to(root)
+              if not relative.parts or relative.parts[0] != "app":
+                  raise SystemExit(f"Unexpected override path: {relative}")
+              target = Path(*relative.parts)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(source, target)
+              print(f"Applied {target}")
+              applied += 1
+          if applied != 50:
+              raise SystemExit(f"Expected 50 override files, applied {applied}")
+          PYOVERRIDES
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
