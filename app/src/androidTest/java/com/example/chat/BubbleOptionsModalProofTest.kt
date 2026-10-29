@@ -155,9 +155,13 @@ class BubbleOptionsModalProofTest {
             dev.findObject(By.text("👍")).click()
             Thread.sleep(900)
             assertEquals("rail reaction must reach the screen callback", listOf("one" to "👍"), reactions.toList())
+        } else {
+            // Rail is gated off for this release: dismiss via back, same path the
+            // long-press proof verifies, so the dismiss assertion stays real.
+            dev.pressBack()
         }
         assertTrue(
-            "menu must dismiss after a reaction",
+            "menu must dismiss after rail reaction or back",
             dev.wait(Until.gone(By.text(actions.first().label)), 5000),
         )
         scenario.close()
