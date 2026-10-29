@@ -135,24 +135,33 @@ class AddedStylesProofTest {
     }
 
     /**
-     * Bounded end-aware search for [text]: every scrollable container is tried
-     * in turn; inside a container, swipes stop as soon as the container reports
-     * it cannot scroll further (end reached) before moving to the next one.
-     * A diagnostic frame is saved when the text stays unreachable.
+     * Bounded flick search for [text]: real fast swipes inside each scrollable
+     * container's bounds (controlled UiObject2.scroll gestures are consumed by
+     * bottom-sheet nested scrolling without advancing - a11y tree + pixel
+     * evidence, capture 40812499812). A container is abandoned when two
+     * consecutive flicks leave the visible text set unchanged (end reached).
      */
-    private fun scrollToText(text: String, maxSwipes: Int = 24): Boolean {
-        if (device.wait(Until.hasObject(By.text(text)), 1500)) return true
-        val margin = (16f * instrumentation.targetContext.resources.displayMetrics.density).toInt()
+    private fun scrollToText(text: String, maxSwipes: Int = 30): Boolean {
+        if (device.wait(Until.hasObject(By.text(text)), 4000)) return true
         var budget = maxSwipes
         val scrollables = device.findObjects(By.scrollable(true)) ?: emptyList()
-        for (scroll in scrollables) {
+        for (s in scrollables) {
+            val b = try { s.visibleBounds } catch (_: StaleObjectException) { continue }
+            val cx = b.centerX()
+            val y1 = b.top + b.height() * 3 / 4
+            val y2 = b.top + b.height() / 4
+            var lastSig = ""
+            var stillCount = 0
             while (budget > 0) {
                 budget--
-                try { scroll.setGestureMargins(margin, margin, margin, margin) } catch (_: StaleObjectException) { break }
-                val moved = try { scroll.scroll(Direction.DOWN, 0.8f) } catch (_: StaleObjectException) { break }
-                device.waitForIdle(500)
+                device.swipe(cx, y1, cx, y2, 12)
+                device.waitForIdle(400)
                 if (device.hasObject(By.text(text))) return true
-                if (!moved) break
+                val sig = try {
+                    (device.findObjects(By.clazz("android.widget.TextView")) ?: emptyList())
+                        .mapNotNull { it.text }.joinToString("|").hashCode().toString()
+                } catch (_: Exception) { "" }
+                if (sig == lastSig) { stillCount++; if (stillCount >= 2) break } else { stillCount = 0; lastSig = sig }
             }
             if (budget <= 0) break
         }
@@ -179,10 +188,15 @@ class AddedStylesProofTest {
         var attempts = 0
         while (!opened && attempts < 3) {
             attempts++
-            val settings = device.wait(Until.findObject(By.desc("Settings")), 5000)
-                ?: device.findObject(By.text("Settings"))
+            // Two nodes carry desc "Settings" on home: the top-bar avatar and the
+            // dock entry (a11y tree evidence, capture 40812499812). Navigate via the dock one.
+            val all = device.wait(Until.findObjects(By.desc("Settings")), 4000) ?: emptyList()
+            val dockLimit = device.displayHeight * 3 / 4
+            val target = all.firstOrNull {
+                try { it.visibleBounds.centerY() > dockLimit } catch (_: StaleObjectException) { false }
+            } ?: all.lastOrNull()
             try {
-                settings?.click()
+                target?.click()
             } catch (_: StaleObjectException) {
                 device.waitForIdle(1000)
                 continue
