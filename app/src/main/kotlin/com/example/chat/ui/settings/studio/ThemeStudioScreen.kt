@@ -44,7 +44,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -457,7 +456,7 @@ private fun ParticlesTab(
     ) {
         Column(Modifier.weight(1f)) {
             Text("Enable falling particles", fontWeight = FontWeight.SemiBold, color = Color(theme.primaryTextColor))
-            Text("Apply the selected effect to the configured Home/Chat scope.", fontSize = 12.sp, color = appColors.secondaryText)
+            Text("Apply the selected effect to the configured Home/Chat scope.", fontSize = 12.sp, color = Color(theme.secondaryTextColor))
         }
         Switch(checked = enabled, onCheckedChange = onEnabledChange)
     }
