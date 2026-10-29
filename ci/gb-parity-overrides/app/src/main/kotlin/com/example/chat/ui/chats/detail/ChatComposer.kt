@@ -227,6 +227,7 @@ fun ChatEntryBar(
                     // (state-level) for the emulator-observed tap-does-not-toggle failure.
                     android.util.Log.i("MicGestureDiag", "mic onTap fired videoMode=" + videoMode + " activeHold=" + activeVideoHold.get() + " t=" + System.currentTimeMillis())
                     if (activeVideoHold.get() == null) videoMode = !videoMode
+                    android.util.Log.i("MicGestureDiag", "mic onTap settled videoMode=" + videoMode + " t=" + System.currentTimeMillis())
                 },
                 onLongPressStart = {
                     android.util.Log.i("MicGestureDiag", "mic onLongPressStart videoMode=" + videoMode + " t=" + System.currentTimeMillis())
