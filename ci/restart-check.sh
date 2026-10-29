@@ -26,7 +26,7 @@ PIDS=""
 for i in 1 2; do
   adb shell am force-stop $PKG
   sleep 2
-  adb shell am start -W -n $PKG/.MainActivity | tr -d '\r' | grep -i "Status\|LaunchState\|TotalTime" | sed "s/^/RESTART-START$i /"
+  adb shell am start -W -n $PKG/com.example.chat.MainActivity | tr -d '\r' | grep -i "Status\|LaunchState\|TotalTime" | sed "s/^/RESTART-START$i /"
   sleep 20
   PID=$(adb shell pidof $PKG | tr -d '\r' | awk '{print $1}')
   echo "RESTART-PID launch=$i pid=${PID:-none}"
