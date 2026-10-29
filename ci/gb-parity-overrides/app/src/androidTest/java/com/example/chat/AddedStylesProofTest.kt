@@ -64,7 +64,7 @@ class AddedStylesProofTest {
 
     private fun capture(name: String): File {
         val bitmap = instrumentation.uiAutomation.takeScreenshot() ?: throw AssertionError("no pixels for $name")
-        val file = File(outDir, name)
+        val file = File(outDir, if (name.endsWith(".png")) name else "$name.png")
         FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bitmap.recycle()
         return file
@@ -75,6 +75,7 @@ class AddedStylesProofTest {
         try {
             val root = instrumentation.uiAutomation.rootInActiveWindow ?: return
             val sb = StringBuilder()
+            sb.append("activeWindowPackage=").append(root.packageName).append("\n")
             fun walk(n: android.view.accessibility.AccessibilityNodeInfo?, d: Int) {
                 if (n == null) return
                 val r = android.graphics.Rect()
@@ -223,8 +224,70 @@ class AddedStylesProofTest {
                     "finalSig=" + finalSig + " final=[" + finalSample + "]\n",
                 )
             } catch (_: Exception) {}
+            evidenceSweep(text, tag)
         }
         return found
+    }
+
+    /**
+     * Failure-path diagnostic, runs only after a search miss: drives containers
+     * back to their top, then records the viewport (pixel + a11y tree carrying
+     * the exact active window) at EVERY drag of one bounded downward sweep,
+     * stopping early if the target appears. A top-to-bottom sweep can jump a
+     * row between checks; per-drag viewports settle composed-vs-jumped directly.
+     */
+    private fun evidenceSweep(text: String, tag: String, maxDrags: Int = 10) {
+        try {
+            capture("added-sweep-" + tag + "-00-initial.png")
+            dumpTree("sweep-" + tag + "-00-initial")
+            // to top first (same mechanic as the search, uncounted)
+            for (s in scrollables()) {
+                val b = try { s.visibleBounds } catch (_: StaleObjectException) { continue }
+                var lastSig = ""
+                var still = 0
+                var k = 0
+                while (k < 8) {
+                    k++
+                    slowDrag(b, revealBelow = false)
+                    val (sig, _) = windowSig()
+                    if (sig == lastSig) { still++; if (still >= 2) break } else { still = 0; lastSig = sig }
+                }
+            }
+            capture("added-sweep-" + tag + "-01-top.png")
+            dumpTree("sweep-" + tag + "-01-top")
+            var n = 1
+            for (s in scrollables()) {
+                val b = try { s.visibleBounds } catch (_: StaleObjectException) { continue }
+                var lastSig = ""
+                var still = 0
+                while (n <= maxDrags) {
+                    slowDrag(b, revealBelow = true)
+                    n++
+                    val name = "sweep-" + tag + "-down-" + n
+                    capture("added-" + name + ".png")
+                    dumpTree(name)
+                    if (device.hasObject(By.text(text))) return
+                    val (sig, _) = windowSig()
+                    if (sig == lastSig) { still++; if (still >= 2) break } else { still = 0; lastSig = sig }
+                }
+                if (n > maxDrags) break
+            }
+        } catch (_: Exception) {}
+    }
+
+    /**
+     * Bounded navigation back to the settings root from any settings subpage or
+     * sheet: back off to home if needed, then re-enter via the dock. Test-local
+     * navigation only; preferences are never touched.
+     */
+    private fun returnToSettingsRoot() {
+        for (i in 1..6) {
+            if (device.hasObject(By.text("Privacy Center"))) return
+            if (device.hasObject(By.textContains("Aisha (sample)"))) break
+            device.pressBack()
+            device.waitForIdle(600)
+        }
+        if (!device.hasObject(By.text("Privacy Center"))) openSettings()
     }
 
     private fun clickText(text: String, timeoutMs: Long = 10000): UiObject2 {
@@ -362,10 +425,12 @@ class AddedStylesProofTest {
                 device.waitForIdle(2000)
                 assertEquals("entrance selection must persist in the controller", "Wave", ctl.effects.homeListAnimation)
                 capture("added-effects-wave-selected")
-                device.pressBack()
 
-                // Font selection through the real route.
-                assertTrue("settings root lost", device.wait(Until.hasObject(By.text("Privacy Center")), 10000))
+                // Font selection through the real route (root re-established
+                // deterministically; a bare pressBack landing position is not
+                // guaranteed - capture 40820379447 :368 evidence).
+                returnToSettingsRoot()
+                assertTrue("settings root not re-established", device.wait(Until.hasObject(By.text("Privacy Center")), 15000))
                 clickAndWait("Universal", "Styles (Look and feel)")
                 clickAndWait("Styles (Look and feel)", "Font Style")
                 clickAndWait("Font Style", "Select font style")
@@ -385,7 +450,7 @@ class AddedStylesProofTest {
                 clickAndWait("Navigation & Touch Effects", "Chats List Animation")
                 assertTrue("Wave not shown as selected after recreate",
                     device.wait(Until.hasObject(By.textContains("Selected: Wave")), 10000))
-                device.pressBack()
+                returnToSettingsRoot()
                 clickAndWait("Universal", "Styles (Look and feel)")
                 clickAndWait("Styles (Look and feel)", "Font Style")
                 assertTrue("BEBASNEUE not shown as selected after recreate",
