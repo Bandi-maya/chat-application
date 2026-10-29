@@ -308,6 +308,15 @@ jobs:
             cat "$f"
             echo "TXT-END $n"
           done
+          for f in screenshots/added-*.txt; do
+            [ -f "$f" ] || continue
+            n=$(basename "$f" .txt)
+            sz=$(stat -c %s "$f")
+            if [ "$sz" -gt 200000 ]; then echo "TXTSKIP $n size=$sz"; continue; fi
+            echo "TXT-BEGIN $n $sz"
+            cat "$f"
+            echo "TXT-END $n"
+          done
           # Sanitized per-case toggle timing (no account data): budget/decision/elapsed/entry/native-state counts only.
           for k in preready release cancel locked auth tenant; do
             t="screenshots/real-host-hold-$k-toggle-timing.txt"
@@ -553,6 +562,15 @@ jobs:
           for n in hdr-sheet-scroll-light hdr-sheet-last-row-light hdr-sheet-scroll-dark hdr-sheet-last-row-dark; do
             f="screenshots/$n.txt"
             [ -f "$f" ] || { echo "TXTMISSING $n"; continue; }
+            sz=$(stat -c %s "$f")
+            if [ "$sz" -gt 200000 ]; then echo "TXTSKIP $n size=$sz"; continue; fi
+            echo "TXT-BEGIN $n $sz"
+            cat "$f"
+            echo "TXT-END $n"
+          done
+          for f in screenshots/added-*.txt; do
+            [ -f "$f" ] || continue
+            n=$(basename "$f" .txt)
             sz=$(stat -c %s "$f")
             if [ "$sz" -gt 200000 ]; then echo "TXTSKIP $n size=$sz"; continue; fi
             echo "TXT-BEGIN $n $sz"
