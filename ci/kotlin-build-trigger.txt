@@ -1,1 +1,1 @@
-build 55 tree-grounded helper fixes: dock-disambiguated Settings entry, in-bounds flick scroll with no-progress detector, 4s settle; assertions intact
+build 56 bidirectional slow-drag helper: known-top start, per-drag composition, initial-viewport searchlog; assertions intact
