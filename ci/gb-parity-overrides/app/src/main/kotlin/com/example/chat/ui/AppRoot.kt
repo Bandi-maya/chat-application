@@ -1,5 +1,6 @@
 package com.example.chat.ui
 
+import com.example.chat.ReleaseFeatures
 import com.example.chat.ui.core.system.ChatySystemBarScrims
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -131,14 +132,8 @@ fun AppRoot() {
         var planIsNew by remember { mutableStateOf(false) }
         var selectedInitialMessageId by remember { mutableStateOf<String?>(null) }
         val lockRequired by ServiceLocator.appLock.lockRequired.collectAsState()
-        androidx.compose.runtime.LaunchedEffect(
-            route,
-            ServiceLocator.apiBackend.isAuthenticated,
-            ServiceLocator.preferencesController.security.isAppLockEnabled,
-            ServiceLocator.preferencesController.security.lockMethod,
-        ) {
-            // Re-run when restored authentication or persisted lock preferences become available.
-            // A route-only effect could run before either value was restored and never show the lock.
+        androidx.compose.runtime.LaunchedEffect(route) {
+            // Dart _scheduleInitialAppLockIfNeeded on reaching the authenticated shell.
             if (route == AuthRoute.Home) ServiceLocator.appLock.scheduleInitialIfNeeded()
         }
         // Call media permissions (Dart: flutter_webrtc getUserMedia prompts RECORD_AUDIO/CAMERA itself).
@@ -171,6 +166,26 @@ fun AppRoot() {
             // Dart _AppState.initState: locator<MessageAutomationService>() (30s account sync, gated on a session).
             ServiceLocator.messageAutomation
         }
+        // Message notification tapped: open that chat once signed in and unlocked.
+        val notificationRoomId by com.example.chat.notifications.ChatyNotifications.pendingRoomId.collectAsState()
+        androidx.compose.runtime.LaunchedEffect(notificationRoomId, ServiceLocator.apiBackend.isAuthenticated, lockRequired) {
+            val roomId = notificationRoomId ?: return@LaunchedEffect
+            val api = ServiceLocator.apiBackend
+            if (!api.isAuthenticated || lockRequired) return@LaunchedEffect
+            var conversation = api.conversations.firstOrNull { it.id == roomId }
+            if (conversation == null) {
+                try { api.loadConversations() } catch (_: Exception) {}
+                conversation = api.conversations.firstOrNull { it.id == roomId }
+            }
+            com.example.chat.notifications.ChatyNotifications.consumeOpenRoom()
+            if (conversation != null) {
+                api.setActiveConversation(conversation.id)
+                selectedInitialMessageId = null
+                selectedConversation = conversation
+                route = AuthRoute.ChatDetail
+            }
+        }
+
         var previousLockRequired by remember { mutableStateOf(lockRequired) }
         androidx.compose.runtime.LaunchedEffect(lockRequired) {
             // local_auth stopAuthentication(): a pending prompt never resumes once the lock requirement drops (unlocked
@@ -574,7 +589,8 @@ fun AppRoot() {
                         separateChatsAndGroups = shellHome.separateChatsAndGroups,
                         hasCustomNavigationDestinations = ServiceLocator.templateController.hasCustomNavigationDestinations,
                         hideTasks = shellPrefsCtl.gbBool("nav_hide_tasks"),
-                        hideUpdates = shellPrefsCtl.gbBool("nav_hide_updates"),
+                        // Status/Updates tab is deferred to the next release (ReleaseFeatures).
+                        hideUpdates = shellPrefsCtl.gbBool("nav_hide_updates") || !ReleaseFeatures.STATUS_UPDATES,
                         pagerTransition3d = shellHome.pagerTransition3d,
                         bottomBarStyle = ServiceLocator.appearanceVariantController.bottomBarStyle,
                         navigationStyleName = ServiceLocator.appearanceVariantController.navigationStyle,
@@ -586,7 +602,8 @@ fun AppRoot() {
                     onExitApp = { (shellCtx as? android.app.Activity)?.finish() },
                     onCenterAction = {
                         // Dart _handleNavigationCenterAction.
-                        if (ServiceLocator.templateController.navigation.centerActionId != "camera") {
+                        // The camera centre action posts a status; statuses are deferred (ReleaseFeatures).
+                        if (ServiceLocator.templateController.navigation.centerActionId != "camera" || !ReleaseFeatures.STATUS_UPDATES) {
                             showCenterEffects = true
                         } else {
                             scope.launch {
@@ -761,7 +778,8 @@ fun AppRoot() {
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.calls -> {
                                 val history = ServiceLocator.callHistory
                                 val callScope = androidx.compose.runtime.rememberCoroutineScope()
-                                androidx.compose.runtime.LaunchedEffect(Unit) { history.start() }
+                                // Call history needs a call-log API (next release); calls themselves work.
+                                androidx.compose.runtime.LaunchedEffect(Unit) { if (ReleaseFeatures.CALL_HISTORY) history.start() }
                                 if (showCallPicker) {
                                     androidx.compose.ui.window.Dialog(
                                         onDismissRequest = { showCallPicker = false },
@@ -1497,11 +1515,7 @@ fun AppRoot() {
                     // session has no Supabase auth, so this may fail at runtime; the api branch has the same rail.
                     onToggleStar = { cid, mid ->
                         val m = ServiceLocator.apiBackend.getMessages(cid).firstOrNull { it.id == mid }
-                        if (m != null) starScope.launch {
-                            try {
-                                ServiceLocator.conversationsRepository.setMessageStateAsync(cid, mid, "starred", !m.isStarred)
-                            } catch (_: Exception) { }
-                        }
+                        if (m != null) ServiceLocator.apiBackend.setMessageLocalState(cid, mid, "starred", !m.isStarred)
                     },
                     onOpenConversation = { cid, mid ->
                         ServiceLocator.apiBackend.conversations.firstOrNull { it.id == cid }?.let { c ->
@@ -1547,22 +1561,18 @@ fun AppRoot() {
         ChatySystemBarScrims(ServiceLocator.preferencesController, resolvedTheme.surfaceColor)
         // App-level calls, locks and notification islands are outside the route
         // container, so they need the same consumed safe-area boundary.
-        var releaseNotesFinished by androidx.compose.runtime.remember(route) { androidx.compose.runtime.mutableStateOf(false) }
         Box(Modifier.fillMaxSize().windowInsetsPadding(
             WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         )) {
         gate.Host()
-        // Release notes must be dismissed before app-lock UI is presented.
+        // Dart ChatsHomeScreen.initState -> NotificationPermissionSheet.showIfNeeded (education sheet once, skipped when granted).
         if (route == AuthRoute.Home) {
             com.example.chat.ui.onboarding.NotificationPermissionSheetHost(modifier = Modifier.fillMaxSize())
-            com.example.chat.ui.updates.UpdateChangelogHost(onFinished = { releaseNotesFinished = true })
-        } else {
-            releaseNotesFinished = false
         }
         } // Shared safe-area app overlays. Island owns its hardware anchor separately.
         com.example.chat.ui.calls.GlobalCallHost(isAuthenticated = ServiceLocator.apiBackend.isAuthenticated)
         // Dart shouldShowLock: authenticated && lock enabled && _appLockRequired.
-        if (releaseNotesFinished && lockRequired && ServiceLocator.apiBackend.isAuthenticated &&
+        if (lockRequired && ServiceLocator.apiBackend.isAuthenticated &&
             ServiceLocator.preferencesController.security.isAppLockEnabled
         ) {
             com.example.chat.ui.settings.security.AppLockOverlay(
