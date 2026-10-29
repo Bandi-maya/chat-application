@@ -476,8 +476,8 @@ class MediaInteractionProofTest {
                 device.waitForIdle()
                 android.util.Log.i("ALBUM-PROBE", "after click2 opened=" + opened.get())
                 try {
-                    val child = albumNode.getChild(0)
-                    android.util.Log.i("ALBUM-PROBE", "tile2 child bounds=" + child.visibleBounds + " clickable=" + child.isClickable + " desc=" + child.contentDescription)
+                    val child = albumNode.children.firstOrNull()
+                    android.util.Log.i("ALBUM-PROBE", "tile2 child bounds=" + (child?.visibleBounds ?: "null") + " clickable=" + (child?.isClickable ?: "null") + " desc=" + (child?.contentDescription ?: "null"))
                 } catch (e: Exception) { android.util.Log.i("ALBUM-PROBE", "child probe failed: " + e.message) }
             }
             assertEquals("album-1", opened.get())
