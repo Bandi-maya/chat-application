@@ -137,7 +137,7 @@ class MediaDownloadStatesProofTest {
         dev.findObject(By.text("Waiting for network")).click()
         assertTrue(
             "failed re-download must render 'Retry download'",
-            dev.wait(Until.hasObject(By.text("Retry download")), 10000),
+            dev.wait(Until.hasObject(By.desc("Retry download")), 10000),
         )
         assertTrue("user retry must attempt a bounded download", downloadCalls.get() >= 1)
         shot("media-state-download-failed")
