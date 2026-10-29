@@ -38,7 +38,7 @@ class NavStyleLabelsProofTest {
         val dir = File(ins.targetContext.getExternalFilesDir(null), "screenshots")
         dir.mkdirs()
         dev.waitForIdle(3000)
-        val bmp = dev.uiAutomation.takeScreenshot() ?: return
+        val bmp = ins.uiAutomation.takeScreenshot() ?: return
         FileOutputStream(File(dir, "$name.png")).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bmp.recycle()
     }
