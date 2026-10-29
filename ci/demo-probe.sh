@@ -5,8 +5,8 @@
 # pre-seed), then capture pixels + the accessibility tree of the clean home.
 set +e
 mkdir -p screenshots
-adb shell pm clear com.example.chat
-adb shell run-as com.example.chat sh -c "mkdir -p shared_prefs && printf '%s' \"<?xml version='1.0' encoding='utf-8' standalone='yes' ?><map><boolean name='chaty_notif_education_shown' value='true' /></map>\" > shared_prefs/FlutterSharedPreferences.xml" || true
+adb shell pm clear com.logybyte.chat
+adb shell run-as com.logybyte.chat sh -c "mkdir -p shared_prefs && printf '%s' \"<?xml version='1.0' encoding='utf-8' standalone='yes' ?><map><boolean name='chaty_notif_education_shown' value='true' /></map>\" > shared_prefs/FlutterSharedPreferences.xml" || true
 cat > /tmp/tap.py <<'PY'
 import re, sys
 label = sys.argv[1]
@@ -31,7 +31,7 @@ tap_text() {
   done
   echo "probe not found: $label"; return 1
 }
-adb shell monkey -p com.example.chat -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
+adb shell monkey -p com.logybyte.chat -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
 # Fresh launch lands on Welcome ("Fast & Private"); the demo card lives on
 # the LOGIN screen behind "Log In".
 tap_text "Log In" 12
@@ -67,8 +67,8 @@ echo "shell-driven probe done" > screenshots/demo-probe-status.txt
 # not app code. Runs last; restores the prop afterwards.
 adb shell setprop debug.hwui.renderer skiavk
 adb shell getprop debug.hwui.renderer > screenshots/demo-probe-renderer.txt
-adb shell am force-stop com.example.chat
-adb shell monkey -p com.example.chat -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
+adb shell am force-stop com.logybyte.chat
+adb shell monkey -p com.logybyte.chat -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
 sleep 12
 adb exec-out screencap -p > screenshots/demo-home-vk.png
 adb shell uiautomator dump /sdcard/demo-window-vk.xml >/dev/null 2>&1
