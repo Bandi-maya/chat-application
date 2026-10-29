@@ -76,8 +76,13 @@ class LockBadgeMotionProofTest {
      *  No diff, or an implausibly large diff region, is a real failure - never a widened pass. */
     private fun measureBadgeRect(empty: Bitmap, settled: Bitmap, title: Rect): Rect {
         val d = inst.targetContext.resources.displayMetrics.density
-        val x0 = (title.left - (56 * d).toInt()).coerceAtLeast(0)
-        val x1 = title.right.coerceAtMost(empty.width)
+        // Pixel-verified (83 settled PNG + 90 measured diff): the badge renders at the LEADING
+        // edge of the unlocked title's a11y bounds (title text shifts right when it appears),
+        // so the search window is a small strip around title.left - not left of it (padding,
+        // build 83's all-zero sampling) and not the full title width (shifted text pollutes the
+        // diff, build 90's 328px bbox).
+        val x0 = (title.left - (4 * d).toInt()).coerceAtLeast(0)
+        val x1 = (title.left + (22 * d).toInt()).coerceAtMost(empty.width)
         val y0 = (title.top - (8 * d).toInt()).coerceAtLeast(0)
         val y1 = (title.bottom + (8 * d).toInt()).coerceAtMost(empty.height)
         var minX = Int.MAX_VALUE; var minY = Int.MAX_VALUE
@@ -109,7 +114,7 @@ class LockBadgeMotionProofTest {
             (maxX + pad + 2).coerceAtMost(empty.width),
             (maxY + pad + 2).coerceAtMost(empty.height),
         )
-        val maxW = (48 * d).toInt(); val minW = (4 * d).toInt()
+        val maxW = (26 * d).toInt(); val minW = (4 * d).toInt()
         assertTrue(
             "measured badge ROI implausible: $r (w=${r.width()} h=${r.height()} expected within ${minW}..$maxW px) - fixture or row layout changed, re-derive deliberately",
             r.width() in minW..maxW && r.height() in minW..maxW,
@@ -405,7 +410,7 @@ class LockBadgeMotionProofTest {
         // class-level setUp/tearDown saves and restores it. The diag asserts only that sampling
         // returned frames - it is not a prerequisite for any other test.
         withDeadline(15000, "calib-am-start") {
-            sh("am start -n com.example.chat/.LockBadgeProofActivity --ez " + LockBadgeProofActivity.EXTRA_CALIB_BEACON + " true")
+            sh("am start -n " + inst.targetContext.packageName + "/com.example.chat.LockBadgeProofActivity --ez " + LockBadgeProofActivity.EXTRA_CALIB_BEACON + " true")
         }
         try {
             withDeadline(60000, "calib-diagnostic") {
