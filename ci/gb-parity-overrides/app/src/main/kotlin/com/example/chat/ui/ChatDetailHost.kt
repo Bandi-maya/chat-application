@@ -124,6 +124,11 @@ fun ChatDetailHost(
     }
     @Suppress("UNUSED_EXPRESSION") rev
 
+    if (com.example.chat.BuildConfig.DEBUG) androidx.compose.runtime.DisposableEffect(Unit) {
+        android.util.Log.d("RouteLayersDiag", "ChatDetailHost enter t=" + android.os.SystemClock.uptimeMillis())
+        onDispose { android.util.Log.d("RouteLayersDiag", "ChatDetailHost DISPOSED t=" + android.os.SystemClock.uptimeMillis()) }
+    }
+
     fun toast(m: String) = Toast.makeText(context, m, Toast.LENGTH_SHORT).show()
     // Dart _captureAndSendPhoto (chat_detail_screen.dart:473): composer camera
     // icon opens the full-screen capture flow in chat mode.
