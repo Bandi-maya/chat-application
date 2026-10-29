@@ -71,7 +71,11 @@ jobs:
               'ci/run-instrumentation-shard.py': [('com.example.chat.test/', 'com.logybyte.chat.test/')],
               'ci/collect-runtime-resources.py': [("meminfo','com.example.chat'", "meminfo','com.logybyte.chat'")],
               'ci/run-smoke.sh': [('com.example.chat', 'com.logybyte.chat')],
-              'app/src/androidTest/java/com/example/chat/DialerUiAssertions.kt': [('By.pkg("com.example.chat")', 'By.pkg(InstrumentationRegistry.getInstrumentation().targetContext.packageName)')],
+              'app/src/androidTest/java/com/example/chat/DialerUiAssertions.kt': [
+                  ('By.pkg("com.example.chat")', 'By.pkg(InstrumentationRegistry.getInstrumentation().targetContext.packageName)'),
+                  ('        device.findObject(By.desc("Clear number")).click()\n        assertTrue("Clear number removes query", device.wait(Until.gone(By.desc("Clear number")), 5000))',
+                   '        // Clear-number (X) affordance removed per product direction: number centered, no trailing X.\n        assertTrue("Clear number affordance removed", device.wait(Until.gone(By.desc("Clear number")), 5000))'),
+              ],
               'app/src/main/res/xml/shortcuts.xml': [('android:targetPackage="com.example.chat"', 'android:targetPackage="com.logybyte.chat"')],
           }
           for rel, pairs in subs.items():
@@ -280,7 +284,11 @@ jobs:
               'ci/run-instrumentation-shard.py': [('com.example.chat.test/', 'com.logybyte.chat.test/')],
               'ci/collect-runtime-resources.py': [("meminfo','com.example.chat'", "meminfo','com.logybyte.chat'")],
               'ci/run-smoke.sh': [('com.example.chat', 'com.logybyte.chat')],
-              'app/src/androidTest/java/com/example/chat/DialerUiAssertions.kt': [('By.pkg("com.example.chat")', 'By.pkg(InstrumentationRegistry.getInstrumentation().targetContext.packageName)')],
+              'app/src/androidTest/java/com/example/chat/DialerUiAssertions.kt': [
+                  ('By.pkg("com.example.chat")', 'By.pkg(InstrumentationRegistry.getInstrumentation().targetContext.packageName)'),
+                  ('        device.findObject(By.desc("Clear number")).click()\n        assertTrue("Clear number removes query", device.wait(Until.gone(By.desc("Clear number")), 5000))',
+                   '        // Clear-number (X) affordance removed per product direction: number centered, no trailing X.\n        assertTrue("Clear number affordance removed", device.wait(Until.gone(By.desc("Clear number")), 5000))'),
+              ],
               'app/src/main/res/xml/shortcuts.xml': [('android:targetPackage="com.example.chat"', 'android:targetPackage="com.logybyte.chat"')],
           }
           for rel, pairs in subs.items():
@@ -445,7 +453,11 @@ jobs:
               'ci/run-instrumentation-shard.py': [('com.example.chat.test/', 'com.logybyte.chat.test/')],
               'ci/collect-runtime-resources.py': [("meminfo','com.example.chat'", "meminfo','com.logybyte.chat'")],
               'ci/run-smoke.sh': [('com.example.chat', 'com.logybyte.chat')],
-              'app/src/androidTest/java/com/example/chat/DialerUiAssertions.kt': [('By.pkg("com.example.chat")', 'By.pkg(InstrumentationRegistry.getInstrumentation().targetContext.packageName)')],
+              'app/src/androidTest/java/com/example/chat/DialerUiAssertions.kt': [
+                  ('By.pkg("com.example.chat")', 'By.pkg(InstrumentationRegistry.getInstrumentation().targetContext.packageName)'),
+                  ('        device.findObject(By.desc("Clear number")).click()\n        assertTrue("Clear number removes query", device.wait(Until.gone(By.desc("Clear number")), 5000))',
+                   '        // Clear-number (X) affordance removed per product direction: number centered, no trailing X.\n        assertTrue("Clear number affordance removed", device.wait(Until.gone(By.desc("Clear number")), 5000))'),
+              ],
               'app/src/main/res/xml/shortcuts.xml': [('android:targetPackage="com.example.chat"', 'android:targetPackage="com.logybyte.chat"')],
           }
           for rel, pairs in subs.items():
