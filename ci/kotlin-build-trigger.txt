@@ -1,13 +1,1 @@
-build 80 trigger: fix demo-signout Compose crash (defer in-composition route write via SideEffect in AppRoot ChatDetail branch) + gate stale test expectations on ReleaseFeatures (Updates tab, reaction rail) + backup archive fixture sections + applicationId com.logybyte.chat with fail-closed stable signing
-build 81: patch pinned overlay CI scripts + shortcuts targetPackage for com.logybyte.chat runtime retest
-build 82: crash fix v2 (defer sign-out route reset across frame boundary) + restart-check full component + dialer Clear-number stale-assertion aligned with X-removal direction
-build 83: bubble-options flag-off dismiss fix + RouteLayersDiag crash instrumentation 2026-10-29T22:29+05:30
-build 84: GB reference parity Kotlin slice — remove live Theme Studio chat preview and non-persistent 3D/particle sliders; persist enable state and align particle choices with FallingSim; regression tests
-build 85: preserve and connect Theme Studio 3D motion + falling particle speed/density to Kotlin preferences and runtime; regression tests and GB parity audit correction
-build 86: preserve all original Theme Studio particle choices; persist and apply speed/density; restore native 3D pager transition controls; test preference round-trip and transition parity
-build 87: regression tests for every restored particle type, None behavior, runtime density/speed, and preference round-trip
-build 88: crash-batch — LockBadge measured badge ROI + calibration launch probe (#46), SystemBar signed-out precondition (#47), mic gesture MicGestureDiag probe (#48), NavStyle icon-only a11y labels, DemoCrashRepro stress loop 2026-10-29T18:27+00:00
-build 89: compile repair — ThemeStudioScreen unresolved AppColors.secondaryText -> foregroundSecondary (same secondaryTextColor); re-run crash batch on buildable head 2026-10-29T18:30+00:00
-build 90: androidTest compile repair — EmojiPickerPanelProofTest fillMaxSize import (4b803fc) + MediaInteractionProofTest ALBUM-PROBE UiObject2.children (96c0ce6); first compile of both since authoring 2026-10-29T18:54+00:00
-build 91: LockBadge ROI strip at title leading edge (pixel-verified) + calib diag applicationId fix; media/emoji-real retry after 90 emulator losses 2026-10-29T19:43+00:00
-build 92: LockBadge calib pkg probe + force-stop applicationId fix; ROI anchored on UNLOCKED title, exact 18dp badge slot; mic post-toggle settled diag + tap-toggle wait 12s; radial dark-rtl Close wait 12s; new overrides #49 VoiceComposerGestureProofTest #50 RadialVariantsProofTest; count 48->50 2026-10-29T20:35+00:00
+build 93: calib pressHome cleanup + passive crash capture + title/entrance diagnostics + AddedStyles shard inclusion
