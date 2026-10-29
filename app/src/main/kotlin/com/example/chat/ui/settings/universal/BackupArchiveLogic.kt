@@ -93,8 +93,12 @@ object BackupArchiveLogic {
      * Parses and fully verifies a plaintext archive ZIP. Throws
      * [InvalidArchive] on any structural, naming, size or hash violation.
      */
+    fun requireWithinArchiveCap(size: Long) {
+        if (size > MAX_ARCHIVE_BYTES) throw InvalidArchive("Backup file is too large.")
+    }
+
     fun parseZip(bytes: ByteArray): ParsedArchive {
-        if (bytes.size > MAX_ARCHIVE_BYTES) throw InvalidArchive("Backup file is too large.")
+        requireWithinArchiveCap(bytes.size.toLong())
         var manifestJson: String? = null
         val found = linkedMapOf<String, ByteArray>()
         ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
