@@ -61,21 +61,80 @@ internal object DialerUiAssertions {
         listOf("7", "9", "6").forEach { digit -> reach("Dial $digit").click() }
         assertTrue("Typed digits are displayed", device.wait(Until.hasObject(By.text("796")), 5000))
         assertTrue("T9 keeps Synthetic Peer", device.wait(Until.hasObject(By.text("Synthetic Peer")), 5000))
+        val deleteStart = android.os.SystemClock.elapsedRealtime()
+        val snapshots = mutableListOf<String>()
+        fun snapshot(label: String) {
+            val fields = device.findObjects(By.clazz("android.widget.EditText"))
+                .map { "text=${it.text} bounds=${it.visibleBounds}" }
+            snapshots.add("$label elapsedMs=${android.os.SystemClock.elapsedRealtime() - deleteStart} fields=$fields")
+        }
+        snapshot("before-delete")
         reach("Delete digit").click()
-        val deleted = device.wait(Until.hasObject(By.text("79")), 5000)
+        val waitStart = android.os.SystemClock.elapsedRealtime()
+        // The cached hierarchy can retain old EditText text after its refreshed
+        // node exposes the current value. Require the same exact number within
+        // the same 5000ms, never a post-deadline snapshot or screenshot.
+        val deleteDeadline = waitStart + 5000L
+        var deleted = false
+        while (android.os.SystemClock.elapsedRealtime() < deleteDeadline) {
+            val cached79 = device.hasObject(By.text("79"))
+            val fields = device.findObjects(By.clazz("android.widget.EditText"))
+            val fresh = fields.map { it.text }
+            val sampledAt = android.os.SystemClock.elapsedRealtime()
+            snapshots.add("poll elapsedMs=${sampledAt - deleteStart} cached79=$cached79 fresh=$fresh")
+            if (sampledAt <= deleteDeadline && fresh.size == 1 && fresh.single() == "79") {
+                deleted = true
+                break
+            }
+            val remaining = deleteDeadline - android.os.SystemClock.elapsedRealtime()
+            if (remaining > 0) android.os.SystemClock.sleep(minOf(50L, remaining))
+        }
+        snapshots.add("wait79 result=$deleted durationMs=${android.os.SystemClock.elapsedRealtime() - waitStart}")
+        snapshot("after-wait")
         if (!deleted) {
             val dir = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
             // Capture immediately, before throwing or any recovery gesture.
             device.takeScreenshot(File(dir, "dialer-delete-failure.png"))
+            snapshots.add("screenshot elapsedMs=${android.os.SystemClock.elapsedRealtime() - deleteStart}")
             device.dumpWindowHierarchy(File(dir, "dialer-delete-failure.xml"))
+            snapshots.add("xml elapsedMs=${android.os.SystemClock.elapsedRealtime() - deleteStart}")
             val nodes = device.findObjects(By.pkg("com.example.chat"))
                 .map { "class=${it.className} text=${it.text} desc=${it.contentDescription} bounds=${it.visibleBounds}" }
+            snapshots.add("nodes elapsedMs=${android.os.SystemClock.elapsedRealtime() - deleteStart}")
+            File(dir, "dialer-delete-timing.txt").writeText(snapshots.joinToString("\n"))
             File(dir, "dialer-delete-nodes.txt").writeText(nodes.joinToString("\n"))
             android.util.Log.e("DialerProof", "Delete expected79 not found: ${nodes.joinToString(" | ")}")
         }
+        val timingDir = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+        File(timingDir, "dialer-delete-timing.txt").writeText(snapshots.joinToString("\n"))
         assertTrue("Backspace removes one digit", deleted)
-        device.findObject(By.desc("Clear number")).click()
-        assertTrue("Clear number removes query", device.wait(Until.gone(By.desc("Clear number")), 5000))
+        // Invoke accessibility ACTION_CLICK, not another coordinate tap. This
+        // separately verifies the production semantic action and single dispatch.
+        fun deleteAccessibilityNode(): android.view.accessibility.AccessibilityNodeInfo {
+            val root = InstrumentationRegistry.getInstrumentation().uiAutomation.rootInActiveWindow
+                ?: throw AssertionError("No accessibility root")
+            val queue = java.util.ArrayDeque<android.view.accessibility.AccessibilityNodeInfo>()
+            queue.add(root)
+            while (queue.isNotEmpty()) {
+                val node = queue.removeFirst()
+                if (node.contentDescription?.toString() == "Delete digit") return node
+                repeat(node.childCount) { index -> node.getChild(index)?.let(queue::add) }
+            }
+            throw AssertionError("Delete digit accessibility node missing")
+        }
+        val deleteNode = deleteAccessibilityNode()
+        assertTrue("Delete supports semantic click", deleteNode.isClickable)
+        assertTrue("Delete supports semantic long click", deleteNode.isLongClickable)
+        assertTrue("Semantic delete dispatched", deleteNode.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK))
+        assertTrue("Semantic click deletes exactly one digit", device.wait(Until.hasObject(By.text("7")), 5000))
+        // The one-tap clear (X) control was removed per the requested dialer
+        // redesign. The meaningful behavior - the entered number is fully
+        // clearable - stays covered here through the delete key.
+        var clearGuard = 0
+        while (device.hasObject(By.text("7")) && clearGuard++ < 10) {
+            deleteNode.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
+        }
+        assertTrue("Delete key clears the entered number", device.wait(Until.gone(By.text("7")), 5000))
         reach("Hide dialpad").click()
         assertTrue("Hide collapses keypad", device.wait(Until.gone(By.desc("Dial 2")), 5000))
         device.findObject(By.desc("Show dialpad")).click()
