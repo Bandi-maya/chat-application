@@ -771,18 +771,22 @@ fun ChatyCameraCaptureScreen(
                 }
                 if (countdown > 0) androidx.compose.material3.Text("$countdown", color = androidx.compose.ui.graphics.Color.White,
                     fontSize = 42.sp)
-                androidx.compose.material3.TextButton(onClick = {
-                    val camera = session.camera
-                    val state = camera?.cameraInfo?.zoomState?.value
-                    if (state != null) {
-                        val target = if (zoomRatio >= 1.9f) 1f.coerceIn(state.minZoomRatio, state.maxZoomRatio)
-                            else 2f.coerceIn(state.minZoomRatio, state.maxZoomRatio)
-                        val result = camera.cameraControl.setZoomRatio(target)
-                        result.addListener({ try { result.get(); zoomRatio = target } catch (_: Exception) {
-                            scannerError = "Zoom is unavailable on this camera."
-                        } }, ContextCompat.getMainExecutor(context))
+                val zoomState = session.camera?.cameraInfo?.zoomState?.value
+                if (zoomState != null) {
+                    CameraZoomControls(
+                        current = zoomRatio,
+                        min = zoomState.minZoomRatio,
+                        max = zoomState.maxZoomRatio,
+                        enabled = phase == CameraPhase.ready && !capturing,
+                    ) { requested ->
+                        val target = requested.coerceIn(zoomState.minZoomRatio, zoomState.maxZoomRatio)
+                        val result = session.camera?.cameraControl?.setZoomRatio(target)
+                        result?.addListener({
+                            try { result.get(); zoomRatio = target }
+                            catch (_: Exception) { scannerError = "Zoom is unavailable on this camera." }
+                        }, ContextCompat.getMainExecutor(context))
                     }
-                }) { androidx.compose.material3.Text("${String.format(java.util.Locale.ROOT, "%.1f", zoomRatio)}x", color = androidx.compose.ui.graphics.Color.White) }
+                }
             }
         } else {
             CameraCaptureConfirmPane(
