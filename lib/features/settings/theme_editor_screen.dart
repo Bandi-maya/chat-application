@@ -6,8 +6,6 @@ import 'package:flutter/services.dart';
 import '../../injection/locator.dart';
 import '../../ui/core/controllers/preferences_controller.dart';
 import '../../ui/core/design_system/design_system.dart';
-import '../messages/message_bubble.dart';
-import '../../domain/models/chat_message.dart';
 import '../../ui/core/theme/chaty_theme_manager.dart';
 import '../../ui/core/theme/image_theme_generator.dart';
 import '../../ui/core/templates/applied_pair_preview.dart';
@@ -363,47 +361,7 @@ class _ThemeEditorScreenState extends State<ThemeEditorScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Preview message bubble live
-            Padding(
-              padding: const EdgeInsets.only(bottom: ChatySpacing.md),
-              child: ChatyCard(
-                child: Column(
-                  children: [
-                    MessageBubble(
-                      message: ChatMessage(
-                        id: 'prev_1',
-                        conversationId: 'c1',
-                        senderId: 'contact_1',
-                        text: 'Live theme palette preview',
-                        createdAt: DateTime.now().subtract(
-                          const Duration(minutes: 2),
-                        ),
-                        deliveryState: DeliveryState.read,
-                      ),
-                      isMe: false,
-                      theme: _current,
-                      onLongPress: () {},
-                    ),
-                    const SizedBox(height: 8),
-                    MessageBubble(
-                      message: ChatMessage(
-                        id: 'prev_2',
-                        conversationId: 'c1',
-                        senderId: 'user_me',
-                        text: 'Warm neutral & high-contrast ready!',
-                        createdAt: DateTime.now(),
-                        deliveryState: DeliveryState.read,
-                      ),
-                      isMe: true,
-                      theme: _current,
-                      onLongPress: () {},
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Live Fine-Tuning Controls
+            // Fine-Tuning Controls
             ChatyGroupedSection(
               title: 'Fine-Tuning & Geometry',
               children: [
