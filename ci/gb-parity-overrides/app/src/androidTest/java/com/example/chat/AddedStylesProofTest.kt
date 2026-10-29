@@ -284,13 +284,19 @@ class AddedStylesProofTest {
      * navigation only; preferences are never touched.
      */
     private fun returnToSettingsRoot() {
+        // Root-exclusive guard: detail pages keep the root's top bar composed underneath, so "Edit profile"
+        // is present on detail pages too (proven: diag-single run 40967677538 tree sweep on the
+        // Navigation & Particle Effects page shows desc=[Back] and desc=[Edit profile] co-present, while
+        // the sweep from the root shows Edit profile present and Back count 0). Only the root lacks
+        // "Back". Require BOTH: no Back desc, Edit profile present. Original 6-press bound and the
+        // existing 600ms idle waits are unchanged; no assertion or deadline widened.
         for (i in 1..6) {
-            if (device.hasObject(By.desc("Edit profile"))) return
+            if (!device.hasObject(By.desc("Back")) && device.hasObject(By.desc("Edit profile"))) return
             if (device.hasObject(By.textContains("Aisha (sample)"))) break
             device.pressBack()
             device.waitForIdle(600)
         }
-        if (!device.hasObject(By.desc("Edit profile"))) openSettings()
+        if (device.hasObject(By.desc("Back")) || !device.hasObject(By.desc("Edit profile"))) openSettings()
     }
 
     private fun clickText(text: String, timeoutMs: Long = 10000): UiObject2 {
