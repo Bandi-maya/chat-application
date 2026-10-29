@@ -285,12 +285,12 @@ class AddedStylesProofTest {
      */
     private fun returnToSettingsRoot() {
         for (i in 1..6) {
-            if (device.hasObject(By.text("Privacy Center"))) return
+            if (device.hasObject(By.desc("Edit profile"))) return
             if (device.hasObject(By.textContains("Aisha (sample)"))) break
             device.pressBack()
             device.waitForIdle(600)
         }
-        if (!device.hasObject(By.text("Privacy Center"))) openSettings()
+        if (!device.hasObject(By.desc("Edit profile"))) openSettings()
     }
 
     private fun clickText(text: String, timeoutMs: Long = 10000): UiObject2 {
@@ -324,7 +324,7 @@ class AddedStylesProofTest {
                 device.waitForIdle(1000)
                 continue
             }
-            opened = device.wait(Until.hasObject(By.text("Privacy Center")), 15000)
+            opened = device.wait(Until.hasObject(By.desc("Edit profile")), 15000)
             if (!opened) device.waitForIdle(1000)
         }
         if (!opened) { capture("added-settings-open-fail.png"); dumpTree("settings-open-fail") }
@@ -379,10 +379,31 @@ class AddedStylesProofTest {
             assertEquals("opt-in selection must persist in the controller", "Cube 3D", ctl.home.pagerTransition3d)
             capture("added-pager-cube-selected")
 
-            // Recreate: the explicit choice must survive.
+            // Recreate: the explicit choice must survive. RECORD which destination the shell
+            // restored first (selected tab is rememberSaveable - MainNavigationShell) WITHOUT
+            // treating a non-Chats restore as home loss; then navigate to Chats explicitly and
+            // verify the home list as a separate navigation check.
             scenario.recreate()
             dismissDemoEntryPrompts()
-            assertTrue("home lost after recreate", device.wait(Until.hasObject(By.textContains("Aisha (sample)")), 20000))
+            device.waitForIdle(3000)
+            capture("added-pager-recreate-restored")
+            dumpTree("pager-recreate-restored")
+            val restoredChats = device.hasObject(By.textContains("Aisha (sample)"))
+            val restoredCalls = device.hasObject(By.text("No recent calls"))
+            val restoredSettings = device.hasObject(By.desc("Edit profile"))
+            android.util.Log.w("AddedStyles", "PAGER-RECREATE restoredChats=" + restoredChats + " restoredCalls=" + restoredCalls + " restoredSettings=" + restoredSettings)
+            println("PAGER-RECREATE restoredChats=" + restoredChats + " restoredCalls=" + restoredCalls + " restoredSettings=" + restoredSettings)
+            if (!restoredChats) {
+                var backTries = 0
+                while (!device.hasObject(By.desc("Chats")) && backTries < 4) {
+                    device.pressBack()
+                    device.waitForIdle(800)
+                    backTries++
+                }
+                device.findObject(By.desc("Chats"))?.click()
+                device.waitForIdle(1000)
+            }
+            assertTrue("Chats home not reachable after recreate navigation", device.wait(Until.hasObject(By.textContains("Aisha (sample)")), 20000))
             assertEquals("Cube 3D must survive recreate", "Cube 3D", ctl.home.pagerTransition3d)
 
             // Frame sequence of a page change with Cube 3D applied.
@@ -433,7 +454,7 @@ class AddedStylesProofTest {
                 // deterministically; a bare pressBack landing position is not
                 // guaranteed - capture 40820379447 :368 evidence).
                 returnToSettingsRoot()
-                assertTrue("settings root not re-established", device.wait(Until.hasObject(By.text("Privacy Center")), 15000))
+                assertTrue("settings root not re-established", device.wait(Until.hasObject(By.desc("Edit profile")), 15000))
                 clickAndWait("Universal", "Styles (Look and feel)")
                 clickAndWait("Styles (Look and feel)", "Font Style")
                 clickAndWait("Font Style", "Select font style")
@@ -443,10 +464,30 @@ class AddedStylesProofTest {
                 assertEquals("font selection must persist in the controller", "BEBASNEUE", ctl.universal.fontStyle)
                 capture("added-font-bebas-selected")
 
-                // Recreate: both selections must survive and render as Selected:.
+                // Recreate: both selections must survive and render as Selected:. RECORD the
+                // restored destination first (tab state is rememberSaveable), then navigate to
+                // Chats explicitly; the Aisha check is a navigation check, not a restore verdict.
                 scenario.recreate()
                 dismissDemoEntryPrompts()
-                assertTrue("home lost after recreate", device.wait(Until.hasObject(By.textContains("Aisha (sample)")), 20000))
+                device.waitForIdle(3000)
+                capture("added-entrance-recreate-restored")
+                dumpTree("entrance-recreate-restored")
+                val restoredChats = device.hasObject(By.textContains("Aisha (sample)"))
+                val restoredCalls = device.hasObject(By.text("No recent calls"))
+                val restoredSettings = device.hasObject(By.desc("Edit profile"))
+                android.util.Log.w("AddedStyles", "ENTRANCE-RECREATE restoredChats=" + restoredChats + " restoredCalls=" + restoredCalls + " restoredSettings=" + restoredSettings)
+                println("ENTRANCE-RECREATE restoredChats=" + restoredChats + " restoredCalls=" + restoredCalls + " restoredSettings=" + restoredSettings)
+                if (!restoredChats) {
+                    var backTries = 0
+                    while (!device.hasObject(By.desc("Chats")) && backTries < 4) {
+                        device.pressBack()
+                        device.waitForIdle(800)
+                        backTries++
+                    }
+                    device.findObject(By.desc("Chats"))?.click()
+                    device.waitForIdle(1000)
+                }
+                assertTrue("Chats home not reachable after recreate navigation", device.wait(Until.hasObject(By.textContains("Aisha (sample)")), 20000))
                 assertEquals("Wave must survive recreate", "Wave", ctl.effects.homeListAnimation)
                 assertEquals("BEBASNEUE must survive recreate", "BEBASNEUE", ctl.universal.fontStyle)
                 openSettings()
