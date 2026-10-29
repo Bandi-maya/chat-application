@@ -215,9 +215,21 @@ fun AppRoot() {
                 ) {
                     ServiceLocator.appLock.onSignedOut()
                     ServiceLocator.lockBiometrics.stopAuthentication()
-                    promptPending = false
-                    selectedConversation = null
-                    route = AuthRoute.Welcome
+                    // Defer the prompt/route/conversation reset across a frame boundary:
+                    // signOut() flips isAuthenticated before notifyChatListeners(), and
+                    // GlobalRouteLayers reads isAuthenticated in composition. Resetting
+                    // route/conversation in the same recomposition pass lets GlobalRouteLayers
+                    // release the route-content group while a route/conversation invalidation
+                    // is pending on it (Composer.endReplaceGroup NPE on demo exit, builds 79+81).
+                    // The auth-flip recompose registers its frame callback before this listener
+                    // runs, so two frame awaits place these writes in a strictly later pass.
+                    scope.launch {
+                        androidx.compose.runtime.withFrameNanos { }
+                        androidx.compose.runtime.withFrameNanos { }
+                        promptPending = false
+                        selectedConversation = null
+                        route = AuthRoute.Welcome
+                    }
                 }
             }
             ServiceLocator.apiBackend.addListener(signOutListener)
