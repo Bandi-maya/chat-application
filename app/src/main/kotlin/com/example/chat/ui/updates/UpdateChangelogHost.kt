@@ -37,7 +37,6 @@ private data class ReleaseNote(val title: String, val detail: String)
 private val currentReleaseNotes = listOf(
     ReleaseNote("Camera zoom controls", "Tap a zoom preset directly or expand the circular dial for finer control. Available zoom is limited by the active camera."),
     ReleaseNote("Camera interaction polish", "Zoom controls expose clear selected states and accessible labels."),
-    ReleaseNote("Security and reliability", "Existing message transport, authentication, and encryption flows remain separate from UI customization."),
 )
 
 @Composable
