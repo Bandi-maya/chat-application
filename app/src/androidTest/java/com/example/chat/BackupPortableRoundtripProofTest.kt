@@ -85,9 +85,10 @@ class BackupPortableRoundtripProofTest {
         assertEquals("no partial mutation allowed", "dark", afterBogus["theme"])
         assertEquals("no partial mutation allowed", "teal", afterBogus["chatWallpaper"])
 
-        // Output scope of this fixture: isolated demo account (unique userId),
-        // empty media exporter -> the archive carries only the preferences
-        // section and the restore writes no media files anywhere.
-        assertEquals(listOf("preferences"), parsed.sections.map { it.name })
+        // Output scope of this fixture: isolated account (unique userId) with an
+        // empty media exporter -> the archive carries exactly the registered
+        // prefs-backed sections (preferences, wallpapers, customization since
+        // f913e57f) and the restore writes no media files anywhere.
+        assertEquals(listOf("preferences", "wallpapers", "customization"), parsed.sections.map { it.name })
     }
 }
