@@ -554,7 +554,7 @@ private fun ParticlesTab(
     Text(
         "Changes are saved and applied to the app's falling-particle overlay when you tap Apply & Save Theme.",
         fontSize = 12.sp,
-        color = appColors.secondaryText,
+        color = appColors.foregroundSecondary,
     )
 }
 
@@ -570,7 +570,7 @@ private fun MotionTab(
     Text(
         "Select a transition for the Home pager. It is saved with Home preferences and used by the native navigation shell.",
         fontSize = 12.sp,
-        color = colors.secondaryText,
+        color = colors.foregroundSecondary,
     )
     Spacer(Modifier.height(12.dp))
     ThemeStudioLogic.TRANSITION_TYPES.forEach { transition ->
