@@ -404,6 +404,12 @@ class AppRootConfiguredProofTest {
                 device.hasObject(By.text("Task Properties")))
             // Edit refresh: a controller update (fake PUT 200, same path the sheet's Save uses) must show in the
             // open detail without reopening it (api _openEditTask re-reads the task by id).
+            // DIAGNOSTIC ONLY: independent test-side listener on the same controller, so the
+            // DETAIL-DIAG line can distinguish controller-never-notified from
+            // notified-but-UI-stale (Compose listener/recomposition path). Verdict unchanged.
+            val diagNotifies = java.util.concurrent.atomic.AtomicInteger(0)
+            val diagListener: () -> Unit = { diagNotifies.incrementAndGet() }
+            ServiceLocator.tasksController.addListener(diagListener)
             kotlinx.coroutines.runBlocking {
                 ServiceLocator.tasksController.updateTask(
                     "synthetic-task-1", "Synthetic Task Beta", "Synthetic", listOf("synthetic-user-1"), "medium",
@@ -419,7 +425,8 @@ class AppRootConfiguredProofTest {
                 val a11yBeta = device.hasObject(By.text("Synthetic Task Beta"))
                 val a11yAlpha = device.hasObject(By.text("Synthetic Task Alpha"))
                 val a11yProps = device.hasObject(By.text("Task Properties"))
-                android.util.Log.w("PixelProof", "DETAIL-DIAG at-expiry controllerTitle=" + ctlTitle + " a11yBeta=" + a11yBeta + " a11yAlpha=" + a11yAlpha + " a11yTaskProps=" + a11yProps)
+                ServiceLocator.tasksController.removeListener(diagListener)
+                android.util.Log.w("PixelProof", "DETAIL-DIAG at-expiry controllerTitle=" + ctlTitle + " a11yBeta=" + a11yBeta + " a11yAlpha=" + a11yAlpha + " a11yTaskProps=" + a11yProps + " testListenerNotifies=" + diagNotifies.get() + " hasLoadedOnce=" + ServiceLocator.tasksController.hasLoadedOnce)
                 logScreenTexts(device, "at-expiry")
                 capture(device, "10f2a-open-detail-after-controller-update")
                 device.pressBack()
