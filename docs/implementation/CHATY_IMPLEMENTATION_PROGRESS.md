@@ -65,3 +65,11 @@
 ## Release gate
 
 The feature is **in implementation**, not production-ready. Preserve MLS end-to-end encryption, Supabase RLS, existing authentication and existing working flows. Any failed validation must be fixed rather than bypassed.
+
+
+## Reference APK review update — 2026-10-29
+
+- Added `GBWHATSAPP_REFERENCE_GAP_IMPLEMENTATION_PLAN.md`, tied to the supplied static analysis of APK build 2.26.39.80. It intentionally keeps this build distinct from the older 2.26.28.78 inventory and records what still needs device evidence.
+- Corrected the Security Center's fabricated safety-number example and unearned "verified/encrypted" state. The replacement clearly says that this screen does not currently verify contact identity fingerprints; it does not imply that app/chat lock is encryption.
+- Added a widget regression test for the truthful identity-verification disclosure.
+- Verification status: the code and test have been committed to the review branch, but Flutter format/analyze/tests/build and the APK-vs-Chaty emulator walkthrough remain **pending** until CI or a Flutter/device environment produces actual results. Do not treat this update as a passing test report.
