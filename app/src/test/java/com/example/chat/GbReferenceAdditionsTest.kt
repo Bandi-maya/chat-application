@@ -48,12 +48,14 @@ class GbReferenceAdditionsTest {
         assertEquals("Standard", restored.conversationListAnimation)
     }
 
-    @Test fun `pager styles keep the existing five and add the thirteen reference names`() {
+    @Test fun `pager styles keep Default first, the existing five and the thirteen reference names`() {
         val styles = HomeUiStyles.pager3dStyles
-        // Existing Chaty transitions preserved, unmodified, in original order.
+        // GB key_pager_animation 0 = default (plain pager, identity); the corrected app default.
+        assertEquals("Default", styles.first())
+        // Existing Chaty transitions preserved, unmodified, in original order after Default.
         assertEquals(
             listOf("Cube 3D", "Accordion Fold", "Card Flip", "Depth Zoom", "Stack Rotate"),
-            styles.take(5),
+            styles.drop(1).take(5),
         )
         // Reference transformer names (mapping 0..13 excluding the default).
         val expectedAdditions = listOf(
@@ -62,6 +64,6 @@ class GbReferenceAdditionsTest {
             "Rotate Down", "Rotate Up", "Stack", "Zoom Out Slide",
         )
         assertTrue(styles.containsAll(expectedAdditions))
-        assertEquals(5 + 13, styles.size)
+        assertEquals(1 + 5 + 13, styles.size)
     }
 }
