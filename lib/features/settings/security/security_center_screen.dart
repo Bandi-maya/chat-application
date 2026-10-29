@@ -11,6 +11,7 @@ import '../../chats/locked_chats_screen.dart';
 import 'app_lock_overlay.dart';
 import 'lock_credential_setup_modal.dart';
 import 'lock_method_selector_sheet.dart';
+import 'encryption_trust_section.dart';
 import 'security_flow_plan.dart';
 
 class SecurityCenterScreen extends StatefulWidget {
@@ -236,55 +237,6 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  void _showSafetyNumberDialog() {
-    final colors = context.colors;
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.verified_user_rounded, color: colors.success),
-            const SizedBox(width: 8),
-            const Text('Safety Number Verification'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: colors.surfaceSecondary,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Text(
-                '05423 89104 33812 77192\n44901 88321 00192 44381',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Demo Security Model • End-to-end encryption state verified with prekey identity.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: colors.foregroundSecondary),
-            ),
-          ],
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Verified'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<String?> _showSecretPhraseSetupDialog() async {
     final controller = TextEditingController();
     final colors = context.colors;
@@ -347,6 +299,7 @@ class _SecurityCenterScreenState extends State<SecurityCenterScreen> {
       title: 'Security & App Lock',
       subtitle: 'Encryption Status, Authentication & Chaty Lock',
       children: [
+        const EncryptionTrustSection(),
         ChatySettingsSection(
           title: 'Chaty App Lock',
           description:
