@@ -20,6 +20,7 @@ Use the GBWhatsApp APK strictly as a user-facing reference for feature categorie
 12. [Implementation report template](CHATY_IMPLEMENTATION_REPORT_TEMPLATE.md)
 13. [Current implementation progress and remaining gaps](CHATY_IMPLEMENTATION_PROGRESS.md)
 14. [UI reference research catalog and design decisions](UI_REFERENCE_RESEARCH_CATALOG.md)
+15. [Build-specific GBWhatsApp reference gap and implementation plan](GBWHATSAPP_REFERENCE_GAP_IMPLEMENTATION_PLAN.md)
 
 ## Non-negotiable engineering rules
 - Read the actual current source before editing; do not assume file names or contracts from documentation alone.
