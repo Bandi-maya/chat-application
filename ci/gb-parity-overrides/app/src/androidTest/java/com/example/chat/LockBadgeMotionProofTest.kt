@@ -82,7 +82,7 @@ class LockBadgeMotionProofTest {
         // build 83's all-zero sampling) and not the full title width (shifted text pollutes the
         // diff, build 90's 328px bbox).
         val x0 = (title.left - (4 * d).toInt()).coerceAtLeast(0)
-        val x1 = (title.left + (22 * d).toInt()).coerceAtMost(empty.width)
+        val x1 = (title.left + (18 * d).toInt()).coerceAtMost(empty.width) // 14dp badge + 4dp spacer: the exact badge slot
         val y0 = (title.top - (8 * d).toInt()).coerceAtLeast(0)
         val y1 = (title.bottom + (8 * d).toInt()).coerceAtMost(empty.height)
         var minX = Int.MAX_VALUE; var minY = Int.MAX_VALUE
@@ -272,11 +272,15 @@ class LockBadgeMotionProofTest {
                 // covers the actual animation start.
                 val emptyFull = shot() // unlocked: no badge pixels in region
                 if (measured == null) {
+                    // Anchor on the UNLOCKED title: the badge slot is [title.left, title.left+18dp]
+                    // before the flip. Reading bounds after the flip anchors on the shifted title
+                    // and the diff becomes the title-shift artifact (build 91's 78px bbox).
+                    val unlockedTitle = titleBounds()
                     clickToggle()
                     waitStatus("locked0=true")
                     Thread.sleep(600)
                     val probe = shot()
-                    measured = measureBadgeRect(emptyFull, probe, titleBounds())
+                    measured = measureBadgeRect(emptyFull, probe, unlockedTitle)
                     probe.recycle()
                     clickToggle()
                     waitStatus("locked0=false")
@@ -418,7 +422,7 @@ class LockBadgeMotionProofTest {
                 // on swiftshader can take well past 5s to reach first composition, and a bare
                 // 5s status wait fails without saying whether the activity ever came up. Probe
                 // the fixture's own package window first; on failure include the current focus.
-                val pkgUp = device.wait(androidx.test.uiautomator.Until.hasObject(By.pkg("com.example.chat")), 20000)
+                val pkgUp = device.wait(androidx.test.uiautomator.Until.hasObject(By.pkg(inst.targetContext.packageName)), 20000)
                 assertTrue(
                     "fixture window never appeared after am start; focus=" + try { sh("dumpsys window displays | grep -m1 mCurrentFocus") } catch (t: Throwable) { "dump-failed:$t" },
                     pkgUp,
@@ -441,7 +445,7 @@ class LockBadgeMotionProofTest {
             // Process-level cleanup bound: the fixture process dies even if any earlier step
             // wedged it; a stuck force-stop is recorded, never masks the diagnostic outcome.
             try {
-                withDeadline(15000, "calib-force-stop") { sh("am force-stop com.example.chat") }
+                withDeadline(15000, "calib-force-stop") { sh("am force-stop " + inst.targetContext.packageName) }
             } catch (t: Throwable) {
                 File(inst.targetContext.getExternalFilesDir(null), "screenshots/calib-loop-verdict.txt")
                     .appendText("forceStopDeadline=${t.message}\n")
