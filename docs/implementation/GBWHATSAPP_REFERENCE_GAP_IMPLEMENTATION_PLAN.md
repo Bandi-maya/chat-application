@@ -127,3 +127,12 @@ The repository already contains a global customization/template system and an ex
 | Full Flutter formatter/analyzer/test/build run from this environment | Not run by the GitHub connector; must be verified by CI or a local Flutter environment |
 | APK + Chaty screen-by-screen emulator comparison | Not run; device/runtime evidence still required |
 
+
+
+## Additional CI issues discovered while executing this plan
+
+The first PR validation exposed two unrelated-to-feature but release-blocking repository defects, so this branch also includes narrowly scoped fixes:
+- Removed the extra trailing closing brace at the end of `lib/features/auth/login_screen.dart` after the Android analyzer reported `expected_executable` at line 527.
+- Converted `.github/workflows/diag.yml` and `.github/workflows/settings-render.yml` from single-line JSON to equivalent structured YAML and quoted shell summary markers/paths so workflow lint can parse the actual run scripts.
+
+These are marked **fixed in source, CI re-run pending**, not “verified”; the latest head's analyzer, full test and runtime-audit results are the acceptance evidence.
