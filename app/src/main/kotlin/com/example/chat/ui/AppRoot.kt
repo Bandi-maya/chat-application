@@ -131,8 +131,13 @@ fun AppRoot() {
         var planIsNew by remember { mutableStateOf(false) }
         var selectedInitialMessageId by remember { mutableStateOf<String?>(null) }
         val lockRequired by ServiceLocator.appLock.lockRequired.collectAsState()
-        androidx.compose.runtime.LaunchedEffect(route) {
-            // Dart _scheduleInitialAppLockIfNeeded on reaching the authenticated shell.
+        androidx.compose.runtime.LaunchedEffect(
+            route,
+            ServiceLocator.apiBackend.isAuthenticated,
+            ServiceLocator.preferencesController.security.isAppLockEnabled,
+        ) {
+            // Re-run when restored authentication or persisted lock preferences become available.
+            // A route-only effect could run before either value was restored and never show the lock.
             if (route == AuthRoute.Home) ServiceLocator.appLock.scheduleInitialIfNeeded()
         }
         // Call media permissions (Dart: flutter_webrtc getUserMedia prompts RECORD_AUDIO/CAMERA itself).
