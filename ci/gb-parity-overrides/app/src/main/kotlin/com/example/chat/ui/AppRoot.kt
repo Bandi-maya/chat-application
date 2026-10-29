@@ -135,6 +135,7 @@ fun AppRoot() {
             route,
             ServiceLocator.apiBackend.isAuthenticated,
             ServiceLocator.preferencesController.security.isAppLockEnabled,
+            ServiceLocator.preferencesController.security.lockMethod,
         ) {
             // Re-run when restored authentication or persisted lock preferences become available.
             // A route-only effect could run before either value was restored and never show the lock.
