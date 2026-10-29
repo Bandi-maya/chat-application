@@ -41,7 +41,7 @@ class ProfileEditCropProofTest {
         val dir = File(ins.targetContext.getExternalFilesDir(null), "screenshots")
         dir.mkdirs()
         dev.waitForIdle(3000)
-        val bmp = dev.uiAutomation.takeScreenshot() ?: return
+        val bmp = ins.uiAutomation.takeScreenshot() ?: return
         FileOutputStream(File(dir, "$name.png")).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bmp.recycle()
     }
@@ -56,7 +56,7 @@ class ProfileEditCropProofTest {
     private fun previewShowsCrop(): Boolean {
         val label = dev.findObject(By.text("Display Name")) ?: return false
         val top = label.visibleBounds.top
-        val bmp = dev.uiAutomation.takeScreenshot() ?: return false
+        val bmp = ins.uiAutomation.takeScreenshot() ?: return false
         var orange = false
         var blue = false
         var y = 0
@@ -152,7 +152,7 @@ class ProfileEditCropProofTest {
         dev.findObject(By.text("Pick / Choose from Gallery")).click()
         waitFor { draftState.value != null }
         assertEquals(ProfileMediaSource.gallery, picked["avatar"])
-        val draft = draftState.value ?: fail("avatar draft preview state missing")
+        val draft = draftState.value ?: throw AssertionError("avatar draft preview state missing")
         // Saved-output pixels: the draft payload the host will upload must be the
         // cropped bitmap (800x800, orange center on blue field).
         val savedPixels = BitmapFactory.decodeByteArray(draft.readBytes(), 0, draft.readBytes().size)
