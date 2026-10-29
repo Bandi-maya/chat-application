@@ -3,6 +3,7 @@ package com.example.chat
 import android.graphics.Bitmap
 import android.os.SystemClock
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
