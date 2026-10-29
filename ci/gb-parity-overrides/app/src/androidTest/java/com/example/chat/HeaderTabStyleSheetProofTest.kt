@@ -152,8 +152,7 @@ class HeaderTabStyleSheetProofTest {
                 capture("hdr-sheet-$tag-nav-$navDrags").recycle()
             }
             runCatching {
-                diagWrite(inst, "hdr-sheet-nav-$tag.txt", "navDrags=$navDrags navFound=$navFound
-" + nodeDump())
+                diagWrite(inst, "hdr-sheet-nav-$tag.txt", "navDrags=$navDrags navFound=$navFound\n" + nodeDump())
             }
             val scrolled = navFound
             // Diagnostics only, before the assertions below: pixels and every visible text/scrollable node.
