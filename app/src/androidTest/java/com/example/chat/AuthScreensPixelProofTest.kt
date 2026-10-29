@@ -66,7 +66,7 @@ class AuthScreensPixelProofTest {
             } catch (e: Exception) { listOf("dump failed: ${e.message}") }
             val errs = try {
                 device.executeShellCommand("logcat -d -t 20000").lineSequence()
-                    .filter { (it.contains("PixelProof") || it.contains("com.example.chat") || it.contains("ActivityScenario") || it.contains("AndroidRuntime") || it.contains("FATAL")) && !it.contains("AppsFilter") }
+                    .filter { (it.contains("PixelProof") || it.contains("com.logybyte.chat") || it.contains("com.example.chat") || it.contains("ActivityScenario") || it.contains("AndroidRuntime") || it.contains("FATAL")) && !it.contains("AppsFilter") }
                     .toList().takeLast(60).joinToString("\n") { it.take(240) }
             } catch (e: Exception) { "n/a: ${e.message}" }
             val st = try { scenario.state.toString() } catch (e: Exception) { "state n/a: ${e.message}" }
