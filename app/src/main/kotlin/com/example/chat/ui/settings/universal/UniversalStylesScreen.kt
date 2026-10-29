@@ -258,8 +258,7 @@ fun UniversalStylesScreen(
             StylesNavRow(
                 icon = Icons.Rounded.EmojiEmotions,
                 title = "Emoji variant",
-                subtitle = "Selected: ${ChatyEmojiPack.normalize(prefs.emojiStyle)}
-Choose the emoji artwork used in chats",
+                subtitle = "Selected: ${ChatyEmojiPack.normalize(prefs.emojiStyle)}\nChoose the emoji artwork used in chats",
                 onClick = { sheet = 3 },
             )
             StylesNavRow(
