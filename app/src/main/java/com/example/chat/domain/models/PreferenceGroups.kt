@@ -650,7 +650,7 @@ data class HomePreferences(
     val hideCutEditFab: Boolean = false,
     val hidePluginsList: Boolean = false,
     val hideGbwaSettingsFab: Boolean = false,
-    val pagerTransition3d: String = "Cube 3D",
+    val pagerTransition3d: String = "Default",
     val tabBubbleStyle: String = "Capsule Pill",
 ) {
     fun toMap(): Map<String, Any?> = mapOf(
@@ -763,7 +763,7 @@ data class HomePreferences(
             hideCutEditFab = map["hideCutEditFab"] as Boolean? ?: false,
             hidePluginsList = map["hidePluginsList"] as Boolean? ?: false,
             hideGbwaSettingsFab = map["hideGbwaSettingsFab"] as Boolean? ?: false,
-            pagerTransition3d = map["pagerTransition3d"] as String? ?: "Cube 3D",
+            pagerTransition3d = map["pagerTransition3d"] as String? ?: "Default",
             tabBubbleStyle = map["tabBubbleStyle"] as String? ?: "Capsule Pill",
         )
     }
