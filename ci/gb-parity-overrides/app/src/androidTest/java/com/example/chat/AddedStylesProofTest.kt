@@ -187,13 +187,16 @@ class AddedStylesProofTest {
             while (budget > 0) {
                 budget--; toTopDrags++
                 slowDrag(b, revealBelow = false)
-                if (device.hasObject(By.text(text))) return true
+                // Bounded event wait (not an arbitrary sleep): rows enter the a11y tree
+                // only after the scroll settles (~1s at evidence-capture cadence, capture
+                // 40823906408 sweep trees/pixels). Returns early on match; assertion unchanged.
+                if (device.wait(Until.hasObject(By.text(text)), 1500)) return true
                 val (sig, _) = windowSig()
                 if (sig == lastSig) { still++; if (still >= 2) break } else { still = 0; lastSig = sig }
             }
             if (budget <= 0) break
         }
-        if (device.hasObject(By.text(text))) return true
+        if (device.wait(Until.hasObject(By.text(text)), 1500)) return true
 
         // Phase B: sweep downward from the top, composing every row.
         for (s in scrollables()) {
@@ -203,14 +206,14 @@ class AddedStylesProofTest {
             while (budget > 0) {
                 budget--; sweepDrags++
                 slowDrag(b, revealBelow = true)
-                if (device.hasObject(By.text(text))) return true
+                if (device.wait(Until.hasObject(By.text(text)), 1500)) return true
                 val (sig, _) = windowSig()
                 if (sig == lastSig) { still++; if (still >= 2) break } else { still = 0; lastSig = sig }
             }
             if (budget <= 0) break
         }
 
-        val found = device.hasObject(By.text(text))
+        val found = device.wait(Until.hasObject(By.text(text)), 1500)
         if (!found) {
             val tag = text.replace(Regex("[^A-Za-z0-9]+"), "-").take(40)
             capture("added-scroll-fail-" + tag + ".png")
