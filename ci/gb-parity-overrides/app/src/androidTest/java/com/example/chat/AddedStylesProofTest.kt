@@ -77,9 +77,11 @@ class AddedStylesProofTest {
             val sb = StringBuilder()
             fun walk(n: android.view.accessibility.AccessibilityNodeInfo?, d: Int) {
                 if (n == null) return
+                val r = android.graphics.Rect()
+                n.getBoundsInScreen(r)
                 sb.append("  ".repeat(d)).append(n.className).append(" text=[").append(n.text)
                     .append("] desc=[").append(n.contentDescription).append("] scrollable=").append(n.isScrollable)
-                    .append(" bounds=").append(n.boundsInScreen).append("\n")
+                    .append(" bounds=").append(r).append("\n")
                 for (i in 0 until n.childCount) walk(n.getChild(i), d + 1)
             }
             walk(root, 0)
