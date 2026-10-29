@@ -116,7 +116,15 @@ data class ChatMessage(
                 text = effectiveText,
                 attachment = parsedAttachment,
                 createdAt = parseIsoOrNow(json["created_at"]?.toString()),
-                deliveryState = DeliveryState.delivered,
+                // Ticks for messages the caller sent: is_read = blue, is_delivered = two grey ticks,
+                // otherwise the server has it but the other phone does not yet (one tick).
+                // Older servers send no is_delivered: keep the previous "delivered" default.
+                deliveryState = when {
+                    json["is_read"] == true || json["is_read"]?.toString() == "true" -> DeliveryState.read
+                    !json.containsKey("is_delivered") -> DeliveryState.delivered
+                    json["is_delivered"] == true || json["is_delivered"]?.toString() == "true" -> DeliveryState.delivered
+                    else -> DeliveryState.sent
+                },
                 metadata = if (senderName.isNotEmpty()) mapOf("sender_name" to senderName) else emptyMap(),
             )
         }

@@ -1,5 +1,7 @@
 package com.example.chat.ui
 
+import com.example.chat.ReleaseFeatures
+
 import com.example.chat.ui.core.system.ChatySystemBarScrims
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -167,6 +169,25 @@ fun AppRoot() {
             }
         }
         androidx.compose.runtime.LaunchedEffect(Unit) { try { ServiceLocator.startBadgeSync() } catch (_: Exception) {} }
+        // Message notification tapped: open that chat once signed in and unlocked.
+        val notificationRoomId by com.example.chat.notifications.ChatyNotifications.pendingRoomId.collectAsState()
+        androidx.compose.runtime.LaunchedEffect(notificationRoomId, ServiceLocator.apiBackend.isAuthenticated, lockRequired) {
+            val roomId = notificationRoomId ?: return@LaunchedEffect
+            val api = ServiceLocator.apiBackend
+            if (!api.isAuthenticated || lockRequired) return@LaunchedEffect
+            var conversation = api.conversations.firstOrNull { it.id == roomId }
+            if (conversation == null) {
+                try { api.loadConversations() } catch (_: Exception) {}
+                conversation = api.conversations.firstOrNull { it.id == roomId }
+            }
+            com.example.chat.notifications.ChatyNotifications.consumeOpenRoom()
+            if (conversation != null) {
+                api.setActiveConversation(conversation.id)
+                selectedInitialMessageId = null
+                selectedConversation = conversation
+                route = AuthRoute.ChatDetail
+            }
+        }
         androidx.compose.runtime.LaunchedEffect(Unit) {
             // Dart _AppState.initState: locator<MessageAutomationService>() (30s account sync, gated on a session).
             ServiceLocator.messageAutomation
@@ -574,7 +595,8 @@ fun AppRoot() {
                         separateChatsAndGroups = shellHome.separateChatsAndGroups,
                         hasCustomNavigationDestinations = ServiceLocator.templateController.hasCustomNavigationDestinations,
                         hideTasks = shellPrefsCtl.gbBool("nav_hide_tasks"),
-                        hideUpdates = shellPrefsCtl.gbBool("nav_hide_updates"),
+                        // Status/Updates tab is deferred to the next release (ReleaseFeatures).
+                        hideUpdates = shellPrefsCtl.gbBool("nav_hide_updates") || !ReleaseFeatures.STATUS_UPDATES,
                         pagerTransition3d = shellHome.pagerTransition3d,
                         bottomBarStyle = ServiceLocator.appearanceVariantController.bottomBarStyle,
                         navigationStyleName = ServiceLocator.appearanceVariantController.navigationStyle,
@@ -586,7 +608,8 @@ fun AppRoot() {
                     onExitApp = { (shellCtx as? android.app.Activity)?.finish() },
                     onCenterAction = {
                         // Dart _handleNavigationCenterAction.
-                        if (ServiceLocator.templateController.navigation.centerActionId != "camera") {
+                        // The camera centre action posts a status; statuses are deferred (ReleaseFeatures).
+                        if (ServiceLocator.templateController.navigation.centerActionId != "camera" || !ReleaseFeatures.STATUS_UPDATES) {
                             showCenterEffects = true
                         } else {
                             scope.launch {
@@ -761,7 +784,8 @@ fun AppRoot() {
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.calls -> {
                                 val history = ServiceLocator.callHistory
                                 val callScope = androidx.compose.runtime.rememberCoroutineScope()
-                                androidx.compose.runtime.LaunchedEffect(Unit) { history.start() }
+                                // Call history needs a call-log API (next release); calls themselves work.
+                                androidx.compose.runtime.LaunchedEffect(Unit) { if (ReleaseFeatures.CALL_HISTORY) history.start() }
                                 if (showCallPicker) {
                                     androidx.compose.ui.window.Dialog(
                                         onDismissRequest = { showCallPicker = false },
@@ -1497,11 +1521,7 @@ fun AppRoot() {
                     // session has no Supabase auth, so this may fail at runtime; the api branch has the same rail.
                     onToggleStar = { cid, mid ->
                         val m = ServiceLocator.apiBackend.getMessages(cid).firstOrNull { it.id == mid }
-                        if (m != null) starScope.launch {
-                            try {
-                                ServiceLocator.conversationsRepository.setMessageStateAsync(cid, mid, "starred", !m.isStarred)
-                            } catch (_: Exception) { }
-                        }
+                        if (m != null) ServiceLocator.apiBackend.setMessageLocalState(cid, mid, "starred", !m.isStarred)
                     },
                     onOpenConversation = { cid, mid ->
                         ServiceLocator.apiBackend.conversations.firstOrNull { it.id == cid }?.let { c ->

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -72,6 +73,21 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
         onDispose { service.removeCallWaitingListener(waiting) }
     }
     @Suppress("UNUSED_EXPRESSION") revision
+    // "Answer" tapped on the incoming-call notification: accept as soon as the offer is here
+    // (when the app was closed it arrives a moment after the socket reconnects).
+    val pendingCallAction by com.example.chat.notifications.ChatyNotifications.pendingCallAction
+        .collectAsState()
+    androidx.compose.runtime.LaunchedEffect(pendingCallAction, revision) {
+        val act = pendingCallAction ?: return@LaunchedEffect
+        val cs = service.currentSession
+        if (cs == null || cs.callId != act.callId) return@LaunchedEffect
+        com.example.chat.notifications.ChatyNotifications.consumeCallAction()
+        if (cs.state != CallSessionState.incoming) return@LaunchedEffect
+        if (act.answer) {
+            presentation.showFullScreen()
+            callAction(cs.callId, "Unable to accept the call. Check microphone and camera permissions.") { service.acceptCall() }
+        }
+    }
     // Dart main.dart:808-830: the DynamicIslandController is always registered, so the call island is a controller
     // payload (id call_<callId>) while the session is active in island presentation, removed otherwise.
     // The standalone ChatyCallIsland is Dart's `showIsland`, which is false whenever the controller exists.

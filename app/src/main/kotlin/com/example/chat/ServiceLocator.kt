@@ -278,8 +278,9 @@ object ServiceLocator {
 
     val connectionHealth: ConnectionHealthService by lazy {
         ConnectionHealthService(
-            // Dart: _client.from('profiles').select('id').limit(1)
-            backendPing = { queryClient.from("profiles").select("id").limit(1).execute() },
+            // Custom backend health endpoint. (The Supabase 'profiles' ping measured a backend this
+            // build does not sign in to, so the banner reported the wrong server.)
+            backendPing = { apiBackend.pingBackend() },
         )
     }
 
@@ -324,12 +325,123 @@ object ServiceLocator {
     /** Dart ctor `dataStore.addListener(syncUnreadBadgeCount)`: explicit post-construction start (AppRoot,
      *  once the locator is ready) - initialize, then subscribe to the api data store. No repository callback,
      *  so there is no lazy-initialisation cycle. */
+    @Volatile private var callNotificationsStarted = false
+    @Volatile private var callAlertSync: () -> Unit = {}
+
+    /** App moved between foreground and background: switch ringing between notification and in-app. */
+    fun refreshCallAlert() { try { callAlertSync() } catch (_: Exception) {} }
+
+    /**
+     * System notifications while the app is in the background or closed:
+     *  - rings (full-screen call notification) when an offer arrives over the socket,
+     *    stops ringing when it is answered / declined / ends, posts "Missed call";
+     *  - message notifications for socket messages while backgrounded or in another chat.
+     * Idempotent; called from ChatyApplication and the FCM service.
+     */
+    fun startCallNotifications() {
+        if (callNotificationsStarted) return
+        callNotificationsStarted = true
+        val ctx = requireContext()
+        com.example.chat.notifications.ChatyNotifications.ensureChannels(ctx)
+        val calls = callSignaling
+        callLifecycle // keeps the active-call foreground service in sync with the session
+        var lastIncoming: com.example.chat.data.services.ChatyCallSession? = null
+        val sync: () -> Unit = sync@{
+            val s = calls.currentSession
+            val N = com.example.chat.notifications.ChatyNotifications
+            val St = com.example.chat.data.services.CallSessionState
+            if (s != null && !s.isOutgoing && s.state == St.incoming) {
+                lastIncoming = s
+                if (N.appInForeground) {
+                    // Call screen is visible: ring in-app instead of the notification.
+                    N.cancelIncomingCall(ctx, s.callId)
+                    N.startRinging(ctx)
+                } else {
+                    N.stopRinging()
+                    N.showIncomingCall(ctx, s.callId, s.remoteUserId, s.remoteDisplayName, s.isVideo)
+                }
+                return@sync
+            }
+            N.stopRinging()
+            val prev = lastIncoming
+            if (prev != null && (s == null || s.callId == prev.callId)) {
+                lastIncoming = null
+                val unanswered = s == null || s.state == St.missed || (s.state == St.ended && s.connectedAt == null)
+                if (unanswered && s?.state != St.declined && !N.appInForeground) {
+                    N.showMissedCall(ctx, prev.callId, prev.remoteDisplayName, prev.isVideo)
+                } else {
+                    N.cancelIncomingCall(ctx, prev.callId)
+                    N.forgetCall(prev.callId)
+                }
+            }
+        }
+        callAlertSync = sync
+        calls.addStateListener { sync() }
+        apiBackend.onIncomingMessage = { m ->
+            val N = com.example.chat.notifications.ChatyNotifications
+            // In the foreground the app shows its own in-app alerts; the system notification is
+            // for when the user is elsewhere.
+            if (!N.appInForeground &&
+                preferencesController.notification.enableGlobalNotifications &&
+                !apiBackend.isConversationMuted(m.conversationId)
+            ) {
+                val conv = apiBackend.conversations.firstOrNull { it.id == m.conversationId }
+                val isGroup = conv?.type == com.example.chat.domain.models.ConversationType.group
+                val sender = m.metadata["sender_name"]?.toString()?.takeIf { it.isNotBlank() }
+                    ?: apiBackend.users.firstOrNull { it.id == m.senderId }?.displayName
+                    ?: conv?.title ?: "New message"
+                val body = when {
+                    m.text.isNotBlank() -> m.text
+                    m.type == com.example.chat.domain.models.MessageType.image -> "📷 Photo"
+                    m.type == com.example.chat.domain.models.MessageType.video -> "🎥 Video"
+                    m.type == com.example.chat.domain.models.MessageType.audio -> "🎤 Voice message"
+                    else -> "📎 Attachment"
+                }
+                N.showMessage(ctx, m.conversationId, m.id, sender, body, conv?.title, isGroup)
+            }
+        }
+        apiBackend.onConversationRead = { roomId ->
+            com.example.chat.notifications.ChatyNotifications.cancelMessages(ctx, roomId)
+        }
+    }
+
     fun startBadgeSync() {
         if (badgeSyncStarted) return
         badgeSyncStarted = true
         val m = notificationChannelManager
         m.initialize()
         apiBackend.addListener { m.syncUnreadBadgeCount() }
+        startPrivacySync()
+    }
+
+    /** Keeps the backend's chat privacy settings (who sees last seen/online, read receipts,
+     *  typing) in line with the Privacy Center. The server enforces them for other users. */
+    private fun startPrivacySync() {
+        val sync: () -> Unit = {
+            runCatching {
+                val p = preferencesController
+                val ghost = p.home.ghostMode || p.gbBool("yo_want_ghostmode")
+                val privacy = p.privacy
+                apiBackend.syncChatPrivacy(
+                    mapOf(
+                        "freeze_last_seen" to privacy.freezeLastSeen,
+                        "who_can_see_last_seen" to when (privacy.hideLastSeenAudience) {
+                            "Everyone" -> "everyone"
+                            "Nobody" -> "nobody"
+                            else -> "contacts"
+                        },
+                        "who_can_see_online" to
+                            if (privacy.hideOnlineAudience == "Same as Last Seen") "same_as_last_seen" else "everyone",
+                        "read_receipts_enabled" to (privacy.readReceipts && !ghost),
+                        "blue_ticks_after_reply" to privacy.showBlueTicksAfterReply,
+                        "typing_indicators_enabled" to (privacy.typingIndicators && !ghost),
+                    ),
+                )
+            }
+        }
+        preferencesController.addListener(sync)
+        apiBackend.addListener(sync)
+        sync()
     }
 
     val conversationsRepository: ConversationsRepository by lazy {
@@ -443,6 +555,8 @@ object ServiceLocator {
                 (expected as? com.example.chat.data.api.ApiAccountScope)?.let { apiBackend.withAuthScope(it, action) } ?: false
             },
         ).also { svc ->
+            // Token refresh waits while a call is active (a refresh is an account-scope transition).
+            apiBackend.isCallActive = { svc.hasActiveSession }
             apiBackend.addAuthScopeListener { next ->
                 // Callback only detaches state under auth lock; disposal owns
                 // the captured old peer and runs outside that lock.

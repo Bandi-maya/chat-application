@@ -3,7 +3,9 @@ package com.example.chat.data.api
 /** Public client routing only. Never a place for credentials or server secrets. */
 object BackendRoutingPolicy {
     const val DEFAULT_REST_API_BASE_URL = "https://api.hub.logybyte.in"
-    const val DEFAULT_WEBSOCKET_URL = "wss://api.hub.logybyte.in/api/chat/ws{userId}"
+    // backend_python serves the chat socket at /api/v1/chat/ws/{user_id} (and /chat/ws/{user_id}); the
+    // client appends ?token=<access token>. The old "/api/chat/ws{userId}" path did not exist.
+    const val DEFAULT_WEBSOCKET_URL = "wss://api.hub.logybyte.in/api/v1/chat/ws/{userId}"
     const val DEFAULT_TENANT_ID = "chat-application"
 
     fun websocketTemplate(dotenv: String, buildOverride: String): String =

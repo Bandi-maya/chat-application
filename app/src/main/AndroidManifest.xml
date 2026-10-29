@@ -4,6 +4,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Incoming-call notification opens the call screen over the lock screen. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
@@ -170,6 +173,13 @@
             android:authorities="${applicationId}.exportprovider"
             android:exported="false"
             android:grantUriPermissions="true" />
+        <receiver
+            android:name="com.example.chat.notifications.CallActionReceiver"
+            android:exported="false" />
+        <!-- Data-only pushes need a default channel for any notification FCM shows itself. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="chaty_messages" />
         <service
             android:name="com.example.chat.notifications.ChatyFirebaseMessagingService"
             android:exported="false">

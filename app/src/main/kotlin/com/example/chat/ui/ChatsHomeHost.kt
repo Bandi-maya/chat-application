@@ -61,7 +61,8 @@ fun ChatsHomeHost(
     fun find(id: String) = conversations.firstOrNull { it.id == id }
     fun toast(m: String) = Toast.makeText(context, m, Toast.LENGTH_SHORT).show()
     fun setState(id: String, field: String, value: Boolean) {
-        scope.launch { try { repo.setConversationStateAsync(id, field, value) } catch (e: Exception) { toast(e.message ?: "Unable to update chat.") } }
+        // Stored on this device: the custom backend has no per-user chat state API yet.
+        api.setConversationLocalState(id, field, value)
     }
     val security = prefs.security
     val headerTabs = com.example.chat.ui.navigation.LocalHomeHeaderTabs.current
@@ -83,6 +84,14 @@ fun ChatsHomeHost(
         subscriptionMessage = api.subscriptionErrorMessage,
         onOpenConversation = onOpenConversation,
         currentUserId = me?.id ?: "",
+        // Presence/typing published by the custom backend socket.
+        presenceFor = { conversationId, otherUserId ->
+            com.example.chat.ui.chats.home.HomePresence(
+                isOnline = api.isUserOnline(otherUserId),
+                isTyping = api.isTyping(conversationId, otherUserId),
+                lastSeenAt = api.lastSeenOf(otherUserId),
+            )
+        },
         identity = HomeIdentity(
             displayName = me?.displayName ?: "",
             username = me?.username ?: "",

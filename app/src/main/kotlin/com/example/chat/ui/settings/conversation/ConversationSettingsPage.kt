@@ -1,5 +1,7 @@
 package com.example.chat.ui.settings.conversation
 
+import com.example.chat.ReleaseFeatures
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -137,7 +139,8 @@ fun ConversationSettingsPage(
             GbSwitchRow(Icons.Rounded.ChatBubbleOutline, "Disable More Options Dialog from Bubble", "You can disable more options dialog from chat bubble", c.disableMoreOptionsFromBubble) {
                 preferences.updateConversation(c.copy(disableMoreOptionsFromBubble = it), logTitle = "Disable bubble options dialog")
             }
-            GbSwitchRow(Icons.Outlined.TouchApp, "Disable Double Tap Reaction", "Suppress emoji reaction on double tapping a message", c.disableDoubleTapReaction) {
+            // Reactions are deferred to the next release (ReleaseFeatures); the toggle is hidden with them.
+            if (ReleaseFeatures.MESSAGE_REACTIONS) GbSwitchRow(Icons.Outlined.TouchApp, "Disable Double Tap Reaction", "Suppress emoji reaction on double tapping a message", c.disableDoubleTapReaction) {
                 preferences.updateConversation(c.copy(disableDoubleTapReaction = it), logTitle = "Disable double tap reaction")
             }
             GbSectionLabel("Translate Option Settings")

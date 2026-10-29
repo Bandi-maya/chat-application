@@ -12,6 +12,15 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+// Push notifications (messages + incoming calls when the app is closed) need Firebase. Download
+// google-services.json from the Firebase console (Android app id com.example.chat) into app/.
+// Without it the build still works, but pushes are not received.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+} else {
+    logger.warn("app/google-services.json not found: Firebase push notifications are disabled in this build.")
+}
+
 // Only public client routing keys are read. Never embed credentials in these values.
 val routingKeys = setOf("REST_API_BASE_URL", "TENANT_ID", "WEBSOCKET_URL")
 val routingDotenv = rootProject.file(".env").takeIf { it.isFile }?.readLines()?.mapNotNull { line ->
@@ -118,11 +127,7 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.security:security-crypto:1.1.0-alpha07")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    // FCM transport (firebase_notification_service.dart port). The
-    // google-services plugin is NOT applied: google-services.json exists in
-    // neither repo branch, and the plugin fails the build without it. The
-    // messaging client compiles and registers now; runtime activation
-    // happens once the Firebase config lands.
+    // FCM transport: active when app/google-services.json is present (see the plugin note above).
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation("com.google.firebase:firebase-messaging")
     // Required by the uniffi-generated Kotlin bindings (JNA native calls).

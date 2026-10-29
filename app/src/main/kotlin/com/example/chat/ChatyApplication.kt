@@ -33,6 +33,12 @@ class ChatyApplication : Application() {
         } catch (e: Exception) {
             android.util.Log.w("ChatyApplication", "Chaty Firebase bootstrap skipped: $e")
         }
+        // Ring / notify even when no screen is open (process started by a push or kept alive).
+        try {
+            ServiceLocator.startCallNotifications()
+        } catch (e: Exception) {
+            android.util.Log.w("ChatyApplication", "call notifications not started: $e")
+        }
         // Dart main() awaits ThemeController.init() before runApp so the first
         // frame already reflects the user's theme; restore it off the main
         // thread into the controller's own scope before AppRoot reads it.
@@ -59,11 +65,15 @@ class ChatyApplication : Application() {
      *  (_applyAutoLockOnResume) remains with the AppRoot overlay slice. */
     private val foregroundObserver = object : DefaultLifecycleObserver {
         override fun onStop(owner: LifecycleOwner) {
+            com.example.chat.notifications.ChatyNotifications.appInForeground = false
+            ServiceLocator.refreshCallAlert()
             ProtectedResourceGate.invalidateAllSessions()
             ServiceLocator.appLock.onBackgrounded()
         }
 
         override fun onStart(owner: LifecycleOwner) {
+            com.example.chat.notifications.ChatyNotifications.appInForeground = true
+            ServiceLocator.refreshCallAlert()
             ServiceLocator.appScope.launch { ServiceLocator.appLock.onResumed() }
             val backend = ServiceLocator.apiBackend
             if (backend.isAuthenticated) {
