@@ -6,7 +6,10 @@ package com.example.chat.core.theme.studio
  * values normalize to Stars instead of silently showing the wrong effect.
  */
 object ThemeStudioLogic {
-    val PARTICLE_TYPES = listOf("Stars", "Hearts", "Snowflakes", "Leaves")
+    val PARTICLE_TYPES = listOf(
+        "Neon Embers", "Sakura", "Snow", "Cyber Matrix", "Hearts",
+        "Stars", "Snowflakes", "Leaves", "None",
+    )
 
     /** Must remain aligned with MainNavigationShell.pagerTransition. */
     val TRANSITION_TYPES = listOf(
