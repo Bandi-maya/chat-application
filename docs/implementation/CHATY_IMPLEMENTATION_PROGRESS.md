@@ -87,3 +87,11 @@ The feature is **in implementation**, not production-ready. Preserve MLS end-to-
 - Expanded source-contract regression coverage to check the shared and feature-level consumers.
 
 **Validation remains pending:** the repository Actions workflow must analyze, test and build the latest branch head. This is not a claim that every screen has completed the planned feature-parity audit; media, status, calls, privacy/device flows, template adoption and device QA still require their own verified slices.
+
+
+## Reference APK review update — 2026-10-29
+
+- Added `GBWHATSAPP_REFERENCE_GAP_IMPLEMENTATION_PLAN.md`, tied to the supplied static analysis of APK build 2.26.39.80. It intentionally keeps this build distinct from the older 2.26.28.78 inventory and records what still needs device evidence.
+- Removed a hard-coded sample safety number and a “Verified” dialog from Security Center because the screen did not derive or verify a contact-specific cryptographic fingerprint. Replaced them with an explicit disclosure that distinguishes MLS encryption from identity verification.
+- Added a widget regression test for the truthful identity-verification disclosure.
+- Verification status: changes are on a fresh branch from current `main`; Flutter format/analyze/tests/build and the APK-vs-Chaty emulator walkthrough remain **pending** until CI or a Flutter/device environment produces actual results. Do not treat this update as a passing test report.
