@@ -1,6 +1,9 @@
 package com.example.chat
 
 import com.example.chat.core.theme.studio.ThemeStudioLogic
+import com.example.chat.ui.core.effects.FallingItem
+import com.example.chat.ui.core.effects.FallingSim
+import kotlin.random.Random
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -41,6 +44,34 @@ class ThemeStudioLogicParityTest {
         for (legacy in listOf("LegacyUnknown", "Unsupported", null)) {
             assertEquals("Stars", ThemeStudioLogic.normalizeParticleType(legacy))
         }
+    }
+
+    @Test
+    fun allParticleOptionsHaveRuntimeSymbolsAndNoneClearsItems() {
+        assertTrue(FallingSim.symbolFor("Neon Embers").isNotEmpty())
+        assertTrue(FallingSim.symbolFor("Sakura").isNotEmpty())
+        assertTrue(FallingSim.symbolFor("Snow").isNotEmpty())
+        assertTrue(FallingSim.symbolFor("Cyber Matrix").isNotEmpty())
+        assertEquals("", FallingSim.symbolFor("None"))
+        val items = mutableListOf(FallingItem(0.2, 0.3, 0.01, 16.0, 0.5, "⭐"))
+        val changed = FallingSim.step(items, true, "Both", "None", "Home", Random(7))
+        assertTrue(changed)
+        assertTrue(items.isEmpty())
+    }
+
+    @Test
+    fun particleDensityCapsRuntimeItemsAndSpeedChangesFallVelocity() {
+        val normal = mutableListOf<FallingItem>()
+        val fast = mutableListOf<FallingItem>()
+        FallingSim.step(normal, true, "Both", "Stars", "Home", Random(7), density = 1, speedMultiplier = 1.0)
+        FallingSim.step(fast, true, "Both", "Stars", "Home", Random(7), density = 1, speedMultiplier = 2.0)
+        assertEquals(1, normal.size)
+        assertEquals(1, fast.size)
+        assertEquals(normal.single().speed * 2.0, fast.single().speed, 0.000001)
+        repeat(4) {
+            FallingSim.step(normal, true, "Both", "Stars", "Home", Random(it), density = 3)
+        }
+        assertEquals(3, normal.size)
     }
 
     @Test
