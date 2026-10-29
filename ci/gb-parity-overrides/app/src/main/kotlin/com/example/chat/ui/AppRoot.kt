@@ -127,6 +127,10 @@ fun AppRoot() {
         var registerOrigin by remember { mutableStateOf(AuthRoute.Welcome) }
         var orgOrigin by remember { mutableStateOf(AuthRoute.Login) }
         var selectedConversation by remember { mutableStateOf<com.example.chat.domain.models.Conversation?>(null) }
+        if (com.example.chat.BuildConfig.DEBUG) {
+            androidx.compose.runtime.LaunchedEffect(route) { android.util.Log.d("RouteLayersDiag", "route=" + route + " t=" + android.os.SystemClock.uptimeMillis()) }
+            androidx.compose.runtime.LaunchedEffect(selectedConversation?.id) { android.util.Log.d("RouteLayersDiag", "selectedConvHash=" + (selectedConversation?.id?.hashCode() ?: 0) + " t=" + android.os.SystemClock.uptimeMillis()) }
+        }
         var planOrgId by remember { mutableStateOf("") }
         var planOrgName by remember { mutableStateOf("") }
         var planIsNew by remember { mutableStateOf(false) }
