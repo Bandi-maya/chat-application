@@ -1,1 +1,3 @@
 build 64: fix 5 unit-test failures from build 63 (1349 ran / 5 failed). Passphrase crypto now uses kotlin.io.encoding.Base64 (android.util.Base64 is unavailable on the JVM test runner); archive-cap guard extracted and tested without a 512MB allocation (CI OOM); GbFeatureCatalog restored to the exact Dart table - PreferencesParityTest assertions retained unchanged.
+
+build 65: add direct camera zoom presets/circular dial to camera screen and show version-aware release notes on home entry; validate Kotlin compile, unit tests, and debug APK artifact.
