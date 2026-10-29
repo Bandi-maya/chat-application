@@ -348,6 +348,17 @@ object ServiceLocator {
      *  (per-event gating). Called from ChatyApplication's lifecycle hook. */
     fun refreshCallAlert() { runCatching { notificationCoordinator.refreshCallState() } }
 
+    /** Badge/channel sync: initialize the notification channel manager once the locator is ready,
+     *  then keep the unread badge in step with the api data store (pinned behavior; AppRoot calls this). */
+    fun startBadgeSync() {
+        if (badgeSyncStarted) return
+        badgeSyncStarted = true
+        val m = notificationChannelManager
+        m.initialize()
+        apiBackend.addListener { m.syncUnreadBadgeCount() }
+        startPrivacySync()
+    }
+
     /**
      * System notifications while the app is in the background or closed.
      * Socket-driven call ringing and message alerts are owned by the privacy-aware
