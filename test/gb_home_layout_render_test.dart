@@ -18,10 +18,8 @@ import 'package:chat/data/services/backend_service.dart';
 import 'package:chat/data/services/connection_health_service.dart';
 import 'package:chat/data/services/rich_chat_realtime_service.dart';
 import 'package:chat/data/services/notification_service.dart';
-import 'package:chat/ui/core/controllers/appearance_variant_controller.dart';
 import 'package:chat/ui/core/controllers/home_preset_normalizer.dart';
 import 'package:chat/ui/core/controllers/preferences_controller.dart';
-import 'package:chat/ui/core/templates/template_controller.dart';
 import 'package:chat/ui/core/theme/theme_config.dart';
 import 'package:chat/ui/core/theme/theme_controller.dart';
 
