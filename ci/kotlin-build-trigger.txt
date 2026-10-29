@@ -5,3 +5,4 @@ build 83: bubble-options flag-off dismiss fix + RouteLayersDiag crash instrument
 build 84: GB reference parity Kotlin slice — remove live Theme Studio chat preview and non-persistent 3D/particle sliders; persist enable state and align particle choices with FallingSim; regression tests
 build 85: preserve and connect Theme Studio 3D motion + falling particle speed/density to Kotlin preferences and runtime; regression tests and GB parity audit correction
 build 86: preserve all original Theme Studio particle choices; persist and apply speed/density; restore native 3D pager transition controls; test preference round-trip and transition parity
+build 87: regression tests for every restored particle type, None behavior, runtime density/speed, and preference round-trip
