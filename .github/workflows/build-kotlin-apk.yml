@@ -116,6 +116,20 @@ jobs:
           gradle :app:generateUniffiBindings --no-daemon
           echo '--- generated tree ---'
           find app/build/generated/uniffi -type f | head -20
+      - name: Materialize Chaty signing keystore
+        env:
+          CHATY_KEYSTORE_B64: ${{ secrets.CHATY_KEYSTORE_B64 }}
+          CHATY_KEYSTORE_PASSWORD: ${{ secrets.CHATY_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CHATY_KEYSTORE_B64:-}" ] || [ -z "${CHATY_KEYSTORE_PASSWORD:-}" ]; then
+            echo "::error::Chaty signing secrets missing (CHATY_KEYSTORE_B64 / CHATY_KEYSTORE_PASSWORD repository secrets)"
+            exit 1
+          fi
+          mkdir -p ci/keystore
+          printf '%s' "$CHATY_KEYSTORE_B64" | base64 -d > ci/keystore/chaty-release.jks
+          chmod 600 ci/keystore/chaty-release.jks
+          echo "CHATY_KEYSTORE_PASSWORD=$CHATY_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
       - name: Build debug APK (compile verification)
         run: gradle :app:assembleDebug --no-daemon
       - name: APK info
@@ -171,6 +185,20 @@ jobs:
           if-no-files-found: warn
 
       # A separate synthetic pair is built once; never install the configured production artifact in fixtures.
+      - name: Materialize Chaty signing keystore
+        env:
+          CHATY_KEYSTORE_B64: ${{ secrets.CHATY_KEYSTORE_B64 }}
+          CHATY_KEYSTORE_PASSWORD: ${{ secrets.CHATY_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CHATY_KEYSTORE_B64:-}" ] || [ -z "${CHATY_KEYSTORE_PASSWORD:-}" ]; then
+            echo "::error::Chaty signing secrets missing (CHATY_KEYSTORE_B64 / CHATY_KEYSTORE_PASSWORD repository secrets)"
+            exit 1
+          fi
+          mkdir -p ci/keystore
+          printf '%s' "$CHATY_KEYSTORE_B64" | base64 -d > ci/keystore/chaty-release.jks
+          chmod 600 ci/keystore/chaty-release.jks
+          echo "CHATY_KEYSTORE_PASSWORD=$CHATY_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
       - name: Build isolated runtime APK pair once
         run: |
           printf '%s\n' 'REST_API_BASE_URL=http://10.0.2.2:8000' 'WEBSOCKET_URL=ws://10.0.2.2:8000/chat/ws/{userId}' 'TENANT_ID=chat-application' > .env
