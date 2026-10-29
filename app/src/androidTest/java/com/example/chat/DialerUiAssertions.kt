@@ -98,7 +98,7 @@ internal object DialerUiAssertions {
             snapshots.add("screenshot elapsedMs=${android.os.SystemClock.elapsedRealtime() - deleteStart}")
             device.dumpWindowHierarchy(File(dir, "dialer-delete-failure.xml"))
             snapshots.add("xml elapsedMs=${android.os.SystemClock.elapsedRealtime() - deleteStart}")
-            val nodes = device.findObjects(By.pkg("com.example.chat"))
+            val nodes = device.findObjects(By.pkg(InstrumentationRegistry.getInstrumentation().targetContext.packageName))
                 .map { "class=${it.className} text=${it.text} desc=${it.contentDescription} bounds=${it.visibleBounds}" }
             snapshots.add("nodes elapsedMs=${android.os.SystemClock.elapsedRealtime() - deleteStart}")
             File(dir, "dialer-delete-timing.txt").writeText(snapshots.joinToString("\n"))
