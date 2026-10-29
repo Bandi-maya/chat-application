@@ -32,6 +32,10 @@ class BackupRestoreLogic(
     private val conversationsSnapshot: () -> List<Map<String, Any?>>,
     private val applyUniversal: (Map<String, Any?>) -> Unit,
     private val nowMillis: () -> Long = { System.currentTimeMillis() },
+    /** Envelope encryption (device Keystore on Android). Null keeps the
+     *  contained "paused" behavior so plaintext is never written. */
+    private val encryptor: ((String) -> String)? = null,
+    private val decryptor: ((String) -> String)? = null,
 ) {
     sealed class Result {
         data class BackupOk(val fileName: String, val message: String) : Result()
@@ -80,9 +84,9 @@ class BackupRestoreLogic(
     /** Dart _performBackup. Returns the created file name or Failure. */
     fun performBackup(target: String): Result {
         // CONTAINMENT: the legacy export wrote PLAINTEXT JSON (preferences + chat
-        // list text). Disabled until an encrypted backup replaces it. No bypass flag.
-        // Existing files are never read, changed or deleted here.
-        if (true) {
+        // list text). Without an encryptor the export stays disabled - plaintext
+        // is never written. Existing files are never read, changed or deleted here.
+        if (encryptor == null) {
             return Result.Failure(
                 "Backup is paused: the old export was not encrypted. An encrypted backup " +
                     "is being built. Nothing was written and existing files were not changed.",
@@ -97,7 +101,7 @@ class BackupRestoreLogic(
             // in this project), so millisecond ISO via SimpleDateFormat.
             val createdAtIso = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US).format(Date())
             val payload = buildBackupPayload(target, createdAtIso)
-            file.writeText(toJson(payload))
+            file.writeText(encryptor.invoke(toJson(payload)))
             Result.BackupOk(
                 file.name,
                 "$target backup created successfully! Saved to ${file.name}",
@@ -148,8 +152,9 @@ class BackupRestoreLogic(
     fun performRestore(target: String): Result {
         // CONTAINMENT: restore auto-picked the newest unauthenticated .json (anyone
         // or anything able to drop a file in app storage could change settings).
-        // Disabled until restore authenticates its source. Files are left untouched.
-        if (true) {
+        // Without a decryptor it stays disabled; with one, GCM authentication
+        // rejects forged or modified files before anything is applied.
+        if (decryptor == null) {
             return Result.Failure(
                 "Restore is paused until encrypted backups are ready. Your existing " +
                     "backup files were not read, changed or deleted.",
@@ -163,7 +168,16 @@ class BackupRestoreLogic(
             val latestBackup = selectLatestBackup(dir)
                 ?: return Result.Failure("No local backups found to restore.")
 
-            val map = fromJson(latestBackup.readText())
+            val map = try {
+                fromJson(decryptor.invoke(latestBackup.readText()))
+            } catch (e: Exception) {
+                return Result.Failure(
+                    "Restore failed: ${latestBackup.name} is not a valid encrypted Chaty " +
+                        "backup from this device. Nothing was restored.",
+                )
+            }
+            // Only the universal (appearance) preferences are applied; chats,
+            // account data, media and security secrets are never overwritten.
             applyBackupManifest(map)
             Result.RestoreOk(
                 latestBackup.name,
