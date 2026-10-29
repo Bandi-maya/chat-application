@@ -72,7 +72,8 @@ fun FallingParticlesOverlay(
 
     Box(modifier.fillMaxSize()) {
         content()
-        val active = FallingSim.active(fxNow.enableFallingParticles, fxNow.fallingParticleScope, currentScope)
+        val active = FallingSim.active(fxNow.enableFallingParticles, fxNow.fallingParticleScope, currentScope) &&
+            fxNow.fallingParticleObject != "None"
         if (active) {
             Canvas(Modifier.fillMaxSize()) {
                 @Suppress("UNUSED_VARIABLE") val f = frame
