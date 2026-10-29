@@ -709,7 +709,13 @@ jobs:
           # Exact method identities from pinned source; count alone must not hide a swapped method.
           expected = {}
           for c in sorted(want):
-              p = pathlib.Path('app/src/androidTest/java/com/example/chat/' + c.rsplit('.', 1)[-1] + '.kt')
+              rel = 'app/src/androidTest/java/com/example/chat/' + c.rsplit('.', 1)[-1] + '.kt'
+              p = pathlib.Path(rel)
+              if not p.exists():
+                  # Override-only (gb-parity shadow) classes are absent from the restored
+                  # overlay tree; the overlay manifest carries zero gb-parity entries, so the
+                  # branch checkout's override dir is the authoritative compiled source.
+                  p = pathlib.Path('ci/gb-parity-overrides') / rel
               names = re.findall(r'@Test\s+fun\s+(\w+)', p.read_text())
               assert len(names) == len(re.findall(r'@Test\b', p.read_text())), c
               expected[c] = sorted(n for n in names if c + '#' + n not in excluded)
