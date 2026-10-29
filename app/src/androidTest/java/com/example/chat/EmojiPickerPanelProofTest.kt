@@ -40,7 +40,7 @@ class EmojiPickerPanelProofTest {
         val dir = File(ins.targetContext.getExternalFilesDir(null), "screenshots")
         dir.mkdirs()
         dev.waitForIdle(3000)
-        val bmp = dev.uiAutomation.takeScreenshot() ?: return
+        val bmp = ins.uiAutomation.takeScreenshot() ?: return
         FileOutputStream(File(dir, "$name.png")).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bmp.recycle()
     }
@@ -74,8 +74,8 @@ class EmojiPickerPanelProofTest {
                 }
             }
         }
-        val recent = dev.wait(Until.findObject(By.desc("Recent")), 8000) ?: fail("Recent tab missing")
-        val close = dev.wait(Until.findObject(By.desc("Close")), 5000) ?: fail("Close header control missing")
+        val recent = dev.wait(Until.findObject(By.desc("Recent")), 8000) ?: throw AssertionError("Recent tab missing")
+        val close = dev.wait(Until.findObject(By.desc("Close")), 5000) ?: throw AssertionError("Close header control missing")
         val h = dev.displayHeight
         val fraction = (h - close.visibleBounds.top).toFloat() / h
         assertTrue("composer panel should be about half the screen, was $fraction", fraction in 0.42f..0.62f)
@@ -114,7 +114,7 @@ class EmojiPickerPanelProofTest {
                 }
             }
         }
-        val close = dev.wait(Until.findObject(By.desc("Close")), 8000) ?: fail("Close header control missing")
+        val close = dev.wait(Until.findObject(By.desc("Close")), 8000) ?: throw AssertionError("Close header control missing")
         val h = dev.displayHeight
         val fraction = (h - close.visibleBounds.top).toFloat() / h
         assertTrue("default panel should be about 0.42 of the screen, was $fraction", fraction in 0.32f..0.52f)
