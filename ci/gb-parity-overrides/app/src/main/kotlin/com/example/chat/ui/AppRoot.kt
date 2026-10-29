@@ -1528,10 +1528,14 @@ fun AppRoot() {
                     onBack = { navigation.goBack() },
                 )
             }
-            AuthRoute.ChatDetail -> run {
+            AuthRoute.ChatDetail -> {
                 val conversation = selectedConversation
                 if (conversation == null) {
-                    route = AuthRoute.Home
+                    // Never write navigation state mid-composition: the demo sign-out cascade
+                    // nulls selectedConversation while this branch is on screen, and the
+                    // re-entrant invalidation recomposed a stale route lambda
+                    // (Composer.endReplaceGroup NPE at ChatDetailHost).
+                    androidx.compose.runtime.SideEffect { route = AuthRoute.Home }
                 } else {
                     ChatDetailHost(
                         conversation = conversation,
