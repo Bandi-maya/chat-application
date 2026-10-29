@@ -2,7 +2,8 @@ package com.example.chat.ui.settings.universal
 
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
-import android.util.Base64
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -17,6 +18,7 @@ import org.json.JSONObject
  * authentication rejects any file that was forged or modified. Nothing is
  * uploaded anywhere; the envelope is a plain JSON object on disk.
  */
+@OptIn(ExperimentalEncodingApi::class)
 object BackupCrypto {
     private const val KEY_ALIAS = "chaty_local_backup_v1"
     private const val TRANSFORMATION = "AES/GCM/NoPadding"
@@ -47,8 +49,8 @@ object BackupCrypto {
         return JSONObject()
             .put("v", 1)
             .put("alg", "AES-256-GCM/AndroidKeyStore")
-            .put("iv", Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
-            .put("ct", Base64.encodeToString(ciphertext, Base64.NO_WRAP))
+            .put("iv", Base64.Default.encode(cipher.iv))
+            .put("ct", Base64.Default.encode(ciphertext))
             .toString()
     }
 
@@ -67,9 +69,9 @@ object BackupCrypto {
         cipher.init(
             Cipher.DECRYPT_MODE,
             secretKey(),
-            GCMParameterSpec(GCM_TAG_BITS, Base64.decode(iv, Base64.NO_WRAP)),
+            GCMParameterSpec(GCM_TAG_BITS, Base64.Default.decode(iv)),
         )
-        return String(cipher.doFinal(Base64.decode(ct, Base64.NO_WRAP)), Charsets.UTF_8)
+        return String(cipher.doFinal(Base64.Default.decode(ct)), Charsets.UTF_8)
     }
 
     // ---- Portable passphrase envelope (v2) ----
@@ -109,9 +111,9 @@ object BackupCrypto {
         return JSONObject()
             .put("v", 2)
             .put("alg", "AES-256-GCM/PBKDF2-HMAC-SHA256-$PBKDF2_ITERATIONS")
-            .put("salt", Base64.encodeToString(salt, Base64.NO_WRAP))
-            .put("iv", Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
-            .put("ct", Base64.encodeToString(ciphertext, Base64.NO_WRAP))
+            .put("salt", Base64.Default.encode(salt))
+            .put("iv", Base64.Default.encode(cipher.iv))
+            .put("ct", Base64.Default.encode(ciphertext))
             .toString()
     }
 
@@ -132,13 +134,13 @@ object BackupCrypto {
             ?: throw IllegalArgumentException("Not a passphrase-protected Chaty backup file.")
         val ct = obj.optString("ct").takeIf { it.isNotEmpty() }
             ?: throw IllegalArgumentException("Not a passphrase-protected Chaty backup file.")
-        val key = deriveKey(passphrase, Base64.decode(salt, Base64.NO_WRAP))
+        val key = deriveKey(passphrase, Base64.Default.decode(salt))
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(
             Cipher.DECRYPT_MODE,
             key,
-            GCMParameterSpec(GCM_TAG_BITS, Base64.decode(iv, Base64.NO_WRAP)),
+            GCMParameterSpec(GCM_TAG_BITS, Base64.Default.decode(iv)),
         )
-        return cipher.doFinal(Base64.decode(ct, Base64.NO_WRAP))
+        return cipher.doFinal(Base64.Default.decode(ct))
     }
 }
