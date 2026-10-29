@@ -6,3 +6,4 @@ build 84: GB reference parity Kotlin slice — remove live Theme Studio chat pre
 build 85: preserve and connect Theme Studio 3D motion + falling particle speed/density to Kotlin preferences and runtime; regression tests and GB parity audit correction
 build 86: preserve all original Theme Studio particle choices; persist and apply speed/density; restore native 3D pager transition controls; test preference round-trip and transition parity
 build 87: regression tests for every restored particle type, None behavior, runtime density/speed, and preference round-trip
+build 88: crash-batch — LockBadge measured badge ROI + calibration launch probe (#46), SystemBar signed-out precondition (#47), mic gesture MicGestureDiag probe (#48), NavStyle icon-only a11y labels, DemoCrashRepro stress loop 2026-10-29T18:27+00:00
