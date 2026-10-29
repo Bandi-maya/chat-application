@@ -216,6 +216,10 @@ data class NavigationEffectPreferences(
     val enableFallingParticles: Boolean = false,
     /** 'Stars', 'Hearts', 'Snowflakes', 'Leaves' */
     val fallingParticleObject: String = "Stars",
+    /** Ambient fall multiplier, persisted with the rest of effect settings. */
+    val fallingParticleSpeed: Double = 1.0,
+    /** Maximum number of ambient particles in the overlay. */
+    val fallingParticleDensity: Int = 15,
     /** 'Home only', 'Chat only', 'Both' */
     val fallingParticleScope: String = "Home only",
     /** GB-reference keys key_chats_listanimation / key_chat_animation (fifteen-value
@@ -230,6 +234,8 @@ data class NavigationEffectPreferences(
         "clickParticleSpeed" to clickParticleSpeed,
         "enableFallingParticles" to enableFallingParticles,
         "fallingParticleObject" to fallingParticleObject,
+        "fallingParticleSpeed" to fallingParticleSpeed,
+        "fallingParticleDensity" to fallingParticleDensity,
         "fallingParticleScope" to fallingParticleScope,
         "homeListAnimation" to homeListAnimation,
         "conversationListAnimation" to conversationListAnimation,
@@ -242,6 +248,8 @@ data class NavigationEffectPreferences(
             clickParticleSpeed = (map["clickParticleSpeed"] as Number?)?.toDouble() ?: 1.0,
             enableFallingParticles = map["enableFallingParticles"] as Boolean? ?: false,
             fallingParticleObject = map["fallingParticleObject"] as String? ?: "Stars",
+            fallingParticleSpeed = ((map["fallingParticleSpeed"] as Number?)?.toDouble() ?: 1.0).coerceIn(0.25, 3.0),
+            fallingParticleDensity = ((map["fallingParticleDensity"] as Number?)?.toInt() ?: 15).coerceIn(1, 60),
             fallingParticleScope = map["fallingParticleScope"] as String? ?: "Home only",
             homeListAnimation = map["homeListAnimation"] as String? ?: "Standard",
             conversationListAnimation = map["conversationListAnimation"] as String? ?: "Standard",
