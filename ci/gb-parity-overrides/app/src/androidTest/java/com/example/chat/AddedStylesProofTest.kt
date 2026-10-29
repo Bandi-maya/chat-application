@@ -70,6 +70,23 @@ class AddedStylesProofTest {
         return file
     }
 
+    /** Diagnostic: dump the active-window accessibility tree on helper failure. */
+    private fun dumpTree(tag: String) {
+        try {
+            val root = instrumentation.uiAutomation.rootInActiveWindow ?: return
+            val sb = StringBuilder()
+            fun walk(n: android.view.accessibility.AccessibilityNodeInfo?, d: Int) {
+                if (n == null) return
+                sb.append("  ".repeat(d)).append(n.className).append(" text=[").append(n.text)
+                    .append("] desc=[").append(n.contentDescription).append("] scrollable=").append(n.isScrollable)
+                    .append(" bounds=").append(n.boundsInScreen).append("\n")
+                for (i in 0 until n.childCount) walk(n.getChild(i), d + 1)
+            }
+            walk(root, 0)
+            File(outDir, "added-tree-" + tag + ".txt").writeText(sb.toString())
+        } catch (_: Exception) {}
+    }
+
     private fun framesDiffer(a: File, b: File): Boolean {
         val ba = BitmapFactory.decodeFile(a.absolutePath)
         val bb = BitmapFactory.decodeFile(b.absolutePath)
@@ -138,7 +155,7 @@ class AddedStylesProofTest {
             if (budget <= 0) break
         }
         val found = device.hasObject(By.text(text))
-        if (!found) capture("added-scroll-fail-" + text.replace(Regex("[^A-Za-z0-9]+"), "-").take(40) + ".png")
+        if (!found) { val tag = text.replace(Regex("[^A-Za-z0-9]+"), "-").take(40); capture("added-scroll-fail-" + tag + ".png"); dumpTree("scroll-fail-" + tag) }
         return found
     }
 
@@ -171,6 +188,7 @@ class AddedStylesProofTest {
             opened = device.wait(Until.hasObject(By.text("Privacy Center")), 15000)
             if (!opened) device.waitForIdle(1000)
         }
+        if (!opened) { capture("added-settings-open-fail.png"); dumpTree("settings-open-fail") }
         assertTrue("settings root never appeared", opened)
     }
 
