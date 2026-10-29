@@ -21,7 +21,7 @@ class ThemeStudioLogicParityTest {
 
     @Test
     fun particleChoicesMatchRuntimeSupportedValues() {
-        assertEquals(listOf("Stars", "Hearts", "Snowflakes", "Leaves"), ThemeStudioLogic.PARTICLE_TYPES)
+        assertEquals(listOf("Neon Embers", "Sakura", "Snow", "Cyber Matrix", "Hearts", "Stars", "Snowflakes", "Leaves", "None"), ThemeStudioLogic.PARTICLE_TYPES)
         for (supported in ThemeStudioLogic.PARTICLE_TYPES) {
             assertEquals(supported, ThemeStudioLogic.normalizeParticleType(supported))
         }
@@ -38,9 +38,20 @@ class ThemeStudioLogicParityTest {
 
     @Test
     fun unsupportedLegacyParticleValuesFallBackSafely() {
-        for (legacy in listOf("Neon Embers", "Sakura", "Snow", "Cyber Matrix", "None", null)) {
+        for (legacy in listOf("LegacyUnknown", "Unsupported", null)) {
             assertEquals("Stars", ThemeStudioLogic.normalizeParticleType(legacy))
         }
+    }
+
+    @Test
+    fun fallingParticleSpeedAndDensityPersistThroughPreferenceModel() {
+        val configured = com.example.chat.domain.models.NavigationEffectPreferences(
+            fallingParticleSpeed = 2.25,
+            fallingParticleDensity = 42,
+        )
+        val restored = com.example.chat.domain.models.NavigationEffectPreferences.fromMap(configured.toMap())
+        assertEquals(2.25, restored.fallingParticleSpeed, 0.001)
+        assertEquals(42, restored.fallingParticleDensity)
     }
 
     @Test
