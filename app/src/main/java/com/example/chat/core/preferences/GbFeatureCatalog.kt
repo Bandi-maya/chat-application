@@ -26,7 +26,7 @@ object GbFeatureCatalog {
         "Chat list rows" to
             "ModConTextColor,ModContactNameColor,HomeCounterBK,HomeCounterText,ModOnlineColor,ModlastseenColor,key_mas_hide_archive_home,onlinechat,onlineDotchat,onlineDotchatColor",
         "Presence & activity alerts" to
-            "abu_saleh_toast_online,abu_saleh_toast_online_bc,abu_saleh_toast_online_tc,abu_saleh_toast_status,abu_saleh_toast_status_bc,abu_saleh_toast_status_tc,abu_saleh_toast_profile,abu_saleh_toast_profile_bc,abu_saleh_toast_profile_tc,abu_saleh_toast_typing,abu_saleh_toast_typing_bc,abu_saleh_toast_typing_tc",
+            "abu_saleh_toast_online,abu_saleh_toast_online_bc,abu_saleh_toast_online_tc,abu_saleh_toast_status,abu_saleh_toast_profile,abu_saleh_toast_profile_bc,abu_saleh_toast_profile_tc,abu_saleh_toast_typing,abu_saleh_toast_typing_bc,abu_saleh_toast_typing_tc",
         "Home header" to
             "ui_home_styleV3,home_stories_key,home_stories_style,enable_grp_separationV2,my_name,yo_want_ghostmode,yo_want_toolbar_cam,yo_want_airplanemode,ModConColor,tabindicator",
         "Privacy" to
@@ -36,7 +36,7 @@ object GbFeatureCatalog {
         "Chat bubbles & ticks" to
             "tick_style,bubble_style,text_size_pick,ConvoBack,ModChatRightBubble,ModChatBubbleText,date_right_color,ModChatLeftBubble,ModChatBubbleTextLeft,date_left_color",
         "Universal behavior" to
-            "Pop_Heds,always_online,Img_highres_seek",
+            "Pop_Heds,always_online",
         "Calls appearance" to
             "ModCallsBackground,ModCallsTextColor,ModCallsIconColors",
         "Conversation header" to
@@ -77,7 +77,6 @@ object GbFeatureCatalog {
         "abu9aleh_status_audio" to "Allow audio status uploads.",
         "Audio_ears" to "Use proximity/earpiece behavior for voice-note playback.",
         "Audio_sensor" to "Enable proximity sensor handling during voice-note playback.",
-        "Img_highres_seek" to "Set preferred image quality for uploads.",
         "Up_size_limit" to "Maximum video/file upload size. Capped at the current 50 MB private-storage limit.",
         "abo_saleh_audio_limit_check" to "Maximum audio upload size. Capped at the current 50 MB private-storage limit.",
         "Img_share_limit" to "Configure maximum images selectable in one send.",
@@ -201,7 +200,6 @@ object GbFeatureCatalog {
             GbFeatureKind.slider -> when (key) {
                 "text_size_pick" -> 15.0
                 "pic_chat_size_pickerV2" -> 36.0
-                "Img_highres_seek" -> 85.0
                 "Up_size_limit" -> 50.0
                 "abo_saleh_audio_limit_check" -> 50.0
                 "Img_share_limit" -> 30.0
@@ -216,7 +214,6 @@ object GbFeatureCatalog {
         when (key) {
             "text_size_pick" -> return 30.0
             "pic_chat_size_pickerV2" -> return 64.0
-            "Img_highres_seek" -> return 100.0
             "Up_size_limit" -> return 50.0
             "abo_saleh_audio_limit_check" -> return 50.0
             "Img_share_limit" -> return 100.0
