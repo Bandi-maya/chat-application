@@ -1,1 +1,1 @@
-build 77 trigger: same merge fixes, committed to the correct override paths (ci/gb-parity-overrides) - build 76 compiled stale override copies
+build 78 trigger: recursive-type annotation fix (ApiBackendService connectionScopeGuard) + foreground call ringer restoration (coordinator-owned, 8 JVM tests) + override count gate 43->44
