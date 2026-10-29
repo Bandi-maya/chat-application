@@ -40,6 +40,10 @@ class ChatyNotificationCoordinator(
     private val registry = ChatyActionRegistry<ApiAccountScope>()
     @Volatile private var lastScope: ApiAccountScope? = null
     @Volatile private var lastIncomingCallId: String? = null
+    /** Foreground incoming-call ring (Bandi's ChatyNotifications.startRinging intent, coordinator-owned):
+     *  audible/vibrating ring ONLY while a live incoming call is present and the app is foreground;
+     *  backgrounded calls ring through the system notification instead (never both). */
+    private val foregroundRinger = ForegroundCallRinger(AndroidRingtonePlayer(context))
     private val stylePrefs get() = context.getSharedPreferences("chaty_notification_style", Context.MODE_PRIVATE)
 
     /** The notification lane. Created ONCE in [start] together with its single daemon thread
@@ -72,11 +76,20 @@ class ChatyNotificationCoordinator(
         api.addAuthScopeListener { next ->
             if (lastScope !== next) {
                 lastScope = next
+                foregroundRinger.stop()
                 registry.clear()
                 lane.cleanupNonCurrent() // enqueue-only: NO sink IPC under the auth lock
             }
         }
         calls.addStateListener { scope.launch { onCallState() } }
+        // Re-evaluate on app foreground/background transitions: ScopedCallCoordinator emits no
+        // call-state event for these, so without this feed a foreground ring would keep ringing
+        // in the background on top of the system full-screen alert (never both, by design).
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            ProcessLifecycleOwner.get().lifecycle.addObserver(androidx.lifecycle.LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_START || event == Lifecycle.Event.ON_STOP) refreshCallState()
+            })
+        }
         api.onIncomingMessage = { message, convoTitle, convoMuted -> scope.launch { onMessage(message, convoTitle, convoMuted) } }
         lane.reconcileOnStart()
     }
@@ -156,6 +169,10 @@ class ChatyNotificationCoordinator(
 
     private fun onCallState() {
         val snap = snapshotCall()
+        foregroundRinger.onCallSnapshot(
+            liveIncomingCall = snap != null && snap.live && snap.incoming && !snap.outgoing,
+            appForeground = foreground(),
+        )
         if (snap == null || !snap.live || !snap.incoming || snap.outgoing) {
             lastIncomingCallId?.let { lane.cancelCallFor(api.authSnapshot(), it) }
             lastIncomingCallId = null
@@ -228,5 +245,91 @@ class ChatyNotificationCoordinator(
                 lane.cancelCallFor(account, id)
             }
         }
+    }
+}
+
+/** Audible/vibrating incoming-call ring for the in-app call UI. The system notification owns the
+ *  ring while backgrounded; this owns it while the app is foreground, so a call never rings twice
+ *  and never rings silently. State-driven and idempotent: the coordinator feeds it a snapshot on
+ *  every call-state or app-foreground transition; answer/decline/end/background/sign-out all stop it. */
+interface RingerPlayer {
+    val isPlaying: Boolean
+    fun start()
+    fun stop()
+}
+
+class ForegroundCallRinger(private val player: RingerPlayer) {
+    @Volatile private var ringing = false
+
+    @Synchronized
+    fun onCallSnapshot(liveIncomingCall: Boolean, appForeground: Boolean) {
+        val shouldRing = liveIncomingCall && appForeground
+        if (shouldRing && !ringing) {
+            ringing = true
+            // A failed start must not wedge the state: the next snapshot retries.
+            runCatching { player.start() }.onFailure { ringing = false }
+        } else if (!shouldRing && ringing) {
+            ringing = false
+            runCatching { player.stop() }
+        }
+    }
+
+    /** Explicit stop for transitions that carry no call snapshot (account switch, sign-out). */
+    @Synchronized
+    fun stop() {
+        if (!ringing) return
+        ringing = false
+        runCatching { player.stop() }
+    }
+}
+
+/** Bandi's startRinging/stopRinging semantics: default ringtone, looping, on the ringtone usage
+ *  stream (system ringer mode and DND stay under the user's control); vibrates unless the ringer
+ *  is fully silent; every failure is contained and logged, never thrown into the call flow. */
+class AndroidRingtonePlayer(private val context: Context) : RingerPlayer {
+    private var ringtone: android.media.Ringtone? = null
+    private var vibrator: android.os.Vibrator? = null
+
+    override val isPlaying: Boolean get() = ringtone?.isPlaying == true
+
+    @Synchronized
+    override fun start() {
+        if (ringtone?.isPlaying == true) return
+        try {
+            val am = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+            if (am.ringerMode == android.media.AudioManager.RINGER_MODE_NORMAL) {
+                ringtone = android.media.RingtoneManager.getRingtone(
+                    context, android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE),
+                )?.apply {
+                    audioAttributes = android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) isLooping = true
+                    play()
+                }
+            }
+            if (am.ringerMode != android.media.AudioManager.RINGER_MODE_SILENT) {
+                @Suppress("DEPRECATION")
+                val v = context.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+                val pattern = longArrayOf(0, 1000, 800)
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    v?.vibrate(android.os.VibrationEffect.createWaveform(pattern, 0))
+                } else {
+                    @Suppress("DEPRECATION") v?.vibrate(pattern, 0)
+                }
+                vibrator = v
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("ChatyNotifCoordinator", "foreground ring failed: $e")
+        }
+    }
+
+    @Synchronized
+    override fun stop() {
+        try { ringtone?.stop() } catch (_: Exception) {}
+        try { vibrator?.cancel() } catch (_: Exception) {}
+        ringtone = null
+        vibrator = null
     }
 }
