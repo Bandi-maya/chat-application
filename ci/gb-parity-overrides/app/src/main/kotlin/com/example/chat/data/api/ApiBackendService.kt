@@ -493,7 +493,7 @@ class ApiBackendService(
     }
     private val healthTransport = OkHttpApiTransport()
 
-    private val realtime = ApiRealtimeClient(
+    private val realtime: ApiRealtimeClient = ApiRealtimeClient(
         webSocketUrl = { resolveWebSocketUrl() },
         token = { session.token },
         backoff = com.example.chat.data.network.BackoffPolicy(),
