@@ -84,6 +84,15 @@ class BackupPortableArchiveTest {
         BackupArchiveLogic.requireWithinArchiveCap(BackupArchiveLogic.MAX_ARCHIVE_BYTES)
     }
 
+    @Test fun `oversize section stream rejected while reading`() {
+        // Zip-bomb shaped: a zeros payload compresses to almost nothing on
+        // disk, but the streamed (decompressed) size crosses the per-entry
+        // cap and must be rejected during streaming, before manifest checks.
+        val big = ByteArray(BackupArchiveLogic.MAX_ENTRY_BYTES.toInt() + 1)
+        val zip = rawZip("sections/big.bin" to big)
+        assertThrows(BackupArchiveLogic.InvalidArchive::class.java) { BackupArchiveLogic.parseZip(zip) }
+    }
+
     // ---------- passphrase crypto ----------
 
     @Test fun `passphrase roundtrip and wrong passphrase rejected`() {
