@@ -1,1 +1,1 @@
-build 56 bidirectional slow-drag helper: known-top start, per-drag composition, initial-viewport searchlog; assertions intact
+build 57 clustered verification: return-to-root nav fix, failure-path per-drag pixel+tree evidence sweep with active-window record, capture .png emit alignment; assertions preserved
