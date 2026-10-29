@@ -46,18 +46,19 @@ fun UpdateChangelogHost() {
     var show by remember { mutableStateOf(false) }
     var resolved by remember { mutableStateOf(false) }
     val versionName = BuildConfig.VERSION_NAME.ifBlank { "current build" }
+    val installVersion = "$versionName (${BuildConfig.VERSION_CODE})"
 
-    LaunchedEffect(versionName) {
+    LaunchedEffect(installVersion) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val previous = prefs.getString(LAST_SEEN_VERSION, null)
-        show = previous != versionName
+        show = previous != installVersion
         resolved = true
     }
 
     if (!resolved || !show) return
 
     AlertDialog(
-        onDismissRequest = { markSeen(context, versionName); show = false },
+        onDismissRequest = { markSeen(context, installVersion); show = false },
         title = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("What’s new in Chaty")
