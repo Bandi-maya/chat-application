@@ -64,6 +64,13 @@ class EmojiPickerPanelProofTest {
         scenario.onActivity { activity ->
             activity.setContent {
                 ChatyTheme(ThemePresets.whatsappIosLight) {
+                    // Production docks the panel at the screen bottom (ChatDetailScreen
+                    // bottom column / ModalBottomSheet); anchor it the same way here so
+                    // the height fraction math measures the panel, not the fixture top.
+                    androidx.compose.foundation.layout.Box(
+                        androidx.compose.ui.Modifier.fillMaxSize(),
+                        contentAlignment = androidx.compose.ui.Alignment.BottomCenter,
+                    ) {
                     ChatyEmojiPickerSheet(
                         theme = ThemePresets.whatsappIosLight,
                         reactionMode = false,
@@ -71,6 +78,7 @@ class EmojiPickerPanelProofTest {
                         recentCache = seededCache(),
                         onEmojiPicked = { picked.add(it) },
                     )
+                    }
                 }
             }
         }
@@ -104,6 +112,13 @@ class EmojiPickerPanelProofTest {
         scenario.onActivity { activity ->
             activity.setContent {
                 ChatyTheme(ThemePresets.whatsappIosLight) {
+                    // Production docks the panel at the screen bottom (ChatDetailScreen
+                    // bottom column / ModalBottomSheet); anchor it the same way here so
+                    // the height fraction math measures the panel, not the fixture top.
+                    androidx.compose.foundation.layout.Box(
+                        androidx.compose.ui.Modifier.fillMaxSize(),
+                        contentAlignment = androidx.compose.ui.Alignment.BottomCenter,
+                    ) {
                     ChatyEmojiPickerSheet(
                         theme = ThemePresets.whatsappIosLight,
                         reactionMode = false,
@@ -111,6 +126,7 @@ class EmojiPickerPanelProofTest {
                         recentCache = seededCache(),
                         onEmojiPicked = {},
                     )
+                    }
                 }
             }
         }
