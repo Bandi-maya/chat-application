@@ -498,7 +498,7 @@ class ApiBackendService(
         token = { session.token },
         backoff = com.example.chat.data.network.BackoffPolicy(),
         connectionScopeIdentity = { authSnapshot() },
-        connectionScopeGuard = { expected, action -> (expected as? ApiAccountScope)?.let { withAuthScope(it, action) } ?: false },
+        connectionScopeGuard = { expected: Any?, action: () -> Unit -> (expected as? ApiAccountScope)?.let { withAuthScope(it, action) } ?: false },
     ).apply { listener = realtimeListener }
 
     /** Network regained after loss: reconnect the socket now instead of waiting out the backoff.
