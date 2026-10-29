@@ -40,9 +40,16 @@ class MainActivity : FragmentActivity() {
         handleNotificationIntent(intent)
     }
 
-    override fun onNewIntent(intent: android.content.Intent) {
+    // launchMode=singleTop: a shortcut tap or notification action while the task is running arrives here, not onCreate.
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        val scope = ServiceLocator.apiBackend.authSnapshot()
+        LauncherShortcutRouter.onShortcutAction(
+            intent.getStringExtra(LauncherShortcutRouter.EXTRA_SHORTCUT_ACTION),
+            scope.userId,
+            scope.generation,
+        )
         handleNotificationIntent(intent)
     }
 
@@ -59,7 +66,7 @@ class MainActivity : FragmentActivity() {
                 N.cancelIncomingCall(this, callId)
                 ServiceLocator.apiBackend.onPushMessage(null) // make sure the socket is up for the offer
                 if (intent.action == N.ACTION_ANSWER_CALL) {
-                    N.requestCallAction(N.PendingCallAction(callId, answer = true))
+                    N.requestCallAction(com.example.chat.notifications.ChatyNotifications.PendingCallAction(callId, answer = true))
                 }
             }
             else -> intent?.getStringExtra(N.EXTRA_ROOM_ID)?.let { N.requestOpenRoom(it) }
@@ -109,16 +116,6 @@ class MainActivity : FragmentActivity() {
         super.onDestroy()
     }
 
-    // launchMode=singleTop: a shortcut tap while the task is running arrives here, not onCreate.
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        val scope = ServiceLocator.apiBackend.authSnapshot()
-        LauncherShortcutRouter.onShortcutAction(
-            intent.getStringExtra(LauncherShortcutRouter.EXTRA_SHORTCUT_ACTION),
-            scope.userId,
-            scope.generation,
-        )
-    }
     private fun clearOverLockScreen() {
         lockScreenListener?.let { ServiceLocator.callSignaling.removeStateListener(it) }
         lockScreenListener = null
