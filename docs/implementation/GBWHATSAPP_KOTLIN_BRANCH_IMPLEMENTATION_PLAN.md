@@ -90,3 +90,27 @@ For each setting, trace: visible option → selected state → save/apply → pe
 ## Initial focus
 
 Start with the existing Kotlin customization and template registry rather than Flutter files. Prioritize settings that appear selectable but do not affect a runtime consumer, preference values that are not restored, unsupported values that silently map to a different effect, false security/verification labels, and interactions that report success before persistence or server confirmation.
+
+
+## Work completed directly on `kotlin` — 2026-10-29
+
+- Closed the Flutter-oriented PR #59 rather than merging its branch into this Kotlin-native codebase.
+- Added the Kotlin-specific plan and linked it from `docs/implementation/00_MASTER_EXECUTION_INDEX.md`.
+- Removed the animated, unsaved live-chat preview from native `ThemeStudioScreen.kt`; retained the separate static applied-theme/home reference.
+- Removed the state-only 3D Motion tab and the particle speed/density controls that were local preview-only state and not consumed by the runtime overlay.
+- Replaced unsupported Theme Studio particle values (`Neon Embers`, `Sakura`, `Snow`, `Cyber Matrix`, `None`) with the runtime-supported `Stars`, `Hearts`, `Snowflakes`, and `Leaves`.
+- Restored the saved particle object when opening Theme Studio, added an explicit enabled switch, and persisted both the enabled flag and selected object through the existing preferences controller.
+- Simplified `ThemeStudioLogic.kt` to the behavior still used by native Theme Studio and added regression tests for supported options, legacy-value fallback, stable gradient presets, and tick-style synchronization.
+- Triggered Kotlin APK/verification workflow run: [Build kotlin APK](https://github.com/Bandi-maya/chat-application/actions/runs/40928203722). At the time this plan was updated, the build job had started but had not completed. Do not mark the slice verified until the build and unit-test steps finish on the latest Kotlin commit.
+
+### Current status
+
+| Item | Status |
+|---|---|
+| All new implementation commits target `kotlin` | Confirmed |
+| Flutter-oriented PR #59 | Closed; not merged |
+| Kotlin plan/index documentation | Committed |
+| Theme Studio live-preview and fake-control cleanup | Committed |
+| Particle option/persistence regression tests | Committed; CI pending |
+| Kotlin APK build and unit tests | Running / not yet verified |
+| Full GBWhatsApp device walkthrough and all-screen parity | Still pending |
