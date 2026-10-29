@@ -6,6 +6,8 @@ Evolve the existing Chaty Flutter + Supabase application so users can customize 
 Use the GBWhatsApp APK strictly as a user-facing reference for feature categories and interaction patterns. Do not copy its proprietary code/assets/branding, and do not implement privacy/security bypasses. "Parity" means legitimate equivalent user workflows where technically and legally appropriate—not identical internals or unsafe mod behavior.
 
 ## Source documents
+- [Kotlin-branch GBWhatsApp gap audit and phased implementation plan](GBWHATSAPP_KOTLIN_BRANCH_IMPLEMENTATION_PLAN.md)
+
 1. [APK screen and settings inventory](GBWHATSAPP_APK_SCREEN_AND_FEATURE_INVENTORY.md)
 2. [Product requirements](CHATY_GLOBAL_CUSTOMIZATION_PRD.md)
 3. [Architecture](CHATY_CUSTOMIZATION_ARCHITECTURE.md)
