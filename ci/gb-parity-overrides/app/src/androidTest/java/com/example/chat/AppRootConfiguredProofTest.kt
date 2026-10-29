@@ -157,6 +157,14 @@ class AppRootConfiguredProofTest {
                     android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.displayCutout(),
                 ).top
             }
+            // ReleaseFeatures.STATUS_UPDATES gates the Updates tab off for this release
+            // (approved: hide backend-unsupported destinations, no dummy controls).
+            if (!com.example.chat.ReleaseFeatures.STATUS_UPDATES) {
+                assertTrue(
+                    "Updates tab must stay hidden while STATUS_UPDATES is off",
+                    device.findObject(By.desc("Updates")) == null,
+                )
+            } else {
             val updatesTab = device.findObject(By.desc("Updates"))
                 ?: throw AssertionError("Updates destination not accessible")
             updatesTab.click()
@@ -172,6 +180,7 @@ class AppRootConfiguredProofTest {
             assertTrue("Updates title below status bar/cutout: top=${updatesTitle.visibleBounds.top}, inset=$topInset",
                 updatesTitle.visibleBounds.top >= topInset)
             capture(device, "10b-updates-safe-area")
+            }
             device.findObject(By.desc("Calls")).click()
             capture(device, "10c-calls-before-fab-assertion")
             logScreenTexts(device, "calls-before-fab")
