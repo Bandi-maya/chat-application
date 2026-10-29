@@ -727,13 +727,8 @@ fun ChatyCameraCaptureScreen(
                     }
                 },
                 onSetViewMode = { m ->
-                    if (m == CaptureViewMode.document) {
-                        captureViewMode = m
-                        optionsOpen = false
-                        scanDocument()
-                    }
-
-                    if (captureViewMode != m) {
+                    val changed = captureViewMode != m
+                    if (changed) {
                         ChatyHapticsPort.selection(view)
                         captureViewMode = m
                         effectsOpen = false
@@ -741,6 +736,10 @@ fun ChatyCameraCaptureScreen(
                             faceSolver.reset()
                             facePoses = emptyList()
                         }
+                    }
+                    if (m == CaptureViewMode.document) {
+                        optionsOpen = false
+                        scanDocument()
                     }
                 },
                 onShutter = ::shutter,
