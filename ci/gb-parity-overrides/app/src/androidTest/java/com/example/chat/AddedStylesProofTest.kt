@@ -134,39 +134,96 @@ class AddedStylesProofTest {
         ctl.updateUniversal(ctl.universal.copy(fontStyle = "Default"))
     }
 
+    /** Visible-text signature of the current window: hash plus a short sample. */
+    private fun windowSig(): Pair<String, String> {
+        return try {
+            val texts = (device.findObjects(By.clazz("android.widget.TextView")) ?: emptyList())
+                .mapNotNull { try { it.text } catch (_: StaleObjectException) { null } }
+                .filter { it.isNotBlank() }
+            texts.joinToString("|").hashCode().toString(16) to texts.take(6).joinToString(", ").take(160)
+        } catch (_: Exception) { "" to "" }
+    }
+
     /**
-     * Bounded flick search for [text]: real fast swipes inside each scrollable
-     * container's bounds (controlled UiObject2.scroll gestures are consumed by
-     * bottom-sheet nested scrolling without advancing - a11y tree + pixel
-     * evidence, capture 40812499812). A container is abandoned when two
-     * consecutive flicks leave the visible text set unchanged (end reached).
+     * One slow drag inside [b]: [revealBelow]=true drags the finger upward
+     * (content moves down-list); false drags downward (content moves up-list).
+     * 40 steps over 40% of the container height = a drag, not a fling: fast
+     * flicks jump pages without composing intermediate rows (capture
+     * 40815358541 tree + pixel evidence: sweep ended at list bottom with the
+     * target group never entering the a11y tree).
      */
-    private fun scrollToText(text: String, maxSwipes: Int = 30): Boolean {
+    private fun slowDrag(b: android.graphics.Rect, revealBelow: Boolean) {
+        val cx = b.centerX()
+        val yLow = b.top + b.height() * 7 / 10
+        val yHigh = b.top + b.height() * 3 / 10
+        if (revealBelow) device.swipe(cx, yLow, cx, yHigh, 40) else device.swipe(cx, yHigh, cx, yLow, 40)
+        device.waitForIdle(350)
+    }
+
+    private fun scrollables(): List<UiObject2> =
+        try { device.findObjects(By.scrollable(true)) ?: emptyList() } catch (_: Exception) { emptyList() }
+
+    /**
+     * Bounded bidirectional search for [text] from a KNOWN initial position:
+     * the target containers are first driven to their top, then swept downward
+     * with slow drags, checking after each drag. The initial viewport signature
+     * and per-phase drag counts are recorded so a failure log shows where the
+     * search STARTED, not only where it ended. A container is abandoned when
+     * two consecutive drags leave the visible text set unchanged (end reached).
+     */
+    private fun scrollToText(text: String, maxDrags: Int = 44): Boolean {
         if (device.wait(Until.hasObject(By.text(text)), 4000)) return true
-        var budget = maxSwipes
-        val scrollables = device.findObjects(By.scrollable(true)) ?: emptyList()
-        for (s in scrollables) {
+        val (initialSig, initialSample) = windowSig()
+        var budget = maxDrags
+        var toTopDrags = 0
+        var sweepDrags = 0
+
+        // Phase A: drive every scrollable to its top so the sweep starts from a known position.
+        for (s in scrollables()) {
             val b = try { s.visibleBounds } catch (_: StaleObjectException) { continue }
-            val cx = b.centerX()
-            val y1 = b.top + b.height() * 3 / 4
-            val y2 = b.top + b.height() / 4
             var lastSig = ""
-            var stillCount = 0
+            var still = 0
             while (budget > 0) {
-                budget--
-                device.swipe(cx, y1, cx, y2, 12)
-                device.waitForIdle(400)
+                budget--; toTopDrags++
+                slowDrag(b, revealBelow = false)
                 if (device.hasObject(By.text(text))) return true
-                val sig = try {
-                    (device.findObjects(By.clazz("android.widget.TextView")) ?: emptyList())
-                        .mapNotNull { it.text }.joinToString("|").hashCode().toString()
-                } catch (_: Exception) { "" }
-                if (sig == lastSig) { stillCount++; if (stillCount >= 2) break } else { stillCount = 0; lastSig = sig }
+                val (sig, _) = windowSig()
+                if (sig == lastSig) { still++; if (still >= 2) break } else { still = 0; lastSig = sig }
             }
             if (budget <= 0) break
         }
+        if (device.hasObject(By.text(text))) return true
+
+        // Phase B: sweep downward from the top, composing every row.
+        for (s in scrollables()) {
+            val b = try { s.visibleBounds } catch (_: StaleObjectException) { continue }
+            var lastSig = ""
+            var still = 0
+            while (budget > 0) {
+                budget--; sweepDrags++
+                slowDrag(b, revealBelow = true)
+                if (device.hasObject(By.text(text))) return true
+                val (sig, _) = windowSig()
+                if (sig == lastSig) { still++; if (still >= 2) break } else { still = 0; lastSig = sig }
+            }
+            if (budget <= 0) break
+        }
+
         val found = device.hasObject(By.text(text))
-        if (!found) { val tag = text.replace(Regex("[^A-Za-z0-9]+"), "-").take(40); capture("added-scroll-fail-" + tag + ".png"); dumpTree("scroll-fail-" + tag) }
+        if (!found) {
+            val tag = text.replace(Regex("[^A-Za-z0-9]+"), "-").take(40)
+            capture("added-scroll-fail-" + tag + ".png")
+            dumpTree("scroll-fail-" + tag)
+            val (finalSig, finalSample) = windowSig()
+            try {
+                File(outDir, "added-searchlog-" + tag + ".txt").writeText(
+                    "target=" + text + "\n" +
+                    "initialSig=" + initialSig + " initial=[" + initialSample + "]\n" +
+                    "toTopDrags=" + toTopDrags + " sweepDrags=" + sweepDrags + " budgetLeft=" + budget + "\n" +
+                    "finalSig=" + finalSig + " final=[" + finalSample + "]\n",
+                )
+            } catch (_: Exception) {}
+        }
         return found
     }
 
@@ -206,6 +263,20 @@ class AddedStylesProofTest {
         }
         if (!opened) { capture("added-settings-open-fail.png"); dumpTree("settings-open-fail") }
         assertTrue("settings root never appeared", opened)
+        // Known starting position: drive the root list to its top (test-local
+        // navigation state reset; preferences are not touched).
+        for (s in scrollables()) {
+            val b = try { s.visibleBounds } catch (_: StaleObjectException) { continue }
+            var lastSig = ""
+            var still = 0
+            var n = 0
+            while (n < 12) {
+                n++
+                slowDrag(b, revealBelow = false)
+                val (sig, _) = windowSig()
+                if (sig == lastSig) { still++; if (still >= 2) break } else { still = 0; lastSig = sig }
+            }
+        }
     }
 
     private fun clickDock(label: String) {
