@@ -58,12 +58,16 @@ object ServiceLocator {
      *  Called once from ChatyApplication.onCreate. */
     fun init(context: Context) {
         appContext = context.applicationContext
+        com.example.chat.core.theme.ThemePresets.platformIsLightProvider = {
+            (requireContext().resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) != android.content.res.Configuration.UI_MODE_NIGHT_YES
+        }
         // gotrue session restore, mirroring supabase_flutter's initializeAuth
         // which runs during Supabase.initialize before runApp.
         appScope.launch { sessionManager.restore() }
         // Decrypted media temps never survive a process restart.
         appScope.launch(kotlinx.coroutines.Dispatchers.IO) { runCatching { mediaCache.purgeTransientTemps() } }
         preferencesController // start load + remote reconcile (Dart controller constructor)
+        notificationCoordinator.start()
     }
 
     private fun requireContext(): Context =
@@ -146,6 +150,8 @@ object ServiceLocator {
             service.onAttachmentsGone = { refs -> invalidateMediaFor(refs) }
             service.syncFcmTokenHook = { fcmRegistrar.syncTokenOnLogin() }
             service.unregisterFcmHook = { fcmRegistrar.unregisterOnLogout() }
+            // Offline demo: fail-closed entry probe; a real GoTrue identity blocks demo mode.
+            service.demoGoTruePresentHook = { sessionManager.hasAnySession() }
             service.initialize()
             startNetworkRecovery(service)
         }
@@ -249,6 +255,15 @@ object ServiceLocator {
      *  its load + remote reconcile on first reference; referenced from
      *  [init] so startup mirrors the Dart controller's constructor. */
     /** main.dart app-lock state machine (_appLockRequired/_backgroundedAt). */
+    /** System notifications (messages, incoming call, ongoing-call actions) for the custom-API account plane. */
+    val notificationCoordinator: com.example.chat.notifications.ChatyNotificationCoordinator by lazy {
+        com.example.chat.notifications.ChatyNotificationCoordinator(
+            context = requireContext(), scope = appScope, api = apiBackend, calls = callSignaling,
+            prefs = preferencesController, appLock = appLock, channelManager = notificationChannelManager,
+            isChatVaultLocked = { id -> hiddenVaultService.isConversationLocked(id) },
+        )
+    }
+
     val appLock: com.example.chat.data.services.AppLockCoordinator by lazy {
         com.example.chat.data.services.AppLockCoordinator(
             isAuthenticated = { apiBackend.isAuthenticated },
@@ -326,85 +341,15 @@ object ServiceLocator {
      *  once the locator is ready) - initialize, then subscribe to the api data store. No repository callback,
      *  so there is no lazy-initialisation cycle. */
     @Volatile private var callNotificationsStarted = false
-    @Volatile private var callAlertSync: () -> Unit = {}
 
-    /** App moved between foreground and background: switch ringing between notification and in-app. */
-    fun refreshCallAlert() { try { callAlertSync() } catch (_: Exception) {} }
+    /** App moved between foreground and background: the coordinator (single owner of call/message
+     *  system alerts) re-evaluates the live call - withdraws the full-screen alert while the in-app
+     *  call UI is visible, re-posts it when backgrounded. Message alerts need no re-evaluation
+     *  (per-event gating). Called from ChatyApplication's lifecycle hook. */
+    fun refreshCallAlert() { runCatching { notificationCoordinator.refreshCallState() } }
 
-    /**
-     * System notifications while the app is in the background or closed:
-     *  - rings (full-screen call notification) when an offer arrives over the socket,
-     *    stops ringing when it is answered / declined / ends, posts "Missed call";
-     *  - message notifications for socket messages while backgrounded or in another chat.
-     * Idempotent; called from ChatyApplication and the FCM service.
-     */
-    fun startCallNotifications() {
-        if (callNotificationsStarted) return
-        callNotificationsStarted = true
-        val ctx = requireContext()
-        com.example.chat.notifications.ChatyNotifications.ensureChannels(ctx)
-        val calls = callSignaling
-        callLifecycle // keeps the active-call foreground service in sync with the session
-        var lastIncoming: com.example.chat.data.services.ChatyCallSession? = null
-        val sync: () -> Unit = sync@{
-            val s = calls.currentSession
-            val N = com.example.chat.notifications.ChatyNotifications
-            val St = com.example.chat.data.services.CallSessionState
-            if (s != null && !s.isOutgoing && s.state == St.incoming) {
-                lastIncoming = s
-                if (N.appInForeground) {
-                    // Call screen is visible: ring in-app instead of the notification.
-                    N.cancelIncomingCall(ctx, s.callId)
-                    N.startRinging(ctx)
-                } else {
-                    N.stopRinging()
-                    N.showIncomingCall(ctx, s.callId, s.remoteUserId, s.remoteDisplayName, s.isVideo)
-                }
-                return@sync
-            }
-            N.stopRinging()
-            val prev = lastIncoming
-            if (prev != null && (s == null || s.callId == prev.callId)) {
-                lastIncoming = null
-                val unanswered = s == null || s.state == St.missed || (s.state == St.ended && s.connectedAt == null)
-                if (unanswered && s?.state != St.declined && !N.appInForeground) {
-                    N.showMissedCall(ctx, prev.callId, prev.remoteDisplayName, prev.isVideo)
-                } else {
-                    N.cancelIncomingCall(ctx, prev.callId)
-                    N.forgetCall(prev.callId)
-                }
-            }
-        }
-        callAlertSync = sync
-        calls.addStateListener { sync() }
-        apiBackend.onIncomingMessage = { m ->
-            val N = com.example.chat.notifications.ChatyNotifications
-            // In the foreground the app shows its own in-app alerts; the system notification is
-            // for when the user is elsewhere.
-            if (!N.appInForeground &&
-                preferencesController.notification.enableGlobalNotifications &&
-                !apiBackend.isConversationMuted(m.conversationId)
-            ) {
-                val conv = apiBackend.conversations.firstOrNull { it.id == m.conversationId }
-                val isGroup = conv?.type == com.example.chat.domain.models.ConversationType.group
-                val sender = m.metadata["sender_name"]?.toString()?.takeIf { it.isNotBlank() }
-                    ?: apiBackend.users.firstOrNull { it.id == m.senderId }?.displayName
-                    ?: conv?.title ?: "New message"
-                val body = when {
-                    m.text.isNotBlank() -> m.text
-                    m.type == com.example.chat.domain.models.MessageType.image -> "📷 Photo"
-                    m.type == com.example.chat.domain.models.MessageType.video -> "🎥 Video"
-                    m.type == com.example.chat.domain.models.MessageType.audio -> "🎤 Voice message"
-                    else -> "📎 Attachment"
-                }
-                N.showMessage(ctx, m.conversationId, m.id, sender, body, conv?.title, isGroup)
-            }
-        }
-        apiBackend.onConversationRead = { roomId ->
-            com.example.chat.notifications.ChatyNotifications.cancelMessages(ctx, roomId)
-        }
-    }
-
+    /** Badge/channel sync: initialize the notification channel manager once the locator is ready,
+     *  then keep the unread badge in step with the api data store (pinned behavior; AppRoot calls this). */
     fun startBadgeSync() {
         if (badgeSyncStarted) return
         badgeSyncStarted = true
@@ -412,6 +357,26 @@ object ServiceLocator {
         m.initialize()
         apiBackend.addListener { m.syncUnreadBadgeCount() }
         startPrivacySync()
+    }
+
+    /**
+     * System notifications while the app is in the background or closed.
+     * Socket-driven call ringing and message alerts are owned by the privacy-aware
+     * ChatyNotificationCoordinator (started once in [init]); this only ensures the
+     * FCM path's channels exist when a push arrives in a cold process, keeps the
+     * active-call foreground service in sync, and wires read-sync cancellation for
+     * FCM-posted message alerts. Idempotent; called from ChatyApplication and the
+     * FCM service.
+     */
+    fun startCallNotifications() {
+        if (callNotificationsStarted) return
+        callNotificationsStarted = true
+        val ctx = requireContext()
+        com.example.chat.notifications.ChatyNotifications.ensureChannels(ctx)
+        callLifecycle // keeps the active-call foreground service in sync with the session
+        apiBackend.onConversationRead = { roomId ->
+            com.example.chat.notifications.ChatyNotifications.cancelMessages(ctx, roomId)
+        }
     }
 
     /** Keeps the backend's chat privacy settings (who sees last seen/online, read receipts,
@@ -455,6 +420,11 @@ object ServiceLocator {
             onPendingEnqueued = { appScope.launch { outgoingQueue.processQueue() } },
             snapshotCache = snapshotCache,
             snapshotScope = appScope,
+            scopeSnapshot = { apiBackend.authSnapshot() },
+            withScope = { expected, action ->
+                (expected as? com.example.chat.data.api.ApiAccountScope)
+                    ?.let { apiBackend.withAuthScope(it, action) } ?: false
+            },
             onAttachmentsGone = { refs -> invalidateMediaFor(refs) },
             // Dart backend_service _shouldSendReadReceipts: ghost mode, readReceipts and blue-ticks-after-reply.
             shouldSendReadReceipts = { conversationId ->
@@ -635,7 +605,7 @@ object ServiceLocator {
                 com.example.chat.ui.media.ImageSendCompressor.compress(bytes, quality)
             },
             apiAuthenticated = { apiBackend.isAuthenticated },
-            apiUpload = { bytes, filename -> apiBackend.uploadMedia(filename, bytes) },
+            apiUpload = { bytes, filename -> apiBackend.uploadMedia(filename, bytes, expectedScope = kotlin.coroutines.coroutineContext[com.example.chat.data.api.ApiScopeElement]?.scope) },
         )
     }
 
@@ -798,6 +768,8 @@ object ServiceLocator {
             authSignOut = { sessionManager.signOut() },
             kickPendingSends = { appScope.launch { outgoingQueue.processQueue() } },
             onSignedOut = { mediaCache.purgeTransientTemps() },
+            apiScopeIdentity = { apiBackend.authSnapshot() },
+            onAccountSwitch = { apiBackend.clearChatCachesForAccountSwitch() },
         )
     }
 
@@ -832,6 +804,11 @@ object ServiceLocator {
             awaitClose { sessionManager.removeAuthStateListener(listener) }
         }
         sessionManager.addAuthStateListener { _, session ->
+            if (session != null) {
+                // A real GoTrue adoption is a real-adopt boundary too: demo
+                // residue must not survive it (mirrors REST afterAuthAdopted).
+                apiBackend.purgeDemoResidueForRealAdopt()
+            }
             richRealtime.onSessionChanged(session?.user?.id)
         }
         sessionLifecycle.initialize(snapshots)
