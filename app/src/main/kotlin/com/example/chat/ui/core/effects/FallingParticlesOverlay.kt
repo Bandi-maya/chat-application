@@ -55,7 +55,16 @@ fun FallingParticlesOverlay(
         while (isActive) {
             androidx.compose.runtime.withFrameNanos { }
             val fx = preferences.effects // live read each frame, like Dart
-            if (FallingSim.step(items, fx.enableFallingParticles, fx.fallingParticleScope, fx.fallingParticleObject, currentScope, random)) {
+            if (FallingSim.step(
+                items = items,
+                enabled = fx.enableFallingParticles,
+                scope = fx.fallingParticleScope,
+                objectName = fx.fallingParticleObject,
+                currentScope = currentScope,
+                random = random,
+                density = fx.fallingParticleDensity,
+                speedMultiplier = fx.fallingParticleSpeed,
+            )) {
                 frame += 1
             }
         }
