@@ -278,7 +278,7 @@ fun GbFeatureCenterScreen(
     // Reuse Chaty's shared color picker so all settings have the same
     // selected-swatch, hex validation, contrast preview, and Apply behavior.
     colorEdit?.let { item ->
-        val current = preferences.gbColor(item.key) ?: scheme.primary.value.toLong()
+        val current = preferences.gbColor(item.key) ?: 0xFF3B82F6L
         com.example.chat.ui.kit.ChatyColorPickerModal(
             title = item.title,
             currentColor = current,
