@@ -76,8 +76,12 @@ class BackupPortableArchiveTest {
     }
 
     @Test fun `oversize archive rejected before parse`() {
-        val big = ByteArray(BackupArchiveLogic.MAX_ARCHIVE_BYTES.toInt() + 1)
-        assertThrows(BackupArchiveLogic.InvalidArchive::class.java) { BackupArchiveLogic.parseZip(big) }
+        // Guard must reject any declared size above the cap before parsing;
+        // asserted without materializing a >512MB array (CI heap).
+        assertThrows(BackupArchiveLogic.InvalidArchive::class.java) {
+            BackupArchiveLogic.requireWithinArchiveCap(BackupArchiveLogic.MAX_ARCHIVE_BYTES + 1)
+        }
+        BackupArchiveLogic.requireWithinArchiveCap(BackupArchiveLogic.MAX_ARCHIVE_BYTES)
     }
 
     // ---------- passphrase crypto ----------
