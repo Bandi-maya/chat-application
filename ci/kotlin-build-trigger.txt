@@ -1,1 +1,1 @@
-build 79 trigger: break realtime/realtimeListener inference cycle with explicit ApiRealtimeClient property type (his listener body calls realtime.* at 3 sites; pinned's does not)
+build 80 trigger: fix demo-signout Compose crash (defer in-composition route write via SideEffect in AppRoot ChatDetail branch) + gate stale test expectations on ReleaseFeatures (Updates tab, reaction rail) + backup archive fixture sections + applicationId com.logybyte.chat with fail-closed stable signing
