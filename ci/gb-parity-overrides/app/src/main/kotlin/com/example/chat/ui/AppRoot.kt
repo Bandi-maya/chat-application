@@ -1548,6 +1548,7 @@ fun AppRoot() {
         // Dart ChatsHomeScreen.initState -> NotificationPermissionSheet.showIfNeeded (education sheet once, skipped when granted).
         if (route == AuthRoute.Home) {
             com.example.chat.ui.onboarding.NotificationPermissionSheetHost(modifier = Modifier.fillMaxSize())
+            com.example.chat.ui.updates.UpdateChangelogHost()
         }
         } // Shared safe-area app overlays. Island owns its hardware anchor separately.
         com.example.chat.ui.calls.GlobalCallHost(isAuthenticated = ServiceLocator.apiBackend.isAuthenticated)
