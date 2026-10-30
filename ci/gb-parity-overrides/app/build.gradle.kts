@@ -97,6 +97,7 @@ android {
             java.srcDir(layout.buildDirectory.dir("generated/uniffi"))
             jniLibs.srcDir(layout.buildDirectory.dir("jniLibs"))
             assets.srcDir(layout.buildDirectory.dir("generated/faceModel/assets"))
+            assets.srcDir(layout.buildDirectory.dir("generated/selfieModel/assets"))
             res.srcDir(layout.buildDirectory.dir("generated/launcherIcons/res"))
         }
     }
@@ -269,6 +270,61 @@ val downloadFaceLandmarker = tasks.register("downloadFaceLandmarker") {
 }
 
 tasks.named("preBuild") { dependsOn(downloadFaceLandmarker) }
+
+// Selfie segmentation model for the bg_* camera effects: downloaded from the
+// canonical MediaPipe model bucket at build time and verified against the
+// pinned SHA-256 (fail closed on mismatch). Same contract as face_landmarker:
+// no binary in the repo, no runtime network dependency. License: Apache 2.0
+// (MediaPipe model card, storage.googleapis.com/mediapipe-models).
+val selfieSegmenterUrl =
+    "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite"
+val selfieSegmenterSha256 =
+    "191ac9529ae506ee0beefa6b2c945a172dab9d07d1e802a290a4e4038226658b"
+val selfieSegmenterSize = 249537L
+val selfieSegmenterAssetsDir = layout.buildDirectory.dir("generated/selfieModel/assets")
+
+val downloadSelfieSegmenter = tasks.register("downloadSelfieSegmenter") {
+    val outFile = selfieSegmenterAssetsDir.get().file("selfie_segmenter.tflite").asFile
+    outputs.file(outFile)
+    doLast {
+        fun sha256(f: File): String {
+            val digest = MessageDigest.getInstance("SHA-256")
+            f.inputStream().use { input ->
+                val buffer = ByteArray(8192)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    digest.update(buffer, 0, read)
+                }
+            }
+            return digest.digest().joinToString("") { "%02x".format(it) }
+        }
+        if (outFile.exists() && outFile.length() == selfieSegmenterSize &&
+            sha256(outFile) == selfieSegmenterSha256
+        ) {
+            return@doLast
+        }
+        outFile.parentFile.mkdirs()
+        val tmp = File(outFile.parentFile, outFile.name + ".download")
+        tmp.delete()
+        URI(selfieSegmenterUrl).toURL().openStream().use { input ->
+            tmp.outputStream().use { input.copyTo(it) }
+        }
+        check(tmp.length() == selfieSegmenterSize) {
+            tmp.delete()
+            "selfie_segmenter.tflite size mismatch: got ${tmp.length()}, want $selfieSegmenterSize"
+        }
+        val hash = sha256(tmp)
+        check(hash == selfieSegmenterSha256) {
+            tmp.delete()
+            "selfie_segmenter.tflite SHA-256 mismatch: got $hash, want $selfieSegmenterSha256"
+        }
+        check(tmp.renameTo(outFile)) { "failed to move $tmp to $outFile" }
+    }
+}
+
+tasks.named("preBuild") { dependsOn(downloadSelfieSegmenter) }
+
 
 // Launcher alias icons (warm/outline/obsidian/glass/signal/fold x 5 densities). The PNGs are stored
 // as a base64 tar.gz (split into part-NN.b64 files) of drawable-<density>/ic_launcher_<variant>.png because binary files cannot be
