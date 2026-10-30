@@ -309,6 +309,7 @@ fun CameraCaptureBottomControls(
     videoActive: Boolean = false,
     videoRecording: Boolean = false,
     videoSeconds: Int = 0,
+    videoPaused: Boolean = false,
     engine: EffectEngine,
     lensManager: LensManager,
     faceHealth: TrackingHealth,
@@ -317,6 +318,7 @@ fun CameraCaptureBottomControls(
     onSelectEffect: (ChatyCameraEffect) -> Unit,
     onSetViewMode: (CaptureViewMode) -> Unit,
     onShutter: () -> Unit,
+    onTogglePause: () -> Unit = {},
     onFlip: () -> Unit,
     onPickFromGallery: () -> Unit,
     onBrowseLenses: () -> Unit = {},
@@ -538,8 +540,34 @@ fun CameraCaptureBottomControls(
             // and flip keep their existing capabilities and safe-area padding.
             // While recording, the stop control stays centered alone (reference).
             if (videoRecording) {
+                // Reference recording row (user video 2026-10-30): the stop control
+                // stays centered; pause/resume sits at the right edge.
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     CameraCaptureShutter(enabled = true, capturing = false, videoActive = true, recording = true, onClick = onShutter)
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = (if (tight) 12 else 16).dp)
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .clickable(onClick = onTogglePause)
+                            .semantics { contentDescription = if (videoPaused) "Resume recording" else "Pause recording" },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (videoPaused) {
+                            androidx.compose.foundation.Canvas(Modifier.size(18.dp)) {
+                                val w = size.width; val h = size.height
+                                drawPath(androidx.compose.ui.graphics.Path().apply {
+                                    moveTo(w * .25f, h * .12f); lineTo(w * .25f, h * .88f); lineTo(w * .88f, h * .5f); close()
+                                }, color = Color.White)
+                            }
+                        } else {
+                            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                Box(Modifier.width(5.dp).height(18.dp).clip(RoundedCornerShape(2.dp)).background(Color.White))
+                                Box(Modifier.width(5.dp).height(18.dp).clip(RoundedCornerShape(2.dp)).background(Color.White))
+                            }
+                        }
+                    }
                 }
             } else {
             Row(
