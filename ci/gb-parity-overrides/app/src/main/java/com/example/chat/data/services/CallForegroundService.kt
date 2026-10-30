@@ -56,7 +56,7 @@ class CallForegroundService : Service() {
                 }
             }
         } catch (e: Exception) {
-            android.util.Log.w("CallForegroundService", "call lock acquire failed: $e")
+            android.util.Log.w("CallForegroundService", "call lock acquire failed: ${e.javaClass.simpleName}")
         }
     }
 
@@ -68,20 +68,20 @@ class CallForegroundService : Service() {
     }
 
     override fun onDestroy() {
-        Log.i(TAG, "FGS-DIAG onDestroy")
+        if (com.example.chat.BuildConfig.DEBUG) Log.i(TAG, "FGS-DIAG onDestroy")
         releaseLocks()
         super.onDestroy()
     }
 
     override fun onCreate() {
         super.onCreate()
-        Log.i(TAG, "FGS-DIAG onCreate")
+        if (com.example.chat.BuildConfig.DEBUG) Log.i(TAG, "FGS-DIAG onCreate")
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.i(TAG, "FGS-DIAG onStartCommand entered startId=$startId")
+        if (com.example.chat.BuildConfig.DEBUG) Log.i(TAG, "FGS-DIAG onStartCommand entered startId=$startId")
         if (intent?.action == ACTION_STOP) {
             // Couriered stop (see stop()): satisfy any pending foreground
             // requirement on this record, then remove the notification and
@@ -90,7 +90,7 @@ class CallForegroundService : Service() {
             // "Bringing down service while still waiting for start
             // foreground"), so a stop must never race context.stopService
             // against an in-flight startForegroundService.
-            Log.i(TAG, "FGS-DIAG ACTION_STOP courier startId=$startId")
+            if (com.example.chat.BuildConfig.DEBUG) Log.i(TAG, "FGS-DIAG ACTION_STOP courier startId=$startId")
             try {
                 ensureChannel()
                 val stopNotification = buildNotification("Chaty call", "")
@@ -100,28 +100,27 @@ class CallForegroundService : Service() {
                     startForeground(SERVICE_ID, stopNotification)
                 }
             } catch (e: Exception) {
-                android.util.Log.w("CallForegroundService", "stop courier foreground failed: $e")
+                android.util.Log.w("CallForegroundService", "stop courier foreground failed: ${e.javaClass.simpleName}")
             }
             val stopOwner = intent.getStringExtra(EXTRA_STOP_OWNER)
             val serving = servingOwner
-            when {
+            when (stopDisposition(serving, stopOwner)) {
                 // No live session on this record: pure pending-requirement
                 // cleanup (the ForegroundServiceDidNotStartInTimeException case).
-                serving == null -> {
+                StopDisposition.CLEANUP -> {
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf(startId)
                 }
                 // The courier names the session actually being served: tear down.
-                stopOwner != null && stopOwner == serving -> {
-                    Log.i(TAG, "FGS-DIAG stop accepted owner=$stopOwner")
+                StopDisposition.ACCEPT -> {
+                    if (com.example.chat.BuildConfig.DEBUG) Log.i(TAG, "FGS-DIAG stop accepted owner=${diagId(stopOwner)}")
                     servingOwner = null
-                    currentServingOwner = null
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf(startId)
                 }
                 // Anything else is a stale teardown racing a newer call: leave
                 // the live session (and its notification) alone.
-                else -> Log.i(TAG, "FGS-DIAG stale stop ignored serving=$serving owner=$stopOwner")
+                StopDisposition.IGNORE -> if (com.example.chat.BuildConfig.DEBUG) Log.i(TAG, "FGS-DIAG stale stop ignored serving=${diagId(serving)} owner=${diagId(stopOwner)}")
             }
             return START_NOT_STICKY
         }
@@ -152,9 +151,8 @@ class CallForegroundService : Service() {
         } else {
             startForeground(SERVICE_ID, notification)
         }
-        servingOwner = intent.getStringExtra(EXTRA_SESSION_ID) ?: "anon-" + (++anonStartCounter)
-        currentServingOwner = servingOwner
-        Log.i(TAG, "FGS-DIAG startForeground posted startId=$startId owner=$servingOwner")
+        servingOwner = intent?.getStringExtra(EXTRA_OWNER) ?: "anon-" + (++anonStartCounter)
+        if (com.example.chat.BuildConfig.DEBUG) Log.i(TAG, "FGS-DIAG startForeground posted startId=$startId owner=${diagId(servingOwner)}")
         acquireLocks()
         // Dart allowAutoRestart=false: never recreated by the system without a live call.
         return START_NOT_STICKY
@@ -225,13 +223,26 @@ class CallForegroundService : Service() {
         const val EXTRA_IS_VIDEO = "chaty.call.is_video"
         private const val ACTION_STOP = "chaty.call.STOP"
         const val EXTRA_SESSION_ID = "chaty.call.session_id"
+        const val EXTRA_OWNER = "chaty.call.owner"
         private const val EXTRA_STOP_OWNER = "chaty.call.stop_owner"
 
-        /** Owner identity of the live service (set/cleared by the service in
-         *  this process) and of the most recently started session. */
-        @Volatile private var currentServingOwner: String? = null
-        @Volatile private var lastStartedCallId: String? = null
         private var anonStartCounter = 0
+        // Per wiring-owner record of what that owner last started: a stop may
+        // only name a session its own caller started, never a process-global
+        // "current" value (a delayed teardown would otherwise be stamped with
+        // a NEWER call's identity and still kill it).
+        private val lastStartedCallIdByToken = mutableMapOf<String, String>()
+        private var pendingSyncOwner: String? = null
+        // Diagnostics never print raw callIds or owner composites (they are
+        // identifiers and debug APKs ship with DEBUG logging on): owners get
+        // opaque process-local correlation labels instead.
+        private val diagIds = java.util.concurrent.ConcurrentHashMap<String, String>()
+        private fun diagId(owner: String?): String =
+            owner?.let { diagIds.getOrPut(it) { "own-" + diagIds.size } } ?: "none"
+        private fun forgetOwnerToken(token: String) {
+            synchronized(syncLock) { lastStartedCallIdByToken.remove(token) }
+            diagIds.keys.removeIf { it == token || it.startsWith(token + ":") }
+        }
 
         private val syncLock = Any()
         private var syncHandler: android.os.Handler? = null
@@ -249,7 +260,7 @@ class CallForegroundService : Service() {
          *  pending decision and that a terminal stop discards any queued
          *  start. The pending slot always clears when its runnable runs, so
          *  later sessions can start the service again. */
-        fun sync(context: Context, session: ChatyCallSession?) {
+        fun sync(context: Context, session: ChatyCallSession?, ownerToken: String) {
             val appContext = context.applicationContext
             val handler = syncHandler
                 ?: android.os.Handler(android.os.Looper.getMainLooper()).also { syncHandler = it }
@@ -257,27 +268,29 @@ class CallForegroundService : Service() {
                 pendingSync?.let { handler.removeCallbacks(it) }
                 val task = Runnable {
                     synchronized(syncLock) { pendingSync = null }
-                    applySync(appContext, session)
+                    applySync(appContext, session, ownerToken)
                 }
                 pendingSync = task
+                pendingSyncOwner = session?.let { ownerToken + ":" + it.callId }
                 handler.post(task)
             }
         }
 
-        private fun applySync(context: Context, session: ChatyCallSession?) {
+        private fun applySync(context: Context, session: ChatyCallSession?, ownerToken: String) {
             if (!CallForegroundPolicy.shouldRunFor(session)) {
-                Log.i(TAG, "FGS-DIAG applySync -> stop (session=${session?.state})")
-                stop(context)
+                if (com.example.chat.BuildConfig.DEBUG) Log.i(TAG, "FGS-DIAG applySync -> stop (session=${session?.state})")
+                stop(context, ownerToken, session?.callId)
                 return
             }
-            Log.i(TAG, "FGS-DIAG applySync -> startForegroundService (session=${session?.state})")
+            if (com.example.chat.BuildConfig.DEBUG) Log.i(TAG, "FGS-DIAG applySync -> startForegroundService (session=${session?.state})")
             val active = session!!
-            lastStartedCallId = active.callId
+            synchronized(syncLock) { lastStartedCallIdByToken[ownerToken] = active.callId }
             val intent = Intent(context, CallForegroundService::class.java).apply {
                 putExtra(EXTRA_TITLE, CallForegroundPolicy.notificationTitle(active))
                 putExtra(EXTRA_TEXT, CallForegroundPolicy.notificationText(active))
                 putExtra(EXTRA_IS_VIDEO, active.isVideo)
                 putExtra(EXTRA_SESSION_ID, active.callId)
+                putExtra(EXTRA_OWNER, ownerToken + ":" + active.callId)
             }
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -289,27 +302,57 @@ class CallForegroundService : Service() {
                 // WebRTC remains the media source of truth; a foreground-service
                 // failure must never present as a successful background-call
                 // guarantee.
-                android.util.Log.w("CallForegroundService", "foreground start failed: $e")
+                android.util.Log.w("CallForegroundService", "foreground start failed: ${e.javaClass.simpleName}")
             }
         }
 
-        fun stop(context: Context) {
-            // A terminal stop also discards any queued start decision so a
-            // hang-up cannot leave a start window open behind the stop.
+        // Stop authorization decisions, factored pure so the lifecycle
+        // regression matrix (old-token stop after new-token foreground, same
+        // callId under different owner tokens, stale owner vs another owner's
+        // queued start) is JVM-testable without instrumentation timing.
+        fun stopDisposition(serving: String?, stopOwner: String?): StopDisposition = when {
+            serving == null -> StopDisposition.CLEANUP
+            stopOwner != null && stopOwner == serving -> StopDisposition.ACCEPT
+            else -> StopDisposition.IGNORE
+        }
+
+        fun shouldDiscardPendingStart(stopOwner: String?, pendingOwner: String?): Boolean =
+            stopOwner != null && stopOwner == pendingOwner
+
+        enum class StopDisposition { CLEANUP, ACCEPT, IGNORE }
+
+        private fun stopOwnerFor(ownerToken: String?, callId: String?): String? = when {
+            ownerToken != null && callId != null -> ownerToken + ":" + callId
+            ownerToken != null -> synchronized(syncLock) { lastStartedCallIdByToken[ownerToken] }?.let { ownerToken + ":" + it }
+            else -> null
+        }
+
+        fun stop(context: Context, ownerToken: String? = null, callId: String? = null) {
+            // A terminal stop also discards any queued start decision - but
+            // only one queued by the SAME owner: a stale teardown must not
+            // discard a newer call's pending start either.
             val handler = syncHandler
+            val stopOwner = stopOwnerFor(ownerToken, callId)
+            // Whole-owner teardown (app detach/dispose/account transition):
+            // do not retain that owner's tokens or session ids afterwards.
+            if (ownerToken != null && callId == null) forgetOwnerToken(ownerToken)
             if (handler != null) {
                 synchronized(syncLock) {
-                    pendingSync?.let { handler.removeCallbacks(it) }
-                    pendingSync = null
+                    if (shouldDiscardPendingStart(stopOwner, pendingSyncOwner)) {
+                        pendingSync?.let { handler.removeCallbacks(it) }
+                        pendingSync = null
+                        pendingSyncOwner = null
+                    }
                 }
             }
-            // Stop authority is scoped to the session actually being torn
-            // down: the live service's owner when known (same process), else
-            // the most recently started session. A courier that names an older
-            // owner is ignored by the service if a newer call has since
-            // started, so this teardown cannot kill it.
-            val stopOwner = currentServingOwner ?: lastStartedCallId
-            Log.i(TAG, "FGS-DIAG stop requested (courier owner=$stopOwner)")
+            // Stop authority originates from the caller: the session being
+            // disposed (ownerToken:callId), or that caller's own last-started
+            // session for whole-owner teardown (app detach/dispose). Never a
+            // process-global "current" value: a delayed old-owner teardown
+            // would otherwise be stamped with a newer call's identity and
+            // still kill it. A courier naming an older owner is ignored by
+            // the service if a newer call has since started.
+            if (com.example.chat.BuildConfig.DEBUG) Log.i(TAG, "FGS-DIAG stop requested (courier owner=${diagId(stopOwner)})")
             // Never race context.stopService against an in-flight
             // startForegroundService: if the platform processes the stop
             // first it brings the record down with the foreground
@@ -327,7 +370,7 @@ class CallForegroundService : Service() {
                 // Background-start rejection means no foreground service is
                 // running or pending, so nothing needs the courier; the
                 // legacy direct stop is then a harmless no-op.
-                android.util.Log.w("CallForegroundService", "stop courier start failed: $e")
+                android.util.Log.w("CallForegroundService", "stop courier start failed: ${e.javaClass.simpleName}")
                 try {
                     context.stopService(Intent(context, CallForegroundService::class.java))
                 } catch (_: Exception) {
