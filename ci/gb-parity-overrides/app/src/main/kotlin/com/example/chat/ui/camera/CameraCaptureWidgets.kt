@@ -340,9 +340,10 @@ fun CameraCaptureBottomControls(
                 ) {
                     items(allEffects.size) { index ->
                         val effect = allEffects[index]
-                        // Honest availability: segmentation-backed effects have no renderer
-                        // yet (bg_* no-ops); show them disabled, never as working filters.
-                        val unavailable = effect.isSegmentationRequired
+                        // Honest availability: effects with no working renderer (segmentation
+                        // bg_* + renderer-less face_pixel_retro) are disabled, never shown as working.
+                        val unavailable = effect.isSegmentationRequired ||
+                            (effect.colorMatrix == null && effect.shaderKey == null && !effect.isFaceTrackingRequired && effect.id != "none")
                         val lensId = lensIdForEffect(effect.id)
                         val isSelected = if (effect.isFaceTrackingRequired) {
                             lensId != null && lensManager.selected.id == lensId
