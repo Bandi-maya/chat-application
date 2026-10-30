@@ -143,9 +143,10 @@ class CameraModeStripProofTest {
     repeat(6){val r=d.findObject(By.desc("Camera modes")).visibleBounds;d.swipe(r.left+12,r.centerY(),r.right-12,r.centerY(),12)}
     var video:UiObject2?=null
     repeat(8){
-     video=d.findObject(By.desc("Video camera mode"))
-     if(video!=null&&video!!.visibleBounds.width()>0)break
-     val r=d.findObject(By.desc("Camera modes")).visibleBounds;d.swipe(r.right-12,r.centerY(),r.left+12,r.centerY(),12)
+     if(video==null||video!!.visibleBounds.width()<=0){
+      video=d.findObject(By.desc("Video camera mode"))
+      if(video==null||video!!.visibleBounds.width()<=0){val r=d.findObject(By.desc("Camera modes")).visibleBounds;d.swipe(r.right-12,r.centerY(),r.left+12,r.centerY(),12)}
+     }
     }
     assertTrue("Video mode reachable",video!=null)
     video!!.click()
