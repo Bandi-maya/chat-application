@@ -253,7 +253,7 @@ tasks.named("preBuild") { dependsOn(downloadFaceLandmarker) }
 // no binary in the repo, no runtime network dependency. License: Apache 2.0
 // (MediaPipe model card, storage.googleapis.com/mediapipe-models).
 val selfieSegmenterUrl =
-    "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite"
+    "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/1/selfie_segmenter.tflite"
 val selfieSegmenterSha256 =
     "191ac9529ae506ee0beefa6b2c945a172dab9d07d1e802a290a4e4038226658b"
 val selfieSegmenterSize = 249537L
