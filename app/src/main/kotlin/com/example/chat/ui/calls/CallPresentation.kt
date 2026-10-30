@@ -55,6 +55,8 @@ data class CallPresentationPreferences(
     val incomingCallTemplate: String = "chatyClassic",
     /** Persisted CallScreenTemplate name for the ongoing call screen. */
     val ongoingCallTemplate: String = "chatyClassic",
+    /** Persisted Call Experience Bundle identifier (atomic complete bundle). */
+    val callExperienceBundleId: String = "chaty_default",
 )
 
 /** Persistence seam so the store stays JVM-testable; the Android adapter
@@ -84,6 +86,7 @@ class CallPresentationPreferencesStore(
         const val LOW_DATA_USAGE_KEY = "chaty.calls.low_data_usage_enabled.v1"
         const val INCOMING_TEMPLATE_KEY = "chaty.calls.incoming_template.v1"
         const val ONGOING_TEMPLATE_KEY = "chaty.calls.ongoing_template.v1"
+        const val CALL_EXPERIENCE_BUNDLE_KEY = "chaty.calls.experience_bundle.v1"
     }
 
     private val listeners = java.util.concurrent.CopyOnWriteArrayList<() -> Unit>()
@@ -113,6 +116,7 @@ class CallPresentationPreferencesStore(
                 lowDataUsageEnabled = storage.getBool(LOW_DATA_USAGE_KEY) ?: false,
                 incomingCallTemplate = storage.getString(INCOMING_TEMPLATE_KEY) ?: "chatyClassic",
                 ongoingCallTemplate = storage.getString(ONGOING_TEMPLATE_KEY) ?: "chatyClassic",
+                callExperienceBundleId = storage.getString(CALL_EXPERIENCE_BUNDLE_KEY) ?: "chaty_default",
             )
             isInitialized = true
             notifyListeners()
@@ -153,6 +157,14 @@ class CallPresentationPreferencesStore(
         template = template,
         read = { it.ongoingCallTemplate },
         update = { it.copy(ongoingCallTemplate = template) },
+    )
+
+    /** Atomically selects and persists one of the six Call Experience Bundles. */
+    fun setCallExperienceBundle(bundleId: String) = setString(
+        key = CALL_EXPERIENCE_BUNDLE_KEY,
+        template = bundleId,
+        read = { it.callExperienceBundleId },
+        update = { it.copy(callExperienceBundleId = bundleId) },
     )
 
     private fun setString(
