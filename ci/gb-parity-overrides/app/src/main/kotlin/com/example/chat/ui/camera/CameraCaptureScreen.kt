@@ -1047,7 +1047,7 @@ fun ChatyCameraCaptureScreen(
                 if (portraitActive) androidx.compose.material3.Text("Portrait · device background blur",color=androidx.compose.ui.graphics.Color.White)
                 if (nightActive) androidx.compose.material3.Text("Night · hold still while capturing",color=androidx.compose.ui.graphics.Color.White)
                 val videoZoomReady = videoState is VideoSessionState.Ready || videoTimerActive
-                CameraZoomControls(zoomRatio,minZoom,maxZoom,enabled = phase == CameraPhase.ready && !capturing && (!videoOpen || videoZoomReady)) { requested ->
+                CameraZoomControls(zoomRatio,minZoom,maxZoom,enabled = phase == CameraPhase.ready && !capturing && (!videoOpen || videoZoomReady),forceSlider = videoTimerActive) { requested ->
                     val control = if (videoOpen) videoSession?.boundCamera()?.cameraControl else session.camera?.cameraControl
                     if (control != null) {
                         val result = control.setZoomRatio(clampCameraZoom(requested,minZoom,maxZoom))
