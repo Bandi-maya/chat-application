@@ -38,6 +38,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -311,6 +312,9 @@ fun EffectPickerSheet(
                     val effect = list[i]
                     val isSelected = engine.activeEffect.id == effect.id
                     val isFavorite = favorites.contains(effect.id)
+                    // INTEGRATOR (honest availability): segmentation-backed effects have
+                    // no renderer yet (bg_* no-ops) — disabled, dimmed, never selectable.
+                    val unavailable = effect.isSegmentationRequired
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
@@ -318,8 +322,10 @@ fun EffectPickerSheet(
                             .pointerInput(effect.id) {
                                 detectTapGestures(
                                     onTap = {
-                                        ChatyHapticsPort.selection(view)
-                                        engine.selectEffect(effect)
+                                        if (!unavailable) {
+                                            ChatyHapticsPort.selection(view)
+                                            engine.selectEffect(effect)
+                                        }
                                     },
                                     onLongPress = {
                                         if (effect.id != "none") {
@@ -332,6 +338,7 @@ fun EffectPickerSheet(
                             .semantics(mergeDescendants = true) {
                                 contentDescription = "${effect.name} filter"
                                 this.selected = isSelected
+                                if (unavailable) stateDescription = "Not available yet"
                             },
                     ) {
                         Box(contentAlignment = Alignment.Center) {
@@ -339,7 +346,7 @@ fun EffectPickerSheet(
                                 modifier = Modifier
                                     .size(swatch)
                                     .clip(CircleShape)
-                                    .background(effect.previewColor.copy(alpha = 0.18f))
+                                    .background(effect.previewColor.copy(alpha = if (unavailable) 0.06f else 0.18f))
                                     .border(
                                         width = if (isSelected) 3.dp else 1.dp,
                                         color = if (isSelected) colors.primary else colors.border,
@@ -350,7 +357,11 @@ fun EffectPickerSheet(
                                 EffectGlyph(
                                     id = effect.id,
                                     category = effect.category,
-                                    color = if (isSelected) colors.primary else effect.previewColor,
+                                    color = when {
+                                        unavailable -> colors.disabledForeground
+                                        isSelected -> colors.primary
+                                        else -> effect.previewColor
+                                    },
                                     size = if (tight) 22.dp else 26.dp,
                                 )
                             }
