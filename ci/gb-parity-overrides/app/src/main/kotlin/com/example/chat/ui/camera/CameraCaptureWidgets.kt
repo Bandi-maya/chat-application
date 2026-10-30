@@ -492,12 +492,7 @@ fun CameraCaptureBottomControls(
                         .semantics { contentDescription = "Browse all lenses" },
                     contentAlignment = Alignment.Center,
                 ) {
-                    androidx.compose.material3.Icon(
-                        androidx.compose.material.icons.Icons.Rounded.Apps,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp),
-                    )
+                    CameraGlyph(kind = "browse_grid", color = Color.White, size = 20.dp)
                 }
                 }
                 Spacer(Modifier.height((if (tight) 1 else 4).dp))
