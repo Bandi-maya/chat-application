@@ -39,10 +39,13 @@ internal object CameraVideoNativeProof {
     /** Instrumentation-only: simulate a device that cannot bind the 3-use-case
      *  combination so tests can prove the no-snapshot fallback path. */
     @Volatile var forceSnapshotUnavailable: Boolean = false
+    /** Instrumentation-only: skip both effect bind attempts so tests can isolate
+     *  plain Preview+VideoCapture recording from the effect pipeline. */
+    @Volatile var forceEffectUnavailable: Boolean = false
     // DEBUG-only: emulator cameras see no real face, so tests inject a synthetic
     // pose to prove the recorded-video compositing path with real output pixels.
     @Volatile var fakeLensPoses: List<FacePose>? = null
-    fun reset() { beforeBind=null; observe=null; forceSnapshotUnavailable=false; fakeLensPoses=null }
+    fun reset() { beforeBind=null; observe=null; forceSnapshotUnavailable=false; forceEffectUnavailable=false; fakeLensPoses=null }
 }
 
 /** Main-thread API. Caller must release its image/analysis use cases BEFORE binding.
@@ -175,7 +178,8 @@ class CameraVideoSession(
                 } catch (_: Exception) { null }
                 var actual: androidx.camera.core.Camera? = null
                 var lensEffectActive = false
-                if (wantSnapshot) {
+                val wantEffect = !(com.example.chat.BuildConfig.DEBUG && CameraVideoNativeProof.forceEffectUnavailable)
+                if (wantSnapshot && wantEffect) {
                     val snap = ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build()
                     actual = bindWithEffect(snap)
                     if (actual != null) { snapshot = snap; lensEffectActive = true }
@@ -183,7 +187,7 @@ class CameraVideoSession(
                 // Plain-recording fallback: devices rejecting the effect bind still
                 // record video rather than failing the camera outright, with the UI
                 // told the lens will NOT be in the recording (lensEffectActive=false).
-                if (actual == null) actual = bindWithEffect().also { if (it != null) lensEffectActive = true }
+                if (actual == null && wantEffect) actual = bindWithEffect().also { if (it != null) lensEffectActive = true }
                 if (actual == null) actual = p.bindToLifecycle(owner, selector, view, video)
                 boundFront = CameraSelector.DEFAULT_FRONT_CAMERA.filter(listOf(actual.cameraInfo)).isNotEmpty()
                 provider = p; preview = view; capture = video; camera = actual
