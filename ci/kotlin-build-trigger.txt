@@ -1,1 +1,2 @@
 build 109: CameraEffect 5-arg LIBRARY_GROUP protected constructor (TRANSFORMATION_ARBITRARY)
+trigger-110: record-proof + non-restricted-ctor + fake-surface-output fix
