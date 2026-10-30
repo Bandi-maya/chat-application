@@ -116,7 +116,11 @@ class CameraVideoSession(
                 // every device supports: try the 3-use-case bind first and fall
                 // back to video-only, reporting real availability in Ready so the
                 // UI never draws a dead snapshot button.
-                val wantSnapshot = !(com.example.chat.BuildConfig.DEBUG && CameraVideoNativeProof.forceSnapshotUnavailable)
+                // Gallery save uses scoped storage (API 29+); below that a public
+                // Pictures write needs a permission this app does not request, so
+                // the snapshot combination is only attempted where saving can work.
+                val canSaveSnapshot = android.os.Build.VERSION.SDK_INT >= 29
+                val wantSnapshot = canSaveSnapshot && !(com.example.chat.BuildConfig.DEBUG && CameraVideoNativeProof.forceSnapshotUnavailable)
                 var actual: androidx.camera.core.Camera? = null
                 if (wantSnapshot) {
                     val snap = ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build()
@@ -199,6 +203,7 @@ class CameraVideoSession(
         checkMain()
         val snap = snapshot
         if (snap == null || !auth.isCurrent() || closed || recording == null) { onResult(false); return }
+        if (android.os.Build.VERSION.SDK_INT < 29) { onResult(false); return }
         val values = android.content.ContentValues().apply {
             put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, "chaty-recording-${System.currentTimeMillis()}.jpg")
             put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
