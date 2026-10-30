@@ -129,7 +129,7 @@ fun CameraCaptureViewfinder(
             },
             modifier = Modifier.align(Alignment.Center)
                 .then(if (previewAspect != null) Modifier.fillMaxWidth().aspectRatio(previewAspect) else Modifier.fillMaxSize())
-                .then(effectMatrixModifier(effect, effectIntensity)),
+                .then(effectRenderModifier(effect, effectIntensity)),
         )
         when (phase) {
             CameraPhase.initializing -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -340,8 +340,7 @@ fun CameraCaptureBottomControls(
                 ) {
                     items(allEffects.size) { index ->
                         val effect = allEffects[index]
-                        // Honest availability: effects with no working renderer (segmentation
-                        // bg_* + renderer-less face_pixel_retro) are disabled, never shown as working.
+                        // Honest availability: effects with no working renderer (segmentation bg_* no-ops) are disabled, never shown as working.
                         val unavailable = effect.isSegmentationRequired ||
                             (effect.colorMatrix == null && effect.shaderKey == null && !effect.isFaceTrackingRequired && effect.id != "none")
                         val lensId = lensIdForEffect(effect.id)
@@ -482,15 +481,14 @@ fun CameraCaptureBottomControls(
                 }
                 }
                 Spacer(Modifier.height((if (tight) 1 else 4).dp))
-                LensCarousel(manager = lensManager, deviceTier = deviceTier)
-                Spacer(Modifier.height((if (tight) 4 else 10).dp))
             }
-            // Gallery / shutter / flip.
+            // Snap-style inline row (verified reference): gallery, shutter, then the
+            // lens carousel scrolling on the SAME row, flip at the far edge. Gallery
+            // and flip keep their existing capabilities and safe-area padding.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = (if (tight) 16 else 24).dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .padding(horizontal = (if (tight) 12 else 16).dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(
@@ -504,6 +502,9 @@ fun CameraCaptureBottomControls(
                     CameraGlyph(kind = "gallery", color = Color.White, size = 27.dp)
                 }
                 CameraCaptureShutter(enabled = ready, capturing = capturing, onClick = onShutter)
+                Box(Modifier.weight(1f)) {
+                    LensCarousel(manager = lensManager, deviceTier = deviceTier)
+                }
                 Box(
                     modifier = Modifier
                         .size((if (tight) 48 else 52).dp)
