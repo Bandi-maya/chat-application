@@ -1,3 +1,4 @@
 build 109: CameraEffect 5-arg LIBRARY_GROUP protected constructor (TRANSFORMATION_ARBITRARY)
 trigger-110: record-proof + non-restricted-ctor + fake-surface-output fix
 trigger-111: FGS end-call coalesced sync fix (CallForegroundService)
+trigger-112: crop requiredSize + crop capture-before-assert + nav dump evidence + FGS delivery diag logging
