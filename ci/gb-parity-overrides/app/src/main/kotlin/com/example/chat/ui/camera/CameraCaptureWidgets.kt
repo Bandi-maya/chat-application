@@ -57,6 +57,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -90,6 +92,7 @@ fun CameraCaptureViewfinder(
     captureViewMode: CaptureViewMode,
     effect: ChatyCameraEffect,
     effectIntensity: Double,
+    segmentPreview: android.graphics.Bitmap? = null,
     onPreviewView: (PreviewView) -> Unit,
     onViewport: (LensSize) -> Unit,
     lens: LensDefinition,
@@ -132,6 +135,19 @@ fun CameraCaptureViewfinder(
                 .then(if (previewAspect != null) Modifier.fillMaxWidth().aspectRatio(previewAspect) else Modifier.fillMaxSize())
                 .then(effectRenderModifier(effect, effectIntensity)),
         )
+        // Live segmented background preview (bg_*): the composited analysis
+        // frame covers the raw preview surface while a segment effect is
+        // active. Best effort - when no composited frame exists yet (or the
+        // segmenter fails open) the unfiltered preview shows through.
+        if (segmentPreview != null && effect.shaderKey?.startsWith("segment_") == true) {
+            Image(
+                bitmap = segmentPreview.asImageBitmap(),
+                contentDescription = "Live background filter preview",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.align(Alignment.Center)
+                    .then(if (previewAspect != null) Modifier.fillMaxWidth().aspectRatio(previewAspect) else Modifier.fillMaxSize()),
+            )
+        }
         when (phase) {
             CameraPhase.initializing -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = Color(0xB3FFFFFF))
@@ -342,11 +358,10 @@ fun CameraCaptureBottomControls(
                     items(allEffects.size) { index ->
                         val effect = allEffects[index]
                         // Honest availability: effects with no working renderer are
-                        // disabled, never shown as working. Segmented background effects
-                        // render on the captured photo (no live segmented preview yet).
+                        // disabled, never shown as working. Segmented background
+                        // effects preview live (best effort) and bake at capture.
                         val unavailable = effect.colorMatrix == null && effect.shaderKey == null &&
                             !effect.isFaceTrackingRequired && effect.id != "none"
-                        val captureOnly = effect.isSegmentationRequired && !unavailable
                         val lensId = lensIdForEffect(effect.id)
                         val isSelected = if (effect.isFaceTrackingRequired) {
                             lensId != null && lensManager.selected.id == lensId
@@ -363,7 +378,7 @@ fun CameraCaptureBottomControls(
                             modifier = Modifier
                                 .padding(horizontal = 5.dp)
                                 .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (unavailable) 0.45f else 1f }
-                                .semantics { if (unavailable) stateDescription = "Not available yet" else if (captureOnly) stateDescription = "Applies to the captured photo" }
+                                .semantics { if (unavailable) stateDescription = "Not available yet" }
                                 .clickable(enabled = !unavailable) { onSelectEffect(effect) },
                         ) {
                             Box(
