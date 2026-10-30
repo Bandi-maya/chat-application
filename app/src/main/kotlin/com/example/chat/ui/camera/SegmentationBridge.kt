@@ -19,11 +19,11 @@ import java.nio.ByteOrder
  * downloadSelfieSegmenter gradle task into the app assets - the same contract
  * as face_landmarker (FaceDetectionBridge). No runtime network access.
  *
- * Used on the CAPTURE path (ImageFxBaker): the live preview renders these
- * effects unfiltered (documented deviation, same contract class as the
- * matrix path below API 31); the captured photo carries the real segmented
- * background effect. Mask failures fail open: the photo saves unfiltered
- * rather than corrupt or block the capture.
+ * Used on BOTH paths: the live preview composites through LiveSegmentPreview
+ * (best effort - failures leave the viewfinder unfiltered) and the capture
+ * path bakes through ImageFxBaker (exact, full resolution). Mask failures fail
+ * open: the preview and photo stay unfiltered rather than corrupt or block
+ * the capture, and a failed bake never claims the filter was applied.
  */
 class SegmentationBridge(private val context: Context) {
 
